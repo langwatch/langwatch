@@ -4,7 +4,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { evaluationPassed, evaluationStatusColor } from "@langwatch/evaluator-browser-kit";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { formatDistanceToNow } from "@langwatch/time";
 import { readableDate } from "@langwatch/trace-browser-kit";
 import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
@@ -207,7 +207,7 @@ export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation
   const { project } = useOrganizationTeamProject();
   const checkType = check.type as EvaluatorTypes;
 
-  const evaluator = getEvaluatorDefinitions(checkType);
+  const [evaluator] = findEvaluatorDefinitions(checkType);
 
   const isEvaluatorTable = check.evaluator_id?.startsWith("evaluator_");
 

@@ -30,7 +30,7 @@ import {
   evaluatorTypesSchema,
   getEvaluatorDefaultSettings,
   type EvaluatorDefinition,
-  getEvaluatorDefinitions,
+  findEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-browser-kit";
@@ -625,7 +625,7 @@ function applyEvaluatorDefaults({
   evaluatorDefinition: EvaluatorDefinition | undefined;
   resolvedModels: { defaultModel: string | null; embeddingsModel: string | null };
 }) {
-  const defaultName = getEvaluatorDefinitions(checkType)?.name;
+  const defaultName = findEvaluatorDefinitions(checkType)[0]?.name;
   const allDefaultNames = Object.values(availableEvaluators).map((evaluator) =>
     evaluatorDisplayName(evaluator.name),
   );

@@ -3,7 +3,7 @@ import {
   PRECONDITION_FIELD_MATCHERS,
   type PreconditionTraceData,
 } from "@langwatch/analytics-contract";
-import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import {
   extractRAGTextualContext,
   type CheckPreconditionRule,
@@ -84,7 +84,7 @@ export function checkEvaluatorRequiredFields({
   spans: readonly Span[];
   expectedOutput?: { value: string } | null;
 }): boolean {
-  const evaluator = getEvaluatorDefinitions(evaluatorType);
+  const [evaluator] = findEvaluatorDefinitions(evaluatorType);
   const hasContexts = spans.some(
     (span) =>
       span.type === "rag" &&

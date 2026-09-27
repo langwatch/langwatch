@@ -3,6 +3,8 @@ export interface SubsystemProbeRequest {
   readonly path: string;
   readonly headers: Readonly<Record<string, string>>;
   readonly body?: string;
+  /** The caller's own signal: the request that asked for the probe. */
+  readonly signal: AbortSignal | undefined;
 }
 
 /** The deployment's public boundary, as the canaries reach it. */

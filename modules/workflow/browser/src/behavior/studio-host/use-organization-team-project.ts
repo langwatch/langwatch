@@ -3,7 +3,7 @@
  */
 
 import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
-import { Temporal, toDate } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 import { useWorkflowHost, type WorkflowCopyTarget } from "@langwatch/workflow-browser-kit";
 import type { Project } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
@@ -74,8 +74,8 @@ export function useOrganizationTeamProject(
           framework: "",
           firstMessage: false,
           integrated: false,
-          createdAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
-          updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
+          createdAt: Temporal.Instant.fromEpochMilliseconds(0),
+          updatedAt: Temporal.Instant.fromEpochMilliseconds(0),
         }
       : void 0;
 

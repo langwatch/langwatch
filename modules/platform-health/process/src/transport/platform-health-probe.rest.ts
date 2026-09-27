@@ -41,8 +41,8 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
   .withHeaders(healthProbeHeadersSchema)
   .withResponse("forwarded", FORWARDED)
   .withDocs({ hide: true })
-  .handle(async ({ app, response }, headers) =>
-    response.pass(await app.probeWithProjectKey({ check: "collector", headers })),
+  .handle(async ({ app, response, signal }, headers) =>
+    response.pass(await app.probeWithProjectKey({ check: "collector", headers, signal })),
   )
 
   .get("/api/health/evaluations", "probeEvaluationsHealth")
@@ -50,8 +50,8 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
   .withHeaders(healthProbeHeadersSchema)
   .withResponse("forwarded", FORWARDED)
   .withDocs({ hide: true })
-  .handle(async ({ app, response }, headers) =>
-    response.pass(await app.probeWithProjectKey({ check: "evaluations", headers })),
+  .handle(async ({ app, response, signal }, headers) =>
+    response.pass(await app.probeWithProjectKey({ check: "evaluations", headers, signal })),
   )
 
   .get("/api/health/processor", "probeProcessorHealth")
@@ -59,8 +59,8 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
   .withHeaders(healthProbeHeadersSchema)
   .withResponse("forwarded", FORWARDED)
   .withDocs({ hide: true })
-  .handle(async ({ app, response }, headers) =>
-    response.pass(await app.probeWithProjectKey({ check: "processor", headers })),
+  .handle(async ({ app, response, signal }, headers) =>
+    response.pass(await app.probeWithProjectKey({ check: "processor", headers, signal })),
   )
 
   .get("/api/health/triggers", "probeTriggersHealth")
@@ -69,12 +69,13 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
   .withHeaders(healthProbeHeadersSchema)
   .withResponse("forwarded", FORWARDED)
   .withDocs({ hide: true })
-  .handle(async ({ app, input, response }, headers) =>
+  .handle(async ({ app, input, response, signal }, headers) =>
     response.pass(
       await app.probeWithProjectKey({
         check: "triggers",
         headers,
         triggerId: input.triggerId,
+        signal,
       }),
     ),
   )
@@ -85,12 +86,13 @@ export const platformHealthProbeRest = defineRestRouter(PlatformHealthProbeApi)
   .withHeaders(healthProbeHeadersSchema)
   .withResponse("forwarded", FORWARDED)
   .withDocs({ hide: true })
-  .handle(async ({ app, input, response }, headers) =>
+  .handle(async ({ app, input, response, signal }, headers) =>
     response.pass(
       await app.probeWithProjectKey({
         check: "workflows",
         headers,
         workflowId: input.workflowId,
+        signal,
       }),
     ),
   )

@@ -10,7 +10,7 @@ import {
   evaluatorSchema,
   evaluatorTypeSchema,
   getEvaluatorDefaultSettings,
-  getEvaluatorDefinitions,
+  findEvaluatorDefinitions,
   isNativeEvaluatorType,
   isCodeEvaluatorCheckType,
 } from "../index.ts";
@@ -86,6 +86,6 @@ describe("evaluator contract", () => {
     expect(AVAILABLE_EVALUATORS["langevals/exact_match"]).toBeDefined();
     expect(isNativeEvaluatorType(API_KEYS_AND_SECRETS_DETECTION)).toBe(true);
     expect(isNativeEvaluatorType("presidio/pii_detection")).toBe(false);
-    expect(getEvaluatorDefinitions(API_KEYS_AND_SECRETS_DETECTION)).toBe(native);
+    expect(findEvaluatorDefinitions(API_KEYS_AND_SECRETS_DETECTION)).toEqual([native]);
   });
 });

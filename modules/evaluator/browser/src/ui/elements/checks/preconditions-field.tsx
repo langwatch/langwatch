@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { X } from "react-feather";
 import { useFormContext } from "react-hook-form";
 
@@ -38,7 +38,7 @@ export const PreconditionsField = ({
   const preconditions = watch("preconditions");
   const checkType = watch("checkType");
 
-  const evaluator = getEvaluatorDefinitions(checkType);
+  const [evaluator] = findEvaluatorDefinitions(checkType);
   const fieldGroups = getFieldOptionsByCategory();
 
   const handleFieldChange = (index: number, newField: string) => {

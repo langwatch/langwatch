@@ -1,5 +1,5 @@
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { EvaluationTraceEvent, EvaluationTraceSpan } from "@langwatch/trace-contract";
 import safe from "safe-regex2";
 import { z } from "zod";
@@ -90,7 +90,7 @@ export class EvaluationPreconditionService {
     evaluatorType: string;
     spans: EvaluationTraceSpan[];
   }): boolean {
-    const evaluator = getEvaluatorDefinitions(input.evaluatorType);
+    const [evaluator] = findEvaluatorDefinitions(input.evaluatorType);
 
     return (
       !evaluator?.requiredFields.includes("contexts") ||

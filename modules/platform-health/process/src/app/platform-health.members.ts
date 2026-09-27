@@ -10,8 +10,15 @@ export type SubsystemProbeResult = Readonly<
   | { outcome: "not_configured"; detail: string }
 >;
 
+/** What a probe is asked about, and the caller's request its canaries stop with. */
+export type SubsystemProbeQuery = Readonly<{
+  triggerId?: string;
+  workflowId?: string;
+  signal: AbortSignal | undefined;
+}>;
+
 /** One subsystem, asked whether it is working right now. */
 export interface SubsystemProbe {
   readonly name: PlatformHealthCheckName;
-  run(query: Readonly<{ triggerId?: string; workflowId?: string }>): Promise<SubsystemProbeResult>;
+  run(query: SubsystemProbeQuery): Promise<SubsystemProbeResult>;
 }

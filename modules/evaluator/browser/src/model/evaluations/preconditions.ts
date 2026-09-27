@@ -4,7 +4,7 @@ import {
   type PreconditionTraceData,
 } from "@langwatch/analytics-contract";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability/browser";
 import { extractRAGTextualContext } from "@langwatch/trace-contract";
 import type {
@@ -194,7 +194,7 @@ export function checkEvaluatorRequiredFields({
   spans: { type: string; model?: string | null }[];
   expectedOutput?: { value: string } | null;
 }): boolean {
-  const evaluator = getEvaluatorDefinitions(evaluatorType);
+  const [evaluator] = findEvaluatorDefinitions(evaluatorType);
 
   const requiresContexts = evaluator?.requiredFields.includes("contexts");
   if (
