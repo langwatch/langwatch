@@ -73,6 +73,7 @@ export type {
   UiEvaluatorGateConfig,
   UiEvaluatorListDrawerProps,
   UiEvaluatorMappingsConfig,
+  UiOnlineEvaluationDrawerProps,
   UiWorkflowSelectorForEvaluatorDrawerProps,
 } from "./model/evaluator-drawers.ts";
 export type { UiAutomationDrawerProps } from "./model/automation-drawers.ts";

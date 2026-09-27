@@ -118,3 +118,11 @@ export type UiWorkflowSelectorForEvaluatorDrawerProps = {
   /** Name for the new evaluator (optional, prompts if not provided) */
   evaluatorName?: string;
 };
+
+/** What a caller hands evaluator's online-evaluation drawer: the monitor to edit, if any. */
+export type UiOnlineEvaluationDrawerProps = {
+  open?: boolean;
+  onClose?: () => void;
+  onSave?: () => void;
+  monitorId?: string;
+};

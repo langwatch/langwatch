@@ -17,6 +17,7 @@ import {
   getDrawerStack,
   navigateToDrawer,
   setFlowCallbacks,
+  type UiOnlineEvaluationDrawerProps,
   useDrawer,
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
@@ -75,13 +76,7 @@ import { serializeMappingsToMappingState } from "../../../model/evaluations/seri
 
 export type EvaluationLevel = "trace" | "thread" | null;
 
-export type OnlineEvaluationDrawerProps = {
-  open?: boolean;
-  onClose?: () => void;
-  onSave?: () => void;
-  /** If provided, loads an existing monitor for editing */
-  monitorId?: string;
-};
+export type OnlineEvaluationDrawerProps = UiOnlineEvaluationDrawerProps;
 
 /** Auto-inferred mappings for standard evaluator fields */
 const AUTO_INFER_MAPPINGS: Record<string, keyof typeof TRACE_MAPPINGS> = {

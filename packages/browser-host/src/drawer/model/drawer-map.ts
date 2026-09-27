@@ -19,6 +19,7 @@ import type {
   UiEvaluatorCategorySelectorDrawerProps,
   UiEvaluatorEditorDrawerProps,
   UiEvaluatorListDrawerProps,
+  UiOnlineEvaluationDrawerProps,
   UiWorkflowSelectorForEvaluatorDrawerProps,
 } from "./evaluator-drawers.ts";
 import type { UiFoundryDrawerProps } from "./ops-drawers.ts";
@@ -43,6 +44,7 @@ export type UiDrawerMap = {
   evaluatorList: UiEvaluatorListDrawerProps;
   foundry: UiFoundryDrawerProps;
   inviteMember: UiInviteMemberDrawerProps;
+  onlineEvaluation: UiOnlineEvaluationDrawerProps;
   promptEditor: UiPromptEditorDrawerProps;
   promptList: UiPromptListDrawerProps;
   scenarioRunDetail: UiScenarioRunDetailDrawerProps;
