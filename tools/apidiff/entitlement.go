@@ -178,7 +178,7 @@ func (engine *probeEngine) entitledProbe(operation Operation) []Finding {
 // mirror (platform/app/scripts/localDevLicense.ts) carries the identical
 // string — verified byte-for-byte when this pass was written — so reading it
 // once from the branch checkout is enough to activate BOTH sides' databases.
-const localDevLicenseSeedPath = "enterprise/modules/licensing/process/src/seeding.ts"
+const localDevLicenseSeedPath = "apps/tasks/src/storage-seed/seed-license.ts"
 
 // localDevLicenseKeyPattern extracts LOCAL_DEV_ENTERPRISE_LICENSE_KEY's
 // quoted value. Copying the constant's VALUE into Go would silently go
