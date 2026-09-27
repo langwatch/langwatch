@@ -1,9 +1,11 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The month's usage reading, as every usage surface receives it.
  *
  * Spec: ../../../../specs/usage-stats-reporting.feature
  */
 import { usageStatsSchema, type Plan, type PlanProvider } from "@langwatch/entitlement-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import type { UsageCounter, UsageCount } from "../../app/entitlement.members.ts";
@@ -27,12 +29,6 @@ function planWith(maxMessagesPerMonth: number): Plan {
 }
 
 class StubMembership implements UsageMembershipRepository {
-  async getMemberCount(): Promise<number> {
-    return 3;
-  }
-  async getMembersLiteCount(): Promise<number> {
-    return 1;
-  }
   async findCurrentMonthCost(): Promise<number> {
     return 12.5;
   }
@@ -58,6 +54,9 @@ function serviceOn(plan: Plan, count: UsageCount = 4_200): UsageStatsService {
   const plans: PlanProvider = { getActivePlan: async () => plan };
   return UsageStatsService.create({
     membership: new StubMembership(),
+    seats: createApiFixture<Pick<OrganizationApi, "countMemberSeats">>({
+      countMemberSeats: async () => ({ fullMembers: 3, liteMembers: 1 }),
+    }),
     counter: new StubCounter(count),
     plans,
   });

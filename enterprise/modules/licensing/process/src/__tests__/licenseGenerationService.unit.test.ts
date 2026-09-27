@@ -250,12 +250,12 @@ describe("generateLicenseKey", () => {
       expect(licenseData.issuedAt).toBe("2025-06-15T12:00:00.000Z");
     });
 
-    it("generates a unique licenseId with lic- prefix", () => {
+    it("generates a unique KSUID licenseId on the license resource", () => {
       const { licenseData: first } = generateLicenseKey(baseParams);
       const { licenseData: second } = generateLicenseKey(baseParams);
 
-      expect(first.licenseId).toMatch(/^lic-/);
-      expect(second.licenseId).toMatch(/^lic-/);
+      expect(first.licenseId).toMatch(/^license_[0-9A-Za-z]+$/);
+      expect(second.licenseId).toMatch(/^license_[0-9A-Za-z]+$/);
       expect(first.licenseId).not.toBe(second.licenseId);
     });
 

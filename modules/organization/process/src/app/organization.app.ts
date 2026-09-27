@@ -107,6 +107,7 @@ import {
   type OrganizationMemberProvenance,
   type OrganizationGroupService,
   type OrganizationFounding,
+  type OrganizationMemberSeats,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
@@ -116,6 +117,7 @@ import { ShareApi } from "@langwatch/share-contract";
 import type { Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
+import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
@@ -233,6 +235,8 @@ export type OrganizationInfrastructure = Readonly<{
   diagnostics?: PersonalWorkspaceDiagnostics;
   prompts: OrganizationPromptSeed;
   seats: OrganizationSeatLicense;
+  /** The full and lite seats an organization holds, as a licence and a plan count them. */
+  seatCounts: OrganizationSeatRepository;
   /** The invitations this deployment administers, or none. */
   invitations: OrganizationInvitations | null;
   /**
@@ -451,6 +455,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       directory: refusing<OrganizationDirectory>("identity directory"),
       settingsSecrets: refusing<OrganizationSettingsSecret>("settings cipher"),
       demoProject: { userId: "", projectId: "" },
+      seatCounts: refusing<OrganizationSeatRepository>("seat counts"),
       invitations: null,
       inviteCreationThrottle: refusing<InviteCreationThrottleService>("invite creation throttle"),
       joinRequests: null,
@@ -1410,6 +1415,16 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     input: Readonly<{ organizationId: string; subscriptionIds: readonly string[] }>,
   ): Promise<void> {
     return this.#invitations.cancelPaymentPending(input);
+  }
+
+  async countMemberSeats(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationMemberSeats> {
+    const [fullMembers, liteMembers] = await Promise.all([
+      this.#members.seatCounts.getMemberCount(input.organizationId),
+      this.#members.seatCounts.getMembersLiteCount(input.organizationId),
+    ]);
+    return { fullMembers, liteMembers };
   }
 
   approvePaymentPendingInvites(

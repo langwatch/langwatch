@@ -58,6 +58,12 @@ Feature: Enterprise licensing lifecycle
       When an organization uploads it
       Then it activates as it always did
 
+    @unit
+    Scenario: A licence minted as lic-<uuid> keeps verifying once new licences carry KSUIDs
+      Given a licence main signed, whose id is lic-<uuid>
+      When this branch validates it beside a licence it minted with a KSUID id
+      Then both verify, each under its own id
+
   Rule: An installation licensed by an organization key is a licensed installation
 
     A self-hosted deployment is licensed either by an instance key or by a key

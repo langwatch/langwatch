@@ -119,7 +119,7 @@ type EntitlementDependencies = EntitlementSetup["dependencies"];
  * directory alone. `license` is consumed once, by `create`, to build
  * {@link EntitlementInfrastructure} — a hand-built test app needs no license source.
  */
-type EntitlementCallerLookup = Pick<EntitlementDependencies, "users">;
+type EntitlementCallerLookup = Pick<EntitlementDependencies, "users" | "organizations">;
 
 /** What a plan allows, and what has been used and spent against it. */
 export class EntitlementApp implements EntitlementApiContract {
@@ -160,6 +160,7 @@ export class EntitlementApp implements EntitlementApiContract {
     this.#plans = EntitlementService.create(members);
     this.#usage = UsageStatsService.create({
       membership: repositories.membership,
+      seats: dependencies.organizations,
       counter: members.counter,
       plans: this.#plans,
     });

@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
@@ -38,7 +39,10 @@ describe("licensing infrastructure composed without licence mutation", () => {
   /** @scenario "A process that composes no licence mutation still scans the licence rows" */
   it("accepts a key activated on an organization when no instance key is set", async () => {
     const app = await LicensingApp.create({
-      dependencies: { gateway: createApiFixture<GatewayApi>() },
+      dependencies: {
+        gateway: createApiFixture<GatewayApi>(),
+        organizations: createApiFixture<OrganizationApi>(),
+      },
       members: { infrastructure: composeWithoutMutation(), isSaas: false, serviceVersion: "test" },
       config: TEST_LICENSING_CONFIG,
       resources: new ResourceScope(),

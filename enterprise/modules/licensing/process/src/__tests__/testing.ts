@@ -12,6 +12,7 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { planQuantities } from "@langwatch/plans";
 import { ScopedSecrets } from "@langwatch/secrets";
 
@@ -180,7 +181,10 @@ export function createTestLicensingApp(
   notifyLimitReached: LicensingInfrastructure["notifyLimitReached"] = async () => {},
 ): Promise<LicensingApp> {
   return LicensingApp.create({
-    dependencies: { gateway: createApiFixture<GatewayApi>() },
+    dependencies: {
+      gateway: createApiFixture<GatewayApi>(),
+      organizations: createApiFixture<OrganizationApi>(),
+    },
     members: {
       infrastructure: {
         repository: new TestLicenseStorage(),

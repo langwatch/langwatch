@@ -45,9 +45,6 @@
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
-      "path": "../../entitlement/process/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {

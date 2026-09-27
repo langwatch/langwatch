@@ -14,6 +14,7 @@ import {
   type ValidationResult,
 } from "@langwatch/enterprise-licensing-contract";
 import { LICENSE_TOKEN_PREFIX } from "@langwatch/gateway-contract";
+import { generate } from "@langwatch/ksuid";
 import { nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 
 import { type LicenseCryptography } from "../app/licensing.members.ts";
@@ -182,13 +183,14 @@ export class NodeLicenseCryptographyService implements LicenseCryptography {
     return Buffer.from(JSON.stringify(signedLicense), "utf-8").toString("base64");
   }
 
+  /** New licences carry KSUIDs; one minted as `lic-<uuid>` still verifies (Alex, 2026-09-27). */
   generateLicenseId(): string {
-    return `lic-${crypto.randomUUID()}`;
+    return generate("license").toString();
   }
 
-  /** ADR-156 section 6: a bare UUID, because it is what an install presents. */
+  /** ADR-156: what an install presents; new instances mint KSUIDs, older UUIDs keep working. */
   generateInstanceId(): string {
-    return crypto.randomUUID();
+    return generate("instance").toString();
   }
 
   /**

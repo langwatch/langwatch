@@ -57,9 +57,9 @@ import {
   type GenerateLicenseOutput,
 } from "@langwatch/enterprise-licensing-contract";
 import type { ResolvePlanInput } from "@langwatch/entitlement-contract";
-import { PrismaUsageMembershipRepository } from "@langwatch/entitlement-process";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, Temporal } from "@langwatch/time";
 
@@ -103,14 +103,15 @@ import type {
   LicenseUsage,
 } from "./licensing.members.ts";
 
-/** Seat counts entitlement already keeps: a peer's own read, not a licence mutation. */
-function seatCountsOverPrisma(
-  database: Parameters<typeof PrismaUsageMembershipRepository.create>[0],
+/** Seat counts are organization's: one peer read, the same count its own seat checks use. */
+function seatCountsOver(
+  organizations: Pick<OrganizationApi, "countMemberSeats">,
 ): Pick<LicensingInfrastructure["repository"], "getMemberCount" | "getMembersLiteCount"> {
-  const memberships = PrismaUsageMembershipRepository.create(database);
   return {
-    getMemberCount: (organizationId) => memberships.getMemberCount(organizationId),
-    getMembersLiteCount: (organizationId) => memberships.getMembersLiteCount(organizationId),
+    getMemberCount: async (organizationId) =>
+      (await organizations.countMemberSeats({ organizationId })).fullMembers,
+    getMembersLiteCount: async (organizationId) =>
+      (await organizations.countMemberSeats({ organizationId })).liteMembers,
   };
 }
 
@@ -203,6 +204,8 @@ export class LicensingApp implements LicensingApiContract {
   static readonly dependencies = {
     /** Where an install's hosted provider slot is kept: a gateway fact licensing writes. */
     gateway: GatewayApi,
+    /** Whose memberships a licence's seats are counted from. */
+    organizations: OrganizationApi,
   };
   static readonly config = licensingConfig;
   /** `LANGWATCH_LICENSE_KEY` has one owner: SSO's gate asks this module, never the secret. */
@@ -287,7 +290,7 @@ export class LicensingApp implements LicensingApiContract {
         ? members.infrastructure
         : partial.withoutMutation({
             licenses: PrismaOrganizationLicenseRepository.create(members.prisma),
-            ...seatCountsOverPrisma(members.prisma),
+            ...seatCountsOver(dependencies.organizations),
           });
     const {
       repository,

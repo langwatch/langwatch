@@ -10,6 +10,7 @@ import type {
   PlanProviderUser,
   UsageStats,
 } from "@langwatch/entitlement-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import { USAGE_UNKNOWN, type UsageCounter } from "../app/entitlement.members.ts";
 import type { UsageMembershipRepository } from "../repositories/usage-membership.repository.ts";
@@ -49,23 +50,33 @@ export const MESSAGE_LIMIT_WARNING_THRESHOLD = 0.8;
 /** The operator a plan is resolved for. */
 export type UsageStatsCaller = PlanProviderUser;
 
+type UsageStatsSources = {
+  membership: UsageMembershipRepository;
+  /** Seats are organization's: the same count a licence and an invitation check read. */
+  seats: Pick<OrganizationApi, "countMemberSeats">;
+  counter: UsageCounter;
+  plans: PlanProvider;
+};
+
 /**
  * Service for retrieving organization usage statistics.
  */
 export class UsageStatsService {
-  static create(options: {
-    membership: UsageMembershipRepository;
-    counter: UsageCounter;
-    plans: PlanProvider;
-  }): UsageStatsService {
-    return new UsageStatsService(options.membership, options.counter, options.plans);
+  static create(options: UsageStatsSources): UsageStatsService {
+    return new UsageStatsService(options);
   }
 
-  private constructor(
-    private readonly membership: UsageMembershipRepository,
-    private readonly counter: UsageCounter,
-    private readonly planProvider: PlanProvider,
-  ) {}
+  private readonly membership: UsageMembershipRepository;
+  private readonly seats: Pick<OrganizationApi, "countMemberSeats">;
+  private readonly counter: UsageCounter;
+  private readonly planProvider: PlanProvider;
+
+  private constructor(options: UsageStatsSources) {
+    this.membership = options.membership;
+    this.seats = options.seats;
+    this.counter = options.counter;
+    this.planProvider = options.plans;
+  }
 
   /**
    * Calculates the message limit status based on current usage and max allowed.
@@ -130,16 +141,14 @@ export class UsageStatsService {
       currentMonthCost,
       activePlan,
       maxMonthlyUsageLimit,
-      membersCount,
-      membersLiteCount,
+      seats,
       usageUnit,
     ] = await Promise.all([
       this.counter.getCurrentMonthCountForDisplay({ organizationId }),
       this.membership.findCurrentMonthCost(organizationId),
       this.planProvider.getActivePlan({ organizationId, user }),
       this.getMaxMonthlyUsageLimit(organizationId),
-      this.membership.getMemberCount(organizationId),
-      this.membership.getMembersLiteCount(organizationId),
+      this.seats.countMemberSeats({ organizationId }),
       this.counter.getResolvedUsageUnit({ organizationId }),
     ]);
 
@@ -165,8 +174,8 @@ export class UsageStatsService {
       currentMonthCost,
       activePlan,
       maxMonthlyUsageLimit,
-      membersCount,
-      membersLiteCount,
+      membersCount: seats.fullMembers,
+      membersLiteCount: seats.liteMembers,
       messageLimitInfo,
       usageUnit,
     };

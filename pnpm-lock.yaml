@@ -2993,9 +2993,6 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../../../modules/entitlement/contract
-      '@langwatch/entitlement-process':
-        specifier: workspace:*
-        version: link:../../../../modules/entitlement/process
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../../packages/eventing
@@ -3011,6 +3008,12 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../../packages/ksuid
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/organization/contract
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../../packages/plans
@@ -10890,9 +10893,6 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
-      '@langwatch/entitlement-process':
-        specifier: workspace:*
-        version: link:../../entitlement/process
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

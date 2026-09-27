@@ -25,9 +25,6 @@
       "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/entitlement/process/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/eventing/tsconfig.build.json"
     },
     {
@@ -41,6 +38,12 @@
     },
     {
       "path": "../../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/organization/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/plans/tsconfig.build.json"
