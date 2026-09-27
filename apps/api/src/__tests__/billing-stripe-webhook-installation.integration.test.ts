@@ -6,6 +6,7 @@
  */
 import { RestHost } from "@langwatch/api/rest";
 import { serverModules } from "@langwatch/installed-server-modules";
+import { ModuleApiToken } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import { bootApi } from "./api-installation.fixture.ts";
@@ -38,9 +39,11 @@ describe("the api process installation", () => {
         transport.protocol === "rest" && transport.namespace === "billing-stripe-webhook";
       const owner = serverModules.find((module) => (module.transports ?? []).some(isCallback));
       const callback = owner?.transports?.find(isCallback);
-      if (!owner || !callback) throw new Error("no installed module declares the Stripe callback");
+      const contract = owner?.apiContract;
+      if (!owner || !callback || !(contract instanceof ModuleApiToken))
+        throw new Error("no installed module declares the Stripe callback");
       expect(owner.name).toBe("billing");
-      host.mount(callback.router(), () => runtime.service(owner.apiContract));
+      host.mount(callback.router(), () => runtime.service(contract));
 
       const delivered = await host.app.fetch(
         new Request("http://api.test/api/webhooks/stripe", {
