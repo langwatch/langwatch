@@ -1,8 +1,10 @@
+import { describe, expect, it } from "vitest";
+
 import {
-  LangyCliEnvelopeService,
+  extractShellCommand,
   type LangyToolFrame,
-} from "@langwatch/langy-process/services/langy-cli-envelope.service";
-import { beforeEach, describe, expect, it } from "vitest";
+  normalizeToolFrame,
+} from "../langy-cli-envelope.rules.ts";
 
 const bashFrame = (overrides: Partial<LangyToolFrame>): LangyToolFrame => ({
   id: "call_1",
@@ -11,16 +13,10 @@ const bashFrame = (overrides: Partial<LangyToolFrame>): LangyToolFrame => ({
   ...overrides,
 });
 
-describe("LangyCliEnvelopeService", () => {
-  let service: LangyCliEnvelopeService;
-
-  beforeEach(() => {
-    service = LangyCliEnvelopeService.create();
-  });
-
+describe("the CLI envelope rules", () => {
   describe("given a bash frame running the LangWatch CLI", () => {
     it("re-types the start frame as the capability it invoked", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           input: { command: "langwatch trace search --format json" },
         }),
@@ -40,7 +36,7 @@ describe("LangyCliEnvelopeService", () => {
         "Use langwatch trace get <traceId> to view full details",
       ].join("\n");
 
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           phase: "end",
           input: { command: "langwatch trace search -f json" },
@@ -61,7 +57,7 @@ describe("LangyCliEnvelopeService", () => {
     });
 
     it("computes the result digest on a successful end frame", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           phase: "end",
           input: {
@@ -83,7 +79,7 @@ describe("LangyCliEnvelopeService", () => {
     });
 
     it("accepts a worker-emitted typed result without reparsing stdout", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           phase: "end",
           input: { command: "langwatch trace search --format json" },
@@ -101,7 +97,7 @@ describe("LangyCliEnvelopeService", () => {
     });
 
     it("computes no digest on a start frame — the result does not exist yet", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           input: { command: "langwatch trace search --format json" },
         }),
@@ -110,7 +106,7 @@ describe("LangyCliEnvelopeService", () => {
     });
 
     it("reads a command passed as a bare string input", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({ input: "langwatch dataset list --format json" }),
       });
 
@@ -119,7 +115,7 @@ describe("LangyCliEnvelopeService", () => {
 
     it("re-types the other shell-tool spellings too", () => {
       for (const name of ["shell", "execute", "Bash"]) {
-        const frame = service.normalizeToolFrame({
+        const frame = normalizeToolFrame({
           frame: bashFrame({
             name,
             input: { command: "langwatch monitor list" },
@@ -136,10 +132,8 @@ describe("LangyCliEnvelopeService", () => {
         input: { command: "langwatch scenario create Checkout --format json" },
       });
 
-      expect(service.extractShellCommand(local)).toBe(
-        "langwatch scenario create Checkout --format json",
-      );
-      const frame = service.normalizeToolFrame({ frame: local });
+      expect(extractShellCommand(local)).toBe("langwatch scenario create Checkout --format json");
+      const frame = normalizeToolFrame({ frame: local });
       expect(frame.name).toBe("langwatch.scenario.create");
       expect(frame.local).toBe(true);
     });
@@ -147,7 +141,7 @@ describe("LangyCliEnvelopeService", () => {
 
   describe("given a CLI frame whose output holds no JSON document", () => {
     it("keeps the raw output and still re-types the frame", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           phase: "end",
           input: { command: "langwatch trace search" },
@@ -164,7 +158,7 @@ describe("LangyCliEnvelopeService", () => {
     });
 
     it("still records a text-tier digest so the card knows what ran", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           phase: "end",
           input: { command: "langwatch trace search" },
@@ -181,7 +175,7 @@ describe("LangyCliEnvelopeService", () => {
 
   describe("given a CLI frame with a JSON document for the wrong capability", () => {
     it("does not promote it to a typed analytics result", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           phase: "end",
           input: { command: "langwatch analytics query --format json" },
@@ -200,7 +194,7 @@ describe("LangyCliEnvelopeService", () => {
 
   describe("given a CLI frame that errored", () => {
     it("keeps the error text the CLI printed", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           phase: "end",
           input: { command: "langwatch trace get missing" },
@@ -215,7 +209,7 @@ describe("LangyCliEnvelopeService", () => {
     });
 
     it("keeps the failure document when the CLI printed one before exiting", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           phase: "end",
           input: { command: "langwatch scenario create Support --format json" },
@@ -243,7 +237,7 @@ describe("LangyCliEnvelopeService", () => {
     });
 
     it("computes no digest — there is no result to reference", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           phase: "end",
           input: { command: "langwatch trace get missing" },
@@ -273,7 +267,7 @@ describe("LangyCliEnvelopeService", () => {
     });
 
     it("marks the frame as failed", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           phase: "end",
           input: { command: "langwatch scenario create Support --format json" },
@@ -284,7 +278,7 @@ describe("LangyCliEnvelopeService", () => {
     });
 
     it("keeps everything the platform reported about the failure", () => {
-      const frame = service.normalizeToolFrame({
+      const frame = normalizeToolFrame({
         frame: bashFrame({
           phase: "end",
           input: { command: "langwatch scenario create Support --format json" },
@@ -308,12 +302,12 @@ describe("LangyCliEnvelopeService", () => {
   describe("given a shell frame that is not a LangWatch CLI call", () => {
     it("passes a plain shell command through untouched", () => {
       const original = bashFrame({ input: { command: "pnpm test:unit" } });
-      expect(service.normalizeToolFrame({ frame: original })).toBe(original);
+      expect(normalizeToolFrame({ frame: original })).toBe(original);
     });
 
     it("passes a bash frame carrying no command through untouched", () => {
       const original = bashFrame({ input: { description: "run the tests" } });
-      expect(service.normalizeToolFrame({ frame: original })).toBe(original);
+      expect(normalizeToolFrame({ frame: original })).toBe(original);
     });
   });
 
@@ -325,7 +319,7 @@ describe("LangyCliEnvelopeService", () => {
         phase: "start",
         input: { filePath: "run.sh", content: "langwatch trace search" },
       };
-      expect(service.normalizeToolFrame({ frame: original })).toBe(original);
+      expect(normalizeToolFrame({ frame: original })).toBe(original);
     });
   });
 });

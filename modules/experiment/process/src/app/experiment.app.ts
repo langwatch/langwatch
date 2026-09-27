@@ -76,6 +76,7 @@ import {
   type ExperimentEvaluationsListPage,
   type ExperimentIdOrSlugInput,
   type ExperimentWizardSaveInput,
+  type TargetConfig,
 } from "@langwatch/experiment-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi, type ModelCostRate } from "@langwatch/model-provider-contract";
@@ -211,6 +212,11 @@ export interface ExperimentAppDependencies {
   modelCosts: ExperimentModelCosts;
   /** The slug this deployment derives from a name. */
   slugify(value: string): string;
+  /** Resolves a saved workbench's column names, over the prompts, agents and evaluators. */
+  workbenchTargetNames(input: {
+    projectId: string;
+    targets: TargetConfig[];
+  }): Promise<Record<string, string>>;
   /** The workbench run loop this deployment composed, or the holes where it did not. */
   runLoop: ExperimentV3RunLoop;
   /** Where a run is recorded and an unnamed failure reported. Both best-effort. */
@@ -886,6 +892,13 @@ export class ExperimentApp implements ExperimentApi {
       projectId: input.projectId,
       runId: input.runId,
     });
+  }
+
+  resolveWorkbenchTargetNames(input: {
+    projectId: string;
+    targets: TargetConfig[];
+  }): Promise<Record<string, string>> {
+    return this.#dependencies.workbenchTargetNames(input);
   }
 
   startSavedRun(input: SavedRunRequest): Promise<SavedRunAnswer> {

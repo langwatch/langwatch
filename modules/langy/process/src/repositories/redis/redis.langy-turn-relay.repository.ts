@@ -14,6 +14,11 @@ import {
   LangyTurnErrors,
 } from "@langwatch/langy-contract";
 
+import {
+  extractShellCommand,
+  type LangyToolFrame,
+  normalizeToolFrame,
+} from "../../rules/langy-cli-envelope.rules.ts";
 import { LANGY_EMPTY_TURN_FALLBACK } from "../../rules/langy-empty-turn.rules.ts";
 import { verifyFrame } from "../../rules/langy-frame-auth.rules.ts";
 import {
@@ -22,10 +27,6 @@ import {
   langyFrameEnvelopeSchema,
   langyRelayFrameSchema,
 } from "../../rules/langy-relay-frame.rules.ts";
-import {
-  LangyCliEnvelopeService,
-  type LangyToolFrame,
-} from "../../services/langy-cli-envelope.service.ts";
 import type { LangyResourceLinksRepository } from "../langy-live-turn.repository.ts";
 import type { LangyStreamRedis } from "../langy-token-buffer.repository.ts";
 import {
@@ -328,7 +329,6 @@ export class RedisLangyTurnRelayRepository {
    * — BEFORE anything is recorded, so every consumer downstream sees
    * `langwatch.<resource>.<verb>`, never "the agent ran bash".
    */
-  private readonly cliEnvelope = LangyCliEnvelopeService.create();
 
   // The platform's own link for every resource a lookup surfaced, keyed by the
   // resource id, is remembered in `deps.resourceLinks` — a per-CONVERSATION
@@ -737,7 +737,7 @@ export class RedisLangyTurnRelayRepository {
     // Re-type a shell call that was really the LangWatch CLI: typed name,
     // stdout reduced to its JSON document, and the result digest computed.
     // Anything else passes through untouched (identity, not a copy).
-    const call = this.cliEnvelope.normalizeToolFrame({
+    const call = normalizeToolFrame({
       frame: {
         id: frame.id,
         name: frame.name,
@@ -784,7 +784,7 @@ export class RedisLangyTurnRelayRepository {
     call: LangyToolFrame;
   }): Promise<void> {
     if (frame.phase !== "end" || call.isError) return;
-    const command = this.cliEnvelope.extractShellCommand({
+    const command = extractShellCommand({
       id: frame.id,
       name: frame.name,
       phase: frame.phase,
@@ -916,7 +916,7 @@ export class RedisLangyTurnRelayRepository {
    * — the resource id it named.
    */
   private shellCommandOfFrame(frame: Extract<LangyRelayFrame, { type: "tool" }>): string | null {
-    return this.cliEnvelope.extractShellCommand({
+    return extractShellCommand({
       id: frame.id,
       name: frame.name,
       phase: frame.phase,

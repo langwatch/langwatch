@@ -36,10 +36,6 @@
       "types": "./dist/processes/langy-conversation-process.types.d.ts",
       "default": "./src/processes/langy-conversation-process.types.ts"
     },
-    "./services/langy-cli-envelope.service": {
-      "types": "./dist/services/langy-cli-envelope.service.d.ts",
-      "default": "./src/services/langy-cli-envelope.service.ts"
-    },
     "./services/langy-final-parts.service": {
       "types": "./dist/services/langy-final-parts.service.d.ts",
       "default": "./src/services/langy-final-parts.service.ts"

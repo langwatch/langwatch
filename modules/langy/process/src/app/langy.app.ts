@@ -11,6 +11,7 @@ import {
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
+import { ExperimentApi } from "@langwatch/experiment-contract";
 /**
  * The Langy feature's application: what its doors call. It holds every service and process
  * capability the feature's api files reach, and it is the one typed thing a transport is given.
@@ -135,8 +136,10 @@ import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
+import { LangyUiActionBackendService } from "../services/langy-ui-action-backend.service.ts";
 import { LangyUiActionCatalogService } from "../services/langy-ui-action-catalog.service.ts";
 import { LangyUiActionDoorService } from "../services/langy-ui-action-door.service.ts";
+import { LangyUiActionExperimentBackendService } from "../services/langy-ui-action-experiment-backend.service.ts";
 import { LangyUiActionPageService } from "../services/langy-ui-action-page.service.ts";
 import { LangyUiActionSurfaceService } from "../services/langy-ui-action-surface.service.ts";
 import { LangyUiActionService } from "../services/langy-ui-action.service.ts";
@@ -232,6 +235,8 @@ export class LangyApp implements LangyApiContract {
     /** Langy's own gateway key: minted by the gateway, kept under a reserved project secret. */
     gateway: GatewayApi,
     secrets: SecretApi,
+    /** The saved workbench an away page's UI action is applied to. */
+    experiments: ExperimentApi,
   };
   static readonly config = langyConfig;
   static readonly secrets = langySecrets;
@@ -359,6 +364,13 @@ export class LangyApp implements LangyApiContract {
             conversations: { getById: (args) => langy.getById(args) },
             buffer: setup.repositories.tokenBuffer.open({ redis }),
             actions: catalog,
+            backendRunner: LangyUiActionBackendService.create({
+              backend: LangyUiActionExperimentBackendService.create({
+                experiments: setup.dependencies.experiments,
+                projects: setup.dependencies.projects,
+              }),
+              projects: setup.dependencies.projects,
+            }).runner,
           })
         : null,
     });

@@ -43,6 +43,8 @@ import { RedisExperimentRunProcessingRepository } from "../repositories/redis/re
 import { RedisExperimentRunProgressRepository } from "../repositories/redis/redis.experiment-run-progress.repository.ts";
 import type { ExecutionDataServices } from "../services/experiment-execution-data.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
+import { ExperimentTargetEntityNamesService } from "../services/experiment-target-entity-names.service.ts";
+import { ExperimentWorkbenchTargetNamesService } from "../services/experiment-workbench-target-names.service.ts";
 import { WorkflowEvaluationService } from "../services/experiment-workflow-evaluation.service.ts";
 import { ExperimentWorkflowSourceService } from "../services/experiment-workflow-source.service.ts";
 import { ExperimentService } from "../services/experiment.service.ts";
@@ -391,9 +393,17 @@ export function buildExperimentInfrastructure(input: {
     startRun: () => Promise.reject(new ExperimentCapabilityUnavailableError("experiment run loop")),
   };
 
+  const targetNames = ExperimentWorkbenchTargetNamesService.create();
+  const targetEntities = ExperimentTargetEntityNamesService.create({
+    agents: dependencies.agents,
+    evaluators: dependencies.evaluators,
+  });
+
   return {
     experiments,
     slugify: slugifyExperimentName,
+    workbenchTargetNames: (input) =>
+      targetNames.resolve({ ...input, prompts: dependencies.prompts, entities: targetEntities }),
     workflows: dependencies.workflows,
     dataset: dependencies.dataset,
     monitors: monitorCascade(dependencies.monitors),

@@ -1,9 +1,3 @@
-/**
- * `LangyApp.startConversationTurn` — every turn is counted against the
- * project's tier-effective window before it dispatches; an over-limit caller
- * never reaches the engine.
- * @vitest-environment node
- */
 import { EventEmitter } from "node:events";
 
 import { createApiFixture } from "@langwatch/api-fixture";
@@ -16,6 +10,13 @@ import {
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
+/**
+ * `LangyApp.startConversationTurn` — every turn is counted against the
+ * project's tier-effective window before it dispatches; an over-limit caller
+ * never reaches the engine.
+ * @vitest-environment node
+ */
+import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
@@ -100,6 +101,7 @@ async function harness() {
       github: createApiFixture<GithubApi>(),
       gateway: createApiFixture<GatewayApi>(),
       secrets: createApiFixture<SecretApi>(),
+      experiments: createApiFixture<ExperimentApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       authz: createApiFixture<AuthzApi>(),

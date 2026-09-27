@@ -29,6 +29,7 @@ import type {
   RecordTargetResultInput,
   StartExperimentRunInput,
 } from "./experiment-run.ts";
+import type { SavedRunAnswer, SavedRunRequest } from "./experiment-workbench-rest.ts";
 import type {
   CommitWorkbenchVersionInput,
   CreateEvaluationsV3Input,
@@ -41,6 +42,7 @@ import type {
   WorkbenchStateView,
   WorkbenchVersionsPage,
 } from "./experiment-workbench-version.ts";
+import type { TargetConfig } from "./experiment-workbench.ts";
 import type {
   ExperimentCopied,
   ExperimentEvaluationsListPage,
@@ -187,6 +189,13 @@ export interface ExperimentApi {
   getWorkbenchState(input: GetWorkbenchStateInput): Promise<WorkbenchStateView>;
   listWorkbenchVersions(input: ListWorkbenchVersionsInput): Promise<WorkbenchVersionsPage>;
   recordWorkbenchRunResults(input: RecordWorkbenchRunResultsInput): Promise<WorkbenchSaveResult>;
+  /** What each column of a saved workbench is called, keyed by target id; never throws. */
+  resolveWorkbenchTargetNames(input: {
+    projectId: string;
+    targets: TargetConfig[];
+  }): Promise<Record<string, string>>;
+  /** Starts a run over the saved workbench, as the CLI's `experiment run` does. */
+  startSavedRun(input: SavedRunRequest): Promise<SavedRunAnswer>;
 
   // ── Workbench writes, attributed to the caller who asked for them ──
   // Each takes the caller as a separate argument rather than an `actor` field,

@@ -215,6 +215,7 @@ function harness({
       people,
       modelCosts,
       slugify: (value: string) => value,
+      workbenchTargetNames: async () => ({}),
       runLoop,
       workbenchObserver,
       workflowEvaluations: createApiFixture<WorkflowEvaluationService>({}, "workflowEvaluations"),

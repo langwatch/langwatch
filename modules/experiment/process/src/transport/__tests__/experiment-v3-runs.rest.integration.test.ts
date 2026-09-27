@@ -123,6 +123,7 @@ function harness({ experiments = {}, progress = null, ports = null }: Harness = 
     people: createApiFixture(),
     modelCosts: createApiFixture(),
     slugify: (value) => value,
+    workbenchTargetNames: async () => ({}),
     runLoop,
     workbenchObserver: { recordExperimentRan: vi.fn(), reportError: vi.fn() },
     workflowEvaluations: createApiFixture<WorkflowEvaluationService>({}, "workflowEvaluations"),
