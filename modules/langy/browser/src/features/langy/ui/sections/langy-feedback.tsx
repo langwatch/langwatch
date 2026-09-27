@@ -3,7 +3,7 @@ import { useLangyStore, useReducedMotion, ACCENT, CARD } from "@langwatch/langy-
 import { ArrowRight, X } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
@@ -57,8 +57,90 @@ function promptFor(sentiment?: LangyFeedbackSentiment): string {
 
 const MotionDiv = motion.create("div");
 
+type FeedbackOrigin = "asked" | "directive" | "requested" | "preview";
+
 /**
- * Low-chrome, four-point feedback under a completed assistant answer.
+ * The card's life: pinned on first render (so the refetch after the shown-mark can't unmount it
+ * mid-look, and a card already waved away stays away), the server's quiet period started once the
+ * project is known, and a rating or "Not now" remembered so a remount cannot resurrect it.
+ */
+function useFeedbackCard({
+  conversationId,
+  messageId,
+  traceId,
+  origin,
+}: {
+  conversationId: string | undefined;
+  messageId: string | undefined;
+  traceId: string | undefined;
+  origin: FeedbackOrigin;
+}) {
+  const { submit } = useLangyFeedback();
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id;
+  const promptShown = api.langy.feedbackPromptShown.useMutation();
+  const dismissedIds = useLangyStore((s) => s.dismissedFeedbackMessageIds);
+  const dismissFeedback = useLangyStore((s) => s.dismissFeedback);
+  const [done, setDone] = useState(false);
+  const [locallyDismissed, setLocallyDismissed] = useState(false);
+  const live = origin !== "preview";
+  const wasDismissed = () =>
+    !!messageId && useLangyStore.getState().dismissedFeedbackMessageIds.has(messageId);
+
+  const pin = useEffectEvent(() => {
+    if (live && messageId && !wasDismissed()) useLangyStore.getState().pinFeedback(messageId);
+  });
+  useEffect(() => pin(), []);
+
+  // Showing IS asking: an ignored card must not re-ask under the next answer. Keyed on the
+  // project, which can resolve a beat after the card renders; the ref makes it exactly-once.
+  const markedShownRef = useRef(false);
+  const markShown = useEffectEvent(() => {
+    const asks = live && origin !== "requested";
+    if (!asks || markedShownRef.current) return;
+    if (!conversationId || !projectId || wasDismissed()) return;
+    markedShownRef.current = true;
+    promptShown.mutate({ projectId, conversationId });
+  });
+  useEffect(() => markShown(), [projectId]);
+
+  /**
+   * Persist one rating, then collapse the card. A rating starts the quiet period for EVERY live
+   * origin, `/feedback` included, and marks the answer handled.
+   */
+  const record = (rating: {
+    rating: FeedbackRating;
+    sentiment: FeedbackSentiment;
+    comment?: string;
+  }) => {
+    submit({ conversationId, messageId, traceId, ...rating });
+    if (live && conversationId && projectId) promptShown.mutate({ projectId, conversationId });
+    if (live && messageId) dismissFeedback(messageId);
+    setDone(true);
+  };
+
+  /** "Not now": remembered, so the card can't reappear when the conversation re-renders. */
+  const dismiss = () => {
+    if (messageId) dismissFeedback(messageId);
+    setLocallyDismissed(true);
+  };
+
+  // `messageId` is optional, so a local flag keeps the card dismissible without one.
+  const hidden = locallyDismissed || (!!messageId && dismissedIds.has(messageId));
+  return { done, hidden, record, dismiss };
+}
+
+/** A typed 1-5 score, or nothing when the field does not hold one. */
+function typedScore(typed: string): { valid: true; score: number } | { valid: false } {
+  const parsed = Number(typed);
+  const valid =
+    typed.trim() !== "" && Number.isFinite(parsed) && parsed >= TYPED_MIN && parsed <= TYPED_MAX;
+  return valid ? { valid: true, score: Math.round(parsed) } : { valid: false };
+}
+
+/**
+ * Low-chrome, four-point feedback under a completed assistant answer. "Thanks, noted." wins over
+ * the dismissal memory: rating also records the message as handled.
  */
 export function LangyFeedback({
   conversationId,
@@ -76,134 +158,19 @@ export function LangyFeedback({
    * How this card came to be: the backend cadence ("asked"), the agent's directive ("directive"),
    * `/feedback` ("requested"), or the dev card gallery ("preview" — fully inert).
    */
-  origin?: "asked" | "directive" | "requested" | "preview";
+  origin?: FeedbackOrigin;
 }) {
-  const { submit } = useLangyFeedback();
-  const { project } = useOrganizationTeamProject();
-  const promptShown = api.langy.feedbackPromptShown.useMutation();
   const reduce = useReducedMotion();
-  const [done, setDone] = useState(false);
-  const [typed, setTyped] = useState("");
-  const dismissedIds = useLangyStore((s) => s.dismissedFeedbackMessageIds);
-  const dismissFeedback = useLangyStore((s) => s.dismissFeedback);
-  const [locallyDismissed, setLocallyDismissed] = useState(false);
+  const card = useFeedbackCard({ conversationId, messageId, traceId, origin });
 
-  // Pin on first render, so the refetch that follows the shown-mark can't flip
-  // the server flag and unmount the card mid-look. A card the user already
-  // waved away must stay away — pinning un-dismisses, so a remount (say, a
-  // history reload) would otherwise resurrect it.
-  useEffect(() => {
-    if (origin === "preview" || !messageId) return;
-    const store = useLangyStore.getState();
-    if (store.dismissedFeedbackMessageIds.has(messageId)) return;
-    store.pinFeedback(messageId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Showing IS asking: start the server-side quiet period — an ignored card
-  // must not re-ask under the next answer. Keyed on the project id (not
-  // mount-only) because the card can render a beat before the project query
-  // resolves; a mount-only effect would then silently never mark, and the
-  // cadence would nag under every answer. The ref makes it exactly-once.
-  const markedShownRef = useRef(false);
-  useEffect(() => {
-    if (origin === "preview" || origin === "requested") return;
-    if (markedShownRef.current || !conversationId || !project?.id) return;
-    const dismissed = useLangyStore.getState().dismissedFeedbackMessageIds;
-    if (messageId && dismissed.has(messageId)) {
-      return;
-    }
-    markedShownRef.current = true;
-    promptShown.mutate({ projectId: project.id, conversationId });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.id]);
-
-  /** Persist one rating, then collapse the card. */
-  const record = ({
-    rating,
-    sentiment: tone,
-    comment,
-  }: {
-    rating: FeedbackRating;
-    sentiment: FeedbackSentiment;
-    comment?: string;
-  }) => {
-    submit({
-      conversationId,
-      messageId,
-      traceId,
-      rating,
-      sentiment: tone,
-      ...(comment ? { comment } : {}),
-    });
-    if (origin !== "preview") {
-      // A rating is a stronger signal than a show: it starts the quiet period
-      // for EVERY live origin — including `/feedback`, whose show deliberately
-      // doesn't count — so the cadence can't ask again right after the user
-      // just rated.
-      if (conversationId && project?.id) {
-        promptShown.mutate({ projectId: project.id, conversationId });
-      }
-      // And remember this answer as handled, so a remount (history reload,
-      // panel round-trip) can't resurrect a rated card as a fresh ask. The
-      // dismissal set is the durable memory; `done` is only this render's
-      // "Thanks, noted."
-      if (messageId) dismissFeedback(messageId);
-    }
-    setDone(true);
-  };
-
-  const sendSegment = (index: number) => {
-    const point = SCALE[index]!;
-    record({ rating: point.rating, sentiment: point.sentiment });
-  };
-
-  const parsedTyped = Number(typed);
-  const typedValid =
-    typed.trim() !== "" &&
-    Number.isFinite(parsedTyped) &&
-    parsedTyped >= TYPED_MIN &&
-    parsedTyped <= TYPED_MAX;
-
-  const sendTyped = () => {
-    if (!typedValid) return;
-    const score = Math.round(parsedTyped);
-    const { rating, sentiment: tone } = deriveFromTypedScore(score);
-    // The exact number rides in `comment` so the finer signal survives the
-    // lossy up/down derivation until a first-class score field lands.
-    record({
-      rating,
-      sentiment: tone,
-      comment: `Rated ${score} out of ${TYPED_MAX}`,
-    });
-  };
-
-  /**
-   * "Not now." Remembers this message so the card can't reappear when the
-   * conversation re-renders or reloads from history. The cross-session quiet
-   * period already started when the card was shown (the mount effect above).
-   */
-  const dismiss = () => {
-    if (messageId) dismissFeedback(messageId);
-    setLocallyDismissed(true);
-  };
-
-  // "Thanks, noted." wins over the dismissal memory: rating ALSO records the
-  // message as handled (see record()), and checking dismissal first would
-  // swallow the acknowledgement in the same breath.
-  if (done) {
+  if (card.done) {
     return (
       <Text textStyle="2xs" color="fg.subtle" alignSelf="flex-start" paddingY={1}>
         Thanks, noted.
       </Text>
     );
   }
-
-  // `messageId` is optional in the contract, so keep a local flag too — the
-  // card must be dismissible even when it has nothing to key the memory on.
-  if (locallyDismissed || (messageId && dismissedIds.has(messageId))) {
-    return null;
-  }
+  if (card.hidden) return null;
 
   return (
     <MotionDiv
@@ -222,15 +189,12 @@ export function LangyFeedback({
         borderRadius={CARD.radius}
         borderWidth={CARD.borderWidth}
         borderStyle="solid"
-        // A restrained warm hairline + a barely-there accent wash: the Langy
-        // card language, not a bright orange ring (see asaplangy tokens).
+        // A restrained warm hairline + a barely-there accent wash: the Langy card language.
         borderColor={CARD.accentBorder}
         background="transparent"
         backgroundImage={CARD.accentWash}
       >
-        {/* The prompt shares its row with the way out. A ✕ (rather than a "Not
-            now" button) keeps the rating rail below it unbroken and reads as the
-            same dismiss gesture used everywhere else in the panel. */}
+        {/* The prompt shares its row with the way out: a ✕ keeps the rating rail unbroken. */}
         <HStack gap={2} width="full" align="center">
           <Text textStyle="2xs" color="fg.muted" letterSpacing="-0.005em" flex={1}>
             {promptFor(sentiment)}
@@ -238,7 +202,7 @@ export function LangyFeedback({
           <chakra.button
             type="button"
             aria-label="Dismiss feedback request"
-            onClick={dismiss}
+            onClick={card.dismiss}
             display="grid"
             placeItems="center"
             borderRadius="full"
@@ -254,64 +218,84 @@ export function LangyFeedback({
           </chakra.button>
         </HStack>
         <HStack gap={1.5} width="full">
-          {SCALE.map((point, index) => (
-            <Segment key={point.label} onClick={() => sendSegment(index)}>
+          {SCALE.map((point) => (
+            <Segment
+              key={point.label}
+              onClick={() => card.record({ rating: point.rating, sentiment: point.sentiment })}
+            >
               {point.label}
             </Segment>
           ))}
         </HStack>
-        {/* A sharper signal for anyone who wants it: type a 1-5 score. It
-            derives to the same up/down the segments do, and carries the exact
-            number along so nothing is thrown away. */}
-        <HStack gap={2} width="full" align="center">
-          <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
-            Or type a score
-          </Text>
-          <Input
-            value={typed}
-            onChange={(e) => setTyped(e.target.value.replace(/[^\d]/g, "").slice(0, 1))}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                sendTyped();
-              }
-            }}
-            aria-label={`Rate Langy from ${TYPED_MIN} to ${TYPED_MAX}`}
-            inputMode="numeric"
-            placeholder={`${TYPED_MIN}-${TYPED_MAX}`}
-            size="xs"
-            width="44px"
-            textAlign="center"
-            borderColor="border.muted"
-            _focusVisible={{
-              borderColor: "orange.emphasized",
-              outline: "none",
-              boxShadow: "none",
-            }}
-          />
-          <chakra.button
-            type="button"
-            aria-label="Submit typed rating"
-            onClick={sendTyped}
-            disabled={!typedValid}
-            display="grid"
-            placeItems="center"
-            width="24px"
-            height="24px"
-            borderRadius="full"
-            borderWidth={0}
-            flexShrink={0}
-            background={typedValid ? "orange.subtle" : "transparent"}
-            color={typedValid ? ACCENT : "fg.subtle"}
-            cursor={typedValid ? "pointer" : "default"}
-            opacity={typedValid ? 1 : 0.5}
-            transition="background 120ms ease, color 120ms ease, opacity 120ms ease"
-          >
-            <ArrowRight size={13} />
-          </chakra.button>
-        </HStack>
+        <TypedScore onRate={card.record} />
       </VStack>
     </MotionDiv>
+  );
+}
+
+/**
+ * A sharper signal for anyone who wants it: a typed 1-5 score, derived to the same up/down the
+ * segments give, with the exact number riding in `comment` until a score field lands.
+ */
+function TypedScore({
+  onRate,
+}: {
+  onRate: (rating: {
+    rating: FeedbackRating;
+    sentiment: FeedbackSentiment;
+    comment: string;
+  }) => void;
+}) {
+  const [typed, setTyped] = useState("");
+  const score = typedScore(typed);
+  const send = () => {
+    if (!score.valid) return;
+    const { rating, sentiment } = deriveFromTypedScore(score.score);
+    onRate({ rating, sentiment, comment: `Rated ${score.score} out of ${TYPED_MAX}` });
+  };
+  return (
+    <HStack gap={2} width="full" align="center">
+      <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
+        Or type a score
+      </Text>
+      <Input
+        value={typed}
+        onChange={(e) => setTyped(e.target.value.replace(/[^\d]/g, "").slice(0, 1))}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          send();
+        }}
+        aria-label={`Rate Langy from ${TYPED_MIN} to ${TYPED_MAX}`}
+        inputMode="numeric"
+        placeholder={`${TYPED_MIN}-${TYPED_MAX}`}
+        size="xs"
+        width="44px"
+        textAlign="center"
+        borderColor="border.muted"
+        _focusVisible={{ borderColor: "orange.emphasized", outline: "none", boxShadow: "none" }}
+      />
+      <chakra.button
+        type="button"
+        aria-label="Submit typed rating"
+        onClick={send}
+        disabled={!score.valid}
+        display="grid"
+        placeItems="center"
+        width="24px"
+        height="24px"
+        borderRadius="full"
+        borderWidth={0}
+        flexShrink={0}
+        background={score.valid ? "orange.subtle" : "transparent"}
+        color={score.valid ? ACCENT : "fg.subtle"}
+        cursor={score.valid ? "pointer" : "default"}
+        opacity={score.valid ? 1 : 0.5}
+        transition="background 120ms ease, color 120ms ease, opacity 120ms ease"
+      >
+        <ArrowRight size={13} />
+      </chakra.button>
+    </HStack>
   );
 }
 

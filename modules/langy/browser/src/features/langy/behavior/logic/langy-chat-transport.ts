@@ -1,11 +1,8 @@
-import type {
-  LangyResourceContext,
-  LangySkillContext,
-  LangyStreamEntry,
-} from "@langwatch/langy-contract";
+import { generate } from "@langwatch/ksuid";
+import type { LangyResourceContext, LangySkillContext } from "@langwatch/langy-contract";
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 
-import type { LangyTrpcClient } from "../../../../behavior/langy-api.ts";
+import type { LangyStreamWireEntry, LangyTrpcClient } from "../../../../behavior/langy-api.ts";
 
 /**
  * What a tRPC subscription hands back.
@@ -41,14 +38,14 @@ export interface LangyTurnRequestContext {
  * the status/thinking lines; `plan` mirrors the manager's plan snapshot into the store.
  */
 export type LangyTurnSignalEntry =
-  | (Extract<LangyStreamEntry, { type: "status" }> & {
+  | (Extract<LangyStreamWireEntry, { type: "status" }> & {
       /**
        * The status arrived BEFORE this stream produced any output — the manager's
        * readiness placeholder for silence ("Starting Langy…", "Thinking…").
        */
       readiness?: boolean;
     })
-  | Extract<LangyStreamEntry, { type: "progress" | "milestone" | "reasoning" | "plan" }>;
+  | Extract<LangyStreamWireEntry, { type: "progress" | "milestone" | "reasoning" | "plan" }>;
 
 /**
  * How a turn stream terminated. "end" is the genuine end-of-turn frame — the answer is
@@ -70,22 +67,22 @@ export interface LangyChatTransportDeps {
    * stream carries no entry id) and routing live in the panel, which alone
    * holds both the router and the active turn id the dedup key needs.
    */
-  onNavigate?: (entry: Extract<LangyStreamEntry, { type: "navigate" }>) => void;
+  onNavigate?: (entry: Extract<LangyStreamWireEntry, { type: "navigate" }>) => void;
   /**
    * Forward a live-only UI action for the page to claim and execute, bare
    * passthrough like `onNavigate` — dedup, the claim race, and the handler
    * lookup all live in the panel's orchestration (`executeUiAction`).
    */
-  onUiAction?: (entry: Extract<LangyStreamEntry, { type: "ui" }>) => void;
+  onUiAction?: (entry: Extract<LangyStreamWireEntry, { type: "ui" }>) => void;
   /**
    * A card the developer has to answer while the turn runs (ADR-129), fast path for putting it
    * on screen before the durable `user_wait_started` tail arrives.
    */
   onLocalWait?: (
-    entry: Extract<LangyStreamEntry, { type: "local_permission" | "question" }>,
+    entry: Extract<LangyStreamWireEntry, { type: "local_permission" | "question" }>,
   ) => void;
   /** The shared folder came or went while the turn ran. */
-  onLocalWorkspace?: (entry: Extract<LangyStreamEntry, { type: "local_workspace" }>) => void;
+  onLocalWorkspace?: (entry: Extract<LangyStreamWireEntry, { type: "local_workspace" }>) => void;
   /** Fired when a turn stream terminates — the reconcile trigger. */
   onTurnSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   /**
@@ -98,7 +95,7 @@ export interface LangyChatTransportDeps {
    * Every wire entry, unfiltered and before any interpretation — the tap the developer
    * drawer's tape records from.
    */
-  onWireEntry?: (entry: LangyStreamEntry, turnId: string) => void;
+  onWireEntry?: (entry: LangyStreamWireEntry, turnId: string) => void;
 }
 
 /** The turn-start response the create/continue mutations return (ids, no stream). */
@@ -193,176 +190,181 @@ function streamCallbacks(deps: LangyChatTransportDeps) {
   };
 }
 
+type Controller = ReadableStreamDefaultController<UIMessageChunk>;
+
+/** Where a turn stream's entries go besides the message chunks. */
+type TurnStreamHandlers = {
+  onSignal: (signal: LangyTurnSignalEntry) => void;
+  onNavigate?: (entry: Extract<LangyStreamWireEntry, { type: "navigate" }>) => void;
+  onUiAction?: (entry: Extract<LangyStreamWireEntry, { type: "ui" }>) => void;
+  onLocalWait?: (
+    entry: Extract<LangyStreamWireEntry, { type: "local_permission" | "question" }>,
+  ) => void;
+  onLocalWorkspace?: (entry: Extract<LangyStreamWireEntry, { type: "local_workspace" }>) => void;
+  onSettled?: (info: { reason: LangyTurnSettleReason }) => void;
+  onWireEntry?: (entry: LangyStreamWireEntry, turnId: string) => void;
+};
+
 /**
- * Bridge one turn's `onTurnStream` subscription into a UIMessageChunk stream.
- * The mapping mirrors the deleted `attachTurnStream` exactly.
+ * One turn's chunk stream while it is open. The prose of a turn is the paragraphs written between
+ * the calls, so a text run opens on the first delta and closes when a call starts; the readiness
+ * status covers the cold window until the first real output retires it.
+ */
+class TurnStreamSink {
+  private openTextId: string | null = null;
+  private sawOutput = false;
+  closed = false;
+
+  constructor(
+    private readonly controller: Controller,
+    private readonly handlers: TurnStreamHandlers,
+    private readonly unsubscribe: () => void,
+  ) {}
+
+  text(delta: string): void {
+    this.clearColdStartStatus();
+    if (!this.openTextId) {
+      this.openTextId = generate("langytext").toString();
+      this.controller.enqueue({ type: "text-start", id: this.openTextId });
+    }
+    this.controller.enqueue({ type: "text-delta", id: this.openTextId, delta });
+  }
+
+  closeText(): void {
+    if (!this.openTextId) return;
+    this.controller.enqueue({ type: "text-end", id: this.openTextId });
+    this.openTextId = null;
+  }
+
+  /** A starting call ends the paragraph before it; an ending one updates the part it opened. */
+  tool(entry: Extract<LangyStreamWireEntry, { type: "tool" }>): void {
+    this.clearColdStartStatus();
+    if (entry.phase === "start") this.closeText();
+    enqueueToolChunk(this.controller, entry);
+  }
+
+  /** Real progress (reasoning, a plan snapshot) retires the cold-start status. */
+  progress(signal: LangyTurnSignalEntry): void {
+    this.clearColdStartStatus();
+    this.handlers.onSignal(signal);
+  }
+
+  status(entry: Extract<LangyStreamWireEntry, { type: "status" }>): void {
+    this.handlers.onSignal({ ...entry, readiness: !this.sawOutput });
+  }
+
+  error(errorText: string): void {
+    this.controller.enqueue({ type: "error", errorText });
+    this.finish("error");
+  }
+
+  finish(reason: LangyTurnSettleReason): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.closeText();
+    this.controller.enqueue({ type: "finish" });
+    this.controller.close();
+    this.unsubscribe();
+    this.handlers.onSettled?.({ reason });
+  }
+
+  abort(): void {
+    this.unsubscribe();
+    if (this.closed) return;
+    this.closed = true;
+    this.controller.close();
+  }
+
+  private clearColdStartStatus(): void {
+    if (this.sawOutput) return;
+    this.sawOutput = true;
+    this.handlers.onSignal({ type: "status", status: "" });
+  }
+}
+
+/**
+ * Where one entry goes. Navigate and ui are one-shot instructions for the page, never message
+ * parts; a card the turn waits on never retires the cold-start status, since a turn waiting for a
+ * person has produced no output yet.
+ */
+function routeStreamEntry({
+  entry,
+  sink,
+  handlers,
+}: {
+  entry: LangyStreamWireEntry;
+  sink: TurnStreamSink;
+  handlers: TurnStreamHandlers;
+}): void {
+  switch (entry.type) {
+    case "delta":
+      return sink.text(entry.text);
+    case "tool":
+      return sink.tool(entry);
+    case "reasoning":
+    case "plan":
+      return sink.progress(entry);
+    case "status":
+      return sink.status(entry);
+    case "progress":
+    case "milestone":
+      return handlers.onSignal(entry);
+    case "navigate":
+      return handlers.onNavigate?.(entry);
+    case "ui":
+      return handlers.onUiAction?.(entry);
+    case "local_permission":
+    case "question":
+      return handlers.onLocalWait?.(entry);
+    case "local_workspace":
+      return handlers.onLocalWorkspace?.(entry);
+    case "error":
+      return sink.error(entry.error);
+    case "end":
+      return sink.finish("end");
+  }
+}
+
+/**
+ * Bridge one turn's `onTurnStream` subscription into a UIMessageChunk stream. The tape
+ * (`onWireEntry`) sees every entry first, including the ones the routing drops.
  */
 function subscribeTurnStream({
   client,
   projectId,
   conversationId,
   turnId,
-  onSignal,
-  onNavigate,
-  onUiAction,
-  onLocalWait,
-  onLocalWorkspace,
-  onSettled,
-  onWireEntry,
   abortSignal,
-}: {
+  ...handlers
+}: TurnStreamHandlers & {
   client: LangyTurnClient;
   projectId: string;
   conversationId: string;
   turnId: string;
-  onSignal: (signal: LangyTurnSignalEntry) => void;
-  onNavigate?: (entry: Extract<LangyStreamEntry, { type: "navigate" }>) => void;
-  onUiAction?: (entry: Extract<LangyStreamEntry, { type: "ui" }>) => void;
-  onLocalWait?: (
-    entry: Extract<LangyStreamEntry, { type: "local_permission" | "question" }>,
-  ) => void;
-  onLocalWorkspace?: (entry: Extract<LangyStreamEntry, { type: "local_workspace" }>) => void;
-  onSettled?: (info: { reason: LangyTurnSettleReason }) => void;
-  onWireEntry?: (entry: LangyStreamEntry, turnId: string) => void;
   abortSignal?: AbortSignal;
 }): ReadableStream<UIMessageChunk> {
   let sub: Unsubscribable | undefined;
 
   return new ReadableStream<UIMessageChunk>({
     start(controller) {
-      // The prose of a turn is not one block: it is the paragraphs written between the
-      // calls.
-      let openTextId: string | null = null;
-      let closed = false;
-
-      const openText = () => {
-        if (openTextId) return openTextId;
-        openTextId = crypto.randomUUID();
-        controller.enqueue({ type: "text-start", id: openTextId });
-        return openTextId;
-      };
-      const closeText = () => {
-        if (!openTextId) return;
-        controller.enqueue({ type: "text-end", id: openTextId });
-        openTextId = null;
-      };
-
-      const finish = (reason: LangyTurnSettleReason) => {
-        if (closed) return;
-        closed = true;
-        closeText();
-        controller.enqueue({ type: "finish" });
-        controller.close();
-        sub?.unsubscribe();
-        onSettled?.({ reason });
-      };
-
+      const sink = new TurnStreamSink(controller, handlers, () => sub?.unsubscribe());
       controller.enqueue({ type: "start" });
-
-      // The manager emits a readiness status ("Starting Langy…") into the cold window
-      // (worker tool prep produces no frames for many seconds).
-      let sawOutput = false;
-      const clearColdStartStatus = () => {
-        if (sawOutput) return;
-        sawOutput = true;
-        onSignal({ type: "status", status: "" });
-      };
-
-      const onEntry = (entry: LangyStreamEntry) => {
-        if (closed) return;
-        // The tape sees it first, and sees ALL of it — including the entries the
-        // switch below deliberately drops on the floor.
-        onWireEntry?.(entry, turnId);
-        switch (entry.type) {
-          case "delta":
-            clearColdStartStatus();
-            controller.enqueue({
-              type: "text-delta",
-              id: openText(),
-              delta: entry.text,
-            });
-            return;
-          case "tool":
-            clearColdStartStatus();
-            // A starting call ends the paragraph before it, which is what puts
-            // its card between that paragraph and the next. An ENDING call
-            // updates the part it already opened, wherever that sits, so the
-            // card stays where the work began and the text after it is not cut
-            // in two by an output that lands late.
-            if (entry.phase === "start") closeText();
-            enqueueToolChunk(controller, entry);
-            return;
-          case "reasoning":
-            clearColdStartStatus();
-            onSignal(entry);
-            return;
-          case "plan":
-            // A plan snapshot is real progress — retire the cold-start status —
-            // and rides the store as the checklist the plan card prefers.
-            clearColdStartStatus();
-            onSignal(entry);
-            return;
-          case "status":
-            onSignal({ ...entry, readiness: !sawOutput });
-            return;
-          case "progress":
-          case "milestone":
-            onSignal(entry);
-            return;
-          case "navigate":
-            // Not a message part, not a signal the status line renders — a
-            // one-shot action. Bare passthrough; the panel owns dedup + routing.
-            onNavigate?.(entry);
-            return;
-          case "ui":
-            // Same contract as navigate: a one-shot instruction for the page,
-            // never a message part. The panel owns dedup, the claim, and the
-            // handler execution.
-            onUiAction?.(entry);
-            return;
-          case "local_permission":
-          case "question":
-            // A card the turn is waiting on. It never retires the cold-start
-            // status, because a turn that is waiting for a person has produced
-            // no output yet and the status line still reads correctly.
-            onLocalWait?.(entry);
-            return;
-          case "local_workspace":
-            onLocalWorkspace?.(entry);
-            return;
-          case "error":
-            controller.enqueue({ type: "error", errorText: entry.error });
-            finish("error");
-            return;
-          case "end":
-            finish("end");
-            return;
-        }
-      };
-
       sub = client.langy.onTurnStream.subscribe(
         { projectId, conversationId, turnId },
         {
-          onData: onEntry,
-          onError: (err: unknown) => {
-            if (closed) return;
-            controller.enqueue({
-              type: "error",
-              errorText: err instanceof Error ? err.message : "Langy stream error",
-            });
-            finish("error");
+          onData: (entry) => {
+            if (sink.closed) return;
+            handlers.onWireEntry?.(entry, turnId);
+            routeStreamEntry({ entry, sink, handlers });
           },
-          onComplete: () => finish("closed"),
+          onError: (err: unknown) => {
+            if (sink.closed) return;
+            sink.error(err instanceof Error ? err.message : "Langy stream error");
+          },
+          onComplete: () => sink.finish("closed"),
         },
       );
-
-      abortSignal?.addEventListener("abort", () => {
-        sub?.unsubscribe();
-        if (!closed) {
-          closed = true;
-          controller.close();
-        }
-      });
+      abortSignal?.addEventListener("abort", () => sink.abort());
     },
     cancel() {
       sub?.unsubscribe();
@@ -372,8 +374,8 @@ function subscribeTurnStream({
 
 /** Map a live tool entry onto the AI-SDK tool chunks the renderers consume. */
 function enqueueToolChunk(
-  controller: ReadableStreamDefaultController<UIMessageChunk>,
-  entry: Extract<LangyStreamEntry, { type: "tool" }>,
+  controller: Controller,
+  entry: Extract<LangyStreamWireEntry, { type: "tool" }>,
 ) {
   if (entry.phase === "start") {
     controller.enqueue({

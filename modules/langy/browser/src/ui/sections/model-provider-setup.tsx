@@ -5,9 +5,9 @@
  */
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
-import { EditModelProviderForm } from "@langwatch/model-provider-browser/edit-model-provider-form";
 import { useCallback, useRef, useState } from "react";
 
+import { LentEditModelProviderForm } from "../../behavior/lent-edit-model-provider-form.tsx";
 import { useLangyHost } from "../../model/langy-host.ts";
 import {
   langyModelProviders,
@@ -90,7 +90,7 @@ export function LangyModelProviderSetup({
       </HStack>
 
       <Box ref={setupRef}>
-        <EditModelProviderForm
+        <LentEditModelProviderForm
           key={providerKey}
           providerKey={providerKey}
           modelProviderId="new"

@@ -154,6 +154,191 @@ function sampleRope(
   return pts;
 }
 
+/** The DOM nodes the frame loop restrokes, reached directly rather than re-rendering React. */
+type WaveNodes = {
+  clipRef: RefObject<HTMLDivElement | null>;
+  edgeRef: RefObject<SVGPathElement | null>;
+  fiberRef: RefObject<SVGPathElement | null>;
+};
+
+/**
+ * The clip layer wants the CLOSED path; the stroked seam and the fibre pulse want the OPEN curve,
+ * so the fibre's travelling dash never wanders onto the off-canvas closing edges.
+ */
+function applyWavePath({
+  nodes,
+  pts,
+  w,
+  h,
+}: {
+  nodes: WaveNodes;
+  pts: RopePoint[];
+  w: number;
+  h: number;
+}) {
+  if (nodes.clipRef.current) {
+    nodes.clipRef.current.style.clipPath = `path('${ropePath(pts, w, h)}')`;
+  }
+  const curve = ropeCurve(pts);
+  nodes.edgeRef.current?.setAttribute("d", curve);
+  nodes.fiberRef.current?.setAttribute("d", curve);
+}
+
+const FIBER_DASH = 42;
+const FIBER_PEAK = 0.5;
+
+/**
+ * The seam glitter: a second copy of the seam stroked bright with one short dash and a long dark
+ * gap, its offset advanced each frame so the pulse runs down the line (negative = top to bottom).
+ */
+function applyWaveFiber({
+  fiber,
+  state,
+  h,
+}: {
+  fiber: SVGPathElement | null;
+  state: WaveState;
+  h: number;
+}) {
+  if (!fiber) return;
+  const energy = state.glitterEnergy;
+  if (energy < 0.004) {
+    fiber.style.opacity = "0";
+    return;
+  }
+  const gap = (h + 120) * 1.25;
+  const period = FIBER_DASH + gap;
+  fiber.style.strokeDasharray = `${FIBER_DASH.toFixed(1)} ${gap.toFixed(1)}`;
+  fiber.style.strokeDashoffset = (-state.glitterPhase * period).toFixed(1);
+  fiber.style.opacity = (energy * FIBER_PEAK).toFixed(3);
+}
+
+/**
+ * Reduced motion: draw the resting fold and stop — no rAF, no gestures, the fibre dark; it
+ * redraws only when the panel actually resizes.
+ */
+function drawStillWave({ el, nodes }: { el: HTMLElement; nodes: WaveNodes }): () => void {
+  const draw = () => {
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    if (w === 0 || h === 0) return;
+    const pts = sampleRope(w, h, {
+      motion: { energy: 0, drift: 0, flutter: 0, pulse: 0 },
+      windPhase: 0,
+      pulsePhase: 0,
+      ripple: null,
+      shake: null,
+      celebrate: null,
+    });
+    applyWavePath({ nodes, pts, w, h });
+    if (nodes.fiberRef.current) nodes.fiberRef.current.style.opacity = "0";
+  };
+  draw();
+  const resizeObserver = new ResizeObserver(draw);
+  resizeObserver.observe(el);
+  return () => resizeObserver.disconnect();
+}
+
+/**
+ * A state change fires the one-shot gestures: the idle→working edge sends the wake ripple,
+ * entering settling shakes (failure), a clean return to idle wags (success).
+ */
+function fireWaveGestures(state: WaveState, activity: LangyWaveActivity): void {
+  if (activity === state.lastActivity) return;
+  if (isWakeTransition(state.lastActivity, activity)) state.ripple = 0;
+  if (isErrorTransition(state.lastActivity, activity)) state.shake = 0;
+  if (isSuccessTransition(state.lastActivity, activity)) state.celebrate = 0;
+  state.lastActivity = activity;
+}
+
+const GESTURE_DURATIONS_S = {
+  ripple: WAVE_RIPPLE_TRAVEL_S,
+  shake: WAVE_SHAKE_DURATION_S,
+  celebrate: WAVE_CELEBRATE_DURATION_S,
+} as const;
+
+/** Each running gesture moves on by its own duration, and ends at 1. */
+function advanceWaveGestures(state: WaveState, dt: number): void {
+  for (const gesture of ["ripple", "shake", "celebrate"] as const) {
+    const progress = state[gesture];
+    if (progress === null) continue;
+    const next = progress + dt / GESTURE_DURATIONS_S[gesture];
+    state[gesture] = next >= 1 ? null : next;
+  }
+}
+
+/**
+ * Seam glitter eases toward lit while a status label is up — a touch faster in than out, so it
+ * never snaps dark — and its phase keeps the pulse running down the line while lit.
+ */
+function advanceWaveGlitter(state: WaveState, dt: number, statusActive: boolean): void {
+  const target = statusActive ? 1 : 0;
+  const tau = target > state.glitterEnergy ? WAVE_GLITTER_RISE_TAU_S : WAVE_GLITTER_FALL_TAU_S;
+  state.glitterEnergy += (target - state.glitterEnergy) * (1 - Math.exp(-dt / tau));
+  state.glitterPhase += dt / WAVE_GLITTER_TRAVEL_S;
+}
+
+/**
+ * One frame: steer the smoothed motion toward the current activity, ACCUMULATE the phases at the
+ * smoothed speeds (so a speed change never jumps the waveform), advance gestures and glitter.
+ */
+function stepWave({
+  state,
+  activity,
+  statusActive,
+  dt,
+}: {
+  state: WaveState;
+  activity: LangyWaveActivity;
+  statusActive: boolean;
+  dt: number;
+}): void {
+  fireWaveGestures(state, activity);
+  state.motion = stepWaveMotion({ current: state.motion, activity, dt });
+  state.windPhase += dt * state.motion.drift;
+  state.pulsePhase += dt * ((Math.PI * 2) / WAVE_PULSE_PERIOD_S);
+  advanceWaveGestures(state, dt);
+  advanceWaveGlitter(state, dt, statusActive);
+}
+
+/**
+ * The rope reacts to Langy's ACTIVITY and nothing else — not the cursor, menus or focus. The loop
+ * reads activity and status through refs, so a change steers it rather than restarting it.
+ */
+function runWaveLoop({
+  el,
+  nodes,
+  state,
+  activityRef,
+  statusActiveRef,
+}: {
+  el: HTMLElement;
+  nodes: WaveNodes;
+  state: WaveState;
+  activityRef: RefObject<LangyWaveActivity>;
+  statusActiveRef: RefObject<boolean>;
+}): () => void {
+  let raf = 0;
+  const tick = (now: number) => {
+    raf = requestAnimationFrame(tick);
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    if (w === 0 || h === 0) return;
+    const dt = Math.min(0.05, state.lastT ? (now - state.lastT) / 1000 : 1 / 60);
+    state.lastT = now;
+    stepWave({ state, activity: activityRef.current, statusActive: statusActiveRef.current, dt });
+    const pts = sampleRope(w, h, state);
+    applyWavePath({ nodes, pts, w, h });
+    applyWaveFiber({ fiber: nodes.fiberRef.current, state, h });
+  };
+  raf = requestAnimationFrame(tick);
+  return () => {
+    cancelAnimationFrame(raf);
+    // A fresh dt on resume, so a long-hidden panel never integrates one huge frame.
+    state.lastT = null;
+  };
+}
+
 export function LangyWave({
   containerRef,
   active,
@@ -210,149 +395,11 @@ export function LangyWave({
   });
 
   useEffect(() => {
-    if (!active) return;
     const el = containerRef.current;
-    if (!el) return;
-    const s = state.current;
-
-    // The clip layer wants the CLOSED path; the stroked seam and the fibre pulse
-    // want the OPEN curve (an open path so the fibre's travelling dash never
-    // wanders onto the off-canvas closing edges).
-    const applyPath = (pts: RopePoint[], w: number, h: number) => {
-      if (clipRef.current) {
-        clipRef.current.style.clipPath = `path('${ropePath(pts, w, h)}')`;
-      }
-      const curve = ropeCurve(pts);
-      edgeRef.current?.setAttribute("d", curve);
-      fiberRef.current?.setAttribute("d", curve);
-    };
-
-    // The seam glitter, drawn as a pulse of light travelling DOWN the fibre: a second
-    // copy of the seam stroked bright, with a single short dash (the pulse) and a long
-    // dark gap, its offset advanced each frame so the dash runs down the line.
-    const FIBER_DASH = 42;
-    const FIBER_PEAK = 0.5;
-    const applyFiber = (h: number) => {
-      const fib = fiberRef.current;
-      if (!fib) return;
-      const e = s.glitterEnergy;
-      if (e < 0.004) {
-        fib.style.opacity = "0";
-        return;
-      }
-      const len = h + 120;
-      const gap = len * 1.25;
-      const period = FIBER_DASH + gap;
-      fib.style.strokeDasharray = `${FIBER_DASH.toFixed(1)} ${gap.toFixed(1)}`;
-      // Negative offset slides the dash toward the path END (top→bottom).
-      fib.style.strokeDashoffset = (-s.glitterPhase * period).toFixed(1);
-      fib.style.opacity = (e * FIBER_PEAK).toFixed(3);
-    };
-
-    // Reduced motion: draw the resting fold and stop. No rAF — redraws only
-    // when the panel actually resizes (the open spring, a layout-mode switch,
-    // a viewport resize in sidebar mode).
-    if (reduceMotion) {
-      const draw = () => {
-        const w = el.clientWidth;
-        const h = el.clientHeight;
-        if (w === 0 || h === 0) return;
-        const pts = sampleRope(w, h, {
-          motion: { energy: 0, drift: 0, flutter: 0, pulse: 0 },
-          windPhase: 0,
-          pulsePhase: 0,
-          ripple: null,
-          shake: null,
-          celebrate: null,
-        });
-        applyPath(pts, w, h);
-        // Reduced motion means no gestures at all — keep the fibre pulse dark.
-        if (fiberRef.current) fiberRef.current.style.opacity = "0";
-      };
-      draw();
-      const resizeObserver = new ResizeObserver(draw);
-      resizeObserver.observe(el);
-      return () => resizeObserver.disconnect();
-    }
-
-    // The rope reacts to Langy's ACTIVITY and nothing else: not the cursor, and —
-    // deliberately — not menus, popovers, selects or focus either.
-    let raf = 0;
-    const tick = (now: number) => {
-      const w = el.clientWidth;
-      const h = el.clientHeight;
-      if (w === 0 || h === 0) {
-        raf = requestAnimationFrame(tick);
-        return;
-      }
-      const dt = Math.min(0.05, s.lastT ? (now - s.lastT) / 1000 : 1 / 60);
-      s.lastT = now;
-
-      // A state change steers the smoothed vector and fires the one-shot
-      // gestures: the idle→working edge sends the wake ripple, entering settling
-      // shakes (failure), a clean return to idle wags (success). Never anything
-      // discontinuous in the ambient motion itself.
-      const currentActivity = activityRef.current;
-      if (currentActivity !== s.lastActivity) {
-        if (isWakeTransition(s.lastActivity, currentActivity)) s.ripple = 0;
-        if (isErrorTransition(s.lastActivity, currentActivity)) s.shake = 0;
-        if (isSuccessTransition(s.lastActivity, currentActivity)) {
-          s.celebrate = 0;
-        }
-        s.lastActivity = currentActivity;
-      }
-      s.motion = stepWaveMotion({
-        current: s.motion,
-        activity: currentActivity,
-        dt,
-      });
-
-      // Phases ACCUMULATE at the smoothed speeds, so a speed change can never
-      // jump the waveform.
-      s.windPhase += dt * s.motion.drift;
-      s.pulsePhase += dt * ((Math.PI * 2) / WAVE_PULSE_PERIOD_S);
-      if (s.ripple !== null) {
-        s.ripple += dt / WAVE_RIPPLE_TRAVEL_S;
-        if (s.ripple >= 1) s.ripple = null;
-      }
-      if (s.shake !== null) {
-        s.shake += dt / WAVE_SHAKE_DURATION_S;
-        if (s.shake >= 1) s.shake = null;
-      }
-      if (s.celebrate !== null) {
-        s.celebrate += dt / WAVE_CELEBRATE_DURATION_S;
-        if (s.celebrate >= 1) s.celebrate = null;
-      }
-
-      // Seam glitter: ease the intensity toward 1 while a status label is up (a
-      // touch faster in than out, so it never snaps dark), and advance the fibre
-      // phase so the pulse keeps running down the line while lit.
-      const glitterTarget = statusActiveRef.current ? 1 : 0;
-      const glitterTau =
-        glitterTarget > s.glitterEnergy ? WAVE_GLITTER_RISE_TAU_S : WAVE_GLITTER_FALL_TAU_S;
-      s.glitterEnergy += (glitterTarget - s.glitterEnergy) * (1 - Math.exp(-dt / glitterTau));
-      s.glitterPhase += dt / WAVE_GLITTER_TRAVEL_S;
-
-      const pts = sampleRope(w, h, {
-        motion: s.motion,
-        windPhase: s.windPhase,
-        pulsePhase: s.pulsePhase,
-        ripple: s.ripple,
-        shake: s.shake,
-        celebrate: s.celebrate,
-      });
-      applyPath(pts, w, h);
-      applyFiber(h);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      // A fresh dt on resume, so a long-hidden panel never integrates one huge
-      // frame.
-      s.lastT = null;
-    };
+    if (!active || !el) return;
+    const nodes = { clipRef, edgeRef, fiberRef };
+    if (reduceMotion) return drawStillWave({ el, nodes });
+    return runWaveLoop({ el, nodes, state: state.current, activityRef, statusActiveRef });
   }, [active, reduceMotion, containerRef]);
 
   if (!active) return null;

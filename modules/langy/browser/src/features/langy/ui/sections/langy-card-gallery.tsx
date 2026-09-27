@@ -47,9 +47,9 @@ import { LangyError } from "./langy-error.tsx";
 import { LangyFeedback } from "./langy-feedback.tsx";
 import { LangyLocalPermissionCard } from "./langy-local-permission-card.tsx";
 import { LangyPlanLimitCard } from "./langy-plan-limit-card.tsx";
+import { type LangyProposal, ProposalCard } from "./langy-proposal-card.tsx";
 import { LangyRecoveringLine } from "./langy-recovering-line.tsx";
 import { LangyToolActivity } from "./langy-tool-activity.tsx";
-import { type LangyProposal, ProposalCard } from "./message-content.tsx";
 
 /** A settled tool call, shaped exactly as the stream delivers one. */
 function call(name: string, output: unknown, input: unknown = {}) {

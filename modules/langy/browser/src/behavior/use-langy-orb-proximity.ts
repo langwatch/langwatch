@@ -19,141 +19,147 @@ const STRETCH_MAX = 0.016;
 /** Uniform grow at full proximity. */
 const GROW_MAX = 0.016;
 
+/** Where the eased pull wants to be: proximity 0..1 and the unit direction toward the cursor. */
+type OrbTarget = { p: number; ux: number; uy: number };
+
+const AT_REST: OrbTarget = { p: 0, ux: 0, uy: 0 };
+
+/** The pull the cursor exerts on the orb — smoothstep over its reach, so the edge is soft. */
+function orbTarget({
+  rect,
+  pointer,
+}: {
+  rect: DOMRect;
+  pointer: { x: number; y: number } | undefined;
+}): OrbTarget {
+  if (!pointer) return AT_REST;
+  const dx = pointer.x - (rect.left + rect.width / 2);
+  const dy = pointer.y - (rect.top + rect.height / 2);
+  const dist = Math.hypot(dx, dy);
+  const raw = Math.max(0, 1 - dist / (PROXIMITY_RADIUS + rect.width / 2));
+  const p = raw * raw * (3 - 2 * raw);
+  if (dist <= 0.001) return { p, ux: 0, uy: 0 };
+  return { p, ux: dx / dist, uy: dy / dist };
+}
+
+/**
+ * A lean toward the cursor with a hint of lift, then a directional stretch: rotate to the cursor
+ * axis, scale unevenly, rotate back — an ellipse elongated toward the pointer.
+ */
+function orbTransform({ p, x, y }: { p: number; x: number; y: number }): string {
+  if (p < 0.001) return "";
+  const angle = (Math.atan2(y, x) * 180) / Math.PI;
+  const stretch = STRETCH_MAX * p;
+  const grow = 1 + GROW_MAX * p;
+  return (
+    `translate(${(x * ORB_REACH).toFixed(2)}px, ${(y * ORB_REACH - p).toFixed(2)}px) ` +
+    `rotate(${angle.toFixed(2)}deg) ` +
+    `scale(${(grow * (1 + stretch)).toFixed(3)}, ${(grow * (1 - stretch)).toFixed(3)}) ` +
+    `rotate(${(-angle).toFixed(2)}deg)`
+  );
+}
+
+/**
+ * The orb's eased pull toward the pointer, driven imperatively. It parks once converged, and the
+ * next pointer move re-arms the loop, so an idle orb costs nothing.
+ */
+class OrbProximity {
+  private raf = 0;
+  private pointer: { x: number; y: number } | undefined;
+  private p = 0;
+  private x = 0;
+  private y = 0;
+
+  constructor(
+    private readonly orb: HTMLElement,
+    private readonly glow: HTMLElement | null,
+  ) {
+    window.addEventListener("pointermove", this.onMove, { passive: true });
+    document.addEventListener("mouseleave", this.onLeave);
+    window.addEventListener("blur", this.onLeave);
+  }
+
+  dispose(): void {
+    window.removeEventListener("pointermove", this.onMove);
+    document.removeEventListener("mouseleave", this.onLeave);
+    window.removeEventListener("blur", this.onLeave);
+    if (this.raf) cancelAnimationFrame(this.raf);
+    this.orb.style.transform = "";
+    if (!this.glow) return;
+    this.glow.style.opacity = "0";
+    this.glow.style.transform = "";
+  }
+
+  private readonly onMove = (event: PointerEvent) => {
+    this.pointer = { x: event.clientX, y: event.clientY };
+    this.kick();
+  };
+
+  private readonly onLeave = () => {
+    this.pointer = undefined;
+    this.kick();
+  };
+
+  private kick(): void {
+    if (!this.raf) this.raf = requestAnimationFrame(this.step);
+  }
+
+  private readonly step = () => {
+    this.raf = 0;
+    const target = orbTarget({ rect: this.orb.getBoundingClientRect(), pointer: this.pointer });
+    const goalX = target.ux * target.p;
+    const goalY = target.uy * target.p;
+    this.p += (target.p - this.p) * EASE;
+    this.x += (goalX - this.x) * EASE;
+    this.y += (goalY - this.y) * EASE;
+    this.paint();
+    const moving = [target.p - this.p, goalX - this.x, goalY - this.y].some(
+      (gap) => Math.abs(gap) >= 0.001,
+    );
+    if (moving) this.raf = requestAnimationFrame(this.step);
+  };
+
+  private paint(): void {
+    this.orb.style.transform = orbTransform({ p: this.p, x: this.x, y: this.y });
+    if (!this.glow) return;
+    this.glow.style.opacity = (this.p * GLOW_PEAK).toFixed(3);
+    this.glow.style.transform = `translate(${(this.x * GLOW_REACH).toFixed(2)}px, ${(this.y * GLOW_REACH).toFixed(2)}px)`;
+  }
+}
+
+/**
+ * The click acknowledgement: a quick warm bloom from the orb's centre that reads as "it heard
+ * you". The orb unmounts on that click, so the bloom lives on <body> and removes itself.
+ */
+function spawnOrbBurst(orb: HTMLElement): void {
+  const rect = orb.getBoundingClientRect();
+  const burst = document.createElement("span");
+  burst.className = "langy-orb-burst";
+  burst.setAttribute("aria-hidden", "true");
+  burst.style.left = `${rect.left + rect.width / 2}px`;
+  burst.style.top = `${rect.top + rect.height / 2}px`;
+  const remove = () => burst.remove();
+  burst.addEventListener("animationend", remove, { once: true });
+  // Safety net in case animationend never fires (e.g. tab backgrounded).
+  window.setTimeout(remove, 500);
+  document.body.appendChild(burst);
+}
+
 export function useLangyOrbProximity({ enabled }: { enabled: boolean }) {
   const orbRef = useRef<HTMLButtonElement>(null);
   const glowRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    if (!enabled) return;
     const orb = orbRef.current;
-    if (!orb) return;
-    const glow = glowRef.current;
-
-    let raf = 0;
-    // Latest pointer position (viewport coords) and whether we have one yet.
-    let px = 0;
-    let py = 0;
-    let havePointer = false;
-    // Eased state: proximity 0..1, and the (already proximity-scaled) unit
-    // direction from the orb toward the cursor.
-    let cp = 0;
-    let cx = 0;
-    let cy = 0;
-
-    const paint = () => {
-      const e = cp;
-      if (e < 0.001) {
-        orb.style.transform = "";
-      } else {
-        // Translate toward the cursor, with a hint of lift; then a directional
-        // stretch: rotate to the cursor axis, scale unevenly, rotate back — an
-        // ellipse elongated toward the pointer.
-        const tx = cx * ORB_REACH;
-        const ty = cy * ORB_REACH - 1 * e;
-        const angle = (Math.atan2(cy, cx) * 180) / Math.PI;
-        const stretch = STRETCH_MAX * e;
-        const grow = 1 + GROW_MAX * e;
-        orb.style.transform =
-          `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) ` +
-          `rotate(${angle.toFixed(2)}deg) ` +
-          `scale(${(grow * (1 + stretch)).toFixed(3)}, ${(grow * (1 - stretch)).toFixed(3)}) ` +
-          `rotate(${(-angle).toFixed(2)}deg)`;
-      }
-      if (glow) {
-        glow.style.opacity = (e * GLOW_PEAK).toFixed(3);
-        glow.style.transform = `translate(${(cx * GLOW_REACH).toFixed(2)}px, ${(
-          cy * GLOW_REACH
-        ).toFixed(2)}px)`;
-      }
-    };
-
-    const step = () => {
-      raf = 0;
-      const rect = orb.getBoundingClientRect();
-      const ocx = rect.left + rect.width / 2;
-      const ocy = rect.top + rect.height / 2;
-
-      let targetP = 0;
-      let targetUx = 0;
-      let targetUy = 0;
-      if (havePointer) {
-        const dx = px - ocx;
-        const dy = py - ocy;
-        const dist = Math.hypot(dx, dy);
-        const reach = PROXIMITY_RADIUS + rect.width / 2;
-        const raw = Math.max(0, 1 - dist / reach);
-        targetP = raw * raw * (3 - 2 * raw); // smoothstep — soft edges
-        if (dist > 0.001) {
-          targetUx = dx / dist;
-          targetUy = dy / dist;
-        }
-      }
-
-      cp += (targetP - cp) * EASE;
-      cx += (targetUx * targetP - cx) * EASE;
-      cy += (targetUy * targetP - cy) * EASE;
-      paint();
-
-      const settled =
-        Math.abs(cp - targetP) < 0.001 &&
-        Math.abs(cx - targetUx * targetP) < 0.001 &&
-        Math.abs(cy - targetUy * targetP) < 0.001;
-      // Park when converged; the next pointer move re-arms the loop, so an idle
-      // orb costs nothing.
-      if (!settled) raf = requestAnimationFrame(step);
-    };
-
-    const kick = () => {
-      if (!raf) raf = requestAnimationFrame(step);
-    };
-    const onMove = (ev: PointerEvent) => {
-      px = ev.clientX;
-      py = ev.clientY;
-      havePointer = true;
-      kick();
-    };
-    const onLeave = () => {
-      havePointer = false;
-      kick();
-    };
-
-    window.addEventListener("pointermove", onMove, { passive: true });
-    document.addEventListener("mouseleave", onLeave);
-    window.addEventListener("blur", onLeave);
-
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      document.removeEventListener("mouseleave", onLeave);
-      window.removeEventListener("blur", onLeave);
-      if (raf) cancelAnimationFrame(raf);
-      orb.style.transform = "";
-      if (glow) {
-        glow.style.opacity = "0";
-        glow.style.transform = "";
-      }
-    };
+    if (!enabled || !orb) return;
+    const proximity = new OrbProximity(orb, glowRef.current);
+    return () => proximity.dispose();
   }, [enabled]);
 
-  // The click acknowledgement: a quick warm bloom from the orb's centre that
-  // reads as "it heard you". Fired on the click that OPENS the panel — at which
-  // point the orb itself unmounts, so the bloom is spawned as a detached element
-  // on <body> (it outlives the orb) and removes itself when the animation ends.
-  // A no-op under reduced motion (the panel just opens instantly).
+  // A no-op under reduced motion: the panel just opens instantly.
   const activate = useCallback(() => {
-    if (!enabled || typeof document === "undefined") return;
     const orb = orbRef.current;
-    if (!orb) return;
-    const rect = orb.getBoundingClientRect();
-    const burst = document.createElement("span");
-    burst.className = "langy-orb-burst";
-    burst.setAttribute("aria-hidden", "true");
-    burst.style.left = `${rect.left + rect.width / 2}px`;
-    burst.style.top = `${rect.top + rect.height / 2}px`;
-    const remove = () => burst.remove();
-    burst.addEventListener("animationend", remove, { once: true });
-    // Safety net in case animationend never fires (e.g. tab backgrounded).
-    window.setTimeout(remove, 500);
-    document.body.appendChild(burst);
+    if (enabled && orb) spawnOrbBurst(orb);
   }, [enabled]);
 
   return { orbRef, glowRef, activate };

@@ -54,6 +54,47 @@ export function turnHadSideEffects(messages: ToolBearingMessage[]): boolean {
   );
 }
 
+type HandledFailure = { kind: string; id: unknown } | null;
+
+type RecoveryDecision =
+  | { kind: "already-handled" }
+  | { kind: "cleared"; handled: null }
+  | { kind: "terminal"; handled: HandledFailure }
+  | { kind: "arm"; handled: HandledFailure; errorKind: string; attempt: number; delayMs: number };
+
+/**
+ * What to do with the failure on screen. Cleared: drop the pending state but KEEP the attempt
+ * count (the chain stays open until the next send). The same (kind, id) pair: already decided.
+ * A terminal kind, an exhausted budget, or a turn that already changed something: the error card.
+ */
+function recoveryDecision({
+  errorKind,
+  errorId,
+  enabled,
+  handled,
+  attemptsUsed,
+  sideEffectsObserved,
+}: {
+  errorKind: string | null;
+  errorId: unknown;
+  enabled: boolean;
+  handled: HandledFailure;
+  attemptsUsed: number;
+  sideEffectsObserved: boolean;
+}): RecoveryDecision {
+  if (!errorKind || !enabled) return { kind: "cleared", handled: null };
+  if (handled && handled.id === errorId && handled.kind === errorKind) {
+    return { kind: "already-handled" };
+  }
+  const current = { kind: errorKind, id: errorId };
+  if (!canAutoRecover({ kind: errorKind, attemptsUsed, sideEffectsObserved })) {
+    return { kind: "terminal", handled: current };
+  }
+  const attempt = attemptsUsed + 1;
+  const delayMs = langyRecoveryPolicy(errorKind).delayMs(attempt);
+  return { kind: "arm", handled: current, errorKind, attempt, delayMs };
+}
+
 export function useLangyTurnRecovery({
   errorKind,
   errorId,
@@ -109,64 +150,40 @@ export function useLangyTurnRecovery({
     setPending(null);
   }, [clearTimer]);
 
-  useEffect(() => {
-    // The failure cleared (the retry got going, or the user moved on): drop the
-    // pending state but KEEP the attempt count — the chain is still open until
-    // the user sends something new, so a policy of "2 attempts" stays 2.
-    if (!errorKind || !enabled) {
-      clearTimer();
-      handledFailureRef.current = null;
-      setPending(null);
-      return;
-    }
-
-    // Same failure, same classification: we already decided what to do with it,
-    // so don't re-arm on every render. A CHANGED kind is a different decision
-    // even on the same Error object — see `handledFailureRef`.
-    const handled = handledFailureRef.current;
-    if (handled && handled.id === errorId && handled.kind === errorKind) return;
-    handledFailureRef.current = { kind: errorKind, id: errorId };
-
-    const attemptsUsed = attemptsUsedRef.current;
-    if (
-      !canAutoRecover({
-        kind: errorKind,
-        attemptsUsed,
-        sideEffectsObserved: sideEffectsObservedRef.current,
-      })
-    ) {
-      // Terminal kind, exhausted budget, or a turn that already changed
-      // something: the caller falls through to the error card.
+  // The armed retry, re-reading the one input that arrives LATE by construction.
+  const fireRetry = useCallback(
+    (attempt: number) => {
       clearTimer();
       setPending(null);
-      return;
-    }
-
-    const policy = langyRecoveryPolicy(errorKind);
-    const attempt = attemptsUsed + 1;
-
-    clearTimer();
-    setPending({ kind: errorKind, attempt });
-    timerRef.current = setTimeout(() => {
-      clearTimer();
-      // LAST-MOMENT SAFETY RE-READ. Everything else the policy weighs was settled when
-      // the timer armed; this one was not.
-      if (sideEffectsObservedRef.current) {
-        setPending(null);
-        return;
-      }
+      if (sideEffectsObservedRef.current) return;
       attemptsUsedRef.current = attempt;
-      setPending(null);
-      // `regenerate` clears useChat's error and flips status to "submitted", so
-      // the panel hands straight over to its normal thinking indicator.
+      // `regenerate` clears useChat's error, so the panel's thinking indicator takes over.
       onRetryRef.current();
-    }, policy.delayMs(attempt));
+    },
+    [clearTimer],
+  );
 
-    // NO CLEANUP, on purpose: an armed timer belongs to the FAILURE, not this effect instance,
-    // and every legitimate cancellation path already clears it by hand. Returning `clearTimer`
-    // here is what wedged the panel before: a re-render killed the pending timer, the
-    // same-failure short-circuit above then re-armed nothing, and `isRecovering` stuck true.
-  }, [errorKind, errorId, enabled, clearTimer]);
+  useEffect(() => {
+    const decision = recoveryDecision({
+      errorKind,
+      errorId,
+      enabled,
+      handled: handledFailureRef.current,
+      attemptsUsed: attemptsUsedRef.current,
+      sideEffectsObserved: sideEffectsObservedRef.current,
+    });
+    if (decision.kind === "already-handled") return;
+    handledFailureRef.current = decision.handled;
+    clearTimer();
+    if (decision.kind !== "arm") {
+      setPending(null);
+      return;
+    }
+    setPending({ kind: decision.errorKind, attempt: decision.attempt });
+    timerRef.current = setTimeout(() => fireRetry(decision.attempt), decision.delayMs);
+    // NO CLEANUP, on purpose: an armed timer belongs to the FAILURE, not this effect
+    // instance; a re-render killing it is what once wedged `isRecovering` true.
+  }, [errorKind, errorId, enabled, clearTimer, fireRetry]);
 
   // Unmount must never leave a timer holding a stale `regenerate`.
   useEffect(() => clearTimer, [clearTimer]);

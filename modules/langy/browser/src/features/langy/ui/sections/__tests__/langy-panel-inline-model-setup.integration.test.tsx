@@ -64,8 +64,8 @@ vi.mock("../../elements/langy-model-pill.tsx", () => ({
 // onComplete -> refetch wiring are what this file drives; the form itself is
 // tested where it lives, and dragging its whole hook tree into jsdom would
 // test the model-provider feature instead.
-vi.mock("@langwatch/model-provider-browser/edit-model-provider-form", () => ({
-  EditModelProviderForm: ({ onSaved }: { onSaved?: () => void }) => (
+vi.mock("../../../../../behavior/lent-edit-model-provider-form.tsx", () => ({
+  LentEditModelProviderForm: ({ onSaved }: { onSaved?: () => void }) => (
     <div data-testid="edit-model-provider-form">
       <label>
         Provider API Key

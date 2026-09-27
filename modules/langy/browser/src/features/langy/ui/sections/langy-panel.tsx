@@ -109,8 +109,8 @@ import { LangyMakeDefaultDialog } from "../elements/langy-make-default-dialog.ts
 import { AnimatedConversationTitle } from "./animated-conversation-title.tsx";
 import { Composer } from "./composer.tsx";
 import { LangyDevDrawer } from "./langy-dev-drawer.tsx";
+import type { ProposalHandlers } from "./langy-proposal-card.tsx";
 import { LangySendProvider } from "./langy-send-context.tsx";
-import { type ProposalHandlers } from "./message-content.tsx";
 import {
   LangyConversationBody,
   LangyConversationScroller,

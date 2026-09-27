@@ -90,6 +90,19 @@ export type UiModelDisplayProps = {
   fontSize?: string;
 };
 
+/** What a screen hands model-provider's form for adding or editing one provider's credentials. */
+export type UiEditModelProviderFormProps = {
+  providerKey: string;
+  /** `"new"` adds the provider; otherwise the stored provider being edited. */
+  modelProviderId?: string;
+  organizationId?: string | undefined;
+  projectId?: string | undefined;
+  /** What "the credential is saved" means to a surface that is not the settings drawer. */
+  onSaved?: () => void;
+  /** Onboarding's presentation: Connect wording, model pills, no settings chrome. */
+  guided?: boolean;
+};
+
 /**
  * Playback coordination for one audio part, as the host's sequential player
  * hands it out. The thread never starts a clip; it passes these to the media.
@@ -247,6 +260,7 @@ export type UiDeclaredCapabilities = {
     readonly section?: "sign-in" | "provisioning";
   };
   conversationThread: UiDeclaredComponent<UiConversationThreadProps>;
+  editModelProviderForm: UiDeclaredComponent<UiEditModelProviderFormProps>;
   heroAskField: UiDeclaredComponent<UiHeroAskFieldProps>;
   hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;

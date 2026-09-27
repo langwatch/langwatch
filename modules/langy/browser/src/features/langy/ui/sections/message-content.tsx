@@ -1,7 +1,6 @@
-import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import { isInternalHref, Markdown } from "@langwatch/browser-host/markdown";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { useLangyStore, LANGY_ACTION_SHADOW, LangyMeshLayer } from "@langwatch/langy-browser-kit";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Markdown } from "@langwatch/browser-host/markdown";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import type {
   LangyChoiceSelection,
   LangyChoicesLockState,
@@ -14,8 +13,6 @@ import {
   githubProgressFromToolParts,
 } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
-import { ArrowRight, Check, Sparkles } from "lucide-react";
-import type React from "react";
 import { memo, useMemo } from "react";
 
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
@@ -60,34 +57,12 @@ import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.t
 import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
 import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
 import { LangySecretSnippetCard } from "../../../../ui/sections/derived-cards/langy-secret-snippet-card.tsx";
-import { useSpaLinkClick } from "../../behavior/logic/spa-link.ts";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";
 import { LangyFeedback } from "./langy-feedback.tsx";
 import { LangyPlanCard } from "./langy-plan-card.tsx";
+import { type LangyProposal, ProposalCard } from "./langy-proposal-card.tsx";
 import { hasLangyActivity, LangyActivityParts } from "./langy-tool-activity.tsx";
-
-export interface LangyProposal {
-  langyProposal: true;
-  kind: string;
-  summary: string;
-  rationale?: string;
-  destructive?: boolean;
-  payload: Record<string, unknown>;
-}
-
-export type AppliedOutcome =
-  | {
-      label?: string;
-      onOpen?: () => void;
-      href?: string;
-    }
-  | undefined;
-
-export type ProposalHandlers = Record<
-  string,
-  (payload: Record<string, unknown>) => Promise<AppliedOutcome>
->;
 
 /** Why the feedback prompt is on screen, as the origin it reports. */
 function feedbackOrigin({
@@ -101,39 +76,8 @@ function feedbackOrigin({
   return shouldAskFeedback ? "asked" : "requested";
 }
 
-/** What the proposal's primary button says, before and during the action. */
-function proposalActionLabel({
-  isApplying,
-  destructive,
-}: {
-  isApplying: boolean;
-  destructive: boolean;
-}) {
-  if (isApplying) return destructive ? "Deleting\u2026" : "Applying\u2026";
-  return destructive ? "Delete" : "Apply";
-}
-
-function MessageContentImpl({
-  message,
-  organizationId,
-  appliedOutcomes,
-  discardedProposals,
-  applyingProposals,
-  onApply,
-  onDiscard,
-  isStreaming = false,
-  interrupted = false,
-  conversationId,
-  showFeedback = false,
-  shouldAskFeedback = false,
-  isFeedbackPinned = false,
-  choicesTimeline,
-  onChoiceSelect,
-  onVerifyDerivedCard,
-  onAskCodeAccessAgain,
-  liveCodeAccessCallId,
-  questionWaits,
-}: {
+/** What one transcript message is drawn with. */
+type MessageContentProps = {
   message: UIMessage;
   organizationId?: string | null;
   appliedOutcomes: Record<string, { href?: string; label?: string; onOpen?: () => void }>;
@@ -189,194 +133,34 @@ function MessageContentImpl({
    * closed. Absent = this message is read on its own, so its card is live.
    */
   liveCodeAccessCallId?: string | null;
-}) {
-  const isUser = message.role === "user";
-  // A notice the platform wrote into the transcript, such as the shared
-  // folder disconnecting (ADR-129). Like a message from the developer it is
-  // plain text, so none of the assistant reading below applies to it.
-  const isNotice = message.role === "system";
-  const isPlainText = isUser || isNotice;
-  const { project } = useOrganizationTeamProject();
-  // Distinct text parts are distinct blocks of the reply, so they join with a
-  // paragraph break — joined bare, a part boundary glued the last word of one
-  // block onto the first word of the next. `reasoning` parts never join this
-  // flow at all: the model's thinking is not the answer (their headlines fold
-  // into the completed receipt below).
-  const rawText = message.parts
+};
+
+function MessageContentImpl(props: MessageContentProps) {
+  const { message } = props;
+  // A message from the developer, or a notice the platform wrote into the
+  // transcript (ADR-129): plain text, so none of the assistant reading applies.
+  if (message.role === "user" || message.role === "system")
+    return <PlainMessage message={message} />;
+  return <AssistantMessage {...props} />;
+}
+
+/** The text parts of a message, one paragraph apart; `reasoning` never joins the answer. */
+function messageText(message: UIMessage): string {
+  return message.parts
     .filter((part): part is { type: "text"; text: string } => part.type === "text")
     .map((part) => part.text)
     .filter((text) => text.length > 0)
     .join("\n\n");
+}
 
-  // A settled turn the reader WATCHED holds the copy this browser streamed,
-  // fences and all, and it is never replaced by the durable one (that would
-  // drop the mid-turn narration the saved reply does not keep). Nothing stamped
-  // that copy, so its fences are read at render — see `AnswerRun`. A RECORDED
-  // message is left alone: the relay already ruled on its fences.
-  const isRecorded = (message.metadata as { recorded?: boolean } | undefined)?.recorded === true;
-
-  // A turn is a sequence, so it renders as one: the paragraphs and the calls in the
-  // order the parts carry, rather than every card in a pile above the whole reply
-  // joined underneath.
-  const runs = useMemo(
-    () => (isPlainText ? [] : langyTranscriptRuns(message.parts)),
-    [isPlainText, message.parts],
-  );
-  const lastActivityRunIndex = runs.findLastIndex((run) => run.kind === "activity");
-  // The run that carries the turn's reply. An activity run before it is work
-  // the turn went on to answer after, which is what makes a failure in it a
-  // step the turn RECOVERED from rather than the story of the turn.
-  const lastAnswerRunIndex = runs.findLastIndex(
-    (run) =>
-      run.kind === "say" || (run.kind === "answer" && langyRunText(run.parts).trim().length > 0),
-  );
-
-  // The agent's `question` TOOL call, mapped onto the choices contract
-  // (langyQuestionTool.ts) and rendered through the same card path a stamped choices
-  // block takes.
-  const questionCards = useMemo(
-    () => (isPlainText ? [] : message.parts.flatMap((part) => questionToolCardParts(part))),
-    [isPlainText, message.parts],
-  );
-
-  // The `code_access` TOOL call, which is where the code access card hangs
-  // (ADR-129). The call says the question was asked; the card reads its own
-  // state from `langy.getLocalWorkspace`, because the folder can connect long
-  // after this turn ended.
-  const codeAccessCall = useMemo(
-    () => (isPlainText ? null : codeAccessCallId(message.parts)),
-    [isPlainText, message.parts],
-  );
-
-  // A secret shown once, where it can be copied. The card is the only place the value ever
-  // appears: it reads it on first render and the server refuses every later read.
-  const secretSnippets = useMemo(
-    () => (isPlainText ? [] : secretSnippetCalls(message.parts)),
-    [isPlainText, message.parts],
-  );
-
-  // The connect card is NOT sniffed out of the assistant's prose any more.
-
-  // The PR-flow progress card, derived from the message's tool parts, the same parts the tool
-  // cards render from: an errored command doesn't mark its step complete, and the card survives
-  // a refresh since it's persisted with the message.
-  const progressEvents = isPlainText ? [] : githubProgressFromToolParts(message.parts);
-
-  // Strip the hidden [langy:feedback:...] directive: when present, Langy asked
-  // for feedback at a high-signal moment — surface the affordance regardless of
-  // the default throttle, tailored by the sentiment it classified.
-  const feedbackDirective = isPlainText
-    ? {
-        requested: false,
-        sentiment: undefined,
-        cleanedText: rawText,
-      }
-    : parseLangyFeedbackDirective(rawText);
-  const text = feedbackDirective.cleanedText;
-
-  // The live turn's tokens now arrive as `text-delta` chunks through the
-  // onTurnStream subscription, so useChat's `message.parts` already carry the
-  // streamed text — no separate optimistic buffer to reconcile. StreamingText
-  // still gives the blur-reveal while `isStreaming`.
-
-  const proposals = extractProposals(message);
-
-  // The PR cards, read off the message's tool parts, not scraped from the model's text: the tool
-  // part is written by the control plane from `gh pr create`'s own stdout, persisted with the
-  // message, and skips a `gh pr create` that failed.
-  const prs = isPlainText ? [] : githubPrsFromToolParts(message.parts);
-  // "Opened pull request #1" is how Langy names a pull request, and the reader
-  // had the number and no way through to it. The URLs come from the same tool
-  // parts the card reads — the sandbox's `github.open_pr` receipt, or the
-  // stdout of the developer's own `gh pr create` on the local path.
-  const pullRequestLinks = useMemo(
-    () => (isPlainText ? new Map<number, string>() : pullRequestLinksFromToolParts(message.parts)),
-    [isPlainText, message.parts],
-  );
-  // Tool-call activity for the assistant turn: activity cards, each labelled by
-  // what the call is DOING ("Searching traces", "Using the GitHub skill"), plus
-  // the in-flight and settled domain-capability cards. Counts toward "has
-  // something to render" so a turn whose only output is a running tool or a
-  // settled card (no prose yet) still surfaces it.
-  const showsActivity = isPlainText ? false : hasLangyActivity(message);
-  // The plan checklist, folded from the turn's `todowrite` tool parts. On the live streaming turn
-  // the manager's typed snapshot is preferred over raw parsing; completed messages don't subscribe
-  // to it, so a plan tick doesn't reconcile the full transcript.
-  const livePlan = useLangyStore((s) => (isStreaming ? s.turnPlan : null));
-  const plan = isPlainText
-    ? null
-    : langyPlan(message, isStreaming ? { overrideItems: livePlan } : undefined);
-  const hasActivityRecord = showsActivity || Boolean(plan);
-  // Reasoning-summary headlines are the model's thinking, not its answer — on a settled turn they
-  // fold into the completed-actions receipt rather than standing as loose bold paragraphs above it.
-  const reasoningFold =
-    isPlainText || isStreaming
-      ? { titles: [], text }
-      : foldReasoningTitles({
-          parts: message.parts,
-          text,
-          hasActivity: hasActivityRecord,
-        });
-  // The cards above already say which skill ran and what it does, so an opening
-  // line that says it again is the same fact three times before the answer.
-  // Dropped here, at the point of display — see logic/langyToolNarration.ts for
-  // why this is presentation, not the prose-sniffing this file deleted.
-  const displayText = isPlainText
-    ? text
-    : stripToolNarration({
-        text: reasoningFold.text,
-        hasActivity: hasActivityRecord,
-      });
-  // A turn whose only output is a stamped card block has no prose at all, and
-  // reading "No content" under a card the reader can see is worse than saying
-  // nothing.
-  const hasBlocks = !isPlainText && hasLangyBlockParts(message.parts);
-  // WHEN to ask is the backend's `shouldAskFeedback`, the agent's own directive,
-  // or /feedback. `showFeedback` is only the position + settled gate.
-  const feedbackWasAskedFor =
-    isFeedbackPinned ||
-    feedbackDirective.requested ||
-    (shouldAskFeedback && isSubstantiveLangyAnswer(displayText));
-  const showsFeedbackPrompt = Boolean(
-    showFeedback && !isStreaming && displayText && feedbackWasAskedFor,
-  );
-  const hasContent = Boolean(
-    displayText ||
-    hasBlocks ||
-    proposals.length > 0 ||
-    prs.length > 0 ||
-    progressEvents.length > 0 ||
-    questionCards.length > 0 ||
-    secretSnippets.length > 0 ||
-    showsActivity ||
-    plan,
-  );
-  if (!hasContent) {
-    if (isPlainText) return null;
-    // Streaming with nothing visible yet: render no box at all. The message
-    // shell arrives before its first content, and an empty row would still
-    // claim a slot in the column's gap, pushing the status line down mid
-    // startup. The working lines below own the live edge until content lands.
-    if (isStreaming) return null;
-    // A settled assistant turn with nothing visible to say, either the model spent the
-    // whole turn reasoning or the user stopped it before any text arrived.
-    return (
-      <Text
-        fontSize="langyAnswer"
-        lineHeight="1.5"
-        paddingX="2px"
-        fontStyle="italic"
-        color="fg.muted"
-      >
-        {interrupted ? "Interrupted" : "No content"}
-      </Text>
-    );
-  }
-
-  if (isNotice) {
-    // A notice is something that HAPPENED to the conversation, so it reads as
-    // a quiet line down the middle: no bubble, which would claim the reader
-    // sent it, and no avatar, which would claim Langy said it.
+/**
+ * The developer's own words, as a bubble on the right; or a notice — something that HAPPENED to
+ * the conversation — as a quiet centred line: no bubble, which would claim the reader sent it.
+ */
+function PlainMessage({ message }: { message: UIMessage }) {
+  const text = messageText(message);
+  if (!text && extractProposals(message).length === 0) return null;
+  if (message.role === "system") {
     return (
       <Text
         data-testid="langy-transcript-notice"
@@ -391,171 +175,327 @@ function MessageContentImpl({
       </Text>
     );
   }
-
-  if (isUser) {
-    return (
-      <Box alignSelf="flex-end" maxWidth="85%">
-        <Box
-          paddingX={3}
-          paddingY={2}
-          // Dedicated tokens, not `bg.muted` / `border.muted` — on the light
-          // ground those two are the SAME colour, which left the bubble with no
-          // edge and almost no fill. See `langy.userBubble*` in langyTheme.ts.
-          background="langy.userBubbleBg"
-          color="fg"
-          borderWidth="1px"
-          borderStyle="solid"
-          borderColor="langy.userBubbleBorder"
-          borderRadius="15px"
-          borderBottomRightRadius="5px"
-          textStyle="sm"
-          lineHeight="1.5"
-          whiteSpace="pre-wrap"
-        >
-          {text}
-        </Box>
+  return (
+    <Box alignSelf="flex-end" maxWidth="85%">
+      <Box
+        paddingX={3}
+        paddingY={2}
+        // Dedicated tokens: on the light ground `bg.muted` and `border.muted` are
+        // the SAME colour. See `langy.userBubble*` in langyTheme.ts.
+        background="langy.userBubbleBg"
+        color="fg"
+        borderWidth="1px"
+        borderStyle="solid"
+        borderColor="langy.userBubbleBorder"
+        borderRadius="15px"
+        borderBottomRightRadius="5px"
+        textStyle="sm"
+        lineHeight="1.5"
+        whiteSpace="pre-wrap"
+      >
+        {text}
       </Box>
-    );
-  }
+    </Box>
+  );
+}
 
-  /** Everything `renderRun` needs that belongs to the turn, not to one run. */
+/** The last run carrying the reply: a said line, or an answer with prose in it. */
+function lastAnswerRun(runs: LangyTranscriptRun[]): number {
+  return runs.findLastIndex(
+    (run) =>
+      run.kind === "say" || (run.kind === "answer" && langyRunText(run.parts).trim().length > 0),
+  );
+}
+
+/**
+ * Everything an assistant reply is read into, from its own parts: the runs in their order, the
+ * cards its tool calls raised, the plan, and the prose left once the feedback directive, the
+ * thinking headlines and the narration the cards already say are taken out.
+ */
+function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStreaming: boolean }) {
+  const parts = message.parts;
+  const runs = useMemo(() => langyTranscriptRuns(parts), [parts]);
+  const questionCards = useMemo(
+    () => parts.flatMap((part) => questionToolCardParts(part)),
+    [parts],
+  );
+  const codeAccessCall = useMemo(() => codeAccessCallId(parts), [parts]);
+  const secretSnippets = useMemo(() => secretSnippetCalls(parts), [parts]);
+  const pullRequestLinks = useMemo(() => pullRequestLinksFromToolParts(parts), [parts]);
+  // The live turn prefers the manager's typed plan snapshot; settled ones do not subscribe.
+  const livePlan = useLangyStore((s) => (isStreaming ? s.turnPlan : null));
+  const plan = langyPlan(message, isStreaming ? { overrideItems: livePlan } : undefined);
+  // The hidden [langy:feedback:...] directive: Langy asked for feedback at a high-signal moment.
+  const feedbackDirective = parseLangyFeedbackDirective(messageText(message));
+  const showsActivity = hasLangyActivity(message);
+  const hasActivity = showsActivity || Boolean(plan);
+  // Thinking headlines fold into the receipt on a settled turn, never loose paragraphs above it.
+  const reasoningFold = isStreaming
+    ? { titles: [], text: feedbackDirective.cleanedText }
+    : foldReasoningTitles({ parts, text: feedbackDirective.cleanedText, hasActivity });
+  return {
+    runs,
+    questionCards,
+    codeAccessCall,
+    secretSnippets,
+    pullRequestLinks,
+    plan,
+    feedbackDirective,
+    showsActivity,
+    hasActivity,
+    reasoningTitles: reasoningFold.titles,
+    // The cards already say which skill ran; an opening line saying it again is dropped here.
+    displayText: stripToolNarration({ text: reasoningFold.text, hasActivity }),
+    // Read off the tool parts, never scraped from the model's prose; persisted with the message.
+    progressEvents: githubProgressFromToolParts(parts),
+    prs: githubPrsFromToolParts(parts),
+    proposals: extractProposals(message),
+    hasBlocks: hasLangyBlockParts(parts),
+  };
+}
+
+type AnswerReading = ReturnType<typeof useAnswerReading>;
+
+/** Anything at all to draw: prose, a block, a card, the activity, or the plan. */
+function answerHasContent(reading: AnswerReading): boolean {
+  const cardCount =
+    reading.proposals.length +
+    reading.prs.length +
+    reading.progressEvents.length +
+    reading.questionCards.length +
+    reading.secretSnippets.length;
+  return Boolean(
+    reading.displayText ||
+    reading.hasBlocks ||
+    cardCount > 0 ||
+    reading.showsActivity ||
+    reading.plan,
+  );
+}
+
+/**
+ * WHEN to ask is the backend's `shouldAskFeedback`, the agent's own directive, or /feedback;
+ * `showFeedback` is only the position + settled gate, and never mid-stream.
+ */
+function showsFeedbackPrompt({
+  props,
+  reading,
+}: {
+  props: MessageContentProps;
+  reading: AnswerReading;
+}): boolean {
+  const askedFor =
+    props.isFeedbackPinned ||
+    reading.feedbackDirective.requested ||
+    (props.shouldAskFeedback && isSubstantiveLangyAnswer(reading.displayText));
+  return Boolean(props.showFeedback && !props.isStreaming && reading.displayText && askedFor);
+}
+
+/**
+ * A settled reply with nothing visible to say — the model spent the turn reasoning, or the user
+ * stopped it first. While streaming there is no box at all: the working lines own the live edge.
+ */
+function EmptyAnswer({ isStreaming, interrupted }: { isStreaming: boolean; interrupted: boolean }) {
+  if (isStreaming) return null;
+  return <MutedAnswerLine>{interrupted ? "Interrupted" : "No content"}</MutedAnswerLine>;
+}
+
+function MutedAnswerLine({ children }: { children: string }) {
+  return (
+    <Text
+      fontSize="langyAnswer"
+      lineHeight="1.5"
+      paddingX="2px"
+      fontStyle="italic"
+      color="fg.muted"
+    >
+      {children}
+    </Text>
+  );
+}
+
+/**
+ * An assistant reply, as the sequence it was: the plan (once settled — while the turn runs the
+ * panel holds it above the composer), the runs in their own order, then the cards the turn raised.
+ * No avatar: Langy's mark lives on the launcher and the empty state, nowhere else.
+ */
+function AssistantMessage(props: MessageContentProps) {
+  const { message, isStreaming = false, interrupted = false, conversationId } = props;
+  const { project } = useOrganizationTeamProject();
+  const reading = useAnswerReading({ message, isStreaming });
+  if (!answerHasContent(reading)) {
+    return <EmptyAnswer isStreaming={isStreaming} interrupted={interrupted} />;
+  }
   const view: RunView = {
     isStreaming,
-    isRecorded,
-    hasActivity: hasActivityRecord,
+    // A RECORDED message is left alone: the relay already ruled on its fences.
+    isRecorded: isRecordedMessage(message),
+    hasActivity: reading.hasActivity,
     projectSlug: project?.slug ?? null,
-    pullRequestLinks,
-    choicesTimeline,
-    onChoiceSelect,
-    onVerifyDerivedCard,
-    reasoningTitles: reasoningFold.titles,
-    lastActivityRunIndex,
-    lastAnswerRunIndex,
+    pullRequestLinks: reading.pullRequestLinks,
+    choicesTimeline: props.choicesTimeline,
+    onChoiceSelect: props.onChoiceSelect,
+    onVerifyDerivedCard: props.onVerifyDerivedCard,
+    reasoningTitles: reading.reasoningTitles,
+    lastActivityRunIndex: reading.runs.findLastIndex((run) => run.kind === "activity"),
+    lastAnswerRunIndex: lastAnswerRun(reading.runs),
   };
-
+  const settledPlan = isStreaming ? null : reading.plan;
   return (
-    // No avatar. Langy's mark lives on the launcher and above the empty state's
-    // display line — nowhere else in the panel. A 24px logo tile repeated down
-    // every answer was chrome, and at that size the mark was a smudge anyway.
     <HStack gap={2} align="flex-start" width="full">
       <VStack align="stretch" gap={2.5} flex={1} minWidth={0}>
-        {/* The plan the turn is following. While it runs, LangyPanel holds this
-            above the composer instead (it must not scroll away on the long
-            turns that have one), so it renders here only once the turn is
-            over — the record of what the turn set out to do. */}
-        {plan && !isStreaming ? (
+        {settledPlan ? (
           <LangyCardBoundary scope="the plan">
-            <LangyPlanCard plan={plan} reasoningTitles={reasoningFold.titles} isStreaming={false} />
-          </LangyCardBoundary>
-        ) : null}
-        {/* The turn itself, in its own order: a paragraph, the call it ran, the
-            paragraph after it. Tool activity is all CARDS — a capability's
-            in-progress shell while it runs and its bespoke card once it
-            settles, a generic activity card for everything else — and every
-            mapping still lives in LangyToolActivity. */}
-        {runs.map((run, index) => renderRun({ run, index, view }))}
-        {progressEvents.length > 0 && (
-          <LangyCardBoundary scope="the progress card">
-            <LangyGitHubProgressCard events={progressEvents} live={isStreaming} />
-          </LangyCardBoundary>
-        )}
-        {prs.map((pr) => (
-          <LangyCardBoundary
-            key={`${pr.owner}/${pr.repo}#${pr.number}`}
-            scope="this pull request card"
-          >
-            <LangyGitHubPrCard {...pr} />
-          </LangyCardBoundary>
-        ))}
-        {proposals.map(({ id, proposal }) => (
-          <LangyCardBoundary key={id} scope="this proposal">
-            <ProposalCard
-              proposal={proposal}
-              appliedOutcome={appliedOutcomes[id]}
-              isDiscarded={discardedProposals.has(id)}
-              isApplying={applyingProposals.has(id)}
-              onApply={() => void onApply(id, proposal)}
-              onDiscard={() => onDiscard(id)}
-            />
-          </LangyCardBoundary>
-        ))}
-        {/* The question the agent is waiting on — the interactive choices
-            card, after the prose so the ask reads as the turn's closing line.
-            Lock state derives from the same recorded timeline as a stamped
-            choices block, so an answered question stays marked forever and a
-            moved-on conversation closes it. */}
-        {questionCards.map((part) => (
-          <LangyCardBoundary key={part.blockId} scope="this question">
-            <LangyDerivedCardView
-              card={part.card}
-              projectSlug={project?.slug ?? null}
-              choicesLockState={
-                questionWaitLockState({
-                  blockId: part.blockId,
-                  card: part.card,
-                  waits: questionWaits,
-                }) ??
-                deriveLangyChoicesLockState({
-                  blockId: part.blockId,
-                  timeline: choicesTimeline ?? [],
-                })
-              }
-              onChoiceSelect={onChoiceSelect}
-            />
-          </LangyCardBoundary>
-        ))}
-        {/* How Langy reaches this person's code (ADR-129). Asked once per
-            conversation, by the tool, and answered here. */}
-        {codeAccessCall && conversationId && project?.id ? (
-          <LangyCardBoundary scope="the code access card">
-            <LangyCodeAccessCard
-              projectId={project.id}
-              conversationId={conversationId}
-              callId={codeAccessCall}
-              organizationId={organizationId ?? null}
-              superseded={liveCodeAccessCallId != null && liveCodeAccessCallId !== codeAccessCall}
-              {...(onChoiceSelect ? { onChoiceSelect } : {})}
-              {...(onAskCodeAccessAgain ? { onAskAgain: onAskCodeAccessAgain } : {})}
+            <LangyPlanCard
+              plan={settledPlan}
+              reasoningTitles={reading.reasoningTitles}
+              isStreaming={false}
             />
           </LangyCardBoundary>
         ) : null}
-        {secretSnippets.map((call) => (
-          <LangyCardBoundary key={call.callId} scope="the secret snippet card">
-            <LangySecretSnippetCard organizationId={organizationId ?? null} call={call} />
-          </LangyCardBoundary>
-        ))}
-        {/* WHEN to ask is the backend's `shouldAskFeedback`, the agent's own directive, or
-            /feedback. `showFeedback` is only the position + settled gate. Never mid-stream. */}
-        {/* The reply the user cut short says so, whatever it managed to say
-            first. Without this line a stopped turn that had already run a tool
-            or written a paragraph looked exactly like a finished one, so the
-            reader had to remember they pressed Stop to read the answer
-            correctly. The empty-reply branch above owns the case where there is
-            nothing else at all. */}
-        {interrupted && !isStreaming ? (
-          <Text
-            fontSize="langyAnswer"
-            lineHeight="1.5"
-            paddingX="2px"
-            fontStyle="italic"
-            color="fg.muted"
-          >
-            Interrupted
-          </Text>
-        ) : null}
-        {showsFeedbackPrompt ? (
+        {reading.runs.map((run, index) => renderRun({ run, index, view }))}
+        <AnswerCards
+          props={props}
+          reading={reading}
+          projectId={project?.id}
+          projectSlug={view.projectSlug}
+        />
+        {/* The reply the user cut short says so, whatever it managed to say first. */}
+        {interrupted && !isStreaming ? <MutedAnswerLine>Interrupted</MutedAnswerLine> : null}
+        {showsFeedbackPrompt({ props, reading }) ? (
           <LangyFeedback
             conversationId={conversationId ?? undefined}
             messageId={message.id}
-            sentiment={feedbackDirective.sentiment}
+            sentiment={reading.feedbackDirective.sentiment}
             origin={feedbackOrigin({
-              requested: feedbackDirective.requested,
-              shouldAskFeedback,
+              requested: reading.feedbackDirective.requested,
+              shouldAskFeedback: props.shouldAskFeedback ?? false,
             })}
           />
         ) : null}
       </VStack>
     </HStack>
+  );
+}
+
+/** A message the relay recorded off the durable fold, rather than one this browser streamed. */
+function isRecordedMessage(message: UIMessage): boolean {
+  const metadata = message.metadata;
+  return (
+    typeof metadata === "object" &&
+    metadata !== null &&
+    "recorded" in metadata &&
+    metadata.recorded === true
+  );
+}
+
+/**
+ * The cards the turn raised, after its prose: progress, pull requests, proposals, the question it
+ * waits on (locked by its wait, else by the recorded timeline), code access and secrets.
+ */
+function AnswerCards({
+  props,
+  reading,
+  projectId,
+  projectSlug,
+}: {
+  props: MessageContentProps;
+  reading: AnswerReading;
+  projectId: string | undefined;
+  projectSlug: string | null;
+}) {
+  const organizationId = props.organizationId ?? null;
+  return (
+    <>
+      {reading.progressEvents.length > 0 ? (
+        <LangyCardBoundary scope="the progress card">
+          <LangyGitHubProgressCard
+            events={reading.progressEvents}
+            live={props.isStreaming ?? false}
+          />
+        </LangyCardBoundary>
+      ) : null}
+      {reading.prs.map((pr) => (
+        <LangyCardBoundary
+          key={`${pr.owner}/${pr.repo}#${pr.number}`}
+          scope="this pull request card"
+        >
+          <LangyGitHubPrCard {...pr} />
+        </LangyCardBoundary>
+      ))}
+      {reading.proposals.map(({ id, proposal }) => (
+        <LangyCardBoundary key={id} scope="this proposal">
+          <ProposalCard
+            proposal={proposal}
+            appliedOutcome={props.appliedOutcomes[id]}
+            isDiscarded={props.discardedProposals.has(id)}
+            isApplying={props.applyingProposals.has(id)}
+            onApply={() => void props.onApply(id, proposal)}
+            onDiscard={() => props.onDiscard(id)}
+          />
+        </LangyCardBoundary>
+      ))}
+      {reading.questionCards.map((part) => (
+        <LangyCardBoundary key={part.blockId} scope="this question">
+          <LangyDerivedCardView
+            card={part.card}
+            projectSlug={projectSlug}
+            choicesLockState={questionLockState({ part, props })}
+            onChoiceSelect={props.onChoiceSelect}
+          />
+        </LangyCardBoundary>
+      ))}
+      <CodeAccessCardSlot props={props} callId={reading.codeAccessCall} projectId={projectId} />
+      {reading.secretSnippets.map((call) => (
+        <LangyCardBoundary key={call.callId} scope="the secret snippet card">
+          <LangySecretSnippetCard organizationId={organizationId} call={call} />
+        </LangyCardBoundary>
+      ))}
+    </>
+  );
+}
+
+/** A question's lock state: what its wait settled, else what the recorded timeline says. */
+function questionLockState({
+  part,
+  props,
+}: {
+  part: { blockId: string; card: LangyDerivedCard };
+  props: MessageContentProps;
+}): LangyChoicesLockState {
+  return (
+    questionWaitLockState({ blockId: part.blockId, card: part.card, waits: props.questionWaits }) ??
+    deriveLangyChoicesLockState({ blockId: part.blockId, timeline: props.choicesTimeline ?? [] })
+  );
+}
+
+/**
+ * How Langy reaches this person's code (ADR-129): asked once per conversation by the tool, the
+ * card reading its own state; one hanging on an older call than the live one renders closed.
+ */
+function CodeAccessCardSlot({
+  props,
+  callId,
+  projectId,
+}: {
+  props: MessageContentProps;
+  callId: string | null;
+  projectId: string | undefined;
+}) {
+  const { conversationId, liveCodeAccessCallId, onChoiceSelect, onAskCodeAccessAgain } = props;
+  if (!callId || !conversationId || !projectId) return null;
+  return (
+    <LangyCardBoundary scope="the code access card">
+      <LangyCodeAccessCard
+        projectId={projectId}
+        conversationId={conversationId}
+        callId={callId}
+        organizationId={props.organizationId ?? null}
+        superseded={liveCodeAccessCallId != null && liveCodeAccessCallId !== callId}
+        {...(onChoiceSelect ? { onChoiceSelect } : {})}
+        {...(onAskCodeAccessAgain ? { onAskAgain: onAskCodeAccessAgain } : {})}
+      />
+    </LangyCardBoundary>
   );
 }
 
@@ -771,179 +711,6 @@ function ProseSegment({
       <Markdown fontSize="langyAnswer" linkVariant="langy" color="langy.answerFg">
         {display}
       </Markdown>
-    </Box>
-  );
-}
-
-export function ProposalCard({
-  proposal,
-  appliedOutcome,
-  isDiscarded,
-  isApplying,
-  onApply,
-  onDiscard,
-}: {
-  proposal: LangyProposal;
-  appliedOutcome?: { href?: string; label?: string; onOpen?: () => void };
-  isDiscarded: boolean;
-  isApplying: boolean;
-  onApply: () => void;
-  onDiscard: () => void;
-}) {
-  const router = useRouter();
-  const isApplied = !!appliedOutcome;
-  const destructive = !!proposal.destructive;
-  const openHref = appliedOutcome?.href;
-  const onOpen = appliedOutcome?.onOpen;
-  const openLabel = appliedOutcome?.label ?? "Open";
-  const hasOpen = !!onOpen || !!openHref;
-
-  // Resolve overline copy + colour up front so the JSX below doesn't read
-  // like a five-deep nested ternary. Each branch states one thing.
-  const overlineLabel = (() => {
-    if (isApplied) return destructive ? "Done" : "Applied";
-    if (isDiscarded) return "Discarded";
-    if (isApplying) return destructive ? "Deleting…" : "Applying…";
-    return destructive ? "Wants to delete" : "Proposal";
-  })();
-
-  const overlineColor = (() => {
-    if (destructive && !isApplied) return "var(--chakra-colors-red-fg)";
-    if (isApplied && !destructive) return "var(--chakra-colors-green-fg)";
-    if (isDiscarded) return "var(--chakra-colors-fg-muted)";
-    return "var(--chakra-colors-purple-fg)";
-  })();
-
-  const onOpenHrefClick = useSpaLinkClick(openHref ?? "");
-
-  const triggerOpen = () => {
-    if (onOpen) {
-      onOpen();
-      return;
-    }
-    if (!openHref) return;
-    // A trace link (or any in-app destination) is an SPA route: push it through
-    // the app router so opening the trace keeps the Langy panel and the rest of
-    // the app mounted, instead of a full-page reload that tears the session
-    // down. External links (a GitHub PR, say) still get a real navigation.
-    if (isInternalHref(openHref)) {
-      void router.push(openHref);
-    } else {
-      window.location.href = openHref;
-    }
-  };
-
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={3}
-      background="bg.subtle"
-      opacity={isDiscarded ? 0.65 : 1}
-      cursor={hasOpen ? "pointer" : "default"}
-      // When the card behaves as a button (an applied proposal that opens
-      // something on click) it needs button semantics so keyboard / screen-
-      // reader users can activate it. Without this, only mouse users could
-      // reach the affordance — the inner Open button is the keyboard
-      // fallback but the whole-card click target is invisible to a11y.
-      {...(hasOpen
-        ? {
-            role: "button",
-            tabIndex: 0,
-            "aria-label": `${openLabel}: ${proposal.summary}`,
-            onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
-              if (e.key !== "Enter" && e.key !== " ") return;
-              const target = e.target as HTMLElement;
-              if (target.closest("a, button")) return;
-              e.preventDefault();
-              triggerOpen();
-            },
-          }
-        : {})}
-      onClick={(e) => {
-        if (!hasOpen) return;
-        const target = e.target as HTMLElement;
-        if (target.closest("a, button")) return;
-        triggerOpen();
-      }}
-      transition="border-color 150ms ease, box-shadow 150ms ease"
-      _hover={hasOpen ? { borderColor: "green.fg", boxShadow: "sm" } : undefined}
-    >
-      <HStack
-        gap={1.5}
-        marginBottom={2}
-        textStyle="2xs"
-        fontWeight="600"
-        letterSpacing="0.08em"
-        textTransform="uppercase"
-        color={overlineColor}
-      >
-        {isApplied && !destructive ? <Check size={11} /> : <Sparkles size={11} />}
-        <Text>{overlineLabel}</Text>
-      </HStack>
-      <Text textStyle="sm" fontWeight="600" color="fg" marginBottom={0.5}>
-        {proposal.summary}
-      </Text>
-      {proposal.rationale && (
-        <Text textStyle="xs" color="fg.muted" lineHeight="1.45" marginBottom={3}>
-          {proposal.rationale}
-        </Text>
-      )}
-      {!isApplied && !isDiscarded && (
-        <HStack gap={1.5} paddingTop={proposal.rationale ? 0 : 2.5}>
-          <chakra.button
-            type="button"
-            flex={1}
-            paddingX={3}
-            paddingY={2}
-            borderRadius="md"
-            borderWidth={0}
-            background={destructive ? "var(--chakra-colors-red-solid)" : "transparent"}
-            color="white"
-            fontSize="sm"
-            fontWeight={500}
-            cursor={isApplying ? "default" : "pointer"}
-            opacity={isApplying ? 0.7 : 1}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            gap={1.5}
-            boxShadow={destructive ? undefined : LANGY_ACTION_SHADOW}
-            onClick={onApply}
-            disabled={isApplying}
-            position="relative"
-            overflow="hidden"
-          >
-            {!destructive && <LangyMeshLayer borderRadius="md" active={isApplying} />}
-            <Box position="relative" zIndex={1} display="flex" alignItems="center" gap={1.5}>
-              <Check size={12} />
-              {proposalActionLabel({ isApplying, destructive })}
-            </Box>
-          </chakra.button>
-          <Button size="xs" variant="outline" onClick={onDiscard} disabled={isApplying}>
-            {destructive ? "Cancel" : "Discard"}
-          </Button>
-        </HStack>
-      )}
-      {isApplied && hasOpen && (
-        <HStack paddingTop={2.5}>
-          {onOpen && (
-            <Button size="xs" variant="outline" colorPalette="green" onClick={triggerOpen}>
-              {openLabel}
-              <ArrowRight size={12} />
-            </Button>
-          )}
-          {!onOpen && openHref && (
-            <Button size="xs" variant="outline" colorPalette="green" asChild>
-              <a href={openHref} onClick={onOpenHrefClick}>
-                {openLabel}
-                <ArrowRight size={12} />
-              </a>
-            </Button>
-          )}
-        </HStack>
-      )}
     </Box>
   );
 }

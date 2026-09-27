@@ -29,8 +29,13 @@ export const modelProviderWeb = defineWebModule("model-provider")
       load: () => import("./ui/sections/model-costs-screen.tsx"),
     },
   })
-  /** Lent, not kitted: both read this module's providers (§3.4 rule 7). */
+  /** Lent, not kitted: each reads this module's providers (§3.4 rule 7). */
   .withCapabilities({
+    editModelProviderForm: {
+      load: async () => ({
+        default: (await import("./ui/sections/model-provider-form.tsx")).EditModelProviderForm,
+      }),
+    },
     modelDisplay: {
       load: async () => ({
         default: (await import("./ui/elements/llm-model-display.tsx")).LLMModelDisplay,
