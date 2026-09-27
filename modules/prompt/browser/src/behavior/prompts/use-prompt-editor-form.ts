@@ -326,6 +326,7 @@ function useFormRearm({
 
 type DebouncedLocalConfig = ((config: LocalPromptConfig | undefined) => void) & {
   cancel: () => void;
+  flush: () => void;
 };
 
 /**
@@ -406,7 +407,7 @@ export function usePromptEditorForm(input: EditorFormInput) {
     modelMetadata,
   });
   useFormRearm({ input, refs, setIsFormInitialized });
-  const debouncedUpdateLocalConfig = useMemo(
+  const debouncedUpdateLocalConfig = useMemo<DebouncedLocalConfig>(
     () =>
       debounce(
         (config: LocalPromptConfig | undefined) => refs.onLocalConfigChange.current?.(config),
