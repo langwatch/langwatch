@@ -44,7 +44,7 @@ COPY feature-map.json ./feature-map.json
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
 # The lockfile resolves @langwatch/scenario to a vendored tarball.
 # Every package tsconfig extends the root ones, and build:types builds tsconfig.build.json.
-COPY tsconfig.base.json tsconfig.shared.json tsconfig.build.json ./
+COPY tsconfig.base.json tsconfig.shared.json tsconfig.build.json tsconfig.emit.json ./
 COPY vendor ./vendor
 # The root postinstall runs this script.
 COPY dev/scripts/install-check-shims.mjs ./dev/scripts/install-check-shims.mjs
