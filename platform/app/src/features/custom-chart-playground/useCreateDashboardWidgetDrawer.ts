@@ -38,8 +38,9 @@ export function useCreateDashboardWidgetDrawer({
 
   // The draft previews against the dashboard's own period, the window the
   // widget runs in once placed (as DashboardWidgetFrame reads it), so the
-  // preview and the saved card agree on what the query returns. Epoch
-  // milliseconds keep the dependency stable across renders.
+  // preview and the saved card agree on what the query returns.
+  // usePeriodSelector keeps the Date objects stable until the selected period
+  // changes, so the window is rebuilt only then.
   const { period } = usePeriodSelector();
   const timeWindow = useMemo(
     () => ({

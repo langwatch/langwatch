@@ -212,7 +212,7 @@ docker compose up -d
 
 ### 3.16 or 3.17 to 3.18: Sign-in and SSO
 
-The upgrade keeps existing accounts working with no manual step, apart from the cases below. Checked on a Helm upgrade from 3.16.0 with email and password users, an Okta-configured deployment and domain SSO:
+The upgrade keeps existing accounts working with no manual step, apart from the cases below. A Helm upgrade from 3.16.0 with email and password users, an Okta-configured deployment and domain SSO was tested end to end; the Azure AD account move is covered by tests only:
 
 - Password users sign in with their existing password on the new email-first sign-in page.
 - SSO users land on their existing user and organization. The callback URL stays `/api/auth/callback/<provider>`, so the identity provider registration does not change.
@@ -220,7 +220,7 @@ The upgrade keeps existing accounts working with no manual step, apart from the 
 - Browser sessions and API keys keep working.
 - The identity migrations run on first start. Check **Ops > Migrations** afterwards; see [Check the migration results](#check-the-migration-results).
 
-The first start waits for these migrations before it serves traffic, so give `helm upgrade` a timeout that covers them, for example `--timeout 45m`. The app can restart once or twice while the bundled ClickHouse restarts on its new image; that is expected.
+The first start runs a migration preflight before the app reports ready. `--timeout 45m` on `helm upgrade` gives it room to start. A migration that cannot finish during the preflight stays gated and does not block startup, so check **Ops > Migrations** once the rollout completes. The app can restart once or twice while the bundled ClickHouse restarts on its new image; that is expected.
 
 **Provider setting.** The chart now passes `app.nextAuth.provider` to the app as `AUTH_PROVIDER`. `NEXTAUTH_PROVIDER` is still read and logs a deprecation warning. If you select the provider with `NEXTAUTH_PROVIDER` in `app.extraEnvs`, the chart leaves the setting to you, as before. Outside the chart, set `AUTH_PROVIDER`; when both are set it wins.
 

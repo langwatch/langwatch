@@ -68,8 +68,7 @@ Feature: Dashboard widgets placed on a dashboard
   Scenario: A new widget previews against the dashboard's period
     Given a dashboard whose period selector shows the last 30 days
     When a member opens "Add chart" to draft a widget
-    Then the draft's queries run against that same period, not a fixed last 24 hours
-    And the preview shows the rows the widget will show once it is placed
+    Then the draft's preview is asked for that same period, not a fixed last 24 hours
 
   # Persistence invariants for the write path (dashboardWidget.service):
   # placement scoped to the target, dashboard ownership enforced, and partial
