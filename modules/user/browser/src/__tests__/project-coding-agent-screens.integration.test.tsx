@@ -12,18 +12,15 @@ const state = vi.hoisted(() => ({
   pullRequestsProps: [] as unknown[],
 }));
 
-vi.mock("@langwatch/coding-agent-browser/surfaces/activity", () => ({
-  SessionsTable: (props: unknown) => {
+vi.mock("../behavior/lent-coding-agent-tables.tsx", () => ({
+  CodingAgentSessionsTable: (props: unknown) => {
     state.sessionsProps.push(props);
     return <div data-testid="sessions-table" />;
   },
-  PullRequestsTable: (props: unknown) => {
+  CodingAgentPullRequestsTable: (props: unknown) => {
     state.pullRequestsProps.push(props);
     return <div data-testid="pull-requests-table" />;
   },
-  CodingAgentActivityHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  CodingAgentActivityHost: class {},
-  codingAgentApi: {},
 }));
 
 import { fakePersonalWorkspaceHost, personalWorkspaceHostWrapper } from "../testing.tsx";

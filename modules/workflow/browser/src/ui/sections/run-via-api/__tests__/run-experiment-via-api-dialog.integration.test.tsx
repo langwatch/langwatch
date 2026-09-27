@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { RunViaApiDialog } from "../run-via-api-button.tsx";
+import { RunExperimentViaApiDialog } from "../run-experiment-via-api-dialog.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -16,7 +16,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 
 const renderDialog = () =>
   render(
-    <RunViaApiDialog
+    <RunExperimentViaApiDialog
       open={true}
       onOpenChange={() => {}}
       experimentSlug="my-experiment"
@@ -38,7 +38,7 @@ const click = async (label: string) => {
   await user.click(screen.getByText(label));
 };
 
-describe("RunViaApiDialog (evaluations-v3)", () => {
+describe("RunExperimentViaApiDialog (evaluations-v3)", () => {
   afterEach(() => {
     cleanup();
   });

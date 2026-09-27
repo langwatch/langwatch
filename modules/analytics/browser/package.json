@@ -18,11 +18,6 @@
       "langwatch-declaration-source": "./src/ui/sections/custom-graph.tsx",
       "types": "./dist/ui/sections/custom-graph.d.ts",
       "default": "./src/ui/sections/custom-graph.tsx"
-    },
-    "./surfaces/filter-sidebar": {
-      "langwatch-declaration-source": "./src/ui/sections/filters/filter-sidebar.tsx",
-      "types": "./dist/ui/sections/filters/filter-sidebar.d.ts",
-      "default": "./src/ui/sections/filters/filter-sidebar.tsx"
     }
   },
   "scripts": {

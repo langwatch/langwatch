@@ -12,31 +12,6 @@
       "langwatch-declaration-source": "./src/prompt.web.ts",
       "types": "./dist/prompt.web.d.ts",
       "default": "./src/prompt.web.ts"
-    },
-    "./llm-config-field": {
-      "langwatch-declaration-source": "./src/llm-config-field.ts",
-      "types": "./dist/llm-config-field.d.ts",
-      "default": "./src/llm-config-field.ts"
-    },
-    "./llm-config-popover": {
-      "langwatch-declaration-source": "./src/llm-config-popover.ts",
-      "types": "./dist/llm-config-popover.d.ts",
-      "default": "./src/llm-config-popover.ts"
-    },
-    "./outputs-section": {
-      "langwatch-declaration-source": "./src/outputs-section.ts",
-      "types": "./dist/outputs-section.d.ts",
-      "default": "./src/outputs-section.ts"
-    },
-    "./surfaces/prompt-editor-drawer": {
-      "langwatch-declaration-source": "./src/ui/sections/prompts/prompt-editor-drawer.tsx",
-      "types": "./dist/ui/sections/prompts/prompt-editor-drawer.d.ts",
-      "default": "./src/ui/sections/prompts/prompt-editor-drawer.tsx"
-    },
-    "./llm-prompt-config-utils": {
-      "langwatch-declaration-source": "./src/llm-prompt-config-utils.ts",
-      "types": "./dist/llm-prompt-config-utils.d.ts",
-      "default": "./src/llm-prompt-config-utils.ts"
     }
   },
   "scripts": {

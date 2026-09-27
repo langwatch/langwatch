@@ -13,21 +13,6 @@
       "langwatch-declaration-source": "./src/experiment.web.ts",
       "types": "./dist/experiment.web.d.ts",
       "default": "./src/experiment.web.ts"
-    },
-    "./batch-evaluation-state": {
-      "langwatch-declaration-source": "./src/batch-evaluation-state.ts",
-      "types": "./dist/batch-evaluation-state.d.ts",
-      "default": "./src/batch-evaluation-state.ts"
-    },
-    "./comparison-config-form": {
-      "langwatch-declaration-source": "./src/comparison-config-form.ts",
-      "types": "./dist/comparison-config-form.d.ts",
-      "default": "./src/comparison-config-form.ts"
-    },
-    "./evaluator-editor-callbacks": {
-      "langwatch-declaration-source": "./src/evaluator-editor-callbacks.ts",
-      "types": "./dist/evaluator-editor-callbacks.d.ts",
-      "default": "./src/evaluator-editor-callbacks.ts"
     }
   },
   "scripts": {

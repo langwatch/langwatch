@@ -26,7 +26,6 @@ import {
   type TwoStepAnswer,
   type TwoStepSetup,
 } from "./model/personal-workspace-host.ts";
-import { CodingAgentHostBridge } from "./ui/sections/coding-agent-host-provider.tsx";
 
 export type PersonalQuery = Readonly<Record<string, string | undefined>>;
 
@@ -355,11 +354,7 @@ function PersonalHostHarness({
     () => host.withQuery({ query, commitQuery: (next) => setQuery(next) }),
     [host, query],
   );
-  return (
-    <PersonalWorkspaceHostProvider value={live}>
-      <CodingAgentHostBridge>{children}</CodingAgentHostBridge>
-    </PersonalWorkspaceHostProvider>
-  );
+  return <PersonalWorkspaceHostProvider value={live}>{children}</PersonalWorkspaceHostProvider>;
 }
 
 /**

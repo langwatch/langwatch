@@ -1,8 +1,9 @@
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { useBatchRunSelection, useBatchRunsPolling } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
-import type { Experiment, Project } from "@langwatch/workflow-contract";
+import type { Experiment } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
 
 /**
@@ -15,7 +16,7 @@ export const useBatchEvaluationState = ({
   selectedRunId,
   setSelectedRunId,
 }: {
-  project?: Project;
+  project?: UiHostProject;
   experiment?: Experiment;
   selectedRunId?: string;
   setSelectedRunId?: (runId: string) => void;

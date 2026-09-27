@@ -12,12 +12,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { downloadCsv } from "@langwatch/csv/download";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { readableDate } from "@langwatch/experiment-browser-kit";
 import { toEpochMs } from "@langwatch/time";
-import type { Experiment, Project } from "@langwatch/workflow-contract";
+import type { Experiment } from "@langwatch/workflow-contract";
 import numeral from "numeral";
 import { Download } from "react-feather";
 
@@ -292,7 +293,7 @@ export default function BatchEvaluation({
   experiment,
   evaluations,
 }: {
-  project: Project;
+  project: UiHostProject;
   experiment: Experiment;
   evaluations: { data?: BatchEvaluation[]; isLoading: boolean };
 }) {

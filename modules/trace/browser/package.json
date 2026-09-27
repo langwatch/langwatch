@@ -18,11 +18,6 @@
       "types": "./dist/ui/sections/setup-with-agent-button.d.ts",
       "default": "./src/ui/sections/setup-with-agent-button.tsx"
     },
-    "./surfaces/traces-mapping": {
-      "langwatch-declaration-source": "./src/ui/sections/traces/traces-mapping.tsx",
-      "types": "./dist/ui/sections/traces/traces-mapping.d.ts",
-      "default": "./src/ui/sections/traces/traces-mapping.tsx"
-    },
     "./surfaces/presence-menu-item": {
       "langwatch-declaration-source": "./src/ui/sections/presence/presence-menu-item.tsx",
       "types": "./dist/ui/sections/presence/presence-menu-item.d.ts",

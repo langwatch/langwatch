@@ -1,5 +1,6 @@
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { api } from "@langwatch/browser-trpc/workflow-api";
-import type { Experiment, Project } from "@langwatch/workflow-contract";
+import type { Experiment } from "@langwatch/workflow-contract";
 
 import type { BatchEvaluation } from "../../model/prisma-types.ts";
 
@@ -12,7 +13,7 @@ export const useLegacyBatchEvaluations = ({
   experiment,
   enabled,
 }: {
-  project: Project | undefined;
+  project: UiHostProject | undefined;
   experiment: Experiment | undefined;
   enabled: boolean;
 }) => {

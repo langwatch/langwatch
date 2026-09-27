@@ -1,10 +1,11 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { downloadCsv } from "@langwatch/csv/download";
 import { readableDate } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
-import type { Experiment, Project } from "@langwatch/workflow-contract";
+import type { Experiment } from "@langwatch/workflow-contract";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
 
@@ -42,7 +43,7 @@ export const useBatchEvaluationResults = ({
   runId,
   isFinished,
 }: {
-  project: Project;
+  project: UiHostProject;
   experiment: Experiment;
   runId: string | undefined;
   isFinished: boolean;
@@ -257,7 +258,7 @@ export const useBatchEvaluationDownloadCSV = ({
   runId,
   isFinished,
 }: {
-  project: Project;
+  project: UiHostProject;
   experiment: Experiment;
   runId: string | undefined;
   isFinished: boolean;

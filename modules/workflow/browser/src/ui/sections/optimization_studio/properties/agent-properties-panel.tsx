@@ -16,14 +16,9 @@ import {
   DEFAULT_CODE,
   getCodeFromConfig,
 } from "@langwatch/agent-contract/code-config";
+import type { UiNodeOutput } from "@langwatch/browser-host/declarations";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { type FieldMapping, type Variable, VariablesSection } from "@langwatch/prompt-browser-kit";
-import {
-  CODE_OUTPUT_TYPES,
-  type Output,
-  OutputsSection,
-  type OutputType,
-} from "@langwatch/prompt-browser/outputs-section";
 import { useRegisterDrawerFooter, renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import type {
   HttpAuth,
@@ -42,6 +37,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useHttpTest } from "../../../../behavior/agents/http/index.ts";
 import { HttpConfigEditor } from "../../../../behavior/lent-agent.tsx";
+import { OutputsSection } from "../../../../behavior/lent-prompt.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {
@@ -117,6 +113,8 @@ function buildHttpConfig({
  * Renders agent configuration inline (HTTP tabs or code editor),
  * matching the pattern used by EvaluatorPropertiesPanel.
  */
+const CODE_OUTPUT_TYPES: UiNodeOutput["type"][] = ["str", "float", "bool", "dict", "list", "image"];
+
 export function AgentPropertiesPanel({ node }: { node: Node<AgentComponent> }) {
   const agentRef = node.data.agent;
 
@@ -304,9 +302,9 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     type: input.type,
   }));
 
-  const outputs: Output[] = (node.data.outputs ?? []).map((output) => ({
+  const outputs: UiNodeOutput[] = (node.data.outputs ?? []).map((output) => ({
     identifier: output.identifier,
-    type: output.type as OutputType,
+    type: output.type as UiNodeOutput["type"],
   }));
 
   const handleInputsChange = useCallback(
@@ -319,7 +317,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   );
 
   const handleOutputsChange = useCallback(
-    (newOutputs: Output[]) => {
+    (newOutputs: UiNodeOutput[]) => {
       const mapped: DslField[] = newOutputs.map((o) => ({
         identifier: o.identifier,
         type: o.type as DslField["type"],

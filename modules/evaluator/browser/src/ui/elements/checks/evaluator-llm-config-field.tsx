@@ -2,13 +2,13 @@ import { Box, HStack, Skeleton } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
 import { allModelOptions, NoModelsConfiguredCallout } from "@langwatch/model-provider-browser-kit";
 import { toInternalKey } from "@langwatch/prompt-browser-kit";
-import { LLMConfigPopover } from "@langwatch/prompt-browser/llm-config-popover";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { useFormContext, useWatch } from "react-hook-form";
 
 import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
+import { LLMConfigPopover } from "../../../behavior/lent-peers.tsx";
 import { useModelSelection } from "../../../behavior/use-model-selection.ts";
 
 /**

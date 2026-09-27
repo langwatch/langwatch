@@ -1,12 +1,10 @@
-import { allModelOptions } from "@langwatch/model-provider-browser-kit";
-import { LLMConfigField } from "@langwatch/prompt-browser/llm-config-field";
-import type { Output } from "@langwatch/prompt-browser/llm-config-popover";
+import type { UiNodeOutput } from "@langwatch/browser-host/declarations";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { normalizeWorkflowLlmConfig } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
 
+import { LLMConfigField } from "../../../../../behavior/lent-prompt.tsx";
 import { useOrganizationTeamProject } from "../../../../../behavior/studio-host/use-organization-team-project.ts";
-import { useModelSelection } from "../../../../../behavior/use-model-selection.ts";
 import { useWorkflowStore } from "../../../../../behavior/use-workflow-store.ts";
 
 type OptimizationStudioLLMConfigFieldProps = {
@@ -14,9 +12,9 @@ type OptimizationStudioLLMConfigFieldProps = {
   onChange: (llmConfig: LLMConfig) => void;
   showProviderKeyMessage?: boolean;
   /** Outputs configuration (for structured outputs) */
-  outputs?: Output[];
+  outputs?: UiNodeOutput[];
   /** Callback when outputs change */
-  onOutputsChange?: (outputs: Output[]) => void;
+  onOutputsChange?: (outputs: UiNodeOutput[]) => void;
   /** Whether to show the structured outputs section */
   showStructuredOutputs?: boolean;
 };
@@ -34,11 +32,6 @@ export function OptimizationStudioLLMConfigField({
   showStructuredOutputs = false,
 }: OptimizationStudioLLMConfigFieldProps) {
   const model = llmConfig?.model ?? "";
-  const { modelOption, isEmpty } = useModelSelection({
-    options: allModelOptions,
-    model,
-    mode: "chat",
-  });
 
   const { hasCodeNodes } = useWorkflowStore((state) => ({
     hasCodeNodes: state.nodes.some((node) => node.type === "code"),
@@ -63,13 +56,11 @@ export function OptimizationStudioLLMConfigField({
     <LLMConfigField
       llmConfig={llmConfig}
       onChange={handleChange}
-      modelOption={modelOption}
       requiresCustomKey={requiresCustomKey}
       showProviderKeyMessage={showProviderKeyMessage}
       outputs={outputs}
       onOutputsChange={onOutputsChange}
       showStructuredOutputs={showStructuredOutputs}
-      noModelsConfigured={isEmpty}
     />
   );
 }

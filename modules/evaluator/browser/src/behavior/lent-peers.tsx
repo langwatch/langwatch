@@ -1,10 +1,11 @@
-/** What analytics, trace and experiment lend this module by declaration (§3.4 rule 7). */
+/** What analytics, trace, experiment and prompt lend this module (§3.4 rule 7). */
 
 import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
 import type {
   UiComparisonConfigFormProps,
   UiEvaluatorTracesMappingProps,
   UiFilterSidebarProps,
+  UiLlmConfigPopoverProps,
 } from "@langwatch/browser-host/declarations";
 import { lazy, Suspense, useMemo } from "react";
 
@@ -50,6 +51,23 @@ export function ComparisonConfigForm(props: UiComparisonConfigFormProps) {
     () =>
       declarations
         .declared("comparisonConfigForm")
+        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
+    [declarations],
+  );
+  return lent.map(({ key, Lent }) => (
+    <Suspense key={key} fallback={null}>
+      <Lent {...props} />
+    </Suspense>
+  ));
+}
+
+/** Prompt's LLM parameter popover content. */
+export function LLMConfigPopover(props: UiLlmConfigPopoverProps) {
+  const declarations = useUiDeclarations();
+  const lent = useMemo(
+    () =>
+      declarations
+        .declared("llmConfigPopover")
         .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
     [declarations],
   );

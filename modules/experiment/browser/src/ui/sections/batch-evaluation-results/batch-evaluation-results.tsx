@@ -2,6 +2,7 @@
 
 import { Alert, Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { ExternalImage } from "@langwatch/design-system/external-image";
@@ -29,7 +30,6 @@ import {
 } from "@langwatch/experiment-browser-kit";
 import type { Experiment } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
-import type { Project } from "@langwatch/workflow-contract";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -46,7 +46,7 @@ import { ComparisonCharts } from "../batch-results/comparison-charts.tsx";
 import { BatchEvaluationResultsHeader } from "./batch-evaluation-results-header.tsx";
 
 type BatchEvaluationResultsProps = {
-  project?: Project;
+  project?: UiHostProject;
   experiment?: Experiment;
   /** Size variant */
   size?: "sm" | "md";

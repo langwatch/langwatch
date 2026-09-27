@@ -1,6 +1,5 @@
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { VariablesSection } from "@langwatch/prompt-browser-kit";
-import { OutputsSection } from "@langwatch/prompt-browser/outputs-section";
 import { InsideDrawerProvider, renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import type {
   AgentComponent,
@@ -17,6 +16,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useHttpTest } from "../../../../behavior/agents/http/index.ts";
 import { HttpConfigEditor } from "../../../../behavior/lent-agent.tsx";
+import { OutputsSection } from "../../../../behavior/lent-prompt.tsx";
 import { useGetDatasetData } from "../../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import { LiquidConditionEditor } from "../../../elements/code/liquid-condition-editor.tsx";

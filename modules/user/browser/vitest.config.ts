@@ -12,9 +12,6 @@ export default defineConfig({
       "@langwatch/coding-agent-contract": fileURLToPath(
         new URL("../../coding-agent/contract/src/index.ts", import.meta.url),
       ),
-      "@langwatch/coding-agent-browser/surfaces/activity": fileURLToPath(
-        new URL("../../coding-agent/browser/src/activity.ts", import.meta.url),
-      ),
       "@langwatch/coding-agent-browser/surfaces/pull-requests": fileURLToPath(
         new URL("../../coding-agent/browser/src/pull-requests.ts", import.meta.url),
       ),

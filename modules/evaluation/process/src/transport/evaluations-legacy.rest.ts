@@ -4,7 +4,7 @@
  * @see specs/monitors/guardrails-api-compatibility.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
 import { mapZodIssuesToLogContext } from "@langwatch/config";
 import {
   EvaluationApi,
@@ -51,7 +51,7 @@ import { nowInstant } from "@langwatch/time";
 import { getInputsOutputs, type StudioEdge, type StudioNode } from "@langwatch/workflow-contract";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { ZodError as ZodErrorClass, z } from "zod";
+import { ZodError as ZodErrorClass } from "zod";
 import { fromZodError } from "zod-validation-error";
 
 import {
@@ -123,24 +123,24 @@ const EVALUATE_RESPONSES = {
   200: {
     description:
       "The evaluator ran, declined, or failed. Branch on `status`; in guardrail mode `passed` is set on all three.",
-    content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(evaluateResponseSchema) } },
+    content: { [PRODUCES_JSON]: { schema: resolver(evaluateResponseSchema) } },
   },
   400: {
     description:
       "The body was not valid JSON, failed validation, or omitted a field this evaluator requires",
-    content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(evaluateErrorSchema) } },
+    content: { [PRODUCES_JSON]: { schema: resolver(evaluateErrorSchema) } },
   },
   401: {
     description: "Missing or invalid API key",
-    content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(evaluateErrorSchema) } },
+    content: { [PRODUCES_JSON]: { schema: resolver(evaluateErrorSchema) } },
   },
   403: {
     description: "The API key lacks evaluations:manage",
-    content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(evaluateErrorSchema) } },
+    content: { [PRODUCES_JSON]: { schema: resolver(evaluateErrorSchema) } },
   },
   404: {
     description: "No evaluator answers to that id",
-    content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(evaluateErrorSchema) } },
+    content: { [PRODUCES_JSON]: { schema: resolver(evaluateErrorSchema) } },
   },
 } as const;
 
@@ -179,7 +179,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
       200: {
         description: "The evaluator catalogue",
         content: {
-          [PRODUCES_JSON]: { schema: z.toJSONSchema(evaluatorCatalogueResponseSchema) },
+          [PRODUCES_JSON]: { schema: resolver(evaluatorCatalogueResponseSchema) },
         },
       },
     },
@@ -204,20 +204,20 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     responses: {
       200: {
         description: "The rows were recorded",
-        content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(acknowledgementSchema) } },
+        content: { [PRODUCES_JSON]: { schema: resolver(acknowledgementSchema) } },
       },
       400: {
         description:
           "The request was not sent as application/json, failed validation, named neither experiment_id nor experiment_slug, or carried timestamps in seconds rather than milliseconds",
-        content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(legacySentenceErrorSchema) } },
+        content: { [PRODUCES_JSON]: { schema: resolver(legacySentenceErrorSchema) } },
       },
       401: {
         description: "Missing or invalid API key",
-        content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(evaluateErrorSchema) } },
+        content: { [PRODUCES_JSON]: { schema: resolver(evaluateErrorSchema) } },
       },
       403: {
         description: "The API key lacks evaluations:manage",
-        content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(evaluateErrorSchema) } },
+        content: { [PRODUCES_JSON]: { schema: resolver(evaluateErrorSchema) } },
       },
     },
   })
@@ -320,24 +320,24 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     responses: {
       200: {
         description: "The evaluator ran; branch on `status`",
-        content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(evaluateResponseSchema) } },
+        content: { [PRODUCES_JSON]: { schema: resolver(evaluateResponseSchema) } },
       },
       400: {
         description:
           "The body was not valid JSON, failed validation, or named an evaluator that does not exist",
-        content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(legacySentenceErrorSchema) } },
+        content: { [PRODUCES_JSON]: { schema: resolver(legacySentenceErrorSchema) } },
       },
       401: {
         description: "Missing or invalid API key",
-        content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(legacySentenceErrorSchema) } },
+        content: { [PRODUCES_JSON]: { schema: resolver(legacySentenceErrorSchema) } },
       },
       403: {
         description: "The API key lacks evaluations:manage",
-        content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(evaluateErrorSchema) } },
+        content: { [PRODUCES_JSON]: { schema: resolver(evaluateErrorSchema) } },
       },
       404: {
         description: "No dataset with that slug",
-        content: { [PRODUCES_JSON]: { schema: z.toJSONSchema(evaluateErrorSchema) } },
+        content: { [PRODUCES_JSON]: { schema: resolver(evaluateErrorSchema) } },
       },
       413: {
         description:

@@ -13152,6 +13152,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../packages/ksuid
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -13991,9 +13994,6 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
-      '@langwatch/coding-agent-browser':
-        specifier: workspace:*
-        version: link:../../coding-agent/browser
       '@langwatch/coding-agent-browser-kit':
         specifier: workspace:*
         version: link:../../coding-agent/browser-kit

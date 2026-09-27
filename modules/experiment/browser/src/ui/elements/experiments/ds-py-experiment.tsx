@@ -17,6 +17,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import type { WorkflowApiRouter } from "@langwatch/browser-trpc/workflow-api";
 import { api } from "@langwatch/browser-trpc/workflow-api";
@@ -34,8 +35,7 @@ import type {
   ExperimentRunWorkflowVersion,
 } from "@langwatch/experiment-contract";
 import { FormatMoney } from "@langwatch/workflow-browser-kit";
-import { VersionBox } from "@langwatch/workflow-browser/version-history";
-import type { Experiment, Project } from "@langwatch/workflow-contract";
+import type { Experiment } from "@langwatch/workflow-contract";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import numeral from "numeral";
@@ -74,6 +74,7 @@ import { LLMIcon } from "@langwatch/design-system/icons";
 import { Switch } from "@langwatch/design-system/switch";
 
 import { RenderInputOutput } from "../../../behavior/lent-trace.tsx";
+import { VersionBox } from "../../../behavior/lent-workflow.tsx";
 import { readKey } from "../../../model/experiments/BatchEvaluationV2/utils.ts";
 import { ChartTooltip } from "../analytics/chart-tooltip.tsx";
 import { FeedbackLink } from "../feedback-link.tsx";
@@ -130,7 +131,7 @@ export function DSPyExperiment({
   project,
   experiment,
 }: {
-  project: Project;
+  project: UiHostProject;
   experiment: Experiment;
 }) {
   const {
@@ -290,7 +291,7 @@ export const useDSPyExperimentState = ({
   setSelectedRuns,
   incomingRunIds = [],
 }: {
-  project: Project;
+  project: UiHostProject;
   experiment: Experiment;
   selectedRuns?: string[];
   setSelectedRuns?: (runs: string[]) => void;
@@ -862,7 +863,7 @@ export const RunDetails = React.memo(
     workflowVersion,
     size = "md",
   }: {
-    project: Project;
+    project: UiHostProject;
     experiment: Experiment;
     dspyStepSummary: DSPyStepSummary;
     workflowVersion?: ExperimentRunWorkflowVersion;
@@ -1408,7 +1409,7 @@ export function DSPyExperimentSummary({
   onApply,
   onViewLogs,
 }: {
-  project: Project;
+  project: UiHostProject;
   experiment: Experiment;
   run: DSPyRunsSummary | undefined;
   onApply?: (appliedOptimizations: AppliedOptimization[]) => void;

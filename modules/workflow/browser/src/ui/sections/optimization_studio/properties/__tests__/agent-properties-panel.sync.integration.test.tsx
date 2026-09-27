@@ -90,8 +90,7 @@ vi.mock("@langwatch/prompt-browser-kit", () => ({
   VariablesSection: () => null,
 }));
 
-vi.mock("@langwatch/prompt-browser/outputs-section", () => ({
-  CODE_OUTPUT_TYPES: ["str"],
+vi.mock("../../../../../behavior/lent-prompt.tsx", () => ({
   OutputsSection: () => null,
 }));
 

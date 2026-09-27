@@ -14,6 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Link } from "@langwatch/browser-host/link";
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
@@ -23,8 +24,7 @@ import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
 import { FormatMoney } from "@langwatch/workflow-browser-kit";
 import { useDejaViewLink } from "@langwatch/workflow-browser/surfaces/deja-view-link";
-import { VersionBox } from "@langwatch/workflow-browser/version-history";
-import type { Experiment, Project } from "@langwatch/workflow-contract";
+import type { Experiment } from "@langwatch/workflow-contract";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import React from "react";
@@ -35,6 +35,7 @@ import {
   useBatchEvaluationResults,
 } from "../../../behavior/experiments/use-batch-evaluation-run-results.ts";
 import { useBatchEvaluationState } from "../../../behavior/experiments/use-batch-evaluation-runs.ts";
+import { VersionBox } from "../../../behavior/lent-workflow.tsx";
 import {
   BatchEvaluationV2EvaluationSummary,
   formatEvaluationSummary,
@@ -55,7 +56,7 @@ export function BatchEvaluationV2({
   project,
   experiment,
 }: {
-  project: Project;
+  project: UiHostProject;
   experiment: Experiment;
 }) {
   const { batchEvaluationRuns, selectedRun, selectedRunId, setSelectedRunId, isFinished } =
