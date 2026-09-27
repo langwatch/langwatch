@@ -9,8 +9,10 @@ import { LOCAL_CONTROL_PROTOCOL_VERSION, type RegisterFrame } from "@langwatch/l
 import { memorySessionState } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { RedisLangyLocalControlRuntimeRepository } from "../../repositories/redis/redis.langy-local-control-runtime.repository.ts";
+import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
+import { nullLocalBuffer } from "../../rules/langy-local-call-record.rules.ts";
 import { readSessionKeyCredential } from "../../rules/langy-local-control-connect.rules.ts";
+import { LangyLocalControlRuntimeService } from "../../services/langy-local-control-runtime.service.ts";
 import { LocalControlLongPollService } from "../langy-local-control-long-poll.service.ts";
 import { LocalControlSessionCoreService } from "../langy-local-session.service.ts";
 
@@ -20,7 +22,7 @@ const conversationId = "conversation_1";
 const PERSONAL_KEY = "sk-lw-personal";
 
 let minted: Map<string, string>;
-let runtime: ReturnType<typeof RedisLangyLocalControlRuntimeRepository.create>;
+let runtime: LangyLocalControlRuntimeService;
 let longPoll: LocalControlLongPollService;
 
 const apiKeys = createApiFixture<ApiKeyApi>({
@@ -51,8 +53,9 @@ const apiKeys = createApiFixture<ApiKeyApi>({
 beforeEach(() => {
   minted = new Map();
   const store = memorySessionState();
-  runtime = RedisLangyLocalControlRuntimeRepository.create({
+  runtime = LangyLocalControlRuntimeService.create({
     store,
+    presence: LangyLocalPresenceRedisRepository.create({ store }),
     projects: { getOrganizationId: async () => "org_1", getSlug: async () => "local" },
     mintSessionKey: async () => {
       const token = `sk-lw-minted-${minted.size}`;
@@ -60,7 +63,7 @@ beforeEach(() => {
       return { token, apiKeyId: minted.get(token) ?? "" };
     },
     events: { startUserWait: async () => undefined, endUserWait: async () => undefined },
-    buffer: RedisLangyLocalControlRuntimeRepository.nullBuffer(),
+    buffer: nullLocalBuffer(),
   });
   longPoll = LocalControlLongPollService.create({
     holdMs: 20,

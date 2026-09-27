@@ -216,7 +216,9 @@ describe("given the langy repository registry", () => {
       });
 
       expect(Object.keys(repositories).toSorted()).toEqual([
+        "feedbackPrompts",
         "frameDedup",
+        "githubPrCounts",
         "localPresence",
         "resourceLinks",
         "sessionState",

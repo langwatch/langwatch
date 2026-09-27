@@ -6,7 +6,7 @@ import {
   useLangyStore,
 } from "@langwatch/langy-browser-kit";
 import { Check, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * Duplicated from `@langwatch/langy-browser-kit`'s own copy (which serves `useLangyContextTarget`)
@@ -282,124 +282,115 @@ function OfferHint() {
   );
 }
 
-function ActiveLayer() {
-  const setProximity = useLangyContextTargetStore((s) => s.setProximity);
-  const hoveredId = useLangyContextTargetStore((s) => s.hoveredId);
+type Pointer = { x: number; y: number };
 
-  // Rect cache. Reading ~30 bounding rects on every pointer move would force a
-  // layout flush per frame; instead we measure once and re-measure only when
-  // the geometry can actually have changed — targets mounting/unmounting (the
-  // virtualizer), scroll, resize. Pointer moves then cost pure arithmetic.
-  const rectsRef = useRef<TargetRect[]>([]);
-  const pointerRef = useRef<{ x: number; y: number } | null>(null);
-  const frameRef = useRef<number | null>(null);
+/**
+ * Every reachable target's rect. A row behind an open drawer is still in the DOM and registered;
+ * dropping it here is what stops the page glowing THROUGH whatever covers it.
+ */
+function measureTargets(): TargetRect[] {
+  const rects: TargetRect[] = [];
+  for (const element of document.querySelectorAll<HTMLElement>("[data-langy-target]")) {
+    const id = element.dataset.langyTarget;
+    if (id && isReachable(element)) rects.push({ id, rect: element.getBoundingClientRect() });
+  }
+  return rects;
+}
 
-  const measure = useCallback(() => {
-    const elements = document.querySelectorAll<HTMLElement>("[data-langy-target]");
-    const rects: TargetRect[] = [];
-    for (const element of elements) {
-      const id = element.dataset.langyTarget;
-      if (!id) continue;
-      // A row behind an open drawer is still in the DOM, still registered, and
-      // still has a perfectly good rect. Dropping it here is what stops the
-      // page glowing THROUGH whatever is covering it.
-      if (!isReachable(element)) continue;
-      rects.push({ id, rect: element.getBoundingClientRect() });
-    }
-    rectsRef.current = rects;
-  }, []);
+/**
+ * Which target is under the pointer is a HIT TEST, not arithmetic. Our own floating button counts
+ * as still on the target (see OVERLAY_ATTR).
+ */
+function hoveredTargetAt(pointer: Pointer): string | null {
+  const hit = document.elementFromPoint(pointer.x, pointer.y);
+  if (hit?.closest(`[${OVERLAY_ATTR}]`)) return useLangyContextTargetStore.getState().hoveredId;
+  const target = hit?.closest<HTMLElement>("[data-langy-target]");
+  if (!target || !isReachable(target)) return null;
+  return target.dataset.langyTarget ?? null;
+}
 
-  const resolve = useCallback(() => {
-    frameRef.current = null;
-    const pointer = pointerRef.current;
+/**
+ * Tracks which targets the pointer is near and over. Rects are cached and re-measured only when
+ * geometry can have changed (targets mounting, scroll, resize, a drawer taking focus), so a
+ * pointer move costs pure arithmetic, resolved at most once a frame.
+ */
+class TargetProximity {
+  private rects: TargetRect[] = [];
+  private pointer: Pointer | undefined;
+  private frame: number | undefined;
+  private unsubscribe: (() => void) | undefined;
+
+  attach(): void {
+    this.rects = measureTargets();
+    window.addEventListener("pointermove", this.onPointerMove, { passive: true });
+    document.addEventListener("pointerleave", this.onPointerLeave);
+    // Capture: the trace table scrolls in its own viewport, which a window listener never hears.
+    window.addEventListener("scroll", this.onGeometryChange, { passive: true, capture: true });
+    window.addEventListener("resize", this.onGeometryChange, { passive: true });
+    // A drawer opening takes focus and hides what is behind it: the moment to re-measure.
+    document.addEventListener("focusin", this.onGeometryChange);
+    // Rows mount and unmount as the virtualizer scrolls: dirty the cache, never re-render.
+    this.unsubscribe = useLangyContextTargetStore.subscribe((state, previous) => {
+      if (state.targets !== previous.targets) this.onGeometryChange();
+    });
+  }
+
+  dispose(): void {
+    window.removeEventListener("pointermove", this.onPointerMove);
+    document.removeEventListener("pointerleave", this.onPointerLeave);
+    window.removeEventListener("scroll", this.onGeometryChange, { capture: true });
+    window.removeEventListener("resize", this.onGeometryChange);
+    document.removeEventListener("focusin", this.onGeometryChange);
+    this.unsubscribe?.();
+    if (this.frame !== undefined) cancelAnimationFrame(this.frame);
+    useLangyContextTargetStore.getState().setProximity({ nearIds: [], hoveredId: null });
+  }
+
+  private readonly onPointerMove = (event: PointerEvent) => {
+    this.pointer = { x: event.clientX, y: event.clientY };
+    this.schedule();
+  };
+
+  private readonly onPointerLeave = () => {
+    this.pointer = undefined;
+    this.schedule();
+  };
+
+  private readonly onGeometryChange = () => {
+    this.rects = measureTargets();
+    this.schedule();
+  };
+
+  private schedule(): void {
+    if (this.frame === undefined) this.frame = requestAnimationFrame(this.resolve);
+  }
+
+  private readonly resolve = () => {
+    this.frame = undefined;
+    const targets = useLangyContextTargetStore.getState();
+    const pointer = this.pointer;
     if (!pointer) {
-      setProximity({ nearIds: [], hoveredId: null });
+      targets.setProximity({ nearIds: [], hoveredId: null });
       return;
     }
+    const hovered = hoveredTargetAt(pointer);
+    // Reaching for a revealed target holds its light: an offer that expires under the
+    // pointer taking it up is worse than no offer.
+    if (hovered && targets.revealedIds.has(hovered)) targets.holdReveal();
+    const nearIds = this.rects
+      .filter(({ rect }) => distanceToRect(pointer, rect) <= PROXIMITY_PX)
+      .map(({ id }) => id);
+    targets.setProximity({ nearIds, hoveredId: hovered });
+  };
+}
 
-    // Which target is under the pointer is a HIT TEST, not an arithmetic question.
-    const hit = document.elementFromPoint(pointer.x, pointer.y);
-    // Our own floating button counts as "still on the target" — see OVERLAY_ATTR.
-    const onOwnOverlay = !!hit?.closest(`[${OVERLAY_ATTR}]`);
-    const hitTarget = hit?.closest<HTMLElement>("[data-langy-target]");
-    const reachableTarget = hitTarget && isReachable(hitTarget) ? hitTarget : null;
-    const hovered = onOwnOverlay
-      ? useLangyContextTargetStore.getState().hoveredId
-      : (reachableTarget?.dataset.langyTarget ?? null);
-
-    // Reaching for a revealed target holds its light. The reveal is a couple of
-    // seconds long by design ("a look, not a state"), which is plenty to SEE and
-    // nowhere near enough to read a row, decide, and click it — and an offer
-    // that expires under the pointer taking it up is worse than no offer.
-    if (hovered) {
-      const targets = useLangyContextTargetStore.getState();
-      if (targets.revealedIds.has(hovered)) targets.holdReveal();
-    }
-
-    const nearIds: string[] = [];
-    for (const { id, rect } of rectsRef.current) {
-      if (distanceToRect(pointer, rect) > PROXIMITY_PX) continue;
-      nearIds.push(id);
-    }
-
-    setProximity({ nearIds, hoveredId: hovered });
-  }, [setProximity]);
-
-  const schedule = useCallback(() => {
-    if (frameRef.current !== null) return;
-    frameRef.current = requestAnimationFrame(resolve);
-  }, [resolve]);
-
+function ActiveLayer() {
+  const hoveredId = useLangyContextTargetStore((s) => s.hoveredId);
+  const [proximity] = useState(() => new TargetProximity());
   useEffect(() => {
-    measure();
-
-    const onPointerMove = (event: PointerEvent) => {
-      pointerRef.current = { x: event.clientX, y: event.clientY };
-      schedule();
-    };
-    const onPointerLeave = () => {
-      pointerRef.current = null;
-      schedule();
-    };
-    const onGeometryChange = () => {
-      measure();
-      schedule();
-    };
-
-    window.addEventListener("pointermove", onPointerMove, { passive: true });
-    document.addEventListener("pointerleave", onPointerLeave);
-    // Capture: the trace table scrolls in its own viewport, not the window, and
-    // a non-capturing window listener never hears about that.
-    window.addEventListener("scroll", onGeometryChange, {
-      passive: true,
-      capture: true,
-    });
-    window.addEventListener("resize", onGeometryChange, { passive: true });
-    // A drawer or dialog opening does not scroll, resize, or change the target
-    // registry — but it does take focus, and it does mark everything behind it
-    // `aria-hidden`. `focusin` is the cheap, reliable moment to re-measure and
-    // let the newly-covered targets drop out.
-    document.addEventListener("focusin", onGeometryChange);
-
-    // Rows mount and unmount constantly as the virtualizer scrolls, which
-    // invalidates the cache. Subscribe imperatively rather than with a selector:
-    // this must NOT re-render the layer, it only has to dirty a ref.
-    const unsubscribe = useLangyContextTargetStore.subscribe((state, previous) => {
-      if (state.targets !== previous.targets) onGeometryChange();
-    });
-
-    return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      document.removeEventListener("pointerleave", onPointerLeave);
-      window.removeEventListener("scroll", onGeometryChange, { capture: true });
-      window.removeEventListener("resize", onGeometryChange);
-      document.removeEventListener("focusin", onGeometryChange);
-      unsubscribe();
-      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
-      useLangyContextTargetStore.getState().setProximity({ nearIds: [], hoveredId: null });
-    };
-  }, [measure, schedule]);
-
+    proximity.attach();
+    return () => proximity.dispose();
+  }, [proximity]);
   if (!hoveredId) return null;
   return <TargetAffordance targetId={hoveredId} />;
 }

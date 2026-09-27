@@ -2,7 +2,9 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 
 import type { LangyRepositories } from "../langy-repositories.registry.ts";
+import { LangyFeedbackPromptRedisRepository } from "./redis.langy-feedback-prompt.repository.ts";
 import { LangyFrameDedupRedisRepository } from "./redis.langy-frame-dedup.repository.ts";
+import { LangyGithubPrCountRedisRepository } from "./redis.langy-github-pr-count.repository.ts";
 import { LangyLocalPresenceRedisRepository } from "./redis.langy-local-presence.repository.ts";
 import { LangyResourceLinksRedisRepository } from "./redis.langy-resource-links.repository.ts";
 import { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
@@ -28,6 +30,8 @@ export class PostgresLangyRepositories {
       resourceLinks: LangyResourceLinksRedisRepository.create({ redis }),
       localPresence: LangyLocalPresenceRedisRepository.create({ store: sessionState }),
       sessionState,
+      githubPrCounts: LangyGithubPrCountRedisRepository.create({ redis }),
+      feedbackPrompts: LangyFeedbackPromptRedisRepository.create({ redis }),
       // A factory row, not a fixed instance: the blocking tail duplicates its
       // own connection per stream, so every call builds a fresh repository
       // over whatever connection the caller borrowed for that stream.

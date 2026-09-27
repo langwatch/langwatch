@@ -4,12 +4,12 @@ import {
   LangyIdempotencyMismatchError,
   LangyInsufficientScopeError,
   LangyModelNotConfiguredError,
+  LangySessionKeyScopeError,
   LangyTurnInProgressError,
   extractLangyTextFromParts,
 } from "@langwatch/langy-contract";
 import { trace } from "@opentelemetry/api";
 
-import { LangySessionKeyScopeError } from "./langy-session-key-scope.error.ts";
 import { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service.ts";
 import { LangyTurnPreparationService } from "./langy-turn-preparation.service.ts";

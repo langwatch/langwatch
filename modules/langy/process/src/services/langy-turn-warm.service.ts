@@ -1,7 +1,6 @@
-import { stripGithubCredentials } from "@langwatch/langy-contract";
+import { LangySessionKeyScopeError, stripGithubCredentials } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
-import { LangySessionKeyScopeError } from "./langy-session-key-scope.error.ts";
 import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service.ts";
 import { type LangyTurnServiceDependencies } from "./langy-turn-shared.service.ts";
 import { LangyTurnSharedService } from "./langy-turn-shared.service.ts";

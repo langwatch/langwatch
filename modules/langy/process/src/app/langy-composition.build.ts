@@ -5,7 +5,6 @@
  */
 import { renderLangyTurnContext, type LangyServerConfig } from "@langwatch/langy-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { Redis } from "ioredis";
 
 import { type LangyWorker } from "../channels/langy-worker.channel.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
@@ -14,7 +13,6 @@ import { langyWorkerRuntimeOf } from "../rules/langy-worker-runtime.rules.ts";
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
 import type { LangyVirtualKeyService } from "../services/langy-credential.service.ts";
 import {
-  LangyGithubPrCounter,
   LangyGithubPrQuotaService,
   LANGY_GITHUB_PRS_PER_DAY,
 } from "../services/langy-github-pr-quota.service.ts";
@@ -25,51 +23,6 @@ import type {
 import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
 import type { LangyTurnTechnicalMembers } from "../services/langy-turn-shared.service.ts";
 import { LangyGithubPermit, type LangyModel } from "./langy.members.ts";
-
-/** The Redis surface this file needs: exactly what `LangyGithubPrCounter` names. */
-export type LangyGithubPrRedis = Readonly<
-  Pick<Redis, "get" | "incr" | "decr" | "incrby" | "expire" | "eval">
->;
-
-/**
- * The daily pull-request counter, on this process's own Redis. `eval` is
- * declared for the quota service's Lua check-and-decrement release;
- * without it a read-then-decr can underflow and grant unlimited permits.
- */
-class LangyGithubPrRedisCounter extends LangyGithubPrCounter {
-  static create(redis: LangyGithubPrRedis): LangyGithubPrRedisCounter {
-    return new LangyGithubPrRedisCounter(redis);
-  }
-
-  private constructor(private readonly redis: LangyGithubPrRedis) {
-    super();
-  }
-
-  async count(key: string): Promise<number> {
-    const raw = await this.redis.get(key);
-    return raw ? Number.parseInt(raw, 10) : 0;
-  }
-
-  incr(key: string): Promise<number> {
-    return this.redis.incr(key);
-  }
-
-  decr(key: string): Promise<number> {
-    return this.redis.decr(key);
-  }
-
-  incrby(key: string, amount: number): Promise<number> {
-    return this.redis.incrby(key, amount);
-  }
-
-  expire(key: string, seconds: number): Promise<unknown> {
-    return this.redis.expire(key, seconds);
-  }
-
-  eval(script: string, numKeys: number, ...args: string[]): Promise<unknown> {
-    return this.redis.eval(script, numKeys, ...args);
-  }
-}
 
 /** The turn's three permit calls, on the feature package's own quota service. */
 class LangyGithubPrPermitsAdapter extends LangyGithubPermit {
@@ -119,7 +72,7 @@ export function buildLangyInfrastructure(input: {
 
   const permits = LangyGithubPrPermitsAdapter.create(
     LangyGithubPrQuotaService.create({
-      counter: redis ? LangyGithubPrRedisCounter.create(redis) : null,
+      counts: redis ? repositories.githubPrCounts : null,
     }),
   );
 
@@ -153,7 +106,7 @@ export function buildLangyInfrastructure(input: {
     credentials,
     events: null,
     blockMetrics: LangyBlockMetricsOtelService.create(),
-    ...(redis ? { feedbackPromptRedis: redis } : {}),
+    ...(redis ? { feedbackPrompts: repositories.feedbackPrompts } : {}),
     // No relay: opening one needs this process's public origin, which is not
     // among the two members `LangyApp` reads. A process that serves the
     // relay wires it in later, over this same build.

@@ -3,6 +3,10 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { LangyApp } from "./app/langy.app.ts";
 import type { LangyTitleGenerator, LangySessionKeyMetrics } from "./app/langy.members.ts";
+import {
+  EventingLangyConversationAdapter,
+  type EventingLangyConversationAdapterOptions,
+} from "./eventing/langy-conversation-runtime.pipeline.ts";
 import { langyMaintenanceEventing } from "./eventing/langy-maintenance.pipeline.ts";
 import { LangyAnalyticsEventClickHouseRepository } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 import type { LangyAnalyticsClickHouseClientResolver } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
@@ -10,10 +14,6 @@ import { langyRepositories } from "./repositories/langy-repositories.registry.ts
 import type { LangyTokenBufferConnection } from "./repositories/langy-token-buffer.repository.ts";
 import { PrismaLangySessionKeyReapRepository } from "./repositories/prisma/prisma.langy-session-key-reap.repository.ts";
 import type { PrismaLangySessionKeyReapDatabase } from "./repositories/prisma/prisma.langy-session-key-reap.repository.ts";
-import {
-  EventingLangyConversationAdapter,
-  type EventingLangyConversationAdapterOptions,
-} from "./repositories/redis/redis.langy-conversation-runtime.repository.ts";
 import { LangyTokenBufferRedisRepository } from "./repositories/redis/redis.langy-token-buffer.repository.ts";
 import {
   LangyTurnHandoffRedisRepository,

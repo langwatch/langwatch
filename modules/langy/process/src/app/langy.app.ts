@@ -11,12 +11,12 @@ import {
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
-import { GatewayApi } from "@langwatch/gateway-contract";
 /**
  * The Langy feature's application: what its doors call. It holds every service and process
  * capability the feature's api files reach, and it is the one typed thing a transport is given.
  */
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { GatewayApi } from "@langwatch/gateway-contract";
 import { GithubApi } from "@langwatch/github-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
@@ -36,6 +36,21 @@ import {
   type LangyMessageRole,
   LangyApi,
   type LangyApi as LangyApiContract,
+  type LangyGetPageInput,
+  type LangyGetEventsAfterInput,
+  type LangyFindByIdVisibleInput,
+  type LangyGetAllByConversationInput,
+  type LangyDeleteByIdInput,
+  type LangyUpdateByIdInput,
+  type LangyForkByIdInput,
+  type LangyWarmConversationWorkerInput,
+  type LangyRevokeWorkerSessionKeyInput,
+  type LangyTurnExistsInput,
+  type LangyFindRunTokenInput,
+  type LangyRecordToolCallStartedInput,
+  type LangyRecordToolCallCompletedInput,
+  type LangyRecordTurnHandoffInput,
+  type LangyRecordPlanUpdatedInput,
   type LangyTurnSettlementWait,
   type LangyTurnSettlementWaitInput,
   assertLangyServerConfig,
@@ -79,10 +94,10 @@ import {
 } from "@langwatch/langy-contract";
 import type * as langyContractModule from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { SecretApi } from "@langwatch/secret-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
+import { SecretApi } from "@langwatch/secret-contract";
 import { UserApi } from "@langwatch/user-contract";
 import type { Redis } from "ioredis";
 import type { z } from "zod";
@@ -92,22 +107,23 @@ import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-wor
 import { buildLangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
+import { createLangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
 import type {
   LangyStreamBlockingRedis,
   LangyStreamRedis,
 } from "../repositories/langy-token-buffer.repository.ts";
 import { PrismaLangySessionKeyReapRepository } from "../repositories/prisma/prisma.langy-session-key-reap.repository.ts";
-import { RedisLangyLocalControlRuntimeRepository } from "../repositories/redis/redis.langy-local-control-runtime.repository.ts";
 import { readSessionKeyCredential } from "../rules/langy-local-control-connect.rules.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
 import { LocalControlConnectionService } from "../services/langy-local-control-connection.service.ts";
 import { LocalControlLongPollService } from "../services/langy-local-control-long-poll.service.ts";
+import { LangyLocalControlRuntimeService } from "../services/langy-local-control-runtime.service.ts";
 import { LangyLocalControlTerminalService } from "../services/langy-local-control-terminal.service.ts";
 import { LocalControlSessionCoreService } from "../services/langy-local-session.service.ts";
-import { LangyModelService } from "../services/langy-model.service.ts";
 import { LangyLocalWorkerService } from "../services/langy-local-worker.service.ts";
 import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
 import { LangyMaintenanceService } from "../services/langy-maintenance.service.ts";
+import { LangyModelService } from "../services/langy-model.service.ts";
 import { LangyPanelAccessService } from "../services/langy-panel-access.service.ts";
 import { LangyPanelConversationService } from "../services/langy-panel-conversation.service.ts";
 import { LangyPanelEgressService } from "../services/langy-panel-egress.service.ts";
@@ -117,10 +133,10 @@ import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts
 import { LangyRestMetricsPrometheusService } from "../services/langy-rest-metrics-prometheus.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
-import { LangyVirtualKeyGatewayService } from "../services/langy-virtual-key-gateway.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
 import { LangyUiActionPageService } from "../services/langy-ui-action-page.service.ts";
+import { LangyVirtualKeyGatewayService } from "../services/langy-virtual-key-gateway.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
 import { LangyWorkerMetricsOtelService } from "../services/langy-worker-metrics-otel.service.ts";
 import type { LangyService } from "../services/langy.service.ts";
@@ -236,7 +252,9 @@ export class LangyApp implements LangyApiContract {
       const door = BearerIdentity.create({ name: "langy-internal", token: internalSecret });
       return { channel, door };
     });
-    const adapter = LangyPostgresService.create({ database: setup.members.prisma });
+    const adapter = LangyPostgresService.create({
+      repositories: createLangyDatabaseRepositories(setup.members.prisma),
+    });
     const sessionKeys = adapter.createSessionKeys({
       apiKeys: setup.dependencies.apiKeys,
       authz: setup.dependencies.authz,
@@ -245,9 +263,9 @@ export class LangyApp implements LangyApiContract {
     const built = buildLangyInfrastructure({
       redis: setup.members.redis,
       config: setup.config,
+      publicBaseUrl: setup.members.publicBaseUrl,
       worker: channel,
       repositories: setup.repositories,
-      publicBaseUrl: setup.members.publicBaseUrl,
       models: LangyModelService.create({ modelProviders: setup.dependencies.modelProviders }),
       sessionKeys,
       virtualKeys: LangyVirtualKeyGatewayService.create({
@@ -275,8 +293,9 @@ export class LangyApp implements LangyApiContract {
       projects: setup.dependencies.projects,
     });
     const buffer = setup.repositories.tokenBuffer.open({ redis: setup.members.redis });
-    const runtime = RedisLangyLocalControlRuntimeRepository.create({
+    const runtime = LangyLocalControlRuntimeService.create({
       store: setup.repositories.sessionState,
+      presence: setup.repositories.localPresence,
       projects: workspace,
       mintSessionKey: (input) => sessionKeys.mintForUser(input),
       events: commands,
@@ -562,19 +581,15 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.openRelayConnection();
   }
 
-  getPage(input: Parameters<LangyApiContract["getPage"]>[0]): Promise<LangyConversationListPage> {
+  getPage(input: LangyGetPageInput): Promise<LangyConversationListPage> {
     return this.dependencies.langy.getPage(input);
   }
 
-  getEventsAfter(
-    input: Parameters<LangyApiContract["getEventsAfter"]>[0],
-  ): Promise<LangyConversationEventPage> {
+  getEventsAfter(input: LangyGetEventsAfterInput): Promise<LangyConversationEventPage> {
     return this.dependencies.langy.getEventsAfter(input);
   }
 
-  findByIdVisible(
-    input: Parameters<LangyApiContract["findByIdVisible"]>[0],
-  ): Promise<LangyConversationDetail | null> {
+  findByIdVisible(input: LangyFindByIdVisibleInput): Promise<LangyConversationDetail | null> {
     return this.dependencies.langy.findByIdVisible(input);
   }
 
@@ -594,23 +609,19 @@ export class LangyApp implements LangyApiContract {
     return this.#setupSkills.getPrompt(input);
   }
 
-  getAllByConversation(
-    input: Parameters<LangyApiContract["getAllByConversation"]>[0],
-  ): Promise<LangyMessageRow[]> {
+  getAllByConversation(input: LangyGetAllByConversationInput): Promise<LangyMessageRow[]> {
     return this.dependencies.langy.getAllByConversation(input);
   }
 
-  deleteById(input: Parameters<LangyApiContract["deleteById"]>[0]): Promise<boolean> {
+  deleteById(input: LangyDeleteByIdInput): Promise<boolean> {
     return this.dependencies.langy.deleteById(input);
   }
 
-  updateById(
-    input: Parameters<LangyApiContract["updateById"]>[0],
-  ): Promise<LangyConversationDetail> {
+  updateById(input: LangyUpdateByIdInput): Promise<LangyConversationDetail> {
     return this.dependencies.langy.updateById(input);
   }
 
-  forkById(input: Parameters<LangyApiContract["forkById"]>[0]): Promise<{
+  forkById(input: LangyForkByIdInput): Promise<{
     conversation: LangyConversationDetail;
   }> {
     return this.dependencies.langy.forkById(input);
@@ -650,9 +661,7 @@ export class LangyApp implements LangyApiContract {
     });
   }
 
-  warmConversationWorker(
-    input: Parameters<LangyApiContract["warmConversationWorker"]>[0],
-  ): Promise<{
+  warmConversationWorker(input: LangyWarmConversationWorkerInput): Promise<{
     conversationId: string | null;
     warmed: boolean;
   }> {
@@ -664,12 +673,12 @@ export class LangyApp implements LangyApiContract {
   }
 
   revokeWorkerSessionKey(
-    input: Parameters<LangyApiContract["revokeWorkerSessionKey"]>[0],
+    input: LangyRevokeWorkerSessionKeyInput,
   ): Promise<"revoked" | "already_revoked" | "not_found" | "refused"> {
     return this.dependencies.langy.revokeWorkerSessionKey(input);
   }
 
-  turnExists(input: Parameters<LangyApiContract["turnExists"]>[0]): Promise<boolean> {
+  turnExists(input: LangyTurnExistsInput): Promise<boolean> {
     return this.dependencies.langy.turnExists(input);
   }
 
@@ -677,27 +686,23 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.ingestAgentTurnResult(input);
   }
 
-  findRunToken(input: Parameters<LangyApiContract["findRunToken"]>[0]): Promise<string | null> {
+  findRunToken(input: LangyFindRunTokenInput): Promise<string | null> {
     return this.dependencies.langy.findRunToken(input);
   }
 
-  recordToolCallStarted(
-    input: Parameters<LangyApiContract["recordToolCallStarted"]>[0],
-  ): Promise<void> {
+  recordToolCallStarted(input: LangyRecordToolCallStartedInput): Promise<void> {
     return this.dependencies.langy.recordToolCallStarted(input);
   }
 
-  recordToolCallCompleted(
-    input: Parameters<LangyApiContract["recordToolCallCompleted"]>[0],
-  ): Promise<void> {
+  recordToolCallCompleted(input: LangyRecordToolCallCompletedInput): Promise<void> {
     return this.dependencies.langy.recordToolCallCompleted(input);
   }
 
-  recordTurnHandoff(input: Parameters<LangyApiContract["recordTurnHandoff"]>[0]): Promise<void> {
+  recordTurnHandoff(input: LangyRecordTurnHandoffInput): Promise<void> {
     return this.dependencies.langy.recordTurnHandoff(input);
   }
 
-  recordPlanUpdated(input: Parameters<LangyApiContract["recordPlanUpdated"]>[0]): Promise<void> {
+  recordPlanUpdated(input: LangyRecordPlanUpdatedInput): Promise<void> {
     return this.dependencies.langy.recordPlanUpdated(input);
   }
 

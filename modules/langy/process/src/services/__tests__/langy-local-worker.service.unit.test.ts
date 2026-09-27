@@ -5,7 +5,8 @@ import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
-import { RedisLangyLocalControlRuntimeRepository } from "../../repositories/redis/redis.langy-local-control-runtime.repository.ts";
+import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
+import { LangyLocalControlRuntimeService } from "../../services/langy-local-control-runtime.service.ts";
 import { LangyLocalWorkerService } from "../langy-local-worker.service.ts";
 
 const PROJECT_ID = "project-123";
@@ -17,8 +18,9 @@ const key: LangyKeyCaller = { actor: { type: "user", id: USER_ID }, projectId: P
 function buildWorker(options: { own: boolean }) {
   const repositories = MemoryLangyRepositories.create();
   const recorded: string[] = [];
-  const runtime = RedisLangyLocalControlRuntimeRepository.create({
+  const runtime = LangyLocalControlRuntimeService.create({
     store: repositories.sessionState,
+    presence: LangyLocalPresenceRedisRepository.create({ store: repositories.sessionState }),
     projects: { getOrganizationId: async () => "organization-1", getSlug: async () => "project" },
     mintSessionKey: async () => ({ token: "sk-lw-test", apiKeyId: "key-2" }),
     events: {

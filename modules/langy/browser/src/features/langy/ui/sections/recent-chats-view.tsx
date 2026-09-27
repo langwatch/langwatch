@@ -87,6 +87,145 @@ function useStableHandler<A extends unknown[], R>(handler: (...args: A) => R): (
   return useCallback((...args: A) => ref.current(...args), []);
 }
 
+/** One row per conversation: its title (or the untitled label), date group and count. */
+function chatItemsFrom(conversations: LangyConversationListItemDto[]): ChatItem[] {
+  return conversations.map((conversation) => {
+    const raw = conversation.title?.trim() ?? "";
+    const untitled = raw.length === 0;
+    const title = untitled ? UNTITLED : raw;
+    return {
+      value: conversation.id,
+      title,
+      untitled,
+      searchText: title.toLowerCase(),
+      lastActivityAtMs: conversation.lastActivityAtMs,
+      dateLabel: formatLangyConversationDate(conversation.lastActivityAtMs),
+      group: chatGroupFor(conversation.lastActivityAtMs),
+      messageCount: conversation.messageCount,
+    };
+  });
+}
+
+/**
+ * The one row being renamed, its draft and its save. Every handler is render-stable, so the
+ * memoized rows re-render only when their own edit state changes.
+ */
+function useChatRename(onRename: (id: string, title: string) => Promise<void>) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const start = useCallback((item: ChatItem) => {
+    setEditingId(item.value);
+    setDraftTitle(item.untitled ? "" : item.title);
+  }, []);
+  const cancel = useCallback(() => {
+    setEditingId(null);
+    setDraftTitle("");
+  }, []);
+  const save = useStableHandler(async () => {
+    if (!editingId || !draftTitle.trim()) return;
+    setSavingId(editingId);
+    try {
+      await onRename(editingId, draftTitle);
+      cancel();
+    } finally {
+      setSavingId(null);
+    }
+  });
+  return { editingId, draftTitle, savingId, setDraftTitle, start, cancel, save };
+}
+
+function ChatSearch({
+  pad,
+  query,
+  onQueryChange,
+}: {
+  pad: string;
+  query: string;
+  onQueryChange: (query: string) => void;
+}) {
+  return (
+    <Box paddingX={pad} paddingBottom={3}>
+      <HStack
+        gap={2}
+        paddingX={2.5}
+        paddingY={1.5}
+        borderWidth="1px"
+        borderStyle="solid"
+        borderColor="border.emphasized"
+        borderRadius="lg"
+        background="bg.subtle"
+      >
+        <Box color="fg.subtle" display="grid" placeItems="center">
+          <Search size={13} />
+        </Box>
+        <Input
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder="Search chats"
+          aria-label="Search chats"
+          size="xs"
+          border="none"
+          background="transparent"
+          paddingX={0}
+          _focus={{ outline: "none", boxShadow: "none" }}
+          _focusVisible={{ outline: "none", boxShadow: "none" }}
+        />
+      </HStack>
+    </Box>
+  );
+}
+
+/**
+ * Loaded and empty: a fresh account (calm, expected) or a search with no hits, each in its own
+ * words. A FAILED list is owned by the panel's own error card, so it never reaches here.
+ */
+function NoChats({ pad, searching }: { pad: string; searching: boolean }) {
+  return (
+    <VStack align="start" gap={0.5} paddingX={pad} paddingY={3}>
+      <Text textStyle="xs" color="fg">
+        {searching ? "No chats match that search." : "No conversations yet."}
+      </Text>
+      <Text textStyle="2xs" color="fg.subtle">
+        {searching ? "Try a different conversation title." : "Chats with Langy will show up here."}
+      </Text>
+    </VStack>
+  );
+}
+
+/** The way to older conversations, and the spinner while they load. */
+function OlderChats({
+  pad,
+  history,
+}: {
+  pad: string;
+  history: ReturnType<typeof useLangyConversationListQuery>;
+}) {
+  if (history.hasNextPage) {
+    return (
+      <Box paddingX={pad} paddingY={2}>
+        <Button
+          width="full"
+          size="xs"
+          variant="ghost"
+          color="fg.muted"
+          disabled={history.isFetchingNextPage}
+          onClick={() => void history.fetchNextPage()}
+          aria-label="Load older conversations"
+        >
+          {history.isFetchingNextPage ? <Spinner size="xs" /> : "Load older chats"}
+        </Button>
+      </Box>
+    );
+  }
+  if (!history.isFetchingNextPage) return null;
+  return (
+    <HStack justify="center" paddingY={2} aria-label="Loading older conversations">
+      <Spinner size="xs" />
+    </HStack>
+  );
+}
+
 export function RecentChatsView({
   conversations: seededConversations,
   isLoading: seededIsLoading,
@@ -113,9 +252,6 @@ export function RecentChatsView({
 }) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftTitle, setDraftTitle] = useState("");
-  const [savingId, setSavingId] = useState<string | null>(null);
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedQuery(query), 250);
     return () => window.clearTimeout(timeout);
@@ -129,25 +265,7 @@ export function RecentChatsView({
   const isLoading = history.isLoading || (!history.isFetched && seededIsLoading);
   const hasError = seededHasError || history.isError;
 
-  const allItems = useMemo<ChatItem[]>(
-    () =>
-      conversations.map((conversation) => {
-        const raw = conversation.title?.trim() ?? "";
-        const untitled = raw.length === 0;
-        const title = untitled ? UNTITLED : raw;
-        return {
-          value: conversation.id,
-          title,
-          untitled,
-          searchText: title.toLowerCase(),
-          lastActivityAtMs: conversation.lastActivityAtMs,
-          dateLabel: formatLangyConversationDate(conversation.lastActivityAtMs),
-          group: chatGroupFor(conversation.lastActivityAtMs),
-          messageCount: conversation.messageCount,
-        };
-      }),
-    [conversations],
-  );
+  const allItems = useMemo(() => chatItemsFrom(conversations), [conversations]);
 
   // Rebuilt per keystroke from the CURRENT items — the list arrives async, so a
   // one-shot snapshot would freeze it empty. The server also filters, but
@@ -164,24 +282,7 @@ export function RecentChatsView({
   // ChatRow only re-renders when ITS row's data or edit state changes.
   const selectChat = useStableHandler(onSelect);
   const deleteChat = useStableHandler(onDelete);
-  const startRename = useCallback((item: ChatItem) => {
-    setEditingId(item.value);
-    setDraftTitle(item.untitled ? "" : item.title);
-  }, []);
-  const cancelRename = useCallback(() => {
-    setEditingId(null);
-    setDraftTitle("");
-  }, []);
-  const saveRename = useStableHandler(async () => {
-    if (!editingId || !draftTitle.trim()) return;
-    setSavingId(editingId);
-    try {
-      await onRename(editingId, draftTitle);
-      cancelRename();
-    } finally {
-      setSavingId(null);
-    }
-  });
+  const rename = useChatRename(onRename);
 
   const pad = compact ? "14px" : "19px";
 
@@ -195,7 +296,7 @@ export function RecentChatsView({
       // popover trained, kept now that the list is a place rather than an
       // overlay.
       onKeyDown={(event) => {
-        if (event.key === "Escape" && !editingId) {
+        if (event.key === "Escape" && !rename.editingId) {
           event.preventDefault();
           onBack();
         }
@@ -218,36 +319,7 @@ export function RecentChatsView({
         </Text>
       </HStack>
 
-      {searchable ? (
-        <Box paddingX={pad} paddingBottom={3}>
-          <HStack
-            gap={2}
-            paddingX={2.5}
-            paddingY={1.5}
-            borderWidth="1px"
-            borderStyle="solid"
-            borderColor="border.emphasized"
-            borderRadius="lg"
-            background="bg.subtle"
-          >
-            <Box color="fg.subtle" display="grid" placeItems="center">
-              <Search size={13} />
-            </Box>
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search chats"
-              aria-label="Search chats"
-              size="xs"
-              border="none"
-              background="transparent"
-              paddingX={0}
-              _focus={{ outline: "none", boxShadow: "none" }}
-              _focusVisible={{ outline: "none", boxShadow: "none" }}
-            />
-          </HStack>
-        </Box>
-      ) : null}
+      {searchable ? <ChatSearch pad={pad} query={query} onQueryChange={setQuery} /> : null}
 
       {isLoading ? (
         <HStack gap={2} paddingX={pad} paddingY={1.5} aria-label="Loading recent conversations">
@@ -264,27 +336,7 @@ export function RecentChatsView({
           its own words. A FAILED list is owned by the panel, which surfaces
           its own dismissable error card above this view. */}
       {!isLoading && !hasError && items.length === 0 ? (
-        <VStack align="start" gap={0.5} paddingX={pad} paddingY={3}>
-          {query.trim().length === 0 ? (
-            <>
-              <Text textStyle="xs" color="fg">
-                No conversations yet.
-              </Text>
-              <Text textStyle="2xs" color="fg.subtle">
-                Chats with Langy will show up here.
-              </Text>
-            </>
-          ) : (
-            <>
-              <Text textStyle="xs" color="fg">
-                No chats match that search.
-              </Text>
-              <Text textStyle="2xs" color="fg.subtle">
-                Try a different conversation title.
-              </Text>
-            </>
-          )}
-        </VStack>
+        <NoChats pad={pad} searching={query.trim().length > 0} />
       ) : null}
 
       <ChatRows
@@ -298,39 +350,20 @@ export function RecentChatsView({
             isActive={item.value === activeConversationId}
             onSelect={selectChat}
             onDelete={deleteChat}
-            onStartRename={startRename}
-            editing={editingId === item.value}
+            onStartRename={rename.start}
+            editing={rename.editingId === item.value}
             // Only the row being renamed sees the draft; a constant for the
             // rest, so typing a title re-renders one row, not the page.
-            draftTitle={editingId === item.value ? draftTitle : ""}
-            saving={savingId === item.value}
-            onDraftTitleChange={setDraftTitle}
-            onSaveRename={saveRename}
-            onCancelRename={cancelRename}
+            draftTitle={rename.editingId === item.value ? rename.draftTitle : ""}
+            saving={rename.savingId === item.value}
+            onDraftTitleChange={rename.setDraftTitle}
+            onSaveRename={rename.save}
+            onCancelRename={rename.cancel}
           />
         )}
       />
 
-      {history.hasNextPage && (
-        <Box paddingX={pad} paddingY={2}>
-          <Button
-            width="full"
-            size="xs"
-            variant="ghost"
-            color="fg.muted"
-            disabled={history.isFetchingNextPage}
-            onClick={() => void history.fetchNextPage()}
-            aria-label="Load older conversations"
-          >
-            {history.isFetchingNextPage ? <Spinner size="xs" /> : "Load older chats"}
-          </Button>
-        </Box>
-      )}
-      {!history.hasNextPage && history.isFetchingNextPage && (
-        <HStack justify="center" paddingY={2} aria-label="Loading older conversations">
-          <Spinner size="xs" />
-        </HStack>
-      )}
+      <OlderChats pad={pad} history={history} />
     </VStack>
   );
 }

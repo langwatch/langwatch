@@ -13,6 +13,7 @@ import { z } from "zod";
 
 import type { LangyLocalPresenceRepository } from "../repositories/langy-local-presence.repository.ts";
 import type { LangyTokenBufferRepository } from "../repositories/langy-token-buffer.repository.ts";
+import type { UserWaitBuffer } from "./langy-local-user-wait-record.rules.ts";
 
 /** What the platform keeps about one call while it is in flight. */
 export const storedLocalCallSchema = z
@@ -71,4 +72,14 @@ export interface LocalCallDispatcherOptions {
   /** Test knob: how long a first call waits for the folder to appear. */
   offlineWaitMs?: number;
   pollIntervalMs?: number;
+}
+
+/** Stands in for the live edge on a process with no Redis: the record still lands. */
+export function nullLocalBuffer(): UserWaitBuffer & LocalCallBuffer {
+  return {
+    appendLocalPermission: async () => undefined,
+    appendQuestion: async () => undefined,
+    appendStatus: async () => undefined,
+    heartbeat: async () => undefined,
+  };
 }

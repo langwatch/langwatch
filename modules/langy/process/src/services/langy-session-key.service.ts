@@ -1,14 +1,17 @@
 import { LANGY_SESSION_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { langyCandidatePermissions, type LangyCredentialSession } from "@langwatch/langy-contract";
+import {
+  langyCandidatePermissions,
+  type LangyCredentialSession,
+  LangySessionKeyScopeError,
+} from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate } from "@langwatch/time";
 
 import { LangySessionKey, type LangySessionKeyMetrics } from "../app/langy.members.ts";
 import type { LangySessionKeyRepository } from "../repositories/langy-session-key.repository.ts";
 import { LangySessionKeyReapService } from "./langy-session-key-reap.service.ts";
-import { LangySessionKeyScopeError } from "./langy-session-key-scope.error.ts";
 
 const logger = createLogger("langwatch:langy:session-key");
 const sessionKeyLifetimeMs = 6 * 60 * 60 * 1000;

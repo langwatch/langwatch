@@ -545,3 +545,10 @@ export class LangyUiHandlerFailedError extends HandledError {
     this.name = "LangyUiHandlerFailedError";
   }
 }
+
+export class LangySessionKeyScopeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LangySessionKeyScopeError";
+  }
+}

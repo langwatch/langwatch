@@ -11,22 +11,10 @@ import type {
 import {
   type LangyConversationCommands,
   type LangyBlockMetrics,
-  type LangyFeedbackPromptRedis,
   type LangySessionKeyMetrics,
 } from "../app/langy.members.ts";
-import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
-import { PrismaLangyConversationProjectionRepository } from "../repositories/prisma/prisma.langy-conversation-projection.repository.ts";
-import { PrismaLangyConversationTurnProjectionRepository } from "../repositories/prisma/prisma.langy-conversation-turn-projection.repository.ts";
-import { PrismaLangyConversationRepository } from "../repositories/prisma/prisma.langy-conversation.repository.ts";
-import { PrismaLangyCredentialRepository } from "../repositories/prisma/prisma.langy-credential.repository.ts";
-import { PrismaLangyMessageProjectionRepository } from "../repositories/prisma/prisma.langy-message-projection.repository.ts";
-import { PrismaLangyMessageRepository } from "../repositories/prisma/prisma.langy-message.repository.ts";
-import { PrismaLangySessionKeyRepository } from "../repositories/prisma/prisma.langy-session-key.repository.ts";
-import { PrismaLangyTurnAdmissionRepository } from "../repositories/prisma/prisma.langy-turn-admission.repository.ts";
-import {
-  RedisLangyTurnRelayRepository,
-  type LangyRelayRedis,
-} from "../repositories/redis/redis.langy-turn-relay.repository.ts";
+import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
+import type { LangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
 import { LangyBlockMetricsNullService } from "./langy-block-metrics-null.service.ts";
 import { LangyConversationService } from "./langy-conversation.service.ts";
 import {
@@ -44,6 +32,7 @@ import { LangySessionKeyService } from "./langy-session-key.service.ts";
 import { LangyTurnService, type LangyTurnTechnicalMembers } from "./langy-turn.service.ts";
 import {
   LangyService,
+  type OpenLangyRelay,
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
 } from "./langy.service.ts";
@@ -91,64 +80,32 @@ export class LangyEventingMembers {
 }
 
 /** How this process's Langy relay reaches Redis, and what it resolves for the agent. */
-export type LangyRelayCompositionOptions = {
-  redis: LangyRelayRedis;
-  baseHost: string;
-  resolveResourceUrl?: (input: { projectId: string; resourceId: string }) => Promise<string | null>;
-  resolveCapabilityProgress?: (name: string) => { headline: string } | null;
-  logger?: {
-    warn(o: unknown, message: string): void;
-    debug?(o: unknown, message: string): void;
-  };
-};
-
 export type LangyServiceCompositionOptions = {
   turns: LangyTurnTechnicalMembers;
   credentials: LangyCredentialComposition;
   commands: LangyConversationCommands;
   events?: LangyConversationEventsReader | null;
   runtime?: LangyConversationRuntime;
-  relay?: LangyRelayCompositionOptions;
-  feedbackPromptRedis?: LangyFeedbackPromptRedis | null;
+  /** Opens the live relay; absent where this process serves none. */
+  openRelay?: OpenLangyRelay;
+  feedbackPrompts?: LangyFeedbackPromptRepository | null;
   /** Block-salvage counter; absent composes LangyBlockMetricsNullService (nothing published). */
   blockMetrics?: LangyBlockMetrics;
 };
 
 export interface LangyPostgresServiceOptions {
-  database: LangyDatabase;
-}
-
-interface LangyRepositories {
-  conversations: PrismaLangyConversationRepository;
-  messages: PrismaLangyMessageRepository;
-  credentials: PrismaLangyCredentialRepository;
-  admission: PrismaLangyTurnAdmissionRepository;
-  conversationState: PrismaLangyConversationProjectionRepository;
-  conversationTurnState: PrismaLangyConversationTurnProjectionRepository;
-  messageStorage: PrismaLangyMessageProjectionRepository;
-  sessionKeys: PrismaLangySessionKeyRepository;
+  repositories: LangyDatabaseRepositories;
 }
 
 /** Composes the Langy capability graph while keeping persistence private. */
 export class LangyPostgresService {
-  private readonly repositories: LangyRepositories;
+  private readonly repositories: LangyDatabaseRepositories;
   private readonly eventingCapabilities: LangyEventingMembers;
   private service: LangyService | null = null;
   private sessionKeys: LangySessionKeyService | null = null;
 
   private constructor(options: LangyPostgresServiceOptions) {
-    this.repositories = {
-      conversations: PrismaLangyConversationRepository.create(options.database),
-      messages: PrismaLangyMessageRepository.create(options.database),
-      credentials: PrismaLangyCredentialRepository.create(options.database),
-      admission: PrismaLangyTurnAdmissionRepository.create(options.database),
-      conversationState: PrismaLangyConversationProjectionRepository.create(options.database),
-      conversationTurnState: PrismaLangyConversationTurnProjectionRepository.create(
-        options.database,
-      ),
-      messageStorage: PrismaLangyMessageProjectionRepository.create(options.database),
-      sessionKeys: PrismaLangySessionKeyRepository.create(options.database),
-    };
+    this.repositories = options.repositories;
     this.eventingCapabilities = new LangyEventingMembers({
       langyConversationState: this.repositories.conversationState,
       langyConversationTurnState: this.repositories.conversationTurnState,
@@ -218,32 +175,15 @@ export class LangyPostgresService {
       messages: this.repositories.messages,
       admission: this.repositories.admission,
     });
-    const relay = options.relay;
     this.service = LangyService.create({
       conversations,
       turns,
       messages,
       credentials,
       feedbackPrompt: LangyFeedbackPromptService.create({
-        redis: options.feedbackPromptRedis ?? null,
+        prompts: options.feedbackPrompts ?? null,
       }),
-      ...(relay
-        ? {
-            openRelay: (langyService) =>
-              RedisLangyTurnRelayRepository.create({
-                conversations: langyService,
-                redis: relay.redis,
-                baseHost: relay.baseHost,
-                ...(relay.resolveResourceUrl
-                  ? { resolveResourceUrl: relay.resolveResourceUrl }
-                  : {}),
-                ...(relay.resolveCapabilityProgress
-                  ? { resolveCapabilityProgress: relay.resolveCapabilityProgress }
-                  : {}),
-                ...(relay.logger ? { logger: relay.logger } : {}),
-              }),
-          }
-        : {}),
+      ...(options.openRelay ? { openRelay: options.openRelay } : {}),
     });
     return this.service;
   }

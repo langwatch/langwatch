@@ -13,30 +13,30 @@ import type {
 } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { LangyTitleGenerator } from "../../app/langy.members.ts";
-import type { LangyWorker } from "../../channels/langy-worker.channel.ts";
-import type { LangyAnalyticsEventProjectionRecord } from "../../eventing/langy-analytics-event.projection.ts";
+import type { LangyTitleGenerator } from "../app/langy.members.ts";
+import type { LangyWorker } from "../channels/langy-worker.channel.ts";
+import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-effect.repository.ts";
+import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
+import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
+import type { ControlTurnStarter } from "../rules/langy-local-session-contract.rules.ts";
+import { LangyConversationPipelineService } from "../services/langy-conversation-pipeline.service.ts";
+import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
+import type { LangyAnalyticsEventProjectionRecord } from "./langy-analytics-event.projection.ts";
 import {
   createAgentTurnLivenessSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,
   createLangyTurnAdmissionLifecycleSubscriber,
   type LangyConversationUpdateChannel,
-} from "../../eventing/langy-conversation.subscriber.ts";
+} from "./langy-conversation.subscriber.ts";
 import {
   createGuidedOnboardingTurnFailedSubscriber,
   type GuidedOnboardingAnalytics,
   type GuidedOnboardingReader,
-} from "../../eventing/langy-guided-onboarding-turn-failed.subscriber.ts";
+} from "./langy-guided-onboarding-turn-failed.subscriber.ts";
 import {
   createLocalConnectTurnSubscriber,
   type LocalConnectTurnPresence,
-} from "../../eventing/langy-local-connect-turn.subscriber.ts";
-import type { ControlTurnStarter } from "../../rules/langy-local-session-contract.rules.ts";
-import { LangyConversationPipelineService } from "../../services/langy-conversation-pipeline.service.ts";
-import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
-import { RedisLangyEffectRepository } from "./redis.langy-effect.repository.ts";
-import type { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
-import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
+} from "./langy-local-connect-turn.subscriber.ts";
 
 /** The two command senders this pipeline's own effects need back. */
 export interface RedisLangyConversationRuntimeRepository {

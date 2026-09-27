@@ -10,15 +10,15 @@ import type {
   LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
 
-import type { LangyTitleGenerator } from "../../app/langy.members.ts";
-import { UnavailableLangyWorkerChannel } from "../../channels/unavailable.langy-worker.channel.ts";
-import type { LangyAnalyticsEventProjectionRecord } from "../../eventing/langy-analytics-event.projection.ts";
-import type { LangyConversationUpdateChannel } from "../../eventing/langy-conversation.subscriber.ts";
-import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
-import { LangyWorkerMetricsNullService } from "../../services/langy-worker-metrics-null.service.ts";
-import { EventingLangyConversationAdapter } from "./redis.langy-conversation-runtime.repository.ts";
-import type { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
-import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
+import type { LangyTitleGenerator } from "../app/langy.members.ts";
+import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-worker.channel.ts";
+import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
+import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
+import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
+import { LangyWorkerMetricsNullService } from "../services/langy-worker-metrics-null.service.ts";
+import type { LangyAnalyticsEventProjectionRecord } from "./langy-analytics-event.projection.ts";
+import { EventingLangyConversationAdapter } from "./langy-conversation-runtime.pipeline.ts";
+import type { LangyConversationUpdateChannel } from "./langy-conversation.subscriber.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {
