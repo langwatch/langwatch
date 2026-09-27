@@ -10,7 +10,7 @@ import {
   tunnelHostFromUrl,
   VoiceTunnelNotReadyError,
   waitUntilTunnelResolvable,
-} from "../voice-public-url-tunnel.ts";
+} from "../voice-public-url-tunnel.channels.ts";
 
 const FAST = { timeoutMs: 30, pollIntervalMs: 5 };
 

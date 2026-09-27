@@ -24,15 +24,19 @@ interface RegisteredNonce {
 }
 
 /**
- * An in-memory map of live nonces. One instance per worker process - the
- * listener and the phone jobs share it through {@link getVoiceNonceRegistry}.
+ * An in-memory map of live nonces. One instance per worker process: the media
+ * door and the child spawner share the one the scenario app builds.
  */
-export class VoiceNonceRegistry {
+export class VoiceNonceRegistryService {
+  static create(options?: { ttlMs?: number; now?: () => number }): VoiceNonceRegistryService {
+    return new VoiceNonceRegistryService(options);
+  }
+
   private readonly _byNonce = new Map<string, RegisteredNonce>();
   private readonly _ttlMs: number;
   private readonly _now: () => number;
 
-  constructor(options?: { ttlMs?: number; now?: () => number }) {
+  private constructor(options?: { ttlMs?: number; now?: () => number }) {
     this._ttlMs = options?.ttlMs ?? VOICE_NONCE_DEFAULT_TTL_MS;
     this._now = options?.now ?? Date.now;
   }
@@ -72,12 +76,4 @@ export class VoiceNonceRegistry {
   discard(nonce: string): void {
     this._byNonce.delete(nonce);
   }
-}
-
-let _registry: VoiceNonceRegistry | null = null;
-
-/** The process-wide registry the listener reads and phone jobs write. */
-export function getVoiceNonceRegistry(): VoiceNonceRegistry {
-  _registry ??= new VoiceNonceRegistry();
-  return _registry;
 }

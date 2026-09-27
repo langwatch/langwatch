@@ -7,11 +7,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   type CloudflaredModule,
+  type ScopedRequire,
   type CloudflaredScope,
   ensureCloudflaredOnPath,
   resolveCloudflaredFromScopes,
   VoiceTunnelBinaryError,
-} from "../voice-cloudflared-binary.ts";
+} from "../voice-cloudflared-binary.channels.ts";
 
 const BIN = "/pkg/cloudflared/bin/cloudflared";
 const BIN_DIR = "/pkg/cloudflared/bin";
@@ -30,19 +31,20 @@ function fakeModule(
 function fakeScopeRequire(opts: {
   resolves: boolean;
   mod?: Partial<CloudflaredModule>;
-}): NodeRequire {
-  const req = ((specifier: string): unknown => {
+}): ScopedRequire {
+  const load = (specifier: string): unknown => {
     if (specifier === "cloudflared") return opts.mod;
     throw new Error(`unexpected require(${specifier})`);
-  }) as unknown as NodeRequire;
-  req.resolve = ((specifier: string): string => {
-    if (specifier === "cloudflared/package.json") {
-      if (opts.resolves) return "/pkg/cloudflared/package.json";
-      throw new Error("Cannot find module 'cloudflared/package.json'");
-    }
-    throw new Error(`unexpected resolve(${specifier})`);
-  }) as NodeRequire["resolve"];
-  return req;
+  };
+  return Object.assign(load, {
+    resolve: (specifier: string): string => {
+      if (specifier === "cloudflared/package.json") {
+        if (opts.resolves) return "/pkg/cloudflared/package.json";
+        throw new Error("Cannot find module 'cloudflared/package.json'");
+      }
+      throw new Error(`unexpected resolve(${specifier})`);
+    },
+  });
 }
 
 describe("ensureCloudflaredOnPath", () => {

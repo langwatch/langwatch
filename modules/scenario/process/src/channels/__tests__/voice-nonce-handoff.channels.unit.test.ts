@@ -7,6 +7,7 @@ import { EventEmitter } from "node:events";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { VoiceNonceRegistryService } from "../../services/voice-nonce-registry.service.ts";
 import {
   handleVoiceNonceRegisterMessage,
   isVoiceMediaUpgradeRefusedMessage,
@@ -23,8 +24,7 @@ import {
   VoiceNonceRegistrationFailedError,
   VoiceNonceRegistrationNoChannelError,
   VoiceNonceRegistrationTimeoutError,
-} from "../voice-nonce-handoff.ts";
-import { VoiceNonceRegistry } from "../voice-nonce-registry.ts";
+} from "../voice-nonce-handoff.channels.ts";
 
 describe("isVoiceNonceRegisterMessage", () => {
   it("matches only the registration request", () => {
@@ -149,7 +149,7 @@ describe("requestNonceRegistration", () => {
 describe("handleVoiceNonceRegisterMessage", () => {
   describe("given a registry that accepts the registration", () => {
     it("registers the nonce against the sending child and acks ok", () => {
-      const registry = new VoiceNonceRegistry();
+      const registry = VoiceNonceRegistryService.create();
       const child = {} as ChildProcess;
       const ack = handleVoiceNonceRegisterMessage({
         message: {

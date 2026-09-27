@@ -1,4 +1,4 @@
-import { WebSocketHost } from "@langwatch/api";
+import { RawSocketHost, WebSocketHost } from "@langwatch/api";
 import type { TransportSelection } from "@langwatch/api/hosting";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
 import {
@@ -145,6 +145,17 @@ export class ProcessServer implements ProcessBoot {
         });
         this.server.with(sockets);
       }
+      if (role === "worker") {
+        const doors = RawSocketHost.create({ port: this.settings.rawSocketPort });
+        surface = () => ({ hosts: { rawsocket: doors }, serve: () => void 0 });
+        this.server.with({
+          name: "raw socket doors",
+          start: async () => {
+            await doors.listen();
+          },
+          stop: () => doors.close(),
+        });
+      }
       const runtime = await bootInstalledProcess({
         role,
         modules,
@@ -239,4 +250,5 @@ const processSettings = z.object({
   nlpServiceUrl: z.string().optional(),
   nlpCodeBlockTimeoutSeconds: z.string().optional(),
   adminEmails: z.array(z.string()).optional(),
+  rawSocketPort: z.number().int().min(0).max(65535).default(3300),
 });

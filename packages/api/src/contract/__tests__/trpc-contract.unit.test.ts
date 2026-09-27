@@ -46,9 +46,9 @@ describe("defineTrpcContract", () => {
       expect(Object.keys(contract.members)).toEqual(["getById", "deleteById"]);
       expect(contract.members.getById?.kind).toBe("query");
       expect(contract.members.deleteById?.kind).toBe("mutation");
-      expect(contract.members.getById?.output?.safeParse({ id: "a" }).success).toBe(true);
+      expect(contract.members.getById?.output?.validate({ id: "a" })).toBe(true);
       expect(contract.members.deleteById?.output).toBeUndefined();
-      expect(contract.members.deleteById?.input.safeParse({ id: "a" }).success).toBe(true);
+      expect(contract.members.deleteById?.input.validate({ id: "a" })).toBe(true);
     });
 
     /** @scenario "A contract declares a procedure once, in a browser-safe module" */

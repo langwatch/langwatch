@@ -6,15 +6,15 @@ import { ChildProcess } from "node:child_process";
 
 import { describe, expect, it } from "vitest";
 
-import { VoiceNonceRegistry } from "../voice-nonce-registry.ts";
+import { VoiceNonceRegistryService } from "../voice-nonce-registry.service.ts";
 
 /** A stand-in child; the registry only stores and returns the reference. */
 const fakeChild = new ChildProcess();
 
-describe("VoiceNonceRegistry", () => {
+describe("VoiceNonceRegistryService", () => {
   describe("given a registered nonce", () => {
     it("returns the owning child once, then never again", () => {
-      const registry = new VoiceNonceRegistry({ now: () => 1000 });
+      const registry = VoiceNonceRegistryService.create({ now: () => 1000 });
       registry.register({ nonce: "abc", child: fakeChild });
 
       const first = registry.consume("abc");
@@ -27,7 +27,7 @@ describe("VoiceNonceRegistry", () => {
   describe("when the nonce was never registered", () => {
     /** @scenario "The media listener refuses an unknown or expired nonce" */
     it("reports it unknown", () => {
-      const registry = new VoiceNonceRegistry();
+      const registry = VoiceNonceRegistryService.create();
       expect(registry.consume("missing")).toEqual({
         ok: false,
         reason: "unknown",
@@ -39,7 +39,7 @@ describe("VoiceNonceRegistry", () => {
     /** @scenario "The media listener refuses an unknown or expired nonce" */
     it("reports it expired and removes it so a replay reads unknown", () => {
       let now = 0;
-      const registry = new VoiceNonceRegistry({ ttlMs: 100, now: () => now });
+      const registry = VoiceNonceRegistryService.create({ ttlMs: 100, now: () => now });
       registry.register({ nonce: "abc", child: fakeChild });
 
       now = 100; // exactly at the boundary counts as expired
@@ -57,7 +57,7 @@ describe("VoiceNonceRegistry", () => {
 
   describe("when a nonce is discarded", () => {
     it("is gone without being consumed", () => {
-      const registry = new VoiceNonceRegistry();
+      const registry = VoiceNonceRegistryService.create();
       registry.register({ nonce: "abc", child: fakeChild });
       expect(registry.size).toBe(1);
 

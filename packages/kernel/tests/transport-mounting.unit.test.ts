@@ -359,3 +359,54 @@ describe("given a feature whose server declares a socket", () => {
     });
   });
 });
+
+/** One declared raw-socket door, standing in for a `RawSocketProtocol`. */
+const mediaDoor = {
+  protocol: "rawsocket",
+  router: () => ({ path: "/twilio/:nonce" }),
+} as const;
+
+describe("given a feature whose server declares a raw-socket door", () => {
+  const server = defineServerModule("dataset")
+    .withApp(CatalogueApp)
+    .withTransports(catalogueRest, mediaDoor);
+
+  describe("when the worker opened its raw-socket host", () => {
+    /** @scenario "A declared raw-socket door mounts on the worker's own port" */
+    it("mounts the door on it, bound to the feature's own app", async () => {
+      const doors: { declaration: object; app: unknown }[] = [];
+
+      await createApp({ role: "worker", members: memberSourceOf({}) })
+        .withTransports({
+          rawsocket: { mount: (declaration, app) => doors.push({ declaration, app: app() }) },
+        })
+        .withModules([server])
+        .boot();
+
+      expect(doors).toHaveLength(1);
+      expect(doors[0]?.declaration).toEqual({ path: "/twilio/:nonce" });
+      const app = doors[0]?.app;
+      if (!readsCatalogue(app)) throw new Error("the door was bound to no catalogue app");
+      expect(app.read()).toBe("one dataset");
+    });
+  });
+
+  describe("when the api process boots the same feature", () => {
+    /** @scenario "The api process never mounts a raw-socket door" */
+    it("mounts its REST family and leaves the door to the worker", async () => {
+      const doors: object[] = [];
+      const rest = recordingRestHost();
+
+      await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({
+          rest,
+          rawsocket: { mount: (declaration) => doors.push(declaration) },
+        })
+        .withModules([server])
+        .boot();
+
+      expect(doors).toHaveLength(0);
+      expect(rest.mounted).toHaveLength(1);
+    });
+  });
+});

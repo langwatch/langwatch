@@ -4,22 +4,20 @@
 import { voice as scenarioVoice } from "@langwatch/scenario";
 import { nowInstant } from "@langwatch/time";
 
-import { ensureCloudflaredOnPath } from "./voice-cloudflared-binary.ts";
+import { ensureCloudflaredOnPath } from "./voice-cloudflared-binary.channels.ts";
 
-type OpenedTunnel = Awaited<ReturnType<typeof scenarioVoice.openTwilioTunnel>>;
+/** The tunnel the SDK opens, as far as this module reads it. */
+type OpenedTunnel = { url: string; close(): Promise<void> };
+
+/** Opens a quick tunnel to a local port through the named provider. */
+type TunnelOpener = (options: { port: number; provider: "cloudflared" }) => Promise<OpenedTunnel>;
 
 /**
  * The SDK helper this module falls back to when no opener is injected.
  * Exported so a test can assert it's callable — every other test injects
  * `openTunnel`, so a broken import would otherwise surface first in production.
  */
-export const defaultOpenTunnel: (
-  // Written out rather than inferred: the SDK reaches this helper through a
-  // namespace re-export, so its own option and result types have no importable
-  // name and a declaration emit cannot write the inferred signature (TS4023).
-  // Deriving both sides off the value keeps the signature exact.
-  ...args: Parameters<typeof scenarioVoice.openTwilioTunnel>
-) => ReturnType<typeof scenarioVoice.openTwilioTunnel> = scenarioVoice.openTwilioTunnel;
+export const defaultOpenTunnel: TunnelOpener = scenarioVoice.openTwilioTunnel;
 
 /**
  * How long to wait for the fresh hostname to become globally resolvable,
@@ -105,14 +103,15 @@ export async function waitUntilTunnelResolvable(params: {
   const host = tunnelHostFromUrl(params.url);
   const deadline = nowInstant().epochMilliseconds + timeoutMs;
 
-  for (;;) {
-    if (await resolveHost(host)) return;
+  let resolved = await resolveHost(host);
+  while (!resolved) {
     if (nowInstant().epochMilliseconds >= deadline) {
       throw new VoiceTunnelNotReadyError(
         `voice public URL tunnel ${params.url} did not become globally resolvable within ${timeoutMs}ms`,
       );
     }
     await new Promise((r) => setTimeout(r, pollIntervalMs));
+    resolved = await resolveHost(host);
   }
 }
 
@@ -126,7 +125,7 @@ export async function openVoicePublicUrlTunnel(params: {
   env: NodeJS.ProcessEnv;
   timeoutMs?: number;
   pollIntervalMs?: number;
-  openTunnel?: (opts: { port: number; provider: "cloudflared" }) => Promise<OpenedTunnel>;
+  openTunnel?: TunnelOpener;
   resolveHost?: (host: string) => Promise<boolean>;
   /** Puts the cloudflared binary on PATH before `openTunnel` spawns it.
    *  Injectable so a test with a fake opener stays hermetic; defaults to the

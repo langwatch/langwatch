@@ -19,6 +19,8 @@ const processSettings = (role: "api" | "worker") =>
       "PROCESS_SHUTDOWN_DEADLINE_MS",
       z.coerce.number().int().positive().default(60000),
     ),
+    /** The port the worker's raw-socket doors listen on (voice media dials back here). */
+    rawSocketPort: c.env("VOICE_WS_PORT", port.default(3300)),
   }));
 
 /** Framework owners and installed module owners feed the same config parser. */

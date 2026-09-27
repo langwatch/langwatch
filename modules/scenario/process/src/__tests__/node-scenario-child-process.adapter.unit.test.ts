@@ -34,6 +34,7 @@ vi.mock("node:child_process", () => ({
 import { ScenarioExecutionPoolService, type ScenarioExecutionRunner } from "../index.ts";
 import { NodeScenarioChildService } from "../services/node-scenario-child.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
+import { VoiceNonceRegistryService } from "../services/voice-nonce-registry.service.ts";
 
 /** A runner that never actually executes — the pool only needs the job
  * marked active so `registerChild` below finds it. */
@@ -94,6 +95,7 @@ describe("NodeScenarioChildService", () => {
           pool.submit(job());
           return pool;
         })(),
+        nonces: VoiceNonceRegistryService.create(),
       });
 
       const session = adapter.start({

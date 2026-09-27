@@ -50,11 +50,17 @@ export interface FeatureWebSocketHost {
   mount(declaration: MountableTransport, app: () => unknown): void;
 }
 
+/** The role's own port for sockets handed on unopened, as the installer calls it. */
+export interface FeatureRawSocketHost {
+  mount(declaration: MountableTransport, app: () => unknown): void;
+}
+
 /** The doors one process opens, named by protocol. */
 export type FeatureTransportHosts<Rest, Trpc> = Readonly<{
   rest?: FeatureRestHost<Rest> | undefined;
   trpc?: FeatureTrpcHost<Trpc> | undefined;
   websocket?: FeatureWebSocketHost | undefined;
+  rawsocket?: FeatureRawSocketHost | undefined;
 }>;
 
 /** Whatever the process's doors made of one feature's declared transports. */
@@ -125,6 +131,10 @@ export function mountDeclaredTransports<Rest, Trpc>({
         mountSocket(entry, descriptor, hosts.websocket);
         continue;
       }
+      if (descriptor.protocol === "rawsocket") {
+        mountRawSocket(entry, descriptor, hosts.rawsocket);
+        continue;
+      }
       if (descriptor.protocol === "rest") {
         rest.push(mountRest(entry, descriptor, hosts.rest));
         continue;
@@ -153,6 +163,32 @@ function mountSocket(
 ): void {
   if (!host) throw new MissingTransportHostError(entry.feature, "WebSocket");
   host.mount(descriptor.router(), entry.provided);
+}
+
+/** One raw-socket door on the role's own port, bound to the feature's app. */
+function mountRawSocket(
+  entry: DeclaredTransports,
+  descriptor: FeatureTransportDescriptor,
+  host: FeatureRawSocketHost | undefined,
+): void {
+  if (!host) throw new MissingTransportHostError(entry.feature, "raw socket");
+  host.mount(descriptor.router(), entry.provided);
+}
+
+/**
+ * The declarations one role mounts: the api role hosts every door but the raw
+ * socket, which the role that owns the scenario children hosts (record §8).
+ */
+export function declaredForRole(
+  declared: readonly DeclaredTransports[],
+  role: "api" | "worker",
+): DeclaredTransports[] {
+  return declared.map((entry) => ({
+    ...entry,
+    transports: entry.transports.filter((descriptor) =>
+      role === "worker" ? descriptor.protocol === "rawsocket" : descriptor.protocol !== "rawsocket",
+    ),
+  }));
 }
 
 /** One REST family on the process's own door, with the family's own options. */

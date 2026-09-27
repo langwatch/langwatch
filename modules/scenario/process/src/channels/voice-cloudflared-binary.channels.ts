@@ -84,6 +84,12 @@ function defaultIsOnPath(): boolean {
   }
 }
 
+/** The part of a scoped `require` the search uses: load a specifier, resolve one. */
+export interface ScopedRequire {
+  (specifier: string): unknown;
+  resolve(specifier: string): string;
+}
+
 /**
  * One named candidate scope to search for the npm `cloudflared` package. The
  * `require` is `null` when the scope's own anchor did not resolve (e.g. the
@@ -94,7 +100,7 @@ export interface CloudflaredScope {
   name: string;
   /** The require to resolve/load `cloudflared` from, or `null` if the scope's
    *  anchor did not resolve. */
-  require: NodeRequire | null;
+  require: ScopedRequire | null;
 }
 
 /**
@@ -130,7 +136,7 @@ export function resolveCloudflaredFromScopes(scopes: CloudflaredScope[]): Cloudf
  */
 function defaultResolveModule(): CloudflaredModule {
   const appRequire = createRequire(import.meta.url);
-  const scopeFrom = (specifier: string): NodeRequire | null => {
+  const scopeFrom = (specifier: string): ScopedRequire | null => {
     try {
       return createRequire(appRequire.resolve(specifier));
     } catch {
