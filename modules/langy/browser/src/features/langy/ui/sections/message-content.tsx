@@ -304,6 +304,8 @@ function answerHasContent(reading: AnswerReading): boolean {
   return Boolean(
     reading.displayText ||
     reading.hasBlocks ||
+    reading.runs.some((run) => run.kind === "say") ||
+    reading.codeAccessCall ||
     cardCount > 0 ||
     reading.offersNotifications ||
     reading.showsActivity ||
