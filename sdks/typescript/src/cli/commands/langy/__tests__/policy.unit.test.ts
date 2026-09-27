@@ -857,6 +857,8 @@ describe("given a folder shared with a Langy conversation", () => {
         "grep -e > /etc/passwd",
         "rg --files /etc",
         "rg --ignore-file /etc/ignore KEY",
+        "grep --ignore-case root /etc/passwd",
+        "sed --in-place 's/a/b/' /etc/hosts",
       ]) {
         const decision = bash(command);
         expect(decision.kind, command).toBe("refuse");

@@ -1663,8 +1663,8 @@ const NO_SCRIPT_OPERAND_LONG_FLAGS: ReadonlySet<string> = new Set([
  * Every `-e` value is text. The first operand is text only while no option
  * gave the script (`-e`, `-f`, `--regexp=` and the like), since then the
  * operands are all files. Anything this reading is unsure of stays a path: a
- * redirect target is never text, and a long option written without `=` is
- * taken to consume the next token, which is then checked like any other.
+ * redirect target is never text, and an unknown long option written without
+ * `=` may or may not take the next token, so it leaves every operand a path.
  */
 function scriptText(part: CommandPart): { text: Set<number>; scriptFiles: string[] } {
   const text = new Set<number>();
@@ -1700,8 +1700,10 @@ function scriptText(part: CommandPart): { text: Set<number>; scriptFiles: string
       } else if (NO_SCRIPT_OPERAND_LONG_FLAGS.has(flag)) {
         scriptGiven = true;
         if (flag === "--file" && value === undefined) index += 1;
-      } else if (value === undefined && takesNext(index + 1)) {
-        index += 1;
+      } else if (value === undefined) {
+        // Whether it takes the next token is not known here, so no operand is
+        // read as the script: every one of them is checked.
+        scriptGiven = true;
       }
       continue;
     }

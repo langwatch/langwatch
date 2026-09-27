@@ -680,7 +680,6 @@ function runFileTool({
   }
 }
 
-/** The HTTP status a rejected key request carries, whichever client threw it. */
 /** Which step refused the key (the key exchange unless the error names the lookup) and its code. */
 function refusalStep(error: unknown): { stage: "lookup" | "key"; code: string | undefined } {
   const { stage, code } = (error ?? {}) as { stage?: unknown; code?: unknown };
@@ -690,6 +689,7 @@ function refusalStep(error: unknown): { stage: "lookup" | "key"; code: string | 
   };
 }
 
+/** The HTTP status a rejected key request carries, whichever client threw it. */
 function refusalStatus(error: unknown): number | undefined {
   if (typeof error !== "object" || error === null) return undefined;
   const { status, httpStatus } = error as {
