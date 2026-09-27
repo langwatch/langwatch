@@ -172,9 +172,10 @@ export class TurnEventMapper {
           },
         ];
       case "auto_retry_end":
-        // A failed end is followed by the turn's error terminal, which is
-        // what the panel shows; only a success clears the retry line.
-        return event.success === true ? [{ type: "retry_settled", turnId: this.turnId }] : [];
+        // Every end clears the retry line: an answered call, the last retry
+        // failing or a stop during the wait. The error terminal that follows a
+        // failed end does not clear the status on its own.
+        return [{ type: "retry_settled", turnId: this.turnId }];
       default:
         return [];
     }
