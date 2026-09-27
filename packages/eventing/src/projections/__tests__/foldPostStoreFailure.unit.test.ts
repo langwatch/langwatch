@@ -66,15 +66,15 @@ describe("fold failures after the state was stored", () => {
   }: {
     shouldSubscriberFail?: boolean;
     shouldStoreFail?: boolean;
-  }): ReturnType<typeof vi.fn> {
+  }) {
     const queueManager = createMockQueueManager({
       hasProjectionSubscriberQueues: false,
     });
-    const router = new ProjectionRouter<Event>(
-      TEST_CONSTANTS.AGGREGATE_TYPE,
-      TEST_CONSTANTS.PIPELINE_NAME,
+    const router = new ProjectionRouter<Event>({
+      aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+      pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       queueManager,
-    );
+    });
 
     const store = createMockFoldProjectionStore<{ count: number }>();
     (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
@@ -99,7 +99,9 @@ describe("fold failures after the state was stored", () => {
     router.registerSubscriber("counter", subscriber);
     router.initializeFoldQueues();
 
-    return queueManager.initializeProjectionQueues as ReturnType<typeof vi.fn>;
+    const [request] = vi.mocked(queueManager.initializeProjectionQueues).mock.calls[0] ?? [];
+    if (!request?.onEventBatch) throw new Error("the router registered no fold queue");
+    return { onEvent: request.onEvent, onEventBatch: request.onEventBatch };
   }
 
   /** The coalesced path — `processFoldProjectionBatch`. */
@@ -108,11 +110,7 @@ describe("fold failures after the state was stored", () => {
     shouldSubscriberFail?: boolean;
     shouldStoreFail?: boolean;
   }): Promise<unknown> {
-    const onEventBatch = buildFoldQueues(options).mock.calls[0]?.[2] as (
-      projectionName: string,
-      events: Event[],
-      context: unknown,
-    ) => Promise<void>;
+    const { onEventBatch } = buildFoldQueues(options);
 
     return onEventBatch("counter", options.batch, { tenantId }).catch((error: unknown) => error);
   }
@@ -123,11 +121,7 @@ describe("fold failures after the state was stored", () => {
     shouldSubscriberFail?: boolean;
     shouldStoreFail?: boolean;
   }): Promise<unknown> {
-    const onEvent = buildFoldQueues(options).mock.calls[0]?.[1] as (
-      projectionName: string,
-      event: Event,
-      context: unknown,
-    ) => Promise<void>;
+    const { onEvent } = buildFoldQueues(options);
 
     return onEvent("counter", options.event, { tenantId }).catch((error: unknown) => error);
   }

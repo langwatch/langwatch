@@ -67,11 +67,11 @@ export class EventingSsoConnectionHistoryRepository extends SsoConnectionHistory
     limit: number;
   }): Promise<readonly SsoConnectionHistoryEntry[]> {
     const store = await this.eventStore();
-    const events = await store.getEvents(
-      connectionId,
-      { tenantId: createTenantId(organizationId) },
-      SSO_CONNECTION_AGGREGATE_TYPE,
-    );
+    const events = await store.getEvents({
+      aggregateId: connectionId,
+      context: { tenantId: createTenantId(organizationId) },
+      aggregateType: SSO_CONNECTION_AGGREGATE_TYPE,
+    });
     return events.map(toHistoryEntry).toSorted(newestFirst).slice(0, limit);
   }
 }

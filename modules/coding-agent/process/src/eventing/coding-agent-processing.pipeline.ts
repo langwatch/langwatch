@@ -148,26 +148,26 @@ export class EventingCodingAgentProcessingAdapter {
       // ADR-066 pillar 2: coalesce contributions preserving order; sharding would break
       // order-dependent model-call derivations. The log lane fills the session-context
       // memo from a declaration; the span lane only reads it.
-      .withCommandInstance(
-        "contributeSpanFacts",
-        EventingContributeSpanFactsService,
-        EventingContributeSpanFactsService.create({ contextMemo }),
-        { coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH },
-      )
-      .withCommandInstance(
-        "contributeLogFacts",
-        EventingContributeLogFactsService,
-        EventingContributeLogFactsService.create({ contextMemo }),
-        { coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH },
-      )
-      .withCommandInstance(
-        "contributeMetricFacts",
-        EventingContributeMetricFactsService,
-        EventingContributeMetricFactsService.create(),
-        {
+      .withCommandInstance({
+        name: "contributeSpanFacts",
+        handlerClass: EventingContributeSpanFactsService,
+        instance: EventingContributeSpanFactsService.create({ contextMemo }),
+        options: { coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH },
+      })
+      .withCommandInstance({
+        name: "contributeLogFacts",
+        handlerClass: EventingContributeLogFactsService,
+        instance: EventingContributeLogFactsService.create({ contextMemo }),
+        options: { coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH },
+      })
+      .withCommandInstance({
+        name: "contributeMetricFacts",
+        handlerClass: EventingContributeMetricFactsService,
+        instance: EventingContributeMetricFactsService.create(),
+        options: {
           coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
         },
-      );
+      });
 
     const configured = github
       ? builder.withProjectionSubscriber(

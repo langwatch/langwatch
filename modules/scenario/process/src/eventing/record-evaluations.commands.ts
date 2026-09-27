@@ -73,11 +73,11 @@ function getFinishedEventOrThrow({
 }): SimulationRunFinishedEvent {
   const finished = priorEvents.find(isSimulationRunFinishedEvent);
   if (!finished) {
-    throw new ValidationError(
-      `Scenario run ${scenarioRunId} has not finished, evaluations can only be recorded on a finished run`,
-      "scenarioRunId",
-      scenarioRunId,
-    );
+    throw new ValidationError({
+      reason: `Scenario run ${scenarioRunId} has not finished, evaluations can only be recorded on a finished run`,
+      field: "scenarioRunId",
+      value: scenarioRunId,
+    });
   }
   return finished;
 }

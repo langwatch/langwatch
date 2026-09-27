@@ -52,7 +52,7 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
         },
       };
 
-      manager.initializeProjectionQueues(projections, vi.fn());
+      manager.initializeProjectionQueues({ projections, onEvent: vi.fn() });
 
       // The registry entry's groupKeyFn dispatches to the projection's custom groupKeyFn
       const entry = globalJobRegistry.get("test-pipeline:projection:myProjection");
@@ -89,7 +89,7 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
         },
       };
 
-      manager.initializeProjectionQueues(projections, vi.fn());
+      manager.initializeProjectionQueues({ projections, onEvent: vi.fn() });
 
       const entry = globalJobRegistry.get("test-pipeline:projection:myProjection");
       expect(entry?.groupKeyFn).toBeDefined();
@@ -132,7 +132,7 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
         },
       };
 
-      manager.initializeProjectionQueues(projections, vi.fn());
+      manager.initializeProjectionQueues({ projections, onEvent: vi.fn() });
 
       // Both entries registered
       expect(globalJobRegistry.has("test-pipeline:projection:customProjection")).toBe(true);

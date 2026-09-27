@@ -111,11 +111,11 @@ export abstract class AbstractEventStore<
     EventUtils.validateTenantId(context, operation);
 
     if (eventId.trim().length === 0 || this.hasMissingAggregateId(aggregateId)) {
-      throw new ValidationError(
-        "An event read requires a non-empty eventId and aggregateId",
-        "eventId",
-        eventId,
-      );
+      throw new ValidationError({
+        reason: "An event read requires a non-empty eventId and aggregateId",
+        field: "eventId",
+        value: eventId,
+      });
     }
 
     return this.instrument(
@@ -139,12 +139,17 @@ export abstract class AbstractEventStore<
     );
   }
 
-  async getEvents(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    anchorOccurredAtMs?: number,
-  ): Promise<readonly EventType[]> {
+  async getEvents({
+    aggregateId,
+    context,
+    aggregateType,
+    anchorOccurredAtMs,
+  }: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    anchorOccurredAtMs?: number;
+  }): Promise<readonly EventType[]> {
     // For time-local aggregate types, lower-bound the event_log scan to a
     // window around the triggering work's time so ClickHouse prunes old weekly
     // partitions instead of cold-scanning every partition on S3. Returns
@@ -163,12 +168,17 @@ export abstract class AbstractEventStore<
    * Retrieves events with an explicit occurred-at lower bound; caller must provide sufficient
    * safety margin to avoid dropping delayed/replayed events.
    */
-  async getEventsOccurredSince(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    occurredAtFromMs: number,
-  ): Promise<readonly EventType[]> {
+  async getEventsOccurredSince({
+    aggregateId,
+    context,
+    aggregateType,
+    occurredAtFromMs,
+  }: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    occurredAtFromMs: number;
+  }): Promise<readonly EventType[]> {
     return this.readEvents({
       operation: "getEventsOccurredSince",
       aggregateId,
@@ -239,12 +249,17 @@ export abstract class AbstractEventStore<
     );
   }
 
-  async getEventsUpTo(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    upToEvent: EventType,
-  ): Promise<readonly EventType[]> {
+  async getEventsUpTo({
+    aggregateId,
+    context,
+    aggregateType,
+    upToEvent,
+  }: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    upToEvent: EventType;
+  }): Promise<readonly EventType[]> {
     EventUtils.validateTenantId(context, `${this.constructor.name}.getEventsUpTo`);
 
     if (this.hasMissingAggregateId(aggregateId)) {
@@ -400,13 +415,19 @@ export abstract class AbstractEventStore<
     );
   }
 
-  async countEventsBefore(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    beforeTimestamp: number,
-    beforeEventId: string,
-  ): Promise<number> {
+  async countEventsBefore({
+    aggregateId,
+    context,
+    aggregateType,
+    beforeTimestamp,
+    beforeEventId,
+  }: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    beforeTimestamp: number;
+    beforeEventId: string;
+  }): Promise<number> {
     EventUtils.validateTenantId(context, `${this.constructor.name}.countEventsBefore`);
 
     if (this.hasMissingAggregateId(aggregateId)) {
@@ -478,19 +499,24 @@ export abstract class AbstractEventStore<
           for (let i = 0; i < events.length; i++) {
             const event = events[i];
             if (!event) {
-              throw new ValidationError(`Event at index ${i} is undefined`, "event", void 0, {
-                index: i,
+              throw new ValidationError({
+                reason: `Event at index ${i} is undefined`,
+                field: "event",
+                value: void 0,
+                context: {
+                  index: i,
+                },
               });
             }
             validateEventTenant(event, context, i);
             validateEventAggregateType(event, aggregateType, i);
             if (!EventUtils.isValidEvent(event)) {
-              throw new ValidationError(
-                `Invalid event at index ${i}: event must have id, aggregateId, timestamp, type, and data`,
-                "event",
-                event,
-                { index: i },
-              );
+              throw new ValidationError({
+                reason: `Invalid event at index ${i}: event must have id, aggregateId, timestamp, type, and data`,
+                field: "event",
+                value: event,
+                context: { index: i },
+              });
             }
           }
 

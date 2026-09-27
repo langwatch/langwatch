@@ -57,7 +57,11 @@ describe("subscriber redelivery", () => {
   }
 
   async function actionCount(aggregateId: string): Promise<number> {
-    const events = await store.getEvents(aggregateId, { tenantId } as never, aggregateType);
+    const events = await store.getEvents({
+      aggregateId,
+      context: { tenantId } as never,
+      aggregateType,
+    });
     return events.filter((event) => event.type === TEST_EVENT_TYPES[1]).length;
   }
 
@@ -67,14 +71,14 @@ describe("subscriber redelivery", () => {
       describe("when the same source event is delivered again after a lost acknowledgement", () => {
         /** @scenario Subscriber redelivery does not repeat its action */
         it("leaves one result for that action identity and completes without repeating it", async () => {
-          const router = new ProjectionRouter<Event>(
+          const router = new ProjectionRouter<Event>({
             aggregateType,
-            TEST_CONSTANTS.PIPELINE_NAME,
-            new QueueManager<Event>({
+            pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+            queueManager: new QueueManager<Event>({
               aggregateType,
               pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
             }),
-          );
+          });
           const name = `${subscriber}Subscriber`;
           router.registerEventSubscriber({
             name,

@@ -78,33 +78,33 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
    * Retrieves all events for an aggregate; optional anchorOccurredAtMs lets
    * time-local stores prune old partitions. Validates tenant isolation before queries.
    */
-  getEvents(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    anchorOccurredAtMs?: number,
-  ): Promise<readonly EventType[]>;
+  getEvents(request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    anchorOccurredAtMs?: number;
+  }): Promise<readonly EventType[]>;
 
   /**
    * Retrieves events with explicit occurred-at lower bound; caller must provide sufficient
    * safety margin. Validates tenantId like getEvents.
    */
-  getEventsOccurredSince(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    occurredAtFromMs: number,
-  ): Promise<readonly EventType[]>;
+  getEventsOccurredSince(request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    occurredAtFromMs: number;
+  }): Promise<readonly EventType[]>;
 
   /**
    * Retrieves events up to and including a specific event; validates tenant isolation.
    */
-  getEventsUpTo(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    upToEvent: EventType,
-  ): Promise<readonly EventType[]>;
+  getEventsUpTo(request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    upToEvent: EventType;
+  }): Promise<readonly EventType[]>;
 
   /**
    * Cursor-paginated variant of getEventsUpTo; enables paging large histories without
@@ -123,13 +123,13 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
    * Counts events before a given event; should use efficient COUNT with indexes for
    * performance. Validates tenantId for security.
    */
-  countEventsBefore(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    beforeTimestamp: number,
-    beforeEventId: string,
-  ): Promise<number>;
+  countEventsBefore(request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    beforeTimestamp: number;
+    beforeEventId: string;
+  }): Promise<number>;
 }
 
 /**

@@ -133,11 +133,11 @@ export class EvaluationProcessingService {
         handler: (event, context) =>
           this.deps.automations.handleEvaluationGraphTriggerActivity({ event, context }),
       })
-      .withCommandInstance(
-        "executeEvaluation",
-        ExecuteEvaluationCommand,
-        this.deps.executeEvaluationCommand,
-        {
+      .withCommandInstance({
+        name: "executeEvaluation",
+        handlerClass: ExecuteEvaluationCommand,
+        instance: this.deps.executeEvaluationCommand,
+        options: {
           serializeByAggregate: true,
           delay: 30_000,
           deduplication: {
@@ -145,7 +145,7 @@ export class EvaluationProcessingService {
             ttlMs: 30_000,
           },
         },
-      )
+      })
       .withCommand("startEvaluation", commands.start, {
         serializeByAggregate: true,
       })

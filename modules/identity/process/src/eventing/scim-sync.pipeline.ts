@@ -76,36 +76,36 @@ export function defineScimSyncPipeline(deps: ScimSyncPipelineDeps): ScimSyncPipe
         store: deps.scimSyncProjectionStore,
       }),
     )
-    .withCommandInstance(
-      "issueScimToken",
-      IssueScimTokenCommand,
-      new IssueScimTokenCommand(deps.scimSyncGuards),
-    )
-    .withCommandInstance(
-      "recordScimUserPush",
-      RecordScimUserPushCommand,
-      new RecordScimUserPushCommand(deps.scimSyncGuards),
-    )
-    .withCommandInstance(
-      "recordScimGroupMapping",
-      RecordScimGroupMappingCommand,
-      new RecordScimGroupMappingCommand(deps.scimSyncGuards),
-    )
-    .withCommandInstance(
-      "recordScimApplyFailure",
-      RecordScimApplyFailureCommand,
-      new RecordScimApplyFailureCommand(deps.scimSyncGuards),
-    )
-    .withCommandInstance(
-      "redriveScimApply",
-      RedriveScimApplyCommand,
-      new RedriveScimApplyCommand(deps.scimSyncGuards),
-    )
-    .withCommandInstance(
-      "revokeScimSync",
-      RevokeScimSyncCommand,
-      new RevokeScimSyncCommand(deps.scimSyncGuards),
-    );
+    .withCommandInstance({
+      name: "issueScimToken",
+      handlerClass: IssueScimTokenCommand,
+      instance: new IssueScimTokenCommand(deps.scimSyncGuards),
+    })
+    .withCommandInstance({
+      name: "recordScimUserPush",
+      handlerClass: RecordScimUserPushCommand,
+      instance: new RecordScimUserPushCommand(deps.scimSyncGuards),
+    })
+    .withCommandInstance({
+      name: "recordScimGroupMapping",
+      handlerClass: RecordScimGroupMappingCommand,
+      instance: new RecordScimGroupMappingCommand(deps.scimSyncGuards),
+    })
+    .withCommandInstance({
+      name: "recordScimApplyFailure",
+      handlerClass: RecordScimApplyFailureCommand,
+      instance: new RecordScimApplyFailureCommand(deps.scimSyncGuards),
+    })
+    .withCommandInstance({
+      name: "redriveScimApply",
+      handlerClass: RedriveScimApplyCommand,
+      instance: new RedriveScimApplyCommand(deps.scimSyncGuards),
+    })
+    .withCommandInstance({
+      name: "revokeScimSync",
+      handlerClass: RevokeScimSyncCommand,
+      instance: new RevokeScimSyncCommand(deps.scimSyncGuards),
+    });
 
   return builder.build();
 }

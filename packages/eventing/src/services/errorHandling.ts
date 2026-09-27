@@ -113,12 +113,17 @@ export class SecurityError extends CriticalError {
   readonly operation: string;
   readonly tenantId?: string;
 
-  constructor(
-    operation: string,
-    message: string,
-    tenantId?: string,
-    context: Record<string, unknown> = {},
-  ) {
+  constructor({
+    operation,
+    message,
+    tenantId,
+    context = {},
+  }: {
+    operation: string;
+    message: string;
+    tenantId?: string;
+    context?: Record<string, unknown>;
+  }) {
     super(`[SECURITY] ${message}`, {
       ...context,
       operation,
@@ -195,12 +200,17 @@ export class ValidationError extends CriticalError {
   readonly value?: unknown;
   readonly reason: string;
 
-  constructor(
-    reason: string,
-    field?: string,
-    value?: unknown,
-    context: Record<string, unknown> = {},
-  ) {
+  constructor({
+    reason,
+    field,
+    value,
+    context = {},
+  }: {
+    reason: string;
+    field?: string;
+    value?: unknown;
+    context?: Record<string, unknown>;
+  }) {
     const message = field ? `[VALIDATION] ${reason} (field: ${field})` : `[VALIDATION] ${reason}`;
     super(message, {
       ...context,
@@ -251,14 +261,21 @@ export class StoreError extends BaseEventSourcingError {
   readonly operation: string;
   readonly store: string;
 
-  constructor(
-    operation: string,
-    store: string,
-    message: string,
-    category: ErrorCategory,
-    context: Record<string, unknown> = {},
-    cause?: unknown,
-  ) {
+  constructor({
+    operation,
+    store,
+    message,
+    category,
+    context = {},
+    cause,
+  }: {
+    operation: string;
+    store: string;
+    message: string;
+    category: ErrorCategory;
+    context?: Record<string, unknown>;
+    cause?: unknown;
+  }) {
     super({ message, category, context: { ...context, operation, store }, cause });
     this.operation = operation;
     this.store = store;

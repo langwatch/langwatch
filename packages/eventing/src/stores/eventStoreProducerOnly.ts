@@ -27,40 +27,40 @@ export class EventStoreProducerOnly<
     return Promise.reject(this.refuse("getEvent"));
   }
 
-  getEvents(
-    _aggregateId: string,
-    _context: EventStoreReadContext<EventType>,
-    _aggregateType: AggregateType,
-    _anchorOccurredAtMs?: number,
-  ): Promise<readonly EventType[]> {
+  getEvents(_request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    anchorOccurredAtMs?: number;
+  }): Promise<readonly EventType[]> {
     return Promise.reject(this.refuse("getEvents"));
   }
 
-  getEventsOccurredSince(
-    _aggregateId: string,
-    _context: EventStoreReadContext<EventType>,
-    _aggregateType: AggregateType,
-    _occurredAtFromMs: number,
-  ): Promise<readonly EventType[]> {
+  getEventsOccurredSince(_request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    occurredAtFromMs: number;
+  }): Promise<readonly EventType[]> {
     return Promise.reject(this.refuse("getEventsOccurredSince"));
   }
 
-  getEventsUpTo(
-    _aggregateId: string,
-    _context: EventStoreReadContext<EventType>,
-    _aggregateType: AggregateType,
-    _upToEvent: EventType,
-  ): Promise<readonly EventType[]> {
+  getEventsUpTo(_request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    upToEvent: EventType;
+  }): Promise<readonly EventType[]> {
     return Promise.reject(this.refuse("getEventsUpTo"));
   }
 
-  countEventsBefore(
-    _aggregateId: string,
-    _context: EventStoreReadContext<EventType>,
-    _aggregateType: AggregateType,
-    _beforeTimestamp: number,
-    _beforeEventId: string,
-  ): Promise<number> {
+  countEventsBefore(_request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    beforeTimestamp: number;
+    beforeEventId: string;
+  }): Promise<number> {
     return Promise.reject(this.refuse("countEventsBefore"));
   }
 

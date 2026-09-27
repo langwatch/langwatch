@@ -209,11 +209,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1], context);
 
       // Verify event is only stored once in the repository
-      const allEvents = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const allEvents = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       const event1Count = allEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
 
@@ -248,11 +248,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1], context);
 
       // Verify event is only stored once
-      const allEvents = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const allEvents = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       const event1Count = allEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
 
@@ -291,11 +291,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1, event2, event1], context);
 
       // Verify each event is only stored once
-      const allEvents = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const allEvents = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       expect(allEvents).toHaveLength(2);
       expect(allEvents.find((e) => e.id === event1.id)).toBeDefined();
       expect(allEvents.find((e) => e.id === event2.id)).toBeDefined();
@@ -333,11 +333,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1], context);
 
       // Verify event is only stored once in the repository
-      const allEvents = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const allEvents = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       const event1Count = allEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
 
@@ -390,8 +390,16 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1_agg2], context);
 
       // Verify both events are stored (they're in different partitions)
-      const events_agg1 = await eventStore.getEvents(aggregateId1, context, aggregateType);
-      const events_agg2 = await eventStore.getEvents(aggregateId2, context, aggregateType);
+      const events_agg1 = await eventStore.getEvents({
+        aggregateId: aggregateId1,
+        context,
+        aggregateType,
+      });
+      const events_agg2 = await eventStore.getEvents({
+        aggregateId: aggregateId2,
+        context,
+        aggregateType,
+      });
       expect(events_agg1).toHaveLength(1);
       expect(events_agg2).toHaveLength(1);
       expect(events_agg1[0]?.id).toBe(event1_agg1.id);
@@ -444,11 +452,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1, event2, event3], context);
 
       // Verify all events are stored (event1 once, event2 once, event3 once)
-      const allEvents = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const allEvents = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       expect(allEvents).toHaveLength(3);
       expect(allEvents.find((e) => e.id === event1.id)).toBeDefined();
       expect(allEvents.find((e) => e.id === event2.id)).toBeDefined();

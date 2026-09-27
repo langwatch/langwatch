@@ -76,7 +76,7 @@ function repositoryOver(eventsByTenant: Record<string, ScimSyncEvent[]>): {
   requestedTenants: string[];
 } {
   const requestedTenants: string[] = [];
-  const getEvents: EventStore<ScimSyncEvent>["getEvents"] = async (aggregateId, context) => {
+  const getEvents: EventStore<ScimSyncEvent>["getEvents"] = async ({ aggregateId, context }) => {
     requestedTenants.push(context.tenantId);
     return (eventsByTenant[context.tenantId] ?? []).filter(
       (event) => event.aggregateId === aggregateId,

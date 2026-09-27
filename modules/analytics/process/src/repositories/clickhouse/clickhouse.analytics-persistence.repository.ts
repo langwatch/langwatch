@@ -120,12 +120,12 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     this.validateTenant(tenantId, "upsertBatch");
     for (const entry of entries) {
       if (entry.row.tenantId !== tenantId) {
-        throw new SecurityError(
-          "AnalyticsEvaluationRepository.upsertBatch",
-          "all rows in a single batch must share one tenantId",
+        throw new SecurityError({
+          operation: "AnalyticsEvaluationRepository.upsertBatch",
+          message: "all rows in a single batch must share one tenantId",
           tenantId,
-          { mismatchedTenantId: entry.row.tenantId },
-        );
+          context: { mismatchedTenantId: entry.row.tenantId },
+        });
       }
     }
     try {
@@ -225,12 +225,12 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     this.validateTenant(tenantId, "appendRollupBatch");
     for (const row of parsed.rows) {
       if (row.tenantId !== tenantId) {
-        throw new SecurityError(
-          "AnalyticsEvaluationRepository.appendRollupBatch",
-          "all rows in a single batch must share one tenantId",
+        throw new SecurityError({
+          operation: "AnalyticsEvaluationRepository.appendRollupBatch",
+          message: "all rows in a single batch must share one tenantId",
           tenantId,
-          { mismatchedTenantId: row.tenantId },
-        );
+          context: { mismatchedTenantId: row.tenantId },
+        });
       }
     }
     const client = await this.clientFor(tenantId);

@@ -51,11 +51,11 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
     // this tenant's ClickHouse. Refuse rather than cross the line.
     for (const record of records) {
       if (record.tenantId !== tenantId) {
-        throw new SecurityError(
-          "CodingAgentTraceSessionClickHouseRepository.ensure",
-          "coding agent trace-session batch spans multiple tenants",
+        throw new SecurityError({
+          operation: "CodingAgentTraceSessionClickHouseRepository.ensure",
+          message: "coding agent trace-session batch spans multiple tenants",
           tenantId,
-        );
+        });
       }
     }
 

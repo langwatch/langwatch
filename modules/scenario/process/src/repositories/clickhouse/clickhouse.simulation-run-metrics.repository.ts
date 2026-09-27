@@ -80,14 +80,14 @@ export class ClickHouseSimulationRunMetricsRepository implements SimulationRunMe
         { tenantId, count: rows.length, error: errorMessage },
         "Failed to insert simulation run metrics into ClickHouse",
       );
-      throw new StoreError(
-        "insertRows",
-        "SimulationRunMetricsRepositoryClickHouse",
-        `Failed to insert ${rows.length} simulation run metrics rows: ${errorMessage}`,
-        classifyClickHouseError(error),
-        { count: rows.length },
-        error,
-      );
+      throw new StoreError({
+        operation: "insertRows",
+        store: "SimulationRunMetricsRepositoryClickHouse",
+        message: `Failed to insert ${rows.length} simulation run metrics rows: ${errorMessage}`,
+        category: classifyClickHouseError(error),
+        context: { count: rows.length },
+        cause: error,
+      });
     }
   }
 
@@ -148,14 +148,14 @@ export class ClickHouseSimulationRunMetricsRepository implements SimulationRunMe
         { tenantId, scenarioRunId, error: errorMessage },
         "Failed to read simulation run metrics from ClickHouse",
       );
-      throw new StoreError(
-        "getRunMetrics",
-        "SimulationRunMetricsRepositoryClickHouse",
-        `Failed to read metrics for scenario run ${scenarioRunId}: ${errorMessage}`,
-        classifyClickHouseError(error),
-        { scenarioRunId },
-        error,
-      );
+      throw new StoreError({
+        operation: "getRunMetrics",
+        store: "SimulationRunMetricsRepositoryClickHouse",
+        message: `Failed to read metrics for scenario run ${scenarioRunId}: ${errorMessage}`,
+        category: classifyClickHouseError(error),
+        context: { scenarioRunId },
+        cause: error,
+      });
     }
   }
 }

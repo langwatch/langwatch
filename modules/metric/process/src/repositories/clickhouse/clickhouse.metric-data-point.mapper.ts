@@ -488,7 +488,7 @@ export class MetricDataPointMapper {
   }): void {
     EventUtils.validateTenantId({ tenantId: point.tenantId }, operation);
     if (!/^[a-f0-9]{64}$/.test(point.pointId)) {
-      throw new SecurityError(operation, "invalid PointId", point.tenantId);
+      throw new SecurityError({ operation, message: "invalid PointId", tenantId: point.tenantId });
     }
   }
 }

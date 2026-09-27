@@ -1,15 +1,14 @@
-import type { Logger } from "@langwatch/observability";
+import { createTestLogger, type TestLogLine } from "@langwatch/test-harness";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ProcessOutboxWorker } from "../processOutboxWorker.ts";
 
-function makeLogger(): Logger {
-  return {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  } as unknown as Logger;
+function makeLogger() {
+  return createTestLogger().logger;
+}
+
+function atLevel(lines: TestLogLine[], level: number): TestLogLine[] {
+  return lines.filter((line) => line.level === level);
 }
 
 function report() {
@@ -40,7 +39,7 @@ describe("ProcessOutboxWorker", () => {
 
   it("logs a failed drain and recovers on the next poll", async () => {
     vi.useFakeTimers();
-    const logger = makeLogger();
+    const { logger, lines } = createTestLogger();
     const failure = new Error("database unavailable");
     const runOnce = vi.fn().mockRejectedValueOnce(failure).mockResolvedValue(report());
     const worker = new ProcessOutboxWorker({
@@ -59,13 +58,11 @@ describe("ProcessOutboxWorker", () => {
     expect(runOnce).toHaveBeenCalledTimes(2);
     // Warning, not error: the drain is retried on the next poll, and the very
     // next assertion is that it recovered.
-    expect(logger.warn).toHaveBeenCalledOnce();
-    expect(logger.error).not.toHaveBeenCalled();
+    expect(atLevel(lines, 40)).toHaveLength(1);
+    expect(atLevel(lines, 50)).toHaveLength(0);
     // The Error itself, not its message: a bare string under `error` loses the
     // stack and the log collector drops the field outright (saas#1041).
-    expect(vi.mocked(logger.warn).mock.calls[0]?.[0]).toMatchObject({
-      error: failure,
-    });
+    expect(atLevel(lines, 40)[0]?.error).toBeTypeOf("object");
     await worker.stop();
   });
 
@@ -131,7 +128,7 @@ describe("ProcessOutboxWorker", () => {
   /** @scenario A never-settling delivery cannot wedge a worker's drain loop */
   it("abandons a drain that never settles and resumes polling", async () => {
     vi.useFakeTimers();
-    const logger = makeLogger();
+    const { logger, lines } = createTestLogger();
     const never = new Promise<void>(() => undefined);
     const runOnce = vi
       .fn()
@@ -157,13 +154,13 @@ describe("ProcessOutboxWorker", () => {
     // poll (or the pending notification) drains again.
     await vi.advanceTimersByTimeAsync(200);
     expect(runOnce.mock.calls.length).toBeGreaterThanOrEqual(2);
-    expect(logger.error).toHaveBeenCalledOnce();
+    expect(atLevel(lines, 50)).toHaveLength(1);
     await worker.stop();
   });
 
   it("stops starting drains once too many abandoned ones are still pending", async () => {
     vi.useFakeTimers();
-    const logger = makeLogger();
+    const { logger, lines } = createTestLogger();
     const never = new Promise<void>(() => undefined);
     const runOnce = vi.fn().mockImplementation(async () => never);
     const worker = new ProcessOutboxWorker({
@@ -181,9 +178,9 @@ describe("ProcessOutboxWorker", () => {
     await vi.advanceTimersByTimeAsync(10_000);
 
     expect(runOnce).toHaveBeenCalledTimes(5);
-    const refusals = vi
-      .mocked(logger.error)
-      .mock.calls.filter(([, message]) => String(message).includes("refusing to start another"));
+    const refusals = atLevel(lines, 50).filter((line) =>
+      String(line.msg).includes("refusing to start another"),
+    );
     // Said once, not once per poll: the refusal must not flood the logs.
     expect(refusals).toHaveLength(1);
     await worker.stop();
@@ -225,7 +222,7 @@ describe("ProcessOutboxWorker", () => {
 
   it("does not abandon a drain that is merely slow but under the threshold", async () => {
     vi.useFakeTimers();
-    const logger = makeLogger();
+    const { logger, lines } = createTestLogger();
     let release!: () => void;
     const blocked = new Promise<void>((resolve) => {
       release = resolve;
@@ -246,7 +243,7 @@ describe("ProcessOutboxWorker", () => {
     worker.start();
     await vi.advanceTimersByTimeAsync(5_000);
     expect(runOnce).toHaveBeenCalledTimes(1);
-    expect(logger.error).not.toHaveBeenCalled();
+    expect(atLevel(lines, 50)).toHaveLength(0);
 
     release();
     await blocked;
@@ -286,7 +283,7 @@ describe("ProcessOutboxWorker", () => {
   it("draws a distinct phase per worker by default", () => {
     vi.useFakeTimers();
     const draw = vi.spyOn(Math, "random").mockReturnValueOnce(0.1).mockReturnValueOnce(0.8);
-    const logger = makeLogger();
+    const { logger, lines } = createTestLogger();
     const workers = [0, 1].map(
       () =>
         new ProcessOutboxWorker({
@@ -298,9 +295,9 @@ describe("ProcessOutboxWorker", () => {
 
     for (const worker of workers) worker.start();
 
-    const phases = vi
-      .mocked(logger.info)
-      .mock.calls.map(([fields]) => (fields as { phaseMs: number }).phaseMs);
+    const phases = atLevel(lines, 30)
+      .filter((line) => "phaseMs" in line)
+      .map((line) => line.phaseMs);
     expect(phases).toEqual([100, 800]);
     draw.mockRestore();
   });

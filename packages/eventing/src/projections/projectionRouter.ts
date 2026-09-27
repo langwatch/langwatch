@@ -175,17 +175,22 @@ export class ProjectionRouter<
   private readonly subscribersForMap = new Map<string, SubscriberDispatchDefinition<EventType>[]>();
   private readonly eventSubscribers = new Map<string, EventSubscriberDefinition<EventType>>();
 
-  constructor(
-    private readonly aggregateType: AggregateType,
-    private readonly pipelineName: string,
-    private readonly queueManager: QueueManager<EventType>,
-    options: {
-      executionTarget?: ExecutionTarget;
-      replayMarkerChecker?: ReplayMarkerChecker;
-      retentionPolicyResolver?: RetentionPolicyResolver;
-      killSwitch?: KillSwitch;
-    } = {},
-  ) {
+  private readonly aggregateType: AggregateType;
+  private readonly pipelineName: string;
+  private readonly queueManager: QueueManager<EventType>;
+
+  constructor(options: {
+    aggregateType: AggregateType;
+    pipelineName: string;
+    queueManager: QueueManager<EventType>;
+    executionTarget?: ExecutionTarget;
+    replayMarkerChecker?: ReplayMarkerChecker;
+    retentionPolicyResolver?: RetentionPolicyResolver;
+    killSwitch?: KillSwitch;
+  }) {
+    this.aggregateType = options.aggregateType;
+    this.pipelineName = options.pipelineName;
+    this.queueManager = options.queueManager;
     this.executionTarget = options.executionTarget;
     this.replayMarkerChecker = options.replayMarkerChecker;
     this.retentionPolicyResolver = options.retentionPolicyResolver;
@@ -590,9 +595,9 @@ export class ProjectionRouter<
       };
     }
 
-    this.queueManager.initializeProjectionQueues(
-      projectionDefs,
-      async (projectionName, triggerEvent, context) => {
+    this.queueManager.initializeProjectionQueues({
+      projections: projectionDefs,
+      onEvent: async (projectionName, triggerEvent, context) => {
         const fold = this.getFoldProjection(projectionName);
 
         await fold.open((definition) =>
@@ -607,7 +612,7 @@ export class ProjectionRouter<
           }),
         );
       },
-      async (projectionName, events, context) => {
+      onEventBatch: async (projectionName, events, context) => {
         const fold = this.getFoldProjection(projectionName);
 
         await fold.open((definition) =>
@@ -629,7 +634,7 @@ export class ProjectionRouter<
           }),
         );
       },
-    );
+    });
   }
 
   /**

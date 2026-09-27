@@ -468,9 +468,9 @@ export class SimulationRunStateFoldProjection
       Messages: event.data.messages.map((m, i) => {
         const parsedMessage = simulationMessageSchema.safeParse(m);
         if (!parsedMessage.success) {
-          throw new ValidationError(
-            `Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`,
-          );
+          throw new ValidationError({
+            reason: `Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`,
+          });
         }
         const message = parsedMessage.data;
 

@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event } from "../domain/types.ts";
@@ -24,7 +24,7 @@ import {
  * events only.
  */
 export class ProjectionRegistry<EventType extends Event = Event> {
-  private readonly logger = createLogger("langwatch:event-sourcing:projection-registry");
+  private readonly logger: Logger;
   private readonly foldProjections = new Map<string, SealedFoldProjection<EventType>>();
   private readonly mapProjections = new Map<string, SealedMapProjection<EventType>>();
   private readonly subscribers = new Map<
@@ -37,6 +37,12 @@ export class ProjectionRegistry<EventType extends Event = Event> {
   >();
   private router?: ProjectionRouter<EventType>;
   private queueManager?: QueueManager<EventType>;
+
+  constructor({
+    logger = createLogger("langwatch:event-sourcing:projection-registry"),
+  }: { logger?: Logger } = {}) {
+    this.logger = logger;
+  }
 
   registerFoldProjection<State>(projection: FoldProjectionDefinition<State, EventType>): void {
     if (this.foldProjections.has(projection.name)) {
@@ -145,7 +151,10 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     });
 
     // Create router — all projections are incremental
-    const router = new ProjectionRouter<EventType>(aggregateType, "global", this.queueManager, {
+    const router = new ProjectionRouter<EventType>({
+      aggregateType,
+      pipelineName: "global",
+      queueManager: this.queueManager,
       executionTarget,
     });
     this.router = router;

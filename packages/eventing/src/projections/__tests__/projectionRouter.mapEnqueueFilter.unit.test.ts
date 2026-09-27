@@ -92,11 +92,11 @@ function makeQueuedRouter(projection: MapProjectionDefinition<SeamRecord, Event>
     globalQueue,
     globalJobRegistry: new Map<string, JobRegistryEntry>(),
   });
-  const router = new ProjectionRouter<Event>(
+  const router = new ProjectionRouter<Event>({
     aggregateType,
-    TEST_CONSTANTS.PIPELINE_NAME,
+    pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
     queueManager,
-  );
+  });
   router.registerMapProjection(projection);
   router.initializeMapQueues();
 
@@ -109,14 +109,14 @@ function makeQueuedRouter(projection: MapProjectionDefinition<SeamRecord, Event>
 
 /** A router with no global queue: `hasHandlerQueues()` is false, so map runs inline. */
 function makeInlineRouter(projection: MapProjectionDefinition<SeamRecord, Event>) {
-  const router = new ProjectionRouter<Event>(
+  const router = new ProjectionRouter<Event>({
     aggregateType,
-    TEST_CONSTANTS.PIPELINE_NAME,
-    new QueueManager<Event>({
+    pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+    queueManager: new QueueManager<Event>({
       aggregateType,
       pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
     }),
-  );
+  });
   router.registerMapProjection(projection);
   return router;
 }

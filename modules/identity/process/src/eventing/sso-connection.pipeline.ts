@@ -220,121 +220,121 @@ export function defineSsoConnectionPipeline(
         store: deps.connectionProjectionStore,
       }),
     )
-    .withCommandInstance(
-      "registerConnection",
-      RegisterConnectionCommand,
-      new RegisterConnectionCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "claimDomain",
-      ClaimDomainCommand,
-      new ClaimDomainCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "approveDomainClaim",
-      ApproveDomainClaimCommand,
-      new ApproveDomainClaimCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "rejectDomainClaim",
-      RejectDomainClaimCommand,
-      new RejectDomainClaimCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "discardConnection",
-      DiscardConnectionCommand,
-      new DiscardConnectionCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "requestVerification",
-      RequestVerificationCommand,
-      new RequestVerificationCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "attestDomain",
-      AttestDomainCommand,
-      new AttestDomainCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "withdrawDomain",
-      WithdrawDomainCommand,
-      new WithdrawDomainCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "verifyDomain",
-      VerifyDomainCommand,
-      new VerifyDomainCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "activateConnection",
-      ActivateConnectionCommand,
-      new ActivateConnectionCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "suspendConnection",
-      SuspendConnectionCommand,
-      new SuspendConnectionCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "resumeConnection",
-      ResumeConnectionCommand,
-      new ResumeConnectionCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "requestTeardown",
-      RequestTeardownCommand,
-      new RequestTeardownCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "completeTeardown",
-      CompleteTeardownCommand,
-      new CompleteTeardownCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "grandfatherConnection",
-      GrandfatherConnectionCommand,
-      new GrandfatherConnectionCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "renameConnection",
-      RenameConnectionCommand,
-      new RenameConnectionCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "registerReplacementConnection",
-      RegisterReplacementConnectionCommand,
-      new RegisterReplacementConnectionCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "selectMigrationRoute",
-      SelectMigrationRouteCommand,
-      new SelectMigrationRouteCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "beginMigrationFinalization",
-      BeginMigrationFinalizationCommand,
-      new BeginMigrationFinalizationCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "finalizeMigration",
-      FinalizeMigrationCommand,
-      new FinalizeMigrationCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "setArrivalPolicy",
-      SetArrivalPolicyCommand,
-      new SetArrivalPolicyCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "recordDomainProofAbsent",
-      RecordDomainProofAbsentCommand,
-      new RecordDomainProofAbsentCommand(deps.connectionGuards),
-    )
-    .withCommandInstance(
-      "recordDomainProofPresent",
-      RecordDomainProofPresentCommand,
-      new RecordDomainProofPresentCommand(deps.connectionGuards),
-    );
+    .withCommandInstance({
+      name: "registerConnection",
+      handlerClass: RegisterConnectionCommand,
+      instance: new RegisterConnectionCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "claimDomain",
+      handlerClass: ClaimDomainCommand,
+      instance: new ClaimDomainCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "approveDomainClaim",
+      handlerClass: ApproveDomainClaimCommand,
+      instance: new ApproveDomainClaimCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "rejectDomainClaim",
+      handlerClass: RejectDomainClaimCommand,
+      instance: new RejectDomainClaimCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "discardConnection",
+      handlerClass: DiscardConnectionCommand,
+      instance: new DiscardConnectionCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "requestVerification",
+      handlerClass: RequestVerificationCommand,
+      instance: new RequestVerificationCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "attestDomain",
+      handlerClass: AttestDomainCommand,
+      instance: new AttestDomainCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "withdrawDomain",
+      handlerClass: WithdrawDomainCommand,
+      instance: new WithdrawDomainCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "verifyDomain",
+      handlerClass: VerifyDomainCommand,
+      instance: new VerifyDomainCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "activateConnection",
+      handlerClass: ActivateConnectionCommand,
+      instance: new ActivateConnectionCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "suspendConnection",
+      handlerClass: SuspendConnectionCommand,
+      instance: new SuspendConnectionCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "resumeConnection",
+      handlerClass: ResumeConnectionCommand,
+      instance: new ResumeConnectionCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "requestTeardown",
+      handlerClass: RequestTeardownCommand,
+      instance: new RequestTeardownCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "completeTeardown",
+      handlerClass: CompleteTeardownCommand,
+      instance: new CompleteTeardownCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "grandfatherConnection",
+      handlerClass: GrandfatherConnectionCommand,
+      instance: new GrandfatherConnectionCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "renameConnection",
+      handlerClass: RenameConnectionCommand,
+      instance: new RenameConnectionCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "registerReplacementConnection",
+      handlerClass: RegisterReplacementConnectionCommand,
+      instance: new RegisterReplacementConnectionCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "selectMigrationRoute",
+      handlerClass: SelectMigrationRouteCommand,
+      instance: new SelectMigrationRouteCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "beginMigrationFinalization",
+      handlerClass: BeginMigrationFinalizationCommand,
+      instance: new BeginMigrationFinalizationCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "finalizeMigration",
+      handlerClass: FinalizeMigrationCommand,
+      instance: new FinalizeMigrationCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "setArrivalPolicy",
+      handlerClass: SetArrivalPolicyCommand,
+      instance: new SetArrivalPolicyCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "recordDomainProofAbsent",
+      handlerClass: RecordDomainProofAbsentCommand,
+      instance: new RecordDomainProofAbsentCommand(deps.connectionGuards),
+    })
+    .withCommandInstance({
+      name: "recordDomainProofPresent",
+      handlerClass: RecordDomainProofPresentCommand,
+      instance: new RecordDomainProofPresentCommand(deps.connectionGuards),
+    });
 
   return builder
     .withProcessManager(CONNECTION_TEARDOWN_PROCESS_NAME, (pm) =>

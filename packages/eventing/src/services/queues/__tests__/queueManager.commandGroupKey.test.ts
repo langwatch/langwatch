@@ -237,9 +237,13 @@ describe("QueueManager migration preflight targets", () => {
       },
       vi.fn(),
     );
-    manager.initializeProjectionQueues({ state: { name: "state" } }, vi.fn(), undefined, {
-      queueType: "projection",
-      jobPath: "fold",
+    manager.initializeProjectionQueues({
+      projections: { state: { name: "state" } },
+      onEvent: vi.fn(),
+      lane: {
+        queueType: "projection",
+        jobPath: "fold",
+      },
     });
     manager.initializeProjectionSubscriberQueues(
       {

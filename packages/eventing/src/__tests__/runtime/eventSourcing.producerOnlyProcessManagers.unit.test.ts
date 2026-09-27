@@ -139,11 +139,11 @@ describe("given a runtime that registers pipelines producer-only", () => {
         note: "produced here",
       });
 
-      const stored = await eventStore.getEvents(
-        AGGREGATE_ID,
-        { tenantId: createTenantId(TENANT_ID) },
-        "trace",
-      );
+      const stored = await eventStore.getEvents({
+        aggregateId: AGGREGATE_ID,
+        context: { tenantId: createTenantId(TENANT_ID) },
+        aggregateType: "trace",
+      });
       expect(stored.map((event) => event.type)).toEqual(["producer.recorded"]);
       await eventSourcing.close();
     });

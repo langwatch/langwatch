@@ -960,12 +960,12 @@ describe("LangyConversationService", () => {
           userId: "alice",
           after: { acceptedAt, eventId: "e1" },
         });
-        expect(events.getEventsOccurredSince).toHaveBeenCalledWith(
-          "c1",
-          expect.anything(),
-          "langy_conversation",
-          5_000,
-        );
+        expect(events.getEventsOccurredSince).toHaveBeenCalledWith({
+          aggregateId: "c1",
+          context: expect.anything(),
+          aggregateType: "langy_conversation",
+          occurredAtFromMs: 5_000,
+        });
 
         await svc.getEventsAfter({
           projectId: "p1",
@@ -973,12 +973,12 @@ describe("LangyConversationService", () => {
           userId: "alice",
           after: { acceptedAt: 10, eventId: "e1" },
         });
-        expect(events.getEventsOccurredSince).toHaveBeenLastCalledWith(
-          "c1",
-          expect.anything(),
-          "langy_conversation",
-          0,
-        );
+        expect(events.getEventsOccurredSince).toHaveBeenLastCalledWith({
+          aggregateId: "c1",
+          context: expect.anything(),
+          aggregateType: "langy_conversation",
+          occurredAtFromMs: 0,
+        });
       });
 
       it("tie-breaks same-millisecond events by event id, byte-wise", async () => {

@@ -189,7 +189,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
   describe("when a pipeline reads its own aggregate's earlier events", () => {
     /** @scenario "A pipeline reads its own aggregate's earlier events" */
     it("reads the event log under the aggregate type its definition declares", async () => {
-      const reads: unknown[][] = [];
+      const reads: unknown[] = [];
       const setups: FeatureEventingSetup<KeyRepositories, KeyApp, unknown>[] = [];
       const pipeline = (
         name: string,
@@ -204,8 +204,8 @@ describe("given a module that declares its event sourcing with withEventing", ()
       const host = {
         processStore: {},
         eventStore: {
-          getEvents: (...args: unknown[]) => {
-            reads.push(args);
+          getEvents: (request: unknown) => {
+            reads.push(request);
             return Promise.resolve([{ type: "queued" }, "not an event", { type: "finished" }]);
           },
         },
@@ -227,7 +227,13 @@ describe("given a module that declares its event sourcing with withEventing", ()
         accepts: (event): event is { type: string } =>
           typeof event === "object" && event !== null && "type" in event,
       });
-      expect(reads).toEqual([["run_1", { tenantId: "project_1" }, "simulation_run"]]);
+      expect(reads).toEqual([
+        {
+          aggregateId: "run_1",
+          context: { tenantId: "project_1" },
+          aggregateType: "simulation_run",
+        },
+      ]);
       expect(events).toEqual([{ type: "queued" }, { type: "finished" }]);
     });
   });
