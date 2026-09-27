@@ -8,12 +8,7 @@ import { createLogger } from "@langwatch/observability/browser";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 
-import type {
-  DrawerCallbacksOf,
-  DrawerPropsOf,
-  DrawerTypeOf,
-  UiDrawerRegistry,
-} from "../model/drawer-registry.ts";
+import type { UiDrawerMap, UiDrawerPropsOf } from "../model/drawer-map.ts";
 import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options.ts";
 import { type DrawerRouter, drawerRouterRef, useDrawerRouter } from "./drawer-router.ts";
 
@@ -491,10 +486,10 @@ function warnNonSerializableProps({
  * button. Generic over the registry so a caller naming the application's
  * registry gets per-drawer prop checking; others just get strings.
  */
-export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
+export const useDrawer = <Map extends object = UiDrawerMap>() => {
   const router = useDrawerRouter();
 
-  const currentDrawer = router.query["drawer.open"] as DrawerTypeOf<R> | undefined;
+  const currentDrawer = router.query["drawer.open"];
 
   /**
    * Internal function to update URL without modifying the stack.
@@ -551,9 +546,9 @@ export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
    * openDrawer("promptEditor", { promptId: "abc" }, { resetStack: true });
    */
   const openDrawer = useCallback(
-    <T extends DrawerTypeOf<R>>(
-      drawer: T,
-      props?: Partial<DrawerPropsOf<R, T>> & { urlParams?: Record<string, string> },
+    <Name extends string>(
+      drawer: Name,
+      props?: Partial<UiDrawerPropsOf<Map, Name>> & { urlParams?: Record<string, string> },
       {
         replace,
         resetStack,
@@ -678,14 +673,8 @@ export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
       goBack,
       canGoBack,
       currentDrawer,
-      setFlowCallbacks: setFlowCallbacks as <T extends DrawerTypeOf<R>>(
-        drawer: T,
-        callbacks: DrawerCallbacksOf<R, T>,
-        options?: { keepOnClose?: boolean },
-      ) => void,
-      getFlowCallbacks: getFlowCallbacks as <T extends DrawerTypeOf<R>>(
-        drawer: T,
-      ) => DrawerCallbacksOf<R, T> | undefined,
+      setFlowCallbacks,
+      getFlowCallbacks,
     }),
     [openDrawer, closeDrawer, drawerOpen, goBack, canGoBack, currentDrawer],
   );

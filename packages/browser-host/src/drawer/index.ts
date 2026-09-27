@@ -48,6 +48,13 @@ export {
   type UiDrawerComponent,
   type UiDrawerRegistry,
 } from "./model/drawer-registry.ts";
+export {
+  type DrawerCallbacksIn,
+  type DrawerPropsMapOf,
+  type UiDrawerMap,
+  type UiDrawerPropsOf,
+  type UiFlowCallbacksStore,
+} from "./model/drawer-map.ts";
 export { URL_QS_PARSE_OPTIONS } from "./model/qs-parse-options.ts";
 export {
   CurrentDrawer,
