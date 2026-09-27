@@ -59596,6 +59596,51 @@ Langy excludes its own turns from your production-traffic views by default. Its 
 
 ---
 
+# FILE: ./self-hosting/checkup.mdx
+
+---
+title: Checkup
+description: "Check that a self-hosted install is wired correctly, and see what it sends to LangWatch"
+---
+
+## What the Checkup Page Shows
+
+**Settings > Checkup** lists one row per part of the install. Each row reads **Pass**, **Fail** or **Not checked**. A failed row names the fix and links the page that explains it. Not checked means the check did not run or could not run; it is never counted as a pass.
+
+Organization members can read the page. Running the checks behind the buttons needs permission to manage the organization.
+
+## Sections
+
+| Section | What it checks | When it runs |
+|---------|----------------|--------------|
+| Install | The release, Postgres, ClickHouse, their migrations, Redis and the AI Gateway | When the page opens |
+| LangWatch | The license, the connect host, the daily usage report, and whether the gateway reports this install as its control plane | **Run connection checks** |
+| Integrations | Object storage, email and model providers, plus a write to storage, an SMTP connection and a call to each model provider | Basic rows when the page opens, the rest with **Run integration checks** |
+| Pipelines | Canaries that send one real trace, evaluation, scenario run or Langy turn through the install | **Run canaries** |
+
+Checks that open outbound connections or spend money run only when you press the button for their section.
+
+The scenario canary needs a run plan: enter its id or slug next to **Run canaries**. The Langy canary sends its turn as the administrator who runs the checkup.
+
+The collector and processor canaries send real traces into the organization's first project, so they appear in its trace list and analytics.
+
+## What This Install Sends
+
+The last section shows the exact usage report the install sends to LangWatch once a day, with the switches that shrink it. See [Data and telemetry](/self-hosting/data-and-telemetry) for the full contract and [Usage report dictionary](/self-hosting/usage-report-dictionary) for every field.
+
+## Common Results
+
+| Row | Result | What to do |
+|-----|--------|------------|
+| Reach the connect host | Fail | The install cannot open `connect.langwatch.ai:443`. It needs that only with a license that names hosted services. See [Connect](/self-hosting/connect). |
+| AI Gateway control plane | Fail | The gateway reports a control plane that is not this install. Point `GATEWAY_CONTROL_PLANE_URL` on the gateway at this app and restart it. |
+| Model provider connection | Not checked | No stored key could be tested. The row names the reason for each provider. |
+| Scenarios | Not checked | Enter a run plan id or slug and run the canaries again. |
+
+For errors outside the checkup, see [Troubleshooting](/self-hosting/troubleshooting).
+
+---
+
 # FILE: ./self-hosting/compliance.mdx
 
 ---

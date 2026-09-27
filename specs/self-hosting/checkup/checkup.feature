@@ -35,6 +35,11 @@ Feature: The checkup page of a self-hosted install
     And the row links a docs page
 
   @unit
+  Scenario: Every docs page a checkup row links to exists
+    Given the docs pages the checkup rows link to
+    Then each one is a page in the published docs
+
+  @unit
   Scenario: Every row carries one of the three verdicts
     When the checkup runs
     Then every row reads pass, fail or not checked

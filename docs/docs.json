@@ -988,6 +988,7 @@
               "self-hosting/data-and-telemetry",
               "self-hosting/usage-report-dictionary",
               "hybrid-setup/overview",
+              "self-hosting/checkup",
               "self-hosting/troubleshooting"
             ]
           },

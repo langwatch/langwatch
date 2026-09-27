@@ -197,7 +197,7 @@ export const CHECKUP_DOCS = {
   environment: "/self-hosting/configuration/environment-variables",
   licensing: "/self-hosting/licensing",
   modelProviders: "/self-hosting/configuration/environment-variables",
-  gateway: "/ai-gateway/self-hosting/overview",
+  gateway: "/ai-gateway/self-hosting/helm",
   lwql: "/self-hosting/troubleshooting",
 } as const;
 
