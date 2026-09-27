@@ -241,9 +241,11 @@ jobs:
       # advisory against a dependency we do not call stays quiet. So a failure
       # means a reachable vulnerability, which is worth stopping for — and the
       # remedy is the same version bump this commit demonstrates.
+      # v1.8.0 or newer: v1.1.4 builds SSA with x/tools v0.29, which panics on
+      # the Go 1.27 standard library.
       - name: govulncheck
         run: |
-          go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 \
+          go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 \
             ./services/... ./pkg/... ./cmd/... ./tools/...
 
   python-advisories:
