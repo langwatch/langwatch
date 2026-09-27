@@ -43,6 +43,7 @@ import {
   JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,
   type JoinRequestLifecycle,
   type JoinRequestLifecycleState,
+  joinRequestLifecycleStateSchema,
   joinRequestLifecycleWake,
   joinRequestNotificationIntentSchema,
   onJoinApproved,
@@ -157,7 +158,7 @@ function mountRequestLifecycle(
   Record<string, IntentSpec<ZodType>>
 > {
   return pm
-    .state<JoinRequestLifecycleState>(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE)
+    .state(joinRequestLifecycleStateSchema, JOIN_REQUEST_LIFECYCLE_INITIAL_STATE)
     .intent("remindAdmins", remindAdminsIntentSchema, runRemindAdmins({ port: lifecycle }))
     .intent("expireRequest", expireRequestIntentSchema, runExpireRequest({ port: lifecycle }))
     .intent(

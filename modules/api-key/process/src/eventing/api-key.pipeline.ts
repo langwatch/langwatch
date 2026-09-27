@@ -25,7 +25,7 @@ import {
   AGENT_SANDBOX_KEY_REAP_INITIAL_STATE,
   AGENT_SANDBOX_KEY_REAP_INTERVAL_MS,
   AGENT_SANDBOX_KEY_REAP_PROCESS_NAME,
-  type AgentSandboxKeyReapState,
+  agentSandboxKeyReapStateSchema,
   agentSandboxKeyReapSchema,
   agentSandboxKeyReapWake,
 } from "./agent-sandbox-key-reap.process.ts";
@@ -34,7 +34,7 @@ import {
   CLI_LOGIN_KEY_REAP_INITIAL_STATE,
   CLI_LOGIN_KEY_REAP_INTERVAL_MS,
   CLI_LOGIN_KEY_REAP_PROCESS_NAME,
-  type CliLoginKeyReapState,
+  cliLoginKeyReapStateSchema,
   cliLoginKeyReapSchema,
   cliLoginKeyReapWake,
 } from "./cli-login-key-reap.process.ts";
@@ -92,7 +92,7 @@ export function buildAgentSandboxMaintenancePipeline({
     .withEvents([])
     .withProcessManager(AGENT_SANDBOX_KEY_REAP_PROCESS_NAME, (pm) =>
       pm
-        .state<AgentSandboxKeyReapState>(AGENT_SANDBOX_KEY_REAP_INITIAL_STATE)
+        .state(agentSandboxKeyReapStateSchema, AGENT_SANDBOX_KEY_REAP_INITIAL_STATE)
         .schedule({ everyMs: AGENT_SANDBOX_KEY_REAP_INTERVAL_MS })
         .onWake(agentSandboxKeyReapWake)
         .intent("reap", agentSandboxKeyReapSchema, runAgentSandboxKeyReap(sandboxKeyReap))
@@ -102,7 +102,7 @@ export function buildAgentSandboxMaintenancePipeline({
     )
     .withProcessManager(CLI_LOGIN_KEY_REAP_PROCESS_NAME, (pm) =>
       pm
-        .state<CliLoginKeyReapState>(CLI_LOGIN_KEY_REAP_INITIAL_STATE)
+        .state(cliLoginKeyReapStateSchema, CLI_LOGIN_KEY_REAP_INITIAL_STATE)
         .schedule({ everyMs: CLI_LOGIN_KEY_REAP_INTERVAL_MS })
         .onWake(cliLoginKeyReapWake)
         .intent("reap", cliLoginKeyReapSchema, runCliLoginKeyReap(cliLoginKeyReap))

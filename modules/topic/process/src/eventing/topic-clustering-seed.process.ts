@@ -10,9 +10,10 @@ export const topicClusteringSeedSchema = z.object({
   scheduledFor: z.number().int(),
 });
 
-export interface TopicClusteringSeedState {
-  lastSeededAt: number | null;
-}
+export const topicClusteringSeedStateSchema = z.object({
+  lastSeededAt: z.number().nullable(),
+});
+export type TopicClusteringSeedState = z.infer<typeof topicClusteringSeedStateSchema>;
 
 export const TOPIC_CLUSTERING_SEED_INITIAL_STATE: TopicClusteringSeedState = {
   lastSeededAt: null,

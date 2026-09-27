@@ -16,15 +16,16 @@ export const lwqlReconvergenceSchema = z.object({
   final: z.boolean(),
 });
 
-export interface LwqlReconvergenceState {
+export const lwqlReconvergenceStateSchema = z.object({
   /** The boot this schedule belongs to; a new boot starts a fresh watch. */
-  bootedAt: number | null;
+  bootedAt: z.number().nullable(),
   /** Epoch ms of the next probe. */
-  nextAt: number;
-  delayMs: number;
-  elapsedMs: number;
-  gaveUp: boolean;
-}
+  nextAt: z.number(),
+  delayMs: z.number(),
+  elapsedMs: z.number(),
+  gaveUp: z.boolean(),
+});
+export type LwqlReconvergenceState = z.infer<typeof lwqlReconvergenceStateSchema>;
 
 export const LWQL_RECONVERGENCE_INITIAL_STATE: LwqlReconvergenceState = {
   bootedAt: null,

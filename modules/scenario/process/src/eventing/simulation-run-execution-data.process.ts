@@ -40,12 +40,14 @@ export const EVALUATION_DEADLINE_MS = 15 * 60_000;
 export const EVALUATION_LOST_DETAILS =
   "The evaluation did not complete: its grading job was lost before it recorded a result";
 
-export type SimulationRunExecutionPhase =
-  | "queued"
-  | "running"
-  | "cancelling"
-  | "evaluating"
-  | "terminal";
+export const simulationRunExecutionPhaseSchema = z.enum([
+  "queued",
+  "running",
+  "cancelling",
+  "evaluating",
+  "terminal",
+]);
+export type SimulationRunExecutionPhase = z.infer<typeof simulationRunExecutionPhaseSchema>;
 
 /**
  * One evaluator the run still owes a result to: the saved evaluator's id and
@@ -62,41 +64,44 @@ export type PendingEvaluator = z.infer<typeof pendingEvaluatorSchema>;
  * Private process state: only what evolve() decisions need. HARD DATA BOUNDARY:
  * persisted in Postgres; ids, enums, timestamps only — never conversation content.
  */
-export interface SimulationRunExecutionProcessState {
+export const simulationRunExecutionProcessStateSchema = z.object({
   /** The tenant; needed by intent payloads (outbox rows persist them). */
-  projectId: string;
+  projectId: z.string(),
   /** The aggregate identity (process key). */
-  scenarioRunId: string;
-  phase: SimulationRunExecutionPhase;
+  scenarioRunId: z.string(),
+  phase: simulationRunExecutionPhaseSchema,
   /** Business time of the queued event. */
-  queuedAtMs: number;
+  queuedAtMs: z.number(),
   /**
    * Last observed sign of life (any event for this run), business time
    * clamped to handling time. The stall wake measures from here.
    */
-  lastActivityAtMs: number;
+  lastActivityAtMs: z.number(),
   /**
    * When cancellation was requested, or null. Set even after the phase has
    * moved on so a late/redelivered queued event can still honour it.
    */
-  cancelRequestedAtMs: number | null;
+  cancelRequestedAtMs: z.number().nullable(),
   /**
    * When the run finished owing evaluator results, scheduling time, or null.
    * The evaluation deadline wake measures from here.
    */
-  finishedAtMs: number | null;
+  finishedAtMs: z.number().nullable().default(null),
   /**
    * The evaluators the run still owes a result to, or null when it owes none.
    * The lost-job results are built from this list.
    */
-  pendingEvaluators: PendingEvaluator[] | null;
+  pendingEvaluators: z.array(pendingEvaluatorSchema).nullable().default(null),
   /**
    * Whether an evaluated event has been seen, even before the finished
    * event: business time can land it first, so the finished event then goes
    * terminal instead of waiting on results already in.
    */
-  evaluationsRecorded: boolean;
-}
+  evaluationsRecorded: z.boolean().default(false),
+});
+export type SimulationRunExecutionProcessState = z.infer<
+  typeof simulationRunExecutionProcessStateSchema
+>;
 
 export const INITIAL_SIMULATION_RUN_EXECUTION_STATE: SimulationRunExecutionProcessState = {
   projectId: "",

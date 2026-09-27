@@ -14,9 +14,10 @@ export const agentSandboxKeyReapSchema = z.object({
   scheduledFor: z.number().int(),
 });
 
-export interface AgentSandboxKeyReapState {
-  lastReapAt: number | null;
-}
+export const agentSandboxKeyReapStateSchema = z.object({
+  lastReapAt: z.number().nullable(),
+});
+export type AgentSandboxKeyReapState = z.infer<typeof agentSandboxKeyReapStateSchema>;
 
 export const AGENT_SANDBOX_KEY_REAP_INITIAL_STATE: AgentSandboxKeyReapState = {
   lastReapAt: null,

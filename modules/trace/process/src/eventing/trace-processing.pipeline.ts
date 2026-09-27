@@ -27,7 +27,7 @@ import {
 import {
   DEFERRED_ORIGIN_INITIAL_STATE,
   DEFERRED_ORIGIN_PROCESS_NAME,
-  type DeferredOriginState,
+  deferredOriginStateSchema,
   deferredOriginWake,
   onOriginResolvedDisarm,
   onSpanReceivedArmOrigin,
@@ -95,7 +95,7 @@ export function buildTraceProcessingConsumer(
   return projections
     .withProcessManager(DEFERRED_ORIGIN_PROCESS_NAME, (pm) =>
       pm
-        .state<DeferredOriginState>(DEFERRED_ORIGIN_INITIAL_STATE)
+        .state(deferredOriginStateSchema, DEFERRED_ORIGIN_INITIAL_STATE)
         .intent("resolveDeferredOrigin", resolveDeferredOriginIntentSchema, (payload) =>
           reactions.resolveDeferredOrigin(payload),
         )

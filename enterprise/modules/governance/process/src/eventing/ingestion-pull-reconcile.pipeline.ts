@@ -12,7 +12,6 @@ import { nowInstant } from "@langwatch/time";
 
 import type { GovernanceApp } from "../app/governance.app.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
-import { INGESTION_PULL_PROCESS_NAME } from "./ingestion-pull.process.ts";
 import {
   INGESTION_PULL_RECONCILE_PROCESS_NAME,
   runIngestionPullReconcile,
@@ -20,10 +19,11 @@ import {
 import {
   INGESTION_PULL_RECONCILE_CHECK_MS,
   INGESTION_PULL_RECONCILE_INITIAL_STATE,
-  type IngestionPullReconcileState,
+  ingestionPullReconcileStateSchema,
   ingestionPullReconcileSchema,
   ingestionPullReconcileWake,
 } from "./ingestion-pull-reconcile.process.ts";
+import { INGESTION_PULL_PROCESS_NAME } from "./ingestion-pull.process.ts";
 
 export const INGESTION_PULL_RECONCILE_PIPELINE_NAME = "ingestion_pull_reconcile";
 
@@ -42,7 +42,7 @@ export function buildIngestionPullReconcile({
     .withEvents([])
     .withProcessManager(INGESTION_PULL_RECONCILE_PROCESS_NAME, (pm) =>
       pm
-        .state<IngestionPullReconcileState>(INGESTION_PULL_RECONCILE_INITIAL_STATE)
+        .state(ingestionPullReconcileStateSchema, INGESTION_PULL_RECONCILE_INITIAL_STATE)
         .schedule({ everyMs: INGESTION_PULL_RECONCILE_CHECK_MS })
         .onWake(ingestionPullReconcileWake({ bootedAt }))
         .intent(
@@ -52,7 +52,10 @@ export function buildIngestionPullReconcile({
             reconcile: () =>
               app.reconcileIngestionPulls({
                 findPullProcessKeys: ({ projectIds }) =>
-                  processStore.findProcessKeys({ processName: INGESTION_PULL_PROCESS_NAME, projectIds }),
+                  processStore.findProcessKeys({
+                    processName: INGESTION_PULL_PROCESS_NAME,
+                    projectIds,
+                  }),
               }),
             deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
             now: () => nowInstant().epochMilliseconds,

@@ -42,7 +42,7 @@ function createProcessPipelineDefinition() {
     .withEvents([pipelineEventSchema])
     .withProcessManager("durable-process", (process) =>
       process
-        .state({ handled: 0 })
+        .state(z.object({ handled: z.number() }), { handled: 0 })
         .keyBy(() => "test-process")
         .on("test.event", (state) => ({
           state: { handled: state.handled + 1 },

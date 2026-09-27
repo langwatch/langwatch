@@ -13,9 +13,10 @@ export const BLOB_CLEANUP_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const blobCleanupSchema = z.object({ scheduledFor: z.number().int() });
 
-export interface BlobCleanupState {
-  lastSweepAt: number | null;
-}
+export const blobCleanupStateSchema = z.object({
+  lastSweepAt: z.number().nullable(),
+});
+export type BlobCleanupState = z.infer<typeof blobCleanupStateSchema>;
 
 export const BLOB_CLEANUP_INITIAL_STATE: BlobCleanupState = { lastSweepAt: null };
 

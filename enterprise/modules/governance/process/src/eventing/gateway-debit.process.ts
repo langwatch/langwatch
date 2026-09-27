@@ -1,4 +1,5 @@
-import type { JsonValue, ProcessManagerApplier } from "@langwatch/eventing";
+import type { ProcessManagerApplier } from "@langwatch/eventing";
+import { z } from "zod";
 
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
@@ -19,16 +20,16 @@ import {
 
 export const GATEWAY_DEBITS_PROCESS_NAME = "gatewayDebits" as const;
 
-export interface GatewayDebitsState {
-  endUserId: string;
-  virtualKeyId: string;
-  organizationId: string;
-  teamId: string;
-  principalUserId: string;
-  admitted: boolean;
-  pendingOutcome: WriteGatewayDebitsPayload | null;
-  [key: string]: JsonValue;
-}
+export const gatewayDebitsStateSchema = z.object({
+  endUserId: z.string(),
+  virtualKeyId: z.string(),
+  organizationId: z.string(),
+  teamId: z.string(),
+  principalUserId: z.string(),
+  admitted: z.boolean(),
+  pendingOutcome: writeGatewayDebitsSchema.nullable(),
+});
+export type GatewayDebitsState = z.infer<typeof gatewayDebitsStateSchema>;
 
 type SpendOutcome =
   | { status: "confirmed"; data: GatewaySpendOutcomeData }
@@ -61,7 +62,7 @@ export class GatewayDebitProcess {
   processManager(): ProcessManagerApplier<GatewaySpendProcessingEvent> {
     return (process) =>
       process
-        .state<GatewayDebitsState>(INITIAL_STATE)
+        .state(gatewayDebitsStateSchema, INITIAL_STATE)
         .intent("writeDebits", writeGatewayDebitsSchema, (payload) => this.intent.execute(payload))
         .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, context) =>
           this.onAdmission(state, context, data),

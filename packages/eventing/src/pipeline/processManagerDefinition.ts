@@ -1,6 +1,7 @@
 import type { ZodTypeAny, z } from "zod";
 
 import type { Event } from "../domain/types.ts";
+import { ensureJsonSafe } from "../process-manager/json.ts";
 import type {
   ProcessEventEnvelope,
   ProcessIntent,
@@ -53,10 +54,18 @@ export type SubscriberSpec<E extends Event = Event, State = unknown> = TriggerSp
     handler: (event: E, context: TriggerContext<State>) => Promise<void>;
   };
 
-export type IntentFactories<Intents extends Record<string, IntentSpec<any>>> = {
+/** The schema an intent declares, read off its spec: what `IntentSpecs` checks `run` against. */
+export type SchemaOf<Spec> = Spec extends { schema: infer Schema extends ZodTypeAny }
+  ? Schema
+  : never;
+
+/** Intents whose every `run` takes what its own `schema` parses to (ARCHITECTURE §9). */
+export type IntentSpecs<Intents> = { [K in keyof Intents]: IntentSpec<SchemaOf<Intents[K]>> };
+
+export type IntentFactories<Intents> = {
   [K in keyof Intents & string]: (
     key: string,
-    payload: z.input<Intents[K]["schema"]>,
+    payload: z.input<SchemaOf<Intents[K]>>,
   ) => ProcessIntent;
 };
 
@@ -84,7 +93,7 @@ export interface ProcessEvolution<State> {
   intents?: ProcessIntent[];
 }
 
-export interface ProcessHandlerContext<Intents extends Record<string, IntentSpec<any>>> {
+export interface ProcessHandlerContext<Intents> {
   /**
    * The instant the input refers to: the event's `occurredAt`, or the slot a
    * wake was scheduled for. May be arbitrarily far in the past when the
@@ -102,18 +111,18 @@ export interface ProcessHandlerContext<Intents extends Record<string, IntentSpec
   intents: IntentFactories<Intents>;
 }
 
-export type EventHandler<State, Data, Intents extends Record<string, IntentSpec<any>>> = (
+export type EventHandler<State, Data, Intents> = (
   state: State,
   data: Data,
   context: ProcessHandlerContext<Intents>,
 ) => ProcessEvolution<State>;
 
-export type WakeHandler<State, Intents extends Record<string, IntentSpec<any>>> = (
+export type WakeHandler<State, Intents> = (
   state: State,
   context: ProcessHandlerContext<Intents>,
 ) => ProcessEvolution<State>;
 
-export type SignalHandler<State, Data, Intents extends Record<string, IntentSpec<any>>> = (
+export type SignalHandler<State, Data, Intents> = (
   state: State,
   data: Data,
   context: ProcessHandlerContext<Intents>,
@@ -122,19 +131,17 @@ export type SignalHandler<State, Data, Intents extends Record<string, IntentSpec
 export interface SignalSpec<
   Schema extends ZodTypeAny = ZodTypeAny,
   State = unknown,
-  Intents extends Record<string, IntentSpec<any>> = Record<string, IntentSpec<any>>,
+  Intents = Record<string, IntentSpec>,
 > {
   schema: Schema;
   handle: SignalHandler<State, z.output<Schema>, Intents>;
 }
 
-export interface ProcessManagerConfig<
-  State,
-  Intents extends Record<string, IntentSpec<any>>,
-  E extends Event = Event,
-> {
+export interface ProcessManagerConfig<State, Intents, E extends Event = Event> {
   name: string;
   state: State;
+  /** Parses the state the store hands back before any handler reads it (ARCHITECTURE §9). */
+  stateSchema: z.ZodType<State>;
   handlers: Record<string, EventHandler<State, unknown, Intents>>;
   eventTypes: readonly string[];
   /**
@@ -170,7 +177,7 @@ export interface ProcessManagerConfig<
 
 export interface ProcessManagerDefinition<
   State = unknown,
-  Intents extends Record<string, IntentSpec<any>> = Record<string, IntentSpec<any>>,
+  Intents = Record<string, IntentSpec>,
   E extends Event = Event,
 > {
   readonly config: ProcessManagerConfig<State, Intents, E>;
@@ -178,7 +185,7 @@ export interface ProcessManagerDefinition<
 
 export function defineProcessManager<
   State,
-  const Intents extends Record<string, IntentSpec<any>>,
+  const Intents extends IntentSpecs<Intents>,
   E extends Event = Event,
 >(config: ProcessManagerConfig<State, Intents, E>): ProcessManagerDefinition<State, Intents, E> {
   if (
@@ -209,8 +216,9 @@ export function defineProcessManager<
   return { config };
 }
 
-export function buildIntentFactories<Intents extends Record<string, IntentSpec<any>>>(
-  intents: Intents,
+export function buildIntentFactories<Intents extends IntentSpecs<Intents>>(
+  intents: Intents &
+    Readonly<Record<string, { readonly schema: ZodTypeAny; readonly run: unknown }>>,
   options?: { processKey?: string },
 ): IntentFactories<Intents> {
   const factories: Record<string, unknown> = {};
@@ -223,7 +231,7 @@ export function buildIntentFactories<Intents extends Record<string, IntentSpec<a
         ? `process:${encodeURIComponent(options.processKey)}:${key}`
         : key,
       intentType,
-      payload: spec.schema.parse(payload),
+      payload: ensureJsonSafe(spec.schema.parse(payload)),
     });
   }
   return factories as IntentFactories<Intents>;

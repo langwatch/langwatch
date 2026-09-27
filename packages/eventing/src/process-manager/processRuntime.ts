@@ -7,6 +7,7 @@ import {
   type ProcessManagerDefinition,
 } from "../pipeline/processManagerDefinition.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
+import { ProcessStateUnreadableError } from "./failureDiagnostic.ts";
 import {
   DEFAULT_LEASE_DURATION_MS,
   type IntentHandler,
@@ -79,6 +80,25 @@ export function buildIntentHandlers(
   return handlers;
 }
 
+/** Parses the state the store handed back; an unreadable one refuses by path, never by value. */
+function readStoredState({
+  config,
+  previousState,
+  processKey,
+}: {
+  config: ProcessManagerDefinition["config"];
+  previousState: unknown;
+  processKey: string;
+}): unknown {
+  const parsed = config.stateSchema.safeParse(previousState);
+  if (parsed.success) return parsed.data;
+  throw new ProcessStateUnreadableError({
+    processName: config.name,
+    processKey,
+    issuePaths: parsed.error.issues.map((issue) => issue.path.join(".") || "(root)"),
+  });
+}
+
 /**
  * `evolve` for a config-built ProcessDefinition: clamping, schedule arming,
  * and the undeclared-event guard. Module-level so its branching counts on its
@@ -91,11 +111,12 @@ function evolveProcessInstance(
   const factories = buildIntentFactories(config.intents, {
     processKey: ref.processKey,
   });
+  const state = readStoredState({ config, previousState, processKey: ref.processKey });
   if (input.kind === "wake") {
     if (!config.onWake) {
       return { state: previousState, nextWakeAt: null, intents: [] };
     }
-    const evolution = config.onWake(previousState, {
+    const evolution = config.onWake(state, {
       at: input.scheduledFor,
       now: input.now,
       key: ref.processKey,
@@ -129,7 +150,7 @@ function evolveProcessInstance(
       `Process manager "${config.name}" received undeclared event "${envelope.eventType}"`,
     );
   }
-  const evolution = handler(previousState, envelope.payload, {
+  const evolution = handler(state, envelope.payload, {
     at: envelope.occurredAt,
     now: input.now,
     key: envelope.processKey,
@@ -166,13 +187,17 @@ function evolveProcessSignal(
   const factories = buildIntentFactories(config.intents, {
     processKey: ref.processKey,
   });
-  const evolution = spec.handle(previousState, spec.schema.parse(signal.payload), {
-    at: signal.occurredAt,
-    now,
-    key: signal.processKey,
-    projectId: signal.projectId,
-    intents: factories,
-  });
+  const evolution = spec.handle(
+    readStoredState({ config, previousState, processKey: ref.processKey }),
+    spec.schema.parse(signal.payload),
+    {
+      at: signal.occurredAt,
+      now,
+      key: signal.processKey,
+      projectId: signal.projectId,
+      intents: factories,
+    },
+  );
   return {
     state: evolution.state,
     nextWakeAt: evolution.nextWakeAt ?? null,
@@ -274,10 +299,7 @@ export class ProcessRuntime {
         ...(keyBy ? { options: { groupKeyFn: keyBy } } : {}),
         handle: async (event, context) => {
           const envelope = processEnvelopeFor({ definition, event, context });
-          const result = await registered.manager.handleEvent({
-            envelope,
-            now: nowInstant().epochMilliseconds,
-          });
+          const result = await this.handleEventReportingUnreadableState({ registered, envelope });
           if (result.outcome === "revisionConflict") {
             throw new Error(
               `Process manager "${definition.config.name}" revision conflict on event ${event.id}`,
@@ -290,6 +312,35 @@ export class ProcessRuntime {
       });
     }
     return { subscribers };
+  }
+
+  /** Names an unreadable stored state by instance and issue paths, then lets the queue retry. */
+  private async handleEventReportingUnreadableState({
+    registered,
+    envelope,
+  }: {
+    registered: RegisteredProcessManager;
+    envelope: ProcessEventEnvelope;
+  }) {
+    try {
+      return await registered.manager.handleEvent({
+        envelope,
+        now: nowInstant().epochMilliseconds,
+      });
+    } catch (error) {
+      if (error instanceof ProcessStateUnreadableError) {
+        this.logger.error(
+          {
+            processName: error.processName,
+            projectId: envelope.projectId,
+            processKey: error.processKey,
+            issuePaths: error.issuePaths,
+          },
+          "Stored process state does not match its schema; the delivery retries until it does",
+        );
+      }
+      throw error;
+    }
   }
 
   /**

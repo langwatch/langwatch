@@ -22,7 +22,7 @@ import {
 import {
   SCIM_REQUEST_LOG_RETENTION_INITIAL_STATE,
   SCIM_REQUEST_LOG_RETENTION_INTERVAL_MS,
-  type ScimRequestLogRetentionState,
+  scimRequestLogRetentionStateSchema,
   scimRequestLogRetentionSchema,
   scimRequestLogRetentionWake,
 } from "./scim-request-log-retention.process.ts";
@@ -41,7 +41,7 @@ export function buildScimMaintenance({
     .withEvents([])
     .withProcessManager(SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME, (pm) =>
       pm
-        .state<ScimRequestLogRetentionState>(SCIM_REQUEST_LOG_RETENTION_INITIAL_STATE)
+        .state(scimRequestLogRetentionStateSchema, SCIM_REQUEST_LOG_RETENTION_INITIAL_STATE)
         .schedule({ everyMs: SCIM_REQUEST_LOG_RETENTION_INTERVAL_MS })
         .onWake(scimRequestLogRetentionWake)
         .intent(

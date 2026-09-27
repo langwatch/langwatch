@@ -8,9 +8,10 @@ export const anomalyDetectionSchema = z.object({
   scheduledFor: z.number().int(),
 });
 
-export interface AnomalyDetectionState {
-  lastDetectionAt: number | null;
-}
+export const anomalyDetectionStateSchema = z.object({
+  lastDetectionAt: z.number().nullable(),
+});
+export type AnomalyDetectionState = z.infer<typeof anomalyDetectionStateSchema>;
 
 export const ANOMALY_DETECTION_INITIAL_STATE: AnomalyDetectionState = {
   lastDetectionAt: null,

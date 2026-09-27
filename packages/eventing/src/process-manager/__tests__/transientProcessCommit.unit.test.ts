@@ -18,9 +18,8 @@ const PROBE_EVENT = "test.integration.event";
 
 type ProbeMode = "note" | "remember";
 
-interface ProbeState {
-  remembered: string | null;
-}
+const probeStateSchema = z.object({ remembered: z.string().nullable() });
+type ProbeState = z.infer<typeof probeStateSchema>;
 
 const INITIAL: ProbeState = { remembered: null };
 
@@ -43,7 +42,7 @@ function buildProbe(
       name: PROCESS_NAME,
       applier: (pm) =>
         pm
-          .state<ProbeState>(INITIAL)
+          .state(probeStateSchema, INITIAL)
           .intent("act", z.object({ id: z.string() }), async () => undefined)
           .on(PROBE_EVENT, handle as never)
           .transient(),
@@ -220,7 +219,7 @@ describe("transient process commits", () => {
           name: PROCESS_NAME,
           applier: (pm) =>
             pm
-              .state<ProbeState>(INITIAL)
+              .state(probeStateSchema, INITIAL)
               .intent("act", z.object({ id: z.string() }), async () => undefined)
               .on(PROBE_EVENT, (state) => ({ state }))
               .transient()

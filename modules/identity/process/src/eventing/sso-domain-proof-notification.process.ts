@@ -23,7 +23,8 @@ export const notifyProofLapsedIntentSchema = notificationBaseSchema;
  * Nothing is remembered between the two facts: each one says everything its
  * own mail needs, so the process stores no state and keeps no identity.
  */
-export type SsoDomainProofNotificationState = Record<string, never>;
+export const ssoDomainProofNotificationStateSchema = z.record(z.string(), z.never());
+export type SsoDomainProofNotificationState = z.infer<typeof ssoDomainProofNotificationStateSchema>;
 
 export const SSO_DOMAIN_PROOF_NOTIFICATION_INITIAL_STATE: SsoDomainProofNotificationState = {};
 

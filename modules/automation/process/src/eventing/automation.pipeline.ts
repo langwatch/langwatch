@@ -23,7 +23,7 @@ import {
 import { runGraphAlertSweep } from "./graph-alert-sweep.intent.ts";
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
-  type GraphAlertSweepState,
+  graphAlertSweepStateSchema,
   graphAlertSweepWake,
   sweepSchema,
 } from "./graph-alert-sweep.process.ts";
@@ -52,7 +52,7 @@ import {
   reportSchedulePaused,
   reportScheduleResumed,
   reportScheduleWake,
-  type ReportScheduleState,
+  reportScheduleStateSchema,
 } from "./report-schedule.process.ts";
 import {
   logOverflowIntentSchema,
@@ -60,12 +60,15 @@ import {
   persistMatchIntentSchema,
   TRIGGER_SETTLEMENT_INTENT_TYPES,
 } from "./trigger-settlement.intent.ts";
-import { INITIAL_SETTLEMENT_STATE, type SettlementState } from "./trigger-settlement.process.ts";
+import {
+  INITIAL_SETTLEMENT_STATE,
+  triggerSettlementStateSchema,
+} from "./trigger-settlement.process.ts";
 import { runWebhookDeliveryPrune } from "./webhook-delivery-prune.intent.ts";
 import {
   pruneSchema,
   WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
-  type WebhookDeliveryPruneState,
+  webhookDeliveryPruneStateSchema,
   webhookDeliveryPruneWake,
 } from "./webhook-delivery-prune.process.ts";
 
@@ -129,7 +132,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
     .withCommand("settleReportRun", SettleReportRunCommand)
     .withProcessManager("triggerSettlement", (pm) =>
       pm
-        .state<SettlementState>(INITIAL_SETTLEMENT_STATE)
+        .state(triggerSettlementStateSchema, INITIAL_SETTLEMENT_STATE)
         .intent(
           TRIGGER_SETTLEMENT_INTENT_TYPES.NOTIFY_DIGEST,
           notifyDigestIntentSchema,
@@ -221,7 +224,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
     )
     .withProcessManager(REPORT_SCHEDULE_PROCESS_NAME, (pm) =>
       pm
-        .state<ReportScheduleState>(INITIAL_REPORT_SCHEDULE_STATE)
+        .state(reportScheduleStateSchema, INITIAL_REPORT_SCHEDULE_STATE)
         .intent(
           REPORT_SCHEDULE_INTENT_TYPES.DISPATCH,
           reportDispatchIntentSchema,
@@ -237,7 +240,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
     )
     .withProcessManager("graphAlertSweep", (pm) =>
       pm
-        .state<GraphAlertSweepState>({ lastSweepAt: null })
+        .state(graphAlertSweepStateSchema, { lastSweepAt: null })
         .schedule({ everyMs: GRAPH_ALERT_SWEEP_INTERVAL_MS })
         .onWake(graphAlertSweepWake)
         .intent(
@@ -248,7 +251,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
     )
     .withProcessManager("webhookDeliveryPrune", (pm) =>
       pm
-        .state<WebhookDeliveryPruneState>({ lastPruneAt: null })
+        .state(webhookDeliveryPruneStateSchema, { lastPruneAt: null })
         .schedule({ everyMs: WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS })
         .onWake(webhookDeliveryPruneWake)
         .intent(

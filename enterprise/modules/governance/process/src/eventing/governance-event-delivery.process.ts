@@ -4,6 +4,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { ProcessManagerApplier } from "@langwatch/eventing";
 import { Temporal } from "@langwatch/time";
+import { z } from "zod";
 
 import {
   type GovernanceWebhookChannel,
@@ -17,6 +18,8 @@ import {
   GovernanceEventDeliveryIntent,
   governanceSendBatchSchema,
 } from "./governance-event-delivery.intent.ts";
+
+const GOVERNANCE_EVENT_DELIVERY_STATE_SCHEMA = z.object({});
 
 export const GOVERNANCE_EVENTS_PROCESS_NAME = "governanceEventsDelivery" as const;
 
@@ -90,7 +93,7 @@ export class GovernanceEventDeliveryProcess {
   processManager(): ProcessManagerApplier<GovernanceEventsProcessingEvent> {
     return (process) =>
       process
-        .state({})
+        .state(GOVERNANCE_EVENT_DELIVERY_STATE_SCHEMA, {})
         .intent("deliverGovernance", deliverGovernanceSchema, (payload, context) =>
           this.intent.deliver(payload, context),
         )

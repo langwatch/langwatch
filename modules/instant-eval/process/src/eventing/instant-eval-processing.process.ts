@@ -12,6 +12,7 @@ import {
 
 import {
   INITIAL_INSTANT_EVAL_STATE,
+  instantEvalProcessStateSchema,
   INSTANT_EVAL_PROCESS_INTENT_TYPES,
   instantEvalFinishIntentSchema,
   instantEvalJudgePageIntentSchema,
@@ -41,7 +42,7 @@ export function instantEvalProcessManager(
 ): ProcessManagerApplier<InstantEvalProcessingEvent> {
   return (pm) =>
     pm
-      .state(INITIAL_INSTANT_EVAL_STATE)
+      .state(instantEvalProcessStateSchema, INITIAL_INSTANT_EVAL_STATE)
       .intent(
         INSTANT_EVAL_PROCESS_INTENT_TYPES.PLAN,
         instantEvalPlanIntentSchema,

@@ -18,7 +18,7 @@ export const SETTLEMENT_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
 export const spendSettlementStateSchema = z.object({
   /** Epoch ms of the last sweep this process scheduled, for operators. */
-  lastSweepAt: z.number().nullable(),
+  lastSweepAt: z.number().nullable().default(null),
 });
 export type SpendSettlementState = z.infer<typeof spendSettlementStateSchema>;
 

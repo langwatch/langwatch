@@ -77,11 +77,12 @@ export const processRetentionSweepSchema = z.object({
 
 export type ProcessRetentionSweepPayload = z.output<typeof processRetentionSweepSchema>;
 
-export interface ProcessRetentionSweepState {
-  lastSweepAt: number | null;
+export const processRetentionSweepStateSchema = z.object({
+  lastSweepAt: z.number().nullable(),
   /** Wakes this process has scheduled, which is what the ramp counts. */
-  sweepsScheduled: number;
-}
+  sweepsScheduled: z.number(),
+});
+export type ProcessRetentionSweepState = z.infer<typeof processRetentionSweepStateSchema>;
 
 export const PROCESS_RETENTION_SWEEP_INITIAL_STATE: ProcessRetentionSweepState = {
   lastSweepAt: null,

@@ -13,7 +13,7 @@ import { STORAGE_STATS_PROCESS_NAME, runStorageStats } from "./ops-storage-stats
 import {
   STORAGE_STATS_INITIAL_STATE,
   STORAGE_STATS_INTERVAL_MS,
-  type StorageStatsState,
+  storageStatsStateSchema,
   storageStatsMeasurementSchema,
   storageStatsWake,
 } from "./ops-storage-stats.process.ts";
@@ -32,7 +32,7 @@ export function buildStorageStats({
     .withEvents([])
     .withProcessManager(STORAGE_STATS_PROCESS_NAME, (pm) =>
       pm
-        .state<StorageStatsState>(STORAGE_STATS_INITIAL_STATE)
+        .state(storageStatsStateSchema, STORAGE_STATS_INITIAL_STATE)
         .schedule({ everyMs: STORAGE_STATS_INTERVAL_MS })
         .onWake(storageStatsWake)
         .intent(

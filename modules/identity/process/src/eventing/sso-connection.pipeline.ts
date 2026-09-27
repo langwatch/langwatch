@@ -48,6 +48,7 @@ import {
   CONNECTION_TEARDOWN_PROCESS_NAME,
   type ConnectionTeardown,
   type ConnectionTeardownState,
+  connectionTeardownStateSchema,
   completeTeardownIntentSchema,
   connectionTeardownWake,
   onTeardownRequested,
@@ -121,6 +122,7 @@ import {
   SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME,
   type SsoDomainProofNotifications,
   type SsoDomainProofNotificationState,
+  ssoDomainProofNotificationStateSchema,
 } from "./sso-domain-proof-notification.process.ts";
 
 /**
@@ -370,7 +372,7 @@ function mountTeardownGrace(
   Record<string, IntentSpec<ZodType>>
 > {
   return pm
-    .state<ConnectionTeardownState>(CONNECTION_TEARDOWN_INITIAL_STATE)
+    .state(connectionTeardownStateSchema, CONNECTION_TEARDOWN_INITIAL_STATE)
     .intent(
       "completeTeardown",
       completeTeardownIntentSchema,
@@ -395,7 +397,7 @@ function mountDomainProofNotification(
   Record<string, IntentSpec<ZodType>>
 > {
   return pm
-    .state<SsoDomainProofNotificationState>(SSO_DOMAIN_PROOF_NOTIFICATION_INITIAL_STATE)
+    .state(ssoDomainProofNotificationStateSchema, SSO_DOMAIN_PROOF_NOTIFICATION_INITIAL_STATE)
     .intent(
       "notifyWavering",
       notifyProofWaveringIntentSchema,

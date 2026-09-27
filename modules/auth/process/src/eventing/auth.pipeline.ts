@@ -19,7 +19,7 @@ import { SIGN_IN_LOCK_REAP_PROCESS_NAME, runSignInLockReap } from "./sign-in-loc
 import {
   SIGN_IN_LOCK_REAP_INITIAL_STATE,
   SIGN_IN_LOCK_REAP_INTERVAL_MS,
-  type SignInLockReapState,
+  signInLockReapStateSchema,
   signInLockReapSchema,
   signInLockReapWake,
 } from "./sign-in-lock-reap.process.ts";
@@ -38,7 +38,7 @@ export function buildSignInLockMaintenance({
     .withEvents([])
     .withProcessManager(SIGN_IN_LOCK_REAP_PROCESS_NAME, (pm) =>
       pm
-        .state<SignInLockReapState>(SIGN_IN_LOCK_REAP_INITIAL_STATE)
+        .state(signInLockReapStateSchema, SIGN_IN_LOCK_REAP_INITIAL_STATE)
         .schedule({ everyMs: SIGN_IN_LOCK_REAP_INTERVAL_MS })
         .onWake(signInLockReapWake)
         .intent(

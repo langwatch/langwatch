@@ -16,7 +16,7 @@ function typeCheckStaging(pm: ProcessManagerInitialStage<ProcessTestEvent>) {
   // @ts-expect-error state must be declared before event handlers
   pm.on(TEST_PROCESS_EVENT_TYPE, () => ({ state: {} }));
 
-  const state = pm.state({ count: 0 });
+  const state = pm.state(z.object({ count: z.number() }), { count: 0 });
   // @ts-expect-error intents must be declared before event handlers
   state.on(TEST_PROCESS_EVENT_TYPE, () => ({ state: { count: 1 } }));
   // @ts-expect-error intents must be declared before signal handlers
@@ -36,7 +36,7 @@ describe("ProcessManagerBuilder", () => {
           name: "triggerSettlement",
           applier: (pm) =>
             pm
-              .state({ traceIds: [] as string[] })
+              .state(z.object({ traceIds: z.array(z.string()) }), { traceIds: [] })
               .intent("persistMatch", payloadSchema, async () => {})
               .on(TEST_PROCESS_EVENT_TYPE, (state, data, ctx) => ({
                 state: {
@@ -59,7 +59,7 @@ describe("ProcessManagerBuilder", () => {
           name: "triggerSettlement",
           applier: (pm) =>
             pm
-              .state({ traceIds: [] as string[] })
+              .state(z.object({ traceIds: z.array(z.string()) }), { traceIds: [] })
               .intent("persistMatch", payloadSchema, async () => {})
               .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state }))
               .outbox({ maxAttempts: 8, leaseDurationMs: 120_000 }),
@@ -76,7 +76,7 @@ describe("ProcessManagerBuilder", () => {
           name: "operationLifecycle",
           applier: (pm) =>
             pm
-              .state({ count: 0 })
+              .state(z.object({ count: z.number() }), { count: 0 })
               .intent("noop", z.object({}), async () => {})
               .keyBy((event) => event.data.traceId)
               .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state })),
@@ -108,7 +108,7 @@ describe("ProcessManagerBuilder", () => {
           name: "graphAlertSweep",
           applier: (pm) =>
             pm
-              .state({ lastWakeAt: null as number | null })
+              .state(z.object({ lastWakeAt: z.number().nullable() }), { lastWakeAt: null })
               .schedule({ everyMs: 30_000 })
               .onWake(sweep)
               .intent("evaluateGraph", payloadSchema, async () => {}),
@@ -125,7 +125,7 @@ describe("ProcessManagerBuilder", () => {
             name: "invalidSweep",
             applier: (pm) =>
               pm
-                .state({ lastWakeAt: null as number | null })
+                .state(z.object({ lastWakeAt: z.number().nullable() }), { lastWakeAt: null })
                 .schedule({ everyMs })
                 .onWake<{ evaluateGraph: IntentSpec<typeof payloadSchema> }>((state) => ({ state }))
                 .intent("evaluateGraph", payloadSchema, async () => {}),
@@ -141,7 +141,7 @@ describe("ProcessManagerBuilder", () => {
             name: "keyedSweep",
             applier: (pm) =>
               pm
-                .state({ lastWakeAt: null as number | null })
+                .state(z.object({ lastWakeAt: z.number().nullable() }), { lastWakeAt: null })
                 .schedule({ everyMs: 30_000 })
                 .onWake<{ evaluateGraph: IntentSpec<typeof payloadSchema> }>((state) => ({ state }))
                 .intent("evaluateGraph", payloadSchema, async () => {})
@@ -158,7 +158,7 @@ describe("ProcessManagerBuilder", () => {
         name: "signalOnly",
         applier: (pm) =>
           pm
-            .state({ count: 0 })
+            .state(z.object({ count: z.number() }), { count: 0 })
             .intent("recordCount", z.object({ count: z.number() }), async () => {})
             .onSignal("increment", z.object({ by: z.number().int() }), (state, data, ctx) => ({
               state: { count: state.count + data.by },
@@ -180,7 +180,7 @@ describe("ProcessManagerBuilder", () => {
           name: "duplicateSignal",
           applier: (pm) =>
             pm
-              .state({ count: 0 })
+              .state(z.object({ count: z.number() }), { count: 0 })
               .intent("noop", z.object({}), async () => {})
               .onSignal("increment", z.object({ by: z.number() }), (state) => ({
                 state,
@@ -201,7 +201,7 @@ describe("ProcessManagerBuilder", () => {
             name: "duplicateIntent",
             applier: (pm) =>
               pm
-                .state({ count: 0 })
+                .state(z.object({ count: z.number() }), { count: 0 })
                 .intent("persistMatch", payloadSchema, async () => {})
                 .intent("persistMatch", payloadSchema, async () => {})
                 .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state })),

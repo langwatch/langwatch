@@ -21,7 +21,7 @@ import {
 import {
   LWQL_RECONVERGENCE_INITIAL_DELAY_MS,
   LWQL_RECONVERGENCE_INITIAL_STATE,
-  type LwqlReconvergenceState,
+  lwqlReconvergenceStateSchema,
   lwqlReconvergenceSchema,
   lwqlReconvergenceWake,
 } from "./analytics-lwql-reconvergence.process.ts";
@@ -48,7 +48,7 @@ export function buildLwqlReconvergence({
     .withEvents([])
     .withProcessManager(LWQL_RECONVERGENCE_PROCESS_NAME, (pm) =>
       pm
-        .state<LwqlReconvergenceState>(LWQL_RECONVERGENCE_INITIAL_STATE)
+        .state(lwqlReconvergenceStateSchema, LWQL_RECONVERGENCE_INITIAL_STATE)
         .schedule({ everyMs: LWQL_RECONVERGENCE_INITIAL_DELAY_MS })
         .onWake(lwqlReconvergenceWake({ bootedAt }))
         .intent(

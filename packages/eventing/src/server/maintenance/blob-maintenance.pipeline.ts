@@ -6,7 +6,7 @@ import { type BlobCleanupDeps, runBlobCleanup } from "./blob-cleanup.intent.ts";
 import {
   BLOB_CLEANUP_INITIAL_STATE,
   BLOB_CLEANUP_PROCESS_NAME,
-  type BlobCleanupState,
+  blobCleanupStateSchema,
   blobCleanupSchema,
   blobCleanupWake,
 } from "./blob-cleanup.process.ts";
@@ -34,7 +34,7 @@ export function createBlobMaintenancePipeline(deps: BlobMaintenancePipelineDeps)
     .withEvents([])
     .withProcessManager(BLOB_CLEANUP_PROCESS_NAME, (pm) =>
       pm
-        .state<BlobCleanupState>(BLOB_CLEANUP_INITIAL_STATE)
+        .state(blobCleanupStateSchema, BLOB_CLEANUP_INITIAL_STATE)
         .schedule({ everyMs: BLOB_SWEEP_INTERVAL_MS })
         .onWake(blobCleanupWake)
         .intent("sweep", blobCleanupSchema, runBlobCleanup(deps.cleanup))

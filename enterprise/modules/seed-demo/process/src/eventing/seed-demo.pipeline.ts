@@ -17,7 +17,7 @@ import {
   seedDemoRunSchema,
   seedDemoWake,
   type SeedDemoRunDeps,
-  type SeedDemoRunState,
+  seedDemoRunStateSchema,
 } from "./seed-demo.process.ts";
 
 export const SEED_DEMO_PIPELINE_NAME = "seed_demo";
@@ -33,7 +33,7 @@ export function buildSeedDemoPipeline(
     .withEvents([])
     .withProcessManager(SEED_DEMO_PROCESS_NAME, (pm) =>
       pm
-        .state<SeedDemoRunState>({ lastRunAt: null })
+        .state(seedDemoRunStateSchema, { lastRunAt: null })
         .schedule({ everyMs: SEED_DEMO_INTERVAL_MS })
         .onWake(seedDemoWake)
         .intent(

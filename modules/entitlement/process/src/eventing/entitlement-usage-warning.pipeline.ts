@@ -21,7 +21,7 @@ import {
   usageWarningSweepSchema,
   usageWarningSweepWake,
   type UsageWarningSweepRunDeps,
-  type UsageWarningSweepState,
+  usageWarningSweepStateSchema,
 } from "./entitlement-usage-warning.process.ts";
 
 export const USAGE_WARNING_PIPELINE_NAME = "entitlement_usage_warning";
@@ -36,7 +36,7 @@ export function buildUsageWarningPipeline(
     .withEvents([])
     .withProcessManager(USAGE_WARNING_SWEEP_PROCESS_NAME, (pm) =>
       pm
-        .state<UsageWarningSweepState>({ lastSweepAt: null })
+        .state(usageWarningSweepStateSchema, { lastSweepAt: null })
         .schedule({ everyMs: USAGE_WARNING_SWEEP_INTERVAL_MS })
         .onWake(usageWarningSweepWake)
         .intent(

@@ -37,25 +37,24 @@ export const TOPIC_CLUSTERING_PROCESS_NAME = "topicClustering" as const;
  * Compact private process state (ADR-051 §2): only what evolve() decisions
  * need. Run facts for the UI live in the run-status projection, not here.
  */
-export interface TopicClusteringProcessState {
+export const topicClusteringProcessStateSchema = z.object({
   /** The aggregate identity; needed to compute the daily hash slot on wakes. */
-  projectId: string;
-  enabled: boolean;
+  projectId: z.string(),
+  enabled: z.boolean(),
   /**
-   * The run currently in flight, or null when idle. Guards a wake or manual request from piling
-   * a second run onto an active backlog walk. Cleared by the final run_completed / run_failed,
-   * or abandoned once `startedAtMs` is older than the stale-run window.
+   * The run in flight, or null when idle; guards a wake or manual request from piling a second
+   * run onto an active backlog walk. Abandoned once `startedAtMs` passes the stale-run window.
    */
-  currentRun: {
-    runId: string;
-    page: number;
-    updatedAtMs: number;
-    /**
-     * When the run began.
-     */
-    startedAtMs?: number;
-  } | null;
-}
+  currentRun: z
+    .object({
+      runId: z.string(),
+      page: z.number(),
+      updatedAtMs: z.number(),
+      startedAtMs: z.number().optional(),
+    })
+    .nullable(),
+});
+export type TopicClusteringProcessState = z.infer<typeof topicClusteringProcessStateSchema>;
 
 /**
  * The content-stripped view of a pipeline event the process consumes.
@@ -192,7 +191,7 @@ export class TopicClusteringProcess {
   ): ProcessManagerApplier<TopicClusteringProcessingEvent> {
     return (pm) =>
       pm
-        .state(INITIAL_TOPIC_CLUSTERING_STATE)
+        .state(topicClusteringProcessStateSchema, INITIAL_TOPIC_CLUSTERING_STATE)
         .intent(
           TOPIC_CLUSTERING_PROCESS_INTENT_TYPES.RUN,
           topicClusteringRunIntentSchema,

@@ -77,7 +77,7 @@ describe("ProcessRuntime", () => {
         name: "operationInbox",
         applier: (pm) =>
           pm
-            .state({ count: 0 })
+            .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
             .keyBy((event) => event.data.traceId)
             .on(TEST_PROCESS_EVENT_TYPE, (state) => ({
@@ -124,7 +124,7 @@ describe("ProcessRuntime", () => {
         name: "keyedInbox",
         applier: (pm) =>
           pm
-            .state({ count: 0 })
+            .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
             .keyBy((event) => `trace:${event.data.traceId}`)
             .on(TEST_PROCESS_EVENT_TYPE, (state) => ({
@@ -168,7 +168,7 @@ describe("ProcessRuntime", () => {
         name: "unkeyedInbox",
         applier: (pm) =>
           pm
-            .state({ count: 0 })
+            .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
             .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state })),
       });
@@ -190,7 +190,7 @@ describe("ProcessRuntime", () => {
         name: "signalInbox",
         applier: (pm) =>
           pm
-            .state({ count: 0 })
+            .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
             .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state }))
             .onSignal(
@@ -264,7 +264,7 @@ describe("ProcessRuntime", () => {
         name: "logicalInbox",
         applier: (pm) =>
           pm
-            .state({ count: 0 })
+            .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
             .on(TEST_PROCESS_EVENT_TYPE, (state) => ({
               state: { count: state.count + 1 },
@@ -308,7 +308,7 @@ describe("ProcessRuntime", () => {
         name: "conflictInbox",
         applier: (pm) =>
           pm
-            .state({ count: 0 })
+            .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
             .on(TEST_PROCESS_EVENT_TYPE, (state) => ({
               state: { count: state.count + 1 },
@@ -340,7 +340,7 @@ describe("ProcessRuntime", () => {
         name: "dupeInbox",
         applier: (pm) =>
           pm
-            .state({ count: 0 })
+            .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
             .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state })),
       });
@@ -368,7 +368,7 @@ describe("ProcessRuntime", () => {
         name: "scheduledSweep",
         applier: (pm) =>
           pm
-            .state({ count: 0 })
+            .state(z.object({ count: z.number() }), { count: 0 })
             .schedule({ everyMs: 60_000 })
             .onWake((state) => ({ state }))
             .intent("noop", z.object({}), async () => {}),
@@ -411,7 +411,7 @@ describe("ProcessRuntime", () => {
         name: "scheduledFailure",
         applier: (pm) =>
           pm
-            .state({ count: 0 })
+            .state(z.object({ count: z.number() }), { count: 0 })
             .schedule({ everyMs: 60_000 })
             .onWake((state) => ({ state }))
             .intent("noop", z.object({}), async () => {}),

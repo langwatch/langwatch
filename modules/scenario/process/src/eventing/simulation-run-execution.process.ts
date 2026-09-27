@@ -11,6 +11,7 @@ import {
   executeRunIntentSchema,
   finishRunIntentSchema,
   INITIAL_SIMULATION_RUN_EXECUTION_STATE,
+  simulationRunExecutionProcessStateSchema,
   recordEvaluationsIntentSchema,
   SIMULATION_RUN_EXECUTION_INTENT_TYPES,
 } from "./simulation-run-execution-data.process.ts";
@@ -82,7 +83,7 @@ export function simulationRunExecutionPM(
 ): ProcessManagerApplier<SimulationProcessingEvent> {
   return (pm) =>
     pm
-      .state(INITIAL_SIMULATION_RUN_EXECUTION_STATE)
+      .state(simulationRunExecutionProcessStateSchema, INITIAL_SIMULATION_RUN_EXECUTION_STATE)
       .intent(
         SIMULATION_RUN_EXECUTION_INTENT_TYPES.EXECUTE,
         executeRunIntentSchema,

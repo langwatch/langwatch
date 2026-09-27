@@ -8,9 +8,10 @@ export const signInLockReapSchema = z.object({
   scheduledFor: z.number().int(),
 });
 
-export interface SignInLockReapState {
-  lastReapAt: number | null;
-}
+export const signInLockReapStateSchema = z.object({
+  lastReapAt: z.number().nullable(),
+});
+export type SignInLockReapState = z.infer<typeof signInLockReapStateSchema>;
 
 export const SIGN_IN_LOCK_REAP_INITIAL_STATE: SignInLockReapState = {
   lastReapAt: null,

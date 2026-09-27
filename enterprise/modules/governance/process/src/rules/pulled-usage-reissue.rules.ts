@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { PulledUsageObservedEventData } from "@langwatch/enterprise-governance-contract";
+import { z } from "zod";
 
 /**
  * Where one charge is filed: the parts of its rollup cell that can move while its restatement key
  * stays the same. The day it sat in is carried because a withdrawal is dated to the day it corrects.
  */
-export interface FiledCell {
-  model: string;
-  currencyCode: string;
-  agentId: string;
-  rawActorId: string;
-  occurredAtMs: number;
-}
+export const filedCellSchema = z.object({
+  model: z.string(),
+  currencyCode: z.string(),
+  agentId: z.string(),
+  rawActorId: z.string(),
+  occurredAtMs: z.number(),
+});
+export type FiledCell = z.infer<typeof filedCellSchema>;
 
 /** Where the charge sits NOW, which is what the next version is compared against. */
 export function filedCellFor(record: PulledUsageObservedEventData): FiledCell {

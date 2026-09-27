@@ -36,7 +36,7 @@ import {
   TOPIC_CLUSTERING_SEED_INITIAL_STATE,
   TOPIC_CLUSTERING_SEED_INTERVAL_MS,
   TOPIC_CLUSTERING_SEED_PROCESS_NAME,
-  type TopicClusteringSeedState,
+  topicClusteringSeedStateSchema,
   topicClusteringSeedSchema,
   topicClusteringSeedWake,
 } from "./topic-clustering-seed.process.ts";
@@ -118,7 +118,7 @@ const buildTopicClusteringProcessingPipeline = (deps: TopicClusteringProcessingP
     )
     .withProcessManager(TOPIC_CLUSTERING_SEED_PROCESS_NAME, (pm) =>
       pm
-        .state<TopicClusteringSeedState>(TOPIC_CLUSTERING_SEED_INITIAL_STATE)
+        .state(topicClusteringSeedStateSchema, TOPIC_CLUSTERING_SEED_INITIAL_STATE)
         .intent("seedTopicModels", topicClusteringSeedSchema, runTopicModelSeed(deps.seeds))
         .intent("seedSchedules", topicClusteringSeedSchema, runClusteringScheduleSeed(deps.seeds))
         .schedule({ everyMs: TOPIC_CLUSTERING_SEED_INTERVAL_MS })
