@@ -39,9 +39,6 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../dev/tsconfig.web-declarations.json"
-    },
-    {
       "path": "../../scenario/contract/tsconfig.build.json"
     },
     {
@@ -49,6 +46,9 @@
     },
     {
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/browser-kit/tsconfig.build.json"
     }
   ]
 }

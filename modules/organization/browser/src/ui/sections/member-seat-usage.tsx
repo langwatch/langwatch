@@ -1,10 +1,7 @@
 import { SimpleGrid } from "@chakra-ui/react";
-import {
-  LIMIT_TYPE_DISPLAY_LABELS,
-  ResourceLimitRow,
-} from "@langwatch/enterprise-licensing-browser/surfaces/resource-limits";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
 
+import { ResourceLimitRow } from "../../behavior/lent-resource-limit-row.tsx";
 import { api } from "../../behavior/organization-api.ts";
 
 /**
@@ -25,12 +22,12 @@ export function MemberSeatUsage({
   return (
     <SimpleGrid columns={{ base: 1, md: 2 }} gap={3} width="full" maxWidth="2xl">
       <ResourceLimitRow
-        label={LIMIT_TYPE_DISPLAY_LABELS.members}
+        limitType="members"
         current={usage.data.membersCount}
         max={activePlan.maxMembers}
       />
       <ResourceLimitRow
-        label={LIMIT_TYPE_DISPLAY_LABELS.membersLite}
+        limitType="membersLite"
         current={usage.data.membersLiteCount}
         max={activePlan.maxMembersLite}
       />

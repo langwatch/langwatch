@@ -13,6 +13,7 @@ import type { DuplicateSubscriptionsReportRepository } from "./duplicate-subscri
 import type { NurturingProfileRepository } from "./nurturing-profile.repository.ts";
 import type { OrganizationPricingRepository } from "./organization-pricing.repository.ts";
 import type { ProjectActiveDayRepository } from "./project-active-day.repository.ts";
+import type { ScenarioRunMilestoneClaimRepository } from "./scenario-run-milestone-claim.repository.ts";
 import type { BillingSubscriptionRepository } from "./subscription.repository.ts";
 import type { TenantOrganizationRepository } from "./tenant-organization.repository.ts";
 
@@ -30,6 +31,7 @@ export interface BillingRepositories {
   readonly organizationPricing: OrganizationPricingRepository;
   readonly projectActiveDays: ProjectActiveDayRepository;
   readonly reportOrganizations: BillingReportOrganizationRepository;
+  readonly scenarioRunMilestoneClaims: ScenarioRunMilestoneClaimRepository;
   readonly subscriptions: BillingSubscriptionRepository;
   readonly tenantOrganizations: TenantOrganizationRepository;
   readonly webhookOrganizations: BillingWebhookOrganizationRepository;
@@ -39,7 +41,7 @@ export interface BillingRepositories {
 /** ClickHouse-backed billing rows, selected through their own registry and store tier. */
 export type BillingPostgresRepositories = Omit<
   BillingRepositories,
-  "billableEvents" | "organizationCache"
+  "billableEvents" | "organizationCache" | "scenarioRunMilestoneClaims"
 >;
 
 export interface BillingClickHouseRepositories {

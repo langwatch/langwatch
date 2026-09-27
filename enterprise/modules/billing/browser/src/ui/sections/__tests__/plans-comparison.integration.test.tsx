@@ -8,6 +8,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { BillingPricingService } from "../../../model/billing-pricing.service.ts";
 import { PlansComparisonPage } from "../plans-comparison.tsx";
 
 vi.mock("../../../behavior/billing-api.ts", () => ({
@@ -20,12 +21,19 @@ vi.mock("../../../behavior/billing-api.ts", () => ({
   },
 }));
 
-function renderPlans(props: Parameters<typeof PlansComparisonPage>[0] = {}) {
-  return render(<PlansComparisonPage {...props} />, {
-    wrapper: ({ children }: { children: React.ReactNode }) => (
-      <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-    ),
-  });
+const TEST_GROWTH_SEAT_PRICE_CENTS = BillingPricingService.create("test").getGrowthSeatPriceCents();
+
+function renderPlans(
+  props: Omit<Parameters<typeof PlansComparisonPage>[0], "growthSeatPriceCents"> = {},
+) {
+  return render(
+    <PlansComparisonPage {...props} growthSeatPriceCents={TEST_GROWTH_SEAT_PRICE_CENTS} />,
+    {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+      ),
+    },
+  );
 }
 
 function column(id: "free" | "growth" | "enterprise") {

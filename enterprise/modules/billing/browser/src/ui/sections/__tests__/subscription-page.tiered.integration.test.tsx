@@ -5,6 +5,7 @@
  */
 import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { StripeEnvironment } from "@langwatch/enterprise-billing-contract";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -51,6 +52,10 @@ class TestBillingHost extends BillingHostApi {
 
   isSaaS(): boolean {
     return true;
+  }
+
+  stripeEnvironment(): StripeEnvironment {
+    return "test";
   }
 
   isDeploymentSettled(): boolean {
@@ -220,11 +225,7 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.queryByTestId("tiered-pricing-alert")).not.toBeInTheDocument();
       });
 
-      // Skipped: Code bug in SubscriptionPage.tsx — `isUpgradePlanRequired` has a
-      // duplicate bare `isDeveloperPlan` condition making it always true for free-plan orgs.
-      // The `|| isDeveloperPlan` term at the end of the OR chain fires unconditionally, so
-      // upgrade-plan-block renders even before any seat changes are planned.
-      it.skip("hides upgrade plan block on free plan without seat changes", async () => {
+      it("hides upgrade plan block on free plan without seat changes", async () => {
         renderSubscriptionPage();
 
         await waitFor(() => {

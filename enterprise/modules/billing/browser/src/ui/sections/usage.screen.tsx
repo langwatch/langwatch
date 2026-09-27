@@ -15,12 +15,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
-import {
-  mapLicenseStatusToLimits,
-  mapUsageToLimits,
-  RESOURCE_LABELS,
-  ResourceLimitsDisplay,
-} from "@langwatch/enterprise-licensing-browser/surfaces/resource-limits";
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { ArrowRight } from "lucide-react";
 
@@ -33,6 +27,12 @@ import {
 } from "../../model/plan-management-url.ts";
 import { PricingModel } from "../../model/prisma-types.ts";
 import { Link } from "../../ui/elements/link.tsx";
+import {
+  mapLicenseStatusToLimits,
+  mapUsageToLimits,
+  RESOURCE_LABELS,
+  ResourceLimitsDisplay,
+} from "./resource-limits/resource-limits-display.tsx";
 
 function ResourceLimitsCard({
   planLabel,

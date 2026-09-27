@@ -3,6 +3,7 @@
  * to handle self-hosted reads that hosted product doesn't answer.
  */
 
+import type { StripeEnvironment } from "@langwatch/enterprise-billing-contract";
 import { createContext, useContext } from "react";
 
 import type { PricingModel } from "./prisma-types.ts";
@@ -51,6 +52,8 @@ export abstract class BillingHostApi {
   /** Whether this deployment is the hosted product. Fail-safe: false. */
   abstract isSaaS(): boolean;
 
+  /** The Stripe catalogue this deployment prices against: a development deployment's is test. */
+  abstract stripeEnvironment(): StripeEnvironment;
   /** Whether the answer above has arrived. */
   abstract isDeploymentSettled(): boolean;
 

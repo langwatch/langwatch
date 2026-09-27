@@ -8,6 +8,7 @@ import {
 } from "@langwatch/scenario-contract";
 
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
+import type { ScenarioRunMilestoneClaimRepository } from "../repositories/scenario-run-milestone-claim.repository.ts";
 import { isConnectedAgentRunSucceeded } from "../rules/scenario-run-milestones.rules.ts";
 import type {
   ProjectActiveDayTrackerService,
@@ -21,6 +22,8 @@ export interface ScenarioRunMilestonesSubscriberDeps {
   resolveOrgAdmin: (projectId: string) => Promise<ProjectAdminResolution | null>;
   posthog: PostHogChannel;
   activeDayTracker: ProjectActiveDayTrackerService;
+  /** One claim per event id, so a redelivered event does not track its milestone twice. */
+  milestoneClaims: ScenarioRunMilestoneClaimRepository;
 }
 
 /**
@@ -43,6 +46,21 @@ export function createScenarioRunMilestonesSubscriber(
 }
 
 async function trackScenarioRunSucceeded(
+  deps: ScenarioRunMilestonesSubscriberDeps,
+  event: SimulationRunFinishedEvent,
+): Promise<void> {
+  const projectId = String(event.tenantId);
+  const claimed = await deps.milestoneClaims.claim({ eventId: event.id });
+  if (claimed) await trackMilestone(deps, event);
+
+  await deps.activeDayTracker.track({
+    projectId,
+    source: "scenario_run",
+    occurredAt: event.occurredAt,
+  });
+}
+
+async function trackMilestone(
   deps: ScenarioRunMilestonesSubscriberDeps,
   event: SimulationRunFinishedEvent,
 ): Promise<void> {
@@ -75,10 +93,4 @@ async function trackScenarioRunSucceeded(
       "Failed to track scenario_run_succeeded, the milestone is discarded",
     );
   }
-
-  await deps.activeDayTracker.track({
-    projectId,
-    source: "scenario_run",
-    occurredAt: event.occurredAt,
-  });
 }
