@@ -230,6 +230,8 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
           REDIS_URL: redis://localhost:6379
           CLICKHOUSE_HOST: http://localhost:8123
+          # The api listens on API_PORT (6560 by default); the matrix calls LW_BASE_URL.
+          API_PORT: "5560"
         run: |
           pnpm start > /tmp/langwatch-dev.log 2>&1 &
           echo $! > /tmp/langwatch.pid

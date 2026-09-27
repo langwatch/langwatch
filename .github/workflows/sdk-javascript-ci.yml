@@ -136,11 +136,15 @@ jobs:
       # because the root `pnpm build` and the Docker image also run this
       # package's build and were paying a full SDK type check the
       # workspace-wide `typecheck` job had already done.
-      - name: Typecheck
-        run: pnpm run typecheck
-
+      #
+      # Build runs first: the typecheck's project references reach
+      # packages/observability, which imports this SDK through its built
+      # declarations, so a typecheck before the build cannot resolve them.
       - name: Build
         run: pnpm run build
+
+      - name: Typecheck
+        run: pnpm run typecheck
 
       - name: Run tests
         # Fork and Dependabot PRs don't receive repository secrets, so a
@@ -336,7 +340,8 @@ jobs:
           # once this step ends, which has already hidden one real regression
           # (a server-side 500 on the visibility poll shows up only as SDK
           # test timeouts). The failure step below tails these files.
-          NODE_ENV=production pnpm --filter @langwatch/platform-api start > /tmp/langwatch-server.log 2>&1 &
+          # The api listens on API_PORT (6560 by default); the SDK and the probe call 5560.
+          API_PORT=5560 NODE_ENV=production pnpm --filter @langwatch/platform-api start > /tmp/langwatch-server.log 2>&1 &
           # Start the worker process so the event-sourcing pipeline
           # consumes traces from Redis and writes them to ClickHouse
           pnpm --filter @langwatch/worker start > /tmp/langwatch-workers.log 2>&1 &

@@ -517,9 +517,11 @@ echo "→ linked workspace: dependencies of apps/server into $STAGE/node_modules
 # and pnpm pack rewrites each to its concrete version only when the packing
 # directory carries them. Only the catalog sections are copied: the staged root
 # is not a workspace, and the file is outside `files`, so it never ships.
-awk '/^(catalog|catalogs):/ { keep = 1; print; next } /^[^[:space:]#]/ { keep = 0 } keep' \
-  "$ROOT/pnpm-workspace.yaml" > "$STAGE/pnpm-workspace.yaml"
-echo "→ staged the workspace catalogs for pnpm pack to resolve catalog: specifiers"
+if [ -f "$ROOT/pnpm-workspace.yaml" ]; then
+  awk '/^(catalog|catalogs):/ { keep = 1; print; next } /^[^[:space:]#]/ { keep = 0 } keep' \
+    "$ROOT/pnpm-workspace.yaml" > "$STAGE/pnpm-workspace.yaml"
+  echo "→ staged the workspace catalogs for pnpm pack to resolve catalog: specifiers"
+fi
 
 echo "→ running: pnpm pack $*"
 cd "$STAGE"
