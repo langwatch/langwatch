@@ -3,6 +3,7 @@
  */
 import { Box, Icon, Text, VStack } from "@chakra-ui/react";
 import type { MediaPartProps, MediaProbeResult } from "@langwatch/scenario-contract";
+import type { MediaPartData } from "@langwatch/trace-contract";
 import { ExternalLink, File, FileText } from "lucide-react";
 import {
   useCallback,
@@ -14,7 +15,6 @@ import {
 } from "react";
 
 import { resolveMediaPart } from "../../model/media-part-source.ts";
-import type { MediaPartData } from "../../model/media-parts.ts";
 import { resolveRawPcmFormat, wrapRawPcmToWav, type RawPcmFormat } from "../../model/pcm-to-wav.ts";
 import { MediaProbing, MediaUnavailable } from "../elements/media-part-placeholder.tsx";
 

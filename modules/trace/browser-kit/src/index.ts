@@ -46,13 +46,6 @@ export {
   groupIntoTurns,
   type StreamingPart,
 } from "./model/conversation/flatten-messages.ts";
-export {
-  collectAnnotatedMediaParts,
-  type CollectedMediaPart,
-  collectMediaParts,
-  type MediaPartData,
-  mediaRefToMediaData,
-} from "./model/conversation/media-parts.ts";
 export type {
   ConversationRoleMode,
   ConversationTurn,

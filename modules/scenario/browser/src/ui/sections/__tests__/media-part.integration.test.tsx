@@ -5,11 +5,11 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { MediaProbeResult } from "@langwatch/scenario-contract";
+import type { MediaPartData } from "@langwatch/trace-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { MediaPartData } from "../../../model/media-parts.ts";
 import { MediaPart } from "../media-part.tsx";
 
 // ---------------------------------------------------------------------------

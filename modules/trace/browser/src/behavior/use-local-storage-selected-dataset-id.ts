@@ -43,6 +43,11 @@ export const useLocalStorageSelectedDataSetId = () => {
     setSelectedDataSetId("");
   }, []);
 
+  const rememberCreated = useCallback((datasetId: string) => {
+    writeStoredDatasetId(datasetId);
+    setSelectedDataSetId(datasetId);
+  }, []);
+
   const handleSetSelectedDataSetId = useCallback(
     async (datasetId: string) => {
       if (datasetId === "") {
@@ -80,6 +85,8 @@ export const useLocalStorageSelectedDataSetId = () => {
     selectedDataSetId,
     /** Remembers a dataset, having checked the project still has it. */
     setSelectedDataSetId: handleSetSelectedDataSetId,
+    /** Remembers a dataset just created, which needs no check that it exists. */
+    rememberCreatedDataset: rememberCreated,
     /** Forgets whatever was remembered. */
     clear,
   };

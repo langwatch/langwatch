@@ -1,18 +1,20 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { mediaRefToMediaData } from "@langwatch/trace-browser-kit";
-import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { RESERVED_INPUT_MEDIA_REFS, RESERVED_OUTPUT_MEDIA_REFS } from "@langwatch/trace-contract";
+import {
+  mediaRefBelongsToSide,
+  mediaRefToMediaData,
+  parseMediaRefs,
+  RESERVED_INPUT_MEDIA_REFS,
+  RESERVED_OUTPUT_MEDIA_REFS,
+  type SpanTreeNode,
+  type TraceHeader,
+  type TraceMediaSide,
+} from "@langwatch/trace-contract";
 import { type ReactNode, useMemo, useRef } from "react";
 import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
 
 import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
-import {
-  mediaRefBelongsToSide,
-  parseMediaRefs,
-  type TraceMediaSide,
-} from "../../../../../behavior/shared/traces/media-refs.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { rankedErrorSpans } from "../../../../../model/explorer/error-spans.ts";
 import { countFlatLeaves } from "../../../../../model/explorer/trace-drawer/trace-accordions/utils.ts";

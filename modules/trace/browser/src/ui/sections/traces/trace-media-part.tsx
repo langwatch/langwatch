@@ -1,4 +1,4 @@
-import type { MediaPartData } from "@langwatch/trace-browser-kit";
+import type { MediaPartData } from "@langwatch/trace-contract";
 
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { MediaPart } from "../simulations/media-part.tsx";

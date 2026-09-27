@@ -173,17 +173,15 @@ describe("given references recorded under different chat roles", () => {
   });
 });
 
-describe("given a raw realtime audio turn the packaged walk cannot wrap", () => {
+describe("given a raw realtime audio turn", () => {
   describe("when the walk and the reference collection run", () => {
     /**
-     * The one deliberate difference from the application's walk: it wraps raw
-     * PCM into a playable WAV data URI, which needs `Buffer`/`atob`, and this
-     * package names neither runtime. The difference cannot be seen through
-     * reference collection, because an inline `data:` source is never a
-     * reference on either side.
+     * The walk wraps raw PCM into a playable WAV data URI, as the application's
+     * one collector did; an inline `data:` source is never a reference, so the
+     * fold still stores none for it.
      *
      * @scenario "a reference to anywhere but our own file route is refused" */
-    it("produces no reference, which is what the application produces too", () => {
+    it("collects a playable WAV and produces no reference", () => {
       const rawTurn = {
         role: "user",
         content: [
@@ -194,7 +192,15 @@ describe("given a raw realtime audio turn the packaged walk cannot wrap", () => 
         ],
       };
 
-      expect(collectAnnotatedMediaParts(rawTurn)).toEqual([]);
+      expect(collectAnnotatedMediaParts(rawTurn)).toEqual([
+        {
+          role: "user",
+          media: {
+            type: "audio",
+            source: expect.objectContaining({ type: "data", mimeType: "audio/wav" }),
+          },
+        },
+      ]);
       expect(collectMediaRefs(rawTurn)).toEqual([]);
     });
   });

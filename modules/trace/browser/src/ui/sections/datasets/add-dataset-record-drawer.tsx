@@ -2,12 +2,12 @@
  * "Add to Dataset": pick a dataset, map the trace onto its columns, add the rows.
  */
 
-import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { useDrawer as useHostDrawer } from "@langwatch/browser-host/use-drawer";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { toaster } from "@langwatch/design-system/toaster";
-import { createLogger } from "@langwatch/observability/browser";
 import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
-import { type ComponentType, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
 import { api } from "../../../behavior/trace-api.ts";
@@ -20,33 +20,10 @@ import { showErrorToast } from "../errors/index.ts";
 import { DatasetMappingPreview } from "./dataset-mapping-preview.tsx";
 import { DatasetSelector } from "./dataset-selector.tsx";
 
-const logger = createLogger("AddDatasetRecordDrawer");
-
 /** Form values for dataset selection */
 type FormValues = {
   datasetId: string;
 };
-
-/**
- * The dataset editor this drawer leads to, as the application hands it over.
- */
-export type DatasetEditorComponent = ComponentType<{
-  datasetToSave?: {
-    datasetId?: string;
-    /** Optional to match the editor's own `InMemoryDataset` shape. */
-    name?: string;
-    columnTypes: DatasetColumns;
-    datasetRecords?: ({ id?: string } & Record<string, unknown>)[];
-  };
-  open?: boolean;
-  onClose?: () => void;
-  /**
-   * OPTIONAL, MATCHING THE EDITOR'S OWN PROP. The editor is a registered drawer as well
-   * as a component, and an address cannot carry a function, so it declares `onSuccess`
-   * optional and calls it only when one arrived.
-   */
-  onSuccess?: (dataset: { datasetId: string; name: string; columnTypes: DatasetColumns }) => void;
-}>;
 
 export interface AddDatasetRecordDrawerProps {
   /** Callback function called on successful record addition */
@@ -57,8 +34,6 @@ export interface AddDatasetRecordDrawerProps {
    * The traces a bulk selection is adding.
    */
   selectedTraceIds?: string[] | string;
-  /** The hosted dataset editor, when the application composed one. */
-  DatasetEditor?: DatasetEditorComponent;
 }
 
 /** The traces a bulk selection or a single trace is adding, blanks dropped. */
@@ -141,8 +116,6 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
   const trpc = api.useUtils();
   const { project } = useOrganizationTeamProject();
   const createDatasetRecord = api.datasetRecord.create.useMutation();
-  const editDataset = useDisclosure();
-  const DatasetEditor = props.DatasetEditor;
   // Leaving this drawer hands the reader back to whatever opened it, the
   // trace they were reading say, rather than clearing the page. Opened with
   // nothing underneath (a bulk selection, the end-of-queue hand-off), going
@@ -153,7 +126,11 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
   const {
     selectedDataSetId: localStorageDatasetId,
     setSelectedDataSetId: setLocalStorageDatasetId,
+    rememberCreatedDataset,
   } = useLocalStorageSelectedDataSetId();
+  // The dataset editor is dataset's routed drawer: this one navigates to it, and
+  // comes back to the dataset it saved, remembered before the return remounts it.
+  const hostDrawer = useHostDrawer();
 
   const {
     handleSubmit,
@@ -194,18 +171,23 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
     },
   );
 
-  const onCreateDatasetSuccess = ({ datasetId }: { datasetId: string }) => {
-    void datasets
-      .refetch()
-      .then(() => {
-        setTimeout(() => {
-          setValue("datasetId", datasetId);
-        }, 100);
-      })
-      .catch((error) => {
-        logger.error({ error });
-      });
-  };
+  const openDatasetEditor = () =>
+    hostDrawer.openDrawer("addOrEditDataset", {
+      ...(selectedDataset
+        ? {
+            datasetToSave: {
+              datasetId,
+              name: selectedDataset.name ?? "",
+              columnTypes: selectedDataset.columnTypes ?? [],
+            },
+          }
+        : {}),
+      onSuccess: (saved) => {
+        rememberCreatedDataset(saved.datasetId);
+        void trpc.dataset.getAll.invalidate();
+      },
+      onClose: hostDrawer.goBack,
+    });
 
   const handleOnClose = () => {
     goBack();
@@ -323,7 +305,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
                 localStorageDatasetId={datasetId}
                 errors={errors}
                 setValue={setValue}
-                {...(DatasetEditor ? { onCreateNew: editDataset.onOpen } : {})}
+                onCreateNew={openDatasetEditor}
               />
               {selectedDataset && (
                 <DatasetMappingPreview
@@ -331,7 +313,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
                   columnTypes={selectedDataset.columnTypes}
                   rowData={rowDataFromDataset}
                   selectedDataset={selectedDataset}
-                  onEditColumns={editDataset.onOpen}
+                  onEditColumns={openDatasetEditor}
                   onRowDataChange={setRowDataFromDataset}
                   editorPortalRef={editorPortalRef}
                 />
@@ -366,22 +348,6 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
           </form>
         </Drawer.Body>
       </Drawer.Content>
-      {DatasetEditor && (
-        <DatasetEditor
-          {...(selectedDataset
-            ? {
-                datasetToSave: {
-                  datasetId,
-                  name: selectedDataset.name ?? "",
-                  columnTypes: selectedDataset.columnTypes ?? [],
-                },
-              }
-            : {})}
-          open={editDataset.open}
-          onClose={editDataset.onClose}
-          onSuccess={onCreateDatasetSuccess}
-        />
-      )}
     </Drawer.Root>
   );
 }

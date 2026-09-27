@@ -5,10 +5,10 @@ import {
   formatDuration,
   formatRelativeTimeAgo,
   isSessionMarked,
-  type MediaPartData,
   useAnnotationQueueSessionStore,
   useConversationExpand,
 } from "@langwatch/trace-browser-kit";
+import type { MediaPartData } from "@langwatch/trace-contract";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
 import { Fragment, memo, useCallback, useEffect, useMemo, useState } from "react";
 

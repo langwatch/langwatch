@@ -1,13 +1,29 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  audioPartToMediaData,
-  collectAudioParts,
   collectMediaParts,
   isSafeMediaUrl,
   convertMediaPartToMediaData,
+  type MediaPartData,
   parseNotCapturedMedia,
-} from "../media-parts.ts";
+} from "../trace-media-part.collector.ts";
+
+/** Audio media: an audio part, or a binary attachment with an audio mime. */
+function isAudioMedia(media: MediaPartData): boolean {
+  if (media.type === "audio") return true;
+  return media.type === "binary" && media.mimeType.toLowerCase().startsWith("audio/");
+}
+
+/** One part's media, when it is audio. */
+function audioPartToMediaData(part: unknown): MediaPartData | null {
+  const media = convertMediaPartToMediaData(part);
+  return media && isAudioMedia(media) ? media : null;
+}
+
+/** The audio among a value's collected media. */
+function collectAudioParts(value: unknown): MediaPartData[] {
+  return collectMediaParts(value).filter(isAudioMedia);
+}
 
 describe("parseNotCapturedMedia", () => {
   describe("given the summary an engine leaves in place of an attachment", () => {

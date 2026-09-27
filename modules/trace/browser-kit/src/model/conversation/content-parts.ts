@@ -3,10 +3,13 @@
  * message-level walk so each file answers one question: this is "what is
  * inside a message", `flattenMessages` is "what is in the conversation".
  */
-import { type ContentPartVisitor, visitContentPart } from "@langwatch/trace-contract";
+import {
+  type ContentPartVisitor,
+  convertMediaPartToMediaData,
+  type MediaPartData,
+  visitContentPart,
+} from "@langwatch/trace-contract";
 import type { DisplayPart } from "@langwatch/trace-contract/conversation";
-
-import { convertMediaPartToMediaData, type MediaPartData } from "./media-parts.ts";
 
 /** Identity a decoded part inherits from the message it came from. */
 export interface PartContext {

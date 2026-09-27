@@ -20,7 +20,6 @@ export * from "./ui/elements/scenario-run-status-icon.tsx";
 export * from "./ui/elements/set-card.tsx";
 export * from "./ui/elements/simulation-chip.tsx";
 export * from "./ui/sections/media-part.tsx";
-export * from "./model/media-parts.ts";
 export * from "./ui/sections/simulations/scenario-message-renderer.tsx";
 export * from "./ui/elements/simulation-results.tsx";
 export * from "./ui/elements/thinking-indicator.tsx";

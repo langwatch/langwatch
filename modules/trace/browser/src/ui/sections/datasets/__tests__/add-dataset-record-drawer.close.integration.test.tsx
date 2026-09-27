@@ -17,6 +17,9 @@ const harness = vi.hoisted(() => {
   return {
     PATH,
     createRecord: vi.fn(),
+    openHostDrawer: vi.fn(),
+    hostGoBack: vi.fn(),
+    rememberCreatedDataset: vi.fn(),
     router: {
       get query() {
         const query: Record<string, string> = {};
@@ -50,7 +53,12 @@ vi.mock("../../../../behavior/use-local-storage-selected-dataset-id.ts", () => (
   useLocalStorageSelectedDataSetId: () => ({
     selectedDataSetId: "dataset-1",
     setSelectedDataSetId: () => Promise.resolve(),
+    rememberCreatedDataset: harness.rememberCreatedDataset,
   }),
+}));
+
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
+  useDrawer: () => ({ openDrawer: harness.openHostDrawer, goBack: harness.hostGoBack }),
 }));
 
 vi.mock("../../../../behavior/trace-api.ts", () => ({
@@ -86,7 +94,11 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
 }));
 
 vi.mock("../dataset-selector.tsx", () => ({
-  DatasetSelector: () => <div data-testid="dataset-selector" />,
+  DatasetSelector: ({ onCreateNew }: { onCreateNew?: () => void }) => (
+    <button type="button" onClick={onCreateNew}>
+      New dataset
+    </button>
+  ),
 }));
 
 vi.mock("../dataset-mapping-preview.tsx", () => ({
@@ -250,6 +262,37 @@ describe("given the dataset drawer was opened from a selection in the list", () 
       await waitFor(() => {
         expect(drawerInUrl()).toEqual({});
       });
+    });
+  });
+});
+
+describe("given the reader wants a new dataset from the drawer", () => {
+  describe("when they ask for one", () => {
+    /** @scenario "Creating a dataset from Add to Dataset opens the dataset editor, then returns" */
+    it("navigates to dataset's editor, coming back to this drawer when it closes", async () => {
+      renderDrawer(OpenFromTrace);
+
+      fireEvent.click(await screen.findByRole("button", { name: "New dataset" }));
+
+      expect(harness.openHostDrawer).toHaveBeenCalledWith(
+        "addOrEditDataset",
+        expect.objectContaining({ onClose: harness.hostGoBack }),
+      );
+    });
+
+    /** @scenario "Creating a dataset from Add to Dataset opens the dataset editor, then returns" */
+    it("remembers the dataset it saved, so the drawer returns with it chosen", async () => {
+      renderDrawer(OpenFromTrace);
+
+      fireEvent.click(await screen.findByRole("button", { name: "New dataset" }));
+      const props: unknown = harness.openHostDrawer.mock.calls[0]?.[1];
+      const onSuccess =
+        props && typeof props === "object" && "onSuccess" in props ? props.onSuccess : undefined;
+      if (typeof onSuccess === "function") {
+        onSuccess({ datasetId: "dataset-new", name: "New", columnTypes: [] });
+      }
+
+      expect(harness.rememberCreatedDataset).toHaveBeenCalledWith("dataset-new");
     });
   });
 });

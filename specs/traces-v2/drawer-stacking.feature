@@ -36,6 +36,13 @@ Feature: Moving between drawers without losing your place
       Then I am back on that trace's drawer
 
     @integration
+    Scenario: Creating a dataset from Add to Dataset opens the dataset editor, then returns
+      Given I chose "Add to Dataset" from a trace
+      When I ask for a new dataset from that drawer
+      Then the dataset editor opens as its own drawer, on top of "Add to Dataset"
+      And saving or closing the editor returns me to "Add to Dataset" with the new dataset chosen
+
+    @integration
     Scenario: Closing Add to Dataset opened from the traces list closes it outright
       Given I selected traces in the list without opening any of them
       And I chose "Add to Dataset" for the selection
