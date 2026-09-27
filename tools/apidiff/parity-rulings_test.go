@@ -230,3 +230,13 @@ func TestLiterallyServedMainRoutesAreIgnored(t *testing.T) {
 		t.Error("unsubscribe is a real gap, not ignored")
 	}
 }
+
+func TestAMainAnyMethodRouteIsCoveredByAnyDeclaredMethod(t *testing.T) {
+	index := indexServed([]ServedRoute{{Method: "POST", Path: "/api/unsubscribe"}})
+	if !index.covers("ALL", routeKey("/api/unsubscribe")) {
+		t.Fatal("a declared POST should cover main's ALL: the method guard answers the rest")
+	}
+	if index.covers("ALL", routeKey("/api/other")) {
+		t.Fatal("an undeclared path was covered")
+	}
+}

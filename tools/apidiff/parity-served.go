@@ -145,6 +145,7 @@ func (diff *servedDiff) file(route ServedRoute) {
 // by the prefix they answer under.
 type servedIndex struct {
 	exact     map[string]bool
+	paths     map[string]bool
 	wildcards []servedWildcard
 	count     int
 }
@@ -155,13 +156,14 @@ type servedWildcard struct {
 }
 
 func indexServed(routes []ServedRoute) servedIndex {
-	index := servedIndex{exact: map[string]bool{}}
+	index := servedIndex{exact: map[string]bool{}, paths: map[string]bool{}}
 	for _, route := range routes {
 		key := routeKey(route.Path)
 		if index.exact[route.Method+" "+key] {
 			continue
 		}
 		index.exact[route.Method+" "+key] = true
+		index.paths[key] = true
 		index.count++
 		if prefix, found := strings.CutSuffix(key, "*"); found {
 			index.wildcards = append(index.wildcards, servedWildcard{method: route.Method, prefix: prefix})
@@ -171,8 +173,13 @@ func indexServed(routes []ServedRoute) servedIndex {
 }
 
 // covers says whether the branch answers a main METHOD key: the same route,
-// an any-method route, GET for a HEAD, or a wildcard the key falls under.
+// an any-method route, GET for a HEAD, or a wildcard the key falls under. A
+// main ALL is covered by any declared method there: the framework's method
+// guard answers the rest with 405, as main's catch-all did.
 func (index servedIndex) covers(method, key string) bool {
+	if method == "ALL" && index.paths[key] {
+		return true
+	}
 	methods := coveringMethods(method)
 	for _, candidate := range methods {
 		if index.exact[candidate+" "+key] {
