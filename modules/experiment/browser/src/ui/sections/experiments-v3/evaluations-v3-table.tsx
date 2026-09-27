@@ -1,4 +1,4 @@
-import { Box, HStack, Link, Text } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import {
   getFlowCallbacks,
@@ -8,26 +8,17 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-/** An evaluator as this table holds one: off a query, so its instants are strings. */
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
-  type DatasetTableColumnType as ColumnType,
   datasetTableCss,
   useTableKeyboardNavigation,
   VirtualizedTableBody,
 } from "@langwatch/dataset-browser-kit";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
-import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { isRowEmpty, isCellInExecution, toComparisonConfig } from "@langwatch/experiment-contract";
 import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
-import {
-  type ColumnDef,
-  createColumnHelper,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
+import { createColumnHelper, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -38,7 +29,6 @@ import {
 import { useDatasetSyncProps } from "../../../behavior/experiments-v3/use-dataset-sync.ts";
 import { useSyncPromptEditorMappings } from "../../../behavior/experiments-v3/use-evaluation-mappings.ts";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
-import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation.ts";
 import { useOpenEvaluatorEditor } from "../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
 import {
   scrollToTargetColumn,
@@ -47,8 +37,12 @@ import {
 import { useDatasetSelectionLoader } from "../../../behavior/experiments-v3/use-saved-dataset-loader.ts";
 import { useSyncWorkflowTargetFields } from "../../../behavior/experiments-v3/use-sync-workflow-target-fields.ts";
 import { useWorkbenchColumnSizing } from "../../../behavior/experiments-v3/use-workbench-column-sizing.ts";
+import {
+  type SaveAsDatasetDraft,
+  useWorkbenchDatasetHandlers,
+} from "../../../behavior/experiments-v3/use-workbench-dataset-handlers.ts";
+import { useWorkbenchRunHandlers } from "../../../behavior/experiments-v3/use-workbench-run-handlers.ts";
 import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants.ts";
-import { convertInlineToRowRecords } from "../../../model/experiments-v3/dataset-conversion.ts";
 import { createEvaluatorEditorCallbacks } from "../../../model/experiments-v3/evaluator-editor-callbacks.ts";
 import { createPromptEditorCallbacks } from "../../../model/experiments-v3/prompt-editor-callbacks.ts";
 import { resolveTargetNameFromCache } from "../../../model/experiments-v3/resolve-target-name.ts";
@@ -66,9 +60,7 @@ import {
 } from "../../../model/experiments-v3/target-configs.ts";
 import type {
   ComparisonEvaluatorConfig,
-  DatasetColumn,
   EvaluationsV3State,
-  DatasetReference,
   EvaluationResults,
   EvaluatorConfig,
   TableMeta,
@@ -80,25 +72,22 @@ import {
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../../../model/experiments-v3/types.ts";
+import { CHECKBOX_WIDTH_PX } from "../../../model/experiments-v3/workbench-column-widths.ts";
 import {
-  CHECKBOX_WIDTH_PX,
-  COMPARISON_COL_DEFAULT_PCT,
-  COMPARISON_COL_MIN_PCT,
-  DATASET_COL_DEFAULT_PCT,
-  TARGET_COL_DEFAULT_PCT,
-} from "../../../model/experiments-v3/workbench-column-widths.ts";
+  datasetEditDraft,
+  editedDatasetUpdate,
+  savedDatasetUpdate,
+} from "../../../model/experiments-v3/workbench-dataset-edits.ts";
 import { SelectionToolbar } from "../../elements/experiments-v3/selection-toolbar.tsx";
 import { TargetSuperHeader } from "../../elements/experiments-v3/target-super-header.tsx";
-import { ComparisonCell } from "./comparison-cell.tsx";
-import { ComparisonColumnHeader } from "./comparison-column-header.tsx";
 import { DatasetSuperHeader } from "./dataset-super-header.tsx";
 import { EvaluationsV3DatasetTableProvider } from "./evaluations-v3-dataset-table-provider.tsx";
+import { workbenchColumns } from "./workbench-columns.tsx";
 import {
-  CheckboxCellFromMeta,
-  CheckboxHeaderFromMeta,
-  TargetCellFromMeta,
-  TargetHeaderFromMeta,
-} from "./table-meta-wrappers.tsx";
+  WorkbenchColGroup,
+  WorkbenchHeaderCell,
+  WorkbenchHeaderFiller,
+} from "./workbench-table-head.tsx";
 
 // Max rows for expanded mode (disable virtualization above this)
 const MAX_ROWS_FOR_FIT_MODE = 100;
@@ -318,65 +307,18 @@ export function EvaluationsV3Table({
     setActiveDataset,
   });
 
-  // Execution hook for running evaluations
-  const { execute, abort, status, isAborting, rerunEvaluator, runEvaluatorOnAllRows } =
-    useExecuteEvaluation();
-
-  // Execution handlers for partial execution
-  const handleRunTarget = useCallback(
-    (targetId: string) => {
-      void execute({ type: "target", targetId });
-    },
-    [execute],
-  );
-
-  const handleRunRow = useCallback(
-    (rowIndex: number) => {
-      void execute({ type: "rows", rowIndices: [rowIndex] });
-    },
-    [execute],
-  );
-
-  const handleRunCell = useCallback(
-    (rowIndex: number, targetId: string) => {
-      void execute({ type: "cell", rowIndex, targetId });
-    },
-    [execute],
-  );
-
-  // Handler for re-running a single evaluator
-  const handleRerunEvaluator = useCallback(
-    (rowIndex: number, targetId: string, evaluatorId: string) => {
-      void rerunEvaluator(rowIndex, targetId, evaluatorId);
-    },
-    [rerunEvaluator],
-  );
-
-  // Handler for running an evaluator on all rows with target outputs
-  const handleRunEvaluatorOnAllRows = useCallback(
-    (targetId: string, evaluatorId: string) => {
-      void runEvaluatorOnAllRows(targetId, evaluatorId);
-    },
-    [runEvaluatorOnAllRows],
-  );
-
-  // Check if any row has a target output for a given target
-  const hasAnyTargetOutputs = useCallback(
-    (targetId: string): boolean => {
-      const outputs = results.targetOutputs[targetId];
-      if (!outputs) return false;
-      return outputs.some((output) => output !== undefined && output !== null);
-    },
-    [results.targetOutputs],
-  );
-
-  // Handler for stopping execution
-  const handleStopExecution = useCallback(() => {
-    void abort();
-  }, [abort]);
-
-  // Check if execution is running
-  const isExecutionRunning = status === "running" || results.status === "running";
+  const {
+    execute,
+    isAborting,
+    handleRunTarget,
+    handleRunRow,
+    handleRunCell,
+    handleRerunEvaluator,
+    handleRunEvaluatorOnAllRows,
+    hasAnyTargetOutputs,
+    handleStopExecution,
+    isExecutionRunning,
+  } = useWorkbenchRunHandlers(results);
 
   // Get the active dataset
   const activeDataset = useMemo(
@@ -831,78 +773,16 @@ export function EvaluationsV3Table({
     [openDrawer, handleSelectPrompt, handleSelectSavedAgent, handleSelectEvaluatorAsTarget],
   );
 
-  // Dataset handlers for drawer integration
-  const datasetHandlers = useMemo(
-    () => ({
-      onSelectExisting: () => {
-        openDrawer("selectDataset", {
-          onSelect: (dataset: {
-            datasetId: string;
-            name: string;
-            columnTypes: { name: string; type: DatasetColumnType }[];
-          }) => {
-            // Trigger loading of saved dataset records
-            loadSavedDataset({
-              datasetId: dataset.datasetId,
-              name: dataset.name,
-              columnTypes: dataset.columnTypes,
-            });
-          },
-        });
-      },
-      onUploadCSV: () => {
-        openDrawer("uploadCSV", {
-          onSuccess: (params: {
-            datasetId: string;
-            name: string;
-            columnTypes: { name: string; type: DatasetColumnType }[];
-          }) => {
-            // Trigger loading of uploaded dataset records
-            loadSavedDataset({
-              datasetId: params.datasetId,
-              name: params.name,
-              columnTypes: params.columnTypes,
-            });
-          },
-        });
-      },
-      onEditDataset: () => {
-        setEditDatasetDrawerOpen(true);
-      },
-      onSaveAsDataset: async (dataset: DatasetReference) => {
-        if (dataset.type !== "inline" || !dataset.inline) return;
-        if (!project?.id) return;
-
-        // Convert inline dataset to row-based format, filtering empty rows
-        const columns = dataset.inline.columns;
-        const datasetRecords = convertInlineToRowRecords(columns, dataset.inline.records);
-
-        // Find next available name to avoid conflicts
-        // E.g., if "Test Data" exists, suggest "Test Data (2)"
-        let suggestedName = dataset.name;
-        try {
-          suggestedName = await trpcUtils.dataset.findNextName.fetch({
-            projectId: project.id,
-            proposedName: dataset.name,
-          });
-        } catch (error) {
-          // If fetch fails, use original name - validation will catch conflicts
-          console.warn("Failed to fetch next available name:", error);
-        }
-
-        setDatasetToSave({
-          name: suggestedName,
-          columnTypes: columns.map((col) => ({
-            name: col.name,
-            type: col.type as DatasetColumnType,
-          })),
-          datasetRecords,
-        });
-        setSaveAsDatasetDrawerOpen(true);
-      },
-    }),
-    [openDrawer, loadSavedDataset, project?.id, trpcUtils],
-  );
+  const openEditDrawer = useCallback(() => setEditDatasetDrawerOpen(true), []);
+  const openSaveAsDrawer = useCallback((draft: SaveAsDatasetDraft) => {
+    setDatasetToSave(draft);
+    setSaveAsDatasetDrawerOpen(true);
+  }, []);
+  const datasetHandlers = useWorkbenchDatasetHandlers({
+    loadSavedDataset,
+    openEditDrawer,
+    openSaveAsDrawer,
+  });
 
   // Create a map of evaluator IDs to evaluator configs for quick lookup
   const evaluatorsMap = useMemo(() => new Map(evaluators.map((e) => [e.id, e])), [evaluators]);
@@ -1190,145 +1070,24 @@ export function EvaluationsV3Table({
     ],
   );
 
-  const columns = useMemo(() => {
-    const cols: ColumnDef<TableRowData>[] = [];
-
-    // Checkbox column - reads from meta to keep column definition stable
-    cols.push(
-      columnHelper.display({
-        id: "select",
-        header: (context) => <CheckboxHeaderFromMeta context={context} />,
-        cell: (info) => (
-          <CheckboxCellFromMeta
-            rowIndex={info.row.index}
-            tableMeta={info.table.options.meta as TableMeta | undefined}
-          />
-        ),
-        size: CHECKBOX_WIDTH_PX, // Checkbox uses fixed pixels
-        enableResizing: false, // Checkbox column shouldn't be resizable
-        meta: {
-          columnType: "checkbox" as ColumnType,
-          columnId: "__checkbox__",
-          isFixedWidth: true, // Mark as fixed pixel width
-        },
+  const columns = useMemo(
+    () =>
+      workbenchColumns({
+        columnHelper,
+        datasetColumns: stableDatasetColumns,
+        targetIds,
+        comparisonTargetIds,
+        comparisonEvaluators: stableComparisonEvaluators,
       }),
-    );
-
-    // Dataset columns from active dataset
-    for (const column of stableDatasetColumns) {
-      cols.push(
-        columnHelper.accessor((row) => row.dataset[column.id], {
-          id: `dataset.${column.id}`,
-          header: () => (
-            <HStack gap={1}>
-              <ColumnTypeIcon type={column.type} />
-              <Text fontSize="13px" fontWeight="medium">
-                {column.name}
-              </Text>
-            </HStack>
-          ),
-          cell: (info) => info.getValue(),
-          size: DATASET_COL_DEFAULT_PCT, // Percentage value
-          minSize: 8, // Minimum 8%
-          meta: {
-            columnType: "dataset" as ColumnType,
-            columnId: column.id,
-            dataType: column.type,
-          },
-        }) as ColumnDef<TableRowData>,
-      );
-    }
-
-    // Target columns - use IDs only for stable column structure
-    // Headers/cells read current data from table meta
-    for (const targetId of targetIds) {
-      cols.push(
-        columnHelper.accessor((row) => row.targets[targetId], {
-          id: `target.${targetId}`,
-          header: (context) => <TargetHeaderFromMeta targetId={targetId} context={context} />,
-          cell: (info) => {
-            // Phantom empty rows render nothing in target columns — the
-            // dataset side keeps the click-to-add affordance, but there's
-            // no input to run a target against.
-            if (info.row.original.isEmpty) return null;
-            const data = info.getValue() as {
-              output: unknown;
-              evaluators: Record<string, unknown>;
-            };
-            return (
-              <TargetCellFromMeta
-                targetId={targetId}
-                data={data}
-                rowIndex={info.row.index}
-                tableMeta={info.table.options.meta as TableMeta | undefined}
-              />
-            );
-          },
-          size: comparisonTargetIds.has(targetId)
-            ? COMPARISON_COL_DEFAULT_PCT
-            : TARGET_COL_DEFAULT_PCT,
-          minSize: comparisonTargetIds.has(targetId) ? COMPARISON_COL_MIN_PCT : 10,
-          meta: {
-            columnType: "target" as ColumnType,
-            columnId: `target.${targetId}`,
-          },
-        }) as ColumnDef<TableRowData>,
-      );
-    }
-
-    // Dedicated comparison result columns — one per fully-configured
-    // comparison evaluator, rendered AFTER all target columns. The
-    // orchestrator anchors Phase-2 results on the first variant's cell.
-    for (const compEval of stableComparisonEvaluators) {
-      const evaluatorId = compEval.id;
-      const variantIds = toComparisonConfig(compEval)!.variants;
-      const anchorVariantId = variantIds[0]!;
-      cols.push(
-        columnHelper.accessor((row) => row.targets[anchorVariantId]?.evaluators[evaluatorId], {
-          id: `comparison.${evaluatorId}`,
-          header: (context) => {
-            const meta = context.table.options.meta as TableMeta | undefined;
-            const evaluator = meta?.evaluatorsMap.get(evaluatorId);
-            return (
-              <ComparisonColumnHeader
-                evaluatorId={evaluatorId}
-                name={evaluator?.localEvaluatorConfig?.name ?? "Comparison"}
-              />
-            );
-          },
-          cell: (info) => {
-            if (info.row.original.isEmpty) return null;
-            const meta = info.table.options.meta as TableMeta | undefined;
-            const variantTargets = variantIds.map((id) => meta?.targetsMap.get(id));
-            const rowData = info.row.original.targets[anchorVariantId];
-            return (
-              <ComparisonCell
-                result={info.getValue()}
-                isLoading={rowData?.isLoading}
-                variantTargets={variantTargets}
-              />
-            );
-          },
-          size: COMPARISON_COL_DEFAULT_PCT,
-          minSize: COMPARISON_COL_MIN_PCT,
-          meta: {
-            columnType: "comparison" as ColumnType,
-            columnId: `comparison.${evaluatorId}`,
-          },
-        }) as ColumnDef<TableRowData>,
-      );
-    }
-
-    return cols;
-  }, [
-    // ONLY structural dependencies - columns should almost never change
-    // All dynamic data goes through tableMeta
-    targetIds,
-    comparisonTargetIds,
-    stableDatasetColumns,
-    stableComparisonEvaluators,
-    columnHelper,
-  ]);
+    // Structural dependencies only: all dynamic data reaches cells through tableMeta.
+    [
+      targetIds,
+      comparisonTargetIds,
+      stableDatasetColumns,
+      stableComparisonEvaluators,
+      columnHelper,
+    ],
+  );
 
   // Column sizing state - stores percentage values (e.g., 16 means 16%)
   // Initialize from store, which also stores percentages
@@ -1458,30 +1217,7 @@ export function EvaluationsV3Table({
           redundant with the column's mini-summary. CSV export + filter chips
           will move into the column header's overflow menu in a follow-up. */}
       <table ref={tableRef}>
-        {/* Define column widths with colgroup for table-layout: fixed */}
-        <colgroup>
-          {table.getAllColumns().map((column) => {
-            const meta = column.columnDef.meta as
-              | { columnType?: string; isFixedWidth?: boolean }
-              | undefined;
-            const columnType = meta?.columnType ?? "unknown";
-            const isFixedWidth = meta?.isFixedWidth ?? false;
-            return (
-              <col
-                key={column.id}
-                style={{
-                  width: getColumnWidth(column.id, columnType, isFixedWidth),
-                  // Prevent checkbox column from growing beyond 40px
-                  ...(isFixedWidth && { maxWidth: `${CHECKBOX_WIDTH_PX}px` }),
-                }}
-              />
-            );
-          })}
-          {/* Filler column - absorbs remaining space when total % < 100% */}
-          <col style={{ width: "auto" }} />
-          {/* Spacer column for drawer */}
-          <col style={{ width: DRAWER_WIDTH }} />
-        </colgroup>
+        <WorkbenchColGroup table={table} getColumnWidth={getColumnWidth} />
         <thead>
           <tr ref={superHeaderRowRef}>
             <DatasetSuperHeader
@@ -1499,87 +1235,19 @@ export function EvaluationsV3Table({
           </tr>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
-              {headerGroup.headers.map((header) => {
-                // Extract target ID if this is a target column
-                const isTargetColumn = header.id.startsWith("target.");
-                const targetId = isTargetColumn ? header.id.replace("target.", "") : undefined;
-                const meta = header.column.columnDef.meta as
-                  | { columnType?: string; isFixedWidth?: boolean }
-                  | undefined;
-                const columnType = meta?.columnType ?? "unknown";
-                const isFixedWidth = meta?.isFixedWidth ?? false;
-
-                const isHighlightedColumn = !!targetId && targetId === highlightedVariantTargetId;
-                // The winning column glows green so a verdict reads at a
-                // glance; tracing a loser (or a tie) keeps the neutral blue.
-                const highlightColor = highlightedVariantOutcome === "won" ? "green" : "blue";
-
-                return (
-                  <th
-                    key={header.id}
-                    style={{
-                      width: getColumnWidth(header.id, columnType, isFixedWidth),
-                      // The highlight is a brief auto-clearing flash (CLICK_HIGHLIGHT_DURATION_MS)
-                      // that must fade, not snap off, so boxShadow always has a "from"/"to" to
-                      // interpolate. background stays unset (not "transparent") when unhighlighted,
-                      // or this would override the sticky header's own opaque background.
-                      transition: "box-shadow 300ms ease, background-color 300ms ease",
-                      boxShadow: isHighlightedColumn
-                        ? `inset 0 0 0 2px var(--chakra-colors-${highlightColor}-400)`
-                        : "inset 0 0 0 0 transparent",
-                      ...(isHighlightedColumn && {
-                        background: `var(--chakra-colors-${highlightColor}-subtle)`,
-                      }),
-                    }}
-                    // Add data attribute for target columns to enable scroll-to behavior
-                    {...(targetId && { "data-target-column": targetId })}
-                  >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                    {/* Resize handle - custom handler for percentage-based resizing */}
-                    {/* Double-click resets to default width */}
-                    {!isFixedWidth && header.id !== "select" && (
-                      <button
-                        type="button"
-                        tabIndex={-1}
-                        aria-label="Resize column"
-                        onMouseDown={createResizeHandler(header.id, columnType)}
-                        onTouchStart={createResizeHandler(header.id, columnType)}
-                        onDoubleClick={() => handleResizeDoubleClick(header.id, columnType)}
-                        className={`resizer ${isColumnResizing(header.id) ? "isResizing" : ""}`}
-                      />
-                    )}
-                  </th>
-                );
-              })}
-              {targets.length === 0 ? (
-                // Filler + Spacer combined when no targets
-                <th
-                  colSpan={2}
-                  style={{
-                    width: `calc(${DRAWER_WIDTH}px + ${TARGET_COL_DEFAULT_PCT}%)`,
-                  }}
-                >
-                  <Link
-                    fontSize="xs"
-                    color="fg.subtle"
-                    fontStyle="italic"
-                    onClick={handleAddTarget}
-                  >
-                    Click "+ Add" above to get started
-                  </Link>
-                </th>
-              ) : (
-                <>
-                  {/* Filler column - absorbs remaining space */}
-                  <th
-                    aria-hidden="true"
-                    colSpan={2}
-                    style={{ width: "auto", minWidth: DRAWER_WIDTH }}
-                  ></th>
-                </>
-              )}
+              {headerGroup.headers.map((header) => (
+                <WorkbenchHeaderCell
+                  key={header.id}
+                  header={header}
+                  highlightedTargetId={highlightedVariantTargetId}
+                  highlightOutcome={highlightedVariantOutcome}
+                  getColumnWidth={getColumnWidth}
+                  createResizeHandler={createResizeHandler}
+                  handleResizeDoubleClick={handleResizeDoubleClick}
+                  isColumnResizing={isColumnResizing}
+                />
+              ))}
+              <WorkbenchHeaderFiller hasTargets={targets.length > 0} onAddClick={handleAddTarget} />
             </tr>
           ))}
         </thead>
@@ -1622,25 +1290,9 @@ export function EvaluationsV3Table({
           setDatasetToSave(undefined);
         }}
         onSuccess={(savedDataset) => {
-          // Replace the inline dataset with a reference to the saved one
           const currentDataset = datasets.find((d) => d.id === activeDatasetId);
-          if (currentDataset && currentDataset.type === "inline") {
-            // Build columns with proper types
-            const columns: DatasetColumn[] = savedDataset.columnTypes.map((col, index) => ({
-              id: `${col.name}_${index}`,
-              name: col.name,
-              type: col.type as DatasetColumnType,
-            }));
-            // Use updateDataset to transform inline to saved in-place
-            // This avoids the removeDataset + addDataset race condition
-            // that caused duplicate datasets when removeDataset was blocked
-            updateDataset(currentDataset.id, {
-              type: "saved",
-              name: savedDataset.name,
-              datasetId: savedDataset.datasetId,
-              inline: undefined,
-              columns,
-            });
+          if (currentDataset?.type === "inline") {
+            updateDataset(currentDataset.id, savedDatasetUpdate(savedDataset));
           }
           setSaveAsDatasetDrawerOpen(false);
           setDatasetToSave(undefined);
@@ -1649,27 +1301,7 @@ export function EvaluationsV3Table({
 
       {/* Edit dataset columns drawer */}
       <AddOrEditDatasetDrawer
-        datasetToSave={
-          activeDataset
-            ? {
-                datasetId: activeDataset.type === "saved" ? activeDataset.datasetId : undefined,
-                name: activeDataset.name,
-                columnTypes: activeDataset.columns.map((col) => ({
-                  name: col.name,
-                  type: col.type,
-                })),
-                // For inline datasets, include records so column mapping works
-                ...(activeDataset.type === "inline" && activeDataset.inline
-                  ? {
-                      datasetRecords: convertInlineToRowRecords(
-                        activeDataset.inline.columns,
-                        activeDataset.inline.records,
-                      ),
-                    }
-                  : {}),
-              }
-            : undefined
-        }
+        datasetToSave={activeDataset ? datasetEditDraft(activeDataset) : undefined}
         open={editDatasetDrawerOpen}
         onClose={() => setEditDatasetDrawerOpen(false)}
         localOnly={activeDataset?.type === "inline"}
@@ -1679,50 +1311,14 @@ export function EvaluationsV3Table({
         }}
         onSuccess={(updatedDataset) => {
           if (!activeDataset) return;
-
-          // Build new columns from the drawer result
-          const newColumns: DatasetColumn[] = updatedDataset.columnTypes.map((col, index) => ({
-            id: `${col.name}_${index}`,
-            name: col.name,
-            type: col.type as DatasetColumnType,
-          }));
-
-          if (activeDataset.type === "inline") {
-            // For inline datasets, update columns and map records
-            const oldRecords = activeDataset.inline?.records ?? {};
-            const newRecords: Record<string, string[]> = {};
-
-            // Map old records to new columns (by name matching)
-            const currentRowCount = getRowCount(activeDataset.id);
-            for (const newCol of newColumns) {
-              const oldCol = activeDataset.columns.find((c) => c.name === newCol.name);
-              const oldValues = oldCol ? oldRecords[oldCol.id] : undefined;
-              if (oldValues) {
-                newRecords[newCol.id] = oldValues;
-              } else {
-                // New column, initialize with empty values
-                newRecords[newCol.id] = Array(currentRowCount).fill("");
-              }
-            }
-
-            updateDataset(activeDataset.id, {
-              name: updatedDataset.name,
-              columns: newColumns,
-              inline: {
-                columns: newColumns,
-                records: newRecords,
-              },
-            });
-          } else {
-            // For saved datasets, just update our local reference
-            // The drawer already saved to DB
-            updateDataset(activeDataset.id, {
-              name: updatedDataset.name,
-              columns: newColumns,
-              datasetId: updatedDataset.datasetId,
-            });
-          }
-
+          updateDataset(
+            activeDataset.id,
+            editedDatasetUpdate({
+              dataset: activeDataset,
+              edited: updatedDataset,
+              rowCount: getRowCount(activeDataset.id),
+            }),
+          );
           setEditDatasetDrawerOpen(false);
         }}
       />

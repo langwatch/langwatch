@@ -7,7 +7,13 @@ export type UiScopeStatus = "loading" | "ready" | "unavailable";
 
 export type UiSessionScopeOrganization = Readonly<{ id: string; name?: string }>;
 export type UiSessionScopeTeam = Readonly<{ id: string; name?: string }>;
-export type UiSessionScopeProject = Readonly<{ id: string; slug: string; name: string }>;
+export type UiSessionScopeProject = Readonly<{
+  id: string;
+  slug: string;
+  name: string;
+  /** A Mustache template turning a `user_id` into a link, when the project set one. */
+  userLinkTemplate?: string | null;
+}>;
 
 export type UiSessionReading =
   | Readonly<{

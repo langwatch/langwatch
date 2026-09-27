@@ -112,7 +112,7 @@ export const useSavedDatasetLoader = () => {
 // New Dataset Selection Hook
 // ============================================================================
 
-type PendingDatasetLoad = {
+export type PendingDatasetLoad = {
   datasetId: string;
   name: string;
   columnTypes: { name: string; type: DatasetColumnType }[];

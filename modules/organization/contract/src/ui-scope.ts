@@ -20,6 +20,8 @@ export type UiScopeProject = {
   readonly id: string;
   readonly slug: string;
   readonly name?: string;
+  /** The project's user link, read by a screen that shows a user id; never by the resolution. */
+  readonly userLinkTemplate?: string | null;
 };
 
 export type UiScopeTeam = {
