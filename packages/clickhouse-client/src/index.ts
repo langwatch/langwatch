@@ -124,7 +124,12 @@ export {
   UnknownTenantError,
 } from "./tenancy.ts";
 export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard.ts";
-export type { StatementLogSink, StatementMetrics, StatementOutcome } from "./statementReporting.ts";
+export {
+  StatementReporter,
+  type StatementLogSink,
+  type StatementMetrics,
+  type StatementOutcome,
+} from "./statementReporting.ts";
 export type { VendorQueryType } from "./statementShape.ts";
 export type { VendorClientResilienceOptions, VendorStatementClient } from "./vendorClient.ts";
 export {

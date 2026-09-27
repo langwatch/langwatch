@@ -8,13 +8,18 @@ import {
   ClickHouseQueryClient,
   ClickHouseShutdownService,
   ConcurrencyLimiter,
+  detectColdScan,
   RetryPolicy,
   routingDriver,
+  StatementReporter,
   TenantGuard,
+  type StatementMetrics,
   type ClickHouseClientCreationInput,
   type TenantDirectory,
 } from "@langwatch/clickhouse-client";
 import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import { counter, histogram } from "@langwatch/observability/metrics";
 
 import type { ClickHouseConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
@@ -42,6 +47,25 @@ export function vendorClickHouseSettings(
   settings: ClickHouseConfig["settings"],
 ): ClickHouseSettings {
   return { date_time_input_format: "best_effort", ...settings };
+}
+
+/** Per-statement latency and outcome counts, under the names main's dashboards read. */
+function clickHouseStatementMetrics(): StatementMetrics {
+  const duration = histogram({
+    name: "clickhouse_query_duration_seconds",
+    description: "Duration of ClickHouse queries in seconds",
+  });
+  const total = counter({
+    name: "clickhouse_query_total",
+    description: "Total number of ClickHouse queries",
+  });
+
+  return {
+    observeDuration: ({ queryType, table, durationSeconds }) =>
+      duration.observe(durationSeconds, { query_type: queryType, table }),
+    incrementCount: ({ queryType, outcome }) =>
+      total.inc({ query_type: queryType, status: outcome }),
+  };
 }
 
 /**
@@ -75,10 +99,29 @@ export function buildClickHouse(options: {
       : { maxTenantCacheEntries: config.maxTenantCacheEntries }),
   }).connect(configuration);
 
+  const reporter = new StatementReporter({
+    metrics: clickHouseStatementMetrics(),
+    noticeLogger: createLogger("langwatch:clickhouse:resilient"),
+    outcomeLogger: createLogger("langwatch:clickhouse:query"),
+    detectColdScan,
+  });
+
   const client = new ClickHouseQueryClient({
     driver: routingDriver(connection),
     tenantGuard: new TenantGuard(),
-    retries: new RetryPolicy({ transientMessageFragments: CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS }),
+    retries: new RetryPolicy({
+      transientMessageFragments: CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
+      onRetry: ({ request, attempt, maxAttempts, delayMs, error, level }) =>
+        reporter.retryNotice({
+          operation: request?.kind === "write" ? "insert" : "query",
+          attempt,
+          maxAttempts,
+          delayMs,
+          error,
+          level,
+        }),
+    }),
+    reporter,
     limiter: new ConcurrencyLimiter({
       maxConcurrent: config.maxConcurrentStatements ?? configuration.poolSizing.size,
     }),
