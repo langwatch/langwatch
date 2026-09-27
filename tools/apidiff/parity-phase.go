@@ -267,14 +267,19 @@ func (phase *parityPhase) inventoryRoutes(ctx context.Context, mainDocument map[
 	return nil
 }
 
-// buildSdkForRoutes builds the TypeScript SDK the route inventory loads:
-// served routes are read from the composed application, whose packages import
-// the SDK's built entry, and the parity prepare deliberately skips the build.
+// routeInventoryBuilds are the built entries the route inventory loads: served
+// routes are read from the composed application, whose packages import these
+// packages' dist, and the parity prepare deliberately skips the build.
+var routeInventoryBuilds = []string{"langwatch", "@langwatch/mail", "@langwatch/mcp-server"}
+
+// buildSdkForRoutes builds each package the route inventory imports built.
 func (phase *parityPhase) buildSdkForRoutes(ctx context.Context, dir string) error {
-	phase.state.logf("parity prepare %s: pnpm --filter langwatch build", dir)
-	build := commandSpec{name: "pnpm", args: []string{"--filter", "langwatch", "build"}, dir: dir}
-	if err := phase.state.run(ctx, build, phase.state.stderr); err != nil {
-		return fmt.Errorf("parity prepare %s (pnpm --filter langwatch build): %w", dir, err)
+	for _, name := range routeInventoryBuilds {
+		phase.state.logf("parity prepare %s: pnpm --filter %s build", dir, name)
+		build := commandSpec{name: "pnpm", args: []string{"--filter", name, "build"}, dir: dir}
+		if err := phase.state.run(ctx, build, phase.state.stderr); err != nil {
+			return fmt.Errorf("parity prepare %s (pnpm --filter %s build): %w", dir, name, err)
+		}
 	}
 	return nil
 }
