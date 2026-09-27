@@ -122,8 +122,7 @@ export function composeScimSyncPipeline(
 
 export const scimSyncEventing = defineEventingModule({
   pipeline: SCIM_SYNC_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<IdentityRepositories, IdentityApp>) =>
-    app.scimSyncPipeline({ participation }),
+  build: ({ app }: EventingSetup<IdentityRepositories, IdentityApp>) => app.scimSyncPipeline(),
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: SCIM_SYNC_PIPELINE_NAME, commands }),
 });

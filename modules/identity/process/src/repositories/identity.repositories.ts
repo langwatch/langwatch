@@ -103,6 +103,18 @@ export interface IdentityRepositories {
 }
 
 /** The rows a one-shot migration pass reads, none of which needs the deployment's encryption. */
+/** The rows the identity pipeline's guards and projections read, with no encryption needed. */
+export type IdentityPipelineRepositories = Pick<
+  IdentityRepositories,
+  | "heads"
+  | "users"
+  | "reservations"
+  | "mfaEnrollment"
+  | "identityProjection"
+  | "mfaProjection"
+  | "identityHistory"
+>;
+
 export type IdentityMigrationRepositories = Pick<
   IdentityRepositories,
   | "heads"

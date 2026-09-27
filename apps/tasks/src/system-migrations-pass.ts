@@ -69,9 +69,7 @@ export async function systemMigrationsPass(input: TaskInput): Promise<void> {
     const commands = new Map<string, { send(data: unknown): Promise<unknown> }>();
     if (eventing) {
       const registered = eventing.register(
-        IdentityProducerPipelines.create({
-          processName: "langwatch-tasks",
-        }).identityPipeline(),
+        IdentityProducerPipelines.create({ database, eventing }).identityPipeline(),
       );
       for (const [name, sender] of Object.entries(registered.commands)) {
         commands.set(name, sender);

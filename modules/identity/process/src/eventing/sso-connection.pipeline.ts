@@ -479,8 +479,7 @@ export function composeSsoConnectionGraph(options: {
 
 export const ssoConnectionEventing = defineEventingModule({
   pipeline: SSO_CONNECTION_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<IdentityRepositories, IdentityApp>) =>
-    app.ssoConnectionPipeline({ participation }),
+  build: ({ app }: EventingSetup<IdentityRepositories, IdentityApp>) => app.ssoConnectionPipeline(),
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: SSO_CONNECTION_PIPELINE_NAME, commands }),
 });

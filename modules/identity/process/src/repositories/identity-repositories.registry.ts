@@ -4,6 +4,7 @@ import { MemoryIdentityRepositories } from "./memory/memory.identity.repositorie
 import {
   PostgresIdentityRepositories,
   identityMigrationRepositoriesOverPrisma,
+  identityPipelineRepositoriesOverPrisma,
 } from "./prisma/prisma.identity.repositories.ts";
 
 export const identityRepositories = defineRepositories({
@@ -13,3 +14,6 @@ export const identityRepositories = defineRepositories({
 
 /** The live rows a one-shot migration pass reads, for a process that holds no encryption. */
 export const identityMigrationRepositories = identityMigrationRepositoriesOverPrisma;
+
+/** The identity pipeline's live rows, for a process that sends commands and holds no encryption. */
+export const identityPipelineRepositories = identityPipelineRepositoriesOverPrisma;

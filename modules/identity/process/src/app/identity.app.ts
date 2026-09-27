@@ -41,7 +41,7 @@ import {
   type TwoStepVerificationApi,
   type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/kernel";
 import type { EmailDelivery } from "@langwatch/mail";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
@@ -160,7 +160,6 @@ import {
   buildIdentityInfrastructure,
   ConnectedIdentityEventing,
 } from "./identity-composition.build.ts";
-import { IdentityProducerPipelines } from "./identity-producer-composition.build.ts";
 /**
  * The boundary `reservations().reapOrphans()` call takes no args, so it bounds
  * itself per pass the same way `IdentityNewbornReconciliationService`'s own
@@ -225,10 +224,9 @@ type IdentityAppParts = {
   pipelines: IdentityPipelineBuilders;
 };
 
-/** The four pipelines' definitions: producer stand-ins, or the full graph built only on consume. */
+/** The four pipelines' definitions over the module's own rows, in every role (Alex, 2026-09-27). */
 type IdentityPipelineBuilders = {
   eventing: ConnectedIdentityEventing;
-  producer: IdentityProducerPipelines;
   identity: () => IdentityPipeline;
   joinRequests: () => JoinRequestPipeline;
   scimSync: () => ScimSyncPipeline;
@@ -761,7 +759,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       signInRouter,
       pipelines: {
         eventing: identityEventing,
-        producer: IdentityProducerPipelines.create({ processName: "identity" }),
         identity: () => composeIdentityPipeline({ repositories: setup.repositories }),
         joinRequests: () =>
           composeJoinRequestPipeline({
@@ -784,40 +781,20 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     });
   }
 
-  identityPipeline({ participation }: { participation: EventingParticipation }): IdentityPipeline {
-    const pipelines = this.#parts.pipelines;
-    return participation === "produce"
-      ? pipelines.producer.identityPipeline()
-      : pipelines.identity();
+  identityPipeline(): IdentityPipeline {
+    return this.#parts.pipelines.identity();
   }
 
-  joinRequestPipeline({
-    participation,
-  }: {
-    participation: EventingParticipation;
-  }): JoinRequestPipeline {
-    const pipelines = this.#parts.pipelines;
-    return participation === "produce"
-      ? pipelines.producer.joinRequestPipeline()
-      : pipelines.joinRequests();
+  joinRequestPipeline(): JoinRequestPipeline {
+    return this.#parts.pipelines.joinRequests();
   }
 
-  scimSyncPipeline({ participation }: { participation: EventingParticipation }): ScimSyncPipeline {
-    const pipelines = this.#parts.pipelines;
-    return participation === "produce"
-      ? pipelines.producer.scimSyncPipeline()
-      : pipelines.scimSync();
+  scimSyncPipeline(): ScimSyncPipeline {
+    return this.#parts.pipelines.scimSync();
   }
 
-  ssoConnectionPipeline({
-    participation,
-  }: {
-    participation: EventingParticipation;
-  }): SsoConnectionPipeline {
-    const pipelines = this.#parts.pipelines;
-    return participation === "produce"
-      ? pipelines.producer.ssoConnectionPipeline()
-      : pipelines.ssoConnections();
+  ssoConnectionPipeline(): SsoConnectionPipeline {
+    return this.#parts.pipelines.ssoConnections();
   }
 
   /** Hands identity a registered pipeline's senders; a missing verb fails the install. */
