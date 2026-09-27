@@ -85,6 +85,18 @@ describe("given an account with no name", () => {
       expect(screen.queryByText(/^\s*\(/)).toBeNull();
     });
   });
+
+  describe("when the avatar button is read by its label", () => {
+    it("names the account by its email", () => {
+      renderMenu({
+        currentUser: { id: "user-1", name: null, email: "ada@example.com", image: null },
+      });
+
+      expect(
+        screen.getByRole("button", { name: "Open user menu for ada@example.com" }),
+      ).not.toBeNull();
+    });
+  });
 });
 
 describe("the My Workspace entry's governance gate", () => {
