@@ -113,7 +113,7 @@ function mount(options: { prisma?: ReturnType<typeof buildMockPrisma>; denied?: 
         throw new Error("The test fire is a REST-only path");
       },
     },
-    endpointStream: createApiFixture<WebhookAppDependencies["endpointStream"]>({
+    endpointStream: createApiFixture<NonNullable<WebhookAppDependencies["endpointStream"]>>({
       flush: () => {
         throw new Error("Endpoint stream flush is not exercised by these scenarios");
       },

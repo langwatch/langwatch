@@ -1175,7 +1175,8 @@ the runtime registers it onto its global registry when that pipeline registers, 
 refuses by name one that arrives after the registry started routing. The runtime's own maintenance
 pipelines (blob sweep, process-manager retention) are built by the eventing member where a Redis and a
 process store exist, answered by `maintenancePipelines()`, and installed once by the process after the
-modules', where the role drains (2026-09-25).
+modules', where the role drains (2026-09-25). The producer role holds the process store too, so
+every role reads and writes one process store (Alex, 2026-09-27).
 
 `withPipelines((pipelines) => pipelines.produce())` selects API production;
 `withPipelines((pipelines) => pipelines.consume())` selects worker consumption.

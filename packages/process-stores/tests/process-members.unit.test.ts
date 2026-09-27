@@ -1,3 +1,4 @@
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createLogger } from "@langwatch/observability";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nowInstant, Temporal } from "@langwatch/time";
@@ -164,8 +165,8 @@ describe("given a member source with several clients open", () => {
   describe("when it is disposed", () => {
     it("closes what it opened, in reverse construction order", async () => {
       const closed: string[] = [];
-      // A role that states no queue, so the only client this source opens is
-      // the runtime itself and the close it records is the one asserted below.
+      // No queue and a supplied Postgres client, so the only client this source
+      // opens is the runtime itself and the close it records is the one asserted.
       const members = createProcessMembers({
         config: config({
           eventing: {
@@ -174,6 +175,7 @@ describe("given a member source with several clients open", () => {
             executionTarget: "api",
           },
         }),
+        members: { prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }) },
       });
       // The two members with a close of their own, in construction order.
       const eventing = members.read("eventing");

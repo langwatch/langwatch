@@ -40,9 +40,8 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { EventingConfig, EventingGroupQueueConfig, EventingStoreConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
 
-/** The event log and the process state a draining role reads and leases. */
+/** The event log a draining role reads. */
 export interface EventingEventLogMembers {
-  readonly prisma: PrismaClient;
   readonly clickhouse: ClickHouseQueryClient;
 }
 
@@ -55,6 +54,8 @@ export function buildEventing(options: {
   readonly config: EventingConfig;
   /** Names this process in a producer-only store's refusals. */
   readonly processName: string;
+  /** Holds the process store every role reads and writes, the producer too. */
+  readonly prisma: PrismaClient;
   /** Absent where the role states no queue, which runs projections inline. */
   readonly redis?: RedisConnection;
   /** Absent on a role that drains nothing and so reads no event log. */
@@ -63,7 +64,8 @@ export function buildEventing(options: {
   readonly participation?: EventingParticipation;
 }): BuiltMember<EventSourcing> {
   const { config } = options;
-  const stores = eventingStores({
+  const processStore = PrismaProcessStore.create({ database: options.prisma });
+  const eventStore = eventingEventStore({
     store: config.store,
     processName: options.processName,
     ...(options.eventLog === undefined ? {} : { eventLog: options.eventLog }),
@@ -79,23 +81,18 @@ export function buildEventing(options: {
 
   const eventing = new EventSourcing({
     enabled: true,
-    eventStore: stores.eventStore,
+    eventStore,
     consumersEnabled: config.consumersEnabled,
     executionTarget: config.executionTarget,
     processManagerMode: config.processManagerMode ?? "run",
     warnWhenProjectionsRunInline: false,
     ...(options.participation === undefined ? {} : { participation: options.participation }),
     ...(queueFactory === undefined ? {} : { queueFactory }),
-    ...(stores.processStore === undefined ? {} : { processStore: stores.processStore }),
+    processStore,
     ...(config.killSwitch === undefined ? {} : { killSwitch: config.killSwitch }),
-    ...(options.redis === undefined || stores.processStore === undefined
+    ...(options.redis === undefined || config.store.kind === "producer-only"
       ? {}
-      : {
-          maintenance: eventingMaintenance({
-            redis: options.redis,
-            processStore: stores.processStore,
-          }),
-        }),
+      : { maintenance: eventingMaintenance({ redis: options.redis, processStore }) }),
   });
 
   return { value: eventing, close: () => eventing.close() };
@@ -131,35 +128,32 @@ function eventingMaintenance({
   ];
 }
 
-/** Where this role appends, and the durable state it leases while draining. */
-function eventingStores(options: {
+/** Where this role appends: a producer refuses reads, a draining role reads the event log. */
+function eventingEventStore(options: {
   readonly store: EventingStoreConfig;
   readonly processName: string;
   readonly eventLog?: EventingEventLogMembers;
-}): { readonly eventStore: EventStore; readonly processStore?: ProcessStore } {
+}): EventStore {
   if (options.store.kind === "producer-only") {
-    return { eventStore: EventStoreProducerOnly.create({ processName: options.processName }) };
+    return EventStoreProducerOnly.create({ processName: options.processName });
   }
   const eventLog = options.eventLog;
   if (!eventLog) {
     throw new Error(
-      `${options.processName} drains the event log, which needs this process's Postgres and ClickHouse members.`,
+      `${options.processName} drains the event log, which needs this process's ClickHouse member.`,
     );
   }
 
   const retention = createEventingRetentionConfiguration({
     defaultRetentionDays: options.store.defaultRetentionDays,
   });
-  return {
-    eventStore: EventingClickHouseEventStore.create({
-      repository: EventingClickHouseEventRepository.create({
-        resolveClient: eventingClickHouseResolver(eventLog.clickhouse),
-        retention,
-      }),
+  return EventingClickHouseEventStore.create({
+    repository: EventingClickHouseEventRepository.create({
+      resolveClient: eventingClickHouseResolver(eventLog.clickhouse),
       retention,
     }),
-    processStore: PrismaProcessStore.create({ database: eventLog.prisma }),
-  };
+    retention,
+  });
 }
 
 /**

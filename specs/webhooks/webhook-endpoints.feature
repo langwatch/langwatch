@@ -423,6 +423,18 @@ Feature: Webhook endpoints, signed outbound event delivery
       Then the endpoint's delivery log records one attempt
 
     @unit
+    Scenario: A memory-tier replay is delivered through the worker's endpoint stream
+      Given a memory-tier worker with one active HTTP endpoint and an emitted envelope
+      When the envelope is replayed to the endpoint
+      Then the endpoint's delivery log records one attempt
+
+    @unit
+    Scenario: Endpoint health reads the worker's pending endpoint stream
+      Given a memory-tier worker with an endpoint that holds envelopes for a minute
+      When a completed gateway request is still coalescing in its endpoint stream
+      Then the endpoint's health reports an undelivered envelope
+
+    @unit
     Scenario: An operator wake on the delivery maintenance claim leaves it as it was
       Given the hourly maintenance claim stored under the delivery process
       When an operator wakes it from the ops console

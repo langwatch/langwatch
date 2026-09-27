@@ -18,9 +18,9 @@ interface EventingRoleOptions {
 }
 
 /**
- * A role that sends commands and drains none of them: its store refuses every
- * read by name, and the process managers its pipelines declare are registered
- * without being run, so the role that claims the queue runs them exactly once.
+ * A role that sends commands and drains none of them: its event store refuses
+ * every read by name, but it holds the process store every role shares. Its
+ * process managers are registered unrun, so the queue's claimant runs them once.
  */
 export function producerEventing(options: EventingRoleOptions): EventingConfig {
   return {

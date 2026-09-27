@@ -179,11 +179,12 @@ export function createProcessMembers(options: {
       return buildEventing({
         config: eventing,
         processName: config.processName,
+        prisma: read("prisma"),
         ...(eventing.participation === undefined ? {} : { participation: eventing.participation }),
         ...(eventing.groupQueue === undefined ? {} : { redis: read("redis") }),
         ...(eventing.store.kind === "producer-only"
           ? {}
-          : { eventLog: { prisma: read("prisma"), clickhouse: read("clickhouse") } }),
+          : { eventLog: { clickhouse: read("clickhouse") } }),
       });
     },
     // `off` is a state, not a refusal: the process boots and every send is
