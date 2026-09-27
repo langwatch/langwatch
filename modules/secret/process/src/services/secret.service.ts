@@ -7,10 +7,12 @@ import {
   getSecretInputSchema,
   listSecretsInputSchema,
   MAX_SECRETS_PER_PROJECT,
+  SecretDuplicateError,
   SecretLimitReachedError,
   SecretNotFoundError,
   SecretReservedNameError,
   updateSecretInputSchema,
+  type CreateReservedSecretInput,
   type CreateSecretInput,
   type DeleteSecretInput,
   type GetSecretInput,
@@ -107,6 +109,28 @@ export class SecretService {
     });
   }
 
+  /** Outside the per-project limit, as on main: a reserved row is not the customer's. */
+  async createReserved(input: CreateReservedSecretInput): Promise<{ value: string }> {
+    if (!this.reservedNames.has(input.name)) {
+      throw new Error(`"${input.name}" is not a reserved project secret name`);
+    }
+
+    try {
+      await this.options.repository.create({
+        projectId: input.projectId,
+        name: input.name,
+        encryptedValue: this.options.encryption.encrypt(input.value),
+        actorId: input.actorId,
+      });
+
+      return { value: input.value };
+    } catch (error) {
+      if (!(error instanceof SecretDuplicateError)) throw error;
+
+      return { value: await this.getStoredValue(input) };
+    }
+  }
+
   async delete(input: DeleteSecretInput): Promise<void> {
     const parsed = deleteSecretInputSchema.parse(input);
     await this.getMutableSecret(parsed);
@@ -132,6 +156,14 @@ export class SecretService {
    * A reserved row answers exactly as an absent one: a caller must not be able
    * to tell that a product-owned credential is there.
    */
+  private async getStoredValue(input: { projectId: string; name: string }): Promise<string> {
+    const rows = await this.options.repository.findAllValues({ projectId: input.projectId });
+    const stored = rows.find((row) => row.name === input.name);
+    if (!stored) throw new Error(`Project secret "${input.name}" vanished after a duplicate write`);
+
+    return this.options.encryption.decrypt(stored.encryptedValue);
+  }
+
   private async getMutableSecret(input: { projectId: string; id: string }): Promise<Secret> {
     const secret = await this.options.repository.findById({
       projectId: input.projectId,

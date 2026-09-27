@@ -146,6 +146,8 @@ export type GatewayVirtualKeyCreateCommand = Readonly<{
   externalId?: string | null;
   metadata?: Record<string, string>;
   actorUserId: string;
+  /** Anything other than USER marks the key product-managed. */
+  purpose?: "USER" | "LANGY" | "CONNECT";
   /** Also park the secret under a one-time reveal id, for a reader other than this caller. */
   revealOnce?: boolean;
 }>;

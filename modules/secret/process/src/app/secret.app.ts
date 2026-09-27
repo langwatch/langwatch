@@ -10,6 +10,7 @@ import {
   type RevealOnceInput,
   type StashedReveal,
   type StashRevealInput,
+  type CreateReservedSecretInput,
   type CreateSecretInput,
   type DeleteSecretInput,
   type GetSecretInput,
@@ -103,6 +104,11 @@ export class SecretApp implements SecretApiContract {
   /** Replaces a secret's value, attributed as `create` attributes. */
   update(input: Omit<UpdateSecretInput, "actorId">, by?: SecretCaller): Promise<Secret> {
     return this.#secrets.update(input, by);
+  }
+
+  /** Stores a reserved-name secret for its feature; a concurrent writer's value wins. */
+  createReserved(input: CreateReservedSecretInput): Promise<{ value: string }> {
+    return this.#secrets.createReserved(input);
   }
 }
 

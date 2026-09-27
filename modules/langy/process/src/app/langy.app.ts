@@ -11,6 +11,7 @@ import {
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
+import { GatewayApi } from "@langwatch/gateway-contract";
 /**
  * The Langy feature's application: what its doors call. It holds every service and process
  * capability the feature's api files reach, and it is the one typed thing a transport is given.
@@ -78,6 +79,7 @@ import {
 } from "@langwatch/langy-contract";
 import type * as langyContractModule from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { SecretApi } from "@langwatch/secret-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -115,6 +117,7 @@ import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts
 import { LangyRestMetricsPrometheusService } from "../services/langy-rest-metrics-prometheus.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
+import { LangyVirtualKeyGatewayService } from "../services/langy-virtual-key-gateway.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
 import { LangyUiActionPageService } from "../services/langy-ui-action-page.service.ts";
@@ -205,6 +208,9 @@ export class LangyApp implements LangyApiContract {
     modelProviders: ModelProviderApi,
     apiKeys: ApiKeyApi,
     authz: AuthzApi,
+    /** Langy's own gateway key: minted by the gateway, kept under a reserved project secret. */
+    gateway: GatewayApi,
+    secrets: SecretApi,
   };
   static readonly config = langyConfig;
   static readonly secrets = langySecrets;
@@ -244,6 +250,10 @@ export class LangyApp implements LangyApiContract {
       publicBaseUrl: setup.members.publicBaseUrl,
       models: LangyModelService.create({ modelProviders: setup.dependencies.modelProviders }),
       sessionKeys,
+      virtualKeys: LangyVirtualKeyGatewayService.create({
+        secrets: setup.dependencies.secrets,
+        gateway: setup.dependencies.gateway,
+      }),
     });
     const commands = buildLangyConversationCommands({
       eventing: setup.members.eventing,

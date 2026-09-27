@@ -7,6 +7,7 @@ import type {
   StashRevealInput,
 } from "./one-time-reveal.ts";
 import type {
+  CreateReservedSecretInput,
   CreateSecretInput,
   DeleteSecretInput,
   GetSecretInput,
@@ -27,6 +28,8 @@ export interface SecretApi {
   create(input: Omit<CreateSecretInput, "actorId">, by?: SecretCaller): Promise<Secret>;
   /** With no caller, the write is attributed to the first member of the project's team. */
   update(input: Omit<UpdateSecretInput, "actorId">, by?: SecretCaller): Promise<Secret>;
+  /** Stores a reserved-name secret. When another writer stored it first, answers that value. */
+  createReserved(input: CreateReservedSecretInput): Promise<{ value: string }>;
   /** Parks a secret for a single later read, and answers the id that reads it. */
   stashReveal(input: StashRevealInput): Promise<StashedReveal>;
   /** Serves a stashed secret and forgets it. Every later read is refused. */

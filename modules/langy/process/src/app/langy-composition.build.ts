@@ -3,11 +3,7 @@
  * and session-key members arrive built over peers; commands are supplied
  * externally (taken as dependency tokens).
  */
-import {
-  renderLangyTurnContext,
-  type LangyServerConfig,
-  LangyNotEnabledError,
-} from "@langwatch/langy-contract";
+import { renderLangyTurnContext, type LangyServerConfig } from "@langwatch/langy-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { Redis } from "ioredis";
 
@@ -16,6 +12,7 @@ import type { LangyRepositories } from "../repositories/langy-repositories.regis
 import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import { langyWorkerRuntimeOf } from "../rules/langy-worker-runtime.rules.ts";
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
+import type { LangyVirtualKeyService } from "../services/langy-credential.service.ts";
 import {
   LangyGithubPrCounter,
   LangyGithubPrQuotaService,
@@ -116,8 +113,9 @@ export function buildLangyInfrastructure(input: {
   repositories: LangyRepositories;
   models: LangyModel;
   sessionKeys: LangySessionKeyService;
+  virtualKeys: LangyVirtualKeyService;
 }): LangyBuiltInfrastructure {
-  const { redis, repositories, worker, models, sessionKeys } = input;
+  const { redis, repositories, worker, models, sessionKeys, virtualKeys } = input;
 
   const permits = LangyGithubPrPermitsAdapter.create(
     LangyGithubPrQuotaService.create({
@@ -145,9 +143,7 @@ export function buildLangyInfrastructure(input: {
 
   const credentials: LangyCredentialComposition = {
     sessionKeys,
-    virtualKeys: {
-      provision: () => Promise.reject(new LangyNotEnabledError()),
-    },
+    virtualKeys,
     github: { enabled: false, mintTurnToken: () => Promise.resolve(null) },
     runtime: langyWorkerRuntimeOf({ config: input.config, publicBaseUrl: input.publicBaseUrl }),
   };

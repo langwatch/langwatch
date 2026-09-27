@@ -9023,6 +9023,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/gateway-contract':
+        specifier: workspace:*
+        version: link:../../gateway/contract
       '@langwatch/github-contract':
         specifier: workspace:*
         version: link:../../github/contract
@@ -9059,6 +9062,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/secret-contract':
+        specifier: workspace:*
+        version: link:../../secret/contract
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets

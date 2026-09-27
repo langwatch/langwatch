@@ -11,6 +11,7 @@ import {
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type {
   LangyConversationCommands,
@@ -26,6 +27,7 @@ import {
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -251,6 +253,8 @@ function createApp(): Promise<LangyApp> {
       featureFlags: createApiFixture<FeatureFlagApi>(),
       users: createApiFixture<UserApi>(),
       github: createApiFixture<GithubApi>(),
+      gateway: createApiFixture<GatewayApi>(),
+      secrets: createApiFixture<SecretApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       authz: createApiFixture<AuthzApi>(),

@@ -2,17 +2,21 @@
  * @vitest-environment node
  * @see specs/langy/langy-model-selection.feature
  * @see specs/langy/langy-internal-control-plane.feature
+ * @see modules/langy/specs/langy-virtual-key.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { LangyServerConfig } from "@langwatch/langy-contract";
+import { LANGY_VK_SECRET_NAME, type SecretApi } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
 
 import { UnavailableLangyWorkerChannel } from "../../channels/unavailable.langy-worker.channel.ts";
 import type { LangySessionKeyRepository } from "../../repositories/langy-session-key.repository.ts";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
+import { LangyVirtualKeyGatewayService } from "../../services/langy-virtual-key-gateway.service.ts";
 import { LangyWorkerMetricsNullService } from "../../services/langy-worker-metrics-null.service.ts";
 import { buildLangyInfrastructure } from "../langy-composition.build.ts";
 import { LangyModel } from "../langy.members.ts";
@@ -51,6 +55,12 @@ function build(input: { config?: Partial<LangyServerConfig>; publicBaseUrl?: str
       repositories: MemoryLangyRepositories.create(),
       models: new ConfiguredLangyModel(),
       sessionKeys,
+      virtualKeys: LangyVirtualKeyGatewayService.create({
+        secrets: createApiFixture<SecretApi>({
+          getValues: async () => ({ [LANGY_VK_SECRET_NAME]: "vk-stored" }),
+        }),
+        gateway: createApiFixture<GatewayApi>(),
+      }),
     }),
   };
 }
@@ -107,6 +117,17 @@ describe("buildLangyInfrastructure", () => {
         build({ config: { gatewayLegacyUrl: "https://legacy.example.test" } }).built.credentials
           .runtime.workerGatewayBaseUrl,
       ).toBe("https://legacy.example.test");
+    });
+
+    /** @scenario "A conversation's credentials resolve once the project's Langy key is provisioned" */
+    it("hands out the project's Langy key rather than refusing that Langy is not enabled", async () => {
+      await expect(
+        build({}).built.credentials.virtualKeys.provision({
+          projectId: "project_1",
+          organizationId: "org_1",
+          actorUserId: "user_1",
+        }),
+      ).resolves.toBe("vk-stored");
     });
 
     it("hands on the mirror project it was configured with", () => {
