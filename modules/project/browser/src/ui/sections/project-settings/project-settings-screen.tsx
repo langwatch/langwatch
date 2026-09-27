@@ -665,7 +665,11 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
             invalid={!!formState.errors.language || !!formState.errors.framework}
           >
             {changeLanguageFramework ? (
-              <TechStackSelector form={form} />
+              <TechStackSelector
+                form={form}
+                language={form.watch("language")}
+                framework={form.watch("framework")}
+              />
             ) : (
               <HStack>
                 <ProjectTechStackIcon project={project} />

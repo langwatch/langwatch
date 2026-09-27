@@ -1,11 +1,11 @@
 import type { FeatureFlagApi } from "./feature-flag.api.ts";
-import { VOICE_AGENTS_FLAG_KEY } from "./voiceAgents.message.ts";
+import { VOICE_AGENTS_FLAG_KEY } from "./voice-agents.message.ts";
 
 /**
- * For server callers; client code imports from `./voiceAgents.message`
+ * For server callers; client code imports from `./voice-agents.message`
  * directly.
  */
-export { VOICE_AGENTS_DISABLED_MESSAGE } from "./voiceAgents.message.ts";
+export { VOICE_AGENTS_DISABLED_MESSAGE } from "./voice-agents.message.ts";
 
 /**
  * Single server-side read of release_voice_agents_enabled flag (AC29);

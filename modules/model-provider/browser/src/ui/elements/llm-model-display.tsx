@@ -52,11 +52,11 @@ export function LLMModelDisplay({
   subtitle,
   ...props
 }: LLMModelDisplayProps) {
-  const { modelOption, groupedByProvider, isLoading } = useModelSelectionOptions(
-    allModelOptions,
+  const { modelOption, groupedByProvider, isLoading } = useModelSelectionOptions({
+    options: allModelOptions,
     model,
-    "chat",
-  );
+    mode: "chat",
+  });
 
   // Model is disabled if explicitly marked or if provider is disabled
   const isDisabled = modelOption?.isDisabled ?? false;

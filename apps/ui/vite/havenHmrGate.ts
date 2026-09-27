@@ -1,37 +1,57 @@
 import { existsSync, readFileSync } from "fs";
 import path from "path";
 
-import type { ModuleNode, Plugin, ViteDevServer } from "vite";
+import type { Plugin } from "vite";
 
-function releaseIsolatedUpdate({
+/** The one Vite server surface the gate touches: the reload it sends. */
+export type HmrReloadChannel = { ws: { send(payload: { type: "full-reload" }): void } };
+
+function releaseIsolatedUpdate<Module>({
   isReloadOwed,
   flush,
   modules,
 }: {
   isReloadOwed: boolean;
   flush: () => void;
-  modules: ModuleNode[];
-}): ModuleNode[] {
+  modules: Module[];
+}): Module[] {
   if (isReloadOwed) flush();
 
   return modules;
 }
+
+type HmrGateOptions = { markerPath?: string; burstGapMs?: number; burstSettleMs?: number };
 
 /**
  * Auto-gated HMR: coalesces a rapid burst of saves (an AI agent editing)
  * into one trailing full-reload, instead of thrashing a human's browser
  * through every intermediate state. `haven hmr on|off` still overrides it.
  */
-export function havenHmrGate(options?: {
-  markerPath?: string;
-  burstGapMs?: number;
-  burstSettleMs?: number;
-}): Plugin {
+export function havenHmrGate(options?: HmrGateOptions): Plugin {
+  const gate = createHmrGate(options);
+
+  return {
+    name: "haven-hmr-gate",
+    apply: "serve",
+    configureServer(server) {
+      gate.attach(server);
+    },
+    handleHotUpdate(ctx) {
+      return gate.hotUpdate(ctx.modules);
+    },
+  };
+}
+
+/** The gate over the two surfaces it touches, which {@link havenHmrGate} plugs into Vite. */
+export function createHmrGate(options?: HmrGateOptions): {
+  attach(server: HmrReloadChannel): void;
+  hotUpdate<Module>(modules: Module[]): Module[];
+} {
   const marker = options?.markerPath ?? path.resolve(process.cwd(), ".haven-hmr-gate");
   const BURST_GAP_MS = options?.burstGapMs ?? 300; // updates closer together than this = one burst
   const BURST_SETTLE_MS = options?.burstSettleMs ?? 500; // delay before coalesced reload
   const MAX_GATE_MS = 60_000; // never hold longer than this, whatever the marker says
-  let server: ViteDevServer | undefined;
+  let server: HmrReloadChannel | undefined;
   let isReloadOwed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let lastUpdateAt = 0;
@@ -62,12 +82,10 @@ export function havenHmrGate(options?: {
   }
 
   return {
-    name: "haven-hmr-gate",
-    apply: "serve",
-    configureServer(s) {
+    attach(s) {
       server = s;
     },
-    handleHotUpdate(ctx) {
+    hotUpdate(modules) {
       const now = Date.now();
 
       // Explicit override (haven hmr on) wins when active, regardless of cadence.
@@ -84,7 +102,7 @@ export function havenHmrGate(options?: {
       if (sinceLast > BURST_GAP_MS) {
         // Isolated update, not part of a rapid burst — let it straight through.
         // (If a burst's trailing timer somehow hadn't fired yet, catch up first.)
-        return releaseIsolatedUpdate({ isReloadOwed, flush, modules: ctx.modules });
+        return releaseIsolatedUpdate({ isReloadOwed, flush, modules });
       }
 
       // Part of a rapid burst: swallow, and coalesce into one trailing reload

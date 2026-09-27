@@ -151,7 +151,7 @@ function hasNestedPath(context: object, segments: PathSegment[]): boolean {
   let current: unknown = context;
   for (const segment of segments) {
     if (!hasSegment(current, segment)) return false;
-    current = Reflect.get(current, segment);
+    current = Object.getOwnPropertyDescriptor(current, segment)?.value;
   }
   return true;
 }

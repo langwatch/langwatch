@@ -34,12 +34,9 @@ function claimsOf(declaration: { router: TrpcRouterMount<never, never> }): Decla
     router: (record) => record,
   };
 
-  (declaration.router as unknown as (factory: TrpcProcedureFactory<object>, app: unknown) => void)(
-    runtime,
-    () => {
-      throw new Error("the wire table never resolves an application");
-    },
-  );
+  declaration.router(runtime, () => {
+    throw new Error("the wire table never resolves an application");
+  });
 
   return claims;
 }

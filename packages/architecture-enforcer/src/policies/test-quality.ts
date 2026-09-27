@@ -508,6 +508,70 @@ function canonicalCaseTable(source: ts.SourceFile, call: ts.CallExpression): str
     .join("|");
 }
 
+/** The test, when an earlier one in its scope has the same body; otherwise it is remembered. */
+function duplicateBodyUses({
+  file,
+  source,
+  test,
+  bodyKey,
+  duplicateBodies,
+}: {
+  file: string;
+  source: ts.SourceFile;
+  test: TestCall;
+  bodyKey: string;
+  duplicateBodies: Map<string, TestCall>;
+}): ArchitectureViolation[] {
+  const duplicate = duplicateBodies.get(bodyKey);
+  if (!duplicate) {
+    duplicateBodies.set(bodyKey, test);
+    return [];
+  }
+
+  return [
+    {
+      policy: "test-quality",
+      file,
+      line: lineOf(source, test.call),
+      message: `Test body exactly duplicates the test at line ${lineOf(source, duplicate.call)}.`,
+      allowed: "Keep one behaviour test, or make the distinct behaviour observable.",
+    },
+  ];
+}
+
+/** The first import from the test's own mocked subject module that the test goes on to use. */
+function mockedSubjectUses({
+  file,
+  source,
+  test,
+  imports,
+  mockedModules,
+}: {
+  file: string;
+  source: ts.SourceFile;
+  test: TestCall;
+  imports: readonly ImportBinding[];
+  mockedModules: ReadonlySet<string>;
+}): ArchitectureViolation[] {
+  const used = imports.find(
+    (binding) =>
+      moduleStem(binding.module) === testSubjectStem(file) &&
+      mockedModules.has(binding.module) &&
+      callbackUsesName(test.callback, binding.name),
+  );
+  if (!used) return [];
+
+  return [
+    {
+      policy: "test-quality",
+      file,
+      line: lineOf(source, test.call),
+      message: `Test uses ${JSON.stringify(used.name)} from its mocked subject module ${JSON.stringify(used.module)}.`,
+      allowed: "Mock collaborators, not the behaviour under test.",
+    },
+  ];
+}
+
 function lintTestFile(file: string): ArchitectureViolation[] {
   const source = sourceFile({ file });
   const violations: ArchitectureViolation[] = [];
@@ -538,36 +602,9 @@ function lintTestFile(file: string): ArchitectureViolation[] {
       canonicalTestBody(source, test.callback),
     ].join(":");
 
-    const duplicate = duplicateBodies.get(bodyKey);
+    violations.push(...duplicateBodyUses({ file, source, test, bodyKey, duplicateBodies }));
 
-    if (duplicate) {
-      violations.push({
-        policy: "test-quality",
-        file,
-        line: lineOf(source, test.call),
-        message: `Test body exactly duplicates the test at line ${lineOf(source, duplicate.call)}.`,
-        allowed: "Keep one behaviour test, or make the distinct behaviour observable.",
-      });
-    } else {
-      duplicateBodies.set(bodyKey, test);
-    }
-
-    for (const binding of imports) {
-      const isSubject = moduleStem(binding.module) === testSubjectStem(file);
-      if (!isSubject || !mockedModules.has(binding.module)) continue;
-
-      if (!callbackUsesName(test.callback, binding.name)) continue;
-
-      violations.push({
-        policy: "test-quality",
-        file,
-        line: lineOf(source, test.call),
-        message: `Test uses ${JSON.stringify(binding.name)} from its mocked subject module ${JSON.stringify(binding.module)}.`,
-        allowed: "Mock collaborators, not the behaviour under test.",
-      });
-
-      break;
-    }
+    violations.push(...mockedSubjectUses({ file, source, test, imports, mockedModules }));
   }
 
   const visit = (node: ts.Node): void => {

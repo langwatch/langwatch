@@ -7,16 +7,14 @@
 import { Box, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { isLegacyOnlineEvaluationWorkbenchState } from "@langwatch/experiment-contract";
 import { Activity, Plus, Shield } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { monitorApi } from "../../behavior/monitor-api.ts";
+import { useOnlineEvaluations } from "../../behavior/use-online-evaluations.ts";
 import { useMonitorHost } from "../../model/monitor-host.ts";
-import {
-  OnlineEvaluationsTable,
-  type OnlineEvaluationRow,
-} from "../blocks/online-evaluations-table.tsx";
+import { onlineEvaluationListState } from "../../model/online-evaluation-list-state.ts";
+import { OnlineEvaluationsTable } from "../blocks/online-evaluations-table.tsx";
 import { FullWidthListPageContent } from "../elements/full-width-list-page-content.tsx";
 import { MonitorLink } from "../elements/monitor-link.tsx";
 import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
@@ -61,59 +59,13 @@ export default function OnlineEvaluationsScreen() {
   const [copyMonitor, setCopyMonitor] = useState<MonitorRef | null>(null);
   const [monitorToDelete, setMonitorToDelete] = useState<MonitorRef | null>(null);
 
-  const monitors = monitorApi.monitors.getAllForProject.useQuery(
-    { projectId: projectId ?? "" },
-    { enabled: !!projectId },
-  );
-
-  const performance = monitorApi.monitors.getPerformanceForProject.useQuery(
-    { projectId: projectId ?? "", timeZone: host.timeZone() },
-    {
-      enabled: !!projectId && canViewAnalytics && monitors.isSuccess,
-      refetchOnWindowFocus: false,
-      trpc: { context: { skipBatch: true } },
-    },
-  );
-
-  const experiments = monitorApi.experiments.getAllByProjectId.useQuery(
-    { projectId: projectId ?? "" },
-    {
-      enabled: !!projectId && canManage && canViewExperiments && monitors.isSuccess,
-      refetchOnWindowFocus: false,
-      trpc: { context: { skipBatch: true } },
-    },
-  );
-
-  const performanceByMonitor = useMemo(
-    () => new Map(performance.data?.map((item) => [item.monitorId, item] as const) ?? []),
-    [performance.data],
-  );
-
-  const experimentSlugs = useMemo(
-    () =>
-      new Map(
-        (experiments.data ?? [])
-          .filter((experiment) => isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState))
-          .map((experiment) => [experiment.id, experiment.slug] as const),
-      ),
-    [experiments.data],
-  );
-
-  const monitorById = useMemo(
-    () => new Map((monitors.data ?? []).map((monitor) => [monitor.id, monitor] as const)),
-    [monitors.data],
-  );
-
-  const rows: OnlineEvaluationRow[] =
-    monitors.data?.map((monitor) => ({
-      id: monitor.id,
-      name: monitor.name,
-      checkType: monitor.checkType,
-      enabled: monitor.enabled,
-      executionMode: monitor.executionMode,
-      performance: performanceByMonitor.get(monitor.id),
-      hasPerformanceError: performance.isError,
-    })) ?? [];
+  const { monitors, performance, rows, monitorById, experimentSlugs } = useOnlineEvaluations({
+    projectId,
+    timeZone: host.timeZone(),
+    canManage,
+    canViewAnalytics,
+    canViewExperiments,
+  });
 
   const toggleMonitor = monitorApi.monitors.toggle.useMutation({
     onSuccess: () => {
@@ -147,10 +99,11 @@ export default function OnlineEvaluationsScreen() {
     host.openOverlay({ drawer: "onlineEvaluation", params: { monitorId } });
   };
 
-  const isLoadingMonitors = monitors.isLoading;
-  const showMonitorsError = !isLoadingMonitors && monitors.isError;
-  const showMonitorsEmpty = !isLoadingMonitors && !monitors.isError && rows.length === 0;
-  const showMonitors = !isLoadingMonitors && !monitors.isError && rows.length !== 0;
+  const listState = onlineEvaluationListState({
+    isLoading: monitors.isLoading,
+    isError: monitors.isError,
+    count: rows.length,
+  });
 
   return (
     <>
@@ -162,17 +115,17 @@ export default function OnlineEvaluationsScreen() {
         </HStack>
       </PageLayout.Header>
 
-      {isLoadingMonitors && (
+      {listState === "loading" && (
         <Box display="flex" justifyContent="center" paddingY={8}>
           <Spinner />
         </Box>
       )}
-      {showMonitorsError && (
+      {listState === "error" && (
         <Box padding={6}>
           <Text color="red.500">Error loading online evaluations</Text>
         </Box>
       )}
-      {showMonitorsEmpty && (
+      {listState === "empty" && (
         <PageLayout.Container>
           <PageLayout.Content>
             <NoDataInfoBlock
@@ -201,7 +154,7 @@ export default function OnlineEvaluationsScreen() {
           </PageLayout.Content>
         </PageLayout.Container>
       )}
-      {showMonitors && (
+      {listState === "list" && (
         <FullWidthListPageContent>
           <VStack width="full" gap={4} align="stretch">
             <VStack align="start" gap={1}>

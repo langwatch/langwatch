@@ -31,12 +31,17 @@ import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
 
-export const useModelSelectionOptions = (
-  options: string[],
-  model: string,
-  mode: "chat" | "embedding" = "chat",
-  opts?: { featureKey?: string | undefined },
-) => {
+export const useModelSelectionOptions = ({
+  options,
+  model,
+  mode = "chat",
+  featureKey,
+}: {
+  options: string[];
+  model: string;
+  mode?: "chat" | "embedding";
+  featureKey?: string | undefined;
+}) => {
   const { project } = useOrganizationTeamProject();
   // `listAllForProjectForFrontend` returns only providers actually stored
   // against a scope reachable from this project, unlike the legacy
@@ -52,7 +57,6 @@ export const useModelSelectionOptions = (
   // `useMemo` keyed on them recomputed too — the langy composer's model pill
   // rebuilt its whole combobox collection per parent render because of it.
   const providers = modelProviders.data;
-  const featureKey = opts?.featureKey;
   const { selectOptions, groupedByProvider } = useMemo(
     () => modelSelectionFrom({ providers: providers ?? [], options, mode, featureKey }),
     [providers, options, mode, featureKey],
@@ -353,11 +357,11 @@ export const ModelSelector = React.memo(function ModelSelector({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
-  const { selectOptions, groupedByProvider, isEmpty, isLoading } = useModelSelectionOptions(
+  const { selectOptions, groupedByProvider, isEmpty, isLoading } = useModelSelectionOptions({
     options,
     model,
     mode,
-  );
+  });
 
   // ALL hooks must run unconditionally — keep the empty-state early
   // return *after* every hook below so we don't violate React's rules

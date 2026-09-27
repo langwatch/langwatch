@@ -41,7 +41,7 @@ function annotationIsZod(source, holder) {
     : false;
 }
 
-/** Whether a local names a Zod schema: by its name, its annotation, its import or what it aliases. */
+/** Whether a local names a Zod schema: by name, annotation, import or what it aliases. */
 function isZodBinding({ context, source, identifier, depth }) {
   if (identifier.name === "z" || SCHEMA_NAME.test(identifier.name)) return true;
   const definition = variableDefinition(context, identifier);

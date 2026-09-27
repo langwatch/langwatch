@@ -192,7 +192,7 @@ function outsideModuleFinding(file, target, subpath) {
 }
 
 function ownershipFinding({ file, target, subpath, node, typeOnly }) {
-  // Types are erased: a browser package's types may cross; its values stay closed (Alex, 2026-09-27).
+  // Types are erased: a browser package's types may cross; its values stay closed (2026-09-27).
   if (typeOnly && target.role === "browser") return undefined;
   if (file.module) return crossModuleFinding({ file, target, subpath, node });
 

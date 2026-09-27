@@ -1,4 +1,4 @@
-import { nowInstant, toDate } from "@langwatch/time";
+import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
 import { Cron } from "croner";
 import { z } from "zod";
 
@@ -52,7 +52,7 @@ export const reportScheduleSchema = z
     }
 
     const tightestGapMs = Math.min(
-      ...runs.slice(1).map((run, index) => run.getTime() - runs[index]!.getTime()),
+      ...runs.slice(1).map((run, index) => run.epochMilliseconds - runs[index]!.epochMilliseconds),
     );
     if (tightestGapMs < MIN_REPORT_INTERVAL_MS) {
       reject(
@@ -128,12 +128,12 @@ export function findReportFromTriggerRow(
 }
 
 /** The next few fires a cron would produce, or null when it does not parse. */
-function findNextRuns({ cron, timezone }: { cron: string; timezone: string }): Date[] | null {
+function findNextRuns({ cron, timezone }: { cron: string; timezone: string }): Instant[] | null {
   let scheduled: Cron;
   try {
     scheduled = new Cron(cron, { timezone });
   } catch {
     return null;
   }
-  return scheduled.nextRuns(GAP_PROBE_RUNS, toDate(nowInstant()));
+  return scheduled.nextRuns(GAP_PROBE_RUNS, toDate(nowInstant())).map(fromDate);
 }

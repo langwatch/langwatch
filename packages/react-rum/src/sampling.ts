@@ -4,7 +4,6 @@
  * unsampled browser trace makes the server's `ParentBasedSampler` drop its spans too. See ADR-058.
  */
 
-import type { Attributes, Context, Link, SpanKind } from "@opentelemetry/api";
 import {
   ParentBasedSampler,
   type Sampler,
@@ -38,14 +37,7 @@ export class SessionRatioSampler implements Sampler {
     this.fallback = fallback;
   }
 
-  shouldSample(
-    _context: Context,
-    _traceId: string,
-    _spanName: string,
-    _spanKind: SpanKind,
-    _attributes: Attributes,
-    _links: Link[],
-  ): SamplingResult {
+  shouldSample(): SamplingResult {
     return this.isSessionSampled() ? SAMPLED : DROPPED;
   }
 

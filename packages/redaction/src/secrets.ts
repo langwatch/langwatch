@@ -486,7 +486,7 @@ const VALUE_RULES: ValueRule[] = [
     // The same scheme the lookbehind reads, so a reported match still spans the
     // whole URL rather than starting at the colon.
     precededBy: /[a-z][a-z0-9+.-]{0,30}$/i,
-    render: (_m, prefix, _password, at) => `${prefix}${REPLACEMENT}${at}`,
+    render: (...[, prefix = "", , at = ""]) => `${prefix}${REPLACEMENT}${at}`,
   },
   {
     id: "bearer_token",

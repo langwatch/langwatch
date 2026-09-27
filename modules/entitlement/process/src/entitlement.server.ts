@@ -51,12 +51,7 @@ export function classifyRoleChangeType(input: {
   newRole: OrganizationUserRole;
   newPermissions: string[] | undefined;
 }): RoleChangeType {
-  return getRoleChangeType(
-    input.oldRole,
-    input.oldPermissions,
-    input.newRole,
-    input.newPermissions,
-  );
+  return getRoleChangeType(input);
 }
 
 export function isViewOnlyCustomRole(permissions: string[]): boolean {

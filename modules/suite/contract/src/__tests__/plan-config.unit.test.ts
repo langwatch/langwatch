@@ -246,6 +246,7 @@ describe("configurationKey", () => {
       const empty = configurationKey({
         config: { ...shared, simulatorModel: null, judgeModel: null },
       });
+      // wrong-typed input: a stored config omitting the models keys like an explicit null
       const absent = configurationKey({
         config: {
           ...shared,

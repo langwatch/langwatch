@@ -137,13 +137,19 @@ export const techStackFrameworkOptions = {
 };
 
 interface TechStackForm {
-  watch(name: "language" | "framework"): string;
   setValue(name: "language" | "framework", value: string): void;
 }
 
-export function TechStackSelector({ form }: { form: TechStackForm }) {
-  const language = form.watch("language");
-  const framework = form.watch("framework");
+/** The form owner watches `language` and `framework` and hands them in; this only sets them. */
+export function TechStackSelector({
+  form,
+  language,
+  framework,
+}: {
+  form: TechStackForm;
+  language: string;
+  framework: string;
+}) {
   const IconWrapper = ({ children }: { children: React.ReactNode }) => {
     return (
       <Box

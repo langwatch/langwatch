@@ -257,84 +257,101 @@ export function collapseRedundantScopes(
   const added = next.filter((s) => !prevKey.has(entryKey(s)));
   if (added.length === 0) return next;
 
-  const { organizationId, availableProjects } = context;
-  let cleaned = next;
-  for (const picked of added) {
-    if (picked.scopeType === "ORGANIZATION" && !picked.personalOnly) {
-      // The picker is single-org-scoped, so every team and project in
-      // `next` belongs to this org by construction. Dropping them - plus
-      // every department and every personal variant (the org-wide rule
-      // covers personal projects too) - collapses to the single ORG chip.
-      cleaned = cleaned.filter((s) => {
-        if (s.personalOnly) return false;
-        if (s.scopeType === "DEPARTMENT") return false;
-        if (s.scopeType === "TEAM" || s.scopeType === "PROJECT") {
-          // Defensive guard: only collapse children that belong to the
-          // picked org. With multi-org pickers this gates the collapse
-          // to the lineage.
-          return !(organizationId === undefined || picked.scopeId === organizationId);
-        }
-        return true;
-      });
-    } else if (picked.scopeType === "ORGANIZATION" && picked.personalOnly) {
-      // "All personal projects" subsumes the per-department personal picks
-      // but coexists with every plain scope (it targets a different slice).
-      cleaned = cleaned.filter((s) => !(s.personalOnly && s.scopeType === "DEPARTMENT"));
-    } else if (picked.scopeType === "DEPARTMENT" && picked.personalOnly) {
-      // A department's personal projects narrow from "all personal
-      // projects", so the org-personal pick goes; siblings coexist.
-      cleaned = cleaned.filter((s) => !(s.personalOnly && s.scopeType === "ORGANIZATION"));
-    } else if (picked.scopeType === "DEPARTMENT") {
-      // A department narrows from org-wide, so it clears the org pick.
-      // Sibling departments are mutually compatible and left untouched.
-      cleaned = cleaned.filter(
-        (s) =>
-          !(
-            s.scopeType === "ORGANIZATION" &&
-            !s.personalOnly &&
-            organizationId !== undefined &&
-            s.scopeId === organizationId
-          ),
-      );
-    } else if (picked.scopeType === "TEAM") {
-      cleaned = cleaned.filter((s) => {
-        // Parent org goes - team narrows the scope. Personal variants
-        // target a different slice and stay.
-        if (
-          s.scopeType === "ORGANIZATION" &&
-          !s.personalOnly &&
-          organizationId !== undefined &&
-          s.scopeId === organizationId
-        ) {
-          return false;
-        }
-        // Projects under this team are redundant once the team is
-        // covered explicitly.
-        if (s.scopeType === "PROJECT") {
-          const proj = availableProjects.find((p) => p.id === s.scopeId);
-          if (proj?.teamId === picked.scopeId) return false;
-        }
-        return true;
-      });
-    } else if (picked.scopeType === "PROJECT") {
-      const parentTeamId = availableProjects.find((p) => p.id === picked.scopeId)?.teamId;
-      cleaned = cleaned.filter((s) => {
-        if (
-          s.scopeType === "ORGANIZATION" &&
-          !s.personalOnly &&
-          organizationId !== undefined &&
-          s.scopeId === organizationId
-        ) {
-          return false;
-        }
-        if (s.scopeType === "TEAM" && parentTeamId !== undefined && s.scopeId === parentTeamId) {
-          return false;
-        }
-        return true;
-      });
-    }
+  return added.reduce(
+    (cleaned, picked) => collapseForPick({ entries: cleaned, picked, context }),
+    next,
+  );
+}
+
+type CollapseContext = {
+  organizationId: string | undefined;
+  availableProjects: { id: string; teamId?: string }[];
+};
+
+/** The plain org-wide pick for this picker's organization. */
+function isOrganizationWide(entry: ScopeChipPickerEntry, organizationId: string | undefined) {
+  return (
+    entry.scopeType === "ORGANIZATION" &&
+    !entry.personalOnly &&
+    organizationId !== undefined &&
+    entry.scopeId === organizationId
+  );
+}
+
+/**
+ * The picker is single-org-scoped, so every team and project belongs to this org: an org-wide
+ * pick drops them, every department and every personal variant, collapsing to the one ORG chip.
+ */
+function keptBesideOrganization(
+  entry: ScopeChipPickerEntry,
+  picked: ScopeChipPickerEntry,
+  organizationId: string | undefined,
+): boolean {
+  if (entry.personalOnly || entry.scopeType === "DEPARTMENT") return false;
+  if (entry.scopeType === "TEAM" || entry.scopeType === "PROJECT") {
+    return !(organizationId === undefined || picked.scopeId === organizationId);
   }
-  return cleaned;
+  return true;
+}
+
+/** A team narrows from org-wide, and covers the projects under it. */
+function keptBesideTeam(
+  entry: ScopeChipPickerEntry,
+  picked: ScopeChipPickerEntry,
+  { organizationId, availableProjects }: CollapseContext,
+): boolean {
+  if (isOrganizationWide(entry, organizationId)) return false;
+  if (entry.scopeType !== "PROJECT") return true;
+
+  return availableProjects.find((p) => p.id === entry.scopeId)?.teamId !== picked.scopeId;
+}
+
+/** A project narrows from org-wide and from its own team. */
+function keptBesideProject(
+  entry: ScopeChipPickerEntry,
+  parentTeamId: string | undefined,
+  organizationId: string | undefined,
+): boolean {
+  if (isOrganizationWide(entry, organizationId)) return false;
+
+  return !(
+    entry.scopeType === "TEAM" &&
+    parentTeamId !== undefined &&
+    entry.scopeId === parentTeamId
+  );
+}
+
+/**
+ * The entries left once one new pick is taken in. Personal picks target a different slice:
+ * "all personal projects" subsumes per-department personal picks, and a department's
+ * personal pick narrows from it; plain department picks clear only the org-wide pick.
+ */
+function collapseForPick({
+  entries,
+  picked,
+  context,
+}: {
+  entries: ScopeChipPickerEntry[];
+  picked: ScopeChipPickerEntry;
+  context: CollapseContext;
+}): ScopeChipPickerEntry[] {
+  const { organizationId, availableProjects } = context;
+  if (picked.scopeType === "ORGANIZATION") {
+    return picked.personalOnly
+      ? entries.filter((s) => !(s.personalOnly && s.scopeType === "DEPARTMENT"))
+      : entries.filter((s) => keptBesideOrganization(s, picked, organizationId));
+  }
+  if (picked.scopeType === "DEPARTMENT") {
+    return picked.personalOnly
+      ? entries.filter((s) => !(s.personalOnly && s.scopeType === "ORGANIZATION"))
+      : entries.filter((s) => !isOrganizationWide(s, organizationId));
+  }
+  if (picked.scopeType === "TEAM") return entries.filter((s) => keptBesideTeam(s, picked, context));
+  if (picked.scopeType === "PROJECT") {
+    const parentTeamId = availableProjects.find((p) => p.id === picked.scopeId)?.teamId;
+    return entries.filter((s) => keptBesideProject(s, parentTeamId, organizationId));
+  }
+  return entries;
 }
 
 // Chip-based scope picker; extracted for reuse across surfaces.

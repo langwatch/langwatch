@@ -1,5 +1,6 @@
-import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createLogger } from "@langwatch/observability";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createTestLogger } from "@langwatch/test-harness";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nowInstant, Temporal } from "@langwatch/time";
 /**
@@ -102,8 +103,7 @@ describe("given a process started with mail off", () => {
   describe("when a module reads mail and sends", () => {
     /** @scenario "Mail off boots and skips each send with one log line" */
     it("builds the member and skips the send with one line naming it", async () => {
-      const logger = createLogger("process-members-test");
-      const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+      const { logger, lines } = createTestLogger();
       const members = createProcessMembers({ config: config(), members: { logger } });
 
       await members.read("mail").send({
@@ -112,11 +112,13 @@ describe("given a process started with mail off", () => {
         html: "<p>hi</p>",
       });
 
-      expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn).toHaveBeenCalledWith(
-        { subject: "Trigger - Errors above threshold" },
-        expect.stringContaining('"Trigger - Errors above threshold" was not sent'),
-      );
+      const warnings = lines.filter((line) => line.level === 40);
+      expect(warnings).toHaveLength(1);
+      expect(
+        lines.findLine("warn", '"Trigger - Errors above threshold" was not sent'),
+      ).toMatchObject({
+        subject: "Trigger - Errors above threshold",
+      });
     });
 
     /** @scenario "Mail off still names the sender main answered" */

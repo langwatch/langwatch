@@ -111,12 +111,12 @@ class EntitlementOrganizationSeatLicense {
     // The NEW role's permissions are deliberately not read: a built-in role
     // carries none, and a custom one is gated below on the plan rather than on
     // a seat. That is the platform's own call, kept.
-    const change = getRoleChangeType(
-      input.currentRole as OrganizationUserRole,
-      input.userPermissions,
-      input.role as OrganizationUserRole,
-      undefined,
-    );
+    const change = getRoleChangeType({
+      oldRole: input.currentRole as OrganizationUserRole,
+      oldPermissions: input.userPermissions,
+      newRole: input.role as OrganizationUserRole,
+      newPermissions: undefined,
+    });
     await this.assertSeatForChange({ change, organizationId: input.organizationId, plan });
 
     const assignsCustomRole = (input.teamRoleUpdates ?? []).some(

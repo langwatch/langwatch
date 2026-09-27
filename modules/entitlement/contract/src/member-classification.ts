@@ -41,12 +41,17 @@ export function isLiteMember(
   return classifyMemberType(role, permissions) === "LiteMember";
 }
 
-export function getRoleChangeType(
-  oldRole: OrganizationUserRole,
-  oldPermissions: string[] | undefined,
-  newRole: OrganizationUserRole,
-  newPermissions: string[] | undefined,
-): RoleChangeType {
+export function getRoleChangeType({
+  oldRole,
+  oldPermissions,
+  newRole,
+  newPermissions,
+}: {
+  oldRole: OrganizationUserRole;
+  oldPermissions: string[] | undefined;
+  newRole: OrganizationUserRole;
+  newPermissions: string[] | undefined;
+}): RoleChangeType {
   const wasFull = isFullMember(oldRole, oldPermissions);
   const willBeFull = isFullMember(newRole, newPermissions);
   if (wasFull === willBeFull) return "no-change";
