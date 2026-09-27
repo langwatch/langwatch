@@ -20,6 +20,7 @@ import type {
   PulledUsageEntitlements,
 } from "../app/governance.members.ts";
 import type { IngestionSourceRepository } from "../repositories/ingestion-source.repository.ts";
+import { azureBillSourceId } from "../rules/azure-bill-identity.rules.ts";
 import type {
   ConversationRoutingProfile,
   RoutingOrigin,
@@ -495,7 +496,13 @@ export class IngestionPullWorkerService {
         record = this.usageRecords.findBuilt({
           event,
           source: {
-            ingestionSourceId: input.source.id,
+            // Only the subscription bill shares history with a retired source;
+            // conversation usage and audit records keep the current source id.
+            ingestionSourceId:
+              input.source.sourceType === "copilot_studio_dataverse" &&
+              event.source_event_id.startsWith("azure_cost:")
+                ? azureBillSourceId(input.source)
+                : input.source.id,
             sourceType: input.source.sourceType,
             organizationId: input.source.organizationId,
             teamId: input.source.teamId,

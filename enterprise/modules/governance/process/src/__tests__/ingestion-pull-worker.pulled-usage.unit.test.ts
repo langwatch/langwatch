@@ -10,6 +10,12 @@
 import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { observed, rollupFold } from "../eventing/__tests__/governance-cost-rollup.fixtures.ts";
+import { azureCostEvents } from "../rules/azure-cost-management.rules.ts";
+import {
+  type GovernanceCostRollupState,
+  governanceCostRollupTotals,
+} from "../rules/governance-cost-rollup-cell.rules.ts";
 import { createWorkerService } from "./support/puller-test-ports.ts";
 
 const { findUnique, update, insertEvent, runOnce, isEnabled } = vi.hoisted(() => ({
@@ -139,9 +145,55 @@ describe("the pull effect's pulled-usage emit seam", () => {
     expect(insertEvent.mock.calls[0]![0].sourceId).toBe("src_replacement");
   });
 
-  // Owed port: the cost-rollup fold projection (dev/docs/plans/merge-2026-09-21-owed-ports.md).
   /** @scenario "A replacement Azure source restates the original bill" */
-  it.todo("keeps the bill total when an archived source is replaced");
+  it("keeps the bill total when an archived source is replaced", async () => {
+    const recordPulledUsage = vi.fn().mockResolvedValue(undefined);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      for (const [index, id] of ["src_original", "src_replacement"].entries()) {
+        vi.setSystemTime(new Date(`2026-09-09T0${index}:00:00Z`));
+        findUnique.mockResolvedValue({
+          ...SOURCE_ROW,
+          id,
+          sourceType: "copilot_studio_dataverse",
+          parserConfig: { adapter: "test_adapter", _azureBillSourceId: "src_original" },
+        });
+        runOnce.mockResolvedValue({
+          events: azureCostEvents({
+            subscriptionId: "subscription-1",
+            days: [
+              {
+                day: "2026-09-08",
+                meterCategory: "Copilot Studio",
+                costMinor: index === 0 ? "100" : "125",
+                costUsd: null,
+                currencyCode: "USD",
+              },
+            ],
+          }),
+          cursor: null,
+          errorCount: 0,
+        });
+        await runIngestionPull({ sourceId: id, cursor: null, pulledUsage: { recordPulledUsage } });
+      }
+      const { projection } = rollupFold();
+      const cells = new Map<string, GovernanceCostRollupState>();
+      for (const [{ tenantId: _tenantId, occurredAt: _occurredAt, ...data }] of recordPulledUsage
+        .mock.calls) {
+        const event = observed(data);
+        const key = projection.key(event);
+        cells.set(key, projection.apply(cells.get(key) ?? projection.init(), event));
+      }
+      const total = [...cells.values()].reduce(
+        (sum, state) => sum + (governanceCostRollupTotals(state).amountNanoUsd ?? 0),
+        0,
+      );
+      expect(total).toBe(125_000_000_000);
+      expect(insertEvent.mock.calls[1]![0].sourceId).toBe("src_replacement");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   describe("when an adapter returns a priced usage event", () => {
     it("appends one record carrying the source's own attribution", async () => {
