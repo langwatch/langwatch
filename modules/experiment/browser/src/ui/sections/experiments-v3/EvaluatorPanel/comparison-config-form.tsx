@@ -9,6 +9,7 @@ import {
   type FieldMapping,
   VariableMappingInput,
 } from "@langwatch/prompt-browser-kit";
+import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
@@ -314,6 +315,7 @@ function VariantCard({
       {outputOptions.length > 1 && (
         <Box data-testid={`comparison-variant-output-${target.id}`}>
           <VariableMappingInput
+            renderSourceIcon={renderSourceTypeIcon}
             mapping={outputMapping}
             availableSources={[outputSource]}
             placeholder="Whole output"
@@ -500,6 +502,7 @@ function GoldenAnswerSection({
         </Field.Label>
         <Box data-testid="comparison-golden-field">
           <VariableMappingInput
+            renderSourceIcon={renderSourceTypeIcon}
             mapping={goldenMapping}
             availableSources={datasetSources}
             placeholder="None (judge on merits)"
@@ -560,6 +563,7 @@ function InputContextSection({
         </Field.Label>
         <Box data-testid="comparison-input-field">
           <VariableMappingInput
+            renderSourceIcon={renderSourceTypeIcon}
             mapping={inputMapping}
             availableSources={datasetSources}
             placeholder="Auto-detect input context"
