@@ -12,6 +12,25 @@ function getGroupedData(bucket: AnalyticsBucket, groupBy: string): GroupedData |
   return undefined;
 }
 
+function groupedPeriodTable({
+  currentPeriod,
+  groupBy,
+}: {
+  currentPeriod: AnalyticsBucket[];
+  groupBy: string;
+}): string[] {
+  const lines = ["| Date | Group | Value |", "|------|-------|-------|"];
+  for (const bucket of currentPeriod) {
+    const groups = getGroupedData(bucket, groupBy);
+    if (!groups) continue;
+    for (const [groupKey, metrics] of Object.entries(groups)) {
+      const value = Object.values(metrics).find((v) => typeof v === "number") ?? "N/A";
+      lines.push(`| ${bucket.date} | ${groupKey} | ${value} |`);
+    }
+  }
+  return lines;
+}
+
 function periodTable({
   currentPeriod,
   groupBy,
@@ -21,22 +40,14 @@ function periodTable({
 }): string[] {
   if (currentPeriod.length === 0) return ["No data available for this period."];
   if (groupBy && currentPeriod.some((b) => getGroupedData(b, groupBy) !== undefined)) {
-    const lines = ["| Date | Group | Value |", "|------|-------|-------|"];
-    for (const bucket of currentPeriod) {
-      const groups = getGroupedData(bucket, groupBy);
-      if (!groups) continue;
-      for (const [groupKey, metrics] of Object.entries(groups)) {
-        const value = Object.values(metrics).find((v) => typeof v === "number") ?? "N/A";
-        lines.push(`| ${bucket.date} | ${groupKey} | ${value} |`);
-      }
-    }
-    return lines;
+    return groupedPeriodTable({ currentPeriod, groupBy });
   }
   const lines = ["| Date | Value |", "|------|-------|"];
   for (const bucket of currentPeriod) {
     const value =
-      Object.entries(bucket).find(([k]) => k !== "date" && typeof bucket[k] === "number")?.[1] ??
-      "N/A";
+      Object.entries(bucket)
+        .map(([k, v]) => (k !== "date" && typeof v === "number" ? v : undefined))
+        .find((v) => v !== undefined) ?? "N/A";
     lines.push(`| ${bucket.date} | ${value} |`);
   }
   return lines;

@@ -4,15 +4,13 @@
  * images, video, and file-attachment chips.
  */
 import {
+  type ContentPartVisitor,
   convertRawPcmBase64ToWavBase64,
   detectRawPcmFormat,
   isMediaPartRole,
   type MediaPartRole,
-  type TraceMediaRef,
-} from "@langwatch/trace-contract";
-import {
   parseBase64DataUri,
-  type ContentPartVisitor,
+  type TraceMediaRef,
   visitContentPart,
 } from "@langwatch/trace-contract";
 import type { MediaPartData } from "@langwatch/trace-contract/conversation";

@@ -126,7 +126,6 @@ describe("createTracingProxy Integration Tests", () => {
       const proxy = createTracingProxy(target, tracer);
 
       // These should not trigger tracing
-      // eslint-disable-next-line @typescript-eslint/no-base-to-string
       proxy.toString();
       proxy.valueOf();
 

@@ -22,7 +22,10 @@ const claudeCodeAgent = (workingDirectory: string): AgentAdapter => ({
   role: AgentRole.AGENT,
   call: async (state) => {
     const formattedMessages = state.messages
-      .map((message) => `${message.role}: ${message.content}`)
+      .map(
+        (message) =>
+          `${message.role}: ${typeof message.content === "string" ? message.content : JSON.stringify(message.content)}`,
+      )
       .join("\n\n");
 
     const mcpConfig = {

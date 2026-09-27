@@ -54,11 +54,10 @@ describe("public HTTP request security", () => {
       "https://agent.example/run",
       () => new Promise(() => undefined),
     );
-    const rejection = await expect(resolution).rejects.toThrow(/destination could not be resolved/);
-
-    await vi.advanceTimersByTimeAsync(30_000);
-
-    await rejection;
+    await Promise.all([
+      expect(resolution).rejects.toThrow(/destination could not be resolved/),
+      vi.advanceTimersByTimeAsync(30_000),
+    ]);
   });
 
   /** @scenario HTTP agent redirects are revalidated */
