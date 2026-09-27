@@ -27,11 +27,6 @@
       "langwatch-declaration-source": "./src/ui/sections/use-project-span-names.ts",
       "types": "./dist/ui/sections/use-project-span-names.d.ts",
       "default": "./src/ui/sections/use-project-span-names.ts"
-    },
-    "./surfaces/conversation": {
-      "langwatch-declaration-source": "./src/ui/sections/conversation/index.ts",
-      "types": "./dist/ui/sections/conversation/index.d.ts",
-      "default": "./src/ui/sections/conversation/index.ts"
     }
   },
   "scripts": {

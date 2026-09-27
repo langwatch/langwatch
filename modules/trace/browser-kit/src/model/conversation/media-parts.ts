@@ -4,42 +4,20 @@
  * images, video, and file-attachment chips.
  */
 import {
+  type ContentPartVisitor,
   convertRawPcmBase64ToWavBase64,
   detectRawPcmFormat,
   isMediaPartRole,
+  type MediaPartData,
   type MediaPartRole,
+  parseBase64DataUri,
   type TraceMediaRef,
+  visitContentPart,
 } from "@langwatch/trace-contract";
 
-import {
-  parseBase64DataUri,
-  type ContentPartVisitor,
-  visitContentPart,
-} from "../../../model/shared/content-parts/visit-content-part.ts";
-import { containsMediaMarkers } from "../content-parts/media-markers.ts";
+import { containsMediaMarkers } from "./media-markers.ts";
 
-/**
- * A single renderable media content part, as produced after content
- * extraction. This matches the subset of InputContentPart shapes the
- * `MediaPart` component renders.
- */
-export type MediaPartData =
-  | {
-      type: "image" | "audio" | "video";
-      source: { type: "url"; value: string; mimeType?: string };
-    }
-  | {
-      type: "image" | "audio" | "video";
-      source: { type: "data"; value: string; mimeType: string };
-    }
-  | {
-      type: "binary";
-      mimeType: string;
-      id?: string;
-      url?: string;
-      data?: string;
-      filename?: string;
-    };
+export type { MediaPartData };
 
 /**
  * Shared recursion ceiling for media walks — identical on the render-side collector

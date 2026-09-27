@@ -1,15 +1,15 @@
 import { Box, Image, Text, VStack } from "@chakra-ui/react";
+import type {
+  UiConversationAudioPlayback,
+  UiRenderMediaPart,
+} from "@langwatch/browser-host/declarations";
 import { getDisplayRoleVisuals } from "@langwatch/trace-browser-kit";
+import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import type { ReactNode } from "react";
 
 import { Bubble } from "../explorer/trace-table/registry/addons/conversation/bubble.tsx";
 import { RenderInputOutput } from "../traces/render-input-output.tsx";
 import { ToolPairCard } from "../transcript/tool-blocks.tsx";
-import type {
-  ConversationAudioPlayback,
-  ConversationRoleMode,
-  DisplayPart,
-} from "./conversation.types.ts";
 import { ErrorMessage } from "./error-message.tsx";
 import { findStructuredOutput } from "./structured-output.ts";
 
@@ -170,11 +170,7 @@ export function ImagePart({
  * not an import: the component that probes a stored object and
  * coordinates playback belongs to the owning surface, unreachable here.
  */
-export type RenderMediaPart = (input: {
-  part: Extract<DisplayPart, { kind: "media" }>["part"];
-  projectId: string;
-  audioPlayback?: ConversationAudioPlayback;
-}) => ReactNode;
+export type { UiRenderMediaPart as RenderMediaPart } from "@langwatch/browser-host/declarations";
 
 export function MediaRow({
   part,
@@ -185,9 +181,9 @@ export function MediaRow({
 }: {
   part: Extract<DisplayPart, { kind: "media" }>;
   projectId: string;
-  audioPlayback?: ConversationAudioPlayback;
+  audioPlayback?: UiConversationAudioPlayback;
   roleMode?: ConversationRoleMode;
-  renderMediaPart: RenderMediaPart;
+  renderMediaPart: UiRenderMediaPart;
 }) {
   const align = alignForRole({ role: part.role, roleMode });
   // Players stretch to the container; attachment chips hug the side the message

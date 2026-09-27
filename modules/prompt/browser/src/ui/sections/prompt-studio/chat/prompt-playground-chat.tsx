@@ -1,15 +1,12 @@
 import { Box, type BoxProps, HStack, IconButton } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { PromptConfigFormValues, runtimeInputsSchema } from "@langwatch/prompt-contract";
-import {
-  ConversationThread,
-  type DisplayPart,
-  flattenMessages,
-} from "@langwatch/trace-browser/surfaces/conversation";
+import { type DisplayPart, flattenMessages } from "@langwatch/trace-browser-kit";
 import { forwardRef, useCallback, useImperativeHandle, useMemo } from "react";
 import { LuCopy, LuTrash2 } from "react-icons/lu";
 import type { z } from "zod";
 
+import { ConversationThread } from "../../../../behavior/lent-trace.tsx";
 import {
   type PlaygroundMessage,
   usePromptExecution,

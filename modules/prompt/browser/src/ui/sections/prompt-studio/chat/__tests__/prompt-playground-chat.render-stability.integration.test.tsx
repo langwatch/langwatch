@@ -33,11 +33,15 @@ vi.mock("../../../../../behavior/use-prompt-project.ts", () => ({
 
 // The thread itself is covered by the shared renderer's own suite; here it is
 // only a render counter, because a re-render of the chat is a re-render of it.
-vi.mock("@langwatch/trace-browser/surfaces/conversation", () => ({
+vi.mock("../../../../../behavior/lent-trace.tsx", () => ({
   ConversationThread: () => {
     renderCount.value += 1;
     return <div data-testid="conversation-thread" />;
   },
+}));
+
+vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   flattenMessages: () => [],
 }));
 

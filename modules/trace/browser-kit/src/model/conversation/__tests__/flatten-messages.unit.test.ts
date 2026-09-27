@@ -1,9 +1,9 @@
+import type { DisplayPart } from "@langwatch/trace-contract/conversation";
 /**
  * Spec: specs/prompts/playground-conversation.feature
  */
 import { describe, expect, it } from "vitest";
 
-import type { DisplayPart } from "../conversation.types.ts";
 import { type FlattenableMessage, flattenMessages, groupIntoTurns } from "../flatten-messages.ts";
 
 const message = (msg: Record<string, unknown>) => msg as FlattenableMessage;

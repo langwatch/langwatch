@@ -39,3 +39,22 @@ export * from "./model/display-formatters.ts";
 export * from "./behavior/ui.store.ts";
 export * from "./ui/sections/explorer/filter-sidebar/utils.ts";
 export * from "./behavior/explorer/filter-sidebar/types.ts";
+// Conversation parts: flattened here, drawn by the thread trace lends.
+export {
+  type FlattenableMessage,
+  flattenMessages,
+  groupIntoTurns,
+  type StreamingPart,
+} from "./model/conversation/flatten-messages.ts";
+export {
+  collectAnnotatedMediaParts,
+  type CollectedMediaPart,
+  collectMediaParts,
+  type MediaPartData,
+  mediaRefToMediaData,
+} from "./model/conversation/media-parts.ts";
+export type {
+  ConversationRoleMode,
+  ConversationTurn,
+  DisplayPart,
+} from "@langwatch/trace-contract/conversation";

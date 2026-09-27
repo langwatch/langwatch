@@ -1,6 +1,6 @@
 import type { ParsedLLMError } from "@langwatch/prompt-contract";
 
-import type { MediaPartData } from "../../../behavior/shared/traces/media-parts.ts";
+import type { MediaPartData } from "../trace-media-part.collector.ts";
 
 // One renderable unit; tool calls and results pair into one part. Every
 // surface flattens and renders through ConversationThread.
@@ -78,14 +78,3 @@ export interface ConversationTurn {
  * voice run the caller was a person rather than a simulator, which reads as "You" (#8020).
  */
 export type ConversationRoleMode = "chat" | "scenario" | "scenario-human-caller";
-
-/**
- * Playback coordination for one audio part, as the host's sequential player
- * hands it out. Structural on purpose: the thread never starts a clip, it only
- * passes the props through to whatever draws the media.
- */
-export interface ConversationAudioPlayback {
-  ref: (element: HTMLAudioElement | null) => void;
-  onPlay: () => void;
-  onEnded: () => void;
-}

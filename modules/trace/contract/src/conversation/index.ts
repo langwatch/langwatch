@@ -13,3 +13,4 @@ export {
   type ParsedTurn,
   turnMediaForSide,
 } from "./parsed-turns.ts";
+export type { ConversationRoleMode, ConversationTurn, DisplayPart } from "./display-part.ts";

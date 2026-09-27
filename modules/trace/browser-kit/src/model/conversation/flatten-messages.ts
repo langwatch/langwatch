@@ -2,11 +2,11 @@
 // (canonical decoder shared with server extraction).
 import type { ParsedLLMError } from "@langwatch/prompt-contract";
 import type { SimulationMessage } from "@langwatch/scenario-contract";
+import type { ConversationTurn, DisplayPart } from "@langwatch/trace-contract/conversation";
 
-import { coerceContentToArray } from "../../../model/shared/content-parts/coerce-content-to-array.ts";
-import { safeJsonParseOrStringFallback } from "../../../model/shared/content-parts/safe-json-parse.ts";
+import { coerceContentToArray } from "./coerce-content-to-array.ts";
 import { collapseAudioTranscript, decodeContentPart, type PartContext } from "./content-parts.ts";
-import type { ConversationTurn, DisplayPart } from "./conversation.types.ts";
+import { safeJsonParseOrStringFallback } from "./safe-json-parse.ts";
 
 // Union type; playground already persists chatMessageSchema, so no
 // conversion needed.

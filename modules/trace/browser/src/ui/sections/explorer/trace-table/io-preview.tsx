@@ -1,4 +1,6 @@
 import { chakra, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import type { MediaPartData } from "@langwatch/trace-browser-kit";
+import { collectMediaParts } from "@langwatch/trace-browser-kit";
 import type { TraceMediaRef } from "@langwatch/trace-contract";
 import { ArrowDown, ArrowUp, AudioLines, Bot, Film, Paperclip, User, Wrench } from "lucide-react";
 import type React from "react";
@@ -6,8 +8,6 @@ import { Fragment, memo, type ReactNode, useLayoutEffect, useMemo, useRef } from
 
 import { useDensityStore } from "../../../../behavior/density.store.ts";
 import { formatPreview } from "../../../../behavior/preview-formatter.ts";
-import type { MediaPartData } from "../../../../behavior/shared/traces/media-parts.ts";
-import { collectMediaParts } from "../../../../behavior/shared/traces/media-parts.ts";
 import { tryParseChat } from "../../../../model/explorer/trace-table/chat-content.ts";
 import { useDensityTokens } from "../hooks/use-density-tokens.ts";
 

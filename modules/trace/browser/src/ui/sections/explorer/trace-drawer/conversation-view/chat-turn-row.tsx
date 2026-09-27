@@ -5,13 +5,13 @@ import {
   formatDuration,
   formatRelativeTimeAgo,
   isSessionMarked,
+  type MediaPartData,
   useAnnotationQueueSessionStore,
   useConversationExpand,
 } from "@langwatch/trace-browser-kit";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
 import { Fragment, memo, useCallback, useEffect, useMemo, useState } from "react";
 
-import type { MediaPartData } from "../../../../../behavior/shared/traces/media-parts.ts";
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../../model/constants.ts";
 import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";

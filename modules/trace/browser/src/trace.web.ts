@@ -35,6 +35,12 @@ export const traceWeb = defineWebModule("trace")
           .AnnotationQueueConversation,
       }),
     },
+    conversationThread: {
+      load: async () => ({
+        default: (await import("./ui/sections/conversation/conversation-thread.tsx"))
+          .ConversationThread,
+      }),
+    },
     evaluatorTracesMapping: {
       load: async () => ({
         default: (await import("./ui/sections/evaluations/evaluator-traces-mapping.tsx"))

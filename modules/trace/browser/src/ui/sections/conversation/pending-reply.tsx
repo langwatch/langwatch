@@ -3,8 +3,7 @@
 import { Box, Circle, Flex, Icon } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { getDisplayRoleVisuals } from "@langwatch/trace-browser-kit";
-
-import type { ConversationRoleMode } from "./conversation.types.ts";
+import type { ConversationRoleMode } from "@langwatch/trace-contract/conversation";
 
 const shimmer = keyframes`
   0%   { background-position: 200% center; }
