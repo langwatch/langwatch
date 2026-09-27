@@ -24,7 +24,6 @@ export type {
   PersonalTeamScopeReader,
   RoleBindingScope,
 } from "./services/personal-team-scope.service.ts";
-export type { TenantOwnershipReader } from "./services/tenant-directory.service.ts";
 export type {
   AuditLogFilters,
   CreateAndAssignInput,

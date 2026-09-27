@@ -1,5 +1,6 @@
+import { randomBytes } from "node:crypto";
+
 import { generate } from "@langwatch/ksuid";
-import { nanoid } from "nanoid";
 
 import type { PersonalWorkspaceIdentity } from "../app/organization.members.ts";
 import type { PersonalWorkspaceResourceIds } from "../repositories/organization.repository.ts";
@@ -9,13 +10,20 @@ const TEAM_KSUID_RESOURCE = "team";
 const PROJECT_KSUID_RESOURCE = "project";
 const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
-/** The personal slug's user-id prefix length, nanoid suffix length, and ingestion key length. */
+/** The personal slug's user-id prefix length, random suffix length, and ingestion key length. */
 const SLUG_USER_PREFIX_CHARS = 12;
 const SLUG_SUFFIX_CHARS = 6;
 const PERSONAL_PROJECT_API_KEY_CHARS = 40;
 
+/** Uniform characters from the URL-safe alphabet, the format these values have always had. */
+function randomUrlSafe(length: number): string {
+  return randomBytes(Math.ceil((length * 3) / 4))
+    .toString("base64url")
+    .slice(0, length);
+}
+
 function personalSlug(slugPrefix: string): string {
-  return `personal-${slugPrefix}-${nanoid(SLUG_SUFFIX_CHARS).toLowerCase()}`;
+  return `personal-${slugPrefix}-${randomUrlSafe(SLUG_SUFFIX_CHARS).toLowerCase()}`;
 }
 
 export class PersonalWorkspaceIdentityService implements PersonalWorkspaceIdentity {
@@ -33,7 +41,7 @@ export class PersonalWorkspaceIdentityService implements PersonalWorkspaceIdenti
       teamSlug: personalSlug(slugPrefix),
       projectId: generate(PROJECT_KSUID_RESOURCE).toString(),
       projectSlug: personalSlug(slugPrefix),
-      projectApiKey: `pkey_${nanoid(PERSONAL_PROJECT_API_KEY_CHARS)}`,
+      projectApiKey: `pkey_${randomUrlSafe(PERSONAL_PROJECT_API_KEY_CHARS)}`,
       ownerBindingId: generate(ROLE_BINDING_KSUID_RESOURCE).toString(),
     };
   }
