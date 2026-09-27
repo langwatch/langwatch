@@ -22,7 +22,8 @@ import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { composeTraceAppDependencies } from "../trace-read.composition.ts";
+import { composeTraceAppDependencies } from "../trace-composition.build.ts";
+import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 
 const FOLDED: TraceSummaryData = traceSummaryDataSchema.parse({
   traceId: "trace-1",
@@ -164,11 +165,18 @@ function summaryStoreReading(read: FoldStateRead<TraceSummaryData>) {
 
 const LOOKUP = { projectId: "project-1", traceId: "trace-1" };
 
+/** The composed tree read; a fixture that composed none is broken, not a failed expectation. */
+function treeOf(deps: ReturnType<typeof compose>) {
+  const tree = deps.traces.tree;
+  if (!tree) throw new Error("fixture: this composition carries no tree read");
+  return tree;
+}
+
 describe("composeTraceAppDependencies summary reader", () => {
   it("answers the folded summary, asking the fold for the trace under its tenant", async () => {
     const { store, asked } = summaryStoreReading({ kind: "folded", state: FOLDED });
 
-    await expect(compose({ summaryStore: store }).traces.tree.findSummary(LOOKUP)).resolves.toEqual(
+    await expect(treeOf(compose({ summaryStore: store })).findSummary(LOOKUP)).resolves.toEqual(
       FOLDED,
     );
     expect(asked).toEqual([{ aggregateId: "trace-1", tenantId: "project-1" }]);
@@ -177,20 +185,20 @@ describe("composeTraceAppDependencies summary reader", () => {
   it("answers null while nothing has been folded for the trace", async () => {
     const { store } = summaryStoreReading({ kind: "empty" });
 
-    await expect(
-      compose({ summaryStore: store }).traces.tree.findSummary(LOOKUP),
-    ).resolves.toBeNull();
+    await expect(treeOf(compose({ summaryStore: store })).findSummary(LOOKUP)).resolves.toBeNull();
   });
 
   it("answers null on a process that folds no trace projections", async () => {
-    await expect(compose({}).traces.tree.findSummary(LOOKUP)).resolves.toBeNull();
+    await expect(treeOf(compose({})).findSummary(LOOKUP)).resolves.toBeNull();
   });
 
   it("refuses the tree read by name on a process that composed no ClickHouse", () => {
     const { store } = summaryStoreReading({ kind: "folded", state: FOLDED });
     const deps = compose({ withClickHouse: false, summaryStore: store });
+    const app = createTraceAppHarness({ traces: { tree: deps.traces.tree } });
 
-    expect(() => deps.traces.tree.findSummary(LOOKUP)).toThrow(
+    expect(deps.traces.tree).toBeUndefined();
+    expect(() => app.findSummary(LOOKUP)).toThrow(
       expect.objectContaining({ code: "service_unavailable" }),
     );
   });

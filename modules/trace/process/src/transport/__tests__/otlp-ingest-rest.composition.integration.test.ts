@@ -25,7 +25,7 @@ import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract"
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it } from "vitest";
 
-import { composeTraceAppDependencies } from "../../app/trace-read.composition.ts";
+import { composeTraceAppDependencies } from "../../app/trace-composition.build.ts";
 import { TraceApp } from "../../app/trace.app.ts";
 import type { TraceProcessingCommands } from "../../app/trace.members.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";

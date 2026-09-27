@@ -163,6 +163,11 @@ describe("given one organization on a private ClickHouse instance and one on the
                 skipped: false,
                 sharedUrl: endpoint.url,
                 privateEndpoints: [],
+                settings: {
+                  coldStorageEnabled: false,
+                  hotDayOverrides: {},
+                  childEnvironment: { PATH: process.env.PATH, HOME: process.env.HOME },
+                },
               },
             }).execute();
           } finally {

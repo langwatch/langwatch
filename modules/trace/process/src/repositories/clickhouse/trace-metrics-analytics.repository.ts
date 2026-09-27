@@ -1,6 +1,7 @@
 import { queryWindowed } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { z } from "zod";
 
 import type { TraceAnalyticsRow } from "../../eventing/trace-derived.projection.ts";
 import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "../../rules/trace-analytics-projection-version.rules.ts";
@@ -9,6 +10,8 @@ import {
   type TraceAnalyticsProjectionRead,
 } from "../trace-analytics-projection.repository.ts";
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+
+const analyticsRecordRowsSchema = z.array(z.record(z.string(), z.unknown()));
 
 const asString = (value: unknown): string =>
   typeof value === "string" || typeof value === "number" || typeof value === "bigint"
@@ -297,7 +300,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<Record<string, unknown>>();
+    const rows = analyticsRecordRowsSchema.parse(await result.json());
     const record = rows[0];
     if (!record) return null;
     return {

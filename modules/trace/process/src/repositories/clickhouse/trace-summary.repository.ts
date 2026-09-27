@@ -7,6 +7,7 @@ import {
   isStorageAnchoredVersion,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import { firstUsableAnchor } from "../../rules/trace-storage-anchor.rules.ts";
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
@@ -16,6 +17,7 @@ import {
   type TraceSummaryReadWindow,
 } from "../trace-summary-projection.repository.ts";
 import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
+import { chBoolean, chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
 import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
 
 /**
@@ -126,6 +128,62 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   EarliestSpanStartMs?: number | string;
   _retention_days: number;
 }
+
+/** One `findByTraceId` row, as ClickHouse's JSON writes the columns that read selects. */
+const summaryReadRowSchema = z.looseObject({
+  ProjectionId: chString,
+  TenantId: chString,
+  TraceId: chString,
+  Version: chString,
+  Attributes: chStringMap,
+  OccurredAt: chNumber,
+  EarliestSpanStartMs: chNumber.optional(),
+  CreatedAt: chNumber,
+  UpdatedAt: chNumber,
+  LastEventOccurredAt: chNumber.optional(),
+  ComputedIOSchemaVersion: chString,
+  ComputedInput: chString.nullable(),
+  ComputedOutput: chString.nullable(),
+  TimeToFirstTokenMs: chNumber.nullable(),
+  TimeToLastTokenMs: chNumber.nullable(),
+  TotalDurationMs: chNumber,
+  TokensPerSecond: chNumber.nullable(),
+  SpanCount: chNumber,
+  ContainsErrorStatus: chBoolean,
+  ContainsOKStatus: chBoolean,
+  ErrorMessage: chString.nullable(),
+  Models: z.array(chString),
+  TotalCost: chNumber.nullable(),
+  NonBilledCost: chNumber.nullable(),
+  TokensEstimated: chBoolean,
+  TotalPromptTokenCount: chNumber.nullable(),
+  TotalCompletionTokenCount: chNumber.nullable(),
+  OutputFromRootSpan: chBoolean,
+  OutputSpanEndTimeMs: chNumber,
+  BlockedByGuardrail: chBoolean,
+  RootSpanType: chString.nullable(),
+  ContainsAi: chBoolean,
+  ContainsPrompt: chBoolean,
+  SelectedPromptId: chString.nullable(),
+  SelectedPromptSpanId: chString.nullable(),
+  LastUsedPromptId: chString.nullable(),
+  LastUsedPromptVersionNumber: chNumber.nullable(),
+  LastUsedPromptVersionId: chString.nullable(),
+  LastUsedPromptSpanId: chString.nullable(),
+  TopicId: chString.nullable(),
+  SubTopicId: chString.nullable(),
+  AnnotationIds: z.array(chString),
+  HasAnnotation: chBoolean.nullable(),
+  TraceName: chString,
+});
+
+const summaryReadRowsSchema = z.array(summaryReadRowSchema);
+
+type SummaryReadRow = z.infer<typeof summaryReadRowSchema>;
+
+const occurredAtCountRowsSchema = z.array(
+  z.looseObject({ rowCount: chNumber, occurredAtMs: chNumber.nullable() }),
+);
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
   private constructor(
@@ -373,10 +431,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       query_params: { tenantId, traceId },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as {
-      rowCount: string | number;
-      occurredAtMs: string | number | null;
-    }[];
+    const rows = occurredAtCountRowsSchema.parse(await result.json());
     const rowCountRaw = rows[0]?.rowCount;
     const raw = rows[0]?.occurredAtMs;
     const rowCount = typeof rowCountRaw === "string" ? Number(rowCountRaw) : (rowCountRaw ?? NaN);
@@ -477,13 +532,13 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<ClickHouseSummaryRecord>();
+    const rows = summaryReadRowsSchema.parse(await result.json());
     const row = rows[0];
     if (!row) return null;
     return this.fromClickHouseRecord(row);
   }
 
-  private fromClickHouseRecord(record: ClickHouseSummaryRecord): TraceSummaryData {
+  private fromClickHouseRecord(record: SummaryReadRow): TraceSummaryData {
     return {
       traceId: record.TraceId,
       spanCount: record.SpanCount,

@@ -69,6 +69,11 @@ export async function startMigratedTraceClickHouse(): Promise<ClickHouseClient> 
             skipped: false,
             sharedUrl: provisioned.url,
             privateEndpoints: [],
+            settings: {
+              coldStorageEnabled: false,
+              hotDayOverrides: {},
+              childEnvironment: { PATH: process.env.PATH, HOME: process.env.HOME },
+            },
           },
         }).execute();
       } finally {

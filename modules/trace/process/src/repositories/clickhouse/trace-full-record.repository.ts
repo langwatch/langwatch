@@ -8,6 +8,7 @@ import {
   type TraceFullReadInput,
   type TraceFullThreadReadInput,
 } from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import type { TraceFullIo } from "../../app/trace.members.ts";
 import {
@@ -31,29 +32,67 @@ import type {
 } from "../trace-clickhouse-client.repository.ts";
 import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
 import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
+import { chBoolean, chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
 
 const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const MAX_SPANS = 10_000;
 const MAX_THREAD_TRACES = 1_000;
 const PAYLOAD_READ_CONCURRENCY = 25;
 
-type SummaryRow = {
-  TraceId: string;
-  Attributes: Record<string, string>;
-  ComputedInput: string | null;
-  ComputedOutput: string | null;
-  ContainsErrorStatus: boolean;
-  ErrorMessage: string | null;
-  TimeToFirstTokenMs: number | null;
-  TotalDurationMs: number | null;
-  TotalPromptTokenCount: number | null;
-  TotalCompletionTokenCount: number | null;
-  TotalCost: number | null;
-  TokensEstimated: boolean;
-  OccurredAtMs: number;
-  CreatedAtMs: number;
-  UpdatedAtMs: number;
-};
+const summaryRowSchema = z.looseObject({
+  TraceId: chString,
+  Attributes: chStringMap,
+  ComputedInput: chString.nullable(),
+  ComputedOutput: chString.nullable(),
+  ContainsErrorStatus: chBoolean,
+  ErrorMessage: chString.nullable(),
+  TimeToFirstTokenMs: chNumber.nullable(),
+  TotalDurationMs: chNumber.nullable(),
+  TotalPromptTokenCount: chNumber.nullable(),
+  TotalCompletionTokenCount: chNumber.nullable(),
+  TotalCost: chNumber.nullable(),
+  TokensEstimated: chBoolean,
+  OccurredAtMs: chNumber,
+  CreatedAtMs: chNumber,
+  UpdatedAtMs: chNumber,
+});
+
+const summaryRowsSchema = z.array(summaryRowSchema);
+
+type SummaryRow = z.infer<typeof summaryRowSchema>;
+
+const threadTraceRowSchema = z.looseObject({ TraceId: chString, OccurredAtMs: chNumber });
+
+const threadTraceRowsSchema = z.array(threadTraceRowSchema);
+
+const storedSpanRowSchema: z.ZodType<StoredSpanRow> = z.looseObject({
+  SpanId: chString,
+  TraceId: chString,
+  TenantId: chString,
+  ParentSpanId: chString.nullable(),
+  ParentTraceId: chString.nullable(),
+  ParentIsRemote: chBoolean.nullable(),
+  Sampled: chBoolean,
+  StartTimeMs: chNumber,
+  EndTimeMs: chNumber,
+  DurationMs: chNumber,
+  SpanName: chString,
+  SpanKind: chNumber,
+  ResourceAttributes: chStringMap,
+  SpanAttributes: chStringMap,
+  StatusCode: chNumber.nullable(),
+  StatusMessage: chString.nullable(),
+  ScopeName: chString.nullable(),
+  ScopeVersion: chString.nullable(),
+  Events_Timestamp: z.array(chNumber).nullable(),
+  Events_Name: z.array(chString).nullable(),
+  Events_Attributes: z.array(chStringMap).nullable(),
+  Links_TraceId: z.array(chString).nullable(),
+  Links_SpanId: z.array(chString).nullable(),
+  Links_Attributes: z.array(chStringMap).nullable(),
+});
+
+const storedSpanRowsSchema = z.array(storedSpanRowSchema);
 
 type PayloadReference = { traceId: string; eventId: string; field: string };
 
@@ -135,7 +174,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
       "ClickHouseTraceFullRecordRepository.findThread",
     );
     const client = await this.clickhouse.resolve(input.tenantId);
-    const result = await client.query<{ TraceId: string; OccurredAtMs: number }>({
+    const result = await client.query({
       query: `SELECT TraceId, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs FROM trace_summaries
         WHERE TenantId = {tenantId:String} AND Attributes['gen_ai.conversation.id'] = {threadId:String}
         AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries
@@ -148,7 +187,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
       },
       format: "JSONEachRow",
     });
-    const rows = await result.json<{ TraceId: string; OccurredAtMs: number }>();
+    const rows = threadTraceRowsSchema.parse(await result.json());
     const records = await ClickHouseTraceFullRecordRepository.mapWithConcurrency(
       rows,
       PAYLOAD_READ_CONCURRENCY,
@@ -170,7 +209,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
     client: TraceClickHouseClient,
     input: TraceFullReadInput,
   ): Promise<SummaryRow | null> {
-    const result = await client.query<SummaryRow>({
+    const result = await client.query({
       query: `SELECT TraceId, Attributes, ComputedInput, ComputedOutput, ContainsErrorStatus, ErrorMessage,
         TimeToFirstTokenMs, TotalDurationMs, TotalPromptTokenCount, TotalCompletionTokenCount, TotalCost, TokensEstimated,
         toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs, toUnixTimestamp64Milli(CreatedAt) AS CreatedAtMs,
@@ -180,7 +219,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
       query_params: { tenantId: input.tenantId, traceId: input.traceId },
       format: "JSONEachRow",
     });
-    return (await result.json<SummaryRow>())[0] ?? null;
+    return summaryRowsSchema.parse(await result.json())[0] ?? null;
   }
 
   private async spans(
@@ -192,7 +231,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
       const filter = bounded
         ? "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})"
         : "";
-      const result = await client.query<StoredSpanRow>({
+      const result = await client.query({
         query: `SELECT SpanId, TraceId, TenantId, ParentSpanId, ParentTraceId, ParentIsRemote, Sampled,
           toUnixTimestamp64Milli(StartTime) AS StartTimeMs, toUnixTimestamp64Milli(EndTime) AS EndTimeMs, DurationMs,
           SpanName, SpanKind, ResourceAttributes, SpanAttributes, StatusCode, StatusMessage, ScopeName, ScopeVersion,
@@ -216,7 +255,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
         clickhouse_settings: { max_memory_usage: String(2 * 1024 * 1024 * 1024) },
         format: "JSONEachRow",
       });
-      return result.json<StoredSpanRow>();
+      return storedSpanRowsSchema.parse(await result.json());
     };
     // A summary occurrence anchor is authoritative for this trace. An empty
     // window means there are no matching spans there; widening to every cold

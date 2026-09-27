@@ -196,7 +196,7 @@ function collectionElements({
   collection: ProjectionCollection;
 }): ProjectionSource[] {
   const annotationsOrEvaluations =
-    collection === "annotations" ? trace.annotations : trace.evaluations;
+    collection === "annotations" ? trace.projectedAnnotations : trace.evaluations;
   const raw = collection === "events" ? trace.events : annotationsOrEvaluations;
 
   return (raw ?? []).map((element) => ({ ...element }));

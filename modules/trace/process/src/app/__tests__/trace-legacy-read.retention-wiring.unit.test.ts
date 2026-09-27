@@ -22,7 +22,7 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-const { composeTraceLegacyRead } = await import("../trace-read.composition.ts");
+const { composeTraceLegacyRead } = await import("../trace-composition.build.ts");
 const { TraceLegacyReadClickHouseRepository } =
   await import("../../repositories/clickhouse/trace-legacy-read.repository.ts");
 const traceCanonicalisation = TraceCanonicalisationService.create();
@@ -58,9 +58,8 @@ describe("the production trace-service factory", () => {
           traceCanonicalisation,
         });
 
-        // `provider` is the PlatformRetentionDaysProvider adapter the floor
-        // service wraps around the resolver; the resolver is the thing that
-        // has to be the real cascade.
+        // `provider` is the TraceRetentionFloorService policy the floor asks;
+        // the resolver inside it is the thing that has to be the real cascade.
         const provider = retentionProviderOf(service) as { resolver?: unknown };
 
         expect(provider?.resolver).toBe(retentionResolver);

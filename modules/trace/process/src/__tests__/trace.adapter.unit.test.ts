@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { TraceTreeComposition } from "#app/trace-tree.composition";
+import { TraceTreeComposition } from "#app/trace-composition.build";
 import type { TraceFullIo } from "#app/trace.members";
 import { TraceQueryFieldValuesRepository } from "#repositories/query-field-values.repository";
 import { TracePayloadReaderRepository } from "#repositories/trace-payload-reader.repository";
@@ -41,34 +41,57 @@ class EmptyFullIo implements TraceFullIo {
   }
 }
 
+/** ClickHouse answers `SpanAttributes['missing']` with "", so every attribute column is present. */
+const ABSENT_ATTRIBUTE_COLUMNS = {
+  ToolName: "",
+  ResponseModel: "",
+  Cost: "",
+  InputTokens: "",
+  OutputTokens: "",
+  CacheReadTokens: "",
+  CacheCreationTokens: "",
+  CacheCreation1hTokens: "",
+  InputChars: "",
+  AudioSeconds: "",
+  InputAudioTokens: "",
+  OutputAudioTokens: "",
+  CustomInputRate: "",
+  CustomOutputRate: "",
+  CustomCacheReadRate: "",
+  CustomCacheCreationRate: "",
+  CustomCacheCreation1hRate: "",
+  LwSpanCost: "",
+};
+
 const resolver =
   (
     calls: { tenantId: string; sql: string }[],
     cost: string | number = 0.2,
   ): TraceClickHouseResolver =>
   async (tenantId): Promise<TraceClickHouseClient> => ({
-    query: async <_Row>({ query }: { query: string }) => {
+    query: async ({ query }: { query: string }) => {
       calls.push({ tenantId, sql: query });
       const rows: unknown[] = [
         {
+          ...ABSENT_ATTRIBUTE_COLUMNS,
           SpanId: "span_1",
           ParentSpanId: null,
           SpanName: "llm",
           SpanType: "llm",
-          ToolName: null,
+          ToolName: "",
           Model: "model",
           Cost: cost,
           InputTokens: 2,
           OutputTokens: 2,
-          CacheReadTokens: null,
-          CacheCreationTokens: null,
+          CacheReadTokens: "",
+          CacheCreationTokens: "",
           StartTimeMs: 10,
           DurationMs: 20,
           UpdatedAtMs: 30,
           StatusCode: 1,
         },
       ];
-      return { json: async <T>() => rows as T[] };
+      return { json: async () => rows };
     },
   });
 
@@ -165,7 +188,7 @@ describe("ClickHouseTraceSpanRepository evaluation reads", () => {
     const calls: string[] = [];
     const repository = ClickHouseTraceSpanRepository.create({
       resolve: async (): Promise<TraceClickHouseClient> => ({
-        query: async <_Row>({ query }: { query: string }) => {
+        query: async ({ query }: { query: string }) => {
           calls.push(query);
           const rows: unknown[] = [
             {
@@ -179,7 +202,7 @@ describe("ClickHouseTraceSpanRepository evaluation reads", () => {
             { SpanType: "", Model: "model-1", Contexts: "" },
           ];
 
-          return { json: async <T>() => rows as T[] };
+          return { json: async () => rows };
         },
       }),
     });
@@ -206,7 +229,7 @@ describe("ClickHouseTraceSpanRepository evaluation reads", () => {
     const calls: string[] = [];
     const repository = ClickHouseTraceSpanRepository.create({
       resolve: async (): Promise<TraceClickHouseClient> => ({
-        query: async <_Row>({ query }: { query: string }) => {
+        query: async ({ query }: { query: string }) => {
           calls.push(query);
           const rows: unknown[] = [
             {
@@ -218,7 +241,7 @@ describe("ClickHouseTraceSpanRepository evaluation reads", () => {
             },
           ];
 
-          return { json: async <T>() => rows as T[] };
+          return { json: async () => rows };
         },
       }),
     });
@@ -249,7 +272,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
       resolve: async (): Promise<TraceClickHouseClient> => ({
         query: async () => {
           queryCount += 1;
-          return { json: async <T>() => [] as T[] };
+          return { json: async () => [] };
         },
       }),
     });
@@ -264,30 +287,30 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     const calls: { sql: string; params?: Record<string, unknown> }[] = [];
     const repository = ClickHouseTraceSpanRepository.create({
       resolve: async (): Promise<TraceClickHouseClient> => ({
-        query: async <_Row>(input: Parameters<TraceClickHouseClient["query"]>[0]) => {
+        query: async (input: Parameters<TraceClickHouseClient["query"]>[0]) => {
           calls.push({ sql: input.query, params: input.query_params });
           return {
-            json: async <T>() =>
-              [
-                {
-                  SpanId: "span_2",
-                  ParentSpanId: null,
-                  SpanName: "child",
-                  SpanType: "",
-                  ToolName: "",
-                  Model: "request-model",
-                  ResponseModel: "response-model",
-                  Cost: "0.3",
-                  InputTokens: "4",
-                  OutputTokens: "5",
-                  CacheReadTokens: "",
-                  CacheCreationTokens: "",
-                  StartTimeMs: 20,
-                  DurationMs: 10,
-                  UpdatedAtMs: 31,
-                  StatusCode: 2,
-                },
-              ] as T[],
+            json: async () => [
+              {
+                ...ABSENT_ATTRIBUTE_COLUMNS,
+                SpanId: "span_2",
+                ParentSpanId: null,
+                SpanName: "child",
+                SpanType: "",
+                ToolName: "",
+                Model: "request-model",
+                ResponseModel: "response-model",
+                Cost: "0.3",
+                InputTokens: "4",
+                OutputTokens: "5",
+                CacheReadTokens: "",
+                CacheCreationTokens: "",
+                StartTimeMs: 20,
+                DurationMs: 10,
+                UpdatedAtMs: 31,
+                StatusCode: 2,
+              },
+            ],
           };
         },
       }),
@@ -333,13 +356,14 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     const calls: string[] = [];
     const repository = ClickHouseTraceSpanRepository.create({
       resolve: async (): Promise<TraceClickHouseClient> => ({
-        query: async <_Row>(input: Parameters<TraceClickHouseClient["query"]>[0]) => {
+        query: async (input: Parameters<TraceClickHouseClient["query"]>[0]) => {
           calls.push(input.query);
           const rows =
             calls.length === 1
               ? []
               : [
                   {
+                    ...ABSENT_ATTRIBUTE_COLUMNS,
                     SpanId: "span_1",
                     ParentSpanId: null,
                     SpanName: "root",
@@ -358,7 +382,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
                     StatusCode: 1,
                   },
                 ];
-          return { json: async <T>() => rows as T[] };
+          return { json: async () => rows };
         },
       }),
     });
@@ -383,7 +407,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
       resolve: async (): Promise<TraceClickHouseClient> => ({
         query: async () => {
           queryCount += 1;
-          return { json: async <T>() => [] as T[] };
+          return { json: async () => [] };
         },
       }),
     });
@@ -408,30 +432,30 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     }[] = [];
     const repository = ClickHouseTraceSpanRepository.create({
       resolve: async (): Promise<TraceClickHouseClient> => ({
-        query: async <_Row>(input: Parameters<TraceClickHouseClient["query"]>[0]) => {
+        query: async (input: Parameters<TraceClickHouseClient["query"]>[0]) => {
           calls.push({ sql: input.query, params: input.query_params });
           return {
-            json: async <T>() =>
-              [
-                {
-                  SpanId: "span_1",
-                  ParentSpanId: null,
-                  SpanName: "root",
-                  SpanType: "llm",
-                  ToolName: "",
-                  Model: "model",
-                  ResponseModel: "",
-                  Cost: "",
-                  InputTokens: "2",
-                  OutputTokens: "3",
-                  CacheReadTokens: "",
-                  CacheCreationTokens: "",
-                  StartTimeMs: 10,
-                  DurationMs: 20,
-                  UpdatedAtMs: 30,
-                  StatusCode: 1,
-                },
-              ] as T[],
+            json: async () => [
+              {
+                ...ABSENT_ATTRIBUTE_COLUMNS,
+                SpanId: "span_1",
+                ParentSpanId: null,
+                SpanName: "root",
+                SpanType: "llm",
+                ToolName: "",
+                Model: "model",
+                ResponseModel: "",
+                Cost: "",
+                InputTokens: "2",
+                OutputTokens: "3",
+                CacheReadTokens: "",
+                CacheCreationTokens: "",
+                StartTimeMs: 10,
+                DurationMs: 20,
+                UpdatedAtMs: 30,
+                StatusCode: 1,
+              },
+            ],
           };
         },
       }),

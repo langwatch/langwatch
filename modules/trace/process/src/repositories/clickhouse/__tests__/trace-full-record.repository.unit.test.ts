@@ -93,9 +93,15 @@ const span = (traceId: string) => ({
   TraceId: traceId,
   TenantId: "tenant_a",
   ParentSpanId: null,
-  StartTimeMs: traceId === "later" ? 20 : 10,
-  EndTimeMs: traceId === "later" ? 30 : 20,
+  ParentTraceId: null,
+  ParentIsRemote: null,
+  Sampled: 1,
+  StartTimeMs: traceId === "later" ? "20" : "10",
+  EndTimeMs: traceId === "later" ? "30" : "20",
+  DurationMs: "10",
   SpanName: "model",
+  SpanKind: 0,
+  ResourceAttributes: {},
   SpanAttributes: {
     "langwatch.span.type": "llm",
     "langwatch.input": "preview input",
@@ -110,9 +116,14 @@ const span = (traceId: string) => ({
   },
   StatusCode: 2,
   StatusMessage: "span error",
-  Events_Timestamp: [15],
+  ScopeName: "",
+  ScopeVersion: null,
+  Events_Timestamp: ["15"],
   Events_Name: ["tool.called"],
   Events_Attributes: [{ tool: "search" }],
+  Links_TraceId: [],
+  Links_SpanId: [],
+  Links_Attributes: [],
 });
 
 function clientFor(
@@ -120,7 +131,7 @@ function clientFor(
   queries: string[] = [],
 ) {
   return {
-    query: async <_Row>(input: { query: string; query_params?: Record<string, unknown> }) => {
+    query: async (input: { query: string; query_params?: Record<string, unknown> }) => {
       queries.push(input.query);
       const queriedTraceId = input.query_params?.traceId;
       const traceId = typeof queriedTraceId === "string" ? queriedTraceId : "trace";
@@ -135,7 +146,7 @@ function clientFor(
       } else if (input.query.includes("FROM trace_summaries")) {
         rows = missing ? [] : [summary(traceId)];
       }
-      return { json: async <T>() => rows as T[] };
+      return { json: async () => rows };
     },
   } satisfies TraceClickHouseClient;
 }

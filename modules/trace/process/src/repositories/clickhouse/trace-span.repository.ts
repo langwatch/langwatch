@@ -8,6 +8,7 @@ import {
   type EvaluationTraceSpan,
   type SpanTreeCursor,
 } from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import type { TraceClickHouse } from "../trace-clickhouse-client.repository.ts";
 import {
@@ -16,6 +17,7 @@ import {
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
 } from "../trace-projected-read.repository.ts";
+import { chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
 
 const STORED_SPANS_TABLE = "stored_spans";
 const evaluationTraceSpansSchema = evaluationTraceSpanSchema.array();
@@ -24,35 +26,41 @@ const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
 
-type SpanSummaryRow = {
-  SpanId: string;
-  ParentSpanId: string | null;
-  SpanName: string;
-  SpanType: string;
-  ToolName: string;
-  Model: string;
-  ResponseModel: string;
-  Cost: string;
-  InputTokens: string;
-  OutputTokens: string;
-  CacheReadTokens: string;
-  CacheCreationTokens: string;
-  CacheCreation1hTokens: string;
-  InputChars: string;
-  AudioSeconds: string;
-  InputAudioTokens: string;
-  OutputAudioTokens: string;
-  CustomInputRate: string;
-  CustomOutputRate: string;
-  CustomCacheReadRate: string;
-  CustomCacheCreationRate: string;
-  CustomCacheCreation1hRate: string;
-  LwSpanCost: string;
-  StartTimeMs: string | number;
-  DurationMs: string | number;
-  UpdatedAtMs: string | number;
-  StatusCode: number | string | null;
-};
+const numeric = z.union([z.number(), z.string()]);
+
+const spanSummaryRowSchema = z.looseObject({
+  SpanId: chString,
+  ParentSpanId: chString.nullable(),
+  SpanName: chString,
+  SpanType: chString,
+  ToolName: chString,
+  Model: chString,
+  ResponseModel: chString,
+  Cost: chString,
+  InputTokens: chString,
+  OutputTokens: chString,
+  CacheReadTokens: chString,
+  CacheCreationTokens: chString,
+  CacheCreation1hTokens: chString,
+  InputChars: chString,
+  AudioSeconds: chString,
+  InputAudioTokens: chString,
+  OutputAudioTokens: chString,
+  CustomInputRate: chString,
+  CustomOutputRate: chString,
+  CustomCacheReadRate: chString,
+  CustomCacheCreationRate: chString,
+  CustomCacheCreation1hRate: chString,
+  LwSpanCost: chString,
+  StartTimeMs: numeric,
+  DurationMs: numeric,
+  UpdatedAtMs: numeric,
+  StatusCode: numeric.nullable(),
+});
+
+const spanSummaryRowsSchema = z.array(spanSummaryRowSchema);
+
+type SpanSummaryRow = z.infer<typeof spanSummaryRowSchema>;
 
 const summarySelect = `
   SpanId,
@@ -95,16 +103,35 @@ const dedupInTuple = (extraInnerWhere: string): string => `
   )
 `;
 
-type EvaluationSpanRow = {
-  SpanType: string;
-  Model: string;
-  Contexts: string;
-};
+const evaluationSpanRowSchema = z.looseObject({
+  SpanType: chString,
+  Model: chString,
+  Contexts: chString,
+});
 
-type EvaluationEventRow = {
-  EventType: string;
-  Attributes: Record<string, string>;
-};
+const evaluationSpanRowsSchema = z.array(evaluationSpanRowSchema);
+
+type EvaluationSpanRow = z.infer<typeof evaluationSpanRowSchema>;
+
+const evaluationEventRowSchema = z.looseObject({
+  EventType: chString,
+  Attributes: chStringMap,
+});
+
+const evaluationEventRowsSchema = z.array(evaluationEventRowSchema);
+
+type EvaluationEventRow = z.infer<typeof evaluationEventRowSchema>;
+
+const ingestLagRowSchema = z.looseObject({
+  P95LagMs: numeric.nullable(),
+  SampleCount: numeric,
+});
+
+const ingestLagRowsSchema = z.array(ingestLagRowSchema);
+
+const occurredAtRowSchema = z.looseObject({ occurredAtMs: numeric.nullable() });
+
+const occurredAtRowsSchema = z.array(occurredAtRowSchema);
 
 /** Concrete, tenant-scoped span-tree persistence for ClickHouse. */
 export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository {
@@ -126,7 +153,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       input.occurredAtMs === void 0
         ? ""
         : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
-    const result = await client.query<EvaluationSpanRow>({
+    const result = await client.query({
       query: `
         SELECT
           SpanAttributes['langwatch.span.type'] AS SpanType,
@@ -152,7 +179,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       },
       format: "JSONEachRow",
     });
-    const rows = await result.json<EvaluationSpanRow>();
+    const rows = evaluationSpanRowsSchema.parse(await result.json());
     if (rows.length === 0 && input.occurredAtMs !== void 0) {
       return this.findEvaluationSpans({
         tenantId: input.tenantId,
@@ -174,7 +201,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       input.occurredAtMs === void 0
         ? ""
         : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
-    const result = await client.query<EvaluationEventRow>({
+    const result = await client.query({
       query: `
         SELECT event_name AS EventType, event_attrs AS Attributes
         FROM (
@@ -207,7 +234,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       },
       format: "JSONEachRow",
     });
-    const rows = await result.json<EvaluationEventRow>();
+    const rows = evaluationEventRowsSchema.parse(await result.json());
     if (rows.length === 0 && input.occurredAtMs !== void 0) {
       return this.findEvaluationEvents({
         tenantId: input.tenantId,
@@ -245,10 +272,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       query_params: { tenantId: input.tenantId },
       format: "JSONEachRow",
     });
-    const rows = await result.json<{
-      P95LagMs: number | null;
-      SampleCount: number | string;
-    }>();
+    const rows = ingestLagRowsSchema.parse(await result.json());
     const row = rows[0];
     const p95LagMs = Number(row?.P95LagMs ?? Number.NaN);
     if (!Number.isFinite(p95LagMs)) return null;
@@ -318,9 +342,9 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       },
       format: "JSONEachRow",
     });
-    return (await result.json<SpanSummaryRow>()).map((row) =>
-      ClickHouseTraceSpanRepository.mapSummary(row),
-    );
+    return spanSummaryRowsSchema
+      .parse(await result.json())
+      .map((row) => ClickHouseTraceSpanRepository.mapSummary(row));
   }
 
   private async queryPage(
@@ -368,7 +392,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       },
       format: "JSONEachRow",
     });
-    const rows = await result.json<SpanSummaryRow>();
+    const rows = spanSummaryRowsSchema.parse(await result.json());
     const mapped = rows.map((row) => ClickHouseTraceSpanRepository.mapSummary(row));
     return {
       rows: mapped.slice(0, input.limit),
@@ -414,7 +438,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
             },
       format: "JSONEachRow",
     });
-    const row = (await result.json<{ occurredAtMs: string | number | null }>())[0];
+    const row = occurredAtRowsSchema.parse(await result.json())[0];
     const value = ClickHouseTraceSpanRepository.numberOrNull(row?.occurredAtMs);
     return value !== null && value > 0 ? value : void 0;
   }

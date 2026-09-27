@@ -191,7 +191,7 @@ export class ClickHouseTraceEventPayloadRepository {
 
     // TenantId MUST be the first predicate in the WHERE clause (ADR-022
     // cross-tenant denial).
-    const result = await client.query<{ EventPayload: string }>({
+    const result = await client.query({
       query: `
         SELECT EventPayload
         FROM event_log

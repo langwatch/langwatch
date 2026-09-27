@@ -1,21 +1,21 @@
-import { type RetentionDaysProvider, RetentionFloorService } from "@langwatch/clickhouse-client";
+import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import {
   RETENTION_TABLE_CATEGORY_MAP,
   type RetentionManagedTable,
 } from "@langwatch/data-retention-contract/retention-tables";
-import { createLogger } from "@langwatch/observability";
-
-const logger = createLogger("langwatch:clickhouse:retention-floor");
 
 /**
- * The app's retention policy, in the shape the ClickHouse package asks for. That package owns the
- * mechanism (floor arithmetic, the never-narrower guarantee, the cache) and deliberately owns none
- * of the policy; this is the whole policy half — map the table to its category, ask the cascade.
+ * The app's retention policy, in the shape the ClickHouse floor asks for. The floor owns the
+ * mechanism (arithmetic, the never-narrower guarantee, the cache) and none of the policy; this is
+ * the whole policy half — map the table to its category, ask the cascade.
  */
-class PlatformRetentionDaysProvider implements RetentionDaysProvider {
-  constructor(private readonly resolver: DataRetentionApi) {}
+export class TraceRetentionFloorService implements RetentionDaysProvider {
+  static create(resolver: DataRetentionApi): TraceRetentionFloorService {
+    return new TraceRetentionFloorService(resolver);
+  }
+
+  private constructor(private readonly resolver: DataRetentionApi) {}
 
   async findRetentionDays({
     tenantId,
@@ -34,20 +34,4 @@ class PlatformRetentionDaysProvider implements RetentionDaysProvider {
 
     return typeof days === "number" ? [days] : [];
   }
-}
-
-/**
- * A floor service bound to this platform's retention policy. Pass no resolver and every read still
- * gets a bound, at the platform default, so a caller can adopt this before its site is rewired.
- */
-export class TraceRetentionFloorService {
-  static create(resolver?: DataRetentionApi): RetentionFloorService {
-    return new RetentionFloorService({
-      defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-      provider: resolver ? new PlatformRetentionDaysProvider(resolver) : undefined,
-      logger,
-    });
-  }
-
-  private constructor() {}
 }

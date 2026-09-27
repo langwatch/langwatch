@@ -8,6 +8,9 @@ import {
   NormalizedStatusCode,
   type NormalizedSpan,
 } from "@langwatch/trace-contract";
+import { z } from "zod";
+
+import { chBoolean, chNumber, chString } from "./clickhouse.trace-row.mapper.ts";
 
 const DECIMAL_NUMBER_RE = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
@@ -157,39 +160,46 @@ export function serializeAttributes(attrs: Record<string, unknown>): Record<stri
   return result;
 }
 
+const attributeMapSchema = z.record(z.string(), z.unknown());
+
 /**
  * The projection of `stored_spans` that {@link mapChRowToNormalized} reads.
  * Exported so the claim-check equivalence test drives the REAL mapping, not
  * a hand-built stand-in — exactly the column-mapping regression it must catch.
  */
-export interface FullSpanRow {
-  SpanId: string;
-  TraceId: string;
-  TenantId: string;
-  ParentSpanId: string | null;
-  ParentTraceId: string | null;
-  ParentIsRemote: boolean | null;
-  Sampled: boolean;
-  StartTimeMs: number;
-  EndTimeMs: number;
-  DurationMs: number;
-  SpanName: string;
-  SpanKind: number;
-  ResourceAttributes: Record<string, unknown>;
-  SpanAttributes: Record<string, unknown>;
-  StatusCode: number | null;
-  StatusMessage: string | null;
-  ScopeName: string | null;
-  ScopeVersion: string | null;
-  Cost: number | null;
-  NonBilledCost: number | null;
-  Events_Timestamp: number[];
-  Events_Name: string[];
-  Events_Attributes: Record<string, unknown>[];
-  Links_TraceId: string[];
-  Links_SpanId: string[];
-  Links_Attributes: Record<string, unknown>[];
-}
+export const fullSpanRowSchema = z.looseObject({
+  SpanId: chString,
+  TraceId: chString,
+  TenantId: chString,
+  ParentSpanId: chString.nullable(),
+  ParentTraceId: chString.nullable(),
+  ParentIsRemote: chBoolean.nullable(),
+  Sampled: chBoolean,
+  StartTimeMs: chNumber,
+  EndTimeMs: chNumber,
+  DurationMs: chNumber,
+  SpanName: chString,
+  SpanKind: chNumber,
+  ResourceAttributes: attributeMapSchema,
+  SpanAttributes: attributeMapSchema,
+  StatusCode: chNumber.nullable(),
+  StatusMessage: chString.nullable(),
+  ScopeName: chString.nullable(),
+  ScopeVersion: chString.nullable(),
+  Cost: chNumber.nullable(),
+  NonBilledCost: chNumber.nullable(),
+  /** Absent from the derivation projection, which selects scalar columns only. */
+  Events_Timestamp: z.array(chNumber).optional(),
+  Events_Name: z.array(chString).optional(),
+  Events_Attributes: z.array(attributeMapSchema).optional(),
+  Links_TraceId: z.array(chString).optional(),
+  Links_SpanId: z.array(chString).optional(),
+  Links_Attributes: z.array(attributeMapSchema).optional(),
+});
+
+export type FullSpanRow = z.infer<typeof fullSpanRowSchema>;
+
+export const fullSpanRowsSchema = z.array(fullSpanRowSchema);
 
 export function mapChRowToNormalized(row: FullSpanRow): NormalizedSpan {
   return {

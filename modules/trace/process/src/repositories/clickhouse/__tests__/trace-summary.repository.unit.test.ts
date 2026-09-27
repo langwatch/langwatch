@@ -11,17 +11,51 @@ import { describe, expect, it, vi } from "vitest";
 import { createFoldState } from "../../../eventing/__tests__/trace-subscriber.fixtures.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
 
+/** A whole `findByTraceId` row, as ClickHouse's JSON writes it (64-bit integers as strings). */
 const heavyRow = {
   ProjectionId: "p1",
   TenantId: "tenant-1",
   TraceId: "t1",
-  SpanCount: 0,
+  Version: "v1",
+  Attributes: {},
+  OccurredAt: "0",
+  EarliestSpanStartMs: "0",
+  CreatedAt: "0",
+  UpdatedAt: "0",
+  ComputedIOSchemaVersion: "v1",
   ComputedInput: "log-input",
   ComputedOutput: "log-output",
-  ComputedIOSchemaVersion: "v1",
+  TimeToFirstTokenMs: null,
+  TimeToLastTokenMs: null,
   TotalDurationMs: "0",
+  TokensPerSecond: null,
+  SpanCount: 0,
+  ContainsErrorStatus: false,
+  ContainsOKStatus: false,
+  ErrorMessage: null,
   Models: [],
+  TotalCost: null,
+  NonBilledCost: null,
+  TokensEstimated: false,
+  TotalPromptTokenCount: null,
+  TotalCompletionTokenCount: null,
+  OutputFromRootSpan: false,
   OutputSpanEndTimeMs: "0",
+  BlockedByGuardrail: false,
+  RootSpanType: null,
+  ContainsAi: false,
+  ContainsPrompt: false,
+  SelectedPromptId: null,
+  SelectedPromptSpanId: null,
+  LastUsedPromptId: null,
+  LastUsedPromptVersionNumber: null,
+  LastUsedPromptVersionId: null,
+  LastUsedPromptSpanId: null,
+  TopicId: null,
+  SubTopicId: null,
+  AnnotationIds: [],
+  HasAnnotation: null,
+  TraceName: "",
 };
 
 function makeRepo(responder: (sql: string) => unknown[]) {
@@ -64,7 +98,9 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (tenancy)", () => {
     it("picks the tenant's own ClickHouse client", () => {
       // The tenant chooses which cluster is read, so a mix-up here is not a
       // filter that misses — it is a read of somebody else's storage.
-      const { repo, resolvedFor } = makeRepo(() => [heavyRow]);
+      const { repo, resolvedFor } = makeRepo((sql) =>
+        isResolve(sql) ? [{ rowCount: "1", occurredAtMs: "0" }] : [heavyRow],
+      );
 
       return repo
         .findByTraceId({ tenantId: "tenant-1", traceId: "t1" })

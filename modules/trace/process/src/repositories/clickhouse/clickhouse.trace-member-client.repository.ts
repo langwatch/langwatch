@@ -29,19 +29,19 @@ export class MemberTraceClickHouseClientRepository implements TraceClickHouseWri
     private readonly tenantId: string,
   ) {}
 
-  async query<Row>(input: {
+  async query(input: {
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
     clickhouse_settings?: Record<string, string>;
-  }): Promise<{ json<T = Row>(): Promise<T[]> }> {
-    const result = await this.clickhouse.query<Row>({
+  }): Promise<{ json(): Promise<unknown[]> }> {
+    const result = await this.clickhouse.query<unknown>({
       tenantId: this.tenantId,
       sql: input.query,
       params: input.query_params ?? {},
       ...(input.clickhouse_settings ? { settings: input.clickhouse_settings } : {}),
     });
-    return { json: async <T = Row>() => result.rows as unknown as T[] };
+    return { json: async () => result.rows };
   }
 
   async insert(input: {

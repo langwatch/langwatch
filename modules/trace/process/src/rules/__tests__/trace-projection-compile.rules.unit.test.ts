@@ -55,7 +55,7 @@ function sampleTrace(): ProjectableTrace {
   };
   return {
     ...base,
-    annotations: [
+    projectedAnnotations: [
       {
         id: "ann-1",
         is_thumbs_up: true,

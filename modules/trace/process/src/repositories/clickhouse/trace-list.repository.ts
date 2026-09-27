@@ -14,84 +14,117 @@ import {
   type EventMetricValues,
   EVENT_METRIC_SEP,
 } from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import { scopeTraceFilterToTable } from "../../rules/trace-facet-scope.rules.ts";
 import type { TraceFilterWhere } from "../../rules/trace-filter-hidden-origins.rules.ts";
 import type { TraceClickHouseResolver } from "../trace-clickhouse-client.repository.ts";
-
-interface TraceSummaryFieldsBase {
-  TraceId: string;
-  TenantId: string;
-  OccurredAt: number;
-  CreatedAt: number;
-  UpdatedAt: number;
-  ComputedIOSchemaVersion: string;
-  ComputedInput: string | null;
-  ComputedOutput: string | null;
-  TimeToFirstTokenMs: number | null;
-  TimeToLastTokenMs: number | null;
-  TotalDurationMs: number;
-  TokensPerSecond: number | null;
-  SpanCount: number;
-  ContainsErrorStatus: number;
-  ContainsOKStatus: number;
-  ErrorMessage: string | null;
-  Models: string[];
-  TotalCost: number | null;
-  NonBilledCost: number | null;
-  TokensEstimated: boolean;
-  TotalPromptTokenCount: number | null;
-  TotalCompletionTokenCount: number | null;
-  OutputFromRootSpan: number;
-  OutputSpanEndTimeMs: number;
-  BlockedByGuardrail: number;
-  RootSpanType: string | null;
-  ContainsAi: number;
-  TraceName: string;
-  ContainsPrompt: number;
-  SelectedPromptId: string | null;
-  SelectedPromptSpanId: string | null;
-  LastUsedPromptId: string | null;
-  LastUsedPromptVersionNumber: number | null;
-  LastUsedPromptVersionId: string | null;
-  LastUsedPromptSpanId: string | null;
-  TopicId: string | null;
-  SubTopicId: string | null;
-  AnnotationIds: string[];
-  SizeBytes?: number;
-}
+import { chBoolean, chNumber, chString } from "./clickhouse.trace-row.mapper.ts";
 
 const TABLE_NAME = "trace_summaries" as const;
+
+const numeric = z.union([z.number(), z.string()]);
+const flag = z.union([z.boolean(), z.number()]);
+
+const totalHitsRowsSchema = z.array(z.looseObject({ totalHits: numeric }));
+
+const countRowsSchema = z.array(z.looseObject({ cnt: numeric }));
+
+const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
+
+const distinctValueRowsSchema = z.array(z.looseObject({ val: chString }));
+
+/** Any column can be a discrete facet, so its value is read as whatever ClickHouse wrote. */
+const discreteValueRowsSchema = z.array(
+  z.looseObject({ discrete_value: z.unknown(), cnt: numeric, total_distinct: numeric }),
+);
+
+const rangeRowsSchema = z.array(z.looseObject({ min_val: z.unknown(), max_val: z.unknown() }));
+
+const keyedFacetRowsSchema = z.array(
+  z.looseObject({
+    facet_key: chString,
+    facet_value: chString,
+    cnt: numeric,
+    total_distinct: numeric,
+  }),
+);
+
+const rangeFacetRowsSchema = z.array(z.record(z.string(), z.unknown()));
 
 /**
  * Buffer for partition-pruning in new-trace-count subquery; matches withPartitionHint.
  */
 const SINCE_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
 
-interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
-  // The list mapper only reads a fixed set of keys out of `Attributes`.
-  // Projecting them individually lets ClickHouse skip reading the full
-  // Map column off disk for every row — the dominant cost on traces
-  // with large attribute bags.
-  AttrSpanName: string;
-  AttrServiceName: string;
-  AttrConversationId: string;
-  AttrUserId: string;
-  AttrOrigin: string;
-  AttrNonBillable: string;
-  AttrCacheReadTokens: string;
-  AttrCacheCreationTokens: string;
-  AttrReasoningTokens: string;
-  AttrContextSizeTokens: string;
-  AttrLabels: string;
-  AttrInputMediaRefs: string;
-  AttrOutputMediaRefs: string;
-  LastEventOccurredAt: number;
-  /** The row's projection stamp; see the OccurredAt decode in `toTraceListItem`. */
-  Version?: string;
+/**
+ * One list row. The list mapper only reads a fixed set of keys out of
+ * `Attributes`, so each is projected individually and ClickHouse skips the
+ * full Map column — the dominant cost on traces with large attribute bags.
+ */
+const listSummaryRowSchema = z.looseObject({
+  TraceId: chString,
+  TenantId: chString,
+  AttrSpanName: chString,
+  AttrServiceName: chString,
+  AttrConversationId: chString,
+  AttrUserId: chString,
+  AttrOrigin: chString,
+  AttrNonBillable: chString,
+  AttrCacheReadTokens: chString,
+  AttrCacheCreationTokens: chString,
+  AttrReasoningTokens: chString,
+  AttrContextSizeTokens: chString,
+  AttrLabels: chString,
+  AttrInputMediaRefs: chString,
+  AttrOutputMediaRefs: chString,
+  OccurredAt: chNumber,
+  /** The row's projection stamp; see the OccurredAt decode in `toTraceSummaryData`. */
+  Version: chString.optional(),
   /** The span timing baseline column added by migration 00072 (ADR-087). */
-  EarliestSpanStartMs?: number | string;
-}
+  EarliestSpanStartMs: chNumber.optional(),
+  CreatedAt: chNumber,
+  UpdatedAt: chNumber,
+  ComputedIOSchemaVersion: chString,
+  ComputedInput: chString.nullable(),
+  ComputedOutput: chString.nullable(),
+  TimeToFirstTokenMs: chNumber.nullable(),
+  TimeToLastTokenMs: chNumber.nullable(),
+  TotalDurationMs: chNumber,
+  TokensPerSecond: chNumber.nullable(),
+  SpanCount: chNumber,
+  ContainsErrorStatus: chBoolean,
+  ContainsOKStatus: chBoolean,
+  ErrorMessage: chString.nullable(),
+  Models: z.array(chString),
+  TotalCost: chNumber.nullable(),
+  NonBilledCost: chNumber.nullable(),
+  TokensEstimated: chBoolean,
+  TotalPromptTokenCount: chNumber.nullable(),
+  TotalCompletionTokenCount: chNumber.nullable(),
+  OutputFromRootSpan: chBoolean,
+  OutputSpanEndTimeMs: chNumber,
+  BlockedByGuardrail: chBoolean,
+  TraceName: chString,
+  RootSpanType: chString.nullable(),
+  ContainsAi: chBoolean,
+  ContainsPrompt: chBoolean,
+  SelectedPromptId: chString.nullable(),
+  SelectedPromptSpanId: chString.nullable(),
+  LastUsedPromptId: chString.nullable(),
+  LastUsedPromptVersionNumber: chNumber.nullable(),
+  LastUsedPromptVersionId: chString.nullable(),
+  LastUsedPromptSpanId: chString.nullable(),
+  TopicId: chString.nullable(),
+  SubTopicId: chString.nullable(),
+  AnnotationIds: z.array(chString),
+  SizeBytes: chNumber.optional(),
+  LastEventOccurredAt: chNumber,
+});
+
+const listSummaryRowsSchema = z.array(listSummaryRowSchema);
+
+type ClickHouseSummaryRow = z.infer<typeof listSummaryRowSchema>;
 
 /**
  * The active trace filter as an `AND` fragment for a facet read on `table`,
@@ -335,8 +368,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       }),
     ]);
 
-    const rows = await result.json<ClickHouseSummaryRow>();
-    const countRows = await countResult.json<{ totalHits: number | string }>();
+    const rows = listSummaryRowsSchema.parse(await result.json());
+    const countRows = totalHitsRowsSchema.parse(await countResult.json());
     const totalHits = countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
 
     return {
@@ -391,7 +424,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<{ cnt: number }>();
+    const rows = countRowsSchema.parse(await result.json());
     return Number(rows[0]?.cnt ?? 0);
   }
 
@@ -434,7 +467,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    return (await result.json<{ TraceId: string }>()).map((row) => row.TraceId);
+    return traceIdRowsSchema.parse(await result.json()).map((row) => row.TraceId);
   }
 
   async findDistinctValues(params: {
@@ -480,7 +513,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<{ val: string }>();
+    const rows = distinctValueRowsSchema.parse(await result.json());
     return rows.map((r) => r.val);
   }
 
@@ -555,7 +588,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<FacetRow>();
+    const rows = facetRowsSchema.parse(await result.json());
     return TraceListClickHouseRepository.mapFacetRows(rows);
   }
 
@@ -614,11 +647,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<{
-      discrete_value: number;
-      cnt: number;
-      total_distinct: number;
-    }>();
+    const rows = discreteValueRowsSchema.parse(await result.json());
     return {
       values: rows.map((r) => ({
         value: Number(r.discrete_value),
@@ -649,7 +678,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<FacetRow>();
+    const rows = facetRowsSchema.parse(await result.json());
     return TraceListClickHouseRepository.mapFacetRows(rows);
   }
 
@@ -705,7 +734,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<{ min_val: number; max_val: number }>();
+    const rows = rangeRowsSchema.parse(await result.json());
     const row = rows[0];
     return { min: Number(row?.min_val ?? 0), max: Number(row?.max_val ?? 0) };
   }
@@ -769,12 +798,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<{
-      facet_key: string;
-      facet_value: string;
-      cnt: number;
-      total_distinct: number;
-    }>();
+    const rows = keyedFacetRowsSchema.parse(await result.json());
 
     const out: Record<string, CategoricalFacetResult> = {};
     for (const spec of specs) {
@@ -832,7 +856,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<Record<string, number | null>>();
+    const rows = rangeFacetRowsSchema.parse(await result.json());
     const row = rows[0] ?? {};
     const out: Record<string, { min: number; max: number }> = {};
     for (let i = 0; i < specs.length; i += 1) {
@@ -987,7 +1011,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<FacetRow>();
+    const rows = facetRowsSchema.parse(await result.json());
     return TraceListClickHouseRepository.mapFacetRows(rows);
   }
 
@@ -1059,7 +1083,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<FacetRow>();
+    const rows = facetRowsSchema.parse(await result.json());
     return TraceListClickHouseRepository.mapFacetRows(rows);
   }
 
@@ -1125,7 +1149,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<FacetRow>();
+    const rows = facetRowsSchema.parse(await result.json());
     return TraceListClickHouseRepository.mapFacetRows(rows);
   }
 
@@ -1378,32 +1402,31 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 }
 
-type FacetRow = {
-  facet_value: string;
-  facet_label?: string;
-  cnt: number;
-  total_distinct: number;
+const facetRowSchema = z.looseObject({
+  facet_value: chString,
+  facet_label: chString.optional(),
+  cnt: numeric,
+  total_distinct: numeric,
   // Optional per-value aggregates carried by the evaluator facet's
   // custom queryBuilder so the sidebar can render the inline drilldown
-  // (verdict pills + score range + hasLabel indicator) without firing
-  // a second query per evaluator.
-  passed_count?: string | number;
-  failed_count?: string | number;
-  errored_count?: string | number;
-  score_min?: number | null;
-  score_max?: number | null;
-  has_score?: boolean | number;
-  distinct_scores?: number | string;
-  has_label?: boolean | number;
-  // Top-N distinct emitted-label (value, count) tuples — ClickHouse serialises
-  // the `Array(Tuple(String, UInt64))` as `[[value, count], …]`. Counts may
-  // arrive as strings for large UInt64, so the mapper coerces with Number().
-  label_values?: [string, number | string][];
-  // Event facet only: top-N (composite key, count) tuples where the composite
-  // is `<metric key>\x1F<stored value>` (see EVENT_METRIC_SEP). Same
-  // Array(Tuple(String, UInt64)) serialisation as label_values.
-  metric_values?: [string, number | string][];
-};
+  // without firing a second query per evaluator.
+  passed_count: numeric.optional(),
+  failed_count: numeric.optional(),
+  errored_count: numeric.optional(),
+  score_min: numeric.nullable().optional(),
+  score_max: numeric.nullable().optional(),
+  has_score: flag.optional(),
+  distinct_scores: numeric.optional(),
+  has_label: flag.optional(),
+  // Top-N `Array(Tuple(String, UInt64))` as `[[value, count], …]`; for the
+  // event facet the value is `<metric key>\x1F<stored value>` (EVENT_METRIC_SEP).
+  label_values: z.array(z.tuple([chString, numeric])).optional(),
+  metric_values: z.array(z.tuple([chString, numeric])).optional(),
+});
+
+const facetRowsSchema = z.array(facetRowSchema);
+
+type FacetRow = z.infer<typeof facetRowSchema>;
 
 // CH returns empty strings for missing Map keys; the list mapper expects
 // keys absent so its ?? null / ?? "" fallbacks fire, not present-but-empty.

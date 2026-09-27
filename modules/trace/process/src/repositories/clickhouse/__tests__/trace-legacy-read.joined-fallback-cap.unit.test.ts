@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
+import { traceSummaryRow } from "./support/trace-summary-row.support.ts";
+
 const mockClickHouseQuery = vi.hoisted(() => vi.fn());
 
 /** The process's tenant-keyed connection as this suite supplies it. The
@@ -34,7 +36,7 @@ const PROJECT = "project_joined_cap";
 const OCCURRED_AT = Date.UTC(2026, 7, 17, 0, 0, 0);
 
 function summaryRow(traceId: string) {
-  return {
+  return traceSummaryRow({
     ts_TraceId: traceId,
     ts_OccurredAt: OCCURRED_AT,
     ts_Attributes: {},
@@ -46,7 +48,7 @@ function summaryRow(traceId: string) {
     ts_TimeToFirstTokenMs: null,
     ts_TimeToLastTokenMs: null,
     ts_TokensPerSecond: null,
-  };
+  });
 }
 
 function spanRow({ traceId, spanIndex }: { traceId: string; spanIndex: number }) {
@@ -54,14 +56,18 @@ function spanRow({ traceId, spanIndex }: { traceId: string; spanIndex: number })
     SpanId: `${traceId}-span-${spanIndex}`,
     TraceId: traceId,
     TenantId: PROJECT,
-    StartTime: OCCURRED_AT,
-    EndTime: OCCURRED_AT + 1,
-    DurationMs: 1,
+    ParentSpanId: null,
+    ParentTraceId: null,
+    ParentIsRemote: null,
+    Sampled: 1,
+    StartTime: String(OCCURRED_AT),
+    EndTime: String(OCCURRED_AT + 1),
+    DurationMs: "1",
     SpanName: "span",
-    SpanKind: "INTERNAL",
+    SpanKind: 1,
     ResourceAttributes: {},
     SpanAttributes: {},
-    StatusCode: "OK",
+    StatusCode: 1,
     StatusMessage: "",
     ScopeName: "",
     ScopeVersion: "",
