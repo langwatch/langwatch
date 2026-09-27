@@ -190,6 +190,10 @@ export class TestModelProviderService implements ModelProviderApi {
     throw new Error("Not used by Workflow tests.");
   }
 
+  completeCodexDeviceSignIn(): Promise<never> {
+    throw new Error("Not used by Workflow tests.");
+  }
+
   getDefaultSnapshotUnattributed(): Promise<never> {
     throw new Error("Not used by Workflow tests.");
   }

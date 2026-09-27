@@ -4,7 +4,7 @@ import {
   type McpOAuthTokenRecord,
 } from "@langwatch/hosted-mcp-contract";
 
-import type { HostedMcpRedis } from "../../app/hosted-mcp-members.ts";
+import type { HostedMcpRedis } from "../../app/hosted-mcp.members.ts";
 import { McpOAuthClientRegistryService } from "../../services/mcp-oauth-client-registry.service.ts";
 import {
   McpOAuthTokenRepository,

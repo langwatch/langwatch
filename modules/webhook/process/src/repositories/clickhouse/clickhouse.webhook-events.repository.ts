@@ -137,6 +137,13 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepository {
     return new WebhookEventsClickHouseRepository(resolveClient);
   }
 
+  /** Over the process's routed member, which resolves each tenant's client itself. */
+  static forRoutedClickHouse(
+    clickhouse: WebhookRoutedClickHouse,
+  ): WebhookEventsClickHouseRepository {
+    return new WebhookEventsClickHouseRepository(createWebhookClickHouseResolver(clickhouse));
+  }
+
   static encodeCursor(cursor: WebhookEventsCursor): string {
     return encodeCursor(cursor);
   }
@@ -247,4 +254,29 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepository {
     const raw = await result.json();
     return Array.isArray(raw) ? raw.filter(isRecord).map(mapSpendEventRow) : [];
   }
+}
+
+/** Adapts the routed process member to Webhook's tenant-resolved read client. */
+export type WebhookRoutedClickHouse = Readonly<{
+  query(input: {
+    tenantId: string;
+    sql: string;
+    params?: Record<string, unknown>;
+  }): Promise<{ rows: unknown[] }>;
+}>;
+
+function createWebhookClickHouseResolver(
+  clickhouse: WebhookRoutedClickHouse,
+): WebhookClickHouseClientResolver {
+  return (tenantId) =>
+    Promise.resolve({
+      async query(input) {
+        const result = await clickhouse.query({
+          tenantId,
+          sql: input.query,
+          params: input.query_params,
+        });
+        return { json: async () => result.rows };
+      },
+    });
 }

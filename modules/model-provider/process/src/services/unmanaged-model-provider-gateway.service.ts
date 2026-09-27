@@ -5,9 +5,13 @@ import { ModelProviderManagedGateway } from "../app/model-provider.members.ts";
  * than defaulted: "no organization is managed" is the true answer for every
  * self-hosted install, keeping one WITH managed providers from getting it by omission.
  */
-export class UnmanagedModelProviderGatewayAdapter extends ModelProviderManagedGateway {
-  static create(): UnmanagedModelProviderGatewayAdapter {
-    return new UnmanagedModelProviderGatewayAdapter();
+export class UnmanagedModelProviderGatewayService extends ModelProviderManagedGateway {
+  static create(): UnmanagedModelProviderGatewayService {
+    return new UnmanagedModelProviderGatewayService();
+  }
+
+  private constructor() {
+    super();
   }
 
   isManaged(_input: { organizationId: string; provider: string }): boolean {

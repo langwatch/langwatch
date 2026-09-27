@@ -45,16 +45,16 @@ import {
   payloadToRow,
   retryDelayMs,
 } from "../rules/webhook-delivery-fold.rules.ts";
+import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
 import {
   confirmedDeliverPayload,
   deliveryEventType,
   failedDeliverPayload,
   settledDeliverPayload,
 } from "../rules/webhook-spend-payload.rules.ts";
-import { HttpWebhookDestinationService } from "./http.webhook-destination.service.ts";
+import { HttpWebhookDestinationService } from "./http-webhook-destination.service.ts";
 import { WebhookBatchSendService } from "./webhook-batch-send.service.ts";
 import { WebhookDeliveryMaintenanceService } from "./webhook-delivery-maintenance.service.ts";
-import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
 import { WebhookEndpointStreamService } from "./webhook-endpoint-stream.service.ts";
 import { WebhookEnvelopeService } from "./webhook-envelope.service.ts";
 

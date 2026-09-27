@@ -9,17 +9,15 @@ import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 
 import { modelProviderConnectionPingChannels } from "../channels/model-provider-connection-ping-channels.registry.ts";
-import {
-  CodexAccountService,
-  CodexOAuthModelProviderTokenRefresherAdapter,
-} from "../services/codex-oauth.model-provider-token-refresher.service.ts";
-import { HttpModelProviderCredentialProbeAdapter } from "../services/http.model-provider-credential-probe.service.ts";
-import { PrefixedModelProviderIdAdapter } from "../services/prefixed.model-provider-id.service.ts";
-import { RegistryModelProviderCatalogAdapter } from "../services/registry.model-provider-catalog.service.ts";
-import { SsrfModelProviderEgressAdapter } from "../services/ssrf.model-provider-egress.service.ts";
-import { UnmanagedModelProviderGatewayAdapter } from "../services/unmanaged.model-provider-gateway.service.ts";
-import { VercelAiModelTranslationAdapter } from "../services/vercel-ai.model-translation.service.ts";
-import { WindowedModelProviderConnectionRateLimiterAdapter } from "../services/windowed.model-provider-connection-rate-limiter.service.ts";
+import { CodexAccountService } from "../services/codex-account.service.ts";
+import { CodexOAuthModelProviderTokenRefresherService } from "../services/codex-oauth-model-provider-token-refresher.service.ts";
+import { HttpModelProviderCredentialProbeService } from "../services/http-model-provider-credential-probe.service.ts";
+import { PrefixedModelProviderIdService } from "../services/prefixed-model-provider-id.service.ts";
+import { RegistryModelProviderCatalogService } from "../services/registry-model-provider-catalog.service.ts";
+import { SsrfModelProviderEgressService } from "../services/ssrf-model-provider-egress.service.ts";
+import { UnmanagedModelProviderGatewayService } from "../services/unmanaged-model-provider-gateway.service.ts";
+import { VercelAiModelTranslationService } from "../services/vercel-ai-model-translation.service.ts";
+import { WindowedModelProviderConnectionRateLimiterService } from "../services/windowed-model-provider-connection-rate-limiter.service.ts";
 import type {
   ModelProviderBuildConfig,
   ModelProviderInfrastructure,
@@ -29,7 +27,7 @@ import { ModelProviderRateLimit } from "./model-provider.members.ts";
 /**
  * Connection-test limiter counter over process Redis with per-call window/max (organization
  * and global), not construction-time constants like {@link
- * WindowedModelProviderConnectionRateLimiterAdapter}.
+ * WindowedModelProviderConnectionRateLimiterService}.
  */
 class RedisModelProviderRateLimit extends ModelProviderRateLimit {
   static create(input: { redis: RedisConnection }): RedisModelProviderRateLimit {
@@ -65,24 +63,24 @@ export function buildModelProviderInfrastructure(input: {
   dependencies: Readonly<{ projects: ProjectApi }>;
 }): ModelProviderInfrastructure {
   const { members, config, dependencies } = input;
-  const egress = SsrfModelProviderEgressAdapter.create({ policy: config.egress });
+  const egress = SsrfModelProviderEgressService.create({ policy: config.egress });
   // The catalogue's own probe and this application's `credentialProbe`
   // member are the SAME behaviour — a vendor-bound HTTP check behind the
   // deployment's SSRF fence — so one instance serves both rather than two
   // that could drift.
-  const probe = HttpModelProviderCredentialProbeAdapter.create({
+  const probe = HttpModelProviderCredentialProbeService.create({
     egress,
     environment: config.environment,
   });
 
   return {
-    catalog: RegistryModelProviderCatalogAdapter.create({
-      managed: UnmanagedModelProviderGatewayAdapter.create(),
+    catalog: RegistryModelProviderCatalogService.create({
+      managed: UnmanagedModelProviderGatewayService.create(),
       probe,
       systemProviderEnvironment: config.environment,
       isSaas: config.isSaas,
     }),
-    translation: VercelAiModelTranslationAdapter.create({
+    translation: VercelAiModelTranslationService.create({
       projects: dependencies.projects,
       executionProxyBaseUrl: config.executionProxyBaseUrl,
       // No `codexHandles`: see the module docblock on `model-provider.members.ts`.
@@ -90,13 +88,13 @@ export function buildModelProviderInfrastructure(input: {
     connectionPing: modelProviderConnectionPingChannels.live.create({
       executionProxyBaseUrl: config.executionProxyBaseUrl,
     }),
-    ids: PrefixedModelProviderIdAdapter.create({ suffix: () => nanoid() }),
-    codexTokenRefresher: CodexOAuthModelProviderTokenRefresherAdapter.create(),
-    connectionRateLimiter: WindowedModelProviderConnectionRateLimiterAdapter.create({
+    ids: PrefixedModelProviderIdService.create({ suffix: () => nanoid() }),
+    codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
+    connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({
       limiter: RedisModelProviderRateLimit.create({ redis: members.redis }),
     }),
     credentialProbe: probe,
-    codexAccounts: new CodexAccountService(),
+    codexAccounts: CodexAccountService.create(),
     // No trace read stack is composed at this seam. See the module docblock.
     spans: undefined,
   };

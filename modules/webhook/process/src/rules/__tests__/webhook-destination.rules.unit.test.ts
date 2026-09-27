@@ -4,57 +4,52 @@
 
 import { describe, expect, it } from "vitest";
 
-import { WebhookDestinationService } from "../webhook-destination.service.ts";
+import { inspectSqsQueueUrl } from "../sqs-queue-url.rules.ts";
+import { findUrlProblem, isRoleArn, sqsCredentialMode } from "../webhook-destination.rules.ts";
 
-const destinations = WebhookDestinationService.create();
-
-describe("WebhookDestinationService", () => {
+describe("webhook destination rules", () => {
   describe("given an HTTP destination", () => {
     describe("when it is an ordinary https endpoint", () => {
       it("admits it", () => {
-        expect(destinations.findUrlProblem("https://example.test/hook", false)).toBeNull();
+        expect(findUrlProblem("https://example.test/hook", false)).toBeNull();
       });
     });
 
     describe("when it carries credentials in the URL", () => {
       it("refuses it, because those would be stored and replayed on every send", () => {
-        expect(destinations.findUrlProblem("https://user:pass@example.test/hook", false)).toBe(
-          "credentials",
-        );
+        expect(findUrlProblem("https://user:pass@example.test/hook", false)).toBe("credentials");
       });
 
       it("refuses it even where local destinations are allowed", () => {
         // The operator opt-in relaxes the origin, never the credential rule —
         // the check runs ahead of the scheme and port checks for that reason.
-        expect(destinations.findUrlProblem("http://user:pass@localhost/hook", true)).toBe(
-          "credentials",
-        );
+        expect(findUrlProblem("http://user:pass@localhost/hook", true)).toBe("credentials");
       });
     });
 
     describe("when it is not https", () => {
       it("refuses it by default", () => {
-        expect(destinations.findUrlProblem("http://example.test/hook", false)).toBe("scheme");
+        expect(findUrlProblem("http://example.test/hook", false)).toBe("scheme");
       });
 
       it("admits it once an operator has opted into local destinations", () => {
-        expect(destinations.findUrlProblem("http://localhost:3000/hook", true)).toBeNull();
+        expect(findUrlProblem("http://localhost:3000/hook", true)).toBeNull();
       });
     });
 
     describe("when it names a port other than 443", () => {
       it("refuses it by default", () => {
-        expect(destinations.findUrlProblem("https://example.test:8443/hook", false)).toBe("port");
+        expect(findUrlProblem("https://example.test:8443/hook", false)).toBe("port");
       });
 
       it("admits 443 written out", () => {
-        expect(destinations.findUrlProblem("https://example.test:443/hook", false)).toBeNull();
+        expect(findUrlProblem("https://example.test:443/hook", false)).toBeNull();
       });
     });
 
     describe("when it is not a URL at all", () => {
       it("says so rather than throwing", () => {
-        expect(destinations.findUrlProblem("not a url", false)).toBe("invalid_url");
+        expect(findUrlProblem("not a url", false)).toBe("invalid_url");
       });
     });
   });
@@ -62,7 +57,7 @@ describe("WebhookDestinationService", () => {
   describe("given an SQS queue URL", () => {
     describe("when it is the regional form", () => {
       it("accepts it and reads back its region, account and name", () => {
-        const result = destinations.inspectSqsQueueUrl(
+        const result = inspectSqsQueueUrl(
           "https://sqs.eu-west-1.amazonaws.com/123456789012/deliveries",
         );
 
@@ -80,7 +75,7 @@ describe("WebhookDestinationService", () => {
 
     describe("when it is the legacy per-region host form", () => {
       it("accepts that too", () => {
-        const result = destinations.inspectSqsQueueUrl(
+        const result = inspectSqsQueueUrl(
           "https://eu-west-1.queue.amazonaws.com/123456789012/deliveries",
         );
 
@@ -90,7 +85,7 @@ describe("WebhookDestinationService", () => {
 
     describe("when it is surrounded by whitespace", () => {
       it("trims before matching, and stores the trimmed form", () => {
-        const result = destinations.inspectSqsQueueUrl(
+        const result = inspectSqsQueueUrl(
           "  https://sqs.eu-west-1.amazonaws.com/123456789012/deliveries  ",
         );
 
@@ -103,7 +98,7 @@ describe("WebhookDestinationService", () => {
 
     describe("when it is a FIFO queue", () => {
       it("refuses it as such, rather than as a malformed URL", () => {
-        const result = destinations.inspectSqsQueueUrl(
+        const result = inspectSqsQueueUrl(
           "https://sqs.eu-west-1.amazonaws.com/123456789012/deliveries.fifo",
         );
 
@@ -113,7 +108,7 @@ describe("WebhookDestinationService", () => {
 
     describe("when the host is not Amazon's", () => {
       it("refuses it, so a queue URL cannot point at somebody else's server", () => {
-        const result = destinations.inspectSqsQueueUrl(
+        const result = inspectSqsQueueUrl(
           "https://sqs.eu-west-1.amazonaws.com.evil.test/123456789012/deliveries",
         );
 
@@ -123,18 +118,17 @@ describe("WebhookDestinationService", () => {
 
     describe("when the account is not twelve digits", () => {
       it("refuses it", () => {
-        expect(
-          destinations.inspectSqsQueueUrl("https://sqs.eu-west-1.amazonaws.com/12345/deliveries"),
-        ).toEqual({ ok: false, problem: "shape" });
+        expect(inspectSqsQueueUrl("https://sqs.eu-west-1.amazonaws.com/12345/deliveries")).toEqual({
+          ok: false,
+          problem: "shape",
+        });
       });
     });
 
     describe("when it is served over plain http", () => {
       it("refuses it", () => {
         expect(
-          destinations.inspectSqsQueueUrl(
-            "http://sqs.eu-west-1.amazonaws.com/123456789012/deliveries",
-          ),
+          inspectSqsQueueUrl("http://sqs.eu-west-1.amazonaws.com/123456789012/deliveries"),
         ).toEqual({ ok: false, problem: "shape" });
       });
     });
@@ -143,16 +137,16 @@ describe("WebhookDestinationService", () => {
   describe("given a role ARN", () => {
     describe("when it names an IAM role", () => {
       it("accepts it, in the commercial and the partitioned forms", () => {
-        expect(destinations.isRoleArn("arn:aws:iam::123456789012:role/deliver")).toBe(true);
-        expect(destinations.isRoleArn("arn:aws-cn:iam::123456789012:role/deliver")).toBe(true);
-        expect(destinations.isRoleArn("arn:aws-us-gov:iam::123456789012:role/deliver")).toBe(true);
+        expect(isRoleArn("arn:aws:iam::123456789012:role/deliver")).toBe(true);
+        expect(isRoleArn("arn:aws-cn:iam::123456789012:role/deliver")).toBe(true);
+        expect(isRoleArn("arn:aws-us-gov:iam::123456789012:role/deliver")).toBe(true);
       });
     });
 
     describe("when it names something other than a role", () => {
       it("refuses it", () => {
-        expect(destinations.isRoleArn("arn:aws:iam::123456789012:user/someone")).toBe(false);
-        expect(destinations.isRoleArn("not an arn")).toBe(false);
+        expect(isRoleArn("arn:aws:iam::123456789012:user/someone")).toBe(false);
+        expect(isRoleArn("not an arn")).toBe(false);
       });
     });
   });
@@ -160,7 +154,7 @@ describe("WebhookDestinationService", () => {
   describe("given a queue's credentials", () => {
     describe("when a role is present", () => {
       it("reports assume-role, which wins over any static key", () => {
-        expect(destinations.sqsCredentialMode({ roleArn: "arn:...", accessKeyId: "AKIA..." })).toBe(
+        expect(sqsCredentialMode({ roleArn: "arn:...", accessKeyId: "AKIA..." })).toBe(
           "assume_role",
         );
       });
@@ -168,17 +162,13 @@ describe("WebhookDestinationService", () => {
 
     describe("when only a static key is present", () => {
       it("reports static", () => {
-        expect(destinations.sqsCredentialMode({ roleArn: null, accessKeyId: "AKIA..." })).toBe(
-          "static",
-        );
+        expect(sqsCredentialMode({ roleArn: null, accessKeyId: "AKIA..." })).toBe("static");
       });
     });
 
     describe("when neither is present", () => {
       it("reports ambient, meaning the process's own credentials", () => {
-        expect(destinations.sqsCredentialMode({ roleArn: null, accessKeyId: null })).toBe(
-          "ambient",
-        );
+        expect(sqsCredentialMode({ roleArn: null, accessKeyId: null })).toBe("ambient");
       });
     });
   });

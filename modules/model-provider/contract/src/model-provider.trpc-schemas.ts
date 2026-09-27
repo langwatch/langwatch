@@ -274,3 +274,9 @@ export const modelProviderIsManagedSchema = z.object({ managed: z.boolean() }).s
 
 /** The id of the default-models config a save created or replaced. */
 export const modelDefaultConfigSavedSchema = z.object({ id: z.string() }).strict();
+
+/** One sign-in poll, and the provider it saves on approval: `completeCodexDeviceSignIn`. */
+export type ModelProviderCodexSignInCompletionInput = z.infer<
+  typeof modelProviderCodexSignInPollTrpcInputSchema
+>;
+export type ModelProviderCodexSignInCompletion = z.infer<typeof modelProviderCodexSignInPollSchema>;

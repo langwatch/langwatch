@@ -28,17 +28,13 @@ export const playgroundRest = defineRestRouter(ModelProviderApi)
     because: "The AI SDK owns the text stream and provider refusal response body.",
   })
   .handle(async ({ app, input, response }, headers) => {
-    const completion = await app.runPlaygroundCompletion({
+    const { body, ...answer } = await app.runPlaygroundCompletion({
       projectId: headers["x-project-id"] ?? "",
       model: headers["x-model"] ?? "",
       systemPrompt: headers["x-system-prompt"] ?? null,
       messages: input.messages,
     });
 
-    return response.stream(completion.body, {
-      mediaType: completion.mediaType,
-      status: completion.status,
-      headers: completion.headers,
-    });
+    return response.stream(body, answer);
   })
   .build();

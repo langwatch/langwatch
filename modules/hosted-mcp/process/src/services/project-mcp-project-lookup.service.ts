@@ -1,6 +1,6 @@
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import { type McpLiveProjectLookup, McpProjectLookup } from "../app/hosted-mcp-members.ts";
+import { type McpLiveProjectLookup, McpProjectLookup } from "../app/hosted-mcp.members.ts";
 
 /**
  * The project an MCP bearer token belongs to, read through the project

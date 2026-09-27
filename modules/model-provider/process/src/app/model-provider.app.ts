@@ -22,6 +22,9 @@ import {
   type ModelLimits,
   type ModelProviderCaller,
   type ModelProviderCodexDeviceApproval,
+  type ModelProviderCodexSignInCompletion,
+  type ModelProviderCodexSignInCompletionInput,
+  type ModelProviderEvaluatorModelEnvInput,
   type ModelProviderCodexDeviceSignIn,
   type ModelProviderCredentialProbeRequest,
   type ModelProviderStoredCredentialProbeRequest,
@@ -441,7 +444,7 @@ export class ModelProviderApp implements ModelProviderApi {
   }
 
   prepareEvaluatorModelEnv(
-    input: Parameters<ModelProviderApi["prepareEvaluatorModelEnv"]>[0],
+    input: ModelProviderEvaluatorModelEnvInput,
   ): Promise<Record<string, string>> {
     return this.#evaluatorModelEnv.prepare(input);
   }
@@ -544,6 +547,40 @@ export class ModelProviderApp implements ModelProviderApi {
     userCode: string;
   }): Promise<ModelProviderCodexDeviceApproval> {
     return this.#codexAccounts.pollDeviceSignIn(input);
+  }
+
+  async completeCodexDeviceSignIn(
+    input: ModelProviderCodexSignInCompletionInput,
+    by: ModelProviderCaller,
+  ): Promise<ModelProviderCodexSignInCompletion> {
+    const poll = await this.pollCodexDeviceSignIn({
+      deviceAuthId: input.deviceAuthId,
+      userCode: input.userCode,
+    });
+
+    if (poll.status === "pending") return { status: "pending" };
+
+    const saved = await this.upsert(
+      {
+        projectId: input.projectId,
+        provider: "openai_codex",
+        enabled: true,
+        customKeys: poll.keys,
+        scopes: input.scopes,
+      },
+      by,
+    );
+
+    if (input.setAsCodingDefaults) {
+      await this.applyCodexCodingDefaults({ scopes: input.scopes }, by);
+    }
+
+    return {
+      status: "complete",
+      providerId: saved.id,
+      email: poll.keys.CODEX_EMAIL,
+      plan: poll.keys.CODEX_PLAN,
+    };
   }
 
   /** Whether LangWatch itself supplies this provider's credentials. */

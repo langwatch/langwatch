@@ -10,7 +10,7 @@ import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.
 import {
   SQS_MAX_MESSAGE_BYTES,
   SqsWebhookDestinationService,
-} from "../sqs.webhook-destination.service.ts";
+} from "../sqs-webhook-destination.service.ts";
 
 // The queue channel and the rate limiter are the two boundaries; everything
 // else in these tests is the real envelope, the real signature and the real

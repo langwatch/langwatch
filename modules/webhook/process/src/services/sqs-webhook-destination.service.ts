@@ -161,11 +161,17 @@ function failureShape(error: unknown): {
   if (typeof error !== "object" || error === null) {
     return { name: "", code: "", httpStatus: undefined };
   }
-  const metadata = Reflect.get(error, "$metadata") ?? {};
+  const metadata =
+    "$metadata" in error && typeof error.$metadata === "object" && error.$metadata !== null
+      ? error.$metadata
+      : {};
   return {
-    name: (Reflect.get(error, "name") as string | undefined) ?? "",
-    code: (Reflect.get(error, "code") as string | undefined) ?? "",
-    httpStatus: Reflect.get(metadata, "httpStatusCode") as number | undefined,
+    name: "name" in error && typeof error.name === "string" ? error.name : "",
+    code: "code" in error && typeof error.code === "string" ? error.code : "",
+    httpStatus:
+      "httpStatusCode" in metadata && typeof metadata.httpStatusCode === "number"
+        ? metadata.httpStatusCode
+        : undefined,
   };
 }
 

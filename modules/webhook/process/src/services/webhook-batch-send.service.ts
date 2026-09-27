@@ -111,9 +111,10 @@ export class WebhookBatchSendService {
       });
     } catch (error) {
       const retryable =
-        typeof error === "object" && error !== null
-          ? Reflect.get(error, "retryable") !== false
-          : true;
+        typeof error !== "object" ||
+        error === null ||
+        !("retryable" in error) ||
+        error.retryable !== false;
       await this.deps.endpoints.recordDeliveryAttempt({
         organizationId: payload.organizationId,
         endpointId: payload.endpointId,

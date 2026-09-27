@@ -8,8 +8,6 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import { CodexTokenRefresher } from "../app/model-provider.members.ts";
-
 /**
  * OpenAI's device-code flow (codex CLI's own client id) so requests bill the ChatGPT plan.
  * Spec: specs/model-providers/codex-account-provider.feature
@@ -65,9 +63,13 @@ export class CodexAccountService {
 
   private readonly issuer: string;
 
-  constructor(
-    private readonly fetchImpl: typeof fetch = fetch,
-    issuer?: string,
+  static create(input: { fetchImpl?: typeof fetch; issuer?: string } = {}): CodexAccountService {
+    return new CodexAccountService(input.fetchImpl ?? fetch, input.issuer);
+  }
+
+  private constructor(
+    private readonly fetchImpl: typeof fetch,
+    issuer: string | undefined,
   ) {
     // The override exists for tests (a local stand-in issuer) and for
     // debugging against a staging identity service; production always runs
@@ -259,35 +261,6 @@ export interface CodexClaims {
   accountId: string;
   email: string;
   plan: string;
-}
-
-/**
- * The Codex refresher, over the device-flow account service above.
- */
-export class CodexOAuthModelProviderTokenRefresherAdapter extends CodexTokenRefresher {
-  static create(input: { issuer?: string } = {}): CodexOAuthModelProviderTokenRefresherAdapter {
-    return new CodexOAuthModelProviderTokenRefresherAdapter(
-      new CodexAccountService(fetch, input.issuer),
-    );
-  }
-
-  private constructor(private readonly account: CodexAccountService) {
-    super();
-  }
-
-  async refresh(input: {
-    tokens: CodexTokenKeys;
-  }): Promise<{ status: "refreshed"; tokens: CodexTokenKeys } | { status: "session_expired" }> {
-    try {
-      const tokens = await this.account.refresh(input.tokens);
-      return { status: "refreshed", tokens };
-    } catch (error) {
-      if (error instanceof CodexAuthError && error.kind === "refresh_rejected") {
-        return { status: "session_expired" };
-      }
-      throw error;
-    }
-  }
 }
 
 function pollIntervalOf(interval: unknown): number {

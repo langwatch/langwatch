@@ -743,7 +743,7 @@ function detectUncheckableReason({
 /**
  * The catalogue's credential probe, over the process's guarded egress.
  */
-export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCredentialProbe {
+export class HttpModelProviderCredentialProbeService extends ModelProviderCredentialProbe {
   /** Validates a stored or env-var API key against a custom URL, or the default if none given. */
   static async validateKeyWithCustomUrl({
     projectId,
@@ -811,7 +811,7 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
     }
     // Note: if customBaseUrl is not provided, validateProviderApiKey will use the default URL
 
-    return HttpModelProviderCredentialProbeAdapter.validateProviderApiKey(
+    return HttpModelProviderCredentialProbeService.validateProviderApiKey(
       provider,
       customKeys,
       egress,
@@ -890,8 +890,8 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
      * own, and the caller that has one is the composition root.
      */
     environment?: Readonly<Record<string, string | undefined>>;
-  }): HttpModelProviderCredentialProbeAdapter {
-    return new HttpModelProviderCredentialProbeAdapter(input.egress, input.environment ?? {});
+  }): HttpModelProviderCredentialProbeService {
+    return new HttpModelProviderCredentialProbeService(input.egress, input.environment ?? {});
   }
 
   private constructor(
@@ -905,7 +905,7 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
     provider: string;
     customKeys: Record<string, string>;
   }): Promise<ModelProviderCredentialVerdict> {
-    return HttpModelProviderCredentialProbeAdapter.validateProviderApiKey(
+    return HttpModelProviderCredentialProbeService.validateProviderApiKey(
       input.provider,
       input.customKeys,
       this.egress,
@@ -918,7 +918,7 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
     customBaseUrl: string | undefined;
     modelProviders: Pick<ModelProviderApi, "findProviderForProject">;
   }): Promise<ModelProviderCredentialVerdict> {
-    return HttpModelProviderCredentialProbeAdapter.validateKeyWithCustomUrl({
+    return HttpModelProviderCredentialProbeService.validateKeyWithCustomUrl({
       ...input,
       environment: this.environment,
       egress: this.egress,

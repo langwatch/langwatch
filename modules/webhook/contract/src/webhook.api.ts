@@ -2,6 +2,7 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { WebhookSpendDeliveryRequest } from "./webhook-spend-delivery.ts";
 import type {
+  ApplyWebhookEndpointChangesCommand,
   CreateWebhookEndpointCommand,
   UpdateWebhookEndpointCommand,
 } from "./webhook.commands.ts";
@@ -22,6 +23,8 @@ export interface WebhookApi {
   getAll(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
   getById(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
   update(input: UpdateWebhookEndpointCommand): Promise<WebhookEndpointView>;
+  /** Updates whatever fields were named, then moves the status when one was asked for. */
+  applyEndpointChanges(input: ApplyWebhookEndpointChangesCommand): Promise<WebhookEndpointView>;
   rollSecret(input: {
     organizationId: string;
     endpointId: string;
@@ -45,10 +48,8 @@ export interface WebhookApi {
    *  through, and records the attempt in the endpoint's delivery log. */
   testFire(input: { organizationId: string; endpointId: string }): Promise<WebhookTestFireResult>;
   getEmittedEvents(input: ListWebhookEventsQuery): Promise<ListWebhookEventsResult>;
-  findEmittedEventById(input: {
-    organizationId: string;
-    id: string;
-  }): Promise<WebhookEnvelope | null>;
+  /** Throws `WebhookEventNotFoundError` when the log cannot answer for the id. */
+  getEmittedEventById(input: { organizationId: string; id: string }): Promise<WebhookEnvelope>;
   assertEndpointsEntitled(organizationId: string): Promise<void>;
   /** Re-delivers one already-emitted envelope through the endpoint's normal delivery path. */
   appendReplayToEndpointStream(input: {

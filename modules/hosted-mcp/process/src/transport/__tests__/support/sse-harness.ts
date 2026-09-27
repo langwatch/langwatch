@@ -8,7 +8,7 @@ import { createServer, type Server, type IncomingMessage } from "node:http";
 
 import { Redis } from "ioredis";
 
-import type { McpLiveProjectLookup } from "../../../app/hosted-mcp-members.ts";
+import type { McpLiveProjectLookup } from "../../../app/hosted-mcp.members.ts";
 import {
   createMcpHandler,
   McpApiKeyCipher,

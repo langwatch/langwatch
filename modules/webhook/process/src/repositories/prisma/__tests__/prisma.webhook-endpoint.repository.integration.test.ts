@@ -33,8 +33,9 @@ import type { WebhookId, WebhookSecret } from "../../../app/webhook.app.ts";
 import {
   WEBHOOK_AUTO_DISABLE_AFTER_MS,
   WEBHOOK_DISABLED_REASON_AUTO,
-  WebhookEndpointConfiguration,
-} from "../../../services/webhook-endpoint-policy.service.ts";
+  webhookEndpointConfiguration,
+  type WebhookEndpointConfiguration,
+} from "../../../rules/webhook-endpoint-policy.rules.ts";
 import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository.ts";
 import { raceOnOneRow } from "./support/row-lock-race.ts";
 
@@ -106,9 +107,7 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository", () => {
         }),
       ).rejects.toBeInstanceOf(WebhookEndpointValidationError);
 
-      const permissive = repository(
-        WebhookEndpointConfiguration.create({ allowInsecureLocalUrls: true }),
-      );
+      const permissive = repository(webhookEndpointConfiguration({ allowInsecureLocalUrls: true }));
       const { endpoint } = await create(permissive, {
         organizationId: orgId,
         url: "http://example.com/hooks",
@@ -184,7 +183,7 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository", () => {
       ).rejects.toBeInstanceOf(WebhookEndpointValidationError);
 
       const permissive = repository(
-        WebhookEndpointConfiguration.create({ allowAmbientAwsCredentials: true }),
+        webhookEndpointConfiguration({ allowAmbientAwsCredentials: true }),
       );
       const { endpoint } = await create(permissive, {
         organizationId: orgId,

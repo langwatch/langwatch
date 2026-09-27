@@ -8,9 +8,13 @@ import { ModelProviderCredentialProbe } from "../app/model-provider.members.ts";
 /**
  * The probe a deployment with no guarded egress composes.
  */
-export class UnavailableModelProviderCredentialProbeAdapter extends ModelProviderCredentialProbe {
-  static create(): UnavailableModelProviderCredentialProbeAdapter {
-    return new UnavailableModelProviderCredentialProbeAdapter();
+export class UnavailableModelProviderCredentialProbeService extends ModelProviderCredentialProbe {
+  static create(): UnavailableModelProviderCredentialProbeService {
+    return new UnavailableModelProviderCredentialProbeService();
+  }
+
+  private constructor() {
+    super();
   }
 
   probe(_input: {

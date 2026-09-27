@@ -10,11 +10,11 @@ import {
 /**
  * One model call, asked to say the same thing in English.
  */
-export class VercelAiModelTranslationAdapter extends ModelTranslation {
+export class VercelAiModelTranslationService extends ModelTranslation {
   static create(
     options: Omit<ModelProviderExecutionHandleOptions, "modelProviders">,
-  ): VercelAiModelTranslationAdapter {
-    return new VercelAiModelTranslationAdapter(options);
+  ): VercelAiModelTranslationService {
+    return new VercelAiModelTranslationService(options);
   }
 
   private constructor(

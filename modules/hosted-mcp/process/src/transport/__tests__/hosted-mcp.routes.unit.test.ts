@@ -4,7 +4,7 @@
 import { getRoutePolicy } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";
 
-import type { McpLiveProjectLookup } from "../../app/hosted-mcp-members.ts";
+import type { McpLiveProjectLookup } from "../../app/hosted-mcp.members.ts";
 import {
   createMcpHandler,
   HeaderMcpClientAddressService,

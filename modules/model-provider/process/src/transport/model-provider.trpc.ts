@@ -152,36 +152,7 @@ export const modelProviderTrpcTransport = defineTrpcRouter(ModelProviderApi, mod
 
   .procedure("codexSignInPoll")
   .withPermission("project:update")
-  .handle(async ({ app, input, actor }) => {
-    const poll = await app.pollCodexDeviceSignIn({
-      deviceAuthId: input.deviceAuthId,
-      userCode: input.userCode,
-    });
-
-    if (poll.status === "pending") return { status: "pending" as const };
-
-    const saved = await app.upsert(
-      {
-        projectId: input.projectId,
-        provider: "openai_codex",
-        enabled: true,
-        customKeys: poll.keys,
-        scopes: input.scopes,
-      },
-      actor,
-    );
-
-    if (input.setAsCodingDefaults) {
-      await app.applyCodexCodingDefaults({ scopes: input.scopes }, actor);
-    }
-
-    return {
-      status: "complete" as const,
-      providerId: saved.id,
-      email: poll.keys.CODEX_EMAIL,
-      plan: poll.keys.CODEX_PLAN,
-    };
-  })
+  .handle(({ app, input, actor }) => app.completeCodexDeviceSignIn(input, actor))
 
   .procedure("codexApplyCodingDefaults")
   .withPermission("project:update")

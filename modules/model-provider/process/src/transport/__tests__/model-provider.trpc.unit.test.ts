@@ -9,7 +9,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import type { CodexAccountService } from "../../services/codex-oauth.model-provider-token-refresher.service.ts";
+import type { ModelProviderCodexDeviceFlow } from "../../app/model-provider.app.ts";
 import { modelProviderTrpcTransport } from "../model-provider.trpc.ts";
 import {
   mountableModelProviderApp,
@@ -53,7 +53,7 @@ function mount(
     modelProviders?: Partial<ModelProviderApi>;
     permits?: ModelProviderTestDecision;
     probe?: RecordingCredentialProbe;
-    codexAccounts?: CodexAccountService;
+    codexAccounts?: ModelProviderCodexDeviceFlow;
     userId?: string;
   } = {},
 ) {
@@ -372,10 +372,7 @@ describe("the modelProvider tRPC namespace", () => {
   describe("given a Codex device authorization the person has approved", () => {
     describe("when the browser polls it", () => {
       it("saves the credential and answers the account, with no token on the wire", async () => {
-        const upsert = vi.fn(async () => ({ id: "mp_codex" }));
-        const setDefault = vi.fn(async () => {});
-        const { caller } = mount({
-          modelProviders: { upsert: upsert as never, setDefault: setDefault as never },
+        const { caller, repositories } = mount({
           codexAccounts: StubCodexAccounts.create({ status: "complete", keys: CODEX_KEYS }),
         });
 
@@ -386,20 +383,25 @@ describe("the modelProvider tRPC namespace", () => {
           scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_A }],
         });
 
+        const [saved] = await repositories.providers.findForProject([
+          { scopeType: "PROJECT", scopeId: PROJECT_A },
+        ]);
+        expect(saved?.provider).toBe("openai_codex");
         expect(result).toEqual({
           status: "complete",
-          providerId: "mp_codex",
+          providerId: saved?.id,
           email: "person@example.com",
           plan: "plus",
         });
         expect(JSON.stringify(result)).not.toContain("access-token-secret");
         // Not asked for, so the coding roles stay where they were.
-        expect(setDefault).not.toHaveBeenCalled();
+        await expect(
+          repositories.defaults.getByScope({ scopeType: "PROJECT", scopeId: PROJECT_A }),
+        ).rejects.toMatchObject({ code: "model_default_not_found" });
       });
 
       it("points only the LANGY and FAST roles at the codex model when asked", async () => {
         const { caller, repositories } = mount({
-          modelProviders: { upsert: (async () => ({ id: "mp_codex" })) as never },
           codexAccounts: StubCodexAccounts.create({ status: "complete", keys: CODEX_KEYS }),
         });
 
@@ -407,13 +409,13 @@ describe("the modelProvider tRPC namespace", () => {
           projectId: PROJECT_A,
           deviceAuthId: "auth-1",
           userCode: "ABCD-EFGH",
-          scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
           setAsCodingDefaults: true,
         });
 
         const stored = await repositories.defaults.getByScope({
           scopeType: "ORGANIZATION",
-          scopeId: "org-1",
+          scopeId: "organization-1",
         });
 
         // The Default role - playground, evaluators, workflows - is untouched:

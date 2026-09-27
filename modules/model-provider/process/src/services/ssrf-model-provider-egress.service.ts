@@ -30,9 +30,9 @@ export type ModelProviderEgressPolicy = Readonly<{
  * customer URL, routed through the shared SSRF fence (denylist, private
  * block, IP pinning). Redirects are refused, since one could leak an API key.
  */
-export class SsrfModelProviderEgressAdapter extends ModelProviderEgress {
-  static create(input: { policy: ModelProviderEgressPolicy }): SsrfModelProviderEgressAdapter {
-    return new SsrfModelProviderEgressAdapter(
+export class SsrfModelProviderEgressService extends ModelProviderEgress {
+  static create(input: { policy: ModelProviderEgressPolicy }): SsrfModelProviderEgressService {
+    return new SsrfModelProviderEgressService(
       createSsrfUrlValidator({
         blockLocal: input.policy.blockLocal,
         allowedHosts: [...input.policy.allowedHosts],

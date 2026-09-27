@@ -1,11 +1,11 @@
 import { EXACT_CREDENTIAL_FIELDS } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
-import {
+import type {
+  CustomKeysRead,
+  ModelProviderCredentialCipher,
   ModelProviderCredentialCodec,
-  type CustomKeysRead,
-  type ModelProviderCredentialCipher,
-} from "../app/model-provider.members.ts";
+} from "../../app/model-provider.members.ts";
 
 const logger = createLogger("langwatch:model-provider:credentials");
 
@@ -77,7 +77,7 @@ function parseDecrypted(raw: string, cipher: ModelProviderCredentialCipher): Cus
 /**
  * The stored form of a provider's credentials: encrypted JSON, one column.
  */
-export class EncryptedModelProviderCredentialAdapter extends ModelProviderCredentialCodec {
+export class PrismaModelProviderCredentialMapper implements ModelProviderCredentialCodec {
   static readCustomKeys(raw: unknown, cipher: ModelProviderCredentialCipher): CustomKeysRead {
     if (raw === null || raw === undefined) return ABSENT;
     if (typeof raw === "object") {
@@ -89,19 +89,17 @@ export class EncryptedModelProviderCredentialAdapter extends ModelProviderCreden
 
   static create(input: {
     cipher: ModelProviderCredentialCipher;
-  }): EncryptedModelProviderCredentialAdapter {
-    return new EncryptedModelProviderCredentialAdapter(input.cipher);
+  }): PrismaModelProviderCredentialMapper {
+    return new PrismaModelProviderCredentialMapper(input.cipher);
   }
 
-  private constructor(private readonly cipher: ModelProviderCredentialCipher) {
-    super();
-  }
+  private constructor(private readonly cipher: ModelProviderCredentialCipher) {}
 
   encode(value: Record<string, unknown> | null): unknown {
     return value === null ? null : this.cipher.encrypt(JSON.stringify(value));
   }
 
   decode(value: unknown): CustomKeysRead {
-    return EncryptedModelProviderCredentialAdapter.readCustomKeys(value, this.cipher);
+    return PrismaModelProviderCredentialMapper.readCustomKeys(value, this.cipher);
   }
 }

@@ -6,10 +6,10 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { ModelProviderCredentialCipher } from "../../app/model-provider.members.ts";
-import { EncryptedModelProviderCredentialAdapter } from "../../services/encrypted.model-provider-api-key-credential.service.ts";
 import type { ModelProviderRepositories } from "../model-provider.repositories.ts";
 import { PrismaModelCostRepository } from "./prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "./prisma.model-default.repository.ts";
+import { PrismaModelProviderCredentialMapper } from "./prisma.model-provider-credential.mapper.ts";
 import { PrismaModelProviderEvidenceRepository } from "./prisma.model-provider-evidence.repository.ts";
 import { PrismaModelProviderRepository } from "./prisma.model-provider.repository.ts";
 
@@ -22,7 +22,7 @@ export class PostgresModelProviderRepositories {
       encryption: ModelProviderCredentialCipher;
     }>,
   ): ModelProviderRepositories {
-    const credentials = EncryptedModelProviderCredentialAdapter.create({
+    const credentials = PrismaModelProviderCredentialMapper.create({
       cipher: members.encryption,
     });
     return {

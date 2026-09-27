@@ -16,6 +16,7 @@ import {
   type WebhookDestinationKind,
   type WebhookServerConfig,
   type WebhookApi as WebhookApiContract,
+  WebhookEventNotFoundError,
 } from "@langwatch/webhook-contract";
 
 import { HttpWebhookDispatchChannel } from "../channels/http/http.webhook-dispatch.channel.ts";
@@ -25,11 +26,11 @@ import {
 } from "../eventing/webhook-delivery.pipeline.ts";
 import type { WebhookEndpointRepository } from "../repositories/webhook-endpoint.repository.ts";
 import type { WebhookRepositories } from "../repositories/webhook.repositories.ts";
+import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
 import {
   WebhookDeliveryService,
   type WebhookDeliveryProcessDeps,
 } from "../services/webhook-delivery.service.ts";
-import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
 import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
 import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../services/webhook-events.service.ts";
@@ -79,7 +80,7 @@ async function recordTestFire(
 const logger = createLogger("langwatch:webhook:app");
 
 /** One endpoint's last hop, as the delivery worker performs it. */
-export type WebhookTestDispatch = (input: {
+export type WebhookTestDispatchInput = {
   destination: WebhookDestinationConfig;
   organizationId: string;
   endpointId: string;
@@ -88,7 +89,11 @@ export type WebhookTestDispatch = (input: {
   attempt: number;
   signingSecrets: readonly string[];
   isTestFire: boolean;
-}) => Promise<WebhookDispatchResult>;
+};
+
+export type WebhookTestDispatch = (
+  input: WebhookTestDispatchInput,
+) => Promise<WebhookDispatchResult>;
 
 /** What the process composes this feature's application from. */
 export interface WebhookAppDependencies {
@@ -244,6 +249,25 @@ export class WebhookApp implements WebhookApiContract {
   getAll: WebhookApiContract["getAll"] = (input) => this.#dependencies.endpoints.findAll(input);
   getById: WebhookApiContract["getById"] = (input) => this.#dependencies.endpoints.getById(input);
   update: WebhookApiContract["update"] = (input) => this.#dependencies.endpoints.update(input);
+
+  applyEndpointChanges: WebhookApiContract["applyEndpointChanges"] = async ({
+    status,
+    ...update
+  }) => {
+    const { organizationId, endpointId, ...fields } = update;
+    const hasFieldUpdate = Object.values(fields).some((value) => value !== undefined);
+    const endpoint = hasFieldUpdate
+      ? await this.update(update)
+      : await this.getById({ organizationId, endpointId });
+
+    if (status === "DISABLED" && endpoint.status === "ACTIVE") {
+      return this.disable({ organizationId, endpointId });
+    }
+    if (status === "ACTIVE" && endpoint.status === "DISABLED") {
+      return this.enable({ organizationId, endpointId });
+    }
+    return endpoint;
+  };
   rollSecret: WebhookApiContract["rollSecret"] = (input) =>
     this.#dependencies.endpoints.rollSecret(input);
   enable: WebhookApiContract["enable"] = (input) => this.#dependencies.endpoints.enable(input);
@@ -323,8 +347,11 @@ export class WebhookApp implements WebhookApiContract {
     this.#dependencies.assertEndpointsEntitled(organizationId);
   getEmittedEvents: WebhookApiContract["getEmittedEvents"] = (input) =>
     this.getEventsService().getEmittedEvents(input);
-  findEmittedEventById: WebhookApiContract["findEmittedEventById"] = (input) =>
-    this.getEventsService().findEmittedEventById(input);
+  getEmittedEventById: WebhookApiContract["getEmittedEventById"] = async (input) => {
+    const event = await this.getEventsService().findEmittedEventById(input);
+    if (!event) throw new WebhookEventNotFoundError();
+    return event;
+  };
   appendReplayToEndpointStream: WebhookApiContract["appendReplayToEndpointStream"] = async ({
     organizationId,
     endpoint,
@@ -402,8 +429,8 @@ export class WebhookApp implements WebhookApiContract {
   }
 
   /** One endpoint's last delivery hop, for a test fire. */
-  dispatch(...args: Parameters<WebhookTestDispatch>): ReturnType<WebhookTestDispatch> {
-    return this.#dependencies.dispatch(...args);
+  dispatch(input: WebhookTestDispatchInput): Promise<WebhookDispatchResult> {
+    return this.#dependencies.dispatch(input);
   }
 }
 

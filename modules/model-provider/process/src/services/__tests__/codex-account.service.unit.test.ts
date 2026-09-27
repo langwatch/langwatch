@@ -6,7 +6,7 @@ import { CodexAuthError, type CodexTokenKeys } from "@langwatch/model-provider-c
  */
 import { describe, expect, it } from "vitest";
 
-import { CodexAccountService } from "../codex-oauth.model-provider-token-refresher.service.ts";
+import { CodexAccountService } from "../codex-account.service.ts";
 
 /** A minimal unsigned JWT with the OpenAI auth claim, base64url-encoded. */
 function fakeIdToken(payload: Record<string, unknown>): string {
@@ -56,7 +56,10 @@ describe("CodexAccountService", () => {
           },
         }),
       });
-      const service = new CodexAccountService(impl, "https://issuer.test");
+      const service = CodexAccountService.create({
+        fetchImpl: impl,
+        issuer: "https://issuer.test",
+      });
       const device = await service.startDeviceSignIn();
       expect(device).toMatchObject({
         deviceAuthId: "dev-1",
@@ -76,7 +79,10 @@ describe("CodexAccountService", () => {
           json: { error: "authorization_pending" },
         }),
       });
-      const service = new CodexAccountService(impl, "https://issuer.test");
+      const service = CodexAccountService.create({
+        fetchImpl: impl,
+        issuer: "https://issuer.test",
+      });
       const result = await service.pollDeviceSignIn({
         deviceAuthId: "dev-1",
         userCode: "ABCD-1234",
@@ -101,7 +107,10 @@ describe("CodexAccountService", () => {
           },
         }),
       });
-      const service = new CodexAccountService(impl, "https://issuer.test");
+      const service = CodexAccountService.create({
+        fetchImpl: impl,
+        issuer: "https://issuer.test",
+      });
       const result = await service.pollDeviceSignIn({
         deviceAuthId: "dev-1",
         userCode: "ABCD-1234",
@@ -139,7 +148,10 @@ describe("CodexAccountService", () => {
           return { status: 200, json: { access_token: "new-access" } };
         },
       });
-      const service = new CodexAccountService(impl, "https://issuer.test");
+      const service = CodexAccountService.create({
+        fetchImpl: impl,
+        issuer: "https://issuer.test",
+      });
       const refreshed = await service.refresh(storedKeys);
       expect(refreshed.CODEX_ACCESS_TOKEN).toBe("new-access");
       expect(refreshed.CODEX_REFRESH_TOKEN).toBe("refresh-1");
@@ -153,7 +165,10 @@ describe("CodexAccountService", () => {
           json: { error: "invalid_grant" },
         }),
       });
-      const service = new CodexAccountService(impl, "https://issuer.test");
+      const service = CodexAccountService.create({
+        fetchImpl: impl,
+        issuer: "https://issuer.test",
+      });
       await expect(service.refresh(storedKeys)).rejects.toMatchObject({
         name: "CodexAuthError",
         kind: "refresh_rejected",
@@ -167,7 +182,10 @@ describe("CodexAccountService", () => {
           json: { error: "temporarily_unavailable" },
         }),
       });
-      const service = new CodexAccountService(impl, "https://issuer.test");
+      const service = CodexAccountService.create({
+        fetchImpl: impl,
+        issuer: "https://issuer.test",
+      });
       await expect(service.refresh(storedKeys)).rejects.toMatchObject({
         name: "CodexAuthError",
         kind: "http",
@@ -178,7 +196,10 @@ describe("CodexAccountService", () => {
       const impl: typeof fetch = async () => {
         throw new TypeError("fetch failed: getaddrinfo ENOTFOUND");
       };
-      const service = new CodexAccountService(impl, "https://issuer.test");
+      const service = CodexAccountService.create({
+        fetchImpl: impl,
+        issuer: "https://issuer.test",
+      });
       await expect(service.refresh(storedKeys)).rejects.toMatchObject({
         name: "CodexAuthError",
         kind: "http",
@@ -212,7 +233,10 @@ describe("CodexAccountService", () => {
           json: { nope: true },
         }),
       });
-      const service = new CodexAccountService(impl, "https://issuer.test");
+      const service = CodexAccountService.create({
+        fetchImpl: impl,
+        issuer: "https://issuer.test",
+      });
       await expect(service.startDeviceSignIn()).rejects.toBeInstanceOf(CodexAuthError);
     });
   });

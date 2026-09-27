@@ -227,70 +227,6 @@ export const mergeCustomModelMetadata = (
   return merged;
 };
 
-// Frontend-only function that masks API keys for security and includes model metadata
-export const getProjectModelProvidersForFrontend = async (
-  service: ModelProviderApi,
-  projectId: string,
-) => {
-  const providers = await service.getForProject({ projectId });
-  const maskedProviders = Object.fromEntries(
-    Object.entries(providers).map(([provider, value]) => [
-      provider,
-      toLegacyProviderSummary(value),
-    ]),
-  );
-
-  // Include model metadata for all models, merged with custom model entries
-  const registryMetadata = getModelMetadataForFrontend();
-  const modelMetadata = mergeCustomModelMetadata(registryMetadata, maskedProviders);
-
-  return {
-    providers: maskedProviders,
-    modelMetadata,
-  };
-};
-
-// List shape (one entry per row) for surfaces that need to render every stored credential
-// — the Model Providers settings table can show two rows of the same provider when the
-// user has e.g. "OpenAI — Org" and "OpenAI — Project override" side by side. The
-// Record-by-provider-key `getProjectModelProvidersForFrontend` collapses those duplicates
-// and is not safe to use here.
-export const listOrgModelProvidersForFrontend = async (
-  service: ModelProviderApi,
-  organizationId: string,
-) => {
-  const providers = (await service.listForOrganization({ organizationId })).map(
-    toLegacyProviderSummary,
-  );
-
-  const registryMetadata = getModelMetadataForFrontend();
-  const providersAsRecord = Object.fromEntries(
-    providers.map((p) => [p.id ?? `system-${p.provider}`, p]),
-  );
-  const modelMetadata = mergeCustomModelMetadata(registryMetadata, providersAsRecord);
-
-  return {
-    providers,
-    modelMetadata,
-  };
-};
-
-export const listProjectModelProvidersForFrontend = async (
-  service: ModelProviderApi,
-  projectId: string,
-) => {
-  const providers = (await service.listForProject({ projectId })).map(toLegacyProviderSummary);
-
-  const registryMetadata = getModelMetadataForFrontend();
-  const providersAsRecord = Object.fromEntries(providers.map((p) => [p.id ?? p.provider, p]));
-  const modelMetadata = mergeCustomModelMetadata(registryMetadata, providersAsRecord);
-
-  return {
-    providers,
-    modelMetadata,
-  };
-};
-
 const getModelOrDefaultEnvKey = ({
   modelProvider,
   environment,
@@ -321,7 +257,7 @@ export const prepareEnvKeys = ({
 }: {
   modelProvider: LegacyModelProviderExecution;
   environment: Record<string, string | undefined>;
-}) => {
+}): Record<string, string> => {
   const providerDefinition = getProviderDefinition(modelProvider.provider);
   if (!providerDefinition) {
     return {};

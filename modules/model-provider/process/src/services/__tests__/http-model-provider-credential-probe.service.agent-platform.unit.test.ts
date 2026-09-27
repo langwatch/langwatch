@@ -4,7 +4,7 @@ import { RedirectRefusedError } from "@langwatch/egress";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ModelProviderEgress } from "../../app/model-provider.members.ts";
-import { HttpModelProviderCredentialProbeAdapter } from "../http.model-provider-credential-probe.service.ts";
+import { HttpModelProviderCredentialProbeService } from "../http-model-provider-credential-probe.service.ts";
 
 function requestBody(init: RequestInit | undefined): string {
   const body = init?.body;
@@ -25,7 +25,7 @@ const egress: ModelProviderEgress = {
 };
 
 const validateProviderApiKey = (provider: string, customKeys: Record<string, string>) =>
-  HttpModelProviderCredentialProbeAdapter.validateProviderApiKey(provider, customKeys, egress);
+  HttpModelProviderCredentialProbeService.validateProviderApiKey(provider, customKeys, egress);
 
 const AGENT_PLATFORM_CREDENTIALS = {
   GEMINI_API_KEY: "AQ.AnAgentPlatformKey",

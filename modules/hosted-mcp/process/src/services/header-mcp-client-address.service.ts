@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 
-import { McpClientAddress } from "../app/hosted-mcp-members.ts";
+import { McpClientAddress } from "../app/hosted-mcp.members.ts";
 
 /**
  * Reads forwarding headers in priority order (cf-connecting-ip first as edge-authored).

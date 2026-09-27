@@ -15,7 +15,7 @@ export {
   type HostedMcpDependencies,
   type HostedMcpRedis,
   type McpToolServer,
-} from "./app/hosted-mcp-members.ts";
+} from "./app/hosted-mcp.members.ts";
 export type {
   McpApprovalOutcome,
   McpApprovalRequest,

@@ -8,7 +8,9 @@
 // returning canned rows, so a narrowed query fails here. See
 // modules/model-provider/specs/model-provider.feature.
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   ModelProviderCredentialCodec,
@@ -62,27 +64,33 @@ const STORED = [
   }),
 ];
 
+const findManyArgsSchema = z.object({
+  where: z.object({
+    scopes: z.object({
+      some: z.object({ OR: z.array(z.object({ scopeType: z.string(), scopeId: z.string() })) }),
+    }),
+  }),
+});
+
 /** Applies the `scopes.some.OR` filter the repository builds. */
 function databaseThatFilters() {
-  return {
+  return prismaDouble({
     modelProvider: {
-      findMany: async ({ where }: { where: { scopes: { some: { OR: StoredScope[] } } } }) => {
-        const wanted = where.scopes.some.OR;
-        return STORED.filter((provider) =>
-          provider.scopes.some((scope) =>
-            wanted.some(
-              (candidate) =>
-                candidate.scopeType === scope.scopeType && candidate.scopeId === scope.scopeId,
+      findMany: (args) => {
+        const wanted = findManyArgsSchema.parse(args).where.scopes.some.OR;
+        return Promise.resolve(
+          STORED.filter((provider) =>
+            provider.scopes.some((scope) =>
+              wanted.some(
+                (candidate) =>
+                  candidate.scopeType === scope.scopeType && candidate.scopeId === scope.scopeId,
+              ),
             ),
           ),
         );
       },
     },
-    gatewayChangeEvent: {},
-    $transaction: async () => {
-      throw new Error("unused capability");
-    },
-  };
+  });
 }
 
 class PlainTextCredentials extends ModelProviderCredentialCodec {
@@ -100,9 +108,7 @@ describe("given a project attached to a team and organization", () => {
     /** @scenario "a provider may be visible at project, team, or organization scope" */
     it("returns the providers attached at any of those scopes, and no other project's", async () => {
       const repository = PrismaModelProviderRepository.create(
-        databaseThatFilters() as unknown as Parameters<
-          typeof PrismaModelProviderRepository.create
-        >[0],
+        databaseThatFilters(),
         new PlainTextCredentials(),
       );
 

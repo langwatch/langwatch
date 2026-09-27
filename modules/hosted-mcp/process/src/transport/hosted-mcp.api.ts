@@ -30,7 +30,7 @@ import type {
   HostedMcpDependencies,
   HostedMcpRedis,
   McpLiveProjectLookup,
-} from "../app/hosted-mcp-members.ts";
+} from "../app/hosted-mcp.members.ts";
 import { RedisMcpOAuthTokenRepository } from "../repositories/redis/redis.mcp-oauth-token.repository.ts";
 import { McpOAuthClientRegistryService } from "../services/mcp-oauth-client-registry.service.ts";
 import { McpOAuthTokenService } from "../services/mcp-oauth-token.service.ts";

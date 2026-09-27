@@ -44,9 +44,9 @@ export type RegistryModelProviderCatalogOptions = {
  * configuration — the base class derives model lists and static rates; this adds the
  * deployment-specific answers (system credentials, resolved execution keys, managed status).
  */
-export class RegistryModelProviderCatalogAdapter extends ModelProviderCatalog {
-  static create(options: RegistryModelProviderCatalogOptions): RegistryModelProviderCatalogAdapter {
-    return new RegistryModelProviderCatalogAdapter(options);
+export class RegistryModelProviderCatalogService extends ModelProviderCatalog {
+  static create(options: RegistryModelProviderCatalogOptions): RegistryModelProviderCatalogService {
+    return new RegistryModelProviderCatalogService(options);
   }
 
   private constructor(private readonly options: RegistryModelProviderCatalogOptions) {

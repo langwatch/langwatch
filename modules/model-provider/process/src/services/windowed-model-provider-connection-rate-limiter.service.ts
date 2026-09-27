@@ -19,11 +19,11 @@ const GLOBAL_WINDOW = { windowSeconds: 60, max: 500 } as const;
  * order, organization first, so a caller already over its own budget doesn't also spend the
  * deployment's.
  */
-export class WindowedModelProviderConnectionRateLimiterAdapter extends ModelProviderConnectionRateLimiter {
+export class WindowedModelProviderConnectionRateLimiterService extends ModelProviderConnectionRateLimiter {
   static create(input: {
     limiter: ModelProviderRateLimit;
-  }): WindowedModelProviderConnectionRateLimiterAdapter {
-    return new WindowedModelProviderConnectionRateLimiterAdapter(input.limiter);
+  }): WindowedModelProviderConnectionRateLimiterService {
+    return new WindowedModelProviderConnectionRateLimiterService(input.limiter);
   }
 
   private constructor(private readonly limiter: ModelProviderRateLimit) {

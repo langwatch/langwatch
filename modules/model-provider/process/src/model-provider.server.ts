@@ -28,28 +28,26 @@ import { type ModelProviderConnectionPing } from "./channels/model-provider-conn
 import { modelProviderRepositories } from "./repositories/model-provider-repositories.registry.ts";
 import { PrismaModelCostRepository } from "./repositories/prisma/prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "./repositories/prisma/prisma.model-default.repository.ts";
+import { PrismaModelProviderCredentialMapper } from "./repositories/prisma/prisma.model-provider-credential.mapper.ts";
 import { PrismaModelProviderRepository } from "./repositories/prisma/prisma.model-provider.repository.ts";
-import {
-  CodexAccountService,
-  CodexOAuthModelProviderTokenRefresherAdapter,
-} from "./services/codex-oauth.model-provider-token-refresher.service.ts";
-import { EncryptedModelProviderCredentialAdapter } from "./services/encrypted.model-provider-api-key-credential.service.ts";
-import { HttpModelProviderCredentialProbeAdapter } from "./services/http.model-provider-credential-probe.service.ts";
+import { CodexAccountService } from "./services/codex-account.service.ts";
+import { CodexOAuthModelProviderTokenRefresherService } from "./services/codex-oauth-model-provider-token-refresher.service.ts";
+import { HttpModelProviderCredentialProbeService } from "./services/http-model-provider-credential-probe.service.ts";
 import { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
 import { ModelProviderExecutionHandleService } from "./services/model-provider-execution-handle.service.ts";
 import { ModelProviderKeysService } from "./services/model-provider-keys.service.ts";
 import { ModelProviderProjectScopeService } from "./services/model-provider-project-scope.service.ts";
 import { ModelProviderService } from "./services/model-provider.service.ts";
-import { PrefixedModelProviderIdAdapter } from "./services/prefixed.model-provider-id.service.ts";
-import { RegistryModelProviderCatalogAdapter } from "./services/registry.model-provider-catalog.service.ts";
+import { PrefixedModelProviderIdService } from "./services/prefixed-model-provider-id.service.ts";
+import { RegistryModelProviderCatalogService } from "./services/registry-model-provider-catalog.service.ts";
 import {
-  SsrfModelProviderEgressAdapter,
+  SsrfModelProviderEgressService,
   type ModelProviderEgressPolicy,
-} from "./services/ssrf.model-provider-egress.service.ts";
-import { UnavailableModelProviderCredentialProbeAdapter } from "./services/unavailable.model-provider-credential-probe.service.ts";
-import { UnmanagedModelProviderGatewayAdapter } from "./services/unmanaged.model-provider-gateway.service.ts";
-import { VercelAiModelTranslationAdapter } from "./services/vercel-ai.model-translation.service.ts";
-import { WindowedModelProviderConnectionRateLimiterAdapter } from "./services/windowed.model-provider-connection-rate-limiter.service.ts";
+} from "./services/ssrf-model-provider-egress.service.ts";
+import { UnavailableModelProviderCredentialProbeService } from "./services/unavailable-model-provider-credential-probe.service.ts";
+import { UnmanagedModelProviderGatewayService } from "./services/unmanaged-model-provider-gateway.service.ts";
+import { VercelAiModelTranslationService } from "./services/vercel-ai-model-translation.service.ts";
+import { WindowedModelProviderConnectionRateLimiterService } from "./services/windowed-model-provider-connection-rate-limiter.service.ts";
 import { ModelRegistrySyncTask } from "./tasks/model-registry-sync.task.ts";
 import { llmModelCostTrpcTransport } from "./transport/llm-model-cost.trpc.ts";
 import { modelDefaultsRest, modelDefaultsRestCredential } from "./transport/model-defaults.rest.ts";
@@ -218,27 +216,27 @@ export type ModelProviderRuntime = Readonly<{
 
 /** Composes the model gateway from a process's own graph. */
 export function createModelProviderRuntime(input: ModelProviderRuntimeInput): ModelProviderRuntime {
-  const credentials = EncryptedModelProviderCredentialAdapter.create({ cipher: input.encryption });
+  const credentials = PrismaModelProviderCredentialMapper.create({ cipher: input.encryption });
   const credentialProbe = input.egress
-    ? HttpModelProviderCredentialProbeAdapter.create({
-        egress: SsrfModelProviderEgressAdapter.create({ policy: input.egress }),
+    ? HttpModelProviderCredentialProbeService.create({
+        egress: SsrfModelProviderEgressService.create({ policy: input.egress }),
       })
-    : UnavailableModelProviderCredentialProbeAdapter.create();
-  const ids = PrefixedModelProviderIdAdapter.create({ suffix: input.idSuffix });
+    : UnavailableModelProviderCredentialProbeService.create();
+  const ids = PrefixedModelProviderIdService.create({ suffix: input.idSuffix });
   const technical = {
-    codexTokenRefresher: CodexOAuthModelProviderTokenRefresherAdapter.create(),
-    connectionRateLimiter: WindowedModelProviderConnectionRateLimiterAdapter.create({
+    codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
+    connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({
       limiter: input.connectionRateLimiter,
     }),
-    catalog: RegistryModelProviderCatalogAdapter.create({
-      managed: input.managedGateway ?? UnmanagedModelProviderGatewayAdapter.create(),
+    catalog: RegistryModelProviderCatalogService.create({
+      managed: input.managedGateway ?? UnmanagedModelProviderGatewayService.create(),
       probe: credentialProbe,
       systemProviderEnvironment: input.systemProviderEnvironment,
       isSaas: input.isSaas,
     }),
     translation:
       "executionProxyBaseUrl" in input.translation
-        ? VercelAiModelTranslationAdapter.create({
+        ? VercelAiModelTranslationService.create({
             projects: input.projects,
             executionProxyBaseUrl: input.translation.executionProxyBaseUrl,
           })
@@ -269,7 +267,7 @@ export function createModelProviderRuntime(input: ModelProviderRuntimeInput): Mo
 
 /** The Codex device ceremony's two answers, over this deployment's own issuer. */
 export function createModelProviderCodexDeviceFlow(): ModelProviderCodexDeviceFlow {
-  return new CodexAccountService();
+  return CodexAccountService.create();
 }
 
 /**
@@ -289,10 +287,10 @@ export function createModelProviderCostCatalog(
 export function readModelProviderCustomKeys(
   input: Readonly<{
     stored: unknown;
-    decryptor: Parameters<typeof EncryptedModelProviderCredentialAdapter.readCustomKeys>[1];
+    decryptor: Parameters<typeof PrismaModelProviderCredentialMapper.readCustomKeys>[1];
   }>,
 ): CustomKeysRead {
-  return EncryptedModelProviderCredentialAdapter.readCustomKeys(input.stored, input.decryptor);
+  return PrismaModelProviderCredentialMapper.readCustomKeys(input.stored, input.decryptor);
 }
 
 /** What a feature asks for when it needs a model to call, resolved through the scope cascade. */

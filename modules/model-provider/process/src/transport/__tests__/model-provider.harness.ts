@@ -11,15 +11,14 @@ import type {
 } from "@langwatch/model-provider-contract";
 
 import { createModelProviderTestApp } from "../../app/__tests__/model-provider.fixture.ts";
-import type { ModelProviderApp } from "../../app/model-provider.app.ts";
+import type {
+  ModelProviderApp,
+  ModelProviderCodexDeviceFlow,
+} from "../../app/model-provider.app.ts";
 import { ModelProviderCredentialProbe } from "../../app/model-provider.members.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
-import {
-  CodexAccountService,
-  type CodexDeviceCode,
-  type CodexPollResult,
-} from "../../services/codex-oauth.model-provider-token-refresher.service.ts";
+import type { CodexDeviceCode, CodexPollResult } from "../../services/codex-account.service.ts";
 
 /** What a mount reads off the request: who is calling. */
 export type ModelProviderTrpcTestContext = { actor: { id: string } };
@@ -92,22 +91,15 @@ export class RecordingCredentialProbe extends ModelProviderCredentialProbe {
 
 const VERIFIED: ModelProviderCredentialVerdict = { outcome: "verified", valid: true };
 
-/** A suite that did not decide the issuer's answers must not reach one. */
-const refuseFetch: typeof fetch = () => {
-  throw new Error("this suite reached the Codex issuer without deciding its answers");
-};
-
 /** The device flow as a suite decides it, with no issuer reached. */
-export class StubCodexAccounts extends CodexAccountService {
+export class StubCodexAccounts implements ModelProviderCodexDeviceFlow {
   static create(poll: CodexPollResult): StubCodexAccounts {
     return new StubCodexAccounts(poll);
   }
 
-  private constructor(private readonly poll: CodexPollResult) {
-    super(refuseFetch);
-  }
+  private constructor(private readonly poll: CodexPollResult) {}
 
-  override startDeviceSignIn(): Promise<CodexDeviceCode> {
+  startDeviceSignIn(): Promise<CodexDeviceCode> {
     return Promise.resolve({
       userCode: "ABCD-EFGH",
       deviceAuthId: "device-auth-1",
@@ -116,7 +108,7 @@ export class StubCodexAccounts extends CodexAccountService {
     });
   }
 
-  override pollDeviceSignIn(): Promise<CodexPollResult> {
+  pollDeviceSignIn(): Promise<CodexPollResult> {
     return Promise.resolve(this.poll);
   }
 }
@@ -132,7 +124,7 @@ export function mountableModelProviderApp(options: {
   probe?: RecordingCredentialProbe;
   permits?: ModelProviderTestDecision;
   /** The device flow this suite decided, or none where it reaches no issuer. */
-  codexAccounts?: CodexAccountService;
+  codexAccounts?: ModelProviderCodexDeviceFlow;
 }): {
   app: ModelProviderApi;
   probe: RecordingCredentialProbe;
@@ -191,6 +183,7 @@ function forwarded(app: ModelProviderApp): ModelProviderApi {
     validateStoredKey: (...args) => app.validateStoredKey(...args),
     startCodexDeviceSignIn: () => app.startCodexDeviceSignIn(),
     pollCodexDeviceSignIn: (...args) => app.pollCodexDeviceSignIn(...args),
+    completeCodexDeviceSignIn: (...args) => app.completeCodexDeviceSignIn(...args),
     testConnection: (...args) => app.testConnection(...args),
     getCodexStatus: (...args) => app.getCodexStatus(...args),
     refreshCodexForGateway: (...args) => app.refreshCodexForGateway(...args),

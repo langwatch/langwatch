@@ -5,12 +5,11 @@ import { PrismaProcessStore } from "@langwatch/eventing/server";
 import { generate } from "@langwatch/ksuid";
 
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
-import { WebhookEndpointConfiguration } from "../../services/webhook-endpoint-policy.service.ts";
-import { WebhookEventsClickHouseRepository } from "../clickhouse/clickhouse.webhook-events.repository.ts";
+import { webhookEndpointConfiguration } from "../../rules/webhook-endpoint-policy.rules.ts";
 import {
-  createWebhookClickHouseResolver,
+  WebhookEventsClickHouseRepository,
   type WebhookRoutedClickHouse,
-} from "../clickhouse/webhook-clickhouse.resolver.ts";
+} from "../clickhouse/clickhouse.webhook-events.repository.ts";
 import type { WebhookRepositories } from "../webhook.repositories.ts";
 import {
   PrismaWebhookEndpointRepository,
@@ -71,11 +70,9 @@ export class PostgresWebhookRepositories {
         prisma: members.prisma,
         ids: new LiveWebhookIds(),
         secrets: CipherWebhookSecrets.create(members.encryption),
-        configuration: WebhookEndpointConfiguration.create(),
+        configuration: webhookEndpointConfiguration(),
       }),
-      events: WebhookEventsClickHouseRepository.create(
-        createWebhookClickHouseResolver(members.clickhouse),
-      ),
+      events: WebhookEventsClickHouseRepository.forRoutedClickHouse(members.clickhouse),
       retention: PrismaWebhookRetentionRepository.create({ prisma: members.prisma }),
       tenants: PrismaWebhookTenantsRepository.create(members.prisma),
       processStore: PrismaProcessStore.create({ database: members.prisma }),

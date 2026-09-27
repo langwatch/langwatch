@@ -10,8 +10,8 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { ModelProviderCredentialCipher } from "../../app/model-provider.members.ts";
-import { EncryptedModelProviderCredentialAdapter } from "../encrypted.model-provider-api-key-credential.service.ts";
+import { ModelProviderCredentialCipher } from "../../../app/model-provider.members.ts";
+import { PrismaModelProviderCredentialMapper } from "../prisma.model-provider-credential.mapper.ts";
 
 /**
  * A cipher with the real one's shape and none of its cryptography: the two
@@ -33,7 +33,7 @@ class RecordedCipher extends ModelProviderCredentialCipher {
 const cipher = new RecordedCipher();
 const encrypt = (value: string): string => cipher.encrypt(value);
 const readCustomKeys = (raw: unknown) =>
-  EncryptedModelProviderCredentialAdapter.readCustomKeys(raw, cipher);
+  PrismaModelProviderCredentialMapper.readCustomKeys(raw, cipher);
 
 /**
  * The three answers a stored credential bag can give.
@@ -162,8 +162,8 @@ describe("readCustomKeys", () => {
   });
 });
 
-describe("EncryptedModelProviderCredentialAdapter", () => {
-  const codec = EncryptedModelProviderCredentialAdapter.create({ cipher });
+describe("PrismaModelProviderCredentialMapper", () => {
+  const codec = PrismaModelProviderCredentialMapper.create({ cipher });
 
   describe("given a bag to store", () => {
     /** @scenario "Encrypted keys are decrypted on read" */

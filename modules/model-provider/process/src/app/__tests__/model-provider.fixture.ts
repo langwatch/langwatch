@@ -12,16 +12,14 @@ import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contr
 import { modelProviderConnectionPingChannels } from "../../channels/model-provider-connection-ping-channels.registry.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
-import {
-  CodexAccountService,
-  CodexOAuthModelProviderTokenRefresherAdapter,
-} from "../../services/codex-oauth.model-provider-token-refresher.service.ts";
-import { PrefixedModelProviderIdAdapter } from "../../services/prefixed.model-provider-id.service.ts";
-import { RegistryModelProviderCatalogAdapter } from "../../services/registry.model-provider-catalog.service.ts";
-import { UnavailableModelProviderCredentialProbeAdapter } from "../../services/unavailable.model-provider-credential-probe.service.ts";
-import { UnmanagedModelProviderGatewayAdapter } from "../../services/unmanaged.model-provider-gateway.service.ts";
-import { VercelAiModelTranslationAdapter } from "../../services/vercel-ai.model-translation.service.ts";
-import { WindowedModelProviderConnectionRateLimiterAdapter } from "../../services/windowed.model-provider-connection-rate-limiter.service.ts";
+import { CodexAccountService } from "../../services/codex-account.service.ts";
+import { CodexOAuthModelProviderTokenRefresherService } from "../../services/codex-oauth-model-provider-token-refresher.service.ts";
+import { PrefixedModelProviderIdService } from "../../services/prefixed-model-provider-id.service.ts";
+import { RegistryModelProviderCatalogService } from "../../services/registry-model-provider-catalog.service.ts";
+import { UnavailableModelProviderCredentialProbeService } from "../../services/unavailable-model-provider-credential-probe.service.ts";
+import { UnmanagedModelProviderGatewayService } from "../../services/unmanaged-model-provider-gateway.service.ts";
+import { VercelAiModelTranslationService } from "../../services/vercel-ai-model-translation.service.ts";
+import { WindowedModelProviderConnectionRateLimiterService } from "../../services/windowed-model-provider-connection-rate-limiter.service.ts";
 import { ModelProviderApp, type ModelProviderInfrastructure } from "../model-provider.app.ts";
 import type { ModelProviderCredentialProbe } from "../model-provider.members.ts";
 
@@ -103,24 +101,24 @@ export function createModelProviderTestInfrastructure(
   const projects = createModelProviderTestProjects();
 
   return {
-    catalog: RegistryModelProviderCatalogAdapter.create({
-      managed: UnmanagedModelProviderGatewayAdapter.create(),
-      probe: UnavailableModelProviderCredentialProbeAdapter.create(),
+    catalog: RegistryModelProviderCatalogService.create({
+      managed: UnmanagedModelProviderGatewayService.create(),
+      probe: UnavailableModelProviderCredentialProbeService.create(),
       systemProviderEnvironment: {},
       isSaas: false,
     }),
-    translation: VercelAiModelTranslationAdapter.create({
+    translation: VercelAiModelTranslationService.create({
       projects,
       executionProxyBaseUrl: UNREACHABLE_EXECUTION_PROXY,
     }),
     connectionPing: modelProviderConnectionPingChannels.memory.create(),
-    ids: PrefixedModelProviderIdAdapter.create({ suffix: () => "test" }),
-    codexTokenRefresher: CodexOAuthModelProviderTokenRefresherAdapter.create(),
-    connectionRateLimiter: WindowedModelProviderConnectionRateLimiterAdapter.create({
+    ids: PrefixedModelProviderIdService.create({ suffix: () => "test" }),
+    codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
+    connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({
       limiter: { consume: async () => ({ allowed: true, resetAt: 0 }) },
     }),
-    credentialProbe: UnavailableModelProviderCredentialProbeAdapter.create(),
-    codexAccounts: new CodexAccountService(refuseFetch),
+    credentialProbe: UnavailableModelProviderCredentialProbeService.create(),
+    codexAccounts: CodexAccountService.create({ fetchImpl: refuseFetch }),
     spans: {},
     ...overrides,
   };

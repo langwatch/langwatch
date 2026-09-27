@@ -10,7 +10,7 @@ import { GovernanceMcpSessionToolsService } from "../services/governance-mcp-ses
 import { HeaderMcpClientAddressService } from "../services/header-mcp-client-address.service.ts";
 import { ProjectMcpProjectLookupService } from "../services/project-mcp-project-lookup.service.ts";
 import { createMcpHandler, type McpHandler } from "../transport/hosted-mcp.api.ts";
-import type { HostedMcpDependencies } from "./hosted-mcp-members.ts";
+import type { HostedMcpDependencies } from "./hosted-mcp.members.ts";
 
 /**
  * Shapes restated rather than imported: a module depends on contracts.

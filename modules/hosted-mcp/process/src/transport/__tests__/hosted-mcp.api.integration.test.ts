@@ -19,7 +19,7 @@ import {
   vi,
 } from "vitest";
 
-import type { McpLiveProjectLookup } from "../../app/hosted-mcp-members.ts";
+import type { McpLiveProjectLookup } from "../../app/hosted-mcp.members.ts";
 import {
   createMcpHandler,
   HeaderMcpClientAddressService,
@@ -1464,11 +1464,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     it("does not import any main app modules", async () => {
       // The mcp-server package's create-mcp-server.ts should not import
       // from the main app (~/server/db, ~/server/app-layer, etc.)
-      const mcpServerDir = resolve(
-        import.meta.dirname,
-        "../../../../../..",
-        "mcp/typescript/src",
-      );
+      const mcpServerDir = resolve(import.meta.dirname, "../../../../../..", "mcp/typescript/src");
       const createMcpServerSrc = readFileSync(join(mcpServerDir, "create-mcp-server.ts"), "utf-8");
       // Should not import from the main app
       expect(createMcpServerSrc).not.toContain("~/server/");

@@ -7,8 +7,8 @@ import type {
 } from "@langwatch/webhook-contract";
 
 import type { WebhookId, WebhookSecret } from "../app/webhook.app.ts";
-import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
-import type { WebhookEndpointConfiguration } from "../services/webhook-endpoint-policy.service.ts";
+import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
+import type { WebhookEndpointConfiguration } from "../rules/webhook-endpoint-policy.rules.ts";
 
 export type WebhookEndpointServiceOptions = {
   ids: WebhookId;

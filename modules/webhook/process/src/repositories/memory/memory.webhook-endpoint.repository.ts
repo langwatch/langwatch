@@ -10,18 +10,23 @@ import {
   type WebhookEndpointView,
 } from "@langwatch/webhook-contract";
 
+import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
 import {
+  describeDestination,
+  findUrlProblem,
+  isRoleArn,
+  sqsCredentialMode,
   type WebhookDestinationConfig,
-  WebhookDestinationService,
   type WebhookUrlProblemCode,
-} from "../../services/webhook-destination.service.ts";
+} from "../../rules/webhook-destination.rules.ts";
 import {
-  WebhookEndpointConfiguration,
-  WebhookEndpointPolicyService,
+  assertValidDeliveryControls,
+  webhookEndpointConfiguration,
+  type WebhookEndpointConfiguration,
   WEBHOOK_AUTO_DISABLE_AFTER_MS,
   WEBHOOK_DISABLED_REASON_AUTO,
   WEBHOOK_DISABLED_REASON_MANUAL,
-} from "../../services/webhook-endpoint-policy.service.ts";
+} from "../../rules/webhook-endpoint-policy.rules.ts";
 import type {
   WebhookEndpointRepository,
   WebhookEndpointServiceOptions,
@@ -30,11 +35,10 @@ import type {
 import {
   type MemoryWebhookDatabase,
   type MemoryWebhookEndpointRow,
-} from "./memory.webhook-database.ts";
+} from "./memory.webhook.database.ts";
 
 const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
 const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
-const destinations = WebhookDestinationService.create();
 
 const URL_PROBLEM_MESSAGES: Record<WebhookUrlProblemCode, string> = {
   invalid_url: "url must be a valid URL",
@@ -119,14 +123,14 @@ function toView(row: MemoryWebhookEndpointRow): WebhookEndpointView {
 
 function toSqsView(row: MemoryWebhookEndpointRow): SqsDestinationView | null {
   if (row.destinationKind !== "sqs" || !row.sqsQueueUrl) return null;
-  const parsed = destinations.findSqsQueueUrl(row.sqsQueueUrl);
+  const parsed = parseSqsQueueUrl(row.sqsQueueUrl);
 
   return {
     queueUrl: row.sqsQueueUrl,
     region: parsed?.region ?? "",
     accountId: parsed?.accountId ?? "",
     queueName: parsed?.queueName ?? "",
-    credentialMode: destinations.sqsCredentialMode({
+    credentialMode: sqsCredentialMode({
       roleArn: row.sqsRoleArn,
       accessKeyId: row.sqsAccessKeyId,
     }),
@@ -137,7 +141,7 @@ function toSqsView(row: MemoryWebhookEndpointRow): SqsDestinationView | null {
 }
 
 function assertValidUrl(url: string, configuration: WebhookEndpointConfiguration): void {
-  const problem = destinations.findUrlProblem(url, configuration.allowInsecureLocalUrls);
+  const problem = findUrlProblem(url, configuration.allowInsecureLocalUrls);
   if (problem) throw new WebhookEndpointValidationError(URL_PROBLEM_MESSAGES[problem]);
 }
 
@@ -156,7 +160,7 @@ function assertValidSqsDestination(
   sqs: SqsDestinationInput,
   configuration: WebhookEndpointConfiguration,
 ): void {
-  const inspection = destinations.inspectSqsQueueUrl(sqs.queueUrl);
+  const inspection = inspectSqsQueueUrl(sqs.queueUrl);
   if (!inspection.ok) {
     throw new WebhookEndpointValidationError(
       inspection.problem === "fifo"
@@ -164,7 +168,7 @@ function assertValidSqsDestination(
         : "sqs.queue_url must be an Amazon SQS queue URL, like https://sqs.<region>.amazonaws.com/<account id>/<queue name>",
     );
   }
-  if (sqs.roleArn && !destinations.isRoleArn(sqs.roleArn)) {
+  if (sqs.roleArn && !isRoleArn(sqs.roleArn)) {
     throw new WebhookEndpointValidationError(
       "sqs.role_arn must be an IAM role ARN, like arn:aws:iam::<account id>:role/<role name>",
     );
@@ -181,7 +185,7 @@ function assertValidSqsDestination(
       "sqs.access_key_id and sqs.secret_access_key are set together or not at all",
     );
   }
-  const mode = destinations.sqsCredentialMode({
+  const mode = sqsCredentialMode({
     roleArn: sqs.roleArn,
     accessKeyId: sqs.accessKeyId,
   });
@@ -349,12 +353,11 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
   readonly #database: MemoryWebhookDatabase;
   readonly #options: WebhookEndpointServiceOptions;
   readonly #configuration: WebhookEndpointConfiguration;
-  readonly #policy = WebhookEndpointPolicyService.create();
 
   private constructor(database: MemoryWebhookDatabase, options: WebhookEndpointServiceOptions) {
     this.#database = database;
     this.#options = options;
-    this.#configuration = options.configuration ?? WebhookEndpointConfiguration.create();
+    this.#configuration = options.configuration ?? webhookEndpointConfiguration();
   }
 
   static create(input: {
@@ -381,7 +384,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
       this.#options.secrets,
     );
     assertValidEvents(params.enabledEvents);
-    this.#policy.assertValidDeliveryControls(params);
+    assertValidDeliveryControls(params);
     const secret = newSecret();
     const now = nowInstant();
     const row: MemoryWebhookEndpointRow = {
@@ -452,7 +455,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
           })
         : {};
     if (params.enabledEvents !== undefined) assertValidEvents(params.enabledEvents);
-    this.#policy.assertValidDeliveryControls(params);
+    assertValidDeliveryControls(params);
     const updated: MemoryWebhookEndpointRow = {
       ...endpoint,
       ...sqsUpdate,
@@ -739,7 +742,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
       await this.#options.notifyAutoDisabled?.({
         organizationId: params.organizationId,
         endpointId: endpoint.id,
-        destination: this.#policy.describeDestination(endpoint),
+        destination: describeDestination(endpoint),
         failingSince: params.failingSince,
       });
     } catch {

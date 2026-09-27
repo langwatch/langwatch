@@ -11,9 +11,9 @@ const PREFIXES = {
   cost: "model_cost",
 } as const;
 
-export class PrefixedModelProviderIdAdapter extends ModelProviderIdService {
-  static create(input: { suffix: () => string }): PrefixedModelProviderIdAdapter {
-    return new PrefixedModelProviderIdAdapter(input.suffix);
+export class PrefixedModelProviderIdService extends ModelProviderIdService {
+  static create(input: { suffix: () => string }): PrefixedModelProviderIdService {
+    return new PrefixedModelProviderIdService(input.suffix);
   }
 
   private constructor(private readonly suffix: () => string) {

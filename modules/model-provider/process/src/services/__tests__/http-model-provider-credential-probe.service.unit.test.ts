@@ -7,7 +7,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ModelProviderEgress } from "../../app/model-provider.members.ts";
-import { HttpModelProviderCredentialProbeAdapter } from "../http.model-provider-credential-probe.service.ts";
+import { HttpModelProviderCredentialProbeService } from "../http-model-provider-credential-probe.service.ts";
 
 // Mocks the guarded egress port, not `global.fetch` — the real SSRF fence would make every
 // assertion about DNS. The redirect refusal still uses the egress's real error type.
@@ -18,7 +18,7 @@ const egress: ModelProviderEgress = {
 };
 
 const validateProviderApiKey = (provider: string, customKeys: Record<string, string>) =>
-  HttpModelProviderCredentialProbeAdapter.validateProviderApiKey(provider, customKeys, egress);
+  HttpModelProviderCredentialProbeService.validateProviderApiKey(provider, customKeys, egress);
 
 type ValidationResult = ModelProviderCredentialVerdict;
 

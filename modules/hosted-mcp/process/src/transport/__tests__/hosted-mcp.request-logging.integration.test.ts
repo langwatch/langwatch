@@ -36,7 +36,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   return { ...actual, createLogger: () => loggerStub };
 });
 
-import type { McpLiveProjectLookup } from "../../app/hosted-mcp-members.ts";
+import type { McpLiveProjectLookup } from "../../app/hosted-mcp.members.ts";
 import {
   createMcpHandler,
   McpApiKeyCipher,

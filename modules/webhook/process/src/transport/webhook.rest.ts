@@ -8,7 +8,6 @@ import { toStoredEnum, toWireEnum } from "@langwatch/gateway-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import {
   WEBHOOK_EVENT_TYPES,
-  WebhookEventNotFoundError,
   WebhookApi,
   type SqsDestinationInput,
   type WebhookEndpointView,
@@ -233,36 +232,18 @@ export const webhookRest: Readonly<{
   .handle(async ({ app, input, scope }) => {
     await app.assertEndpointsEntitled(scope.id);
 
-    const endpointId = input.id;
-    const hasFieldUpdate =
-      input.destination_kind !== undefined ||
-      input.url !== undefined ||
-      input.sqs !== undefined ||
-      input.enabled_events !== undefined ||
-      input.max_batch_size !== undefined ||
-      input.max_batch_delay_ms !== undefined ||
-      input.max_in_flight !== undefined;
-
-    let endpoint = hasFieldUpdate
-      ? await app.update({
-          organizationId: scope.id,
-          endpointId,
-          destinationKind: input.destination_kind,
-          url: input.url,
-          ...(input.sqs !== undefined ? { sqs: sqsFromBody(input.sqs) } : {}),
-          enabledEvents: input.enabled_events,
-          maxBatchSize: input.max_batch_size,
-          maxBatchDelayMs: input.max_batch_delay_ms,
-          maxInFlight: input.max_in_flight,
-        })
-      : await app.getById({ organizationId: scope.id, endpointId });
-
-    const requestedStatus = input.status && toStoredEnum(input.status);
-    if (requestedStatus === "DISABLED" && endpoint.status === "ACTIVE") {
-      endpoint = await app.disable({ organizationId: scope.id, endpointId });
-    } else if (requestedStatus === "ACTIVE" && endpoint.status === "DISABLED") {
-      endpoint = await app.enable({ organizationId: scope.id, endpointId });
-    }
+    const endpoint = await app.applyEndpointChanges({
+      organizationId: scope.id,
+      endpointId: input.id,
+      destinationKind: input.destination_kind,
+      url: input.url,
+      ...(input.sqs !== undefined ? { sqs: sqsFromBody(input.sqs) } : {}),
+      enabledEvents: input.enabled_events,
+      maxBatchSize: input.max_batch_size,
+      maxBatchDelayMs: input.max_batch_delay_ms,
+      maxInFlight: input.max_in_flight,
+      status: input.status && toStoredEnum(input.status),
+    });
 
     return { data: endpointResponse(endpoint) };
   })
@@ -464,9 +445,7 @@ export const webhookRest: Readonly<{
   .handle(async ({ app, input, scope }) => {
     await app.assertEndpointsEntitled(scope.id);
 
-    const event = await app.findEmittedEventById({ organizationId: scope.id, id: input.id });
-    if (!event) throw new WebhookEventNotFoundError();
-    return { data: event };
+    return { data: await app.getEmittedEventById({ organizationId: scope.id, id: input.id }) };
   })
 
   .build();

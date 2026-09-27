@@ -2,8 +2,8 @@ import { Temporal } from "@langwatch/time";
 import type { WebhookSpendEventRow } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
+import { inspectSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
 import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
-import { WebhookDestinationService } from "../webhook-destination.service.ts";
 import { WebhookEnvelopeService } from "../webhook-envelope.service.ts";
 
 const spendRow = (overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEventRow => ({
@@ -61,12 +61,11 @@ describe("webhook server", () => {
   });
 
   it("accepts canonical standard SQS URLs and refuses FIFO", () => {
-    const service = WebhookDestinationService.create();
+    expect(inspectSqsQueueUrl("https://sqs.eu-west-1.amazonaws.com/123456789012/events").ok).toBe(
+      true,
+    );
     expect(
-      service.inspectSqsQueueUrl("https://sqs.eu-west-1.amazonaws.com/123456789012/events").ok,
-    ).toBe(true);
-    expect(
-      service.inspectSqsQueueUrl("https://sqs.eu-west-1.amazonaws.com/123456789012/events.fifo"),
+      inspectSqsQueueUrl("https://sqs.eu-west-1.amazonaws.com/123456789012/events.fifo"),
     ).toEqual({ ok: false, problem: "fifo" });
   });
 });

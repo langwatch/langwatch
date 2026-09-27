@@ -5,11 +5,10 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { WebhookEventsClickHouseRepository } from "../clickhouse.webhook-events.repository.ts";
 import {
-  createWebhookClickHouseResolver,
+  WebhookEventsClickHouseRepository,
   type WebhookRoutedClickHouse,
-} from "../webhook-clickhouse.resolver.ts";
+} from "../clickhouse.webhook-events.repository.ts";
 
 const tenantId = `test-webhook-events-${Math.random().toString(36).slice(2, 10)}`;
 const baseTime = Date.UTC(2026, 6, 20, 12, 0, 0);
@@ -248,8 +247,8 @@ describe("webhook emitted-events listing", () => {
         }),
       ],
     });
-    const routed = WebhookEventsClickHouseRepository.create(
-      createWebhookClickHouseResolver(tenantRoutedClickHouse(() => client)),
+    const routed = WebhookEventsClickHouseRepository.forRoutedClickHouse(
+      tenantRoutedClickHouse(() => client),
     );
     const window = { fromMs: windowStart - 1, toMs: windowStart + 60_000 };
 

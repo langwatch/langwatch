@@ -34,7 +34,7 @@ import {
   ModelProviderCredentialCodec,
   type CustomKeysRead,
 } from "../../app/model-provider.members.ts";
-import { PrefixedModelProviderIdAdapter } from "../../services/prefixed.model-provider-id.service.ts";
+import { PrefixedModelProviderIdService } from "../../services/prefixed-model-provider-id.service.ts";
 import { TestProjectApi } from "./test-project-api.ts";
 
 export const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -233,7 +233,7 @@ export function buildModelProvider(overrides: {
   } as ModelProvider;
 }
 
-export const idService = PrefixedModelProviderIdAdapter.create({
+export const idService = PrefixedModelProviderIdService.create({
   suffix: () => randomBytes(6).toString("hex"),
 });
 
