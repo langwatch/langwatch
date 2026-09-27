@@ -131,9 +131,9 @@ describe("given a deployment that named no browser-session identity", () => {
     await expect(app.verifyBrowserSession({ headers: new Headers() })).resolves.toEqual({
       kind: "anonymous",
     });
-    await expect(
-      app.resolveSession(new Request("https://app.langwatch.test/api/auth/session")),
-    ).resolves.toEqual({ kind: "anonymous" });
+    await expect(app.getSessionByCookie({ cookie: undefined })).resolves.toEqual({
+      document: null,
+    });
   });
 });
 

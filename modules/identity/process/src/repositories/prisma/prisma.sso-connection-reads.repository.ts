@@ -1,7 +1,6 @@
 import {
   IDENTIFIER_PROVIDERS,
   LIVE_IDENTIFIER_STATES,
-  looksLikeSsoConnectionId,
   routingStateOf,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
@@ -9,7 +8,10 @@ import {
 } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { identifierBelongsToMigrationConnection } from "../../rules/sso-migration.rules.ts";
+import {
+  teardownCandidateUserIds,
+  usersWithAnotherWayIn,
+} from "../../rules/sso-connection-stranding.rules.ts";
 import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
@@ -139,15 +141,7 @@ export class PrismaSsoConnectionStrandingRepository implements SsoConnectionStra
       },
       select: { userId: true, connectionId: true, providerId: true, providerAccountId: true },
     });
-    const userIds = [
-      ...new Set(
-        candidates
-          .filter((identifier) =>
-            identifierBelongsToMigrationConnection({ identifier, connection }),
-          )
-          .map(({ userId }) => userId),
-      ),
-    ];
+    const userIds = teardownCandidateUserIds({ connection, candidates });
     if (userIds.length === 0) return [];
 
     const covered = await this.#usersWithAnotherWayIn({ connection, userIds });
@@ -171,22 +165,20 @@ export class PrismaSsoConnectionStrandingRepository implements SsoConnectionStra
       },
       select: { userId: true, connectionId: true, providerId: true, providerAccountId: true },
     });
-    const independent = alternatives.filter(
-      (identifier) => !identifierBelongsToMigrationConnection({ identifier, connection }),
-    );
-    if (independent.length === 0) return new Set<string>();
-
     const referencedIds = [
       ...new Set(
-        independent.flatMap(({ connectionId, providerId }) =>
+        alternatives.flatMap(({ connectionId, providerId }) =>
           [connectionId, providerId].filter((id): id is string => id !== null),
         ),
       ),
     ];
-    const referenced = await this.prisma.ssoConnection.findMany({
-      where: { id: { in: referencedIds } },
-      select: { id: true, state: true },
-    });
+    const referenced =
+      referencedIds.length === 0
+        ? []
+        : await this.prisma.ssoConnection.findMany({
+            where: { id: { in: referencedIds } },
+            select: { id: true, state: true },
+          });
     const routing = new Map(
       referenced.map(({ id, state }) => [
         id,
@@ -194,26 +186,7 @@ export class PrismaSsoConnectionStrandingRepository implements SsoConnectionStra
       ]),
     );
 
-    return new Set(
-      independent
-        .filter(({ connectionId, providerId }) => {
-          if (connectionId !== null && routing.get(connectionId) !== "ACTIVE") return false;
-          if (
-            providerId !== null &&
-            looksLikeSsoConnectionId(providerId) &&
-            !routing.has(providerId)
-          ) {
-            return false;
-          }
-          return (
-            providerId !== connection.connectionId &&
-            (providerId === null ||
-              !routing.has(providerId) ||
-              routing.get(providerId) === "ACTIVE")
-          );
-        })
-        .map(({ userId }) => userId),
-    );
+    return usersWithAnotherWayIn({ connection, alternatives, routing });
   }
 }
 

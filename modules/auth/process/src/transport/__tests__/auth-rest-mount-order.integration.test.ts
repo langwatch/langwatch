@@ -3,7 +3,6 @@
  * The `/api/auth` family mounted before a later `/api/auth/cli/*` family, in install order.
  * @see specs/auth/auth-rest-family-mounted.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { publicRoute } from "@langwatch/api/access";
 import {
   BearerIdentity,
@@ -11,12 +10,10 @@ import {
   defineRestRouter,
   RestHost,
 } from "@langwatch/api/rest";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import type { AuthDirectory } from "../../app/auth.members.ts";
 import { authRest, type AuthDoorApi } from "../auth.rest.ts";
 
 const BASE_URL = "https://app.test";
@@ -48,15 +45,12 @@ function mountedInInstallOrder() {
     async () => new Response(null, { status: 404 }),
   );
   const door: AuthDoorApi = {
-    betterAuth: async () => ({ handler, api: { getSession: async () => null } }),
-    revokeBrowserSession: async () => {},
-    resolveSession: async () => ({ kind: "anonymous" }),
-    findProjectSlugByToken: async () => null,
-    featureFlags: () => createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
-    directory: () => createApiFixture<AuthDirectory>(),
+    validateProjectAuthToken: async () => ({ projectSlug: "unreached" }),
+    getSessionByCookie: async () => ({ document: null }),
+    revokeSessionFromCookies: async () => {},
+    betterAuthHandshake: handler,
     baseUrl: () => BASE_URL,
     federatedLogout: async () => null,
-    runWithIdentityBirth: (run) => run(),
   };
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
   const host = RestHost.create({

@@ -76,6 +76,8 @@ export class MemoryIdentityStore {
   /** The identity log: every person's events, in the order they landed. */
   readonly identityEvents: IdentityEvent[] = [];
   readonly organizationNames = new Map<string, string>();
+  /** Each organization's member user ids, the legacy stranding check's membership read. */
+  readonly organizationMembers = new Map<string, string[]>();
   readonly organizationAdminEmails = new Map<string, string[]>();
   readonly finalizedUsers = new Set<string>();
   /** Keyed by the lowercased address, the way the legacy read matches it. */

@@ -1,5 +1,14 @@
-import { SsoConnectionNotFoundError, type SsoConnectionState } from "@langwatch/identity-contract";
+import {
+  LIVE_IDENTIFIER_STATES,
+  routingStateOf,
+  SsoConnectionNotFoundError,
+  type SsoConnectionState,
+} from "@langwatch/identity-contract";
 
+import {
+  teardownCandidateUserIds,
+  usersWithAnotherWayIn,
+} from "../../rules/sso-connection-stranding.rules.ts";
 import { ownedVerifiedDomains } from "../../rules/sso-domain-ownership.rules.ts";
 import type {
   SsoConnectionBackofficePage,
@@ -10,8 +19,6 @@ import type {
   SsoConnectionStrandingRepository,
 } from "../sso-connection.repository.ts";
 import type { MemoryIdentityStore } from "./memory.identity.store.ts";
-
-const VERIFIED = "VERIFIED";
 
 /** The connection-read twin: the guards' folded head and the domain owner. */
 export class MemorySsoConnectionReadRepository implements SsoConnectionReadRepository {
@@ -57,7 +64,7 @@ export class MemorySsoConnectionReadRepository implements SsoConnectionReadRepos
   }
 }
 
-/** The stranding twin: users whose only live identifiers hang off one connection. */
+/** The stranding twin: users a teardown would leave with no proved way in. */
 export class MemorySsoConnectionStrandingRepository implements SsoConnectionStrandingRepository {
   static create(store: MemoryIdentityStore): MemorySsoConnectionStrandingRepository {
     return new MemorySsoConnectionStrandingRepository(store);
@@ -65,19 +72,47 @@ export class MemorySsoConnectionStrandingRepository implements SsoConnectionStra
 
   private constructor(private readonly store: MemoryIdentityStore) {}
 
-  async findStrandedUserIds(args: { connectionId: string }): Promise<string[]> {
-    const live = [...this.store.identifiers.values()].filter(
-      (fact) => fact.state === VERIFIED || fact.state === "PRIMARY",
-    );
-
-    const byUser = new Map<string, typeof live>();
-    for (const fact of live) {
-      byUser.set(fact.userId, [...(byUser.get(fact.userId) ?? []), fact]);
+  async findStrandedUserIds({ connectionId }: { connectionId: string }): Promise<string[]> {
+    const connection = this.store.ssoConnections.get(connectionId);
+    if (!connection) {
+      throw new SsoConnectionNotFoundError(
+        `connection ${connectionId}: cannot assess teardown without its projection`,
+      );
     }
+    const identifiers = [...this.store.identifiers.values()];
+    const legacyMembers =
+      connection.source === "legacy-grandfathered"
+        ? (this.store.organizationMembers.get(connection.organizationId) ?? [])
+        : [];
+    const legacyProviders = ["auth0", connection.idpMetadata.providerId];
+    const candidates = identifiers.filter(
+      (fact) =>
+        LIVE_IDENTIFIER_STATES.some((state) => state === fact.state) &&
+        (fact.connectionId === connectionId ||
+          (fact.connectionId === null && fact.providerId === connectionId) ||
+          (fact.connectionId === null &&
+            legacyMembers.includes(fact.userId) &&
+            fact.providerId !== null &&
+            legacyProviders.includes(fact.providerId))),
+    );
+    const userIds = teardownCandidateUserIds({ connection, candidates });
+    if (userIds.length === 0) return [];
 
-    return [...byUser.entries()]
-      .filter(([, facts]) => facts.every((fact) => fact.connectionId === args.connectionId))
-      .map(([userId]) => userId);
+    const alternatives = identifiers.filter(
+      (fact) =>
+        userIds.includes(fact.userId) &&
+        (fact.state === "VERIFIED" || fact.state === "PRIMARY") &&
+        fact.provider !== "email",
+    );
+    const routing = new Map(
+      [...this.store.ssoConnections.values()].map((stored) => [
+        stored.connectionId,
+        routingStateOf(stored.state),
+      ]),
+    );
+    const covered = usersWithAnotherWayIn({ connection, alternatives, routing });
+
+    return userIds.filter((userId) => !covered.has(userId));
   }
 }
 

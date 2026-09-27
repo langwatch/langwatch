@@ -36,12 +36,17 @@ describe("the /api/auth REST family", () => {
       }
     });
 
-    it("writes its own body on every route, since the answers are Better Auth's", () => {
-      for (const route of declaration.routes) {
-        const writesOwnBody = route.rawResponse !== undefined || route.response !== undefined;
+    it("writes its own body on every route but the token check, which answers plain JSON", () => {
+      const writesOwnBody = declaration.routes
+        .filter((route) => route.rawResponse !== undefined || route.response !== undefined)
+        .map((route) => route.operation);
 
-        expect([route.operation, writesOwnBody]).toEqual([route.operation, true]);
-      }
+      expect(writesOwnBody).toEqual([
+        "readBrowserAuthSession",
+        "endBrowserSessionAndRedirect",
+        "endBrowserSession",
+        "betterAuthHandshake",
+      ]);
     });
 
     it("answers whatever method arrives on the catch-all alone, and it is declared last", () => {
