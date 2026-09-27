@@ -78,28 +78,58 @@ export interface InstalledFeature<Provided, Rest, Trpc, Worker> {
 /** A booted application: everything constructed, nothing serving yet. */
 export class BootedRuntime<Members, Rest = never, Trpc = never> {
   private readonly lifecycle: RuntimeLifecycle;
-  constructor(
-    readonly name: string,
-    readonly role: ServerRole,
-    /** Members built: union of modules' required members, nothing else. */
-    readonly members: Readonly<Partial<Members>>,
-    /** Mounted transports, in install/namespace order. */
-    readonly transports: MountedTransports<Rest, Trpc>,
-    private readonly installed: ReadonlyMap<string, InstalledFeatureState>,
-    private readonly provided: ReadonlyMap<TokenIdentity, unknown>,
-    /** Background work this role owns (workers/tasks/empty for others). */
-    readonly contributions: readonly unknown[],
-    scope: ResourceScope,
-    services: readonly RuntimeService[],
-    /** Which feature declared each contribution, so a bad one can be named. */
-    private readonly declaredBy: ReadonlyMap<unknown, string> = new Map(),
-    /**
-     * What this process serves: ONE composed handler, built by the surface the
-     * chain exposed once everything mounted. Absent in every role that serves
-     * no requests, and absent in a test, which passes no server.
-     */
-    readonly handler: unknown = void 0,
-  ) {
+  readonly name: string;
+  readonly role: ServerRole;
+  /** Members built: union of modules' required members, nothing else. */
+  readonly members: Readonly<Partial<Members>>;
+  /** Mounted transports, in install/namespace order. */
+  readonly transports: MountedTransports<Rest, Trpc>;
+  private readonly installed: ReadonlyMap<string, InstalledFeatureState>;
+  private readonly provided: ReadonlyMap<TokenIdentity, unknown>;
+  /** Background work this role owns (workers/tasks/empty for others). */
+  readonly contributions: readonly unknown[];
+  /** Which feature declared each contribution, so a bad one can be named. */
+  private readonly declaredBy: ReadonlyMap<unknown, string>;
+  /**
+   * What this process serves: ONE composed handler, built by the surface the chain exposed once
+   * everything mounted. Absent in every role that serves no requests, and in a test.
+   */
+  readonly handler: unknown;
+
+  constructor({
+    name,
+    role,
+    members,
+    transports,
+    installed,
+    provided,
+    contributions,
+    scope,
+    services,
+    declaredBy = new Map(),
+    handler = void 0,
+  }: {
+    name: string;
+    role: ServerRole;
+    members: Readonly<Partial<Members>>;
+    transports: MountedTransports<Rest, Trpc>;
+    installed: ReadonlyMap<string, InstalledFeatureState>;
+    provided: ReadonlyMap<TokenIdentity, unknown>;
+    contributions: readonly unknown[];
+    scope: ResourceScope;
+    services: readonly RuntimeService[];
+    declaredBy?: ReadonlyMap<unknown, string>;
+    handler?: unknown;
+  }) {
+    this.name = name;
+    this.role = role;
+    this.members = members;
+    this.transports = transports;
+    this.installed = installed;
+    this.provided = provided;
+    this.contributions = contributions;
+    this.declaredBy = declaredBy;
+    this.handler = handler;
     this.lifecycle = new RuntimeLifecycle(services, scope);
   }
 
@@ -459,7 +489,12 @@ export class ApplicationBuilder<
       if (role === "api") {
         // Now: all Apps exist, nothing serves yet. Only moment doors can be built.
         const hosts = this.openDoors((token) => provided.get(token));
-        if (hosts.rest !== void 0 || hosts.trpc !== void 0 || hosts.websocket !== void 0) {
+        if (
+          hosts.rest !== void 0 ||
+          hosts.trpc !== void 0 ||
+          hosts.websocket !== void 0 ||
+          hosts.rawhttp !== void 0
+        ) {
           transports = mountDeclaredTransports({
             declared: declaredForRole(declared, "api"),
             hosts,
@@ -481,19 +516,19 @@ export class ApplicationBuilder<
 
     const contributions = roleContributions(declarations, role, installed);
 
-    return new BootedRuntime<Members, Rest, Trpc>(
-      this.name,
+    return new BootedRuntime<Members, Rest, Trpc>({
+      name: this.name,
       role,
-      members as Readonly<Partial<Members>>,
+      members: members as Readonly<Partial<Members>>,
       transports,
       installed,
       provided,
-      contributions.contributions,
+      contributions: contributions.contributions,
       scope,
-      [...featureServices, ...this.state.services],
-      contributions.declaredBy,
+      services: [...featureServices, ...this.state.services],
+      declaredBy: contributions.declaredBy,
       handler,
-    );
+    });
   }
 
   /**

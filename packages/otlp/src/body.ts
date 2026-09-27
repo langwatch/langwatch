@@ -24,13 +24,67 @@ const gunzipAsync = promisify(gunzip);
 const inflateAsync = promisify(inflate);
 const brotliDecompressAsync = promisify(brotliDecompress);
 
+/** One generated collector message: decodes wire bytes, re-encodes a parsed body. */
+type OtlpMessageType<T> = Readonly<{
+  decode(buf: Uint8Array): T;
+  encode(message: T): { finish(): Uint8Array };
+}>;
+
+/** The three collector request messages this package reads off the generated root. */
+export type OtlpProtobufRoot = Readonly<{
+  opentelemetry: {
+    proto: {
+      collector: {
+        trace: { v1: { ExportTraceServiceRequest: OtlpMessageType<IExportTraceServiceRequest> } };
+        logs: { v1: { ExportLogsServiceRequest: OtlpMessageType<IExportLogsServiceRequest> } };
+        metrics: {
+          v1: { ExportMetricsServiceRequest: OtlpMessageType<IExportMetricsServiceRequest> };
+        };
+      };
+    };
+  };
+}>;
+
+const COLLECTOR_REQUEST_PATHS = [
+  ["opentelemetry", "proto", "collector", "trace", "v1", "ExportTraceServiceRequest"],
+  ["opentelemetry", "proto", "collector", "logs", "v1", "ExportLogsServiceRequest"],
+  ["opentelemetry", "proto", "collector", "metrics", "v1", "ExportMetricsServiceRequest"],
+] as const;
+
+function isMessageTypeAt(root: unknown, path: readonly string[]): boolean {
+  const found = path.reduce<unknown>(
+    (node, key) =>
+      (typeof node === "object" || typeof node === "function") && node !== null
+        ? Reflect.get(node, key)
+        : undefined,
+    root,
+  );
+  return (
+    (typeof found === "object" || typeof found === "function") &&
+    found !== null &&
+    typeof Reflect.get(found, "decode") === "function" &&
+    typeof Reflect.get(found, "encode") === "function"
+  );
+}
+
+function isOtlpProtobufRoot(value: unknown): value is OtlpProtobufRoot {
+  return COLLECTOR_REQUEST_PATHS.every((path) => isMessageTypeAt(value, path));
+}
+
 /**
  * `.../generated/root` is CommonJS: a bundler's interop shim (Vite) puts the
  * exports on `.default`, Node's own ESM loader leaves them on the namespace —
  * reading `default` first, namespace second, covers both.
  */
-export const otlpProtobufRoot: Record<string, any> =
-  (rootModule as { default?: Record<string, any> }).default ?? rootModule;
+function loadOtlpProtobufRoot(): OtlpProtobufRoot {
+  const candidate: unknown = Reflect.get(rootModule, "default") ?? rootModule;
+  if (!isOtlpProtobufRoot(candidate)) {
+    throw new Error("The generated OTLP protobuf root does not carry the collector request types");
+  }
+  return candidate;
+}
+
+export const otlpProtobufRoot: OtlpProtobufRoot = loadOtlpProtobufRoot();
 
 const root = otlpProtobufRoot;
 
@@ -138,7 +192,7 @@ async function drainWithinLimit(reader: ReadableStreamDefaultReader<Uint8Array>)
   return Buffer.concat(chunks);
 }
 
-async function readWireBody(req: Request): Promise<Buffer> {
+async function readWireBody(req: OtlpBodySource): Promise<Buffer> {
   const stream = req.body;
   if (!stream) return Buffer.alloc(0);
 
@@ -156,12 +210,15 @@ async function readWireBody(req: Request): Promise<Buffer> {
   }
 }
 
+/** What the reader needs of a request: its body stream and its headers. */
+export type OtlpBodySource = Pick<Request, "body" | "headers">;
+
 /**
  * Reads the request body, decompressing per `Content-Encoding`. Throws on
  * unsupported encodings or a body over {@link OTLP_MAX_BODY_BYTES} — bounded
  * by zlib itself, so an oversized body stops being written past the line.
  */
-export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
+export async function readOtlpBody(req: OtlpBodySource): Promise<ArrayBuffer> {
   const encoding = req.headers.get("content-encoding");
   if (encoding && encoding !== "identity" && !isSupportedEncoding(encoding)) {
     throw new OtlpUnsupportedEncodingError({ encoding });

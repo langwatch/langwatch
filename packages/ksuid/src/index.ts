@@ -5,13 +5,7 @@ import { Node } from "./node.ts";
 /**
  * Singleton node instance with proper KSUID factory
  */
-const node = new Node(
-  "prod",
-  undefined,
-  (environment, resource, timestamp, instance, sequenceId) => {
-    return new Ksuid(environment, resource, timestamp, instance, sequenceId);
-  },
-);
+const node = new Node("prod", undefined, (components) => new Ksuid(components));
 
 /**
  * @param input - The KSUID string to parse

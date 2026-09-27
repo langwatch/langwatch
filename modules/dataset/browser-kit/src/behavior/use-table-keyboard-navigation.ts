@@ -119,65 +119,76 @@ function handleTableKeyDown({
 
   const currentCol = allColumns[currentColIndex];
 
-  switch (event.key) {
-    case "Enter":
-    case " ":
-      event.preventDefault();
-      if (currentCol?.type === "checkbox") {
-        toggleRowSelection(selectedCell.row);
-      } else if (currentCol?.type === "dataset") {
-        setEditingCell({ row: selectedCell.row, columnId: selectedCell.columnId });
-      }
-      break;
+  if (!HANDLED_KEYS.has(event.key)) return;
+  event.preventDefault();
 
-    case "ArrowUp":
-      event.preventDefault();
-      if (selectedCell.row > 0) {
-        setSelectedCell({ row: selectedCell.row - 1, columnId: selectedCell.columnId });
-      }
-      break;
-
-    case "ArrowDown":
-      event.preventDefault();
-      if (selectedCell.row < displayRowCount - 1) {
-        setSelectedCell({ row: selectedCell.row + 1, columnId: selectedCell.columnId });
-      }
-      break;
-
-    case "ArrowLeft":
-      event.preventDefault();
-      if (currentColIndex > 0) {
-        setSelectedCell({ row: selectedCell.row, columnId: allColumns[currentColIndex - 1]!.id });
-      }
-      break;
-
-    case "ArrowRight":
-      event.preventDefault();
-      if (currentColIndex < allColumns.length - 1) {
-        setSelectedCell({ row: selectedCell.row, columnId: allColumns[currentColIndex + 1]!.id });
-      }
-      break;
-
-    case "Tab":
-      event.preventDefault();
-      if (event.shiftKey) {
-        selectPreviousCell({ selectedCell, currentColIndex, allColumns, setSelectedCell });
-      } else {
-        selectNextCell({
-          selectedCell,
-          currentColIndex,
-          allColumns,
-          displayRowCount,
-          setSelectedCell,
-        });
-      }
-      break;
-
-    case "Escape":
-      event.preventDefault();
-      setSelectedCell(undefined);
-      break;
+  if (event.key === "Escape") {
+    setSelectedCell(undefined);
+    return;
   }
+  if (event.key === "Enter" || event.key === " ") {
+    if (currentCol?.type === "checkbox") toggleRowSelection(selectedCell.row);
+    else if (currentCol?.type === "dataset") setEditingCell({ ...selectedCell });
+    return;
+  }
+  if (event.key === "Tab") {
+    if (event.shiftKey) {
+      selectPreviousCell({ selectedCell, currentColIndex, allColumns, setSelectedCell });
+    } else {
+      selectNextCell({
+        selectedCell,
+        currentColIndex,
+        allColumns,
+        displayRowCount,
+        setSelectedCell,
+      });
+    }
+    return;
+  }
+  const target = arrowTarget({
+    key: event.key,
+    selectedCell,
+    currentColIndex,
+    allColumns,
+    displayRowCount,
+  });
+  if (target) setSelectedCell(target);
+}
+
+const HANDLED_KEYS = new Set([
+  "Enter",
+  " ",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Tab",
+  "Escape",
+]);
+
+/** The cell an arrow key moves to, or nothing at the table's edge. */
+function arrowTarget({
+  key,
+  selectedCell,
+  currentColIndex,
+  allColumns,
+  displayRowCount,
+}: {
+  key: string;
+  selectedCell: Cell;
+  currentColIndex: number;
+  allColumns: NavigableColumn[];
+  displayRowCount: number;
+}): Cell | undefined {
+  const { row, columnId } = selectedCell;
+  if (key === "ArrowUp") return row > 0 ? { row: row - 1, columnId } : undefined;
+  if (key === "ArrowDown")
+    return row < displayRowCount - 1 ? { row: row + 1, columnId } : undefined;
+  const nextColumn =
+    key === "ArrowLeft" ? allColumns[currentColIndex - 1] : allColumns[currentColIndex + 1];
+  return key === "ArrowLeft" || key === "ArrowRight"
+    ? nextColumn && { row, columnId: nextColumn.id }
+    : undefined;
 }
 
 /**

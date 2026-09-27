@@ -14,7 +14,8 @@ export type RunTaskInput = {
   argv: readonly string[];
   /** Always awaited, success or failure — closes the process's real handles. */
   close: () => Promise<void>;
-  logger: Logger;
+  /** Only the lines the launcher writes: a task starting, finishing or failing. */
+  logger: Pick<Logger, "info" | "error">;
 };
 
 /**

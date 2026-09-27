@@ -166,15 +166,15 @@ export class ProcessSupply<
   InstalledPeerSet extends SupplyRecord = InstalledSupplyPeers<Modules>,
   InstalledPeerSetInAnyBranch extends SupplyRecord = InstalledPeersInAnyBranch<Modules>,
 > {
-  declare readonly [supplyState]: (
-    modules: Modules,
-    members: Members,
-    config: Config,
-    peers: Peers,
-    missing: Missing,
-    rest: Rest,
-    trpc: Trpc,
-  ) => void;
+  declare readonly [supplyState]: (state: {
+    modules: Modules;
+    members: Members;
+    config: Config;
+    peers: Peers;
+    missing: Missing;
+    rest: Rest;
+    trpc: Trpc;
+  }) => void;
   declare readonly boot: Boot<
     Modules,
     Members,

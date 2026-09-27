@@ -37,7 +37,13 @@ function deriveStoredObjectId({
   const identifier = hash.subarray(0, 8);
   const instance = new Instance(Instance.schemes.RANDOM, identifier);
 
-  return new Ksuid("prod", "so", 0, instance, 0).toString();
+  return new Ksuid({
+    environment: "prod",
+    resource: "so",
+    timestamp: 0,
+    instance,
+    sequenceId: 0,
+  }).toString();
 }
 
 /**

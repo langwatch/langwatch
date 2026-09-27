@@ -9,35 +9,36 @@ export function otlpScalarValue(
   value: OtlpAnyValue,
 ): string | boolean | number | Uint8Array | undefined {
   if (typeof value.stringValue === "string") return value.stringValue;
-  if (value.boolValue !== undefined && value.boolValue !== null) {
-    return typeof value.boolValue === "string"
-      ? value.boolValue.toLowerCase() === "true"
-      : value.boolValue;
-  }
-  if (value.intValue !== undefined && value.intValue !== null) {
-    if (typeof value.intValue === "object") {
-      return Number(
-        (BigInt(value.intValue.high) << 32n) | (BigInt(value.intValue.low) & 0xffffffffn),
-      );
-    }
-    return typeof value.intValue === "string"
-      ? Number.parseInt(value.intValue, 10)
-      : value.intValue;
-  }
+  if (value.boolValue !== undefined && value.boolValue !== null) return boolOf(value.boolValue);
+  if (value.intValue !== undefined && value.intValue !== null) return intOf(value.intValue);
   if (value.doubleValue !== undefined && value.doubleValue !== null) {
-    return typeof value.doubleValue === "string"
-      ? Number.parseFloat(value.doubleValue)
-      : value.doubleValue;
+    return doubleOf(value.doubleValue);
   }
   if (value.bytesValue instanceof Uint8Array) return value.bytesValue;
   if (typeof value.bytesValue === "string") return Buffer.from(value.bytesValue, "base64");
-  if (
-    value.arrayValue &&
-    value.arrayValue.values.every((item) => otlpScalarValue(item) !== undefined)
-  ) {
-    return JSON.stringify(value.arrayValue.values.map((item) => otlpScalarValue(item)));
+  return scalarArrayOf(value.arrayValue);
+}
+
+function boolOf(value: NonNullable<OtlpAnyValue["boolValue"]>): boolean {
+  return typeof value === "string" ? value.toLowerCase() === "true" : value;
+}
+
+function intOf(value: NonNullable<OtlpAnyValue["intValue"]>): number {
+  if (typeof value === "object") {
+    return Number((BigInt(value.high) << 32n) | (BigInt(value.low) & 0xffffffffn));
   }
-  return undefined;
+  return typeof value === "string" ? Number.parseInt(value, 10) : value;
+}
+
+function doubleOf(value: NonNullable<OtlpAnyValue["doubleValue"]>): number {
+  return typeof value === "string" ? Number.parseFloat(value) : value;
+}
+
+/** An array whose items are all scalars becomes one JSON string; anything else is not scalar. */
+function scalarArrayOf(arrayValue: OtlpAnyValue["arrayValue"]): string | undefined {
+  if (!arrayValue) return undefined;
+  if (!arrayValue.values.every((item) => otlpScalarValue(item) !== undefined)) return undefined;
+  return JSON.stringify(arrayValue.values.map((item) => otlpScalarValue(item)));
 }
 
 /**

@@ -52,12 +52,12 @@ export class AuthzGrantIdentityService {
     );
     const sequenceId = digest.readUInt32BE(8);
     const timestampSeconds = Math.floor(occurredAtMs / 1000);
-    return new Ksuid(
-      GRANT_ID_ENVIRONMENT,
-      "grant",
-      timestampSeconds,
+    return new Ksuid({
+      environment: GRANT_ID_ENVIRONMENT,
+      resource: "grant",
+      timestamp: timestampSeconds,
       instance,
       sequenceId,
-    ).toString();
+    }).toString();
   }
 }

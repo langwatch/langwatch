@@ -37,13 +37,18 @@ describe("applyOtlpReceiverPolicy", () => {
       ],
     };
 
-    applyOtlpReceiverPolicy(request, "traces", "authenticated", {
-      resourceAttributeKeysToRemove: ["remove"],
-      resourceAttributes: [
-        attribute("configured", "yes"),
-        attribute("langwatch.api_key.id", "policy"),
-      ],
-      allowedTraceScopeNames: ["allowed"],
+    applyOtlpReceiverPolicy({
+      request,
+      signal: "traces",
+      apiKeyId: "authenticated",
+      policy: {
+        resourceAttributeKeysToRemove: ["remove"],
+        resourceAttributes: [
+          attribute("configured", "yes"),
+          attribute("langwatch.api_key.id", "policy"),
+        ],
+        allowedTraceScopeNames: ["allowed"],
+      },
     });
 
     expect(request.resourceSpans?.[0]?.resource?.attributes).toEqual([
@@ -91,10 +96,15 @@ describe("applyOtlpReceiverPolicy", () => {
       ],
     };
 
-    const result = applyOtlpReceiverPolicy(request, "metrics", null, {
-      resourceAttributeKeysToRemove: [],
-      resourceAttributes: [],
-      allowedMetricScopeNames: ["keep"],
+    const result = applyOtlpReceiverPolicy({
+      request,
+      signal: "metrics",
+      apiKeyId: null,
+      policy: {
+        resourceAttributeKeysToRemove: [],
+        resourceAttributes: [],
+        allowedMetricScopeNames: ["keep"],
+      },
     });
 
     expect(result).toEqual({ droppedScopes: 1 });
@@ -127,9 +137,14 @@ describe("applyOtlpReceiverPolicy", () => {
       ],
     };
 
-    applyOtlpReceiverPolicy(request, "logs", null, {
-      resourceAttributeKeysToRemove: [],
-      resourceAttributes: [],
+    applyOtlpReceiverPolicy({
+      request,
+      signal: "logs",
+      apiKeyId: null,
+      policy: {
+        resourceAttributeKeysToRemove: [],
+        resourceAttributes: [],
+      },
     });
 
     expect(request.resourceLogs?.[0]?.scopeLogs?.[0]?.logRecords?.[0]?.attributes).toBeNull();
@@ -161,8 +176,12 @@ describe("applyOtlpReceiverPolicy", () => {
       allowedMetricScopeNames: ["allowed"],
     };
 
-    expect(applyOtlpReceiverPolicy(traces, "traces", null, policy)).toEqual({ droppedScopes: 1 });
-    expect(applyOtlpReceiverPolicy(metrics, "metrics", null, policy)).toEqual({ droppedScopes: 1 });
+    expect(
+      applyOtlpReceiverPolicy({ request: traces, signal: "traces", apiKeyId: null, policy }),
+    ).toEqual({ droppedScopes: 1 });
+    expect(
+      applyOtlpReceiverPolicy({ request: metrics, signal: "metrics", apiKeyId: null, policy }),
+    ).toEqual({ droppedScopes: 1 });
     expect(traces.resourceSpans).toEqual([]);
     expect(metrics.resourceMetrics).toEqual([]);
   });
@@ -171,9 +190,9 @@ describe("applyOtlpReceiverPolicy", () => {
     const trace: IExportTraceServiceRequest = { resourceSpans: [] };
     const metric: IExportMetricsServiceRequest = { resourceMetrics: [] };
     const logs: IExportLogsServiceRequest = { resourceLogs: [] };
-    applyOtlpReceiverPolicy(trace, "traces", null);
-    applyOtlpReceiverPolicy(metric, "metrics", null);
-    applyOtlpReceiverPolicy(logs, "logs", null);
+    applyOtlpReceiverPolicy({ request: trace, signal: "traces", apiKeyId: null });
+    applyOtlpReceiverPolicy({ request: metric, signal: "metrics", apiKeyId: null });
+    applyOtlpReceiverPolicy({ request: logs, signal: "logs", apiKeyId: null });
     expect(trace.resourceSpans).toEqual([]);
     expect(metric.resourceMetrics).toEqual([]);
     expect(logs.resourceLogs).toEqual([]);
@@ -203,7 +222,7 @@ describe("applyOtlpReceiverPolicy", () => {
     };
     const request = { resourceSpans: [{ resource, scopeSpans: [{ scope, spans: [span] }] }] };
 
-    applyOtlpReceiverPolicy(request, "traces", null);
+    applyOtlpReceiverPolicy({ request, signal: "traces", apiKeyId: null });
 
     expect(resource).toEqual({
       droppedAttributesCount: 7,
@@ -236,7 +255,7 @@ describe("applyOtlpReceiverPolicy", () => {
       const metric = { [kind]: { dataPoints: [point] }, attributes: [] };
       const request = { resourceMetrics: [{ scopeMetrics: [{ metrics: [metric] }] }] };
 
-      applyOtlpReceiverPolicy(request, "metrics", "real");
+      applyOtlpReceiverPolicy({ request, signal: "metrics", apiKeyId: "real" });
 
       expect(point).toEqual({
         asDouble: 42,
@@ -250,10 +269,15 @@ describe("applyOtlpReceiverPolicy", () => {
   it("removes null scopes and their empty resources under a scope restriction", () => {
     const request = { resourceSpans: [{ scopeSpans: [null] }] };
 
-    const result = applyOtlpReceiverPolicy(request, "traces", null, {
-      resourceAttributeKeysToRemove: [],
-      resourceAttributes: [],
-      allowedTraceScopeNames: [],
+    const result = applyOtlpReceiverPolicy({
+      request,
+      signal: "traces",
+      apiKeyId: null,
+      policy: {
+        resourceAttributeKeysToRemove: [],
+        resourceAttributes: [],
+        allowedTraceScopeNames: [],
+      },
     });
 
     expect(result).toEqual({ droppedScopes: 1 });

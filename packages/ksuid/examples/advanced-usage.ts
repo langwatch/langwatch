@@ -16,9 +16,7 @@ console.log("=== Advanced KSUID Usage ===");
 const customNode = new Node(
   "dev",
   new Instance(Instance.schemes.RANDOM, new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])),
-  (environment, resource, timestamp, instance, sequenceId) => {
-    return new Ksuid(environment, resource, timestamp, instance, sequenceId);
-  },
+  (components) => new Ksuid(components),
 );
 
 // Generate KSUIDs with custom node

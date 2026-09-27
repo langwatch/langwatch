@@ -1,16 +1,11 @@
 import { checkInstance, Instance } from "./instance.ts";
 import type { Ksuid } from "./ksuid.ts";
 import { getRandomBytes, detectPlatform } from "./platform.ts";
+import type { KsuidComponents } from "./types.ts";
 import { checkPrefix, checkNonEmptyString } from "./validation.ts";
 
 // Factory function to create Ksuid instances
-export type KsuidFactory = (
-  environment: string,
-  resource: string,
-  timestamp: number,
-  instance: Instance,
-  sequenceId: number,
-) => Ksuid;
+export type KsuidFactory = (components: KsuidComponents) => Ksuid;
 
 export class Node {
   private _environment: string;
@@ -55,22 +50,16 @@ export class Node {
       this._currentSequence = 0;
     }
 
-    return this._ksuidFactory(
-      this._environment,
+    return this._ksuidFactory({
+      environment: this._environment,
       resource,
-      this._lastTimestamp,
-      this._instance,
-      this._currentSequence,
-    );
+      timestamp: this._lastTimestamp,
+      instance: this._instance,
+      sequenceId: this._currentSequence,
+    });
   }
 
-  private defaultKsuidFactory(
-    _environment: string,
-    _resource: string,
-    _timestamp: number,
-    _instance: Instance,
-    _sequenceId: number,
-  ): Ksuid {
+  private defaultKsuidFactory(_components: KsuidComponents): Ksuid {
     throw new Error("Ksuid factory not initialized");
   }
 

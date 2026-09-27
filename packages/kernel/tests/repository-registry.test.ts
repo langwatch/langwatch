@@ -10,6 +10,7 @@ import {
   type FeatureSetup,
 } from "../src/index.ts";
 import { MissingMemberError } from "../src/module-members.ts";
+import type { MemberSource } from "../src/module-members.ts";
 import { RepositoryOwnershipConflictError } from "../src/repository-ownership.ts";
 import {
   instantiateRepositories,
@@ -245,10 +246,14 @@ describe("given a module that declares both repository tiers", () => {
     });
 
     it("refuses a member the source names but cannot build", async () => {
-      const booting = createApp({
-        role: "api",
-        members: memberSourceOf({ prisma: undefined as unknown as { prefix: string } }),
-      })
+      const unbuildable: MemberSource<{ prisma: { prefix: string } }> = {
+        order: ["prisma"],
+        read: () => {
+          throw new Error('This process has no "prisma" member.');
+        },
+        close: () => Promise.resolve(),
+      };
+      const booting = createApp({ role: "api", members: unbuildable })
         .withModules([feature])
         .boot();
 

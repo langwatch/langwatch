@@ -52,13 +52,13 @@ export class SpanRecordIdentityService {
     // Use the next 4 bytes for the sequence to further ensure uniqueness
     const sequence = ((hash[8]! << 24) | (hash[9]! << 16) | (hash[10]! << 8) | hash[11]!) >>> 0;
 
-    const ksuid = new Ksuid(
-      getEnvironment(),
+    const ksuid = new Ksuid({
+      environment: getEnvironment(),
       resource,
-      Math.floor(timestampMs / 1000),
+      timestamp: Math.floor(timestampMs / 1000),
       instance,
-      sequence,
-    );
+      sequenceId: sequence,
+    });
 
     return ksuid.toString();
   }

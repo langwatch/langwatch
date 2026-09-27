@@ -42,13 +42,13 @@ export function generateDeterministicResultId({
   const timestampSeconds = 0;
   const sequenceId = 0;
 
-  const ksuid = new Ksuid(
-    getEnvironment(),
-    EXPERIMENT_RUN_RESULT_KSUID_RESOURCE,
-    timestampSeconds,
+  const ksuid = new Ksuid({
+    environment: getEnvironment(),
+    resource: EXPERIMENT_RUN_RESULT_KSUID_RESOURCE,
+    timestamp: timestampSeconds,
     instance,
     sequenceId,
-  );
+  });
 
   return ksuid.toString();
 }

@@ -311,16 +311,17 @@ describe("the personal Pull Requests table", () => {
 
       const disabled = screen.getByText("Link this repo");
       expect(disabled.closest("a")).toBeNull();
-      expect(disabled.closest("button")).toBeDisabled();
+      const inert = disabled.closest("button");
+      expect(inert).toHaveAttribute("aria-disabled", "true");
 
-      await user.hover(disabled.closest("span[tabindex]") as HTMLElement);
+      await user.hover(inert as HTMLElement);
       expect(
         await screen.findByText("Ask an administrator to link this repository."),
       ).toBeInTheDocument();
 
-      // The button is inert, so the click lands on its wrapper; it must stop
-      // there rather than fall through and open whatever the row opens.
-      await user.click(disabled.closest("span[tabindex]") as HTMLElement);
+      // The button is inert: its click must stop there rather than fall through
+      // and open whatever the row opens.
+      await user.click(inert as HTMLElement);
       expect(host.recording.queries).toEqual([]);
     });
   });

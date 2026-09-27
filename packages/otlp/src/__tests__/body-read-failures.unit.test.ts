@@ -8,7 +8,7 @@ import { gzipSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
-import { OTLP_MAX_BODY_BYTES, readOtlpBody } from "../body.ts";
+import { OTLP_MAX_BODY_BYTES, readOtlpBody, type OtlpBodySource } from "../body.ts";
 import {
   OtlpBodyTooLargeError,
   OtlpBodyUnreadableError,
@@ -23,11 +23,8 @@ import {
 function requestWithStream(
   stream: ReadableStream<Uint8Array>,
   { headers }: { headers?: Record<string, string> } = {},
-): Request {
-  return {
-    body: stream,
-    headers: new Headers(headers ?? {}),
-  } as unknown as Request;
+): OtlpBodySource {
+  return { body: stream, headers: new Headers(headers ?? {}) };
 }
 
 /** A stream that yields one chunk and then errors, like a dropped connection. */

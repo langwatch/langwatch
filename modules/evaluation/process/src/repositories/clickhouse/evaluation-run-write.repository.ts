@@ -130,13 +130,13 @@ function deterministicProjectionId(
 
   const hash = createHash("sha256").update(`${tenantId}:${evaluationId}`).digest();
   const instance = new Instance(Instance.schemes.RANDOM, new Uint8Array(hash.subarray(0, 8)));
-  return new Ksuid(
-    getEnvironment(),
-    EVALUATION_RESOURCE,
-    Math.floor(scheduledAtMs / 1000),
+  return new Ksuid({
+    environment: getEnvironment(),
+    resource: EVALUATION_RESOURCE,
+    timestamp: Math.floor(scheduledAtMs / 1000),
     instance,
-    0,
-  ).toString();
+    sequenceId: 0,
+  }).toString();
 }
 
 /** Owns the evaluation_runs insert shape and write-side bounds. */
