@@ -1,122 +1,25 @@
 /**
- * The procedures this family calls, and the hooks that call them.
+ * The procedures this family calls, derived from their owners' contracts, and the hooks that
+ * call them.
  */
 
-import type { AgentApiUpdateOutput, UpdateAgentCommand } from "@langwatch/agent-contract";
+import type { agentTrpc, httpProxyTrpc } from "@langwatch/agent-contract";
 import { type ContractApiMap, createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
-import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
+import type { evaluatorTrpc } from "@langwatch/evaluator-contract";
+import type { featureFlagTrpc } from "@langwatch/feature-flag-contract";
+import type { modelProviderTrpc } from "@langwatch/model-provider-contract";
 import type {
-  ModelDefaultResolvedTrpcOutput,
-  ModelProviderListAllForProjectTrpcOutput,
-} from "@langwatch/model-provider-contract";
+  OrganizationWithMembersAndTheirTeams,
+  organizationTrpc,
+} from "@langwatch/organization-contract";
+import type { promptTrpc } from "@langwatch/prompt-contract";
 import type { scenarioTrpc } from "@langwatch/scenario-contract";
+import type { suiteTrpc, testSuiteTrpc } from "@langwatch/suite-contract";
+import type { exportTrpc, tracesTrpc } from "@langwatch/trace-contract";
+import type { workflowTrpc } from "@langwatch/workflow-contract";
 
-/**
- * A payload no contract package publishes yet.
- */
-type Unpublished = any;
-
-type Q = { query: { input: Unpublished; output: Unpublished } };
-
-/**
- * A LIST procedure, stated as a list.
- */
-type QL = { query: { input: Unpublished; output: Unpublished[] } };
-type M = { mutation: { input: Unpublished; output: Unpublished } };
-type S = { subscription: { input: Unpublished; output: Unpublished } };
-
-/** The voice-session doors, read off the contract rather than restated. */
-type VoiceSessionProcedures = Pick<
-  ContractApiMap<typeof scenarioTrpc>["scenarios"],
-  "mintVoiceSession" | "finishVoiceSession"
->;
-
-export type ScenarioApiMap = {
-  scenarios: VoiceSessionProcedures & {
-    getAll: QL;
-    getById: Q;
-    getByIdIncludingArchived: Q;
-    getExternalSetSummaries: QL;
-    getLastResultSummaries: QL;
-    getBatchRunData: Q;
-    getScenarioSetBatchHistory: Q;
-    getScenarioSetBatchRunCount: Q;
-    getScenarioSetRunData: Q;
-    getSuiteRunData: Q;
-    getSuiteRunFreshness: Q;
-    getRunState: Q;
-    getVersion: Q;
-    listVersions: Q;
-    create: M;
-    update: M;
-    duplicate: M;
-    archive: M;
-    batchArchive: M;
-    moveToTestSuite: M;
-    restoreVersion: M;
-    run: M;
-    cancelJob: M;
-    cancelBatchRun: M;
-    /** The Results tab's fold: one row per group, over the whole window. */
-    getResultsOverview: Q;
-    /** The rows behind one opened group. */
-    getResultAtoms: Q;
-    /** The scenarios a run named that no stored scenario row matches. */
-    getCodeScenarios: QL;
-    /** The targets a run went against, as the runs themselves recorded them. */
-    getRunTargets: QL;
-    /** What the previous runs of this scope were configured with. */
-    getRunConfigurations: QL;
-    /** The live board. One entry per simulation event on the project. */
-    onSimulationUpdate: S;
-    /** The tab follower: who else is watching this scenario run. */
-    onScenarioTabPresence: S;
-  };
-
-  suites: {
-    getAll: QL;
-    getById: Q;
-    getSummaries: Q;
-    resolveArchivedNames: Q;
-    create: M;
-    update: M;
-    duplicate: M;
-    archive: M;
-    run: M;
-    runAll: M;
-    /** Starts one run plan, which is a suite of the `run_plan` kind. */
-    runPlan: M;
-    /**
-     * The test suites of a project.
-     */
-    testSuites: {
-      getAll: QL;
-      create: M;
-      update: M;
-      rename: M;
-      archive: M;
-    };
-  };
-
-  /**
-   * THE BORROWED VOCABULARY, one segment per feature these screens reach.
-   */
-  agents: {
-    getAll: QL;
-    getById: Q;
-    getRelatedEntities: Q;
-    create: M;
-    update: { mutation: { input: UpdateAgentCommand; output: AgentApiUpdateOutput } };
-    delete: M;
-    cascadeArchive: M;
-    /** One scenario run against a saved agent, from the agents page. */
-    testRun: M;
-    /** One turn against a saved agent, from the editor's test panel. */
-    testTurn: M;
-  };
-  /**
-   * What the reader may do here.
-   */
+/** authz states this procedure in its process transport, not its contract, so it is typed here. */
+type AuthzProcedures = {
   authz: {
     effectivePermissions: {
       query: {
@@ -125,89 +28,50 @@ export type ScenarioApiMap = {
       };
     };
   };
-  /**
-   * One browser-visible release flag, resolved for the reader.
-   */
-  featureFlag: {
-    isEnabled: {
-      query: {
-        input: {
-          flag: string;
-          projectId: string | null;
-          organizationId: string | null;
-        };
-        output: { enabled: boolean };
-      };
-    };
-  };
-  export: { onScenarioRunExportProgress: S };
-  httpProxy: { execute: M };
-  modelProvider: {
-    getResolvedDefault: {
-      query: {
-        input: { projectId: string; featureKey: string };
-        output: ModelDefaultResolvedTrpcOutput;
-      };
-    };
-    listAllForProjectForFrontend: {
-      query: { input: { projectId: string }; output: ModelProviderListAllForProjectTrpcOutput };
-    };
-  };
-  /**
-   * The workspace graph, narrowed to what this family needs.
-   */
-  organization: {
-    getAll: {
-      query: {
-        input: { isDemo?: boolean };
-        output: {
-          id: string;
-          name: string;
-          slug?: string;
-          teams: {
-            id: string;
-            name: string;
-            slug?: string;
-            isPersonal?: boolean;
-            ownerUserId?: string | null;
-            members?: { userId: string }[];
-            projects: {
-              id: string;
-              name: string;
-              slug: string;
-              apiKey?: string;
-              firstMessage?: boolean;
-            }[];
-          }[];
-        }[];
-      };
-    };
-    /**
-     * The organization's members, read only to put a name on a run's actor.
-     */
-    getOrganizationWithMembersAndTheirTeams: Q;
-  };
-  prompts: { getAllPromptsForProject: QL };
-  traces: { getById: Q };
-  workflow: { create: M };
+};
 
-  /** The project's saved evaluators, which the suite editor and the run
-   * dialog attach onto scenarios and read pills for. */
-  evaluators: {
-    getAll: {
-      query: { input: { projectId: string }; output: EvaluatorWithFields[] };
-    };
-    getById: {
-      query: { input: { id: string; projectId: string }; output: EvaluatorWithFields | null };
+/**
+ * The organization aggregate is declared `unknown` on its contract; the browser reads it as the
+ * contract's own `OrganizationWithMembersAndTheirTeams`.
+ */
+type OrganizationMembersProcedure = {
+  organization: {
+    getOrganizationWithMembersAndTheirTeams: {
+      query: {
+        input: { organizationId: string };
+        output: OrganizationWithMembersAndTheirTeams;
+      };
     };
   };
 };
 
-/** What each procedure in the map takes. */
+export type ScenarioApiMap = ContractApiMap<typeof scenarioTrpc> &
+  ContractApiMap<typeof suiteTrpc> &
+  ContractApiMap<typeof testSuiteTrpc> &
+  ContractApiMap<typeof agentTrpc> &
+  ContractApiMap<typeof httpProxyTrpc> &
+  ContractApiMap<typeof featureFlagTrpc> &
+  ContractApiMap<typeof exportTrpc> &
+  ContractApiMap<typeof modelProviderTrpc> &
+  ContractApiMap<typeof organizationTrpc> &
+  ContractApiMap<typeof promptTrpc> &
+  ContractApiMap<typeof tracesTrpc> &
+  ContractApiMap<typeof workflowTrpc> &
+  ContractApiMap<typeof evaluatorTrpc> &
+  AuthzProcedures &
+  OrganizationMembersProcedure;
+
+/** What each procedure in the map takes, as the browser sends it. */
 export type RouterInputs = { [K in keyof ScenarioApiMap]: InputsOf<ScenarioApiMap[K]> };
 
 /** What each procedure in the map answers, as the browser receives it. */
 export type RouterOutputs = OutputsFromMap<ScenarioApiMap>;
+
+/** A scenario as the browser receives it: dates arrive as ISO strings. */
+export type Scenario = NonNullable<RouterOutputs["scenarios"]["getById"]>;
+
+/** A run plan or test suite as the browser receives it. */
+export type SimulationSuite = NonNullable<RouterOutputs["suites"]["getById"]>;
 
 type InputsOf<TNode> = TNode extends { query: { input: infer TIn } }
   ? TIn

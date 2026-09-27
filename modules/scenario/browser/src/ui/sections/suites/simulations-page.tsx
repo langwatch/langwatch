@@ -16,13 +16,12 @@ import {
   SuiteRunConfirmationDialog,
   NowProvider,
 } from "@langwatch/suite-browser-kit";
-import type { Suite as SimulationSuite } from "@langwatch/suite-contract";
 import { fromDate, nowInstant, subDays } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
-import { api } from "../../../behavior/scenario-api.ts";
+import { api, type SimulationSuite } from "../../../behavior/scenario-api.ts";
 import { useRunSuite } from "../../../behavior/suites/use-run-suite.ts";
 import {
   ALL_RUNS_ID,

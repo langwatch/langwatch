@@ -34,7 +34,11 @@ function freshRow(): SuiteFieldRow {
 }
 
 /** The draft a stored suite reads as. */
-function draftFromSuite(suite: { name: string; fields: unknown; evaluators: unknown }): SuiteDraft {
+function draftFromSuite(suite: {
+  name: string;
+  fields?: unknown;
+  evaluators?: unknown;
+}): SuiteDraft {
   const fields = parseSuiteFieldDefinitions(suite.fields);
   const evaluators = parseEvaluatorAttachments(suite.evaluators);
   return {
@@ -87,7 +91,7 @@ function useSuiteDraft({
 }: {
   testSuiteId: string | null;
   isOpen: boolean;
-  suite: { name: string; fields: unknown; evaluators: unknown } | undefined;
+  suite: { name: string; fields?: unknown; evaluators?: unknown } | undefined;
 }) {
   const storedSuiteId = useSuiteEditorStore((state) => state.suiteId);
   const draft = useSuiteEditorStore((state) => state.draft);

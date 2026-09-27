@@ -190,6 +190,8 @@ export type SuiteRunPlanInput = z.infer<typeof suiteRunPlanInputSchema>;
 export type SuiteRunPlanResult = SuiteRunResult & {
   suiteId: string;
   planName: string;
+  /** The address segment of the plan the run joined or created, as main returns it. */
+  planSlug: string;
   created: boolean;
 };
 

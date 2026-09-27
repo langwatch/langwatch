@@ -2,7 +2,11 @@
  * One browser-visible release flag, resolved for the signed-in reader.
  */
 
-import { type FeatureFlagTargetId, NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import {
+  type FeatureFlagTargetId,
+  type FrontendFeatureFlag,
+  NOT_TARGETED,
+} from "@langwatch/feature-flag-contract";
 
 import { api } from "./scenario-api.ts";
 
@@ -33,7 +37,10 @@ function toWireTargetId(id: FeatureFlagTargetId): string | null {
   return id === void 0 || id === NOT_TARGETED ? null : id;
 }
 
-export function useFeatureFlag(flag: string, options: UseFeatureFlagOptions): UseFeatureFlagResult {
+export function useFeatureFlag(
+  flag: FrontendFeatureFlag,
+  options: UseFeatureFlagOptions,
+): UseFeatureFlagResult {
   const queryEnabled = options.enabled ?? true;
 
   const { data, isLoading } = api.featureFlag.isEnabled.useQuery(

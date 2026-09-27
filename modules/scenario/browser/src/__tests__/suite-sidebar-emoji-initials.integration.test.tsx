@@ -20,7 +20,7 @@ vi.mock("posthog-js", () => ({ default: { capture: vi.fn() } }));
 import { SUITE_SIDEBAR_COLLAPSED_KEY, SuiteSidebar } from "../ui/sections/suites/suite-sidebar.tsx";
 
 type SuiteSidebarProps = ComponentProps<typeof SuiteSidebar>;
-type Suite = SuiteSidebarProps["suites"][number];
+type Suite = SuiteSidebarProps["suites"][number] & { kind: "run_plan" };
 
 function makeSuite(overrides: Partial<Suite> & Pick<Suite, "name">): Suite {
   return {
@@ -37,8 +37,8 @@ function makeSuite(overrides: Partial<Suite> & Pick<Suite, "name">): Suite {
     simulatorModel: null,
     judgeModel: null,
     archivedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     ...overrides,
   };
 }

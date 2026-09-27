@@ -20,7 +20,7 @@ describe("<ScenarioRunActions/>", () => {
   });
 
   describe("given an archived scenario", () => {
-    const archivedScenario = { archivedAt: new Date("2025-01-15T00:00:00Z") };
+    const archivedScenario = { archivedAt: new Date("2025-01-15T00:00:00Z").toISOString() };
 
     describe("when viewing the run results", () => {
       // aria-disabled (not native disabled) keeps the button focusable so

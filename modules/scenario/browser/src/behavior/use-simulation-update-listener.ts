@@ -132,7 +132,7 @@ function handleBroadcastUpdate(
   }
 }
 
-function handleSimulationEvent(event: string, actions: SimulationEventActions) {
+function handleSimulationEvent(event: unknown, actions: SimulationEventActions) {
   if (!event) return;
   try {
     const parsed: unknown = typeof event === "string" ? JSON.parse(event) : event;
@@ -208,12 +208,10 @@ function useRunUpdate(projectId: string) {
       const parsedStatus = z.enum(ScenarioRunStatus).safeParse(status);
       if (!parsedStatus.success || !isTerminalStatus(parsedStatus.data)) return;
 
-      trpcUtils.scenarios.getRunState.setData(
-        { projectId, scenarioRunId },
-        (previous: { status: ScenarioRunStatus } | undefined) =>
-          previous && !isTerminalStatus(previous.status)
-            ? { ...previous, status: parsedStatus.data }
-            : previous,
+      trpcUtils.scenarios.getRunState.setData({ projectId, scenarioRunId }, (previous) =>
+        previous && !isTerminalStatus(previous.status)
+          ? { ...previous, status: parsedStatus.data }
+          : previous,
       );
     },
     [projectId, trpcUtils],
@@ -279,7 +277,7 @@ export function useSimulationUpdateListener({
   );
 
   const subscription = useSSESubscription<
-    { event: string; timestamp: number },
+    { event?: unknown; timestamp?: number },
     { projectId: string; tabKey?: string; tabId?: string }
   >(api.scenarios.onSimulationUpdate, subscriptionInput, {
     enabled: Boolean(enabled && projectId),

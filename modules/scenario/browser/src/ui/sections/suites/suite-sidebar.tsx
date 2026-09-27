@@ -23,7 +23,6 @@ import {
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ExternalSetSummary, SuiteRunSummary } from "@langwatch/scenario-contract";
-import type { Suite as SimulationSuite } from "@langwatch/suite-contract";
 import {
   FlaskConical,
   List,
@@ -41,6 +40,7 @@ import { useNow } from "../../../behavior/use-now.ts";
 
 export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 
+import type { SimulationSuite } from "../../../behavior/scenario-api.ts";
 import { ShadowDivider } from "../../elements/shadow-divider.tsx";
 
 type SuiteSidebarProps = {
