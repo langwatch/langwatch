@@ -1,18 +1,20 @@
 import { Box, VStack } from "@chakra-ui/react";
 import {
-  AnnotateBody,
-  FormFooter,
   readAnnotationScoreOptions,
-  SuggestBody,
   type AnnotationFormState,
-} from "@langwatch/annotation-browser/annotation-form";
-import { describeAnnotationAnchor } from "@langwatch/annotation-contract";
+  describeAnnotationAnchor,
+} from "@langwatch/annotation-contract";
 import { useEffect } from "react";
 
 import {
   type AnnotationDraft,
   useAnnotationDraftStore,
 } from "../../../../../behavior/annotation-draft.store.ts";
+import {
+  AnnotateBody,
+  FormFooter,
+  SuggestBody,
+} from "../../../../../behavior/lent-annotation-form.tsx";
 import { useAnnotationMutations } from "./use-annotation-form.ts";
 
 interface AnnotationEditorCardProps {

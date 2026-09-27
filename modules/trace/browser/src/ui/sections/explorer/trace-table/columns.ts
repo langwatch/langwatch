@@ -14,7 +14,7 @@ const num: ColumnMeta = { align: "right" };
 const flex: ColumnMeta = { flex: true };
 
 const traceColumnDefs = {
-  time: traceCol.accessor("timestamp", {
+  time: traceCol.accessor((row): unknown => row.timestamp, {
     id: "time",
     header: "Time",
     // Default sizing is the relative-mode footprint (68px) — enough for
@@ -24,7 +24,7 @@ const traceColumnDefs = {
     // stamp doesn't clip; both footprints live in one place on the store.
     ...timeColumnSizing("relative"),
   }),
-  since: traceCol.accessor("timestamp", {
+  since: traceCol.accessor((row): unknown => row.timestamp, {
     id: "since",
     header: "Since",
     // Verbose relative — "3 minutes ago", "2 weeks ago". Wider than the
@@ -34,7 +34,7 @@ const traceColumnDefs = {
     size: 130,
     minSize: 110,
   }),
-  timestamp: traceCol.accessor("timestamp", {
+  timestamp: traceCol.accessor((row): unknown => row.timestamp, {
     id: "timestamp",
     header: "Timestamp",
     // ISO 8601 — "2026-06-02T13:14:15.123Z" is 24 chars in monospace.
@@ -43,7 +43,7 @@ const traceColumnDefs = {
     size: 220,
     minSize: 210,
   }),
-  trace: traceCol.accessor("name", {
+  trace: traceCol.accessor((row): unknown => row.name, {
     id: "trace",
     header: "Trace (summary)",
     // Fixed rather than flex: a flex column absorbing leftover space balloons out to mostly empty
@@ -56,35 +56,35 @@ const traceColumnDefs = {
   // Broken-out alternates to the composite `trace` column. Lenses can mix and match:
   // engineers tend to prefer the dense `trace` summary; product people prefer dedicated
   // input/output columns.
-  "trace-name": traceCol.accessor((row) => row.traceName ?? "", {
+  "trace-name": traceCol.accessor((row): unknown => row.traceName ?? "", {
     id: "trace-name",
     header: "Trace name",
     size: 200,
     minSize: 140,
     enableSorting: false,
   }),
-  "root-span-name": traceCol.accessor((row) => row.name ?? "", {
+  "root-span-name": traceCol.accessor((row): unknown => row.name ?? "", {
     id: "root-span-name",
     header: "Root span name",
     size: 200,
     minSize: 140,
     enableSorting: false,
   }),
-  "root-span-type": traceCol.accessor((row) => row.rootSpanType ?? "", {
+  "root-span-type": traceCol.accessor((row): unknown => row.rootSpanType ?? "", {
     id: "root-span-type",
     header: "Root span type",
     size: 90,
     minSize: 80,
     enableSorting: false,
   }),
-  "trace-id": traceCol.accessor("traceId", {
+  "trace-id": traceCol.accessor((row): unknown => row.traceId, {
     id: "trace-id",
     header: "Trace ID",
     size: 240,
     minSize: 180,
     enableSorting: false,
   }),
-  input: traceCol.accessor("input", {
+  input: traceCol.accessor((row): unknown => row.input, {
     id: "input",
     header: "Input",
     size: 9999,
@@ -92,7 +92,7 @@ const traceColumnDefs = {
     meta: flex,
     enableSorting: false,
   }),
-  output: traceCol.accessor("output", {
+  output: traceCol.accessor((row): unknown => row.output, {
     id: "output",
     header: "Output",
     size: 9999,
@@ -100,14 +100,14 @@ const traceColumnDefs = {
     meta: flex,
     enableSorting: false,
   }),
-  "error-text": traceCol.accessor("error", {
+  "error-text": traceCol.accessor((row): unknown => row.error, {
     id: "error-text",
     header: "Error",
     size: 320,
     minSize: 220,
     enableSorting: false,
   }),
-  service: traceCol.accessor("serviceName", {
+  service: traceCol.accessor((row): unknown => row.serviceName, {
     id: "service",
     header: "Service",
     // Bumped from 100→160 so the common case (`fraud-risk-checker`,
@@ -118,7 +118,7 @@ const traceColumnDefs = {
     minSize: 110,
     enableSorting: false,
   }),
-  duration: traceCol.accessor("durationMs", {
+  duration: traceCol.accessor((row): unknown => row.durationMs, {
     // Min widths below are sized so the uppercase header label *and*
     // the sort chevron fit without clamping at the default column
     // width. The numeric content itself is short (`1.0s`, `$0.0016`)
@@ -129,21 +129,21 @@ const traceColumnDefs = {
     minSize: 95,
     meta: num,
   }),
-  cost: traceCol.accessor("totalCost", {
+  cost: traceCol.accessor((row): unknown => row.totalCost, {
     id: "cost",
     header: "Cost",
     size: 90,
     minSize: 80,
     meta: num,
   }),
-  contextSize: traceCol.accessor((row) => row.contextSizeTokens ?? 0, {
+  contextSize: traceCol.accessor((row): unknown => row.contextSizeTokens ?? 0, {
     id: "contextSize",
     header: "Context Size",
     size: 120,
     minSize: 110,
     meta: num,
   }),
-  tokens: traceCol.accessor("totalTokens", {
+  tokens: traceCol.accessor((row): unknown => row.totalTokens, {
     id: "tokens",
     header: "Tokens",
     // Bumped from 90/85 — "TOKENS" header (6 uppercase chars in 2xs) +
@@ -154,14 +154,14 @@ const traceColumnDefs = {
     minSize: 95,
     meta: num,
   }),
-  spans: traceCol.accessor("spanCount", {
+  spans: traceCol.accessor((row): unknown => row.spanCount, {
     id: "spans",
     header: "Spans",
     size: 85,
     minSize: 80,
     meta: num,
   }),
-  size: traceCol.accessor("sizeBytes", {
+  size: traceCol.accessor((row): unknown => row.sizeBytes, {
     id: "size",
     header: "Storage size",
     // Body content is short ("1.4 MB"); the "STORAGE SIZE" header + sort
@@ -171,14 +171,14 @@ const traceColumnDefs = {
     minSize: 110,
     meta: num,
   }),
-  model: traceCol.accessor((row) => row.models[0] ?? "", {
+  model: traceCol.accessor((row): unknown => row.models[0] ?? "", {
     id: "model",
     header: "Model",
     size: 180,
     minSize: 140,
     enableSorting: false,
   }),
-  labels: traceCol.accessor((row) => row.labels.join(", "), {
+  labels: traceCol.accessor((row): unknown => row.labels.join(", "), {
     id: "labels",
     header: "Labels",
     // Wide enough for two or three short label badges before wrapping;
@@ -188,7 +188,7 @@ const traceColumnDefs = {
     minSize: 140,
     enableSorting: false,
   }),
-  prompt: traceCol.accessor((row) => row.promptId ?? "", {
+  prompt: traceCol.accessor((row): unknown => row.promptId ?? "", {
     id: "prompt",
     header: "Prompt",
     // Fits a prompt handle + "v{N}" chip; the handle truncates inside it.
@@ -196,7 +196,7 @@ const traceColumnDefs = {
     minSize: 140,
     enableSorting: false,
   }),
-  evaluations: traceCol.accessor((row) => row.evaluations.length, {
+  evaluations: traceCol.accessor((row): unknown => row.evaluations.length, {
     id: "evaluations",
     header: "Evals",
     // Default sized for the common case (0–2 evaluator chips per row).
@@ -205,14 +205,14 @@ const traceColumnDefs = {
     maxSize: 640,
     enableSorting: false,
   }),
-  events: traceCol.accessor((row) => row.events.totalCount, {
+  events: traceCol.accessor((row): unknown => row.events.totalCount, {
     id: "events",
     header: "Events",
     size: 250,
     minSize: 140,
     enableSorting: false,
   }),
-  annotations: traceCol.accessor((row) => row.annotations?.length ?? 0, {
+  annotations: traceCol.accessor((row): unknown => row.annotations?.length ?? 0, {
     id: "annotations",
     header: "Annotations",
     // Wide enough for the four counts a thoroughly reviewed trace carries on
@@ -222,28 +222,28 @@ const traceColumnDefs = {
     minSize: 130,
     enableSorting: false,
   }),
-  status: traceCol.accessor("status", {
+  status: traceCol.accessor((row): unknown => row.status, {
     id: "status",
     header: "Status",
     size: 70,
     minSize: 70,
     enableSorting: false,
   }),
-  ttft: traceCol.accessor((row) => row.ttft ?? 0, {
+  ttft: traceCol.accessor((row): unknown => row.ttft ?? 0, {
     id: "ttft",
     header: "TTFT",
     size: 80,
     minSize: 75,
     meta: num,
   }),
-  userId: traceCol.accessor((row) => row.userId ?? "", {
+  userId: traceCol.accessor((row): unknown => row.userId ?? "", {
     id: "userId",
     header: "User ID",
     size: 120,
     minSize: 100,
     enableSorting: false,
   }),
-  conversationId: traceCol.accessor((row) => row.conversationId ?? "", {
+  conversationId: traceCol.accessor((row): unknown => row.conversationId ?? "", {
     id: "conversationId",
     header: "Conversation ID",
     // "CONVERSATION ID" header is 15 chars — needs ~165px to render
@@ -253,7 +253,7 @@ const traceColumnDefs = {
     minSize: 165,
     enableSorting: false,
   }),
-  origin: traceCol.accessor("origin", {
+  origin: traceCol.accessor((row): unknown => row.origin, {
     id: "origin",
     header: "Origin",
     // Fits the longest expected label ("Application", 11 chars) +
@@ -262,21 +262,21 @@ const traceColumnDefs = {
     minSize: 120,
     enableSorting: false,
   }),
-  tokensIn: traceCol.accessor((row) => row.inputTokens ?? 0, {
+  tokensIn: traceCol.accessor((row): unknown => row.inputTokens ?? 0, {
     id: "tokensIn",
     header: "Tokens In",
     size: 105,
     minSize: 100,
     meta: num,
   }),
-  tokensOut: traceCol.accessor((row) => row.outputTokens ?? 0, {
+  tokensOut: traceCol.accessor((row): unknown => row.outputTokens ?? 0, {
     id: "tokensOut",
     header: "Tokens Out",
     size: 115,
     minSize: 110,
     meta: num,
   }),
-} satisfies Record<string, ColumnDef<TraceListItem, any>>;
+} satisfies Record<string, ColumnDef<TraceListItem, unknown>>;
 
 /**
  * Union of every id present in `traceColumnDefs`. Used to constrain the
@@ -285,8 +285,8 @@ const traceColumnDefs = {
  */
 export type TraceColumnId = keyof typeof traceColumnDefs;
 
-const conversationColumnDefs: Record<string, ColumnDef<ConversationGroup, any>> = {
-  conversation: convCol.accessor("conversationId", {
+const conversationColumnDefs: Record<string, ColumnDef<ConversationGroup, unknown>> = {
+  conversation: convCol.accessor((row): unknown => row.conversationId, {
     id: "conversation",
     header: "Conversation",
     size: 9999,
@@ -298,13 +298,13 @@ const conversationColumnDefs: Record<string, ColumnDef<ConversationGroup, any>> 
   // are now spelled out so users in the column picker recognise them,
   // which means widths need to actually fit the spelled-out header
   // plus the sort chevron + 16px Th padding (≈ chars * 7 + 28 + 12).
-  started: convCol.accessor("earliestTimestamp", {
+  started: convCol.accessor((row): unknown => row.earliestTimestamp, {
     id: "started",
     header: "Started",
     size: 110,
     minSize: 90,
   }),
-  lastTurn: convCol.accessor("latestTimestamp", {
+  lastTurn: convCol.accessor((row): unknown => row.latestTimestamp, {
     id: "lastTurn",
     header: "Last Activity",
     size: 115,
@@ -312,35 +312,35 @@ const conversationColumnDefs: Record<string, ColumnDef<ConversationGroup, any>> 
   }),
   // True per-session rollup, NOT the page-local `traces.length`: server
   // grouping counts every trace of the session in range.
-  turns: convCol.accessor("traceCount", {
+  turns: convCol.accessor((row): unknown => row.traceCount, {
     id: "turns",
     header: "Traces",
     size: 80,
     minSize: 72,
     meta: num,
   }),
-  duration: convCol.accessor("totalDuration", {
+  duration: convCol.accessor((row): unknown => row.totalDuration, {
     id: "duration",
     header: "Duration",
     size: 100,
     minSize: 90,
     meta: num,
   }),
-  cost: convCol.accessor("totalCost", {
+  cost: convCol.accessor((row): unknown => row.totalCost, {
     id: "cost",
     header: "Cost",
     size: 80,
     minSize: 70,
     meta: num,
   }),
-  tokens: convCol.accessor("totalTokens", {
+  tokens: convCol.accessor((row): unknown => row.totalTokens, {
     id: "tokens",
     header: "Tokens",
     size: 95,
     minSize: 85,
     meta: num,
   }),
-  contextSize: convCol.accessor((row) => row.contextSizeTokens ?? 0, {
+  contextSize: convCol.accessor((row): unknown => row.contextSizeTokens ?? 0, {
     id: "contextSize",
     header: "Context Size",
     size: 110,
@@ -350,7 +350,7 @@ const conversationColumnDefs: Record<string, ColumnDef<ConversationGroup, any>> 
   }),
   // Pre-folded coding-agent counters, only populated when the session's
   // conversation id matches a coding-agent session row.
-  modelCalls: convCol.accessor((row) => row.modelCalls ?? 0, {
+  modelCalls: convCol.accessor((row): unknown => row.modelCalls ?? 0, {
     id: "modelCalls",
     header: "Model Calls",
     size: 105,
@@ -358,7 +358,7 @@ const conversationColumnDefs: Record<string, ColumnDef<ConversationGroup, any>> 
     meta: num,
     enableSorting: false,
   }),
-  compactions: convCol.accessor((row) => row.compactions ?? 0, {
+  compactions: convCol.accessor((row): unknown => row.compactions ?? 0, {
     id: "compactions",
     header: "Compactions",
     size: 110,
@@ -369,7 +369,7 @@ const conversationColumnDefs: Record<string, ColumnDef<ConversationGroup, any>> 
   // Where the session ran and what it produced. The session rollup does not
   // order by either, so neither offers a sort.
   repository: convCol.accessor(
-    (row) =>
+    (row): unknown =>
       row.repositoryOwner && row.repositoryName
         ? `${row.repositoryOwner}/${row.repositoryName}`
         : "",
@@ -384,26 +384,26 @@ const conversationColumnDefs: Record<string, ColumnDef<ConversationGroup, any>> 
   // `null` when the session has no mapped pull request, never `0`: zero is a
   // number a reader would take for a pull request. The cell renders the
   // missing case as a dash.
-  pullRequest: convCol.accessor((row) => row.pullRequest?.number ?? null, {
+  pullRequest: convCol.accessor((row): unknown => row.pullRequest?.number ?? null, {
     id: "pullRequest",
     header: "Pull Request",
     size: 115,
     minSize: 105,
     enableSorting: false,
   }),
-  model: convCol.accessor("primaryModel", {
+  model: convCol.accessor((row): unknown => row.primaryModel, {
     id: "model",
     header: "Model",
     size: 120,
     minSize: 100,
   }),
-  service: convCol.accessor("serviceName", {
+  service: convCol.accessor((row): unknown => row.serviceName, {
     id: "service",
     header: "Service",
     size: 160,
     minSize: 110,
   }),
-  status: convCol.accessor("worstStatus", {
+  status: convCol.accessor((row): unknown => row.worstStatus, {
     id: "status",
     header: "Status",
     size: 85,
@@ -419,9 +419,9 @@ const GROUP_BY_LABEL: Record<"service" | "model" | "user", string> = {
 
 function buildGroupColumnDefs(
   groupBy: "service" | "model" | "user",
-): Record<string, ColumnDef<TraceGroup, any>> {
+): Record<string, ColumnDef<TraceGroup, unknown>> {
   return {
-    group: groupCol.accessor("label", {
+    group: groupCol.accessor((row): unknown => row.label, {
       id: "group",
       header: GROUP_BY_LABEL[groupBy],
       size: 9999,
@@ -431,35 +431,35 @@ function buildGroupColumnDefs(
     // Each header below fits the longest body content; widths are
     // header-driven (the numeric body — "12.4K", "$3.42" — is shorter
     // than the column name in every case).
-    count: groupCol.accessor((row) => row.traces.length, {
+    count: groupCol.accessor((row): unknown => row.traces.length, {
       id: "count",
       header: "Traces",
       size: 90,
       minSize: 80,
       meta: num,
     }),
-    duration: groupCol.accessor("avgDuration", {
+    duration: groupCol.accessor((row): unknown => row.avgDuration, {
       id: "duration",
       header: "Avg duration",
       size: 130,
       minSize: 115,
       meta: num,
     }),
-    cost: groupCol.accessor("totalCost", {
+    cost: groupCol.accessor((row): unknown => row.totalCost, {
       id: "cost",
       header: "Total cost",
       size: 110,
       minSize: 100,
       meta: num,
     }),
-    tokens: groupCol.accessor("totalTokens", {
+    tokens: groupCol.accessor((row): unknown => row.totalTokens, {
       id: "tokens",
       header: "Total tokens",
       size: 130,
       minSize: 120,
       meta: num,
     }),
-    errors: groupCol.accessor("errorCount", {
+    errors: groupCol.accessor((row): unknown => row.errorCount, {
       id: "errors",
       header: "Errors",
       size: 85,
@@ -469,18 +469,16 @@ function buildGroupColumnDefs(
   };
 }
 
-// Cast at the index site: column ids fed in here are user-controlled
-// (lens config, URL fragment) so we treat them as `string` and accept that
-// some values may not be a known column.
-const traceColumnDefsByString = traceColumnDefs as Record<
-  string,
-  ColumnDef<TraceListItem, any> | undefined
->;
+// Column ids fed in here are user-controlled (lens config, URL fragment), so they are
+// looked up as `string` and some may name no known column.
+const traceColumnDefsByString: Readonly<
+  Record<string, ColumnDef<TraceListItem, unknown> | undefined>
+> = traceColumnDefs;
 
-export function buildTraceColumns(ids: string[]): ColumnDef<TraceListItem, any>[] {
+export function buildTraceColumns(ids: string[]): ColumnDef<TraceListItem, unknown>[] {
   return ids
     .map((id) => traceColumnDefsByString[id])
-    .filter((def): def is ColumnDef<TraceListItem, any> => Boolean(def));
+    .filter((def): def is ColumnDef<TraceListItem, unknown> => Boolean(def));
 }
 
 /**
@@ -492,18 +490,20 @@ export function getTraceColumnDef(id: string): ColumnDef<TraceListItem, unknown>
   return traceColumnDefsByString[id];
 }
 
-export function buildConversationColumns(ids: string[]): ColumnDef<ConversationGroup, any>[] {
+export function buildConversationColumns(ids: string[]): ColumnDef<ConversationGroup, unknown>[] {
   return ids
     .map((id) => conversationColumnDefs[id])
-    .filter((def): def is ColumnDef<ConversationGroup, any> => Boolean(def));
+    .filter((def): def is ColumnDef<ConversationGroup, unknown> => Boolean(def));
 }
 
 export function buildGroupColumns(
   ids: string[],
   groupBy: "service" | "model" | "user",
-): ColumnDef<TraceGroup, any>[] {
+): ColumnDef<TraceGroup, unknown>[] {
   const defs = buildGroupColumnDefs(groupBy);
-  return ids.map((id) => defs[id]).filter((def): def is ColumnDef<TraceGroup, any> => Boolean(def));
+  return ids
+    .map((id) => defs[id])
+    .filter((def): def is ColumnDef<TraceGroup, unknown> => Boolean(def));
 }
 
 export const allTraceColumnIds = Object.keys(traceColumnDefs);

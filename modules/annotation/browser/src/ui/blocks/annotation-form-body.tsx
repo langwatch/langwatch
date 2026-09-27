@@ -1,7 +1,7 @@
 import { Button, HStack, Icon, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
+import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import { Crosshair, RotateCcw, Trash2 } from "lucide-react";
 
-import type { AnnotationFormState } from "../../model/annotation-form-types.ts";
 import { DiffCounts, DiffPanel, useOutputDiff } from "./annotation-output-diff.tsx";
 import { ScoreFields } from "./annotation-score-fields.tsx";
 

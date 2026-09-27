@@ -37,7 +37,6 @@ const StatefulEditor: React.FC<{
         setText(next);
         onSubmitted?.(next);
       }}
-      autoFocus
       onHasContentChange={() => undefined}
     />
   );
@@ -54,6 +53,8 @@ function renderEditor() {
       />
     </ChakraProvider>,
   );
+  // Focused as a reader would reach it, so a keystroke lands in the editor.
+  getEditor().focus();
   return { ...utils, applied, submitted };
 }
 
@@ -1190,7 +1191,6 @@ describe("SearchBar in real Chromium", () => {
             queryText={text}
             applyQueryText={setText}
             submitQueryText={setText}
-            autoFocus
             onHasContentChange={() => undefined}
           />
         );
@@ -1235,7 +1235,6 @@ describe("SearchBar in real Chromium", () => {
             queryText={text}
             applyQueryText={setText}
             submitQueryText={setText}
-            autoFocus
             onHasContentChange={() => undefined}
           />
         );

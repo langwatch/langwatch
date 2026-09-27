@@ -1,6 +1,14 @@
 import { formatDuration } from "@langwatch/trace-browser-kit";
 
-import type { BuiltTree, FlameNode, SpanContext, TraceFlameSpan, Viewport } from "./types.ts";
+import { ZOOM_FIT_PADDING } from "../../model/flame/constants.ts";
+import type {
+  BuiltTree,
+  FlameNode,
+  FlameRelatedSpanIds,
+  SpanContext,
+  TraceFlameSpan,
+  Viewport,
+} from "./types.ts";
 
 export function buildTree(spans: TraceFlameSpan[]): BuiltTree {
   const spanById = new Map<string, TraceFlameSpan>();
@@ -94,4 +102,116 @@ export function generateTicks(
     ticks.push({ time: t, label: formatDuration(t - fullStartMs) });
   }
   return ticks;
+}
+
+/** The time the spans cover, first start to last end. */
+export function fullRangeOf(spans: TraceFlameSpan[]): Viewport {
+  if (spans.length === 0) return { startMs: 0, endMs: 0 };
+  return spans.reduce<Viewport>(
+    (range, s) => ({
+      startMs: Math.min(range.startMs, s.startTimeMs),
+      endMs: Math.max(range.endMs, s.endTimeMs),
+    }),
+    { startMs: Infinity, endMs: -Infinity },
+  );
+}
+
+/** The viewport that fits one span with padding either side. */
+export function fitViewport(node: FlameNode): Viewport {
+  const pad = Math.max((node.span.endTimeMs - node.span.startTimeMs) * ZOOM_FIT_PADDING, 0);
+  return { startMs: node.span.startTimeMs - pad, endMs: node.span.endTimeMs + pad };
+}
+
+/**
+ * Where the viewport goes to bring a span that fell wholly outside it back into
+ * view: centred at the same zoom when the span is small, fitted otherwise.
+ */
+export function followViewport({
+  node,
+  viewport,
+}: {
+  node: FlameNode;
+  viewport: Viewport;
+}): Viewport | undefined {
+  const { startTimeMs, endTimeMs } = node.span;
+  if (endTimeMs >= viewport.startMs && startTimeMs <= viewport.endMs) return undefined;
+  const viewportDur = viewport.endMs - viewport.startMs;
+  if (endTimeMs - startTimeMs >= viewportDur * 0.5) return fitViewport(node);
+  const center = (startTimeMs + endTimeMs) / 2;
+  return { startMs: center - viewportDur / 2, endMs: center + viewportDur / 2 };
+}
+
+/** A node and its ancestors, root first. */
+export function ancestorChain(node: FlameNode | undefined): FlameNode[] {
+  const chain: FlameNode[] = [];
+  for (let curr: FlameNode | null = node ?? null; curr; curr = curr.parent) chain.unshift(curr);
+  return chain;
+}
+
+function descendantIdsOf(node: FlameNode): string[] {
+  return node.children.flatMap((child) => [child.span.spanId, ...descendantIdsOf(child)]);
+}
+
+/** The ancestors and descendants of a span, which drive the relationship highlights. */
+export function relatedSpanIdsOf(node: FlameNode): FlameRelatedSpanIds {
+  return {
+    ancestors: new Set(ancestorChain(node.parent ?? undefined).map((n) => n.span.spanId)),
+    descendants: new Set(descendantIdsOf(node)),
+    parent: node.parent,
+    children: new Set(node.children.map((child) => child.span.spanId)),
+  };
+}
+
+/** The nodes a viewport shows, or all of them when it has no width. */
+export function nodesInViewport({
+  nodes,
+  viewport,
+}: {
+  nodes: FlameNode[];
+  viewport: Viewport;
+}): FlameNode[] {
+  if (viewport.endMs - viewport.startMs <= 0) return nodes;
+  return nodes.filter(
+    (n) => n.span.endTimeMs >= viewport.startMs && n.span.startTimeMs <= viewport.endMs,
+  );
+}
+
+/** Nodes grouped by depth, so each virtual row reads only its own. */
+export function groupByDepth(nodes: FlameNode[]): Map<number, FlameNode[]> {
+  const map = new Map<number, FlameNode[]>();
+  for (const node of nodes) {
+    const row = map.get(node.depth);
+    if (row) row.push(node);
+    else map.set(node.depth, [node]);
+  }
+  return map;
+}
+
+/** How many visible spans are too narrow to draw, counted only once the view is crowded. */
+export function hiddenSpanCountOf({
+  nodes,
+  durationMs,
+}: {
+  nodes: FlameNode[];
+  durationMs: number;
+}): number {
+  if (nodes.length <= 200) return 0;
+  return nodes.filter(
+    (node) => ((node.span.endTimeMs - node.span.startTimeMs) / durationMs) * 100 < 0.1,
+  ).length;
+}
+
+/**
+ * Whether a click landed on the flame area's empty space: the area itself or
+ * its absolute layer. A span's own click stops propagation before this.
+ */
+export function isEmptyFlameClick({
+  target,
+  currentTarget,
+}: {
+  target: EventTarget;
+  currentTarget: EventTarget;
+}): boolean {
+  if (target === currentTarget) return true;
+  return target instanceof HTMLElement && target.dataset.flameLayer === "true";
 }

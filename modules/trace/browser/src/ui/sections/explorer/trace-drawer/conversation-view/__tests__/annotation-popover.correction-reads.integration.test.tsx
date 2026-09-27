@@ -4,6 +4,12 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import {
+  uiDeclarations,
+  type UiAnnotationFormFooterProps,
+  type UiDeclarations,
+  type UiSuggestBodyProps,
+} from "@langwatch/browser-host/declarations";
 import { cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -18,6 +24,15 @@ const mocks = vi.hoisted(() => ({
   invalidateAnnotationFeed: vi.fn(),
   invalidateOverlay: vi.fn(),
   existingAnnotations: [] as unknown[],
+}));
+
+const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => ({
+  current: undefined,
+}));
+
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useUiDeclarations: () => declarations.current,
 }));
 
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
@@ -62,6 +77,34 @@ const { useAnnotationMutations } = await import("../use-annotation-form.ts");
 
 const TRACE = "trace-1";
 
+/** Annotation's form controls as it lends them: save in the footer, delete in the body. */
+const annotationLends = uiDeclarations([
+  {
+    name: "annotation",
+    installation: {
+      capabilities: {
+        suggestBody: {
+          load: async () => ({
+            default: ({ state }: UiSuggestBodyProps) =>
+              state.isEdit && state.hasExisting ? (
+                <button type="button" aria-label="Delete annotation" onClick={state.handleDelete} />
+              ) : null,
+          }),
+        },
+        annotationFormFooter: {
+          load: async () => ({
+            default: ({ state }: UiAnnotationFormFooterProps) => (
+              <button type="button" onClick={state.handleSave} disabled={state.isSaveBlocked}>
+                {state.isEdit ? "Update" : "Save"}
+              </button>
+            ),
+          }),
+        },
+      },
+    },
+  },
+]);
+
 function renderSuggest({ annotationId }: { annotationId?: string } = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -103,6 +146,7 @@ async function submitAndSucceed({
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.existingAnnotations = [];
+  declarations.current = annotationLends;
 });
 
 afterEach(cleanup);

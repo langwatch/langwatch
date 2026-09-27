@@ -70,11 +70,27 @@ export const annotationWeb = defineWebModule("annotation")
       load: () => import("./ui/sections/annotation-scores-screen.tsx"),
     },
   })
-  /** What another module may mount. Today the trace explorer mounts all three. */
+  /** What another module may mount. Today the trace explorer mounts both. */
   .publishSurfaces({
     "annotation-chips": { load: () => import("./annotation-chips.ts") },
-    "annotation-form": { load: () => import("./annotation-form.ts") },
     "annotation-scores": { load: () => import("./annotation-scores.ts") },
+  })
+  /** The annotation form's pieces, lent to the trace explorer (§3.4 rule 7). */
+  .withCapabilities({
+    annotateBody: {
+      load: async () => ({ default: (await import("./annotation-form.ts")).AnnotateBody }),
+    },
+    suggestBody: {
+      load: async () => ({ default: (await import("./annotation-form.ts")).SuggestBody }),
+    },
+    annotationFormFooter: {
+      load: async () => ({ default: (await import("./annotation-form.ts")).FormFooter }),
+    },
+    annotationScoreEditor: {
+      load: async () => ({
+        default: (await import("./annotation-form.ts")).AnnotationScoreEditor,
+      }),
+    },
   })
   /**
    * The deployment mode decides which documentation host an annotation screen

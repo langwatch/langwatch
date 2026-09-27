@@ -1,9 +1,9 @@
 import { Input, Textarea } from "@chakra-ui/react";
-import { AnnotationScoreEditor } from "@langwatch/annotation-browser/annotation-form";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { AnnotationScoreEditor } from "../../../behavior/lent-annotation-form.tsx";
 import { api } from "../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { AnnotationScoreDataType } from "../../../model/prisma-types.ts";

@@ -21,7 +21,6 @@ function renderEditor(queryText: string) {
         queryText={queryText}
         applyQueryText={applyQueryText}
         submitQueryText={submitQueryText}
-        autoFocus={false}
         onHasContentChange={() => {
           /* no-op */
         }}
@@ -124,7 +123,6 @@ describe("ActiveSearchEditor applied query", () => {
           queryText={text}
           applyQueryText={vi.fn()}
           submitQueryText={submitQueryText}
-          autoFocus={false}
           onHasContentChange={() => {
             /* no-op */
           }}

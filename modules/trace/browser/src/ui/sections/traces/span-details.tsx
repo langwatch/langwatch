@@ -9,7 +9,12 @@ import {
   type PromptLookupSpan,
 } from "@langwatch/prompt-contract";
 import { Temporal, toDate } from "@langwatch/time";
-import type { ErrorCapture, EvaluationResult, Span } from "@langwatch/trace-contract";
+import {
+  type ErrorCapture,
+  type EvaluationResult,
+  evaluationResultSchema,
+  type Span,
+} from "@langwatch/trace-contract";
 import numeral from "numeral";
 import { useMemo } from "react";
 import { ChevronDown, Clock, Play, Settings } from "react-feather";
@@ -367,18 +372,15 @@ export const getEvaluationResult = (span: Span): EvaluationResult | undefined =>
     return undefined;
   }
 
-  if (span.output.type === "evaluation_result") {
-    try {
-      if (typeof span.output.value === "string") {
-        return JSON.parse(span.output.value);
-      }
-
-      return span.output.value;
-    } catch {
-      return undefined;
-    }
+  if (span.output.type !== "evaluation_result") return undefined;
+  const { value } = span.output;
+  try {
+    const raw: unknown = typeof value === "string" ? JSON.parse(value) : value;
+    const parsed = evaluationResultSchema.safeParse(raw);
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
   }
-  return undefined;
 };
 
 function evaluationBadgeColor({

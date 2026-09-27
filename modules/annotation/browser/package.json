@@ -14,11 +14,6 @@
       "langwatch-declaration-source": "./src/annotation.web.ts",
       "types": "./dist/annotation.web.d.ts",
       "default": "./src/annotation.web.ts"
-    },
-    "./annotation-form": {
-      "langwatch-declaration-source": "./src/annotation-form.ts",
-      "types": "./dist/annotation-form.d.ts",
-      "default": "./src/annotation-form.ts"
     }
   },
   "scripts": {

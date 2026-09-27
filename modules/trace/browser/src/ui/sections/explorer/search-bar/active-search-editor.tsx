@@ -12,8 +12,6 @@ interface ActiveSearchEditorProps {
   applyQueryText: (text: string) => void;
   /** Enter with no highlighted suggestion; the only path for typed text. */
   submitQueryText: (text: string) => void;
-  /** Focus the editor as soon as it mounts. */
-  autoFocus: boolean;
   /** Bubble up `hasContent` so the parent can swap the Clear/Kbd affordance. */
   onHasContentChange: (hasContent: boolean) => void;
   /** Synchronous resolver for dynamic value suggestions (model, service, …). */
@@ -61,7 +59,6 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   queryText,
   applyQueryText,
   submitQueryText,
-  autoFocus,
   onHasContentChange,
   valueResolver,
   onTokenClick,
@@ -83,13 +80,6 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
     });
 
   useGlobalSlashFocus(editor);
-
-  const focusedRef = useRef(false);
-  useEffect(() => {
-    if (!autoFocus || !editor || focusedRef.current) return;
-    editor.commands.focus();
-    focusedRef.current = true;
-  }, [autoFocus, editor]);
 
   // Bubble suggestion open state up — the parent uses it to hide the
   // inline AI-search hint while autocomplete is active. Mirrors the

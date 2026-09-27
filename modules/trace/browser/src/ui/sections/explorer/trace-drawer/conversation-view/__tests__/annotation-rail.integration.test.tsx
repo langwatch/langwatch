@@ -2,8 +2,13 @@
 // virtualizer unmount.
 // @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { AnnotationFormState } from "@langwatch/annotation-contract";
+import type {
+  UiAnnotateBodyProps,
+  UiAnnotationFormFooterProps,
+  UiSuggestBodyProps,
+} from "@langwatch/browser-host/declarations";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -84,6 +89,72 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
     },
   },
 }));
+
+/** Annotation's lent form, which its own tests cover, stood in by controls that read the state. */
+vi.mock("../../../../../../behavior/lent-annotation-form.tsx", () => {
+  function CommentAndScores({ state }: { state: AnnotationFormState }) {
+    const scores = state.scores.data ?? [];
+    return (
+      <>
+        {state.anchorLabel && (
+          <span data-testid="annotation-composer-anchor">{state.anchorLabel}</span>
+        )}
+        {state.isEdit && state.hasExisting && (
+          <button type="button" aria-label="Delete annotation" onClick={state.handleDelete} />
+        )}
+        <textarea
+          placeholder="Optional"
+          value={state.comment}
+          onChange={(e) => state.setComment(e.target.value)}
+        />
+        {scores.length > 0 && <span>Scores</span>}
+        {scores.map((score) => (
+          <div key={score.id}>
+            <span>{score.name}</span>
+            <button
+              type="button"
+              onClick={() =>
+                state.setScoreOptions((previous) => ({
+                  ...previous,
+                  [score.id]: { value: "good", reason: "" },
+                }))
+              }
+            >
+              {`Rate ${score.name} Good`}
+            </button>
+          </div>
+        ))}
+      </>
+    );
+  }
+  return {
+    AnnotateBody: ({ state }: UiAnnotateBodyProps) => <CommentAndScores state={state} />,
+    SuggestBody: ({ state, originalOutput }: UiSuggestBodyProps) => (
+      <>
+        <span>{state.suggestTarget === "input" ? "Suggested input" : "Expected output"}</span>
+        <textarea
+          placeholder={`What should the ${state.suggestTarget} have been?`}
+          value={state.expectedOutput}
+          onChange={(e) => state.setExpectedOutput(e.target.value)}
+        />
+        <button type="button" onClick={() => state.setExpectedOutput(originalOutput)}>
+          Reset
+        </button>
+        <CommentAndScores state={state} />
+      </>
+    ),
+    FormFooter: ({ state }: UiAnnotationFormFooterProps) => (
+      <>
+        <button type="button" onClick={state.onCancel}>
+          Cancel
+        </button>
+        <button type="button" onClick={state.handleSave} disabled={state.isSaveBlocked}>
+          {state.isEdit ? "Update" : "Save"}
+        </button>
+      </>
+    ),
+  };
+});
 
 /**
  * The turn itself is covered by its own tests; here it only has to be
@@ -703,9 +774,7 @@ describe("given the project has active annotation score keys", () => {
       renderRow();
 
       fireEvent.click(rail());
-      await userEvent.click(screen.getByRole("button", { name: /Helpfulness/ }));
-      await userEvent.click(await screen.findByRole("radio", { name: "Good" }));
-      await userEvent.click(screen.getByRole("button", { name: "OK" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Rate Helpfulness Good" }));
       fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
       expect(mocks.create).toHaveBeenCalledWith(

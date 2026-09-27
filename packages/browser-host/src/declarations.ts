@@ -4,6 +4,7 @@
  * to its screens. ARCHITECTURE.md §10.1, "A capability travels by declaration".
  */
 
+import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import type { TimeInput } from "@langwatch/time";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
@@ -322,9 +323,43 @@ export type UiResourceLimitRowProps = { current: number; max?: number } & (
  * Each capability a peer reads by name, and the shape a declaration must have
  * to fill it: the CORE side of the contract, as `UiSlotProps` is for slots.
  */
+/** Annotation's form body in annotate mode, lent to the trace explorer. */
+export type UiAnnotateBodyProps = { state: AnnotationFormState };
+
+/** Annotation's form body in suggest mode, diffed against the output it corrects. */
+export type UiSuggestBodyProps = { state: AnnotationFormState; originalOutput: string };
+
+/** Annotation's form footer: save, delete and cancel over the same state. */
+export type UiAnnotationFormFooterProps = { state: AnnotationFormState; padding: number };
+
+/** Annotation's controlled score-metric editor; the host owns the form and its errors. */
+export type UiAnnotationScoreEditorProps = {
+  formError: ReactNode;
+  nameField: ReactNode;
+  nameError?: ReactNode;
+  descriptionField: ReactNode;
+  descriptionError?: ReactNode;
+  dataType: string;
+  dataTypeError?: ReactNode;
+  onDataTypeChange: (value: string) => void;
+  options: string[];
+  onOptionChange: (index: number, value: string) => void;
+  onOptionRemove: (index: number) => void;
+  onOptionAdd: () => void;
+  defaultRadioOption: string;
+  onDefaultRadioOptionChange: (value: string) => void;
+  defaultCheckboxOptions: string[];
+  onDefaultCheckboxOptionsChange: (value: string[]) => void;
+  isSaving: boolean;
+  submitLabel: string;
+};
+
 export type UiDeclaredCapabilities = {
   addOrEditDatasetDrawer: UiDeclaredComponent<UiAddOrEditDatasetDrawerProps>;
+  annotateBody: UiDeclaredComponent<UiAnnotateBodyProps>;
+  annotationFormFooter: UiDeclaredComponent<UiAnnotationFormFooterProps>;
   annotationQueueConversation: UiDeclaredComponent<UiAnnotationQueueConversationProps>;
+  annotationScoreEditor: UiDeclaredComponent<UiAnnotationScoreEditorProps>;
   /** A card on the Authentication overview; `section` places it, sign-in first. */
   authenticationOverviewCard: UiDeclaredComponent<UiAuthenticationOverviewCardProps> & {
     readonly section?: "sign-in" | "provisioning";
@@ -346,6 +381,7 @@ export type UiDeclaredCapabilities = {
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;
+  suggestBody: UiDeclaredComponent<UiSuggestBodyProps>;
   talkToItPanel: UiDeclaredComponent<UiTalkToItPanelProps>;
   traceEditButton: UiDeclaredComponent<UiTraceEditButtonProps>;
   traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;

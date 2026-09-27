@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Icon, Text, Textarea, VStack } from "@chakra-ui/react";
+import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import { Checkbox, CheckboxGroup } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
@@ -6,11 +7,7 @@ import { MessageSquareText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
-import type {
-  AnnotationFormState,
-  AnnotationScoreOption,
-  ScoreChipProps,
-} from "../../model/annotation-form-types.ts";
+import type { AnnotationScoreOption, ScoreChipProps } from "../../model/annotation-form-types.ts";
 
 const scoreOptionSchema = z.object({
   label: z.string(),

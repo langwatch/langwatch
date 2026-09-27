@@ -51,8 +51,8 @@ import {
   statusBackgroundColor,
   statusBorderColor,
 } from "./search-bar-indicators.tsx";
-import { searchSubmitProgress } from "./search-submit-progress.ts";
 import { SearchFallbackNotice } from "./search-fallback-notice.tsx";
+import { searchSubmitProgress } from "./search-submit-progress.ts";
 import { SearchedAsNotice } from "./searched-as-notice.tsx";
 import { SyntaxHelpDrawerHost } from "./syntax-help-drawer.tsx";
 import { TokenValuePicker, type TokenValuePickerAnchor } from "./token-value-picker.tsx";
@@ -732,90 +732,89 @@ function StructuredSearchBar({
 }) {
   return (
     <>
-        <Flex
-          align="center"
-          width="full"
-          gap={2}
-          paddingX={3}
-          paddingY={1.5}
-          borderBottomWidth={status.kind === "error" ? "0" : "1px"}
-          borderColor={statusBorderColor(status)}
-          minHeight="38px"
-          bg={statusBackgroundColor(status)}
-          transition="background 120ms ease, border-color 120ms ease"
-          position="relative"
-          zIndex={1}
-        >
-          <AskAiButton
-            label={askLabel}
-            ariaLabel={langyRoutesAsk ? "Ask Langy" : undefined}
-            tooltip={langyRoutesAsk ? "Ask Langy about these traces" : undefined}
-            onClick={langyRoutesAsk ? onOpenLangyAsk : onStartAiMode}
-            needsProviderPrimer={askAiNeedsProviderPrimer}
-            disabledReason={askAiSampleDisabledReason}
-          />
-          {/* The standalone search glyph is only an at-rest hint — the
+      <Flex
+        align="center"
+        width="full"
+        gap={2}
+        paddingX={3}
+        paddingY={1.5}
+        borderBottomWidth={status.kind === "error" ? "0" : "1px"}
+        borderColor={statusBorderColor(status)}
+        minHeight="38px"
+        bg={statusBackgroundColor(status)}
+        transition="background 120ms ease, border-color 120ms ease"
+        position="relative"
+        zIndex={1}
+      >
+        <AskAiButton
+          label={askLabel}
+          ariaLabel={langyRoutesAsk ? "Ask Langy" : undefined}
+          tooltip={langyRoutesAsk ? "Ask Langy about these traces" : undefined}
+          onClick={langyRoutesAsk ? onOpenLangyAsk : onStartAiMode}
+          needsProviderPrimer={askAiNeedsProviderPrimer}
+          disabledReason={askAiSampleDisabledReason}
+        />
+        {/* The standalone search glyph is only an at-rest hint — the
             placeholder already
             says what the field is. Once focused or non-empty it reads as
             clutter wedged between the ask button and the text, so it drops
             out and the editor sits directly beside the ask button. */}
-          {!editorFocused && !hasContent && (
-            <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
-              <Search />
-            </Icon>
+        {!editorFocused && !hasContent && (
+          <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
+            <Search />
+          </Icon>
+        )}
+
+        <Box
+          flex={1}
+          minWidth={0}
+          position="relative"
+          css={editorStyles}
+          data-instant-eval-busy={instantEvalBusy ? "" : undefined}
+        >
+          {editorMounted ? (
+            <ActiveSearchEditor
+              queryText={queryText}
+              applyQueryText={applyQueryText}
+              submitQueryText={submitQueryText}
+              clearNonce={clearNonce}
+
+              onHasContentChange={setEditorHasContent}
+              valueResolver={valueResolver}
+              onTokenClick={setTokenAnchor}
+              onAiShortcut={handleEditorAiShortcut}
+              onSuggestionOpenChange={setSuggestionOpen}
+              onCursorAnchorChange={setCursorAnchorX}
+              onFocusChange={setEditorFocused}
+            />
+          ) : (
+            <PlaceholderEditor
+              queryText={queryText}
+              onActivate={requestEditor}
+              onApplyQueryText={applyQueryText}
+              onTokenClick={setTokenAnchor}
+            />
           )}
+          {hasContent && editorFocused && !suggestionOpen && !askAiNeedsProviderPrimer && (
+            <SearchSubmitHint anchorX={cursorAnchorX} />
+          )}
+        </Box>
 
-          <Box
-            flex={1}
-            minWidth={0}
-            position="relative"
-            css={editorStyles}
-            data-instant-eval-busy={instantEvalBusy ? "" : undefined}
-          >
-            {editorMounted ? (
-              <ActiveSearchEditor
-                queryText={queryText}
-                applyQueryText={applyQueryText}
-                submitQueryText={submitQueryText}
-                autoFocus={false}
-                clearNonce={clearNonce}
-
-                onHasContentChange={setEditorHasContent}
-                valueResolver={valueResolver}
-                onTokenClick={setTokenAnchor}
-                onAiShortcut={handleEditorAiShortcut}
-                onSuggestionOpenChange={setSuggestionOpen}
-                onCursorAnchorChange={setCursorAnchorX}
-                onFocusChange={setEditorFocused}
-              />
-            ) : (
-              <PlaceholderEditor
-                queryText={queryText}
-                onActivate={requestEditor}
-                onApplyQueryText={applyQueryText}
-                onTokenClick={setTokenAnchor}
-              />
-            )}
-            {hasContent && editorFocused && !suggestionOpen && !askAiNeedsProviderPrimer && (
-              <SearchSubmitHint anchorX={cursorAnchorX} />
-            )}
-          </Box>
-
-          {/* Only render the badge for non-error statuses — parse errors
+        {/* Only render the badge for non-error statuses — parse errors
             get the full inline banner below, which is far more visible
             and positioned right under the input where the user is
             looking. Showing the badge *and* the banner would be
             redundant and noisy. */}
-          {status.kind !== "error" && <StatusBadge status={status} />}
-          {submitProgress && (
-            <HStack gap={1.5} flexShrink={0} color="fg.subtle" as="output">
-              <Spinner size="xs" />
-              <Text textStyle="xs">{submitProgress}</Text>
-            </HStack>
-          )}
-          {hasContent ? <ClearButton onClear={handleClear} /> : <Kbd>{"/"}</Kbd>}
-          <TokenValuePicker anchor={tokenAnchor} onClose={() => setTokenAnchor(null)} />
-        </Flex>
+        {status.kind !== "error" && <StatusBadge status={status} />}
+        {submitProgress && (
+          <HStack gap={1.5} flexShrink={0} color="fg.subtle" as="output">
+            <Spinner size="xs" />
+            <Text textStyle="xs">{submitProgress}</Text>
+          </HStack>
+        )}
+        {hasContent ? <ClearButton onClear={handleClear} /> : <Kbd>{"/"}</Kbd>}
+        <TokenValuePicker anchor={tokenAnchor} onClose={() => setTokenAnchor(null)} />
+      </Flex>
       <SearchedAsNotice />
       <SearchFallbackNotice />
       {/* Unified error banner — handles both parse errors and AI errors.
