@@ -222,13 +222,15 @@ const betterAuthCatchAll = async (c: Context) => {
   // applied to the two shapes an answer takes.
   // See `better-auth/signin-error-redirect.ts`.
   const traceId = c.get("traceId") as string | undefined;
-  return withholdInternalSignInError({
-    response: redirectFailedSignInCallback({
+  // The two act on different statuses (a 3xx to the error page, a 5xx on a
+  // callback), so each answer passes through at most one of them.
+  return redirectFailedSignInCallback({
+    response: withholdInternalSignInError({
       response: answered,
-      path: c.req.path,
       errorPageUrl: SIGN_IN_ERROR_PAGE_URL,
       traceId,
     }),
+    path: c.req.path,
     errorPageUrl: SIGN_IN_ERROR_PAGE_URL,
     traceId,
   });
