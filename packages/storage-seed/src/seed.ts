@@ -15,7 +15,7 @@ import {
   resolveSeedLicense,
 } from "@langwatch/enterprise-licensing-process/seeding";
 import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-process/testing";
-import { modelProviders } from "@langwatch/model-provider-contract";
+import { getSchemaShape, modelProviders } from "@langwatch/model-provider-contract";
 import { runScript, writeScriptWarning } from "@langwatch/observability";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -483,14 +483,100 @@ function loadSeedEnv(): Record<string, string> {
   return merged;
 }
 
-// schemaKeyNames lists a provider's credential variable names from its zod
-// keysSchema, unwrapping ZodEffects (superRefine) to reach the object shape.
-function schemaKeyNames(schema: unknown): string[] {
-  let inner = schema as { _def?: { schema?: unknown }; shape?: object };
-  while (inner?._def?.schema) {
-    inner = inner._def.schema as typeof inner;
+type ModelProviderDefinition = (typeof modelProviders)[keyof typeof modelProviders];
+
+/** A provider's credential variables, falling back to its API-key and endpoint names. */
+function providerKeyNames(def: ModelProviderDefinition): (string | undefined)[] {
+  const keyNames = Object.keys(getSchemaShape(def.keysSchema));
+  const endpointKey = "endpointKey" in def ? def.endpointKey : void 0;
+  return keyNames.length > 0 ? keyNames : [def.apiKey, endpointKey];
+}
+
+/**
+ * Registry keys are all `.nullable().optional()`, so safeParse alone would seed an unusable
+ * provider: every non-optional key is required, and Azure needs either mode's endpoint.
+ */
+function missingProviderKeys({
+  provider,
+  def,
+  names,
+  keys,
+}: {
+  provider: string;
+  def: ModelProviderDefinition;
+  names: (string | undefined)[];
+  keys: Record<string, string>;
+}): string[] {
+  const optionalKeys = new Set<string>("optionalKeys" in def ? (def.optionalKeys ?? []) : []);
+  const missing = names.filter(
+    (name): name is string => Boolean(name) && !optionalKeys.has(name ?? "") && !keys[name ?? ""],
+  );
+  if (provider !== "azure") return missing;
+  const endpointNames = ["AZURE_OPENAI_ENDPOINT", "AZURE_API_GATEWAY_BASE_URL"];
+  const withoutEndpoints = missing.filter((name) => !endpointNames.includes(name));
+  return endpointNames.some((name) => keys[name])
+    ? withoutEndpoints
+    : [...withoutEndpoints, endpointNames.join(" or ")];
+}
+
+async function seedModelProviderFromEnv({
+  provider,
+  def,
+  envMap,
+  organizationId,
+  pepper,
+}: {
+  provider: string;
+  def: ModelProviderDefinition;
+  envMap: Record<string, string>;
+  organizationId: string;
+  pepper: string;
+}): Promise<void> {
+  const names = providerKeyNames(def);
+  const keys: Record<string, string> = {};
+  for (const name of names) {
+    if (name && envMap[name]) keys[name] = envMap[name];
   }
-  return inner?.shape ? Object.keys(inner.shape) : [];
+  const missing = missingProviderKeys({ provider, def, names, keys });
+  const parsed = def.keysSchema.safeParse(keys);
+  if (!parsed.success || missing.length > 0) {
+    const missingText = missing.length > 0 ? ` (missing ${missing.join(", ")})` : "";
+    console.log(
+      `⏭️  Model provider ${provider}: ${def.apiKey} is set but the key set is incomplete${missingText} — skipped`,
+    );
+    return;
+  }
+
+  const id = MODEL_PROVIDER_ID_PREFIX + provider;
+  const customKeys = encryptCredentials(JSON.stringify(keys), pepper);
+  const row = await prisma.modelProvider.upsert({
+    where: { id },
+    create: {
+      id,
+      name: def.name,
+      provider,
+      enabled: true,
+      customKeys,
+      organizationId,
+    },
+    update: { customKeys, enabled: true, disabledAt: null },
+  });
+  await prisma.modelProviderScope.upsert({
+    where: {
+      modelProviderId_scopeType_scopeId: {
+        modelProviderId: row.id,
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+      },
+    },
+    create: {
+      modelProviderId: row.id,
+      scopeType: "ORGANIZATION",
+      scopeId: organizationId,
+    },
+    update: {},
+  });
+  console.log(`✅ Model provider: ${provider} (keys from environment)`);
 }
 
 async function seedModelProvidersFromEnv(organizationId: string, pepper: string) {
@@ -504,70 +590,7 @@ async function seedModelProvidersFromEnv(organizationId: string, pepper: string)
     // "custom" has no inferable identity from the environment; skip it.
     if (provider === "custom") continue;
     if (!envMap[def.apiKey]) continue;
-
-    const keyNames = schemaKeyNames(def.keysSchema);
-    const endpointKey = "endpointKey" in def ? def.endpointKey : void 0;
-    const names = keyNames.length > 0 ? keyNames : [def.apiKey, endpointKey];
-    const keys: Record<string, string> = {};
-    for (const name of names) {
-      if (name && envMap[name]) keys[name] = envMap[name];
-    }
-    // The registry schemas mark every key `.nullable().optional()` (to allow
-    // env-var fallback in inbound payloads), so safeParse alone would happily
-    // seed an enabled-but-unusable provider (e.g. Bedrock with only the access
-    // key). Require every non-optional key; Azure needs its API key plus
-    // either mode's endpoint, not both.
-    const optionalKeys = new Set("optionalKeys" in def ? (def.optionalKeys ?? []) : []);
-    let missing = names.filter(
-      (name): name is string => Boolean(name) && !optionalKeys.has(name!) && !keys[name!],
-    );
-    if (provider === "azure") {
-      const endpointNames = ["AZURE_OPENAI_ENDPOINT", "AZURE_API_GATEWAY_BASE_URL"];
-      missing = missing.filter((name) => !endpointNames.includes(name));
-      if (!endpointNames.some((name) => keys[name])) {
-        missing.push(endpointNames.join(" or "));
-      }
-    }
-    const parsed = def.keysSchema.safeParse(keys);
-    if (!parsed.success || missing.length > 0) {
-      console.log(
-        `⏭️  Model provider ${provider}: ${def.apiKey} is set but the key set is incomplete${
-          missing.length > 0 ? ` (missing ${missing.join(", ")})` : ""
-        } — skipped`,
-      );
-      continue;
-    }
-
-    const id = MODEL_PROVIDER_ID_PREFIX + provider;
-    const customKeys = encryptCredentials(JSON.stringify(keys), pepper);
-    const row = await prisma.modelProvider.upsert({
-      where: { id },
-      create: {
-        id,
-        name: def.name,
-        provider,
-        enabled: true,
-        customKeys,
-        organizationId,
-      },
-      update: { customKeys, enabled: true, disabledAt: null },
-    });
-    await prisma.modelProviderScope.upsert({
-      where: {
-        modelProviderId_scopeType_scopeId: {
-          modelProviderId: row.id,
-          scopeType: "ORGANIZATION",
-          scopeId: organizationId,
-        },
-      },
-      create: {
-        modelProviderId: row.id,
-        scopeType: "ORGANIZATION",
-        scopeId: organizationId,
-      },
-      update: {},
-    });
-    console.log(`✅ Model provider: ${provider} (keys from environment)`);
+    await seedModelProviderFromEnv({ provider, def, envMap, organizationId, pepper });
   }
 }
 

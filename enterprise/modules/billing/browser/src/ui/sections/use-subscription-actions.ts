@@ -19,6 +19,64 @@ function memberTypeToRole(memberType: MemberType): "MEMBER" | "EXTERNAL" {
   return memberType === "FullMember" ? "MEMBER" : "EXTERNAL";
 }
 
+/** The planned users that carry an address, as checkout invites. */
+function plannedInvites(plannedUsers: PlannedUser[]) {
+  return plannedUsers
+    .filter((u) => u.email.trim() !== "")
+    .map((u) => ({
+      email: u.email.trim(),
+      role: memberTypeToRole(u.memberType),
+    }));
+}
+
+/** The seat-event plan a seat change bills on: the active one, else the one for this cut. */
+function seatChangePlan({
+  activePlanType,
+  currency,
+  billingPeriod,
+}: {
+  activePlanType?: string;
+  currency: Currency;
+  billingPeriod: BillingInterval;
+}) {
+  return activePlanType && isGrowthSeatEventPlan(activePlanType)
+    ? activePlanType
+    : resolveGrowthSeatPlanType({ currency, interval: billingPeriod });
+}
+
+/**
+ * Resolving is not succeeding: the non-seat pricing path answers `{ success: false }` when it
+ * has no subscription to change, and "Seats updated successfully" then told customers a seat
+ * count had moved when nothing had.
+ */
+function assertSeatChangeWentThrough(result: { success?: boolean } | undefined): void {
+  if (!result?.success) {
+    throw new Error("The seat update did not go through");
+  }
+}
+
+type BillingHost = ReturnType<typeof useBillingHost>;
+
+/** Runs a request that answers with a hosted page, then leaves for it; a failure is toasted. */
+async function leaveToAnsweredUrl({
+  host,
+  request,
+  fallbackTitle,
+}: {
+  host: BillingHost;
+  request: () => Promise<{ url?: string | null }>;
+  fallbackTitle: string;
+}): Promise<void> {
+  try {
+    const result = await request();
+    if (result.url) {
+      host.leaveTo(result.url);
+    }
+  } catch (error) {
+    host.failed({ error, fallbackTitle });
+  }
+}
+
 export function useSubscriptionActions({
   organizationId,
   currency,
@@ -50,48 +108,30 @@ export function useSubscriptionActions({
 
   const handleUpgrade = async () => {
     if (!organizationId) return;
+    const invites = plannedInvites(plannedUsers);
 
-    try {
-      // Separate invites (have email) from empty seats
-      const invitesWithEmail = plannedUsers
-        .filter((u) => u.email.trim() !== "")
-        .map((u) => ({
-          email: u.email.trim(),
-          role: memberTypeToRole(u.memberType),
-        }));
-
-      if (invitesWithEmail.length > 0) {
-        const result = await upgradeWithInvites.mutateAsync({
-          organizationId,
-          baseUrl: host.applicationOrigin(),
-          currency,
-          billingInterval: billingPeriod,
-          totalSeats: totalFullMembers,
-          invites: invitesWithEmail,
-        });
-
-        if (result.url) {
-          host.leaveTo(result.url);
-        }
-        return;
-      }
-
-      // Fallback to create mutation (no invites)
-      const result = await createSubscription.mutateAsync({
-        organizationId,
-        baseUrl: host.applicationOrigin(),
-        plan: resolveGrowthSeatPlanType({ currency, interval: billingPeriod }),
-        membersToAdd: totalFullMembers,
-        currency,
-        billingInterval: billingPeriod,
-      });
-
-      if (result.url) {
-        host.leaveTo(result.url);
-      }
-    } catch (error) {
-      host.failed({ error, fallbackTitle: "Couldn't upgrade your plan" });
-    }
+    await leaveToAnsweredUrl({
+      host,
+      fallbackTitle: "Couldn't upgrade your plan",
+      request: () =>
+        invites.length > 0
+          ? upgradeWithInvites.mutateAsync({
+              organizationId,
+              baseUrl: host.applicationOrigin(),
+              currency,
+              billingInterval: billingPeriod,
+              totalSeats: totalFullMembers,
+              invites,
+            })
+          : createSubscription.mutateAsync({
+              organizationId,
+              baseUrl: host.applicationOrigin(),
+              plan: resolveGrowthSeatPlanType({ currency, interval: billingPeriod }),
+              membersToAdd: totalFullMembers,
+              currency,
+              billingInterval: billingPeriod,
+            }),
+    });
   };
 
   const handleUpdateSeats = () => {
@@ -105,32 +145,16 @@ export function useSubscriptionActions({
       newSeats: updateTotalMembers,
       onConfirm: async (quotedAt) => {
         try {
-          const plan =
-            activePlanType && isGrowthSeatEventPlan(activePlanType)
-              ? activePlanType
-              : resolveGrowthSeatPlanType({
-                  currency,
-                  interval: billingPeriod,
-                });
-
           const result = await addTeamMemberOrEvents.mutateAsync({
             organizationId,
-            plan,
+            plan: seatChangePlan({ activePlanType, currency, billingPeriod }),
             upgradeMembers: true,
             upgradeTraces: false,
             totalMembers: updateTotalMembers,
             totalTraces: 0,
             quotedAt,
           });
-
-          // Resolving is not the same as succeeding: the non-seat pricing path
-          // still answers `{ success: false }` when it has no subscription to
-          // change, and reporting that as "Seats updated successfully" told
-          // customers a seat count had moved when nothing had.
-          if (!result?.success) {
-            throw new Error("The seat update did not go through");
-          }
-
+          assertSeatChangeWentThrough(result);
           onSeatsUpdated();
           host.succeeded({ title: "Seats updated successfully" });
           void organizationWithMembers.refetch();
@@ -144,18 +168,12 @@ export function useSubscriptionActions({
   const handleManageSubscription = async () => {
     if (!organizationId) return;
 
-    try {
-      const result = await manageSubscription.mutateAsync({
-        organizationId,
-        baseUrl: host.applicationOrigin(),
-      });
-
-      if (result.url) {
-        host.leaveTo(result.url);
-      }
-    } catch (error) {
-      host.failed({ error, fallbackTitle: "Couldn't open your billing settings" });
-    }
+    await leaveToAnsweredUrl({
+      host,
+      fallbackTitle: "Couldn't open your billing settings",
+      request: () =>
+        manageSubscription.mutateAsync({ organizationId, baseUrl: host.applicationOrigin() }),
+    });
   };
 
   return {

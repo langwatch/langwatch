@@ -2,6 +2,7 @@
 
 import isEmpty from "lodash-es/isEmpty.js";
 
+import { clauseField, isClause } from "./clause-field.ts";
 import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
 
 /**
@@ -35,14 +36,16 @@ const _guardEnMasse = ({
 }) => {
   // Check if empty, if not and safeWord is provided, then set where = {} and proceed to execute
   // Don't allow delete all queries
-  if (actions.includes(params.action) && isEmpty(params.args.where)) {
+  const args = params.args;
+  const where = clauseField(args, "where");
+  if (actions.includes(params.action) && isEmpty(where)) {
     throw new Error(
       `It looks like you just tried to perform a ${params.action} on all of the ${params.model}s. If this was intentional, pass 'where: ${safeWord}'`,
     );
   }
 
-  if (params.args?.where?.id === safeWord) {
-    params.args.where = {};
+  if (isClause(args) && clauseField(where, "id") === safeWord) {
+    args.where = {};
   }
 };
 

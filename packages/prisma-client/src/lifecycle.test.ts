@@ -1,6 +1,6 @@
-import type { Logger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaPg } from "@prisma/adapter-pg";
-import type { Pool } from "pg";
+import { Pool } from "pg";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaConfigService } from "./config.ts";
@@ -15,7 +15,7 @@ import {
   type PrismaQueryExecutor,
 } from "./connection.ts";
 import { type PrismaDriverAdapter, PrismaDriverAdapterFactory } from "./driver-adapter.ts";
-import type { PrismaClient } from "./generated/client.ts";
+import { PrismaClient } from "./generated/client.ts";
 import {
   PrismaMigrationExecutor,
   type PrismaMigrationRequest,
@@ -68,24 +68,42 @@ class RecordingSeed extends PrismaSeed {
   }
 }
 
-const fakePool = (end = vi.fn(async () => undefined)): Pool => ({ end }) as unknown as Pool;
+/** A real, never-connected value whose named members answer as the test says. */
+function withMembers<Target extends object>(target: Target, members: object): Target {
+  return new Proxy(target, {
+    get: (real, property) =>
+      Object.hasOwn(members, property)
+        ? Reflect.get(members, property)
+        : Reflect.get(real, property),
+  });
+}
 
-const fakeClient = (overrides: Record<string, unknown> = {}): PrismaClient =>
-  ({
+const fakePool = (end = vi.fn(async () => undefined)): Pool =>
+  withMembers(new Pool({ connectionString: "postgresql://localhost/langwatch" }), { end });
+
+const fakeClient = (overrides: object = {}): PrismaClient => {
+  const real = new PrismaClient({
+    adapter: {
+      provider: "postgres",
+      adapterName: "lifecycle-test",
+      connect: () => Promise.reject(new Error("the lifecycle test client never connects")),
+    },
+  });
+  const client: PrismaClient = withMembers(real, {
     $disconnect: vi.fn(async () => undefined),
-    $extends: vi.fn(function (this: PrismaClient) {
-      return this;
-    }),
+    $extends: vi.fn(() => client),
     ...overrides,
-  }) as unknown as PrismaClient;
+  });
+  return client;
+};
 
-const fakeLogger = () =>
-  ({
+const fakeLogger = (): Logger =>
+  withMembers(createLogger("prisma-client:lifecycle-test"), {
     error: vi.fn(),
     warn: vi.fn(),
     info: vi.fn(),
     debug: vi.fn(),
-  }) as unknown as Logger;
+  });
 
 describe("explicit Prisma lifecycle", () => {
   it("constructs one guarded client and one externally owned pool", async () => {

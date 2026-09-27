@@ -189,18 +189,23 @@ function delegateName(model: PrismaTableModel): string {
   return `${model.slice(0, 1).toLowerCase()}${model.slice(1)}`;
 }
 
+type ScopedTransaction =
+  | (<Result>(callback: (transactionClient: object) => Promise<Result>) => Promise<Result>)
+  | undefined;
+
+type OwnershipScope = {
+  models: readonly PrismaTableModel[];
+  exceptions: readonly PrismaRelationException[];
+};
+
 function scopedClient<Models extends readonly PrismaTableModel[]>({
   client,
   models,
   exceptions,
   transaction,
-}: {
+}: OwnershipScope & {
   client: object;
-  models: readonly PrismaTableModel[];
-  exceptions: readonly PrismaRelationException[];
-  transaction:
-    | (<Result>(callback: (transactionClient: object) => Promise<Result>) => Promise<Result>)
-    | undefined;
+  transaction: ScopedTransaction;
 }): ScopedPrismaClient<Models> {
   const claimedModels = new Set<PrismaTableModel>(models);
   const claimedDelegates = new Map(models.map((model) => [delegateName(model), model]));
@@ -213,25 +218,7 @@ function scopedClient<Models extends readonly PrismaTableModel[]>({
       get(_target, property) {
         if (typeof property !== "string") return undefined;
         if (property === "transaction") {
-          return async <Result>(
-            callback: (transaction: ScopedPrismaClient<Models>) => Promise<Result>,
-          ) => {
-            if (!transaction) {
-              throw ownershipError(
-                "transaction because the underlying client has no transaction function",
-              );
-            }
-            return transaction((transactionClient) =>
-              callback(
-                scopedClient({
-                  client: transactionClient,
-                  models,
-                  exceptions,
-                  transaction: undefined,
-                }),
-              ),
-            );
-          };
+          return scopedTransaction<Models>({ models, exceptions, transaction });
         }
         const model = claimedDelegates.get(property);
         if (!model) {
@@ -244,33 +231,71 @@ function scopedClient<Models extends readonly PrismaTableModel[]>({
         if (!delegate || typeof delegate !== "object") {
           throw ownershipError(`delegate ${property} is unavailable`);
         }
-        return new Proxy(delegate, {
-          get(delegateTarget, operation) {
-            const method = Reflect.get(delegateTarget, operation);
-            if (typeof method !== "function") return method;
-            return (...args: unknown[]) => {
-              assertRelationAccess({
-                value: args[0],
-                model,
-                operation: String(operation),
-                claimedModels,
-                exceptions,
-              });
-              if (UNSAFE_MUTATION_OPERATIONS.has(String(operation))) {
-                throw ownershipError(
-                  `${String(operation)} because Prisma relationMode cascades are not scoped`,
-                );
-              }
-              const result = Reflect.apply(method, delegateTarget, args);
-              return new Promise((resolve, reject) => {
-                Promise.resolve(result).then(resolve).catch(reject);
-              });
-            };
-          },
-        });
+        return scopedDelegate({ delegate, model, claimedModels, exceptions });
       },
     },
   ) as ScopedPrismaClient<Models>;
+}
+
+function scopedTransaction<Models extends readonly PrismaTableModel[]>({
+  models,
+  exceptions,
+  transaction,
+}: OwnershipScope & { transaction: ScopedTransaction }) {
+  return async <Result>(
+    callback: (transaction: ScopedPrismaClient<Models>) => Promise<Result>,
+  ): Promise<Result> => {
+    if (!transaction) {
+      throw ownershipError("transaction because the underlying client has no transaction function");
+    }
+    return transaction((transactionClient) =>
+      callback(
+        scopedClient<Models>({
+          client: transactionClient,
+          models,
+          exceptions,
+          transaction: undefined,
+        }),
+      ),
+    );
+  };
+}
+
+function scopedDelegate({
+  delegate,
+  model,
+  claimedModels,
+  exceptions,
+}: {
+  delegate: object;
+  model: PrismaTableModel;
+  claimedModels: ReadonlySet<PrismaTableModel>;
+  exceptions: readonly PrismaRelationException[];
+}): object {
+  return new Proxy(delegate, {
+    get(delegateTarget, operation) {
+      const method: unknown = Reflect.get(delegateTarget, operation);
+      if (typeof method !== "function") return method;
+      return (...args: unknown[]) => {
+        assertRelationAccess({
+          value: args[0],
+          model,
+          operation: String(operation),
+          claimedModels,
+          exceptions,
+        });
+        if (UNSAFE_MUTATION_OPERATIONS.has(String(operation))) {
+          throw ownershipError(
+            `${String(operation)} because Prisma relationMode cascades are not scoped`,
+          );
+        }
+        const result: unknown = Reflect.apply(method, delegateTarget, args);
+        return new Promise((resolve, reject) => {
+          Promise.resolve(result).then(resolve).catch(reject);
+        });
+      };
+    },
+  });
 }
 
 /**

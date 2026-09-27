@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { clauseField, isClause } from "./clause-field.ts";
 import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
 import { ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
 
@@ -134,67 +135,68 @@ type ScopedModelConfig = {
    * lets bulk writes (`updateMany`/`deleteMany`) hold a stricter predicate
    * than reads — a bounded *view* of many tenants is still an unbounded *edit*.
    */
-  validateWhere: (where: any, action?: string) => string | null;
+  validateWhere: (where: unknown, action?: string) => string | null;
   /** Data validator for create / createMany. */
-  validateCreateData: (data: any) => string | null;
+  validateCreateData: (data: unknown) => string | null;
 };
+
+type Clause = Record<string, unknown>;
+
+/** The rows a create / createMany carries; a row that is not an object reads as absent. */
+const createRecords = (data: unknown): (Clause | null)[] =>
+  (Array.isArray(data) ? data : [data]).map((record: unknown) =>
+    isClause(record) ? record : null,
+  );
+
+const isNonEmptyList = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
+
+/** A Prisma list filter (`{ in: [...] }`) on this field, empty or not. */
+const hasInList = (value: unknown): boolean => Array.isArray(clauseField(value, "in"));
 
 /**
  * A scopeId value is acceptable as a string (single id) or a Prisma list
  * filter `{ in: [...] }` with a non-empty array — both constrain the query
  * to a finite, caller-known scope; `{}` or `{ in: [] }` would not, so both are rejected.
  */
-const isScopeIdValue = (value: any): boolean => {
+const isScopeIdValue = (value: unknown): boolean => {
   if (typeof value === "string") return true;
-  if (!value) return false;
-  if (typeof value !== "object") return false;
-  if (!Array.isArray(value.in)) return false;
-  if (value.in.length === 0) return false;
-  return value.in.every((v: any) => typeof v === "string");
+  const list = clauseField(value, "in");
+  if (!Array.isArray(list)) return false;
+  if (list.length === 0) return false;
+  return list.every((v: unknown) => typeof v === "string");
 };
 
-const hasScopedOrBranch = (some: any): boolean => {
-  if (!Array.isArray(some.OR)) return false;
-  if (some.OR.length === 0) return false;
-  return some.OR.every(
-    (o: any) => o && typeof o.scopeType === "string" && isScopeIdValue(o.scopeId),
-  );
+const isScopePair = (clause: unknown): boolean =>
+  typeof clauseField(clause, "scopeType") === "string" &&
+  isScopeIdValue(clauseField(clause, "scopeId"));
+
+const hasScopedOrBranch = (some: unknown): boolean => {
+  const branches = clauseField(some, "OR");
+  if (!Array.isArray(branches)) return false;
+  if (branches.length === 0) return false;
+  return branches.every((o: unknown) => Boolean(o) && isScopePair(o));
 };
 
-const hasScopePredicate = (where: any): boolean => {
-  if (!where || typeof where !== "object") return false;
+const hasScopePredicate = (where: unknown): boolean => {
+  if (!isClause(where)) return false;
   // Top-level (scopeType, scopeId) - typical for join tables filtering by one scope.
-  if (typeof where.scopeType === "string" && isScopeIdValue(where.scopeId)) {
-    return true;
-  }
+  if (isScopePair(where)) return true;
   // Nested through a `scopes` relation (`{ scopes: { some: ... } }`), single
-  // or OR-list — every OR-branch must be valid so a query can't sneak in
-  // `{ OR: [{}] }` and walk every row. scopeId accepts `string` or
-  // `{ in: [...] }`; the cascade walker's lists for TEAM/PROJECT tiers ARE
-  // the tenancy constraint.
-  const some = where.scopes?.some;
-  if (some && typeof some === "object") {
-    if (typeof some.scopeType === "string" && isScopeIdValue(some.scopeId)) {
-      return true;
-    }
-    if (hasScopedOrBranch(some)) {
-      return true;
-    }
-  }
-  return false;
+  // or OR-list — every OR-branch must be valid so `{ OR: [{}] }` can't walk
+  // every row. The cascade walker's lists ARE the tenancy constraint.
+  const some = clauseField(where.scopes, "some");
+  if (!isClause(some)) return false;
+  return isScopePair(some) || hasScopedOrBranch(some);
 };
 
-const hasIdOrInPredicate = (where: any): boolean => {
-  if (!where || typeof where !== "object") return false;
+const hasIdOrInPredicate = (where: unknown): boolean => {
+  if (!isClause(where)) return false;
   if (typeof where.id === "string") return true;
-  if (where.id && Array.isArray(where.id.in) && where.id.in.length > 0) {
-    return true;
-  }
-  return false;
+  return isNonEmptyList(clauseField(where.id, "in"));
 };
 
-const validateRecursive = (where: any, passes: (clause: any) => boolean): boolean => {
-  if (!where || typeof where !== "object") return false;
+const validateRecursive = (where: unknown, passes: (clause: Clause) => boolean): boolean => {
+  if (!isClause(where)) return false;
   if (passes(where)) return true;
   if (Array.isArray(where.AND)) {
     for (const clause of where.AND) {
@@ -203,11 +205,12 @@ const validateRecursive = (where: any, passes: (clause: any) => boolean): boolea
   }
   // OR semantics: every alternative branch must independently carry a
   // tenancy predicate, otherwise the unbounded branch leaks rows. The
-  // canonical case is `findByHashedSecret`, which ORs together a current
-  // hashedSecret + an in-grace previousHashedSecret; both branches name
-  // a uniquely-keyed secret, so the guard recognises the query as bounded.
+  // canonical case is `findByHashedSecret`: both branches name a
+  // uniquely-keyed secret, so the guard recognises the query as bounded.
   if (Array.isArray(where.OR) && where.OR.length > 0) {
-    const allBranchesBounded = where.OR.every((clause: any) => validateRecursive(clause, passes));
+    const allBranchesBounded = where.OR.every((clause: unknown) =>
+      validateRecursive(clause, passes),
+    );
     if (allBranchesBounded) return true;
   }
   return false;
@@ -226,17 +229,14 @@ const parentEntryScoped = (): ScopedModelConfig => ({
       (c) =>
         hasIdOrInPredicate(c) ||
         typeof c.entryId === "string" ||
-        (c.entryId && Array.isArray(c.entryId.in) && c.entryId.in.length > 0),
+        isNonEmptyList(clauseField(c.entryId, "in")),
     );
     return ok ? null : reason;
   },
-  validateCreateData: (data) => {
-    const records = Array.isArray(data) ? data : [data];
-    return validateParentEntryCreateRecords(records);
-  },
+  validateCreateData: (data) => validateParentEntryCreateRecords(createRecords(data)),
 });
 
-const validateParentEntryCreateRecords = (records: any[]): string | null => {
+const validateParentEntryCreateRecords = (records: (Clause | null)[]): string | null => {
   for (const d of records) {
     if (!d) return "create requires a data payload";
     if (typeof d.entryId !== "string") {
@@ -307,12 +307,13 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       const ok = validateRecursive(
         where,
         (clause) =>
-          typeof clause.tenantId === "string" || typeof clause.tenantId_id?.tenantId === "string",
+          typeof clause.tenantId === "string" ||
+          typeof clauseField(clause.tenantId_id, "tenantId") === "string",
       );
       return ok ? null : reason;
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       return records.every((record) => typeof record?.tenantId === "string")
         ? null
         : "create requires tenantId in the data payload";
@@ -350,12 +351,12 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           hasIdOrInPredicate(c) ||
           typeof c.scopeId === "string" ||
           // The compound unique, as `findUnique` spells it.
-          typeof c.scopeId_key?.scopeId === "string",
+          typeof clauseField(c.scopeId_key, "scopeId") === "string",
       );
       return ok ? null : reason;
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (typeof d.scopeId !== "string") {
@@ -380,7 +381,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         : "requires a row id, organizationId, or scope predicate in the where clause";
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (!d.scopes) {
@@ -400,13 +401,13 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         (c) =>
           hasIdOrInPredicate(c) ||
           typeof c.modelProviderId === "string" ||
-          (c.modelProviderId && Array.isArray(c.modelProviderId.in)) ||
+          hasInList(c.modelProviderId) ||
           hasScopePredicate(c),
       );
       return ok ? null : "requires a row id, modelProviderId, or scope predicate";
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (
@@ -430,13 +431,13 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         (c) =>
           hasIdOrInPredicate(c) ||
           typeof c.routingPolicyId === "string" ||
-          (c.routingPolicyId && Array.isArray(c.routingPolicyId.in)) ||
+          hasInList(c.routingPolicyId) ||
           hasScopePredicate(c),
       );
       return ok ? null : "requires a row id, routingPolicyId, or scope predicate";
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (
@@ -459,7 +460,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         where,
         (c) =>
           typeof c.organizationId === "string" ||
-          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasInList(c.organizationId) ||
           hasIdOrInPredicate(c) ||
           typeof c.hashedSecret === "string" ||
           typeof c.licenseTokenHash === "string" ||
@@ -478,7 +479,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         : "requires an 'organizationId', row id, hashedSecret, principalUserId, or scope predicate";
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (typeof d.organizationId !== "string") {
@@ -498,13 +499,13 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         (c) =>
           hasIdOrInPredicate(c) ||
           typeof c.virtualKeyId === "string" ||
-          (c.virtualKeyId && Array.isArray(c.virtualKeyId.in)) ||
+          hasInList(c.virtualKeyId) ||
           hasScopePredicate(c),
       );
       return ok ? null : "requires a row id, virtualKeyId, or scope predicate";
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (
@@ -529,7 +530,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return ok ? null : "requires a row id, organizationId, or scope predicate";
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (!d.scopes) {
@@ -549,13 +550,13 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         (c) =>
           hasIdOrInPredicate(c) ||
           typeof c.configId === "string" ||
-          (c.configId && Array.isArray(c.configId.in)) ||
+          hasInList(c.configId) ||
           hasScopePredicate(c),
       );
       return ok ? null : "requires a row id, configId, or scope predicate";
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (
@@ -583,7 +584,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         (c) =>
           hasIdOrInPredicate(c) ||
           typeof c.organizationId === "string" ||
-          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasInList(c.organizationId) ||
           hasScopePredicate(c) ||
           typeof c.projectId === "string",
       );
@@ -592,7 +593,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         : "requires a row id, organizationId, scope predicate, or projectId in the where clause";
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (typeof d.organizationId !== "string") {
@@ -616,15 +617,14 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         (c) =>
           hasIdOrInPredicate(c) ||
           typeof c.organizationId === "string" ||
-          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasInList(c.organizationId) ||
           hasScopePredicate(c) ||
-          (c.scopeType_scopeId_category &&
-            typeof c.scopeType_scopeId_category.scopeId === "string"),
+          typeof clauseField(c.scopeType_scopeId_category, "scopeId") === "string",
       );
       return ok ? null : reason;
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (typeof d.organizationId !== "string") {
@@ -648,15 +648,14 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         (c) =>
           hasIdOrInPredicate(c) ||
           typeof c.organizationId === "string" ||
-          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasInList(c.organizationId) ||
           hasScopePredicate(c) ||
-          (c.scopeType_scopeId_personalOnly &&
-            typeof c.scopeType_scopeId_personalOnly.scopeId === "string"),
+          typeof clauseField(c.scopeType_scopeId_personalOnly, "scopeId") === "string",
       );
       return ok ? null : reason;
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (typeof d.organizationId !== "string") {
@@ -678,12 +677,12 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         (c) =>
           hasIdOrInPredicate(c) ||
           typeof c.organizationId === "string" ||
-          (c.organizationId && Array.isArray(c.organizationId.in)),
+          hasInList(c.organizationId),
       );
       return ok ? null : reason;
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (typeof d.organizationId !== "string") {
@@ -707,15 +706,15 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         (c) =>
           hasIdOrInPredicate(c) ||
           typeof c.organizationId === "string" ||
-          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasInList(c.organizationId) ||
           typeof c.endpointId === "string" ||
           typeof c.projectId === "string" ||
-          (c.projectId && Array.isArray(c.projectId.in)),
+          hasInList(c.projectId),
       );
       return ok ? null : reason;
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         const platformScoped =
@@ -750,7 +749,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         where,
         (c) =>
           typeof c.tenantId === "string" ||
-          typeof c.migrationName_tenantId?.tenantId === "string" ||
+          typeof clauseField(c.migrationName_tenantId, "tenantId") === "string" ||
           // A finite list of migrations is as bounded as one: the periodic
           // re-drive asks about every registered migration in a single read.
           (!bulkWrite && isScopeIdValue(c.migrationName)),
@@ -758,7 +757,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return ok ? null : reason;
     },
     validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
+      const records = createRecords(data);
       for (const d of records) {
         if (!d) return "create requires a data payload";
         if (typeof d.migrationName !== "string" || typeof d.tenantId !== "string") {
@@ -824,14 +823,14 @@ function assertScopedModel({ action, args }: GuardParams, model: string): boolea
   if (!config) return false;
 
   if (action === "create" || action === "createMany") {
-    const err = config.validateCreateData(args?.data);
+    const err = config.validateCreateData(clauseField(args, "data"));
     if (err) {
       throw new Error(`The ${action} action on the ${model} model ${err}.`);
     }
     return true;
   }
 
-  const err = config.validateWhere(args?.where, action);
+  const err = config.validateWhere(clauseField(args, "where"), action);
   if (err) {
     throw new Error(`The ${action} action on the ${model} model ${err}.`);
   }
@@ -841,7 +840,8 @@ function assertScopedModel({ action, args }: GuardParams, model: string): boolea
 function isShareLinkCapabilityLookup({ action, args }: GuardParams, model: string): boolean {
   if (action !== "findFirst" && action !== "findUnique") return false;
   if (model !== "ShareLink") return false;
-  return Boolean(args?.where?.token || args?.where?.id);
+  const where = clauseField(args, "where");
+  return Boolean(clauseField(where, "token") || clauseField(where, "id"));
 }
 
 // Gateway auth resolver: hashedSecret is cryptographically unique across the
@@ -851,9 +851,11 @@ function isVirtualKeySecretLookup({ action, args }: GuardParams, model: string):
   if (action !== "findFirst") return false;
   if (model !== "VirtualKey") return false;
 
-  const orClauses = args?.where?.OR;
+  const orClauses = clauseField(clauseField(args, "where"), "OR");
   if (!Array.isArray(orClauses)) return false;
-  return orClauses.every((o: any) => o?.hashedSecret || o?.previousHashedSecret);
+  return orClauses.every((o: unknown) =>
+    Boolean(clauseField(o, "hashedSecret") || clauseField(o, "previousHashedSecret")),
+  );
 }
 
 // Gateway warm-cache resolver: /api/internal/gateway/config/:vk_id hits
@@ -863,8 +865,9 @@ function isVirtualKeySecretLookup({ action, args }: GuardParams, model: string):
 function isVirtualKeyWarmCacheLookup({ action, args }: GuardParams, model: string): boolean {
   if (action !== "findUnique") return false;
   if (model !== "VirtualKey") return false;
-  if (typeof args?.where?.id !== "string") return false;
-  return Object.keys(args.where).length === 1;
+  const where = clauseField(args, "where");
+  if (!isClause(where) || typeof where.id !== "string") return false;
+  return Object.keys(where).length === 1;
 }
 
 function isProjectLookupExempt(params: GuardParams, model: string): boolean {
@@ -874,8 +877,10 @@ function isProjectLookupExempt(params: GuardParams, model: string): boolean {
 }
 
 function assertCreateProjectId({ action, args }: GuardParams, model: string): void {
-  const data = args?.data;
-  const hasProjectId = Array.isArray(data) ? data.every((d) => d.projectId) : data?.projectId;
+  const data = clauseField(args, "data");
+  const hasProjectId = Array.isArray(data)
+    ? data.every((d: unknown) => clauseField(d, "projectId"))
+    : clauseField(data, "projectId");
 
   if (!hasProjectId) {
     throw new Error(
@@ -884,22 +889,31 @@ function assertCreateProjectId({ action, args }: GuardParams, model: string): vo
   }
 }
 
-function whereHasProjectScope(where: any): boolean {
-  if (where?.projectId) return true;
-  if (where?.projectId_slug) return true;
-  if (where?.projectId_date) return true;
-  if (where?.projectId_modelProviderId_slot) return true;
-  if (where?.projectId_traceId) return true;
-  if (where?.projectId?.in) return true;
-  return Boolean(where?.OR?.every((o: any) => o.projectId || o.organizationId));
+const PROJECT_SCOPED_KEYS = [
+  "projectId",
+  "projectId_slug",
+  "projectId_date",
+  "projectId_modelProviderId_slot",
+  "projectId_traceId",
+] as const;
+
+function whereHasProjectScope(where: unknown): boolean {
+  if (PROJECT_SCOPED_KEYS.some((key) => clauseField(where, key))) return true;
+  const branches = clauseField(where, "OR");
+  return (
+    Array.isArray(branches) &&
+    branches.every((o: unknown) =>
+      Boolean(clauseField(o, "projectId") || clauseField(o, "organizationId")),
+    )
+  );
 }
 
 function assertWhereProjectId({ action, args }: GuardParams, model: string): void {
-  const where = args?.where;
+  const where = clauseField(args, "where");
   if (whereHasProjectScope(where)) return;
 
   throw new Error(
-    where?.OR
+    clauseField(where, "OR")
       ? `The ${action} action on the ${model} model requires that all the OR clauses check for either the projectId or organizationId`
       : `The ${action} action on the ${model} model requires a 'projectId' or 'projectId.in' in the where clause`,
   );

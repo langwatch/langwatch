@@ -123,6 +123,48 @@ const createFakeMeter = (overrides?: Partial<Stripe.Billing.Meter>): Stripe.Bill
   } as Stripe.Billing.Meter;
 };
 
+/** A whole Stripe price, as the API returns one; the test names what it reads. */
+const stripePrice = (fields: Partial<Stripe.Price> & Pick<Stripe.Price, "id">): Stripe.Price => ({
+  object: "price",
+  active: true,
+  billing_scheme: "per_unit",
+  created: 0,
+  currency: "usd",
+  custom_unit_amount: null,
+  livemode: false,
+  lookup_key: null,
+  metadata: {},
+  nickname: null,
+  product: "prod_default",
+  recurring: null,
+  tax_behavior: null,
+  tiers_mode: null,
+  transform_quantity: null,
+  type: "one_time",
+  unit_amount: null,
+  unit_amount_decimal: null,
+  ...fields,
+});
+
+const stripeProduct = (id: string): Stripe.Product => ({
+  id,
+  object: "product",
+  active: true,
+  created: 0,
+  description: null,
+  images: [],
+  livemode: false,
+  marketing_features: [],
+  metadata: {},
+  name: id,
+  package_dimensions: null,
+  shippable: null,
+  tax_code: null,
+  type: "service",
+  updated: 0,
+  url: null,
+});
+
 describe("syncStripePrices", () => {
   describe("detectEnvironment()", () => {
     it("detects test mode keys", () => {
@@ -144,19 +186,24 @@ describe("syncStripePrices", () => {
 
   describe("transformPrice()", () => {
     it("maps recurring Stripe prices to persisted details", () => {
-      const input = {
+      const input = stripePrice({
         id: "price_123",
-        active: true,
         livemode: false,
-        product: { id: "prod_123" },
+        product: stripeProduct("prod_123"),
         unit_amount: 9900,
-        currency: "usd",
         type: "recurring",
-        recurring: { interval: "month", interval_count: 1 },
+        recurring: {
+          aggregate_usage: null,
+          interval: "month",
+          interval_count: 1,
+          meter: null,
+          trial_period_days: null,
+          usage_type: "licensed",
+        },
         nickname: "Pro Monthly",
         lookup_key: "PRO",
         metadata: { langwatch_key: "PRO" },
-      } as unknown as Stripe.Price;
+      });
 
       const result = transformPrice(input);
 
@@ -176,19 +223,17 @@ describe("syncStripePrices", () => {
     });
 
     it("maps one-time prices with null recurring", () => {
-      const input = {
+      const input = stripePrice({
         id: "price_456",
-        active: true,
         livemode: true,
         product: "prod_456",
         unit_amount: 500,
-        currency: "usd",
         type: "one_time",
         recurring: null,
         nickname: null,
         lookup_key: null,
         metadata: {},
-      } as unknown as Stripe.Price;
+      });
 
       const result = transformPrice(input);
 
@@ -398,10 +443,10 @@ describe("syncStripePrices", () => {
 
     it("defaults to empty strings when existing catalog has no meters", () => {
       const existing = createStripePricesFile();
-      const existingWithoutMeters = {
+      const existingWithoutMeters: StripePricesFile = {
         ...existing,
-        meters: undefined,
-      } as unknown as StripePricesFile;
+        meters: { BILLABLE_EVENTS: undefined, INSTANT_EVAL_USD: undefined },
+      };
 
       const resolvedMapping = createPriceMapForEnvironment(existing.mapping, "test");
       const resolvedMeterMapping = {} as StripeMeterMap;

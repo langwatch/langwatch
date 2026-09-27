@@ -275,9 +275,9 @@ export async function seedDemoPlatform({
         id: `demo-dataset-record-${index + 1}`,
         datasetId: dataset.id,
         projectId,
-        entry: entry as unknown as Prisma.InputJsonValue,
+        entry: entry,
       },
-      update: { entry: entry as unknown as Prisma.InputJsonValue },
+      update: { entry: entry },
     });
   }
 

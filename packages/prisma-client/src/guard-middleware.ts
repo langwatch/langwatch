@@ -7,7 +7,7 @@ export interface GuardParams {
   model?: string;
   /** The operation name: `findMany`, `create`, `queryRaw`, `executeRaw`, … */
   action: string;
-  args: any;
+  args: unknown;
 }
 
 export type GuardNext = (params: GuardParams) => Promise<unknown>;
