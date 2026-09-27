@@ -48,6 +48,45 @@ interface TraceOverflowMenuProps {
 }
 
 /**
+ * The trace's pin. Pins are UI annotations and do not exempt rows from the TTL.
+ * A share's own pin belongs to the share, so it cannot be unpinned by hand
+ * while the share is live, and the menu says so rather than failing.
+ */
+function useTracePin({ projectId, traceId }: { projectId: string | undefined; traceId: string }) {
+  const utils = api.useUtils();
+  const pinQuery = api.pinnedTrace.getPin.useQuery(
+    { projectId: projectId ?? "", traceId },
+    { enabled: !!projectId },
+  );
+  const isPinned = !!pinQuery.data;
+  const isSharePin = pinQuery.data?.source === "share";
+  const onChanged = (title: string) => () => {
+    if (projectId) void utils.pinnedTrace.getPin.invalidate({ projectId, traceId });
+    toaster.create({ title, type: "success" });
+  };
+  const pinMutation = api.pinnedTrace.pin.useMutation({
+    onSuccess: onChanged("Trace pinned"),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't pin trace" }),
+  });
+  const unpinMutation = api.pinnedTrace.unpin.useMutation({
+    onSuccess: onChanged("Trace unpinned"),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't unpin trace" }),
+  });
+  const toggle = () => {
+    if (!projectId) return;
+    (isPinned ? unpinMutation : pinMutation).mutate({ projectId, traceId });
+  };
+  const ownLabel = isPinned ? "Unpin trace" : "Pin trace";
+  return {
+    isPinned,
+    isSharePin,
+    label: isSharePin ? "Pinned by share" : ownLabel,
+    isBusy: pinMutation.isPending || unpinMutation.isPending,
+    toggle,
+  };
+}
+
+/**
  * Single overflow menu that absorbs every secondary drawer action so the top-right
  * action cluster stays small (Share / Refresh / Maximize / More / Close).
  */
@@ -79,49 +118,7 @@ export function TraceOverflowMenu({
 
   const handleEditTrace = useCallback(() => enterTraceEditMode(traceId), [traceId]);
 
-  const utils = api.useUtils();
-  const pinQuery = api.pinnedTrace.getPin.useQuery(
-    project ? { projectId: project.id, traceId } : (undefined as never),
-    { enabled: !!project },
-  );
-  const isPinned = !!pinQuery.data;
-  // Pins are UI annotations only and do not exempt CH rows from TTL. While a
-  // share is live, the share-created pin annotation belongs to that share
-  // lifecycle, so the router rejects manual unpin until the share is removed;
-  // mirror that in the menu so users see why the action is unavailable instead
-  // of getting a surprise CONFLICT toast.
-  const isSharePin = pinQuery.data?.source === "share";
-  const ownPinLabel = isPinned ? "Unpin trace" : "Pin trace";
-  const pinLabel = isSharePin ? "Pinned by share" : ownPinLabel;
-
-  const pinMutation = api.pinnedTrace.pin.useMutation({
-    onSuccess: () => {
-      if (project) {
-        void utils.pinnedTrace.getPin.invalidate({ projectId: project.id, traceId });
-      }
-      toaster.create({ title: "Trace pinned", type: "success" });
-    },
-    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't pin trace" }),
-  });
-
-  const unpinMutation = api.pinnedTrace.unpin.useMutation({
-    onSuccess: () => {
-      if (project) {
-        void utils.pinnedTrace.getPin.invalidate({ projectId: project.id, traceId });
-      }
-      toaster.create({ title: "Trace unpinned", type: "success" });
-    },
-    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't unpin trace" }),
-  });
-
-  const handleTogglePin = useCallback(() => {
-    if (!project) return;
-    if (isPinned) {
-      unpinMutation.mutate({ projectId: project.id, traceId });
-    } else {
-      pinMutation.mutate({ projectId: project.id, traceId });
-    }
-  }, [project, traceId, isPinned, pinMutation, unpinMutation]);
+  const pin = useTracePin({ projectId: project?.id, traceId });
 
   const conversationTurns = useConversationTurns(conversationId);
   const conversationTraceIds = useMemo(
@@ -225,14 +222,10 @@ export function TraceOverflowMenu({
         )}
 
         {project && (
-          <Menu.Item
-            value="pin"
-            onClick={handleTogglePin}
-            disabled={pinMutation.isPending || unpinMutation.isPending || isSharePin}
-          >
+          <Menu.Item value="pin" onClick={pin.toggle} disabled={pin.isBusy || pin.isSharePin}>
             <HStack gap={2}>
-              <Icon as={isPinned ? LuPinOff : LuPin} boxSize={3.5} />
-              <Text>{pinLabel}</Text>
+              <Icon as={pin.isPinned ? LuPinOff : LuPin} boxSize={3.5} />
+              <Text>{pin.label}</Text>
             </HStack>
           </Menu.Item>
         )}

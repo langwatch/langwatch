@@ -22,125 +22,56 @@ const DISCOVER_INVALIDATE_DEBOUNCE_MS = 30_000;
 const NEWCOUNT_INVALIDATE_DEBOUNCE_MS = 10_000;
 
 /**
- * Coordinator hook that bridges SSE trace events into TanStack Query cache
- * invalidation. Mounted once in TracesPage.
+ * Runs the action once per window: the first call starts the timer and later
+ * calls within it ride along. The timer is dropped on unmount.
  */
-export function useTraceFreshness() {
-  const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useUtils();
-  const requestFastPoll = useSseStatusStore((s) => s.requestFastPoll);
-  const setSseConnectionState = useSseStatusStore((s) => s.setSseConnectionState);
-  const setLastEventAt = useSseStatusStore((s) => s.setLastEventAt);
-  const discoverInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const newCountInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pulse = useRowPulseStore((s) => s.pulse);
-  const visibleTraceIds = useVisibleTraceIds();
-
-  useEffect(() => {
-    return () => {
-      if (discoverInvalidateTimer.current) {
-        clearTimeout(discoverInvalidateTimer.current);
-      }
-      if (newCountInvalidateTimer.current) {
-        clearTimeout(newCountInvalidateTimer.current);
-      }
-    };
-  }, []);
-
-  const onTraceSummaryUpdated = useCallback(
-    (traceIds: string[]) => {
-      const mode = useSseStatusStore.getState().liveUpdatesMode;
-
-      // Coalesced like discover: a busy trace fires this on nearly every span, and re-querying the
-      // pill's count on each one is wasted work when the count usually hasn't changed at all.
-      if (!newCountInvalidateTimer.current) {
-        newCountInvalidateTimer.current = setTimeout(() => {
-          newCountInvalidateTimer.current = null;
-          void trpcUtils.traces.newCount.cancel();
-          void trpcUtils.traces.newCount.invalidate();
-        }, NEWCOUNT_INVALIDATE_DEBOUNCE_MS);
-      }
-
-      // Partition incoming trace IDs into three buckets:
-      //   1. visible  — already rendered in the current page → pulse only
-      //   2. new      — not visible AND page === 1 → need a list refresh
-      //   3. off-screen — not visible AND page > 1  → drop (pagination
-      //                   will fetch fresh data when the user navigates)
-      const { ids: visibleIds, page } = visibleTraceIds;
-
-      let hasNewTrace = false;
-      for (const traceId of traceIds) {
-        if (visibleIds.has(traceId)) {
-          // In-place update — animate the row, skip network round-trip. The pulse fires
-          // in every mode (live / ask / paused): `ask` gates *new trace prepends*, not
-          // updates to rows the user is already looking at.
-          pulse(traceId);
-        } else if (page === 1) {
-          // New trace that belongs on page 1 (highest priority view).
-          hasNewTrace = true;
-        }
-        // Off-screen updates (page > 1) are silently dropped — the
-        // user isn't looking at those rows, and paginating will fetch
-        // the freshest data when they arrive.
-      }
-
-      if (mode === "live" && hasNewTrace) {
-        // Only `live` mode auto-merges new traces. `ask` mode keeps the
-        // pill count fresh (via newCount above) but waits for the user
-        // to opt in by clicking it. Cancel any in-flight list fetch
-        // before kicking a new one so a slow previous round-trip can't
-        // race the fresh one and overwrite the view with stale data.
-        void trpcUtils.traces.list.cancel();
-        void trpcUtils.traces.list.invalidate();
-      }
-
-      // Discover (facets) is heavy. Coalesce into a 30s window so a
-      // steady trace stream doesn't keep it permanently refetching.
-      // `ask` / `paused` modes skip discover entirely — the user
-      // explicitly opted out of background churn.
-      if (mode === "live" && !discoverInvalidateTimer.current) {
-        discoverInvalidateTimer.current = setTimeout(() => {
-          discoverInvalidateTimer.current = null;
-          void trpcUtils.traces.discover.cancel();
-          void trpcUtils.traces.discover.invalidate();
-        }, DISCOVER_INVALIDATE_DEBOUNCE_MS);
-      }
-
-      // Reset adaptive polling to fast interval
-      requestFastPoll();
-
-      // Targeted drawer invalidation. Project-scoped explicitly so the partial-input
-      // filter matches the project queries are keyed under, not just every
-      // header/spanTree/evals query in the cache.
-      const { traceId: openTraceId } = useDrawerStore.getState();
-      const projectId = project?.id;
-      if (openTraceId && projectId && traceIds.includes(openTraceId)) {
-        void trpcUtils.traces.header.invalidate({
-          projectId,
-          traceId: openTraceId,
-        });
-        void trpcUtils.traces.spanTree.invalidate({
-          projectId,
-          traceId: openTraceId,
-        });
-        void trpcUtils.traces.evals.invalidate({
-          projectId,
-          traceId: openTraceId,
-        });
-      }
+function useCoalesced({ delayMs, action }: { delayMs: number; action: () => void }) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const actionRef = useRef(action);
+  actionRef.current = action;
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
     },
-    [trpcUtils, requestFastPoll, project?.id, visibleTraceIds, pulse],
+    [],
   );
+  return useCallback(() => {
+    if (timer.current) return;
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      actionRef.current();
+    }, delayMs);
+  }, [delayMs]);
+}
 
-  const onSpanStored = useCallback(
+/**
+ * Sorts updated traces: a row already on screen pulses in place (in every
+ * mode; `ask` gates new rows, not updates), an unseen one on page 1 means the
+ * list needs a refresh, and one past page 1 is dropped until the reader pages.
+ */
+function partitionUpdates({
+  traceIds,
+  visibleIds,
+  page,
+}: {
+  traceIds: string[];
+  visibleIds: ReadonlySet<string>;
+  page: number;
+}): { visible: string[]; hasNewTrace: boolean } {
+  const visible = traceIds.filter((id) => visibleIds.has(id));
+  return { visible, hasNewTrace: page === 1 && visible.length < traceIds.length };
+}
+
+/**
+ * A stored span refreshes every read of the open trace that changes shape with
+ * it, keeping the cache push-fresh so polling can stay off while SSE is up.
+ */
+function useSpanStoredInvalidation(projectId: string | undefined) {
+  const trpcUtils = api.useUtils();
+  return useCallback(
     (traceIds: string[]) => {
       const { traceId: openTraceId } = useDrawerStore.getState();
-      const projectId = project?.id;
       if (!openTraceId || !projectId || !traceIds.includes(openTraceId)) return;
-
-      // Invalidate every per-trace query that changes shape when a new span lands —
-      // keeps the cache push-fresh so the per-hook refetchInterval can stay off while
-      // SSE is connected.
       const key = { projectId, traceId: openTraceId };
       void trpcUtils.traces.spanTreeDelta.invalidate(key);
       void trpcUtils.traces.spanDetail.invalidate(key);
@@ -148,8 +79,97 @@ export function useTraceFreshness() {
       void trpcUtils.traces.traceEvents.invalidate(key);
       void trpcUtils.traces.resourceInfo.invalidate(key);
     },
-    [trpcUtils, project?.id],
+    [trpcUtils, projectId],
   );
+}
+
+/** Mirrors the connection into the toolbar's store; disabled live updates read as disconnected. */
+function useSseStatusSync({
+  connectionState,
+  lastEventAt,
+  liveUpdatesEnabled,
+}: {
+  connectionState: ReturnType<typeof useTraceUpdateListener>["connectionState"];
+  lastEventAt: number;
+  liveUpdatesEnabled: boolean;
+}) {
+  const setSseConnectionState = useSseStatusStore((s) => s.setSseConnectionState);
+  const setLastEventAt = useSseStatusStore((s) => s.setLastEventAt);
+  useEffect(() => {
+    setSseConnectionState(liveUpdatesEnabled ? connectionState : "disconnected");
+  }, [connectionState, liveUpdatesEnabled, setSseConnectionState]);
+  useEffect(() => {
+    if (lastEventAt > 0) setLastEventAt(lastEventAt);
+  }, [lastEventAt, setLastEventAt]);
+}
+
+/**
+ * Coordinator hook that bridges SSE trace events into TanStack Query cache
+ * invalidation. Mounted once in TracesPage.
+ */
+export function useTraceFreshness() {
+  const { project } = useOrganizationTeamProject();
+  const trpcUtils = api.useUtils();
+  const requestFastPoll = useSseStatusStore((s) => s.requestFastPoll);
+  const pulse = useRowPulseStore((s) => s.pulse);
+  const visibleTraceIds = useVisibleTraceIds();
+
+  // A busy trace fires on nearly every span; the pill's count seldom changes.
+  const refreshNewCount = useCoalesced({
+    delayMs: NEWCOUNT_INVALIDATE_DEBOUNCE_MS,
+    action: () => {
+      void trpcUtils.traces.newCount.cancel();
+      void trpcUtils.traces.newCount.invalidate();
+    },
+  });
+  const refreshDiscover = useCoalesced({
+    delayMs: DISCOVER_INVALIDATE_DEBOUNCE_MS,
+    action: () => {
+      void trpcUtils.traces.discover.cancel();
+      void trpcUtils.traces.discover.invalidate();
+    },
+  });
+
+  const onTraceSummaryUpdated = useCallback(
+    (traceIds: string[]) => {
+      const isLive = useSseStatusStore.getState().liveUpdatesMode === "live";
+      refreshNewCount();
+      const { visible, hasNewTrace } = partitionUpdates({
+        traceIds,
+        visibleIds: visibleTraceIds.ids,
+        page: visibleTraceIds.page,
+      });
+      for (const traceId of visible) pulse(traceId);
+      // Only live mode merges new traces, and the in-flight list read is cancelled
+      // first so a slow earlier one cannot overwrite the fresh view.
+      if (isLive && hasNewTrace) {
+        void trpcUtils.traces.list.cancel();
+        void trpcUtils.traces.list.invalidate();
+      }
+      // Facets are heavy: coalesced to 30s, and skipped outside live mode.
+      if (isLive) refreshDiscover();
+      requestFastPoll();
+      // The open trace's reads, scoped to the project the queries are keyed under.
+      const { traceId: openTraceId } = useDrawerStore.getState();
+      const projectId = project?.id;
+      if (!openTraceId || !projectId || !traceIds.includes(openTraceId)) return;
+      const key = { projectId, traceId: openTraceId };
+      void trpcUtils.traces.header.invalidate(key);
+      void trpcUtils.traces.spanTree.invalidate(key);
+      void trpcUtils.traces.evals.invalidate(key);
+    },
+    [
+      trpcUtils,
+      requestFastPoll,
+      project?.id,
+      visibleTraceIds,
+      pulse,
+      refreshNewCount,
+      refreshDiscover,
+    ],
+  );
+
+  const onSpanStored = useSpanStoredInvalidation(project?.id);
 
   // Honour the operator's "live updates" preference — when disabled,
   // skip subscribing and force the connection state to disconnected so
@@ -181,13 +201,5 @@ export function useTraceFreshness() {
     },
   );
 
-  useEffect(() => {
-    setSseConnectionState(liveUpdatesEnabled ? connectionState : "disconnected");
-  }, [connectionState, liveUpdatesEnabled, setSseConnectionState]);
-
-  useEffect(() => {
-    if (lastEventAt > 0) {
-      setLastEventAt(lastEventAt);
-    }
-  }, [lastEventAt, setLastEventAt]);
+  useSseStatusSync({ connectionState, lastEventAt, liveUpdatesEnabled });
 }

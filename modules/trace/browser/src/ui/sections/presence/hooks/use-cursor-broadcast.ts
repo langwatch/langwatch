@@ -15,6 +15,59 @@ interface UseCursorBroadcastOptions {
   enabled?: boolean;
 }
 
+type CursorPoint = { x: number; y: number };
+
+/** The cursor as fractions of the container's box. */
+function fractionalPoint({ event, rect }: { event: MouseEvent; rect: DOMRect }): CursorPoint {
+  return {
+    x: (event.clientX - rect.left) / rect.width,
+    y: (event.clientY - rect.top) / rect.height,
+  };
+}
+
+function isInsideUnitBox({ x, y }: CursorPoint): boolean {
+  return x >= 0 && x <= 1 && y >= 0 && y <= 1;
+}
+
+/**
+ * A frame-driven throttle: the latest point waits for the next frame and the
+ * send interval, and a point equal to the last one sent is dropped.
+ */
+function cursorThrottle(send: (point: CursorPoint) => void) {
+  let lastSentAt = 0;
+  let lastSent: CursorPoint | undefined;
+  let pending: CursorPoint | undefined;
+  let rafHandle: number | undefined;
+
+  const flush = () => {
+    rafHandle = undefined;
+    if (!pending) return;
+    if (lastSent && lastSent.x === pending.x && lastSent.y === pending.y) {
+      pending = undefined;
+      return;
+    }
+    const now = performance.now();
+    if (now - lastSentAt < SEND_INTERVAL_MS) {
+      rafHandle = requestAnimationFrame(flush);
+      return;
+    }
+    lastSentAt = now;
+    lastSent = pending;
+    pending = undefined;
+    send(lastSent);
+  };
+
+  return {
+    queue(point: CursorPoint) {
+      pending = point;
+      rafHandle ??= requestAnimationFrame(flush);
+    },
+    stop() {
+      if (rafHandle !== undefined) cancelAnimationFrame(rafHandle);
+    },
+  };
+}
+
 /**
  * Tracks the local user's cursor inside `containerRef` and forwards a
  * throttled stream of fractional coordinates over the presence cursor
@@ -28,69 +81,34 @@ export function useCursorBroadcast({
 }: UseCursorBroadcastOptions): void {
   const sessionId = useTabSessionId();
   const hidden = usePresencePreferencesStore((s) => s.hidden);
-  // Route this mutation over the persistent tRPC WebSocket — at ~15 Hz one
-  // HTTP request per tick was saturating the browser's connection cap.
-  const cursorMutation = api.presence.cursor.useMutation({
-    trpc: { context: { useWS: true } },
-  });
+  // Over the persistent WebSocket: at ~15 Hz, one HTTP request per tick saturated
+  // the browser's connection cap.
+  const cursorMutation = api.presence.cursor.useMutation({ trpc: { context: { useWS: true } } });
   const sendRef = useRef(cursorMutation.mutateAsync);
   sendRef.current = cursorMutation.mutateAsync;
 
   useEffect(() => {
-    const isBroadcasting = enabled && !hidden;
-    const hasTarget = !!projectId && !!anchor && !!sessionId;
-    if (!isBroadcasting || !hasTarget) return;
     const container = containerRef.current;
-    if (!container) return;
+    if (!enabled || hidden || !container) return;
+    if (!projectId || !anchor || !sessionId) return;
 
-    let lastSentAt = 0;
-    let lastSent: { x: number; y: number } | null = null;
-    let pending: { x: number; y: number } | null = null;
-    let rafHandle: number | null = null;
-
-    const flush = () => {
-      rafHandle = null;
-      if (!pending) return;
-      if (lastSent && lastSent.x === pending.x && lastSent.y === pending.y) {
-        pending = null;
-        return;
-      }
-      const now = performance.now();
-      if (now - lastSentAt < SEND_INTERVAL_MS) {
-        rafHandle = requestAnimationFrame(flush);
-        return;
-      }
-      lastSentAt = now;
-      const { x, y } = pending;
-      lastSent = pending;
-      pending = null;
+    const throttle = cursorThrottle(({ x, y }) => {
+      // A tick the server's rate limit drops is fine; the next move reschedules.
       void sendRef
-        .current({
-          projectId,
-          sessionId,
-          payload: { anchor, x, y },
-        })
-        .catch(() => {
-          // Server-side rate limit dropped this tick — fine, the next move
-          // event will reschedule.
-        });
-    };
-
+        .current({ projectId, sessionId, payload: { anchor, x, y } })
+        .catch(() => undefined);
+    });
     const handleMove = (event: MouseEvent) => {
       const rect = container.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
-      const x = (event.clientX - rect.left) / rect.width;
-      const y = (event.clientY - rect.top) / rect.height;
-      const isInsideContainer = x >= 0 && x <= 1 && y >= 0 && y <= 1;
-      if (!isInsideContainer) return;
-      pending = { x, y };
-      if (rafHandle == null) rafHandle = requestAnimationFrame(flush);
+      const point = fractionalPoint({ event, rect });
+      if (isInsideUnitBox(point)) throttle.queue(point);
     };
 
     container.addEventListener("mousemove", handleMove);
     return () => {
       container.removeEventListener("mousemove", handleMove);
-      if (rafHandle != null) cancelAnimationFrame(rafHandle);
+      throttle.stop();
     };
   }, [projectId, anchor, sessionId, enabled, hidden, containerRef]);
 }
