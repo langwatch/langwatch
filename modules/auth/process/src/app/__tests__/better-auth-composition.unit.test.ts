@@ -126,7 +126,9 @@ describe("given a deployment that named no browser-session identity", () => {
   it("verifies every caller as anonymous rather than failing", async () => {
     const app = await appFor();
 
-    await expect(app.tryVerifyBrowserSession({ headers: new Headers() })).resolves.toBeNull();
+    await expect(app.verifyBrowserSession({ headers: new Headers() })).resolves.toEqual({
+      kind: "anonymous",
+    });
     await expect(
       app.resolveSession(new Request("https://app.langwatch.test/api/auth/session")),
     ).resolves.toEqual({ kind: "anonymous" });
@@ -147,7 +149,10 @@ describe("given a deployment that named one", () => {
 
     const headers = new Headers({ cookie: "better-auth.session_token=token" });
 
-    await expect(app.tryVerifyBrowserSession({ headers })).resolves.toEqual(VERIFIED);
+    await expect(app.verifyBrowserSession({ headers })).resolves.toEqual({
+      kind: "verified",
+      verified: VERIFIED,
+    });
     expect(getSession).toHaveBeenCalledWith({ headers });
   });
 
@@ -156,8 +161,8 @@ describe("given a deployment that named one", () => {
     (await app.betterAuth()).api.getSession = (async () => null) as never;
 
     await expect(
-      app.tryVerifyBrowserSession({ headers: new Headers({ cookie: "stale=1" }) }),
-    ).resolves.toBeNull();
+      app.verifyBrowserSession({ headers: new Headers({ cookie: "stale=1" }) }),
+    ).resolves.toEqual({ kind: "anonymous" });
   });
 });
 

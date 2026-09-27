@@ -10,6 +10,81 @@ import { api } from "./organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";
 import { useLicenseEnforcement } from "./use-license-enforcement.ts";
 
+type SeatDecision =
+  | { kind: "proceed" }
+  | { kind: "expand"; currentSeats: number; newSeats: number }
+  | { kind: "upgrade" };
+
+/**
+ * Whether new full members fit the seat limit, and if not, whether the plan expands in place.
+ * Limits not loaded yet proceed optimistically; the server is the final guard.
+ */
+function seatDecision({
+  invites,
+  limitInfo,
+  activePlanSource,
+  pricingModel,
+}: {
+  invites: MembersForm["invites"];
+  limitInfo: { current: number; max: number } | undefined | null;
+  activePlanSource?: "license" | "subscription" | "free";
+  pricingModel?: string;
+}): SeatDecision {
+  const newFullMembers = invites.filter(
+    (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
+  ).length;
+  if (newFullMembers === 0 || !limitInfo) return { kind: "proceed" };
+  const newSeats = limitInfo.current + newFullMembers;
+  if (newSeats <= limitInfo.max) return { kind: "proceed" };
+  if (activePlanSource === "subscription" && pricingModel === "SEAT_EVENT") {
+    return { kind: "expand", currentSeats: limitInfo.max, newSeats };
+  }
+  return { kind: "upgrade" };
+}
+
+/** The invites whose email did not go out, so their links are shown instead. */
+function unsentInvites(
+  created: readonly (
+    | { invite?: { inviteCode: string; email: string }; emailNotSent?: boolean }
+    | null
+    | undefined
+  )[],
+): { inviteCode: string; email: string }[] {
+  return created.flatMap((entry) =>
+    entry?.invite && entry.emailNotSent
+      ? [{ inviteCode: entry.invite.inviteCode, email: entry.invite.email }]
+      : [],
+  );
+}
+
+function invitesCreatedToast({
+  count,
+  hasEmailProvider,
+}: {
+  count: number;
+  hasEmailProvider: boolean;
+}) {
+  return {
+    title: `${count > 1 ? "Invites" : "Invite"} created successfully`,
+    description: hasEmailProvider
+      ? "All invites have been sent."
+      : "All invites have been created. View invite link under actions menu.",
+    type: "success",
+    duration: 2000,
+  };
+}
+
+function inviteResentToast({ emailSent }: { emailSent: boolean }) {
+  return {
+    title: "Invitation resent",
+    description: emailSent
+      ? "A fresh invitation is on its way."
+      : "A fresh invite link is ready to share.",
+    type: "success",
+    duration: 5000,
+  };
+}
+
 /**
  * Invite mutation handlers: create, resend, revoke. All pricing models go
  * through enforcement first — SEAT_EVENT with an active subscription opens
@@ -53,12 +128,7 @@ export function useInviteActions({
     void queryClient.licenseEnforcement.checkLimit.invalidate();
   };
 
-  // SaaS-only: subscription API for seat expansion (not available in OSS builds).
-  const subscriptionApi = (api as any).subscription;
-  // Build-time invariant: subscriptionApi shape is fixed per build (SaaS vs OSS)
-  const expandSeatsMutation = subscriptionApi?.addTeamMemberOrEvents?.useMutation() as
-    | { mutateAsync: (input: Record<string, unknown>) => Promise<unknown> }
-    | undefined;
+  const expandSeatsMutation = api.subscription.addTeamMemberOrEvents.useMutation();
 
   const createInvitesMutation = api.invite.createInvites.useMutation();
   const deleteInviteMutation = api.invite.deleteInvite.useMutation();
@@ -80,32 +150,10 @@ export function useInviteActions({
       },
       {
         onSuccess: (data) => {
-          const newInvites = data.reduce(
-            (acc, invite) => {
-              if (invite?.invite && invite.emailNotSent) {
-                acc.push({
-                  inviteCode: invite.invite.inviteCode,
-                  email: invite.invite.email,
-                });
-              }
-              return acc;
-            },
-            [] as { inviteCode: string; email: string }[],
+          onInviteCreated(unsentInvites(data));
+          toaster.create(
+            invitesCreatedToast({ count: data.filter(Boolean).length, hasEmailProvider }),
           );
-
-          onInviteCreated(newInvites);
-
-          const totalInvites = data.filter(Boolean).length;
-          const description = hasEmailProvider
-            ? "All invites have been sent."
-            : "All invites have been created. View invite link under actions menu.";
-
-          toaster.create({
-            title: `${totalInvites > 1 ? "Invites" : "Invite"} created successfully`,
-            description,
-            type: "success",
-            duration: 2000,
-          });
           onClose();
           refetchInvites();
           invalidateLimits();
@@ -116,92 +164,58 @@ export function useInviteActions({
   };
 
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
-    const hasNewFullMembers = data.invites.some(
-      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
-    );
-    const hasNewLiteMembers = data.invites.some(
-      (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL,
-    );
-    const newFullMemberInviteCount = data.invites.filter(
-      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
-    ).length;
-
     const performMutation = performAdminInvite;
-
-    // Check lite member limits, then perform the mutation
     const proceedAfterLiteCheck = () => {
-      if (hasNewLiteMembers) {
-        membersLiteEnforcement.checkAndProceed(() => performMutation(data));
-      } else {
+      if (!data.invites.some((invite) => invite.orgRole === OrganizationUserRole.EXTERNAL)) {
         performMutation(data);
+        return;
       }
+      membersLiteEnforcement.checkAndProceed(() => performMutation(data));
     };
 
-    // No full members being invited — only check lite limits
-    if (!hasNewFullMembers) {
+    const decision = seatDecision({
+      invites: data.invites,
+      limitInfo: membersEnforcement.limitInfo,
+      activePlanSource,
+      pricingModel,
+    });
+    if (decision.kind === "proceed") {
       proceedAfterLiteCheck();
       return;
     }
-
-    const limitInfo = membersEnforcement.limitInfo;
-    // Data not loaded yet — allow optimistically (server is final guard)
-    if (!limitInfo) {
-      proceedAfterLiteCheck();
+    if (decision.kind === "upgrade") {
+      // Over the limit on a plan that cannot expand in place: this opens the upgrade modal.
+      membersEnforcement.checkAndProceed(() => {});
       return;
     }
 
-    const projectedCount = limitInfo.current + newFullMemberInviteCount;
-
-    if (projectedCount <= limitInfo.max) {
-      // Within limits — proceed directly
-      proceedAfterLiteCheck();
-      return;
-    }
-
-    // Over limit — decide which modal to show
-    if (
-      activePlanSource === "subscription" &&
-      pricingModel === "SEAT_EVENT" &&
-      expandSeatsMutation
-    ) {
-      // SEAT_EVENT with active subscription — proration modal
-      const newSeats = limitInfo.current + newFullMemberInviteCount;
-      analytics.track({
-        boundary: "organization",
-        action: "shown",
-        name: "upgrade_modal",
-        attributes: { mode: "seats", current: limitInfo.max, max: newSeats },
-      });
-      openSeats({
-        organizationId,
-        currentSeats: limitInfo.max,
-        newSeats,
-        onConfirm: async () => {
-          try {
-            await expandSeatsMutation.mutateAsync({
-              organizationId,
-              plan: activePlanType,
-              upgradeMembers: true,
-              upgradeTraces: false,
-              totalMembers: newSeats,
-              totalTraces: 0,
-            });
-            performMutation(data);
-          } catch (err) {
-            showErrorToast({
-              error: err,
-              fallbackTitle: "Couldn't expand seats",
-            });
-          }
-        },
-      });
-    } else {
-      // TIERED, free plan, self-hosted, no subscription — upgrade modal
-      membersEnforcement.checkAndProceed(() => {
-        // Won't execute since we know it's over limit,
-        // but checkAndProceed will open the upgrade modal
-      });
-    }
+    const { currentSeats, newSeats } = decision;
+    analytics.track({
+      boundary: "organization",
+      action: "shown",
+      name: "upgrade_modal",
+      attributes: { mode: "seats", current: currentSeats, max: newSeats },
+    });
+    openSeats({
+      organizationId,
+      currentSeats,
+      newSeats,
+      onConfirm: async () => {
+        try {
+          await expandSeatsMutation.mutateAsync({
+            organizationId,
+            plan: activePlanType,
+            upgradeMembers: true,
+            upgradeTraces: false,
+            totalMembers: newSeats,
+            totalTraces: 0,
+          });
+          performMutation(data);
+        } catch (err) {
+          showErrorToast({ error: err, fallbackTitle: "Couldn't expand seats" });
+        }
+      },
+    });
   };
 
   const revokeInvite = (inviteId: string) => {
@@ -238,22 +252,9 @@ export function useInviteActions({
       {
         onSuccess: (data) => {
           if (data.emailNotSent) {
-            onInviteCreated([
-              {
-                inviteCode: data.invite.inviteCode,
-                email: data.invite.email,
-              },
-            ]);
+            onInviteCreated([{ inviteCode: data.invite.inviteCode, email: data.invite.email }]);
           }
-          toaster.create({
-            title: "Invitation resent",
-            description:
-              hasEmailProvider && !data.emailNotSent
-                ? "A fresh invitation is on its way."
-                : "A fresh invite link is ready to share.",
-            type: "success",
-            duration: 5000,
-          });
+          toaster.create(inviteResentToast({ emailSent: hasEmailProvider && !data.emailNotSent }));
           refetchInvites();
         },
         onError: (error) =>

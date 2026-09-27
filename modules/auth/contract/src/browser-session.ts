@@ -46,6 +46,16 @@ export const browserSessionSchema = z
   .strict();
 export type BrowserSession = z.infer<typeof browserSessionSchema>;
 
+/** Whether Better Auth accepts a request's session token; no token, or no sign-in door, is anonymous. */
+export type BrowserSessionVerification =
+  | { kind: "verified"; verified: VerifiedBrowserSession }
+  | { kind: "anonymous" };
+
+/** A verified token resolved to a live session; a missing, revoked or expired one is anonymous. */
+export type BrowserSessionResolution =
+  | { kind: "signed_in"; session: BrowserSession }
+  | { kind: "anonymous" };
+
 export const browserSessionImpersonationSchema = browserSessionActorSchema
   .safeExtend({ expires: z.coerce.date() })
   .strict();

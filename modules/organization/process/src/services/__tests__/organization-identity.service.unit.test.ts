@@ -64,17 +64,25 @@ describe("PersonalWorkspaceIdentityService", () => {
 describe("TeamIdentityService", () => {
   describe("when a shared team is created", () => {
     /** @scenario "A shared team is born with packaged identifiers" */
-    it("mints the nanoid team id shape the Team rows already carry", () => {
+    it("mints a team-prefixed KSUID", () => {
       const { teamId } = TeamIdentityService.create().createTeam({ name: "Platform" });
 
-      expect(teamId).toMatch(/^team_[A-Za-z0-9_-]{21}$/);
+      expect(teamId).toMatch(/^team_[0-9A-Za-z]+$/);
     });
 
     /** @scenario "A shared team is born with packaged identifiers" */
-    it("suffixes the slug with the first eleven characters of the team id", () => {
+    it("suffixes the slug with the random tail of the team id", () => {
       const { teamId, slug } = TeamIdentityService.create().createTeam({ name: "Platform" });
 
-      expect(slug).toBe(`platform-${teamId.substring(0, 11)}`);
+      expect(slug).toBe(`platform-${teamId.slice(-6)}`);
+    });
+
+    it("tells apart the slugs of teams created in the same moment", () => {
+      const service = TeamIdentityService.create();
+      const first = service.createTeam({ name: "Platform" });
+      const second = service.createTeam({ name: "Platform" });
+
+      expect(first.slug).not.toBe(second.slug);
     });
 
     /** @scenario "A team or group slug survives a URL" */
@@ -83,7 +91,7 @@ describe("TeamIdentityService", () => {
         name: "Crème_Brûlée: R&D?",
       });
 
-      expect(slug).toBe(`creme-brulee-r-d-${teamId.substring(0, 11)}`);
+      expect(slug).toBe(`creme-brulee-r-d-${teamId.slice(-6)}`);
     });
   });
 
@@ -127,7 +135,7 @@ describe("GroupIdentityService", () => {
       expect(GroupIdentityService.create().slugify("Platform Engineering")).toBe(
         "platform-engineering",
       );
-      expect(slug).toBe(`platform-engineering-${teamId.substring(0, 11)}`);
+      expect(slug).toBe(`platform-engineering-${teamId.slice(-6)}`);
     });
   });
 });

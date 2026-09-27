@@ -172,7 +172,7 @@ function harness(overrides?: {
     // The sender is handed in directly, so the eventing port is never asked:
     // a shape that refuses proves it stays unasked.
     eventing: {
-      tryPipelineCommand: () => {
+      resolvePipelineCommand: () => {
         throw new Error("the staged sender is supplied directly in this suite");
       },
     },

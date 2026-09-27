@@ -271,6 +271,482 @@ async function emitScopeBindingPlans({
  * other feature package spells its own: the prefix is a PERSISTED format, and a second
  * description of it writes bindings the revocation queries never find.
  */
+type TeamRoleUpdate = UpdateMemberRoleInput["effectiveTeamRoleUpdates"][number];
+
+async function assertNotDemotingLastAdmin({
+  tx,
+  organizationId,
+  role,
+  currentRole,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  role: OrganizationUserRole;
+  currentRole: OrganizationUserRole;
+}): Promise<void> {
+  if (role === OrganizationUserRole.ADMIN || currentRole !== OrganizationUserRole.ADMIN) return;
+  const adminCount = await tx.organizationUser.count({
+    where: { organizationId, role: OrganizationUserRole.ADMIN },
+  });
+  // Handled for the same reason as the disable guard: the tRPC boundary still maps the 400 to
+  // BAD_REQUEST, and the REST surface answers the stable code instead of an unknown 500.
+  if (adminCount <= 1) throw new CannotDemoteLastAdminError();
+}
+
+/** A team role update's own refusals: the Lite seat's cap, and a custom role that must exist. */
+async function assertTeamRoleUpdateAllowed({
+  tx,
+  organizationId,
+  role,
+  teamId,
+  teamRoleUpdate,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  role: OrganizationUserRole;
+  teamId: string;
+  teamRoleUpdate: TeamRoleUpdate;
+}): Promise<void> {
+  if (
+    !isTeamRoleAllowedForOrganizationRole({
+      organizationRole: role,
+      teamRole: teamRoleUpdate.role as TeamRoleValue,
+    })
+  ) {
+    throw new LiteMemberViewerOnlyError(await teamNameFor({ tx, teamId }));
+  }
+
+  const updateIsCustomRole = isCustomRole(teamRoleUpdate.role);
+  if (updateIsCustomRole && !teamRoleUpdate.customRoleId) {
+    throw new ValidationError("Custom role ID is required for custom role updates", {
+      meta: {
+        fieldErrors: {
+          customRoleId: ["Pick which custom role to use."],
+        },
+        formErrors: ["Pick which custom role to use."],
+      },
+    });
+  }
+
+  if (updateIsCustomRole && teamRoleUpdate.customRoleId) {
+    const customRole = await tx.customRole.findUnique({
+      where: { id: teamRoleUpdate.customRoleId },
+      select: { organizationId: true, kind: true },
+    });
+    if (customRole?.kind !== "custom" || customRole.organizationId !== organizationId) {
+      throw new NotFoundError(
+        "custom_role_not_found",
+        "CustomRole",
+        teamRoleUpdate.customRoleId ?? "unknown",
+      );
+    }
+  }
+}
+
+/** One team's role correction; none when the member already holds that role there. */
+async function planTeamRoleUpdate({
+  tx,
+  organizationId,
+  userId,
+  role,
+  teamId,
+  teamRoleUpdate,
+  currentMembership,
+  teamsLeftWithoutAdmin,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+  role: OrganizationUserRole;
+  teamId: string;
+  teamRoleUpdate: TeamRoleUpdate;
+  currentMembership: { role: string; customRoleId: string | null } | undefined;
+  teamsLeftWithoutAdmin: { id: string; name: string }[];
+}): Promise<ScopeBindingPlan[]> {
+  if (!currentMembership) {
+    throw new NotFoundError("team_membership_not_found", "TeamMember", userId);
+  }
+  await assertTeamRoleUpdateAllowed({ tx, organizationId, role, teamId, teamRoleUpdate });
+  const updateIsCustomRole = isCustomRole(teamRoleUpdate.role);
+  const nextRole = updateIsCustomRole ? TeamUserRole.CUSTOM : (teamRoleUpdate.role as TeamUserRole);
+  const shouldClearCustomRole = !updateIsCustomRole;
+  const wouldDemoteAdmin =
+    currentMembership.role === TeamUserRole.ADMIN && nextRole !== TeamUserRole.ADMIN;
+
+  if (wouldDemoteAdmin) {
+    const adminsAfter = await effectiveTeamAdmins.projectAdminUserIdsWithoutDirectRole({
+      tx,
+      organizationId,
+      teamId,
+      userId,
+    });
+    if (adminsAfter.size === 0) {
+      // A caller who named this team asked for a team-local change, and a team needs
+      // an admin. A seat correction did not name it: the decision was about one
+      // person's seat, and every shared team is still administered through any
+      // ORGANIZATION-scoped ADMIN binding — so it goes through, and the team is
+      // reported so the admin who did it is not left to discover this.
+      if (teamRoleUpdate.origin === "requested") {
+        throw new TeamLastAdminRequiredError(await teamNameFor({ tx, teamId }));
+      }
+      teamsLeftWithoutAdmin.push({
+        id: teamId,
+        name: await teamNameFor({ tx, teamId }),
+      });
+    }
+  }
+
+  const roleUnchanged =
+    currentMembership.role === nextRole &&
+    (shouldClearCustomRole
+      ? currentMembership.customRoleId === null
+      : currentMembership.customRoleId === teamRoleUpdate.customRoleId);
+  if (roleUnchanged) return [];
+
+  return [
+    await planUserScopeBinding({
+      tx,
+      organizationId,
+      userId,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
+      role: nextRole,
+      customRoleId: shouldClearCustomRole ? null : (teamRoleUpdate.customRoleId ?? null),
+    }),
+  ];
+}
+
+/** The ORGANIZATION-scoped grant kept in step with the seat; a Lite Member holds none. */
+async function planOrganizationSeatBinding({
+  tx,
+  organizationId,
+  userId,
+  role,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+  role: OrganizationUserRole;
+}): Promise<ScopeBindingPlan> {
+  if (role !== OrganizationUserRole.EXTERNAL) {
+    return planUserScopeBinding({
+      tx,
+      organizationId,
+      userId,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
+      role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
+      customRoleId: null,
+    });
+  }
+  const orgRows = await tx.roleBinding.findMany({
+    where: {
+      organizationId,
+      userId,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
+    },
+    select: { id: true },
+  });
+  return { revokeIds: orgRows.map((row) => row.id) };
+}
+
+/**
+ * A Lite seat's correction of the shared PROJECT rows the team loop never sees (personal
+ * workspaces are capped at resolution). Through planUserScopeBinding, so ids survive and a
+ * pre-existing Viewer row can't collide on the partial unique index.
+ */
+async function planLiteProjectCorrections({
+  tx,
+  organizationId,
+  userId,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+}): Promise<ScopeBindingPlan[]> {
+  const projectRows = await tx.roleBinding.findMany({
+    where: {
+      organizationId,
+      userId,
+      scopeType: RoleBindingScopeType.PROJECT,
+      OR: [{ role: { not: TeamUserRole.VIEWER } }, { customRoleId: { not: null } }],
+    },
+    select: { scopeId: true },
+  });
+  if (projectRows.length === 0) return [];
+  const sharedProjects = await tx.project.findMany({
+    where: {
+      id: { in: projectRows.map((row) => row.scopeId) },
+      isPersonal: false,
+      team: { organizationId, isPersonal: false },
+    },
+    select: { id: true },
+  });
+  const plans: ScopeBindingPlan[] = [];
+  for (const project of sharedProjects) {
+    plans.push(
+      await planUserScopeBinding({
+        tx,
+        organizationId,
+        userId,
+        scopeType: RoleBindingScopeType.PROJECT,
+        scopeId: project.id,
+        role: TeamUserRole.VIEWER,
+        customRoleId: null,
+      }),
+    );
+  }
+  return plans;
+}
+
+type PlannedTeamRole = { organizationId: string; plan: ScopeBindingPlan };
+
+async function getTeamForMemberChange({
+  tx,
+  teamId,
+}: {
+  tx: Prisma.TransactionClient;
+  teamId: string;
+}): Promise<{ organizationId: string; name: string }> {
+  const team = await tx.team.findUnique({
+    where: { id: teamId },
+    select: { organizationId: true, name: true },
+  });
+  if (!team) throw new TeamNotFoundError(teamId);
+  return team;
+}
+
+/** Whether the member holds a Lite Member seat in the organization. */
+async function holdsLiteSeat({
+  tx,
+  organizationId,
+  userId,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+}): Promise<boolean> {
+  const membership = await tx.organizationUser.findUnique({
+    where: { userId_organizationId: { userId, organizationId } },
+  });
+  return membership?.role === OrganizationUserRole.EXTERNAL;
+}
+
+async function getTeamBindingRole({
+  tx,
+  organizationId,
+  teamId,
+  userId,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  teamId: string;
+  userId: string;
+}): Promise<string> {
+  const binding = await tx.roleBinding.findFirst({
+    where: { organizationId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId, userId },
+    select: { role: true },
+  });
+  if (!binding) throw new TeamMembershipNotFoundError(userId);
+  return binding.role;
+}
+
+/**
+ * Only a save that demotes an admin can shrink the admin set, so the projection of its exact
+ * post-state is the whole guard; a team already without an admin stays editable from here,
+ * since this is one of the places somebody gets promoted back.
+ */
+async function assertTeamKeepsAnAdmin({
+  tx,
+  organizationId,
+  team,
+  userId,
+  currentUserId,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  team: { id: string; name: string };
+  userId: string;
+  currentUserId: string | null | undefined;
+}): Promise<void> {
+  const adminsAfter = await effectiveTeamAdmins.projectAdminUserIdsWithoutDirectRole({
+    tx,
+    organizationId,
+    teamId: team.id,
+    userId,
+  });
+  if (adminsAfter.size > 0) return;
+  if (userId === currentUserId) throw new CannotRemoveSelfAsLastAdminError(team.name);
+  throw new TeamLastAdminRequiredError(team.name);
+}
+
+async function planCustomTeamRole({
+  tx,
+  teamId,
+  userId,
+  currentUserId,
+  customRoleId,
+}: {
+  tx: Prisma.TransactionClient;
+  teamId: string;
+  userId: string;
+  currentUserId: string | null | undefined;
+  customRoleId: string;
+}): Promise<PlannedTeamRole> {
+  const team = await getTeamForMemberChange({ tx, teamId });
+  const { organizationId } = team;
+  const customRole = await tx.customRole.findUnique({
+    where: { id: customRoleId },
+    select: { organizationId: true, permissions: true, kind: true },
+  });
+  if (customRole?.kind !== "custom" || customRole.organizationId !== organizationId) {
+    throw new CustomRoleNotAssignableError(customRoleId);
+  }
+  if (await holdsLiteSeat({ tx, organizationId, userId })) {
+    throw new LiteMemberViewerOnlyError(team.name);
+  }
+  const current = await getTeamBindingRole({ tx, organizationId, teamId, userId });
+  if (current === TeamUserRole.ADMIN) {
+    await assertTeamKeepsAnAdmin({
+      tx,
+      organizationId,
+      team: { id: teamId, name: team.name },
+      userId,
+      currentUserId,
+    });
+  }
+  return {
+    organizationId,
+    plan: await planUserScopeBinding({
+      tx,
+      organizationId,
+      userId,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
+      role: TeamUserRole.CUSTOM,
+      customRoleId,
+    }),
+  };
+}
+
+async function planBuiltInTeamRole({
+  tx,
+  teamId,
+  userId,
+  currentUserId,
+  role,
+}: {
+  tx: Prisma.TransactionClient;
+  teamId: string;
+  userId: string;
+  currentUserId: string | null | undefined;
+  role: UpdateTeamMemberRoleInput["role"];
+}): Promise<PlannedTeamRole> {
+  const team = await getTeamForMemberChange({ tx, teamId });
+  const { organizationId } = team;
+  if (
+    (await holdsLiteSeat({ tx, organizationId, userId })) &&
+    !isTeamRoleAllowedForOrganizationRole({
+      organizationRole: OrganizationUserRole.EXTERNAL,
+      teamRole: role as TeamRoleValue,
+    })
+  ) {
+    throw new LiteMemberViewerOnlyError(team.name);
+  }
+  const current = await getTeamBindingRole({ tx, organizationId, teamId, userId });
+  if (current === TeamUserRole.ADMIN && role !== TeamUserRole.ADMIN) {
+    await assertTeamKeepsAnAdmin({
+      tx,
+      organizationId,
+      team: { id: teamId, name: team.name },
+      userId,
+      currentUserId,
+    });
+  }
+  return {
+    organizationId,
+    plan: await planUserScopeBinding({
+      tx,
+      organizationId,
+      userId,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
+      role: role as TeamUserRole,
+      customRoleId: null,
+    }),
+  };
+}
+
+function auditLogWhere({
+  fence,
+  filters,
+}: {
+  fence: Prisma.AuditLogWhereInput[];
+  filters: AuditLogFilters;
+}): Prisma.AuditLogWhereInput {
+  const conditions: Prisma.AuditLogWhereInput[] = [
+    { OR: fence },
+    ...auditLogFilterConditions(filters),
+  ];
+  return conditions.length > 1 ? { AND: conditions } : { OR: fence };
+}
+
+/** The optional narrowing an audit-log read applies on top of the organization fence. */
+function auditLogFilterConditions({
+  userId,
+  action,
+  projectId,
+  startDate,
+  endDate,
+  targetKind,
+  targetId,
+}: AuditLogFilters): Prisma.AuditLogWhereInput[] {
+  const conditions: Prisma.AuditLogWhereInput[] = [];
+  if (userId) {
+    conditions.push({ userId });
+  }
+
+  if (action) {
+    conditions.push({
+      action: {
+        contains: action,
+        mode: "insensitive" as const,
+      },
+    });
+  }
+
+  if (projectId) {
+    conditions.push({
+      OR: [{ projectId }, { projectId: null }],
+    });
+  }
+
+  if (startDate !== undefined || endDate !== undefined) {
+    const dateFilter: { gte?: Date; lte?: Date } = {};
+    if (startDate !== undefined) {
+      dateFilter.gte = new Date(startDate);
+    }
+    if (endDate !== undefined) {
+      dateFilter.lte = new Date(endDate);
+    }
+    conditions.push({ createdAt: dateFilter });
+  }
+
+  // Gateway-resource deep-link filter (`/settings/audit-log?targetKind=…
+  // &targetId=…`). Both columns live on `AuditLog` post-consolidation —
+  // see migration 20260425000000_consolidate_gateway_audit_into_audit_log.
+  // targetId is only honored when paired with targetKind so a stray
+  // `?targetId=` from a typo'd URL cannot match across kinds.
+  if (targetKind) {
+    conditions.push({ targetKind: targetKind });
+    if (targetId) {
+      conditions.push({ targetId: targetId });
+    }
+  }
+  return conditions;
+}
+
 const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
 export class PrismaOrganizationMembershipRepository implements OrganizationMembershipRepository {
@@ -1317,24 +1793,12 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         throw new MemberNotFoundError(userId);
       }
 
-      if (
-        role !== OrganizationUserRole.ADMIN &&
-        currentMember.role === OrganizationUserRole.ADMIN
-      ) {
-        const adminCount = await tx.organizationUser.count({
-          where: {
-            organizationId,
-            role: OrganizationUserRole.ADMIN,
-          },
-        });
-
-        if (adminCount <= 1) {
-          // Handled for the same reason as the disable guard: the tRPC
-          // boundary still maps the 400 to BAD_REQUEST, and the REST surface
-          // answers the stable code instead of an unknown 500.
-          throw new CannotDemoteLastAdminError();
-        }
-      }
+      await assertNotDemotingLastAdmin({
+        tx,
+        organizationId,
+        role,
+        currentRole: currentMember.role,
+      });
 
       await tx.organizationUser.update({
         where: {
@@ -1346,32 +1810,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         data: { role },
       });
 
-      // Keep the ORGANIZATION-scoped grant in sync (skip EXTERNAL)
-      if (role !== OrganizationUserRole.EXTERNAL) {
-        plans.push(
-          await planUserScopeBinding({
-            tx,
-            organizationId,
-            userId,
-            scopeType: RoleBindingScopeType.ORGANIZATION,
-            scopeId: organizationId,
-            role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
-            customRoleId: null,
-          }),
-        );
-      } else {
-        // EXTERNAL (Lite Member) users have no org-level grant
-        const orgRows = await tx.roleBinding.findMany({
-          where: {
-            organizationId,
-            userId,
-            scopeType: RoleBindingScopeType.ORGANIZATION,
-            scopeId: organizationId,
-          },
-          select: { id: true },
-        });
-        plans.push({ revokeIds: orgRows.map((row) => row.id) });
-      }
+      plans.push(await planOrganizationSeatBinding({ tx, organizationId, userId, role }));
 
       // Shared teams only, matching what the router resolved before it computed
       // the effective updates. The personal workspace each member gets to
@@ -1401,133 +1840,22 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       const dedupedTeamRoleUpdates = new Map(effectiveTeamRoleUpdates.map((u) => [u.teamId, u]));
 
       for (const [teamId, teamRoleUpdate] of dedupedTeamRoleUpdates.entries()) {
-        const currentMembership = currentMembershipByTeamId.get(teamId);
-        if (!currentMembership) {
-          throw new NotFoundError("team_membership_not_found", "TeamMember", userId);
-        }
-
-        if (
-          !isTeamRoleAllowedForOrganizationRole({
-            organizationRole: role,
-            teamRole: teamRoleUpdate.role as TeamRoleValue,
-          })
-        ) {
-          throw new LiteMemberViewerOnlyError(await teamNameFor({ tx, teamId }));
-        }
-
-        const updateIsCustomRole = isCustomRole(teamRoleUpdate.role);
-        if (updateIsCustomRole && !teamRoleUpdate.customRoleId) {
-          throw new ValidationError("Custom role ID is required for custom role updates", {
-            meta: {
-              fieldErrors: {
-                customRoleId: ["Pick which custom role to use."],
-              },
-              formErrors: ["Pick which custom role to use."],
-            },
-          });
-        }
-
-        if (updateIsCustomRole && teamRoleUpdate.customRoleId) {
-          const customRole = await tx.customRole.findUnique({
-            where: { id: teamRoleUpdate.customRoleId },
-            select: { organizationId: true, kind: true },
-          });
-          if (customRole?.kind !== "custom" || customRole.organizationId !== organizationId) {
-            throw new NotFoundError(
-              "custom_role_not_found",
-              "CustomRole",
-              teamRoleUpdate.customRoleId ?? "unknown",
-            );
-          }
-        }
-
-        const nextRole = updateIsCustomRole
-          ? TeamUserRole.CUSTOM
-          : (teamRoleUpdate.role as TeamUserRole);
-        const shouldClearCustomRole = !updateIsCustomRole;
-        const wouldDemoteAdmin =
-          currentMembership.role === TeamUserRole.ADMIN && nextRole !== TeamUserRole.ADMIN;
-
-        if (wouldDemoteAdmin) {
-          const adminsAfter = await effectiveTeamAdmins.projectAdminUserIdsWithoutDirectRole({
-            tx,
-            organizationId,
-            teamId,
-            userId,
-          });
-          if (adminsAfter.size === 0) {
-            // A caller who named this team asked for a team-local change, and a team needs
-            // an admin. A seat correction did not name it: the decision was about one
-            // person's seat, and every shared team is still administered through any
-            // ORGANIZATION-scoped ADMIN binding — so it goes through, and the team is
-            // reported so the admin who did it is not left to discover this.
-            if (teamRoleUpdate.origin === "requested") {
-              throw new TeamLastAdminRequiredError(await teamNameFor({ tx, teamId }));
-            }
-            teamsLeftWithoutAdmin.push({
-              id: teamId,
-              name: await teamNameFor({ tx, teamId }),
-            });
-          }
-        }
-
-        const roleUnchanged =
-          currentMembership.role === nextRole &&
-          (shouldClearCustomRole
-            ? currentMembership.customRoleId === null
-            : currentMembership.customRoleId === teamRoleUpdate.customRoleId);
-        if (roleUnchanged) continue;
-
         plans.push(
-          await planUserScopeBinding({
+          ...(await planTeamRoleUpdate({
             tx,
             organizationId,
             userId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamId,
-            role: nextRole,
-            customRoleId: shouldClearCustomRole ? null : (teamRoleUpdate.customRoleId ?? null),
-          }),
+            role,
+            teamId,
+            teamRoleUpdate,
+            currentMembership: currentMembershipByTeamId.get(teamId),
+            teamsLeftWithoutAdmin,
+          })),
         );
       }
 
-      // The seat correction reaches PROJECT-scoped rows the team loop above never sees, shared
-      // projects only (personal workspaces are capped at resolution instead). Corrected through
-      // planUserScopeBinding so ids survive and a pre-existing Viewer row can't collide on the
-      // partial unique index.
       if (role === OrganizationUserRole.EXTERNAL) {
-        const projectRows = await tx.roleBinding.findMany({
-          where: {
-            organizationId,
-            userId,
-            scopeType: RoleBindingScopeType.PROJECT,
-            OR: [{ role: { not: TeamUserRole.VIEWER } }, { customRoleId: { not: null } }],
-          },
-          select: { scopeId: true },
-        });
-        if (projectRows.length > 0) {
-          const sharedProjects = await tx.project.findMany({
-            where: {
-              id: { in: projectRows.map((row) => row.scopeId) },
-              isPersonal: false,
-              team: { organizationId, isPersonal: false },
-            },
-            select: { id: true },
-          });
-          for (const project of sharedProjects) {
-            plans.push(
-              await planUserScopeBinding({
-                tx,
-                organizationId,
-                userId,
-                scopeType: RoleBindingScopeType.PROJECT,
-                scopeId: project.id,
-                role: TeamUserRole.VIEWER,
-                customRoleId: null,
-              }),
-            );
-          }
-        }
+        plans.push(...(await planLiteProjectCorrections({ tx, organizationId, userId })));
       }
 
       const finalAdminCount = await tx.organizationUser.count({
@@ -1574,170 +1902,11 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
 
   async updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void> {
     const { teamId, userId, role, customRoleId, currentUserId } = input;
-    const inputIsCustomRole = customRoleId !== undefined;
-    let planned: { organizationId: string; plan: ScopeBindingPlan };
-
-    if (inputIsCustomRole && customRoleId) {
-      const storedCustomRoleId = customRoleId;
-
-      planned = await this.prisma.$transaction(async (tx) => {
-        const team = await tx.team.findUnique({
-          where: { id: teamId },
-          select: { organizationId: true, name: true },
-        });
-        if (!team) {
-          throw new TeamNotFoundError(teamId);
-        }
-        const customRole = await tx.customRole.findUnique({
-          where: { id: storedCustomRoleId },
-          select: { organizationId: true, permissions: true, kind: true },
-        });
-        if (customRole?.kind !== "custom" || customRole.organizationId !== team.organizationId) {
-          throw new CustomRoleNotAssignableError(storedCustomRoleId);
-        }
-
-        const orgMembership = await tx.organizationUser.findUnique({
-          where: {
-            userId_organizationId: {
-              userId,
-              organizationId: team.organizationId,
-            },
-          },
-        });
-
-        if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
-          throw new LiteMemberViewerOnlyError(team.name);
-        }
-
-        const targetUserBinding = await tx.roleBinding.findFirst({
-          where: {
-            organizationId: team.organizationId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamId,
-            userId,
-          },
-          select: { role: true },
-        });
-
-        if (!targetUserBinding) {
-          throw new TeamMembershipNotFoundError(userId);
-        }
-
-        const isTargetUserAdmin = targetUserBinding.role === TeamUserRole.ADMIN;
-
-        // The projection is the whole guard: a save that does not demote an admin
-        // cannot shrink the admin set, and one that does is checked against its exact
-        // post-state. A team already without an admin stays editable from here — this
-        // is one of the places somebody gets promoted back, so the team form's
-        // carve-out holds for the member dialog too.
-        if (isTargetUserAdmin) {
-          const adminsAfter = await effectiveTeamAdmins.projectAdminUserIdsWithoutDirectRole({
-            tx,
-            organizationId: team.organizationId,
-            teamId,
-            userId,
-          });
-          if (adminsAfter.size === 0) {
-            if (userId === currentUserId) {
-              throw new CannotRemoveSelfAsLastAdminError(team.name);
-            }
-
-            throw new TeamLastAdminRequiredError(team.name);
-          }
-        }
-
-        return {
-          organizationId: team.organizationId,
-          plan: await planUserScopeBinding({
-            tx,
-            organizationId: team.organizationId,
-            userId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamId,
-            role: TeamUserRole.CUSTOM,
-            customRoleId: storedCustomRoleId,
-          }),
-        };
-      });
-    } else {
-      planned = await this.prisma.$transaction(async (tx) => {
-        const team = await tx.team.findUnique({
-          where: { id: teamId },
-          select: { organizationId: true, name: true },
-        });
-        if (!team) {
-          throw new TeamNotFoundError(teamId);
-        }
-
-        const orgMembership = await tx.organizationUser.findUnique({
-          where: {
-            userId_organizationId: {
-              userId,
-              organizationId: team.organizationId,
-            },
-          },
-        });
-
-        if (
-          orgMembership?.role === OrganizationUserRole.EXTERNAL &&
-          !isTeamRoleAllowedForOrganizationRole({
-            organizationRole: OrganizationUserRole.EXTERNAL,
-            teamRole: role as TeamRoleValue,
-          })
-        ) {
-          throw new LiteMemberViewerOnlyError(team.name);
-        }
-
-        const targetUserBinding = await tx.roleBinding.findFirst({
-          where: {
-            organizationId: team.organizationId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamId,
-            userId,
-          },
-          select: { role: true },
-        });
-
-        if (!targetUserBinding) {
-          throw new TeamMembershipNotFoundError(userId);
-        }
-
-        const isTargetUserAdmin = targetUserBinding.role === TeamUserRole.ADMIN;
-        const wouldDemoteAdmin = isTargetUserAdmin && role !== TeamUserRole.ADMIN;
-
-        // Same rule as the custom-role branch above: only a save that demotes
-        // an admin can shrink the admin set, so the projection is the whole
-        // guard and an orphaned team stays editable and repairable.
-        if (wouldDemoteAdmin) {
-          const adminsAfter = await effectiveTeamAdmins.projectAdminUserIdsWithoutDirectRole({
-            tx,
-            organizationId: team.organizationId,
-            teamId,
-            userId,
-          });
-          if (adminsAfter.size === 0) {
-            if (userId === currentUserId) {
-              throw new CannotRemoveSelfAsLastAdminError(team.name);
-            }
-
-            throw new TeamLastAdminRequiredError(team.name);
-          }
-        }
-
-        return {
-          organizationId: team.organizationId,
-          plan: await planUserScopeBinding({
-            tx,
-            organizationId: team.organizationId,
-            userId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamId,
-            role: role as TeamUserRole,
-            customRoleId: null,
-          }),
-        };
-      });
-    }
+    const planned = await this.prisma.$transaction((tx) =>
+      customRoleId
+        ? planCustomTeamRole({ tx, teamId, userId, currentUserId, customRoleId })
+        : planBuiltInTeamRole({ tx, teamId, userId, currentUserId, role }),
+    );
 
     await emitScopeBindingPlans({
       writer: this.writer,
@@ -1753,8 +1922,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   async getAuditLogs(
     filters: AuditLogFilters,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
-    const { organizationId, projectId, userId, pageOffset, pageSize, action, startDate, endDate } =
-      filters;
+    const { organizationId, projectId, pageOffset, pageSize } = filters;
 
     const orgUserIds = await this.prisma.organizationUser.findMany({
       where: { organizationId },
@@ -1787,56 +1955,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       });
     }
 
-    const where: Prisma.AuditLogWhereInput = {};
-    const andConditions: Prisma.AuditLogWhereInput[] = [{ OR: orgIdConditions }];
-
-    if (userId) {
-      andConditions.push({ userId });
-    }
-
-    if (action) {
-      andConditions.push({
-        action: {
-          contains: action,
-          mode: "insensitive" as const,
-        },
-      });
-    }
-
-    if (projectId) {
-      andConditions.push({
-        OR: [{ projectId }, { projectId: null }],
-      });
-    }
-
-    if (startDate !== undefined || endDate !== undefined) {
-      const dateFilter: { gte?: Date; lte?: Date } = {};
-      if (startDate !== undefined) {
-        dateFilter.gte = new Date(startDate);
-      }
-      if (endDate !== undefined) {
-        dateFilter.lte = new Date(endDate);
-      }
-      andConditions.push({ createdAt: dateFilter });
-    }
-
-    // Gateway-resource deep-link filter (`/settings/audit-log?targetKind=…
-    // &targetId=…`). Both columns live on `AuditLog` post-consolidation —
-    // see migration 20260425000000_consolidate_gateway_audit_into_audit_log.
-    // targetId is only honored when paired with targetKind so a stray
-    // `?targetId=` from a typo'd URL cannot match across kinds.
-    if (filters.targetKind) {
-      andConditions.push({ targetKind: filters.targetKind });
-      if (filters.targetId) {
-        andConditions.push({ targetId: filters.targetId });
-      }
-    }
-
-    if (andConditions.length > 1) {
-      where.AND = andConditions;
-    } else {
-      Object.assign(where, andConditions[0]);
-    }
+    const where = auditLogWhere({ fence: orgIdConditions, filters });
 
     const [totalCount, rows] = await Promise.all([
       this.prisma.auditLog.count({ where }),

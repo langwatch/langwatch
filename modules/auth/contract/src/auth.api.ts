@@ -2,8 +2,9 @@ import type { RoutingDecision, SignedInWith } from "@langwatch/identity-contract
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type {
-  BrowserSession,
   BrowserSessionInventoryEntry,
+  BrowserSessionResolution,
+  BrowserSessionVerification,
   VerifiedBrowserSession,
 } from "./browser-session.ts";
 import type {
@@ -100,11 +101,11 @@ export interface AuthApi {
    * an impersonation starts/stops against; a process with no sign-in door
    * composed answers null, so callers are anonymous rather than failing.
    */
-  tryVerifyBrowserSession(input: { headers: Headers }): Promise<VerifiedBrowserSession | null>;
-  /** A missing, revoked, expired, or unusable session resolves to null. */
-  tryResolveBrowserSession(input: {
-    verified: VerifiedBrowserSession | null;
-  }): Promise<BrowserSession | null>;
+  verifyBrowserSession(input: { headers: Headers }): Promise<BrowserSessionVerification>;
+  /** A missing, revoked, expired, or unusable session resolves as anonymous. */
+  resolveBrowserSession(input: {
+    verified: VerifiedBrowserSession;
+  }): Promise<BrowserSessionResolution>;
   /** The CLI token door's verifier: the session and its severing key, or `invalid_credentials`. */
   getCliAccessSession(input: {
     authorization: string;
@@ -298,8 +299,8 @@ export interface LegacySsoAccessQuery {
  */
 export type BrowserSessionApi = Pick<
   AuthApi,
-  | "tryVerifyBrowserSession"
-  | "tryResolveBrowserSession"
+  | "verifyBrowserSession"
+  | "resolveBrowserSession"
   | "listBrowserSessions"
   | "endBrowserSession"
   | "revokeAllBrowserSessions"

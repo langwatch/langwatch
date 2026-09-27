@@ -118,6 +118,82 @@ const onlyIdIn = (where: readonly AccountWhere[]): boolean => {
 const valueOf = (where: readonly AccountWhere[], field: string): unknown =>
   where.find((clause) => clause.field === field)?.value;
 
+type AccountQueryShape = (where: readonly AccountWhere[]) => AccountQuery[];
+
+const byProviderSubject: AccountQueryShape = (where) => {
+  if (!only(where, "accountId", "providerId")) return [];
+  const accountId = valueOf(where, "accountId");
+  const providerId = valueOf(where, "providerId");
+  if (typeof accountId !== "string" || typeof providerId !== "string") return [];
+  return [{ kind: "byProviderSubject", providerId, accountId }];
+};
+
+// better-auth 1.7's account key. The issuer stands in for the provider id
+// it was minted from; a `providerId` clause beside it is the same fact said
+// twice, and is preferred verbatim when present rather than derived.
+const byIssuerSubject: AccountQueryShape = (where) => {
+  if (!only(where, "accountId", "issuer")) return [];
+  const accountId = valueOf(where, "accountId");
+  const issuer = valueOf(where, "issuer");
+  if (typeof accountId !== "string" || typeof issuer !== "string") return [];
+  const provider = providerIdFromIssuer(issuer);
+  if (provider.minted) {
+    return [{ kind: "byProviderSubject", providerId: provider.providerId, accountId }];
+  }
+  // A provider that asserts its own issuer: refusing it failed every Google, GitHub, GitLab and
+  // Azure sign-in once ONE user was finalized, since the callback key names no user.
+  return [{ kind: "byIssuerSubject", issuer, accountId }];
+};
+
+// `userId` is a refinement, not decoration: the pair is unique, but answering a query that
+// named a user with another user's row is the cross-tenant miss this module refuses to make.
+const byUserProviderSubject: AccountQueryShape = (where) => {
+  if (!only(where, "accountId", "issuer", "providerId", "userId")) return [];
+  const accountId = valueOf(where, "accountId");
+  const providerId = valueOf(where, "providerId");
+  const userId = valueOf(where, "userId");
+  if (typeof accountId !== "string" || typeof providerId !== "string") return [];
+  if (typeof userId !== "string") return [];
+  return [{ kind: "byUserProviderSubject", userId, providerId, accountId }];
+};
+
+const byIds: AccountQueryShape = (where) => {
+  if (!onlyIdIn(where)) return [];
+  const ids = valueOf(where, "id") as unknown[];
+  return [
+    { kind: "byIds", ids: ids.filter((value): value is string => typeof value === "string") },
+  ];
+};
+
+const byId: AccountQueryShape = (where) => {
+  const id = valueOf(where, "id");
+  return only(where, "id") && typeof id === "string" ? [{ kind: "byId", id }] : [];
+};
+
+const byUser: AccountQueryShape = (where) => {
+  const userId = valueOf(where, "userId");
+  return only(where, "userId") && typeof userId === "string" ? [{ kind: "byUser", userId }] : [];
+};
+
+const byUserAndProvider: AccountQueryShape = (where) => {
+  if (!only(where, "userId", "providerId")) return [];
+  const userId = valueOf(where, "userId");
+  const providerId = valueOf(where, "providerId");
+  if (typeof userId !== "string" || typeof providerId !== "string") return [];
+  return [{ kind: "byUserAndProvider", userId, providerId }];
+};
+
+/** Tried in order; the first shape that recognises the query answers it. */
+const ACCOUNT_QUERY_SHAPES: readonly AccountQueryShape[] = [
+  byProviderSubject,
+  byIssuerSubject,
+  byUserProviderSubject,
+  byIds,
+  byId,
+  byUser,
+  byUserAndProvider,
+];
+
 /** Recognize one of the shapes above, or throw naming what arrived. */
 export function parseAccountQuery({
   operation,
@@ -126,69 +202,8 @@ export function parseAccountQuery({
   operation: string;
   where: readonly AccountWhere[];
 }): AccountQuery {
-  if (only(where, "accountId", "providerId")) {
-    const accountId = valueOf(where, "accountId");
-    const providerId = valueOf(where, "providerId");
-    if (typeof accountId === "string" && typeof providerId === "string") {
-      return { kind: "byProviderSubject", providerId, accountId };
-    }
-  }
-  // better-auth 1.7's account key. The issuer stands in for the provider id
-  // it was minted from; a `providerId` clause beside it is the same fact said
-  // twice, and is preferred verbatim when present rather than derived.
-  if (only(where, "accountId", "issuer")) {
-    const accountId = valueOf(where, "accountId");
-    const issuer = valueOf(where, "issuer");
-    if (typeof accountId === "string" && typeof issuer === "string") {
-      const provider = providerIdFromIssuer(issuer);
-      if (provider.minted) {
-        return { kind: "byProviderSubject", providerId: provider.providerId, accountId };
-      }
-      // A provider that asserts its own issuer. Falling through to the
-      // refusal below made every Google, GitHub, GitLab and Azure sign-in on
-      // the deployment fail the moment ONE user was finalized: the callback
-      // key names no user, so it takes the fleet gate, and the throw left no
-      // legacy fallthrough for the users still held on that branch.
-      return { kind: "byIssuerSubject", issuer, accountId };
-    }
-  }
-  if (only(where, "accountId", "issuer", "providerId", "userId")) {
-    const accountId = valueOf(where, "accountId");
-    const providerId = valueOf(where, "providerId");
-    const userId = valueOf(where, "userId");
-    if (
-      typeof accountId === "string" &&
-      typeof providerId === "string" &&
-      typeof userId === "string"
-    ) {
-      // `userId` is a refinement, not decoration: the pair below is unique,
-      // but answering a query that named a user with another user's row is
-      // the cross-tenant miss this module refuses to make.
-      return { kind: "byUserProviderSubject", userId, providerId, accountId };
-    }
-  }
-  if (onlyIdIn(where)) {
-    const ids = valueOf(where, "id") as unknown[];
-    return {
-      kind: "byIds",
-      ids: ids.filter((value): value is string => typeof value === "string"),
-    };
-  }
-  if (only(where, "id")) {
-    const id = valueOf(where, "id");
-    if (typeof id === "string") return { kind: "byId", id };
-  }
-  if (only(where, "userId")) {
-    const userId = valueOf(where, "userId");
-    if (typeof userId === "string") return { kind: "byUser", userId };
-  }
-  if (only(where, "userId", "providerId")) {
-    const userId = valueOf(where, "userId");
-    const providerId = valueOf(where, "providerId");
-    if (typeof userId === "string" && typeof providerId === "string") {
-      return { kind: "byUserAndProvider", userId, providerId };
-    }
-  }
+  const [query] = ACCOUNT_QUERY_SHAPES.flatMap((shape) => shape(where));
+  if (query !== undefined) return query;
   throw new IdentityUnsupportedStorageQueryError(
     `identity storage adapter: better-auth issued an account ${operation} the identity branch cannot answer: (${shapeOf(where)}). ` +
       "Answering it wrongly would look like a missing sign-in method, so it refuses instead. " +

@@ -17,8 +17,9 @@ import {
   NoAddressToConfirmError,
   type AuthApi as AuthApiContract,
   type AuthServerConfig,
-  type BrowserSession,
   type BrowserSessionInventoryEntry,
+  type BrowserSessionResolution,
+  type BrowserSessionVerification,
   type CliAccessSession,
   type CliTokenRecordEntry,
   type InviteLanding,
@@ -596,24 +597,24 @@ export class AuthApp implements AuthApiContract {
    * Answers "nobody" rather than refusing when this process composed no
    * instance — an unconfigured deployment has anonymous callers, not failing ones.
    */
-  async tryVerifyBrowserSession(input: {
-    headers: Headers;
-  }): Promise<VerifiedBrowserSession | null> {
-    if (!this.#composeBetterAuth) return null;
+  async verifyBrowserSession(input: { headers: Headers }): Promise<BrowserSessionVerification> {
+    if (!this.#composeBetterAuth) return { kind: "anonymous" };
 
-    return (await (
+    const verified = (await (
       await this.betterAuth()
     ).api.getSession({
       headers: input.headers,
     })) as VerifiedBrowserSession | null;
+
+    return verified === null ? { kind: "anonymous" } : { kind: "verified", verified };
   }
 
   /** The session the browser's own poll reads, verified and then resolved. */
   async resolveSession(request: Request): Promise<AuthRestSessionAnswer> {
-    const verified = await this.tryVerifyBrowserSession({ headers: request.headers });
-    const session = await this.tryResolveBrowserSession({ verified });
+    const verification = await this.verifyBrowserSession({ headers: request.headers });
+    if (verification.kind === "anonymous") return verification;
 
-    return session === null ? { kind: "anonymous" } : { kind: "signed_in", session };
+    return this.resolveBrowserSession({ verified: verification.verified });
   }
 
   /**
@@ -676,16 +677,16 @@ export class AuthApp implements AuthApiContract {
     return Promise.reject(
       new AuthUnavailableError({
         capability:
-          "identity birth context (@langwatch/identity-process publishes no BetterAuthIdentityBirthAdapter), so it cannot run a born-finalized sign-up",
+          "identity birth context (@langwatch/identity-process publishes no BetterAuthIdentityBirthService), so it cannot run a born-finalized sign-up",
         processName: this.#members.processName,
       }),
     );
   }
 
-  tryResolveBrowserSession(input: {
-    verified: VerifiedBrowserSession | null;
-  }): Promise<BrowserSession | null> {
-    return this.#sessions.tryResolveBrowserSession(input);
+  resolveBrowserSession(input: {
+    verified: VerifiedBrowserSession;
+  }): Promise<BrowserSessionResolution> {
+    return this.#sessions.resolveBrowserSession(input);
   }
 
   async getCliAccessSession(input: {
@@ -748,10 +749,11 @@ export class AuthApp implements AuthApiContract {
 
   /** The person a browser cookie names, for the approval page's three routes. */
   async #cliBrowserSession(headers: Headers): Promise<CliBrowserSession | null> {
-    const verified = await this.tryVerifyBrowserSession({ headers });
-    const session = await this.tryResolveBrowserSession({ verified });
+    const verification = await this.verifyBrowserSession({ headers });
+    if (verification.kind === "anonymous") return null;
+    const resolution = await this.resolveBrowserSession({ verified: verification.verified });
 
-    return session === null ? null : session.user;
+    return resolution.kind === "signed_in" ? resolution.session.user : null;
   }
 
   findCliTokenRecordsForUser(input: { userId: string }): Promise<CliTokenRecordEntry[]> {

@@ -17,7 +17,7 @@ import {
 } from "@langwatch/identity-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 
-import type { IdentityEventing } from "../app/identity.members.ts";
+import type { IdentityEventing, IdentityPipelineCommand } from "../app/identity.members.ts";
 import type { ScimSyncLedger } from "../rules/scim-sync-ledger.rules.ts";
 
 export type ScimSyncStagedSender = {
@@ -57,8 +57,8 @@ export class ScimSyncLedgerWriterService implements ScimSyncLedger {
     this.logger = deps.logger ?? createLogger("langwatch:identity:scim-sync-ledger");
   }
 
-  private stagedSender(name: string): Promise<ScimSyncStagedSender | null> {
-    return this.eventing.tryPipelineCommand({
+  private stagedSender(name: string): Promise<IdentityPipelineCommand> {
+    return this.eventing.resolvePipelineCommand({
       pipeline: SCIM_SYNC_PIPELINE_NAME,
       command: name,
     });
@@ -104,8 +104,8 @@ export class ScimSyncLedgerWriterService implements ScimSyncLedger {
     connectionId: string;
   }): Promise<void> {
     const senderName = SENDER_NAME_BY_COMMAND[command.type];
-    const sender = await this.stagedSender(senderName);
-    if (!sender) {
+    const resolved = await this.stagedSender(senderName);
+    if (resolved.kind === "unregistered") {
       this.logger.error(
         {
           scimSyncId,
@@ -118,6 +118,6 @@ export class ScimSyncLedgerWriterService implements ScimSyncLedger {
       );
       return;
     }
-    await sender.send(command.data);
+    await resolved.sender.send(command.data);
   }
 }

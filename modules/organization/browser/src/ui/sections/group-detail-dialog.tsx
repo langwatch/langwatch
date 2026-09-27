@@ -1,11 +1,9 @@
 import {
-  Badge,
   Box,
   Button,
   createListCollection,
   HStack,
   Input,
-  Spacer,
   Spinner,
   Text,
   VStack,
@@ -19,19 +17,162 @@ import { useEffect, useRef, useState } from "react";
 import type { RouterOutputs } from "../../behavior/organization-api.ts";
 import { api } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
-import type { TeamUserRole } from "../../model/prisma-types.ts";
 import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import {
   BindingInputRow,
   type BindingInputRowHandle,
+  DirectBindingRow,
   type PendingBinding,
-  roleBadgeColor,
   SourceBadge,
-  scopeTypeLabel,
+  StagedBindingRow,
+  toggled,
 } from "./group-binding-input-row.tsx";
 
 type Group = RouterOutputs["group"]["listAll"][number];
 type PendingAddition = { userId: string; label: string; image: string | null };
+
+type GroupMember = {
+  userId: string;
+  name: string | null;
+  email: string | null;
+  image?: string | null;
+};
+
+function GroupMemberRow({
+  member,
+  markedForRemoval,
+  removable,
+  onToggle,
+}: {
+  member: GroupMember;
+  markedForRemoval: boolean;
+  removable: boolean;
+  onToggle: () => void;
+}) {
+  const label = member.name ?? member.email;
+  return (
+    <HStack py={1} fontSize="sm" opacity={markedForRemoval ? 0.4 : 1} transition="opacity 0.15s">
+      <RandomColorAvatar name={label ?? "?"} image={member.image} size="xs" />
+      <Text flex={1} textDecoration={markedForRemoval ? "line-through" : undefined}>
+        {label}
+      </Text>
+      {removable && (
+        <Button
+          size="xs"
+          variant="ghost"
+          color={markedForRemoval ? "blue.500" : "fg.muted"}
+          aria-label={markedForRemoval ? `Undo removal of ${label}` : `Mark ${label} for removal`}
+          onClick={onToggle}
+        >
+          <X size={14} />
+        </Button>
+      )}
+    </HStack>
+  );
+}
+
+function StagedMemberRow({ addition, onUndo }: { addition: PendingAddition; onUndo: () => void }) {
+  return (
+    <HStack py={1} fontSize="sm" opacity={0.7}>
+      <RandomColorAvatar name={addition.label} image={addition.image} size="xs" />
+      <Text flex={1} color="green.600">
+        {addition.label}
+      </Text>
+      <Button
+        size="xs"
+        variant="ghost"
+        color="fg.muted"
+        aria-label={`Undo adding ${addition.label}`}
+        onClick={onUndo}
+      >
+        <X size={14} />
+      </Button>
+    </HStack>
+  );
+}
+
+type MemberCandidate = {
+  userId: string;
+  user: { name: string | null; email: string | null; image?: string | null };
+};
+
+function AddMemberPicker({
+  candidates,
+  existingMemberIds,
+  search,
+  onSearch,
+  selected,
+  onSelect,
+  onAdd,
+}: {
+  candidates: MemberCandidate[];
+  existingMemberIds: ReadonlySet<string>;
+  search: string;
+  onSearch: (search: string) => void;
+  selected: string;
+  onSelect: (userId: string) => void;
+  onAdd: (addition: PendingAddition) => void;
+}) {
+  const allAvailable = candidates
+    .filter((m) => !existingMemberIds.has(m.userId))
+    .map((m) => ({
+      label: `${m.user.name ?? m.user.email} (${m.user.email})`,
+      value: m.userId,
+      image: m.user.image ?? null,
+    }))
+    .toSorted((a, b) => a.label.localeCompare(b.label));
+  const needle = search.toLowerCase();
+  const availableItems = search
+    ? allAvailable.filter((m) => m.label.toLowerCase().includes(needle))
+    : allAvailable;
+  const availableCollection = createListCollection({ items: availableItems });
+  const add = () => {
+    const item = allAvailable.find((a) => a.value === selected);
+    if (item) onAdd({ userId: item.value, label: item.label, image: item.image });
+  };
+
+  return (
+    <HStack gap={2} mt={2}>
+      <Select.Root
+        collection={availableCollection}
+        value={selected ? [selected] : []}
+        onValueChange={(e) => onSelect(e.value[0] ?? "")}
+        size="sm"
+        flex={1}
+      >
+        <Select.Trigger>
+          <Select.ValueText placeholder="Add member..." />
+        </Select.Trigger>
+        <Select.Content>
+          <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
+            <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
+              <Input
+                size="sm"
+                placeholder="Search members..."
+                value={search}
+                onChange={(e) => onSearch(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+            </InputGroup>
+          </Box>
+          {availableItems.map((item) => (
+            <Select.Item key={item.value} item={item}>
+              {item.label}
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+      <Button
+        size="sm"
+        colorPalette={selected ? "blue" : undefined}
+        disabled={!selected}
+        onClick={add}
+      >
+        Add
+      </Button>
+    </HStack>
+  );
+}
 
 export function GroupDetailDialog({
   group,
@@ -120,7 +261,7 @@ export function GroupDetailDialog({
         rename: nameChanged ? { name: pendingName.trim() } : null,
         bindingIdsToDelete: [...pendingBindingRemovals],
         bindingsToCreate: allBindingAdditions.map((b) => ({
-          role: b.role as TeamUserRole,
+          role: b.role,
           customRoleId: b.customRoleId,
           scopeType: b.scopeType,
           scopeId: b.scopeId,
@@ -142,26 +283,10 @@ export function GroupDetailDialog({
 
   // ── helpers ──────────────────────────────────────────────────────────────────
   const toggleBindingRemoval = (id: string) =>
-    setPendingBindingRemovals((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    setPendingBindingRemovals((prev) => toggled({ set: prev, id }));
 
   const toggleMemberRemoval = (userId: string) =>
-    setPendingRemovals((prev) => {
-      const next = new Set(prev);
-      if (next.has(userId)) {
-        next.delete(userId);
-      } else {
-        next.add(userId);
-      }
-      return next;
-    });
+    setPendingRemovals((prev) => toggled({ set: prev, id: userId }));
 
   const stageMemberAdd = ({
     userId,
@@ -234,80 +359,23 @@ export function GroupDetailDialog({
                   </Text>
                 ) : (
                   <VStack gap={2} align="stretch">
-                    {d.bindings.map((b) => {
-                      const markedForRemoval = pendingBindingRemovals.has(b.id);
-                      return (
-                        <HStack
-                          key={b.id}
-                          px={3}
-                          py={2}
-                          bg="bg.muted"
-                          borderRadius="md"
-                          fontSize="sm"
-                          opacity={markedForRemoval ? 0.4 : 1}
-                          transition="opacity 0.15s"
-                        >
-                          <Badge
-                            colorPalette={roleBadgeColor(b.role)}
-                            size="sm"
-                            textDecoration={markedForRemoval ? "line-through" : undefined}
-                          >
-                            {b.customRoleName ?? b.role}
-                          </Badge>
-                          <Text color="fg.muted">on</Text>
-                          <Badge
-                            colorPalette="purple"
-                            size="sm"
-                            textDecoration={markedForRemoval ? "line-through" : undefined}
-                          >
-                            {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
-                          </Badge>
-                          <Spacer />
-                          {canManage && (
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              color={markedForRemoval ? "blue.500" : "fg.muted"}
-                              aria-label={markedForRemoval ? "Undo removal" : `Remove binding`}
-                              onClick={() => toggleBindingRemoval(b.id)}
-                            >
-                              <X size={14} />
-                            </Button>
-                          )}
-                        </HStack>
-                      );
-                    })}
-
+                    {d.bindings.map((b) => (
+                      <DirectBindingRow
+                        key={b.id}
+                        binding={b}
+                        markedForRemoval={pendingBindingRemovals.has(b.id)}
+                        removable={canManage}
+                        onToggle={() => toggleBindingRemoval(b.id)}
+                      />
+                    ))}
                     {pendingBindingAdditions.map((b, i) => (
-                      <HStack
+                      <StagedBindingRow
                         key={i}
-                        px={3}
-                        py={2}
-                        bg="bg.muted"
-                        borderRadius="md"
-                        fontSize="sm"
-                        opacity={0.7}
-                      >
-                        <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
-                          {b.customRoleName ?? b.role}
-                        </Badge>
-                        <Text color="fg.muted">on</Text>
-                        <Badge colorPalette="purple" size="sm">
-                          {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
-                        </Badge>
-                        <Spacer />
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          color="fg.muted"
-                          aria-label="Undo add"
-                          onClick={() =>
-                            setPendingBindingAdditions((prev) => prev.filter((_, j) => j !== i))
-                          }
-                        >
-                          <X size={14} />
-                        </Button>
-                      </HStack>
+                        binding={b}
+                        onUndo={() =>
+                          setPendingBindingAdditions((prev) => prev.filter((_, j) => j !== i))
+                        }
+                      />
                     ))}
                   </VStack>
                 )}
@@ -346,141 +414,38 @@ export function GroupDetailDialog({
                   </Text>
                 ) : (
                   <>
-                    {d.members.map((m) => {
-                      const markedForRemoval = pendingRemovals.has(m.userId);
-                      return (
-                        <HStack
-                          key={m.userId}
-                          py={1}
-                          fontSize="sm"
-                          opacity={markedForRemoval ? 0.4 : 1}
-                          transition="opacity 0.15s"
-                        >
-                          <RandomColorAvatar
-                            name={m.name ?? m.email ?? "?"}
-                            image={m.image}
-                            size="xs"
-                          />
-                          <Text
-                            flex={1}
-                            textDecoration={markedForRemoval ? "line-through" : undefined}
-                          >
-                            {m.name ?? m.email}
-                          </Text>
-                          {canManage && !d.scimSource && (
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              color={markedForRemoval ? "blue.500" : "fg.muted"}
-                              aria-label={
-                                markedForRemoval
-                                  ? `Undo removal of ${m.name ?? m.email}`
-                                  : `Mark ${m.name ?? m.email} for removal`
-                              }
-                              onClick={() => toggleMemberRemoval(m.userId)}
-                            >
-                              <X size={14} />
-                            </Button>
-                          )}
-                        </HStack>
-                      );
-                    })}
+                    {d.members.map((m) => (
+                      <GroupMemberRow
+                        key={m.userId}
+                        member={m}
+                        markedForRemoval={pendingRemovals.has(m.userId)}
+                        removable={canManage && !d.scimSource}
+                        onToggle={() => toggleMemberRemoval(m.userId)}
+                      />
+                    ))}
                     {pendingAdditions.map((a) => (
-                      <HStack key={a.userId} py={1} fontSize="sm" opacity={0.7}>
-                        <RandomColorAvatar name={a.label} image={a.image} size="xs" />
-                        <Text flex={1} color="green.600">
-                          {a.label}
-                        </Text>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          color="fg.muted"
-                          aria-label={`Undo adding ${a.label}`}
-                          onClick={() =>
-                            setPendingAdditions((prev) => prev.filter((x) => x.userId !== a.userId))
-                          }
-                        >
-                          <X size={14} />
-                        </Button>
-                      </HStack>
+                      <StagedMemberRow
+                        key={a.userId}
+                        addition={a}
+                        onUndo={() =>
+                          setPendingAdditions((prev) => prev.filter((x) => x.userId !== a.userId))
+                        }
+                      />
                     ))}
                   </>
                 )}
 
-                {canManage &&
-                  !d.scimSource &&
-                  (() => {
-                    const allAvailable = (orgMembers.data?.members ?? [])
-                      .filter((m) => !existingMemberIds.has(m.userId))
-                      .map((m) => ({
-                        label: `${m.user.name ?? m.user.email} (${m.user.email})`,
-                        value: m.userId,
-                        image: m.user.image ?? null,
-                      }))
-                      .toSorted((a, b) => a.label.localeCompare(b.label));
-                    const availableItems = memberSearch
-                      ? allAvailable.filter((m) =>
-                          m.label.toLowerCase().includes(memberSearch.toLowerCase()),
-                        )
-                      : allAvailable;
-                    const availableCollection = createListCollection({
-                      items: availableItems,
-                    });
-
-                    return (
-                      <HStack gap={2} mt={2}>
-                        <Select.Root
-                          collection={availableCollection}
-                          value={addMemberId ? [addMemberId] : []}
-                          onValueChange={(e) => setAddMemberId(e.value[0] ?? "")}
-                          size="sm"
-                          flex={1}
-                        >
-                          <Select.Trigger>
-                            <Select.ValueText placeholder="Add member..." />
-                          </Select.Trigger>
-                          <Select.Content>
-                            <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
-                              <InputGroup
-                                startElement={<Search size={14} />}
-                                startOffset="2px"
-                                width="full"
-                              >
-                                <Input
-                                  size="sm"
-                                  placeholder="Search members..."
-                                  value={memberSearch}
-                                  onChange={(e) => setMemberSearch(e.target.value)}
-                                  onKeyDown={(e) => e.stopPropagation()}
-                                />
-                              </InputGroup>
-                            </Box>
-                            {availableItems.map((item) => (
-                              <Select.Item key={item.value} item={item}>
-                                {item.label}
-                              </Select.Item>
-                            ))}
-                          </Select.Content>
-                        </Select.Root>
-                        <Button
-                          size="sm"
-                          colorPalette={addMemberId ? "blue" : undefined}
-                          disabled={!addMemberId}
-                          onClick={() => {
-                            const item = allAvailable.find((a) => a.value === addMemberId);
-                            if (item)
-                              stageMemberAdd({
-                                userId: item.value,
-                                label: item.label,
-                                image: item.image,
-                              });
-                          }}
-                        >
-                          Add
-                        </Button>
-                      </HStack>
-                    );
-                  })()}
+                {canManage && !d.scimSource && (
+                  <AddMemberPicker
+                    candidates={orgMembers.data?.members ?? []}
+                    existingMemberIds={existingMemberIds}
+                    search={memberSearch}
+                    onSearch={setMemberSearch}
+                    selected={addMemberId}
+                    onSelect={setAddMemberId}
+                    onAdd={stageMemberAdd}
+                  />
+                )}
               </Box>
             </VStack>
           )}

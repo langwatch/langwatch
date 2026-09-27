@@ -47,8 +47,11 @@ describe("ConnectedIdentityEventing", () => {
       const eventing = ConnectedIdentityEventing.create();
 
       await expect(
-        eventing.tryPipelineCommand({ pipeline: IDENTITY_PIPELINE_NAME, command: "markPrimary" }),
-      ).resolves.toBeNull();
+        eventing.resolvePipelineCommand({
+          pipeline: IDENTITY_PIPELINE_NAME,
+          command: "markPrimary",
+        }),
+      ).resolves.toEqual({ kind: "unregistered" });
     });
   });
 
@@ -71,11 +74,11 @@ describe("ConnectedIdentityEventing", () => {
       const { commands, sent } = recordingCommands(IDENTITY_PIPELINE_NAME, IDENTITY_VERBS);
       eventing.connect({ pipeline: IDENTITY_PIPELINE_NAME, commands });
 
-      const sender = await eventing.tryPipelineCommand({
+      const resolved = await eventing.resolvePipelineCommand({
         pipeline: IDENTITY_PIPELINE_NAME,
         command: "markPrimary",
       });
-      await sender?.send({ userId: "user_1" });
+      if (resolved.kind === "registered") await resolved.sender.send({ userId: "user_1" });
 
       expect(sent).toEqual([
         { pipeline: IDENTITY_PIPELINE_NAME, command: "markPrimary", data: { userId: "user_1" } },
@@ -92,8 +95,8 @@ describe("ConnectedIdentityEventing", () => {
       eventing.connect({ pipeline: IDENTITY_PIPELINE_NAME, commands });
 
       await expect(
-        eventing.tryPipelineCommand({ pipeline: IDENTITY_PIPELINE_NAME, command: "dropTable" }),
-      ).resolves.toBeNull();
+        eventing.resolvePipelineCommand({ pipeline: IDENTITY_PIPELINE_NAME, command: "dropTable" }),
+      ).resolves.toEqual({ kind: "unregistered" });
     });
   });
 });

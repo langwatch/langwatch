@@ -103,7 +103,12 @@ class ApiSurface {
       ? SessionReader.create({
           verify: composeSessionVerification({
             sessions: BetterAuthBrowserSessionTransportAdapter.create({
-              api: { getSession: (input) => auth.tryVerifyBrowserSession(input) },
+              api: {
+                getSession: async (input) => {
+                  const verification = await auth.verifyBrowserSession(input);
+                  return verification.kind === "verified" ? verification.verified : null;
+                },
+              },
             }),
             auth,
           }),

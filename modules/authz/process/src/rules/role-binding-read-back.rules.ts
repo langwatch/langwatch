@@ -1,6 +1,8 @@
 // Creates answer optimistically while projection catches up; follow-up read fills names.
 import type {
   AuthzManagedOrganizationBinding,
+  RoleBindingPrincipal,
+  RoleBindingRest,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/authz-contract";
@@ -72,4 +74,26 @@ function principalOfCreated({
   // The service refuses a create naming no principal, so the last branch is
   // the API key one rather than a fallback for "none of the above".
   return { type: "apiKey", id: apiKeyId ?? "", name: null };
+}
+
+function principalOf(row: AuthzManagedOrganizationBinding): RoleBindingPrincipal {
+  if (row.userId) return { type: "user", id: row.userId, name: row.userName ?? null };
+  if (row.groupId) return { type: "group", id: row.groupId, name: row.groupName ?? null };
+
+  return { type: "apiKey", id: row.apiKeyId ?? "", name: row.apiKeyName ?? null };
+}
+
+/** One managed binding as the role-bindings REST family reports it. */
+export function bindingWire(row: AuthzManagedOrganizationBinding): RoleBindingRest {
+  return {
+    id: row.id,
+    principal: principalOf(row),
+    role: row.role,
+    customRoleId: row.customRoleId,
+    customRoleName: row.customRoleName,
+    scopeType: row.scopeType,
+    scopeId: row.scopeId,
+    scopeName: row.scopeName,
+    createdAt: row.createdAt,
+  };
 }

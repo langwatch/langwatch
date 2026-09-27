@@ -134,7 +134,7 @@ export type {
 // layer/identity/`: the Postgres repositories the guards and the fold read and write through, the
 // two ledger writers, the join-request orchestration around the event-sourced lifecycle, and the
 // instance's sign-in method policy.
-export { type IdentityEventing } from "./app/identity.members.ts";
+export { type IdentityEventing, type IdentityPipelineCommand } from "./app/identity.members.ts";
 export { type PlatformOperator } from "./app/identity.members.ts";
 export {
   IDENTITY_CONVERGENCE_POLL_MS,
@@ -224,7 +224,7 @@ export {
 } from "./services/sso-connection-teardown.service.ts";
 export type { IdentityRepositories } from "./repositories/identity.repositories.ts";
 export {
-  BetterAuthIdentityBirthAdapter,
+  BetterAuthIdentityBirthService,
   type IdentityBirthScope,
 } from "./services/better-auth-identity-birth.service.ts";
 export { buildIdentityInfrastructure } from "./app/identity-composition.build.ts";

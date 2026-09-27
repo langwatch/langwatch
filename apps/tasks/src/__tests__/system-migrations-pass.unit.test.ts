@@ -128,8 +128,8 @@ describe("given the system migration task", () => {
         eventing: identity,
       });
       await expect(
-        identity.tryPipelineCommand({ pipeline: "identity", command: "attachIdentifier" }),
-      ).resolves.toBe(dependencies.sender);
+        identity.resolvePipelineCommand({ pipeline: "identity", command: "attachIdentifier" }),
+      ).resolves.toEqual({ kind: "registered", sender: dependencies.sender });
       expect(dependencies.runPass).toHaveBeenCalledWith({ signal });
       // The task closes only what it made; the boot seam closes the stores.
       expect(dependencies.closeOrder).toEqual(["eventing"]);
@@ -168,8 +168,8 @@ describe("given the system migration task", () => {
       expect(options.userMigrations()).toEqual(["identifier-backfill", "secret-heal"]);
       const identity = dependencies.userMigrations.mock.calls[0]?.[0].eventing;
       await expect(
-        identity.tryPipelineCommand({ pipeline: "identity", command: "attachIdentifier" }),
-      ).resolves.toBeNull();
+        identity.resolvePipelineCommand({ pipeline: "identity", command: "attachIdentifier" }),
+      ).resolves.toEqual({ kind: "unregistered" });
       expect(dependencies.closeOrder).toEqual([]);
     });
   });

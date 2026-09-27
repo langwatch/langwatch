@@ -12,56 +12,52 @@ export interface IdentityBirthScope {
   readonly born: Set<string>;
 }
 
-/**
- * The request-scoped entrance a flagged sign-up runs inside. Static because the scope is
- * `AsyncLocalStorage`: it belongs to the request, not to an instance, and every collaborator in
- * that request must see the same one.
- */
-export class BetterAuthIdentityBirthAdapter {
-  static create(): BetterAuthIdentityBirthAdapter {
-    return new BetterAuthIdentityBirthAdapter();
+/** One scope per process: it belongs to the request, and every instance must see the same one. */
+const birthScope = new AsyncLocalStorage<IdentityBirthScope>();
+
+/** The request-scoped entrance a flagged sign-up runs inside. */
+export class BetterAuthIdentityBirthService {
+  static create(): BetterAuthIdentityBirthService {
+    return new BetterAuthIdentityBirthService();
   }
 
   private constructor() {}
-
-  private static readonly scope = new AsyncLocalStorage<IdentityBirthScope>();
 
   /**
    * Open the entrance for one request. The caller has already decided the
    * request is flag-listed; this only carries that decision down to storage.
    */
-  static runWithIdentityBirth<T>(run: () => Promise<T>): Promise<T> {
-    return BetterAuthIdentityBirthAdapter.scope.run({ born: new Set<string>() }, run);
+  runWithIdentityBirth<T>(run: () => Promise<T>): Promise<T> {
+    return birthScope.run({ born: new Set<string>() }, run);
   }
 
   /** Whether this request is inside an entrance. */
-  static isInsideIdentityBirth(): boolean {
-    return BetterAuthIdentityBirthAdapter.scope.getStore() !== undefined;
+  isInsideIdentityBirth(): boolean {
+    return birthScope.getStore() !== undefined;
   }
 
   /** A user borne on the identity branch: every later routed write in this
    *  request is theirs to take on the identity branch. */
-  static recordIdentityBirth({ userId }: { userId: string }): void {
-    BetterAuthIdentityBirthAdapter.scope.getStore()?.born.add(userId);
+  recordIdentityBirth({ userId }: { userId: string }): void {
+    birthScope.getStore()?.born.add(userId);
   }
 
   /** Whether this request already bore this user — the gate's answer for a
    *  newborn, which the real gate cannot give until their rows commit. */
-  static wasBornInThisRequest({ userId }: { userId: string }): boolean {
-    return BetterAuthIdentityBirthAdapter.scope.getStore()?.born.has(userId) === true;
+  wasBornInThisRequest({ userId }: { userId: string }): boolean {
+    return birthScope.getStore()?.born.has(userId) === true;
   }
 
   /** Whether this request bore ANYONE — the fleet-level question, asked of a
    *  request whose newborn no state row can answer for yet. */
-  static anyBornInThisRequest(): boolean {
-    return (BetterAuthIdentityBirthAdapter.scope.getStore()?.born.size ?? 0) > 0;
+  anyBornInThisRequest(): boolean {
+    return (birthScope.getStore()?.born.size ?? 0) > 0;
   }
 
   /**
    * The per-user gate, plus the answer it cannot give for a user this request just bore.
    */
-  static birthAwareGate(gate: IdentityUserGate): IdentityUserGate {
-    return async ({ userId }) =>
-      BetterAuthIdentityBirthAdapter.wasBornInThisRequest({ userId }) || gate({ userId });
+  birthAwareGate(gate: IdentityUserGate): IdentityUserGate {
+    return async ({ userId }) => this.wasBornInThisRequest({ userId }) || gate({ userId });
   }
 }

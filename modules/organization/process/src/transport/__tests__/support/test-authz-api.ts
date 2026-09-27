@@ -247,6 +247,7 @@ export class TestAuthzApi implements AuthzApi {
   deleteRole = unsupported<AuthzApi["deleteRole"]>("deleteRole");
   createBinding = unsupported<AuthzApi["createBinding"]>("createBinding");
   updateBinding = unsupported<AuthzApi["updateBinding"]>("updateBinding");
+  updateRoleBinding = unsupported<AuthzApi["updateRoleBinding"]>("updateRoleBinding");
   deleteBinding = unsupported<AuthzApi["deleteBinding"]>("deleteBinding");
   applyMemberBindings = unsupported<AuthzApi["applyMemberBindings"]>("applyMemberBindings");
   retireDirectoryGrants = unsupported<AuthzApi["retireDirectoryGrants"]>("retireDirectoryGrants");

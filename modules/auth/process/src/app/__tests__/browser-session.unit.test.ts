@@ -173,8 +173,8 @@ describe("BrowserSessionService", () => {
       sessions.stored = null;
 
       await expect(
-        service({ sessions }).service.tryResolveBrowserSession({ verified }),
-      ).resolves.toBeNull();
+        service({ sessions }).service.resolveBrowserSession({ verified }),
+      ).resolves.toEqual({ kind: "anonymous" });
     });
   });
 
@@ -184,10 +184,13 @@ describe("BrowserSessionService", () => {
       const identityEmails = new IdentityEmails(new Map([["admin-1", "identity@example.com"]]));
 
       await expect(
-        service({ identityEmails }).service.tryResolveBrowserSession({ verified }),
+        service({ identityEmails }).service.resolveBrowserSession({ verified }),
       ).resolves.toMatchObject({
-        sessionId: "session-1",
-        user: { id: "admin-1", email: "identity@example.com", pendingSsoSetup: false },
+        kind: "signed_in",
+        session: {
+          sessionId: "session-1",
+          user: { id: "admin-1", email: "identity@example.com", pendingSsoSetup: false },
+        },
       });
     });
   });
@@ -195,11 +198,12 @@ describe("BrowserSessionService", () => {
   describe("when the identifier ledger holds no address for the person", () => {
     /** @scenario "An unenrolled user's session carries the stored column" */
     it("answers the address stored on the user row, not the one the cookie carried", async () => {
-      await expect(service().service.tryResolveBrowserSession({ verified })).resolves.toMatchObject(
-        {
+      await expect(service().service.resolveBrowserSession({ verified })).resolves.toMatchObject({
+        kind: "signed_in",
+        session: {
           user: { id: "admin-1", email: "admin-1@example.com" },
         },
-      );
+      });
     });
   });
 
@@ -221,12 +225,15 @@ describe("BrowserSessionService", () => {
       });
 
       await expect(
-        service({ sessions, identityEmails }).service.tryResolveBrowserSession({ verified }),
+        service({ sessions, identityEmails }).service.resolveBrowserSession({ verified }),
       ).resolves.toMatchObject({
-        user: {
-          id: "target-1",
-          email: "target-identity@example.com",
-          impersonator: { id: "admin-1", email: "admin-identity@example.com" },
+        kind: "signed_in",
+        session: {
+          user: {
+            id: "target-1",
+            email: "target-identity@example.com",
+            impersonator: { id: "admin-1", email: "admin-identity@example.com" },
+          },
         },
       });
     });
@@ -255,8 +262,8 @@ describe("BrowserSessionService", () => {
       ],
     ])("keeps the real actor for %s impersonation", async (_label, value) => {
       await expect(
-        service({ sessions: impersonating(value) }).service.tryResolveBrowserSession({ verified }),
-      ).resolves.toMatchObject({ user: { id: "admin-1" } });
+        service({ sessions: impersonating(value) }).service.resolveBrowserSession({ verified }),
+      ).resolves.toMatchObject({ kind: "signed_in", session: { user: { id: "admin-1" } } });
     });
   });
 

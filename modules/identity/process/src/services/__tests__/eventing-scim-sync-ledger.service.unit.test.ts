@@ -13,7 +13,7 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
-import type { IdentityEventing } from "../../app/identity.members.ts";
+import type { IdentityEventing, IdentityPipelineCommand } from "../../app/identity.members.ts";
 import { ScimSyncLedgerWriterService } from "../eventing-scim-sync-ledger.service.ts";
 
 const ORGANIZATION = "org_acme";
@@ -27,13 +27,19 @@ class RecordingEventing implements IdentityEventing {
 
   constructor(private readonly registered: boolean) {}
 
-  async tryPipelineCommand(input: { pipeline: string; command: string }) {
+  async resolvePipelineCommand(input: {
+    pipeline: string;
+    command: string;
+  }): Promise<IdentityPipelineCommand> {
     this.asked.push(input);
-    if (!this.registered) return null;
+    if (!this.registered) return { kind: "unregistered" };
     return {
-      send: async (data: unknown) => {
-        this.staged.push(data);
-        return undefined;
+      kind: "registered",
+      sender: {
+        send: async (data: unknown) => {
+          this.staged.push(data);
+          return undefined;
+        },
       },
     };
   }

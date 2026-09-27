@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { identifierProviderFor } from "@langwatch/identity-contract";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { nanoid } from "nanoid";
 
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
@@ -16,6 +16,9 @@ import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
 import type { IdentityCeremonyWrites } from "../rules/identity-writes.rules.ts";
 
 const logger = createLogger("langwatch:better-auth:identity-ceremonies");
+
+/** KSUID resource prefix for an account row id: a persisted format. */
+const ACCOUNT_KSUID_RESOURCE = "account";
 
 /** The `User` fields a ceremony reads. */
 interface UserRow {
@@ -91,10 +94,11 @@ export class IdentityCeremoniesService implements IdentityAccountCeremonies {
       );
       return { pinned: false };
     }
-    // Minted the same way the schema's own `@default(nanoid())` would mint
-    // it; better-auth persists a hook-supplied id (forceAllowId is always on
-    // for creates), and the backfill links the identifier by this id.
-    const accountRowId = typeof account.id === "string" ? account.id : nanoid();
+    // A new account id is a KSUID; rows minted before keep the schema's nanoid (Alex, 2026-09-27).
+    // better-auth persists a hook-supplied id (forceAllowId is on for creates), and the backfill
+    // links the identifier by this id.
+    const accountRowId =
+      typeof account.id === "string" ? account.id : generate(ACCOUNT_KSUID_RESOURCE).toString();
     await this.identity.attachIdentifier({
       tenantId: userId,
       userId,
