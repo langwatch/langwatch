@@ -152,6 +152,9 @@ EXCLUDES=(
   # `Dockerfile` and `Dockerfile.<target>` rather than `Dockerfile*`: the star
   # form also matches any source file whose name merely starts with the word,
   # and every container file in the repo uses one of these two spellings.
+  # The langy agent's is claimed first: generate:langy-skills reads its COPY set
+  # during `start:prepare:files` on the end user's machine.
+  --include=Dockerfile.langyagent
   --exclude=Dockerfile
   --exclude=Dockerfile.*
   --exclude=.dockerignore
@@ -420,7 +423,7 @@ fi
 # which JSON.parse rejects outright.
 missing_extends=""
 while IFS= read -r -d '' tsconfig; do
-  extends_target="$(grep -o '"extends"[[:space:]]*:[[:space:]]*"[^"]*"' "$tsconfig" \
+  extends_target="$({ grep -o '"extends"[[:space:]]*:[[:space:]]*"[^"]*"' "$tsconfig" || true; } \
     | head -n1 | sed -E 's/.*"extends"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/')"
   [ -n "$extends_target" ] || continue
   # `test -e` resolves the "../.." in a relative extends target itself; no
