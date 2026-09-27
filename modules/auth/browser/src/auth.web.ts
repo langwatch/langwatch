@@ -51,6 +51,8 @@ export const authWeb = defineWebModule("auth")
     session: { load: () => import("./session.ts") },
     /** The front door's theme config; the composition root adds it to the design system. */
     frontDoorTheme: { load: () => import("./model/front-door-theme.ts") },
+    /** The front door's host port, which the shell's auth layout implements. */
+    host: { load: () => import("./model/auth-host.ts") },
     /** Auth's half of a peer's host: a sign-in that names a connection, and
      *  one spelling for a sign-in code. */
     signIn: { load: () => import("./behavior/sign-in-capability.ts") },

@@ -12,6 +12,7 @@ import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { LangyMark, LangyMarkGradientDefs, useLangyStore } from "@langwatch/langy-browser-kit";
 import {
+  NavigationHost,
   NavigationHostProvider,
   type NavigationAccountMenu,
   type NavigationLangy,
@@ -29,7 +30,7 @@ import { UiPageFailure, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbac
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, type ReactNode } from "react";
 
-import { BrowserNavigationHost } from "./navigation-host";
+import { browserNavigationHosts } from "./navigation-host";
 import { readNavigationDeployment } from "./navigation-host-deployment";
 import { offersLangyAsk, offersPresenceMenuItem, opsAccessOf } from "./navigation-host-gates";
 import {
@@ -46,6 +47,9 @@ import { useUiShellFailure } from "./ui-shell-failure";
 const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
 
 const ORGANIZATIONS_INPUT = { isDemo: false };
+
+/** Built over the port class this file already imports, until navigation declares it. */
+const BrowserNavigationHost = browserNavigationHosts(NavigationHost);
 
 /** The port's scope write, in the shell's own storage vocabulary. */
 function rememberScope({
@@ -166,8 +170,14 @@ function useNavigationHostReading({
     [actor],
   );
   const openableTeams = useMemo(
-    () => openableTeamsOf({ organization, userId: currentUser?.id, organizationRole }),
-    [organization, currentUser?.id, organizationRole],
+    () =>
+      openableTeamsOf({
+        organization,
+        userId: currentUser?.id,
+        organizationRole,
+        teamRules: scopeCapability,
+      }),
+    [organization, currentUser?.id, organizationRole, scopeCapability],
   );
 
   const deployment = useMemo(readNavigationDeployment, []);

@@ -1,24 +1,24 @@
 /**
- * The shell's answer to the navigation module's host port — the shell
- * implements a module's `*HostApi`, never the module itself (ARCHITECTURE.md
- * 10.1). Holds the port's shape over readings the mount already took.
+ * The shell's answer to navigation's host port — the shell implements a
+ * module's `*HostApi` (ARCHITECTURE.md 10.1). Holds the port's shape over the
+ * mount's readings, extending the port class the caller hands in.
  */
 
-import {
+import type {
+  NavigationAccountMenu,
+  NavigationCommandBar,
+  NavigationDeployment,
+  NavigationFlagReading,
   NavigationHost,
-  type NavigationAccountMenu,
-  type NavigationCommandBar,
-  type NavigationDeployment,
-  type NavigationFlagReading,
-  type NavigationLangy,
-  type NavigationOpsAccess,
-  type NavigationOrganization,
-  type NavigationPlanReading,
-  type NavigationProject,
-  type NavigationScopeWrite,
-  type NavigationSupportChat,
-  type NavigationTeam,
-  type NavigationUser,
+  NavigationLangy,
+  NavigationOpsAccess,
+  NavigationOrganization,
+  NavigationPlanReading,
+  NavigationProject,
+  NavigationScopeWrite,
+  NavigationSupportChat,
+  NavigationTeam,
+  NavigationUser,
 } from "@langwatch/navigation-browser/navigation";
 import type { ReactNode } from "react";
 
@@ -64,162 +64,172 @@ export type BrowserNavigationActions = {
   openDrawer: (drawer: string, params?: Record<string, string>) => void;
 };
 
-export class BrowserNavigationHost extends NavigationHost {
-  static create(
-    reading: BrowserNavigationReading,
-    actions: BrowserNavigationActions,
-  ): BrowserNavigationHost {
-    return new BrowserNavigationHost(reading, actions);
+/** Builds a host over the shell's readings and actions. */
+export type BrowserNavigationHosts = {
+  create: (reading: BrowserNavigationReading, actions: BrowserNavigationActions) => NavigationHost;
+};
+
+/** The shell's host class, over the navigation port class it is handed. */
+export function browserNavigationHosts(port: typeof NavigationHost): BrowserNavigationHosts {
+  class BrowserNavigationHost extends port {
+    static create(
+      reading: BrowserNavigationReading,
+      actions: BrowserNavigationActions,
+    ): BrowserNavigationHost {
+      return new BrowserNavigationHost(reading, actions);
+    }
+
+    private constructor(
+      private readonly reading: BrowserNavigationReading,
+      private readonly actions: BrowserNavigationActions,
+    ) {
+      super();
+    }
+
+    organizations(): NavigationOrganization[] {
+      return this.reading.organizations;
+    }
+
+    organization(): NavigationOrganization | undefined {
+      return this.reading.organization;
+    }
+
+    team(): NavigationTeam | undefined {
+      return this.reading.team;
+    }
+
+    project(): NavigationProject | undefined {
+      return this.reading.project;
+    }
+
+    openableTeams(): readonly NavigationTeam[] {
+      return this.reading.openableTeams;
+    }
+
+    isLoading(): boolean {
+      return this.reading.isLoading;
+    }
+
+    currentUser(): NavigationUser | undefined {
+      return this.reading.currentUser;
+    }
+
+    organizationRole(): string | undefined {
+      return this.reading.organizationRole;
+    }
+
+    rememberedProjectSlug(): string {
+      return this.reading.rememberedProjectSlug;
+    }
+
+    hasPermission(permission: string): boolean {
+      return this.reading.hasPermission(permission);
+    }
+
+    /** The port's own tri-state: unanswered is neither on nor off. */
+    featureFlag(flag: string): NavigationFlagReading {
+      const answer = this.reading.featureFlag(flag);
+      return { enabled: answer === true, isLoading: answer === void 0 };
+    }
+
+    waiting(): ReactNode {
+      return this.reading.waiting;
+    }
+
+    notFound(): ReactNode {
+      return this.reading.notFound;
+    }
+
+    pathname(): string {
+      return this.reading.pathname;
+    }
+
+    override routePattern(): string {
+      return this.reading.routePattern;
+    }
+
+    search(): string {
+      return this.reading.search;
+    }
+
+    projectParam(): string | undefined {
+      return this.reading.projectParam;
+    }
+
+    catchAllPath(): string {
+      return this.reading.catchAllPath;
+    }
+
+    deployment(): NavigationDeployment {
+      return this.reading.deployment;
+    }
+
+    plan(): NavigationPlanReading {
+      return this.reading.plan;
+    }
+
+    opsAccess(): NavigationOpsAccess {
+      return this.reading.opsAccess;
+    }
+
+    commandBar(): NavigationCommandBar | null {
+      return this.reading.commandBar;
+    }
+
+    langy(): NavigationLangy | null {
+      return this.reading.langy;
+    }
+
+    /** No live-chat bubble: this application does not carry the Crisp script. */
+    supportChat(): NavigationSupportChat | null {
+      return null;
+    }
+
+    accountMenu(): NavigationAccountMenu | null {
+      return this.reading.accountMenu;
+    }
+
+    navigate(to: string): void {
+      this.actions.navigate(to);
+    }
+
+    replace(to: string): void {
+      this.actions.replace(to);
+    }
+
+    back(): void {
+      this.actions.back();
+    }
+
+    rememberScope(write: NavigationScopeWrite): void {
+      this.actions.rememberScope(write);
+    }
+
+    signOut(): void {
+      this.actions.signOut();
+    }
+
+    setDocumentTitle(title: string): () => void {
+      return this.actions.setDocumentTitle(title);
+    }
+
+    openDrawer(drawer: string, params?: Record<string, string>): void {
+      this.actions.openDrawer(drawer, params);
+    }
+
+    override startupNotice(): ReactNode {
+      return startupNotice();
+    }
+
+    override joinOffer(input: { currentOrganizationId: string | null | undefined }): ReactNode {
+      return joinOffer(input);
+    }
+
+    /** "Check again" reloads the page, so a membership granted meanwhile is read afresh. */
+    override teamAccessWaiting({ organizationName }: { organizationName: string }): ReactNode {
+      return teamAccessWaiting({ organizationName, onCheckAccess: () => window.location.reload() });
+    }
   }
 
-  private constructor(
-    private readonly reading: BrowserNavigationReading,
-    private readonly actions: BrowserNavigationActions,
-  ) {
-    super();
-  }
-
-  organizations(): NavigationOrganization[] {
-    return this.reading.organizations;
-  }
-
-  organization(): NavigationOrganization | undefined {
-    return this.reading.organization;
-  }
-
-  team(): NavigationTeam | undefined {
-    return this.reading.team;
-  }
-
-  project(): NavigationProject | undefined {
-    return this.reading.project;
-  }
-
-  openableTeams(): readonly NavigationTeam[] {
-    return this.reading.openableTeams;
-  }
-
-  isLoading(): boolean {
-    return this.reading.isLoading;
-  }
-
-  currentUser(): NavigationUser | undefined {
-    return this.reading.currentUser;
-  }
-
-  organizationRole(): string | undefined {
-    return this.reading.organizationRole;
-  }
-
-  rememberedProjectSlug(): string {
-    return this.reading.rememberedProjectSlug;
-  }
-
-  hasPermission(permission: string): boolean {
-    return this.reading.hasPermission(permission);
-  }
-
-  /** The port's own tri-state: unanswered is neither on nor off. */
-  featureFlag(flag: string): NavigationFlagReading {
-    const answer = this.reading.featureFlag(flag);
-    return { enabled: answer === true, isLoading: answer === void 0 };
-  }
-
-  waiting(): ReactNode {
-    return this.reading.waiting;
-  }
-
-  notFound(): ReactNode {
-    return this.reading.notFound;
-  }
-
-  pathname(): string {
-    return this.reading.pathname;
-  }
-
-  override routePattern(): string {
-    return this.reading.routePattern;
-  }
-
-  search(): string {
-    return this.reading.search;
-  }
-
-  projectParam(): string | undefined {
-    return this.reading.projectParam;
-  }
-
-  catchAllPath(): string {
-    return this.reading.catchAllPath;
-  }
-
-  deployment(): NavigationDeployment {
-    return this.reading.deployment;
-  }
-
-  plan(): NavigationPlanReading {
-    return this.reading.plan;
-  }
-
-  opsAccess(): NavigationOpsAccess {
-    return this.reading.opsAccess;
-  }
-
-  commandBar(): NavigationCommandBar | null {
-    return this.reading.commandBar;
-  }
-
-  langy(): NavigationLangy | null {
-    return this.reading.langy;
-  }
-
-  /** No live-chat bubble: this application does not carry the Crisp script. */
-  supportChat(): NavigationSupportChat | null {
-    return null;
-  }
-
-  accountMenu(): NavigationAccountMenu | null {
-    return this.reading.accountMenu;
-  }
-
-  navigate(to: string): void {
-    this.actions.navigate(to);
-  }
-
-  replace(to: string): void {
-    this.actions.replace(to);
-  }
-
-  back(): void {
-    this.actions.back();
-  }
-
-  rememberScope(write: NavigationScopeWrite): void {
-    this.actions.rememberScope(write);
-  }
-
-  signOut(): void {
-    this.actions.signOut();
-  }
-
-  setDocumentTitle(title: string): () => void {
-    return this.actions.setDocumentTitle(title);
-  }
-
-  openDrawer(drawer: string, params?: Record<string, string>): void {
-    this.actions.openDrawer(drawer, params);
-  }
-
-  override startupNotice(): ReactNode {
-    return startupNotice();
-  }
-
-  override joinOffer(input: { currentOrganizationId: string | null | undefined }): ReactNode {
-    return joinOffer(input);
-  }
-
-  /** "Check again" reloads the page, so a membership granted meanwhile is read afresh. */
-  override teamAccessWaiting({ organizationName }: { organizationName: string }): ReactNode {
-    return teamAccessWaiting({ organizationName, onCheckAccess: () => window.location.reload() });
-  }
+  return { create: (reading, actions) => BrowserNavigationHost.create(reading, actions) };
 }
