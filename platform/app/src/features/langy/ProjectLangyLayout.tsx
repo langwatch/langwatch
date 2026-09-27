@@ -4,11 +4,13 @@ import { Outlet } from "react-router";
 import { GuidedOnboardingHost } from "~/features/guided-onboarding/tour/GuidedOnboardingHost";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { LangySidecar } from "./components/LangyPanel";
 import { useLangyConversationDeepLink } from "./hooks/useLangyConversationDeepLink";
 import { useLangyScopeReset } from "./hooks/useLangyScopeReset";
 import { useShowLangy } from "./hooks/useShowLangy";
 import { LangyProvider, useLangy } from "./LangyContext";
+import { LangyChatsImproveLangyContext } from "./langyDataUse";
 import {
   LANGY_DOCKED_OFFSET,
   LANGY_TRANSITION,
@@ -40,6 +42,7 @@ import { useLangyStore } from "./stores/langyStore";
  */
 export default function ProjectLangyLayout() {
   const showLangy = useShowLangy();
+  const publicEnv = usePublicEnv();
   const { project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
@@ -51,6 +54,7 @@ export default function ProjectLangyLayout() {
     <ProjectLangySubtree
       projectId={project?.id ?? "no-project"}
       showLangy={showLangy}
+      chatsImproveLangy={publicEnv.data?.IS_SAAS === true}
     />
   );
 }
@@ -64,23 +68,27 @@ export default function ProjectLangyLayout() {
  * the page behind the panel, the dashboard, everything. Opening the Langy
  * panel triggers exactly such a refetch, so opening history paid two full-app
  * render passes (profiled at ~700ms each) for data that resolves to the same
- * `project.id`. The memo compares the two scalars that actually matter and
+ * `project.id`. The memo compares the scalars that actually matter and
  * lets everything below bail out; navigation still flows, because the router
  * re-renders `<Outlet/>` through context, not through these props.
  */
 const ProjectLangySubtree = memo(function ProjectLangySubtree({
   projectId,
   showLangy,
+  chatsImproveLangy,
 }: {
   projectId: string;
   showLangy: boolean;
+  chatsImproveLangy: boolean;
 }) {
   return (
-    <LangyProvider key={projectId}>
-      <LangyShiftedRoot showLangy={showLangy}>
-        <Outlet />
-      </LangyShiftedRoot>
-    </LangyProvider>
+    <LangyChatsImproveLangyContext.Provider value={chatsImproveLangy}>
+      <LangyProvider key={projectId}>
+        <LangyShiftedRoot showLangy={showLangy}>
+          <Outlet />
+        </LangyShiftedRoot>
+      </LangyProvider>
+    </LangyChatsImproveLangyContext.Provider>
   );
 });
 
