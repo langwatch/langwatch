@@ -4,7 +4,7 @@ import {
   type TopicClusteringRequest,
 } from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
-import { Temporal, nowInstant } from "@langwatch/time";
+import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 import {
   type BatchClusteringParams,
   CLUSTERING_ERROR_CODES,
@@ -118,6 +118,30 @@ export class TopicClusteringRunner implements TopicClusteringRun {
   }
 }
 
+function batchCadence({
+  topics,
+  assignedTracesCount,
+}: {
+  topics: readonly { createdAt: Instant }[];
+  assignedTracesCount: number;
+}): { daysFrequency: number; clusteredRecently: boolean } {
+  const lastTopicCreatedAt = topics.reduce(
+    (acc, topic) => (Temporal.Instant.compare(topic.createdAt, acc) > 0 ? topic.createdAt : acc),
+    Temporal.Instant.fromEpochMilliseconds(0),
+  );
+  let daysFrequency = 2;
+  if (assignedTracesCount < 100) daysFrequency = 7;
+  else if (assignedTracesCount < 500) daysFrequency = 3;
+  const cadenceHorizon = nowInstant().subtract({
+    milliseconds: daysFrequency * 24 * 60 * 60 * 1000,
+  });
+
+  return {
+    daysFrequency,
+    clusteredRecently: Temporal.Instant.compare(lastTopicCreatedAt, cadenceHorizon) > 0,
+  };
+}
+
 // Runs one clustering page; cadence gate throttles run STARTS only, not continuation pages.
 // Caller owns continuing the walk; this function never schedules its own next page.
 export const clusterTopicsForProject = async (
@@ -158,23 +182,12 @@ export const clusterTopicsForProject = async (
   // batch mode if all topics for a project are deleted.
   const isIncrementalProcessing = topicIds.length > 0 && assignedTracesCount >= 1200;
 
-  const lastTopicCreatedAt = topics.reduce(
-    (acc, topic) => (Temporal.Instant.compare(topic.createdAt, acc) > 0 ? topic.createdAt : acc),
-    Temporal.Instant.fromEpochMilliseconds(0),
-  );
-
   // The cadence gate throttles run STARTS only — a continuation page
   // (searchAfter present) never re-takes it. Page 1 writes topics whose
   // createdAt is "now"; re-evaluating the gate on page 2 would read them as
   // "recently clustered" and stop the walk, silently truncating any backlog
   // larger than one page. The run was approved on page 1; later pages are the same run.
-  let daysFrequency = 2;
-  if (assignedTracesCount < 100) daysFrequency = 7;
-  else if (assignedTracesCount < 500) daysFrequency = 3;
-  const cadenceHorizon = nowInstant().subtract({
-    milliseconds: daysFrequency * 24 * 60 * 60 * 1000,
-  });
-  const clusteredRecently = Temporal.Instant.compare(lastTopicCreatedAt, cadenceHorizon) > 0;
+  const { daysFrequency, clusteredRecently } = batchCadence({ topics, assignedTracesCount });
   if (!searchAfter && !isIncrementalProcessing && clusteredRecently) {
     logger.info(
       { projectId },

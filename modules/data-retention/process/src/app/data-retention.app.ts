@@ -31,6 +31,15 @@ import { UserApi } from "@langwatch/user-contract";
 import { ClickHouseRetroactiveRetentionRepository } from "../repositories/clickhouse/clickhouse.retroactive-retention.repository.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
 import {
+  RedisDataRetentionCacheRepository,
+  type DataRetentionRedis,
+} from "../repositories/redis/redis.data-retention-cache.repository.ts";
+import {
+  RedisStorageMeterCacheRepository,
+  type StorageMeterRedis,
+} from "../repositories/redis/redis.storage-meter-cache.repository.ts";
+import { STORAGE_METER_CACHE_TTL_MS } from "../repositories/storage-meter-cache.repository.ts";
+import {
   DataRetentionPolicyService,
   type RetentionActor,
 } from "../services/data-retention-policy.service.ts";
@@ -39,11 +48,6 @@ import { DataRetentionService } from "../services/data-retention.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { StorageMeterScopeService } from "../services/storage-meter-scope.service.ts";
 import { StorageMeterService } from "../services/storage-meter.service.ts";
-import {
-  RedisDataRetentionCacheStore,
-  type DataRetentionRedis,
-} from "../stores/data-retention-cache.store.ts";
-import type { StorageMeterRedis } from "../stores/storage-meter-cache.store.ts";
 import type { DataRetentionPlanResolver } from "./data-retention.members.ts";
 
 const DEFAULT_CACHE_TTL_MS = 60_000;
@@ -172,7 +176,10 @@ export class DataRetentionApp implements DataRetentionApiContract {
   }: DataRetentionSetup): DataRetentionApp {
     const storageMeter = StorageMeterService.create({
       clickhouse: members.clickhouse,
-      redis: members.redis,
+      cache: RedisStorageMeterCacheRepository.create({
+        redis: members.redis,
+        ttlMs: STORAGE_METER_CACHE_TTL_MS,
+      }),
     });
     const retention = DataRetentionService.create({
       policies: repositories.policies,
@@ -186,7 +193,7 @@ export class DataRetentionApp implements DataRetentionApiContract {
       retroactive: ClickHouseRetroactiveRetentionRepository.create({
         clickhouse: members.clickhouse,
       }),
-      cache: RedisDataRetentionCacheStore.create({
+      cache: RedisDataRetentionCacheRepository.create({
         redis: members.redis,
         ttlMs: members.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS,
       }),

@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { InstantEvalPricedSpend } from "../../rules/instant-eval-spend-outcome.rules.ts";
@@ -12,7 +13,7 @@ const RECORD = {
   requests: 40,
   costUsd: 0.01,
   priceUsd: 0.013,
-  occurredAt: new Date("2026-09-22T10:00:00.000Z"),
+  occurredAt: Temporal.Instant.from("2026-09-22T10:00:00.000Z"),
 };
 
 function peers(overrides: Partial<InstantEvalSpendPeers> = {}): InstantEvalSpendPeers {

@@ -38,6 +38,7 @@ import { TraceApi } from "@langwatch/trace-contract";
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
 import { ProjectCredentialsService } from "../services/project-credentials.service.ts";
 import { ProjectOperationsService } from "../services/project-operations.service.ts";
+import { ProjectRequestService } from "../services/project-request.service.ts";
 import { ProjectService as ProjectApplicationService } from "../services/project.service.ts";
 import type { ProjectManagementApi } from "../transport/project.rest.ts";
 import type {
@@ -132,6 +133,12 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
   readonly #langy: LangyApi;
   readonly #encryption: ProjectProcessMembers["encryption"];
   readonly #logger: ProjectProcessMembers["logger"];
+  readonly #requests = ProjectRequestService.create({
+    projects: this,
+    probePermission: (input) => this.probePermission(input),
+    reportTopicClusteringFailure: (error, context) =>
+      this.#reportTopicClusteringFailure(error, context),
+  });
   private constructor({
     projectService,
     operations,
@@ -260,8 +267,27 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
    * door has already decided this is best effort, and the topic module
    * re-schedules on its own.
    */
-  reportTopicClusteringFailure(error: unknown, context: { projectId: string }): void {
+  #reportTopicClusteringFailure(error: unknown, context: { projectId: string }): void {
     this.#logger.error({ error, projectId: context.projectId }, "Topic clustering request failed.");
+  }
+
+  getProject(input: { projectId: string }): Promise<Project> {
+    return this.#requests.getProject(input);
+  }
+
+  archiveOtherProject(input: {
+    projectId: string;
+    projectToArchiveId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<{ alreadyArchived: boolean }> {
+    return this.#requests.archiveOtherProject(input);
+  }
+
+  triggerTopicClustering(input: {
+    projectId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<TopicClusteringRequest> {
+    return this.#requests.triggerTopicClustering(input);
   }
 
   /**

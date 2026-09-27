@@ -6,7 +6,7 @@
 
 import type { InstantEvalOutcome, InstantEvalPricing } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { InstantEvalSpend } from "../eventing/instant-eval-processing.intent.ts";
 import { instantEvalCostUsd, instantEvalPriceUsd } from "../rules/instant-eval-pricing.rules.ts";
@@ -74,7 +74,7 @@ export class InstantEvalFinishService {
         requests,
         costUsd,
         priceUsd,
-        occurredAt: toDate(this.now()),
+        occurredAt: this.now(),
       });
       logger.debug(
         { projectId, runId, outcome, costUsd, priceUsd },

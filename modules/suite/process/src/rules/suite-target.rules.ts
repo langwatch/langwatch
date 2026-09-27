@@ -1,3 +1,5 @@
+import { isConnectedAgentStale } from "@langwatch/agent-contract";
+import type { TimeInput } from "@langwatch/time";
 import {
   parseScenarioParameterDefinitions,
   partitionParameterDefinitions,
@@ -73,4 +75,9 @@ export function targetsOverrideASecret({
   return targets.some((target) =>
     Object.keys(target.runParameters ?? {}).some((name) => secretNames.has(name)),
   );
+}
+
+/** Whether a target's agent is a connected agent whose process has not been seen for too long. */
+export function isAgentUnseen(agent: { type?: string; lastSeenAt?: TimeInput | null }): boolean {
+  return agent.type === "connected" && isConnectedAgentStale({ lastSeenAt: agent.lastSeenAt });
 }

@@ -8,8 +8,10 @@ import {
 } from "../../app/__tests__/data-retention.fixture.ts";
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
 import { MemoryPinnedTraceRepository } from "../../repositories/memory/memory.pinned-trace.repository.ts";
+import { RedisDataRetentionCacheRepository } from "../../repositories/redis/redis.data-retention-cache.repository.ts";
+import { RedisStorageMeterCacheRepository } from "../../repositories/redis/redis.storage-meter-cache.repository.ts";
 import type { RetroactiveRetentionRepository } from "../../repositories/retroactive-retention.repository.ts";
-import { RedisDataRetentionCacheStore } from "../../stores/data-retention-cache.store.ts";
+import { STORAGE_METER_CACHE_TTL_MS } from "../../repositories/storage-meter-cache.repository.ts";
 import { DataRetentionService } from "../data-retention.service.ts";
 import { StorageMeterService } from "../storage-meter.service.ts";
 
@@ -58,8 +60,11 @@ function createService(retroactive: RetroactiveRetentionRepository = new Recordi
     organizations: createDataRetentionTestOrganizations(),
     defaultRetentionDays: 49,
     retroactive,
-    cache: RedisDataRetentionCacheStore.create({ redis: null, ttlMs: 1_000 }),
-    storageMeter: StorageMeterService.create({ clickhouse: noopClickHouse }),
+    cache: RedisDataRetentionCacheRepository.create({ redis: null, ttlMs: 1_000 }),
+    storageMeter: StorageMeterService.create({
+      clickhouse: noopClickHouse,
+      cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
+    }),
   });
 }
 

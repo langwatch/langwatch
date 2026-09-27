@@ -1,4 +1,5 @@
 import { isUniqueConstraintError } from "@langwatch/prisma-client/errors";
+import { type Instant, toDate } from "@langwatch/time";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { parseEvaluatorAttachments, type EvaluatorAttachment } from "@langwatch/scenario-contract";
 import {
@@ -236,7 +237,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
     config: RunPlanConfigInput;
   }): Promise<{ suite: Suite; created: boolean }> {
     const storedConfig = {
-      scope: input.scope as unknown as Prisma.InputJsonValue,
+      scope: input.scope as Prisma.InputJsonValue,
       targets: input.targets as Prisma.InputJsonValue,
       repeatCount: input.config.repeatCount ?? 1,
       simulatorModel: input.config.simulatorModel ?? null,
@@ -413,11 +414,11 @@ SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
   };
 
   archive = async (
-    input: SuiteIdInput & { archivedAt: Date; archivedSlug: string },
+    input: SuiteIdInput & { archivedAt: Instant; archivedSlug: string },
   ): Promise<Suite> => {
     const row = await this.database.simulationSuite.update({
       where: { id: input.id, projectId: input.projectId, kind: "run_plan" },
-      data: { archivedAt: input.archivedAt, slug: input.archivedSlug },
+      data: { archivedAt: toDate(input.archivedAt), slug: input.archivedSlug },
     });
     return mapSuite(row);
   };

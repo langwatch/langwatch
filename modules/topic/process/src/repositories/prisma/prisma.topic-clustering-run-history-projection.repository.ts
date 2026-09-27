@@ -6,13 +6,13 @@ import type {
 } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import type { Prisma } from "@langwatch/prisma-client/generated";
+import {
+  topicClusteringRunHistoryEntrySchema,
+  type TopicClusteringRunHistoryEntry,
+} from "@langwatch/topic-contract";
 import { z } from "zod";
 
-import {
-  topicClusteringRunHistoryProjectionEntrySchema,
-  type TopicClusteringRunHistoryData,
-  type TopicClusteringRunHistoryEntry,
-} from "../../eventing/topic-clustering-run-history.projection.ts";
+import type { TopicClusteringRunHistoryData } from "../../eventing/topic-clustering-run-history.projection.ts";
 
 function fromRow(row: Row): StoredProjection<TopicClusteringRunHistoryData> {
   return {
@@ -43,11 +43,10 @@ export type RunHistoryPrismaClient = {
   };
 };
 
-// The persisted shape of one history entry is the fold projection's own
-// schema (single source of truth; the type is z.infer'd from it there).
-// Validated on read so a corrupted or hand-edited JSON column degrades to
-// an empty history (which a replay rebuilds) instead of poisoning the fold.
-const runsSchema = z.array(topicClusteringRunHistoryProjectionEntrySchema);
+// The persisted entry is the contract's read shape, stripped rather than strict
+// so keys an older fold wrote still read. Validated on read so a corrupted JSON
+// column degrades to an empty history (a replay rebuilds it) instead of poisoning the fold.
+const runsSchema = z.array(topicClusteringRunHistoryEntrySchema.strip());
 
 /** Postgres row I/O for the topic clustering run-history projection. */
 export class PrismaTopicClusteringRunHistoryProjectionRepository implements StateProjectionStore<TopicClusteringRunHistoryData> {

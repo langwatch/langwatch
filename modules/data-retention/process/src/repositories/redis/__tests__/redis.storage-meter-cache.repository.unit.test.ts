@@ -1,7 +1,7 @@
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
-import { RedisStorageMeterCacheStore } from "../storage-meter-cache.store.ts";
+import { RedisStorageMeterCacheRepository } from "../redis.storage-meter-cache.repository.ts";
 
 function createRedisScript() {
   return {
@@ -11,10 +11,10 @@ function createRedisScript() {
   };
 }
 
-describe("RedisStorageMeterCacheStore", () => {
+describe("RedisStorageMeterCacheRepository", () => {
   it("keeps the process fallback warm for the full hard TTL", async () => {
     let now = 10_000;
-    const cache = RedisStorageMeterCacheStore.create({
+    const cache = RedisStorageMeterCacheRepository.create({
       redis: redisDouble(createRedisScript()),
       ttlMs: 30_000,
       now: () => now,
@@ -33,7 +33,7 @@ describe("RedisStorageMeterCacheStore", () => {
   it("keeps a successful distributed claim locally locked during Redis failure", async () => {
     let now = 10_000;
     const redis = createRedisScript();
-    const cache = RedisStorageMeterCacheStore.create({
+    const cache = RedisStorageMeterCacheRepository.create({
       redis: redisDouble(redis),
       ttlMs: 30_000,
       now: () => now,

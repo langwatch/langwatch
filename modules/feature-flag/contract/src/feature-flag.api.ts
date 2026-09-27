@@ -23,6 +23,21 @@ import type { FeatureFlagKey } from "./feature-flag.ts";
 import type { FrontendFeatureFlag } from "./frontend-feature-flags.ts";
 import type { PublicAnonymousFlagMap } from "./public-anonymous-feature-flags.ts";
 
+/** A person's own enrolment in one experiment. */
+export type UserExperimentEnrolmentInput = {
+  flagKey: FrontendFeatureFlag;
+  target: AuthenticatedExperimentTarget;
+  enrolled: boolean;
+};
+
+/** An owner's policy for one experiment in one tenant scope. */
+export type ExperimentTenantPolicyInput = {
+  flagKey: FrontendFeatureFlag;
+  scope: ExperimentTenantScope;
+  policy: ExperimentTenantPolicy;
+  changedByUserId: string;
+};
+
 /**
  * The one canonical feature flag capability: evaluation, operator
  * administration and the browser's authorized reads share this API because
@@ -67,23 +82,14 @@ export interface FeatureFlagApi {
    * the target; leaving removes the row (not a stored negative) so a later
    * tenant `enabled` still reaches them. Throws for an unknown/unavailable key.
    */
-  setUserExperimentEnrolment(input: {
-    flagKey: FrontendFeatureFlag;
-    target: AuthenticatedExperimentTarget;
-    enrolled: boolean;
-  }): Promise<void>;
+  setUserExperimentEnrolment(input: UserExperimentEnrolmentInput): Promise<void>;
 
   /**
    * An owner's policy for one exact tenant scope the caller authorized.
    * Validates the key is a registered experiment; an unreleased experiment's
    * policy changes nothing until release. Throws for a non-experiment key.
    */
-  setExperimentTenantPolicy(input: {
-    flagKey: FrontendFeatureFlag;
-    scope: ExperimentTenantScope;
-    policy: ExperimentTenantPolicy;
-    changedByUserId: string;
-  }): Promise<void>;
+  setExperimentTenantPolicy(input: ExperimentTenantPolicyInput): Promise<void>;
 
   listOperatorCatalogue(): Promise<OperatorFeatureFlagCatalogue>;
 

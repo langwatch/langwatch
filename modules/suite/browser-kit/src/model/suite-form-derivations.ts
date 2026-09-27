@@ -54,12 +54,17 @@ export function getArchivedScenarioIds(
   return selectedScenarioIds.filter((id) => !activeIds.has(id)).map((id) => ({ id, name: id }));
 }
 
-export function getArchivedTargets(
-  selectedTargets: SuiteTarget[],
-  availableTargets: SuiteFormAvailableTarget[],
-  agents: SuiteFormAgent[] | undefined,
-  prompts: SuiteFormPrompt[] | undefined,
-) {
+export function getArchivedTargets({
+  selectedTargets,
+  availableTargets,
+  agents,
+  prompts,
+}: {
+  selectedTargets: SuiteTarget[];
+  availableTargets: SuiteFormAvailableTarget[];
+  agents: SuiteFormAgent[] | undefined;
+  prompts: SuiteFormPrompt[] | undefined;
+}) {
   if (!agents || !prompts) return [];
 
   return selectedTargets

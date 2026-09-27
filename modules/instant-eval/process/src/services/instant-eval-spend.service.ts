@@ -4,6 +4,7 @@
  * debits and the same monthly meter see it. @see specs/instant-evals/instant-eval-billing.feature
  */
 
+import type { Instant } from "@langwatch/time";
 import type { InstantEvalPricing } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 
@@ -30,7 +31,7 @@ export interface InstantEvalSpendPeers {
    * judgement is not followed by a trace still reports. Absent on a
    * deployment that does not bill.
    */
-  reportBillingMonth?(input: { organizationId: string; occurredAt: Date }): Promise<void>;
+  reportBillingMonth?(input: { organizationId: string; occurredAt: Instant }): Promise<void>;
 }
 
 export class InstantEvalSpendService {
@@ -98,7 +99,7 @@ export class InstantEvalSpendService {
    * the grace window at the start of the next month, so a failure here costs
    * the nudge rather than the spend.
    */
-  async #nudgeBilling(input: { organizationId: string; occurredAt: Date }): Promise<void> {
+  async #nudgeBilling(input: { organizationId: string; occurredAt: Instant }): Promise<void> {
     if (!this.peers.reportBillingMonth) return;
     try {
       await this.peers.reportBillingMonth(input);

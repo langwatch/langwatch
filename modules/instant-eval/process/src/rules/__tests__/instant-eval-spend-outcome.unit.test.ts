@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
 import { describe, expect, it } from "vitest";
 
@@ -20,7 +21,7 @@ function record(overrides: Partial<InstantEvalSpendRecord> = {}): InstantEvalSpe
     requests: 40,
     costUsd: 0.01,
     priceUsd: 0.013,
-    occurredAt: new Date("2026-09-22T10:00:00.000Z"),
+    occurredAt: Temporal.Instant.from("2026-09-22T10:00:00.000Z"),
     ...overrides,
   };
 }

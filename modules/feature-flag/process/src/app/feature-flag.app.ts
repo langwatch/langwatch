@@ -8,7 +8,9 @@ import {
   type AuthenticatedFeatureFlagTargetInput,
   type ExperimentCatalogueEntry,
   type ExperimentEnrolmentForCaller,
+  type ExperimentEvaluationTarget,
   type ExperimentTenantPolicyForCaller,
+  type ExperimentTenantPolicyInput,
   type ExperimentTenantScope,
   type FeatureFlagKey,
   type FeatureFlagReadForCaller,
@@ -21,6 +23,7 @@ import {
   type OperatorFeatureFlagCatalogue,
   type OrganizationFeatureFlagsForCaller,
   type PublicAnonymousFlagMap,
+  type UserExperimentEnrolmentInput,
 } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -127,19 +130,19 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
   }
 
   resolveExperimentCatalogue(
-    target: Parameters<FeatureFlagService["resolveExperimentCatalogue"]>[0],
+    target: ExperimentEvaluationTarget,
   ): Promise<ExperimentCatalogueEntry[]> {
     return this.#flags.resolveExperimentCatalogue(target);
   }
 
   setUserExperimentEnrolment(
-    input: Parameters<FeatureFlagService["setUserExperimentEnrolment"]>[0],
+    input: UserExperimentEnrolmentInput,
   ): Promise<void> {
     return this.#flags.setUserExperimentEnrolment(input);
   }
 
   setExperimentTenantPolicy(
-    input: Parameters<FeatureFlagService["setExperimentTenantPolicy"]>[0],
+    input: ExperimentTenantPolicyInput,
   ): Promise<void> {
     return this.#flags.setExperimentTenantPolicy(input);
   }

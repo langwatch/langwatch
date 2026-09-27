@@ -54,6 +54,52 @@ function evaluatorResultFieldType(identifier: string): string {
 }
 
 /** The evaluator runtime this module composes over its own repository. */
+function codeEvaluatorWithFields(evaluator: Evaluator): EvaluatorWithFields {
+  const config = codeEvaluatorConfigSchema.safeParse(evaluator.config);
+
+  return {
+    ...evaluator,
+    fields: config.success ? config.data.inputs : [],
+    outputFields: config.success ? config.data.outputs : [...standardEvaluatorOutputFields],
+  };
+}
+
+function builtInEvaluatorWithFields(evaluator: Evaluator): EvaluatorWithFields {
+  const evaluatorConfig = evaluatorConfigSchema.safeParse(evaluator.config);
+  const evaluatorType =
+    evaluatorConfig.success && typeof evaluatorConfig.data.evaluatorType === "string"
+      ? evaluatorConfig.data.evaluatorType
+      : undefined;
+  const definition = evaluatorType
+    ? AVAILABLE_EVALUATORS[evaluatorType as keyof typeof AVAILABLE_EVALUATORS]
+    : undefined;
+  const fields: EvaluatorField[] = definition
+    ? [
+        ...definition.requiredFields.map((identifier) => ({
+          identifier,
+          type: fieldType(identifier),
+        })),
+        ...definition.optionalFields.map((identifier) => ({
+          identifier,
+          type: fieldType(identifier),
+          optional: true,
+        })),
+      ]
+    : [];
+  const outputFields = definition
+    ? Object.keys(definition.result).map((identifier) => ({
+        identifier,
+        type: evaluatorResultFieldType(identifier),
+      }))
+    : [...standardEvaluatorOutputFields];
+
+  return {
+    ...evaluator,
+    fields,
+    outputFields: outputFields.length ? outputFields : [...standardEvaluatorOutputFields],
+  };
+}
+
 export class EvaluatorService {
   private readonly code: EvaluatorCodeService;
   private readonly native = EvaluatorNativeService.create();
@@ -241,50 +287,9 @@ export class EvaluatorService {
       };
     }
 
-    if (evaluator.type === "code") {
-      const config = codeEvaluatorConfigSchema.safeParse(evaluator.config);
+    if (evaluator.type === "code") return codeEvaluatorWithFields(evaluator);
 
-      return {
-        ...evaluator,
-        fields: config.success ? config.data.inputs : [],
-        outputFields: config.success ? config.data.outputs : [...standardEvaluatorOutputFields],
-      };
-    }
-
-    const evaluatorConfig = evaluatorConfigSchema.safeParse(evaluator.config);
-    const evaluatorType =
-      evaluatorConfig.success && typeof evaluatorConfig.data.evaluatorType === "string"
-        ? evaluatorConfig.data.evaluatorType
-        : undefined;
-    const definition = evaluatorType
-      ? AVAILABLE_EVALUATORS[evaluatorType as keyof typeof AVAILABLE_EVALUATORS]
-      : undefined;
-    const fields: EvaluatorField[] = definition
-      ? [
-          ...definition.requiredFields.map((identifier) => ({
-            identifier,
-            type: fieldType(identifier),
-          })),
-          ...definition.optionalFields.map((identifier) => ({
-            identifier,
-            type: fieldType(identifier),
-            optional: true,
-          })),
-        ]
-      : [];
-    const outputFields = definition
-      ? Object.entries(definition.result).map(([identifier, result]) => ({
-          identifier,
-          type: evaluatorResultFieldType(identifier),
-          ...(result ? {} : {}),
-        }))
-      : [...standardEvaluatorOutputFields];
-
-    return {
-      ...evaluator,
-      fields,
-      outputFields: outputFields.length ? outputFields : [...standardEvaluatorOutputFields],
-    };
+    return builtInEvaluatorWithFields(evaluator);
   }
 
   async getWorkflowFields(input: { id: string; projectId: string }): Promise<{

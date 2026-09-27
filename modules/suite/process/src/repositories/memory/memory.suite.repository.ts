@@ -299,7 +299,7 @@ export class MemorySuiteRepository extends SuiteRepository {
 
     const archived = suiteSchema.parse({
       ...existing,
-      archivedAt: input.archivedAt,
+      archivedAt: toDate(input.archivedAt),
       slug: input.archivedSlug,
       updatedAt: toDate(nowInstant()),
     });

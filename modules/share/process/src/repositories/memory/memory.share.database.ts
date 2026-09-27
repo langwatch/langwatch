@@ -42,8 +42,8 @@ export class MemoryShareDatabase {
     return this.projects.find((project) => project.id === projectId);
   }
 
-  link(id: string, projectId: string): ShareLink | undefined {
-    return this.links.find((link) => link.id === id && link.projectId === projectId);
+  findLinks({ id, projectId }: { id: string; projectId: string }): ShareLink[] {
+    return this.links.filter((link) => link.id === id && link.projectId === projectId);
   }
 
   /** The project context sharing policy reads beside a link. */

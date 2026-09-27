@@ -1,19 +1,11 @@
 import type { Cluster, Redis } from "ioredis";
-import { z } from "zod";
 
-const cachedStorageBytesSchema = z
-  .object({
-    bytes: z.number().finite().nonnegative(),
-    computedAt: z.number().finite(),
-  })
-  .strict();
-
-export type CachedStorageBytes = z.infer<typeof cachedStorageBytesSchema>;
-
-/** A cache read: the bytes held under the key, or a miss the caller computes. */
-export type CachedStorageBytesLookup =
-  | { kind: "hit"; value: CachedStorageBytes }
-  | { kind: "miss" };
+import {
+  type CachedStorageBytes,
+  type CachedStorageBytesLookup,
+  cachedStorageBytesSchema,
+  StorageMeterCacheRepository,
+} from "../storage-meter-cache.repository.ts";
 
 type MemoryEntry = {
   value: CachedStorageBytes;
@@ -23,21 +15,15 @@ type MemoryEntry = {
 /** Only what this cache calls. */
 export type StorageMeterRedis = Pick<Redis | Cluster, "get" | "setex" | "set">;
 
-export abstract class StorageMeterCacheStore {
-  abstract get(key: string): Promise<CachedStorageBytesLookup>;
-  abstract set(key: string, value: CachedStorageBytes): Promise<void>;
-  abstract claim(key: string, value: number): Promise<boolean>;
-}
-
-export class RedisStorageMeterCacheStore extends StorageMeterCacheStore {
+export class RedisStorageMeterCacheRepository extends StorageMeterCacheRepository {
   static create(options: {
     redis?: StorageMeterRedis | null;
     ttlMs: number;
     prefix?: string;
     refreshPrefix?: string;
     now?: () => number;
-  }): RedisStorageMeterCacheStore {
-    return new RedisStorageMeterCacheStore({
+  }): RedisStorageMeterCacheRepository {
+    return new RedisStorageMeterCacheRepository({
       redis: options.redis ?? null,
       ttlMs: options.ttlMs,
       prefix: options.prefix ?? "storage-meter:v2:",

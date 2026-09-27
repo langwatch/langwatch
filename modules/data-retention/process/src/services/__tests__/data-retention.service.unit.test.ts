@@ -10,13 +10,15 @@ import {
   createDataRetentionTestProjects,
   retentionTestGraph,
 } from "../../app/__tests__/data-retention.fixture.ts";
+import {
+  type CachedRetentionLookup,
+  DataRetentionCacheRepository,
+} from "../../repositories/data-retention-cache.repository.ts";
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
 import { MemoryPinnedTraceRepository } from "../../repositories/memory/memory.pinned-trace.repository.ts";
 import { MemoryRetroactiveRetentionRepository } from "../../repositories/memory/memory.retroactive-retention.repository.ts";
-import {
-  type CachedRetentionLookup,
-  DataRetentionCacheStore,
-} from "../../stores/data-retention-cache.store.ts";
+import { RedisStorageMeterCacheRepository } from "../../repositories/redis/redis.storage-meter-cache.repository.ts";
+import { STORAGE_METER_CACHE_TTL_MS } from "../../repositories/storage-meter-cache.repository.ts";
 import { DataRetentionService } from "../data-retention.service.ts";
 import { StorageMeterService } from "../storage-meter.service.ts";
 
@@ -34,7 +36,7 @@ const PROJECT = retentionTestGraph.projectId;
 const ORGANIZATION = retentionTestGraph.organizationId ?? "organization-1";
 
 /** Records what a write invalidated, which is what the cascade has to reach. */
-class RecordingCache extends DataRetentionCacheStore {
+class RecordingCache extends DataRetentionCacheRepository {
   readonly values = new Map<string, ResolvedRetention>();
   readonly deleted: string[] = [];
 
@@ -56,7 +58,7 @@ class RecordingCache extends DataRetentionCacheStore {
 function createService(
   input: Readonly<{
     policies?: MemoryDataRetentionRepository;
-    cache?: DataRetentionCacheStore;
+    cache?: DataRetentionCacheRepository;
     projects?: ProjectApi;
     organizations?: OrganizationApi;
     retroactive?: MemoryRetroactiveRetentionRepository;
@@ -70,7 +72,10 @@ function createService(
     defaultRetentionDays: DEFAULT_DAYS,
     retroactive: input.retroactive ?? MemoryRetroactiveRetentionRepository.create(),
     cache: input.cache ?? new RecordingCache(),
-    storageMeter: StorageMeterService.create({ clickhouse: refusingClickHouse() }),
+    storageMeter: StorageMeterService.create({
+      clickhouse: refusingClickHouse(),
+      cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
+    }),
   });
 }
 

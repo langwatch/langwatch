@@ -2,9 +2,10 @@
  * Provider that ticks every `intervalMs` and makes the current time
  * available to all descendants via `useNow()`.
  */
+import { nowInstant } from "@langwatch/time";
 import { createContext, useContext, useEffect, useState } from "react";
 
-export const NowContext = createContext<number>(Date.now());
+export const NowContext = createContext<number>(nowInstant().epochMilliseconds);
 
 export function useNow(): number {
   return useContext(NowContext);
@@ -19,10 +20,10 @@ export function NowProvider({
   intervalMs?: number;
   children: React.ReactNode;
 }) {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => nowInstant().epochMilliseconds);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    const id = setInterval(() => setNow(nowInstant().epochMilliseconds), intervalMs);
     return () => clearInterval(id);
   }, [intervalMs]);
 

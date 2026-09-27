@@ -2,7 +2,17 @@ import { createLogger } from "@langwatch/observability";
 
 import type { FeatureFlagCache, FeatureFlagRow } from "../app/feature-flag.app.ts";
 import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
-import { FeatureFlagRowStore } from "../stores/feature-flag-row.store.ts";
+
+/**
+ * One operator row as the resolver reads it, with the caching tiers behind
+ * it. `null` is an absent row, which resolves to the registry default.
+ */
+export abstract class FeatureFlagRowStore {
+  abstract findRow(key: string): Promise<FeatureFlagRow | null>;
+
+  /** Drops every tier's copy, so the next read sees an operator write. */
+  abstract invalidate(key: string): Promise<void>;
+}
 
 /**
  * Per-process window in front of the shared cache. The trace-processing

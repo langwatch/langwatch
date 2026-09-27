@@ -1,4 +1,5 @@
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
+import type { Instant } from "@langwatch/time";
 import type {
   CreateSuiteCommand,
   RunPlanConfigInput,
@@ -53,6 +54,6 @@ export abstract class SuiteRepository {
     input: Omit<UpdateSuiteCommand, "fields"> & { slug?: string },
   ) => Promise<Suite>;
   abstract archive: (
-    input: SuiteIdInput & { archivedAt: Date; archivedSlug: string },
+    input: SuiteIdInput & { archivedAt: Instant; archivedSlug: string },
   ) => Promise<Suite>;
 }

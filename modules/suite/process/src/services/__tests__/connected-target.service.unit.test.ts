@@ -441,11 +441,12 @@ describe("given the listing mark and the run refusal read the same agents", () =
         ownerUserId: agent.ownerUserId,
         viewerUserId: actor.id,
       }).selectable;
-      const refused = await ConnectedTargetService.assertConnectedAgentsRunnable({
-        agents: [agent],
-        actor,
+      const refused = await ConnectedTargetService.create({
+        agents: createApiFixture<AgentApi>(),
         owners,
-      }).then(
+      })
+        .assertConnectedAgentsRunnable({ agents: [agent], actor })
+        .then(
         () => false,
         () => true,
       );
