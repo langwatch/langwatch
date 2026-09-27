@@ -94,6 +94,8 @@ COPY apps/ui/package.json ./apps/ui/package.json
 # The boot-chain task runner: prisma-migrate, clickhouse-migrate,
 # lwql-provision, and every other feature-owned task.
 COPY apps/tasks/package.json ./apps/tasks/package.json
+# The scenario child program, a workspace dependency of the api and the worker.
+COPY apps/scenario-child/package.json ./apps/scenario-child/package.json
 # Four filters, because the four applications are four dependency subtrees
 # and none is a subset of the others.
 RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
@@ -101,6 +103,13 @@ COPY apps/worker ./apps/worker
 COPY apps/api ./apps/api
 COPY apps/ui ./apps/ui
 COPY apps/tasks ./apps/tasks
+COPY apps/scenario-child ./apps/scenario-child
+# What `start:prepare:files` and `ensure:built` read: the generator scripts, the
+# OpenAPI document the SDK derives its REST client from, and the web declarations
+# project the browser packages reference.
+COPY dev/scripts ./dev/scripts
+COPY dev/tsconfig.web-declarations.json ./dev/tsconfig.web-declarations.json
+COPY specs/api-reference/openapi-document.json ./specs/api-reference/openapi-document.json
 # The trailing `...` on each filter makes pnpm build each application's
 # workspace DEPENDENCIES first, in topological order, and pnpm skips the
 # members that declare no `build`. That order is load-bearing twice over: the
@@ -119,7 +128,11 @@ COPY apps/tasks ./apps/tasks
 # `tsc -b` over the generated root solution rather than a compiler process per
 # package, so the filtered application builds below find their dependencies'
 # .d.ts already on disk instead of emitting them 38 processes at a time.
-RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm run build:types \
+# The same preparation the CI build runs: generated files (modules, Prisma client,
+# langy skills) and the four dist-resolving packages (SDK, mcp-server, ksuid, mail)
+# before `build:types`, which reads their declarations.
+RUN pnpm start:prepare:files && pnpm ensure:built \
+ && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build:types \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build
 
 # Remove dev dependencies — not needed at runtime, and on the order of a
