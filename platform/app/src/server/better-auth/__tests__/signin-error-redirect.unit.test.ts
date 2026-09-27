@@ -255,7 +255,11 @@ describe("given a sign-in callback that fails on the server", () => {
     ])("redirects %s to the error screen with the generic code and trace", async (path) => {
       const answered = await redirectFailedSignInCallback({
         response: new Response(
-          JSON.stringify({ message: "rekey transaction failed" }),
+          JSON.stringify({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "rekey transaction failed",
+            stack: "Error: at secret-path.ts",
+          }),
           { status: 500 },
         ),
         path,
@@ -275,10 +279,14 @@ describe("given a sign-in callback that fails on the server", () => {
           path,
           traceId: "trace_1",
           status: 500,
-          cause: expect.stringContaining("rekey transaction failed"),
+          cause: {
+            code: "INTERNAL_SERVER_ERROR",
+            message: "rekey transaction failed",
+          },
         }),
         expect.any(String),
       );
+      expect(JSON.stringify(errorLog.mock.calls)).not.toContain("secret-path");
     });
   });
 });

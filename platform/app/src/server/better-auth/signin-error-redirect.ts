@@ -89,9 +89,7 @@ export async function redirectFailedSignInCallback({
   if (response.status < 500) return response;
   if (!SIGN_IN_CALLBACK_PATH.test(path)) return response;
 
-  // The body better-auth answers a thrown callback with carries the error's
-  // message. It goes to the log only, never to the screen.
-  const cause = (await response.text().catch(() => "")).slice(0, 1000);
+  const cause = await errorCauseOf(response);
   logger.error(
     { status: response.status, path, traceId: traceId ?? null, cause },
     "a sign-in callback failed on the server; the person was sent a generic refusal",
@@ -104,6 +102,29 @@ export async function redirectFailedSignInCallback({
     status: 302,
     headers: { location: target.toString() },
   });
+}
+
+/**
+ * The `code` and `message` of better-auth's JSON error body, for the log only.
+ * Nothing else in the body is read, so a stack, a header echo or a token in
+ * some other field never reaches the log line.
+ */
+async function errorCauseOf(
+  response: Response,
+): Promise<{ code?: string; message?: string } | null> {
+  try {
+    const body: unknown = JSON.parse(await response.text());
+    if (typeof body !== "object" || body === null) return null;
+    const { code, message } = body as Record<string, unknown>;
+    return {
+      ...(typeof code === "string" ? { code: code.slice(0, 100) } : {}),
+      ...(typeof message === "string"
+        ? { message: message.slice(0, 300) }
+        : {}),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function signInErrorTarget(
