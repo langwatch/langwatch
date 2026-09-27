@@ -69,6 +69,8 @@ class LocalVault extends SsoCredentialRepository {
 
 let connections: InMemoryConnections;
 let vault: LocalVault;
+/** Every fact the ledger was asked to append, as the event log would hold them. */
+let committed: unknown[];
 let commands: SsoSetupCommandsService;
 
 /** An issuer that answers as one, so registration turns on what was typed. */
@@ -77,8 +79,10 @@ const reachableDiscovery = { discover: async () => ({ reachable: true as const }
 beforeEach(() => {
   connections = new InMemoryConnections();
   vault = new LocalVault();
+  committed = [];
   const ledger: SsoConnectionLedger = {
     async commit({ command, facts }) {
+      committed.push(...facts);
       connections.apply({
         connectionId: command.data.connectionId,
         facts,
@@ -124,6 +128,26 @@ function seed(over: Partial<SsoConnectionState> = {}): void {
 
 describe("given an administrator registering their identity provider", () => {
   describe("when it speaks openid connect", () => {
+    /** @scenario "A client secret never reaches the event log" */
+    /** @scenario "The proof is recorded as a hash and the identity provider's secret is not recorded at all" */
+    it("appends no fact that carries the client secret or the client id", async () => {
+      await commands.register({
+        organizationId: ORG,
+        actor: ANA,
+        providerId: "acme-okta",
+        registration: {
+          protocol: "oidc",
+          issuer: "https://idp.example",
+          clientId: "client-id-7f3a",
+          clientSecret: "client-secret-9c2e",
+        },
+      });
+
+      expect(committed.length).toBeGreaterThan(0);
+      expect(JSON.stringify(committed)).not.toContain("client-secret-9c2e");
+      expect(JSON.stringify(committed)).not.toContain("client-id-7f3a");
+    });
+
     /** @scenario "Registering an OpenID Connect provider takes the credentials it will dial with" */
     it("keeps both credentials in the vault and names only their references in the fact", async () => {
       const { connectionId } = await commands.register({
@@ -250,6 +274,26 @@ describe("given a connection somebody presses remove on", () => {
       const state = await connections.getConnection({ connectionId: CONNECTION });
       expect(state?.state).toBe("TEARDOWN_PENDING");
       expect(state?.tearDownAfterMs).toBe(T0 + 86_400_000);
+    });
+  });
+
+  describe("when it is paused, so it carries nobody", () => {
+    /** @scenario "A removal of a connection that is carrying nobody is scheduled for now" */
+    it("schedules the teardown for the moment of the ask", async () => {
+      seed({ state: "SUSPENDED", verifiedDomains: ["acme.com"], testLoginAccountId: "acc_test" });
+
+      await expect(
+        commands.removeConnection({
+          organizationId: ORG,
+          connectionId: CONNECTION,
+          actor: ANA,
+          reason: null,
+          graceMs: 604_800_000,
+        }),
+      ).resolves.toEqual({ removal: "teardown-requested" });
+      const state = await connections.getConnection({ connectionId: CONNECTION });
+      expect(state?.state).toBe("TEARDOWN_PENDING");
+      expect(state?.tearDownAfterMs).toBe(T0);
     });
   });
 

@@ -69,6 +69,7 @@ import {
   EnterprisePlanRequiredError,
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { IdentityApi, SsoConnectionNotFoundError } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
@@ -178,6 +179,7 @@ export class SsoApp implements SsoApiContract {
     auditLog: AuditLogApi,
     identity: IdentityApi,
     entitlements: EntitlementApi,
+    featureFlags: FeatureFlagApi,
   };
   static readonly config = ssoConfig;
   static readonly secrets = signInProviderSecrets;
@@ -242,10 +244,14 @@ export class SsoApp implements SsoApiContract {
         licensedAtStartup: () => gate.platformAllowed(),
       }),
       licenseProof: InstanceLicenseProof.create({ licensing: dependencies.licensing }),
-      // Hosted self-serve (tier 3) is not offered: nothing stages the claim
-      // queue it waits on. When it ships this reads the organization's
-      // `self_serve_sso` opt-in - handoff §10.
-      optIn: { isOptedIn: async () => false },
+      // Hosted self-serve (tier 3) is opted into per organization (D05).
+      optIn: {
+        isOptedIn: ({ organizationId }) =>
+          dependencies.featureFlags.isEnabled("self_serve_sso", {
+            kind: "organization",
+            organizationId,
+          }),
+      },
       isHosted,
     });
     this.#operators = dependencies.operators;
@@ -580,10 +586,12 @@ export class SsoApp implements SsoApiContract {
     });
   }
 
-  setupClaimDomain(
+  async setupClaimDomain(
     input: SsoSetupDomainInput,
     by: SsoAdministrator,
   ): Promise<SsoDomainClaimOutcome> {
+    await this.#assertSelfServeAvailable(input.organizationId);
+
     return this.#attempted({
       by,
       action: "claimDomain",
@@ -592,7 +600,12 @@ export class SsoApp implements SsoApiContract {
     });
   }
 
-  setupProveDomain(input: SsoSetupDomainInput, by: SsoAdministrator): Promise<SsoDomainProof> {
+  async setupProveDomain(
+    input: SsoSetupDomainInput,
+    by: SsoAdministrator,
+  ): Promise<SsoDomainProof> {
+    await this.#assertSelfServeAvailable(input.organizationId);
+
     return this.#attempted({
       by,
       action: "proveDomain",
@@ -610,10 +623,12 @@ export class SsoApp implements SsoApiContract {
     });
   }
 
-  setupCheckDomainRecord(
+  async setupCheckDomainRecord(
     input: SsoSetupDomainInput,
     by: SsoAdministrator,
   ): Promise<SsoDomainProved> {
+    await this.#assertSelfServeAvailable(input.organizationId);
+
     return this.#attempted({
       by,
       action: "checkDomainRecord",
@@ -622,7 +637,12 @@ export class SsoApp implements SsoApiContract {
     });
   }
 
-  setupCheckDomainFile(input: SsoSetupDomainInput, by: SsoAdministrator): Promise<SsoDomainProved> {
+  async setupCheckDomainFile(
+    input: SsoSetupDomainInput,
+    by: SsoAdministrator,
+  ): Promise<SsoDomainProved> {
+    await this.#assertSelfServeAvailable(input.organizationId);
+
     return this.#attempted({
       by,
       action: "checkDomainFile",
@@ -640,6 +660,7 @@ export class SsoApp implements SsoApiContract {
     input: SsoSetupRegisterInput,
     by: SsoAdministrator,
   ): Promise<SsoSetupRegistered> {
+    await this.#assertSelfServeAvailable(input.organizationId);
     await this.#requireEnterprisePlan(input.organizationId);
 
     return this.#attempted({
@@ -667,6 +688,7 @@ export class SsoApp implements SsoApiContract {
     input: SsoSetupStartMigrationInput,
     by: SsoAdministrator,
   ): Promise<SsoSetupRegistered> {
+    await this.#assertSelfServeAvailable(input.organizationId);
     await this.#requireEnterprisePlan(input.organizationId);
 
     return this.#attempted({
@@ -720,6 +742,7 @@ export class SsoApp implements SsoApiContract {
     input: SsoSetupConnectionInput,
     by: SsoAdministrator,
   ): Promise<void> {
+    await this.#assertSelfServeAvailable(input.organizationId);
     await this.#requireEnterprisePlan(input.organizationId);
 
     await this.#attempted({
@@ -750,6 +773,7 @@ export class SsoApp implements SsoApiContract {
    * stranger turned up in the member list needs, so the row carries it.
    */
   async setupSetArrivals(input: SsoSetupArrivalsInput, by: SsoAdministrator): Promise<void> {
+    await this.#assertSelfServeAvailable(input.organizationId);
     await this.#requireEnterprisePlan(input.organizationId);
 
     await this.#attempted({
@@ -774,6 +798,7 @@ export class SsoApp implements SsoApiContract {
    * time, so the page can name the one step still outstanding.
    */
   async setupActivate(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void> {
+    await this.#assertSelfServeAvailable(input.organizationId);
     await this.#requireEnterprisePlan(input.organizationId);
 
     await this.#attempted({
@@ -869,6 +894,11 @@ export class SsoApp implements SsoApiContract {
    * READS are deliberately never gated: a page that refuses to render cannot
    * say what it is refusing.
    */
+  /** D05's tier gate: a licence decides self-hosted, the opt-in decides hosted. */
+  #assertSelfServeAvailable(organizationId: string): Promise<void> {
+    return this.#selfServeContext.assertAvailable({ organizationId });
+  }
+
   async #requireEnterprisePlan(organizationId: string): Promise<void> {
     const plan = await this.#entitlements.getActivePlan({ organizationId });
     if (!isEnterpriseTier(plan.type)) throw new EnterprisePlanRequiredError(SSO_ENTERPRISE_REFUSAL);

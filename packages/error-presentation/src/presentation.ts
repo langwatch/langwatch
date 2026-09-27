@@ -2914,6 +2914,21 @@ const presentations = {
     describe: () =>
       "Going live rests on a sign-in that actually worked. Use the test sign-in to go to your identity provider and come back, then try again.",
   },
+  sso_activation_arrivals_undecided: {
+    title: "Say who this connection lets in",
+    describe: () =>
+      "Somebody signs in through your identity provider and you have never seen them before — they can join on a domain you verified, they can ask and wait for your approval, or they can be turned away. Choose one, then turn the connection on.",
+  },
+  sso_license_required: {
+    title: "Single sign-on needs an active licence",
+    describe: () =>
+      "Activate an enterprise licence on this installation, then restart it, and you can set single sign-on up here.",
+  },
+  sso_self_serve_unavailable: {
+    title: "Setting single sign-on up yourself isn't switched on yet",
+    describe: () =>
+      "Talk to us and we'll set your connection up with you, or switch this on for your organization.",
+  },
   sso_activation_break_glass_missing: {
     title: "Name someone who can still get in",
     describe: () =>

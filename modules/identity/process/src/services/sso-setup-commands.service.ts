@@ -2,6 +2,7 @@ import {
   type SelfServeActor,
   type SsoArrivalPolicy,
   type SsoMigrationRoute,
+  SsoActivationArrivalsUndecidedError,
   SsoActivationBreakGlassMissingError,
   SsoActivationDomainUnprovedError,
   SsoActivationTestSignInMissingError,
@@ -216,6 +217,11 @@ export class SsoSetupCommandsService {
         `organization ${state.organizationId}: no live way in without the identity provider`,
       );
     }
+    if (state.arrivalPolicyDecidedAtMs === null) {
+      throw new SsoActivationArrivalsUndecidedError(
+        `connection ${state.connectionId}: nobody has said who it admits`,
+      );
+    }
   }
 
   /** The subject the newest recorded sign-in asserted. A connection nobody
@@ -285,7 +291,13 @@ export class SsoSetupCommandsService {
       return { removal: "discarded" };
     }
 
-    await this.deps.connections().requestTeardown({ ...command, reason, graceMs });
+    // A paused connection carries nobody, so the week would protect nobody.
+    const carriesNobody = state.state === "SUSPENDED";
+    await this.deps.connections().requestTeardown({
+      ...command,
+      reason,
+      graceMs: carriesNobody ? 0 : graceMs,
+    });
     return { removal: "teardown-requested" };
   }
 

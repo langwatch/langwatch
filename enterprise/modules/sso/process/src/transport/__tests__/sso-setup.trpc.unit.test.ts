@@ -6,6 +6,7 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoMigrationView, SsoSetupApi, SsoSetupView } from "@langwatch/identity-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
@@ -13,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createSsoTestApp,
   createSsoTestEntitlements,
+  createSsoTestFeatureFlags,
   createSsoTestIdentity,
   RecordingSsoBreakGlass,
   RecordingSsoConnectionLedger,
@@ -102,6 +104,12 @@ async function harness(
     planType?: string;
     /** The cutover identity answers for this organization, if any. */
     migration?: SsoMigrationView | null;
+    /** Whether the installation held a genuine licence at startup. */
+    licensed?: boolean;
+    /** The hosted service, where the organization's opt-in decides instead. */
+    isSaas?: boolean;
+    /** Hosted organizations opted in to setting single sign-on up themselves. */
+    optedIn?: readonly string[];
   } = {},
 ) {
   const connections = RecordingSsoConnectionLedger.create();
@@ -127,7 +135,14 @@ async function harness(
   };
   const app = await createSsoTestApp({
     connections,
+    members: { isSaas: options.isSaas ?? false },
     dependencies: {
+      licensing: createApiFixture<LicensingApi>({
+        inspectPlatformAccess: async () => ({
+          allowed: options.licensed ?? true,
+          inspections: [],
+        }),
+      }),
       auditLog,
       identity: createSsoTestIdentity({
         connections,
@@ -141,6 +156,7 @@ async function harness(
         breakGlass,
       }),
       entitlements: createSsoTestEntitlements(options.planType ?? "ENTERPRISE"),
+      featureFlags: createSsoTestFeatureFlags(options.optedIn ?? []),
     },
   });
   const trpc = initTRPC.context<TestContext>().create();
@@ -369,6 +385,62 @@ describe("the organization's own single sign-on surface", () => {
         args: { organizationId: "org_acme", providerId: "Okta", protocol: "oidc" },
         targetKind: "ssoConnection",
       });
+    });
+  });
+
+  describe("given an installation that never held a licence", () => {
+    /** @scenario "An unlicensed self-hosted installation is told what would change that" */
+    it("refuses every setup step by the licence, and commands identity with nothing", async () => {
+      const { caller, commands, ceremony } = await harness({ licensed: false });
+
+      await expect(caller.setArrivals({ ...TARGET, policy: "admit" })).rejects.toMatchObject({
+        cause: { code: "sso_license_required" },
+      });
+      await expect(caller.claimDomain({ ...TARGET, domain: "acme.test" })).rejects.toMatchObject({
+        cause: { code: "sso_license_required" },
+      });
+      expect(commands.setArrivals).not.toHaveBeenCalled();
+      expect(ceremony.claimDomain).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a hosted organization nobody opted in", () => {
+    /** @scenario "Setting single sign-on up yourself is unavailable until the organization is opted in" */
+    /** @scenario "Going live is refused for an organization that may not set single sign-on up" */
+    it("refuses by name and offers a conversation, commanding identity with nothing", async () => {
+      const { caller, commands, ceremony } = await harness({ isSaas: true });
+
+      await expect(caller.setArrivals({ ...TARGET, policy: "admit" })).rejects.toMatchObject({
+        cause: { code: "sso_self_serve_unavailable" },
+      });
+      await expect(caller.activate(TARGET)).rejects.toMatchObject({
+        cause: { code: "sso_self_serve_unavailable" },
+      });
+      expect(commands.activate).not.toHaveBeenCalled();
+      await expect(caller.claimDomain({ ...TARGET, domain: "acme.test" })).rejects.toMatchObject({
+        cause: { code: "sso_self_serve_unavailable" },
+      });
+      expect(commands.setArrivals).not.toHaveBeenCalled();
+      expect(ceremony.claimDomain).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a hosted organization opted in to setting up itself", () => {
+    it("passes the gate and hands the claim to identity", async () => {
+      const { caller, ceremony } = await harness({ isSaas: true, optedIn: ["org_acme"] });
+
+      await caller.claimDomain({ ...TARGET, domain: "acme.test" });
+
+      expect(ceremony.claimDomain).toHaveBeenCalled();
+    });
+
+    it("still refuses a hosted organization the opt-in does not name", async () => {
+      const { caller, ceremony } = await harness({ isSaas: true, optedIn: ["org_other"] });
+
+      await expect(caller.claimDomain({ ...TARGET, domain: "acme.test" })).rejects.toMatchObject({
+        cause: { code: "sso_self_serve_unavailable" },
+      });
+      expect(ceremony.claimDomain).not.toHaveBeenCalled();
     });
   });
 

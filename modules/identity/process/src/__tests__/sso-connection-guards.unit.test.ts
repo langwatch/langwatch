@@ -342,12 +342,34 @@ describe("sso connection guards", () => {
         organizationId: "org_first",
       });
     });
+
+    /** @scenario "A domain another live connection already holds is refused without naming who holds it" */
+    it("refuses by name, and names neither the other organization nor anybody in it", async () => {
+      const refusal = await guards
+        .requestVerification({
+          ...identity,
+          domain: "acme.com",
+          method: "dns-txt",
+          tokenHash: "sha256:proof",
+        })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({ code: "sso_connection_domain_taken" });
+      // What crosses to the claimant is the message and the meta; the detail stays in the log.
+      const spoken = `${String(Reflect.get(Object(refusal), "message"))} ${JSON.stringify(
+        Reflect.get(Object(refusal), "meta") ?? {},
+      )}`;
+      expect(spoken).not.toContain("org_first");
+      expect(spoken).not.toContain("user_first");
+      expect(spoken).not.toContain("ssoc_first");
+    });
   });
 
   describe("given a VERIFIED connection", () => {
     beforeEach(reachVerified);
 
     /** @scenario "Activation requires a verified domain and a live break-glass binding" */
+    /** @scenario "Activation needs somebody who can still get in without the identity provider" */
     it("refuses without a live break-glass binding and succeeds with one", async () => {
       breakGlass.set(false);
       await expect(
@@ -688,6 +710,7 @@ describe("sso connection guards", () => {
   });
 
   describe("when domain after domain is claimed inside the hour", () => {
+    /** @scenario "Claiming domain after domain is stopped by name" */
     it("refuses the claim past the window with the wait attached, counting withdrawn claims", async () => {
       await run(() =>
         guards.registerConnection({ ...identity, type: "oidc", idp: IDP, arrivalPolicy: "admit" }),

@@ -194,6 +194,7 @@ describe("given a connection part-way through its setup", () => {
 });
 
 describe("given a connection waiting to go live", () => {
+  /** @scenario "No sign-in through the connection means no test" */
   it("holds it back until every precondition is met", async () => {
     const service = scenario([
       connection({ verifiedDomains: ["acme.com"], domainVerifications: [DNS_PROOF] }),
@@ -230,6 +231,7 @@ describe("given a connection waiting to go live", () => {
     });
   });
 
+  /** @scenario "A sign-in through the connection is what records the test" */
   it("counts a sign-in the connection itself decided as the test sign-in", async () => {
     const service = scenario(
       [connection({ verifiedDomains: ["acme.com"], domainVerifications: [DNS_PROOF] })],
@@ -242,6 +244,20 @@ describe("given a connection waiting to go live", () => {
     });
   });
 
+  /** @scenario "Somebody else's sign-in through another organization's connection is not this test" */
+  it("counts no sign-in through another connection as this one's test", async () => {
+    const service = scenario(
+      [connection({ verifiedDomains: ["acme.com"], domainVerifications: [DNS_PROOF] })],
+      [],
+      [{ connectionId: "ssoc_elsewhere", userId: "user_ana", authenticatedAtMs: NOW - 60_000 }],
+    );
+
+    await expect(service.getSetup({ organizationId: ORG })).resolves.toMatchObject({
+      goLive: { testSignIn: { done: false } },
+    });
+  });
+
+  /** @scenario "A way back in that has expired is not one" */
   it("counts no way back in that has expired or been replaced", async () => {
     const service = scenario(
       [connection({ verifiedDomains: ["acme.com"], domainVerifications: [DNS_PROOF] })],

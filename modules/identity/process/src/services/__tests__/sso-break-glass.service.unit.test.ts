@@ -142,6 +142,7 @@ describe("SsoBreakGlassService", () => {
 
   describe("when a way back in is renewed", () => {
     /** @scenario "Renewing a way back in leaves the date it previously ended readable" */
+    /** @scenario "Renewing a way back in is deliberate and recorded" */
     it("writes a new binding naming the old, and supersedes rather than edits it", async () => {
       const service = serviceFor();
       const first = await grant(service);
@@ -179,6 +180,7 @@ describe("SsoBreakGlassService", () => {
 
   describe("when a way back in is revoked", () => {
     /** @scenario "The last way back in cannot be revoked while a connection is live" */
+    /** @scenario "The last way back in cannot be ended while the connection decides sign-in" */
     it("refuses the only live binding of an organization whose connection is ACTIVE", async () => {
       const service = serviceFor();
       const binding = await grant(service);
@@ -210,6 +212,7 @@ describe("SsoBreakGlassService", () => {
 
   describe("when the expiry sweep runs", () => {
     /** @scenario "A way back in that is ending is warned about once per mark" */
+    /** @scenario "A way back in ends on its own date, and says so before it does" */
     it("warns with the days actually left, and stays silent on a second pass", async () => {
       const service = serviceFor();
       await grant(service, NOW + 5 * DAY_MS);
@@ -266,6 +269,7 @@ describe("SsoBreakGlassService", () => {
 
   describe("when eligibility is composed from standing and key", () => {
     /** @scenario "A way back in names somebody who could actually use it" */
+    /** @scenario "A way back in names somebody who holds a password, not merely somebody senior" */
     it("refuses an administrator who holds no password, and asks in that order", async () => {
       const holdsPassword = vi.fn(async () => false);
       const eligible = breakGlassHolderEligibility({

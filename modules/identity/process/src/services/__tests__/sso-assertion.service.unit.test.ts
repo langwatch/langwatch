@@ -282,6 +282,7 @@ describe("given a connection that is not live yet", () => {
     ).resolves.toEqual({ action: "continue" });
   });
 
+  /** @scenario "A connection still being set up carries only its own people" */
   it("refuses a colleague, though they are a member of the same organization", async () => {
     // Widening the exemption to any member hands an administrator holding
     // `sso:manage` a colleague's session — and with it that colleague's
@@ -432,6 +433,7 @@ describe("given an address the gate cannot read a domain from", () => {
 
 describe("given several different reasons to refuse", () => {
   /** @scenario "No such connection is held" */
+  /** @scenario "A refusal about what exists here says nothing" */
   it("answers identically every cause that would say what exists here", async () => {
     const causes = await Promise.all([
       serviceOver({ row: null }).service.decide({
@@ -494,6 +496,7 @@ describe("given several different reasons to refuse", () => {
   });
 
   /** @scenario "The opaque refusal is not the credential refusal" */
+  /** @scenario "No refusal at the door claims a password was wrong" */
   it("never borrows the credential refusal's code", async () => {
     // `identity_sign_in_refused` means "that email or password is wrong", and
     // every one of these reached the gate without a password existing.

@@ -293,6 +293,7 @@ beforeEach(() => {
 
 describe("asking for a record", () => {
   /** @scenario "The value is shown when it is minted and never read back afterwards" */
+  /** @scenario "The proof is recorded as a hash and the identity provider's secret is not recorded at all" */
   it("answers the value once and records only its hash", async () => {
     await reachClaimed();
 
@@ -335,6 +336,7 @@ describe("checking what the domain publishes", () => {
   }
 
   /** @scenario "One token satisfies either channel" */
+  /** @scenario "A published record proves the domain, and a missing one says exactly that" */
   it("proves the domain from the record, and names the record as what proved it", async () => {
     const value = await issue();
     proofs.answer = { outcome: "published", values: [`  ${value}  `] };
@@ -374,6 +376,7 @@ describe("checking what the domain publishes", () => {
   });
 
   /** @scenario "A record that is not published yet is not a failed proof" */
+  /** @scenario "A published record proves the domain, and a missing one says exactly that" */
   it("refuses a record that is not there, and leaves the ceremony where it was", async () => {
     await issue();
     const before = await stateOf();
@@ -458,6 +461,7 @@ describe("checking what the domain publishes", () => {
   });
 
   /** @scenario "A ceremony that expired is re-proved through the same check" */
+  /** @scenario "An expired proof verifies nothing and a fresh one costs no progress" */
   it("re-proves an expired ceremony from a fresh record, deciding no claim twice", async () => {
     const stale = await issue();
     clock = T0 + SSO_DNS_PROOF_TTL_MS + 1;
@@ -527,6 +531,7 @@ describe("a domain somebody else holds", () => {
     expect((await stateOf())?.claimedDomains).toEqual([DOMAIN]);
   });
 
+  /** @scenario "A disputed claim is the one that cannot be proved yet" */
   it("refuses to issue a record while that claim is undecided", async () => {
     seedRivalOwner();
     await reachClaimed();

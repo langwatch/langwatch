@@ -4,6 +4,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { type SsoConfig } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   ssoDomainRecordLocation,
   type IdentityApi,
@@ -325,6 +326,16 @@ export function createSsoTestEntitlements(planType = "ENTERPRISE"): EntitlementA
   });
 }
 
+/** The flag service, answering `self_serve_sso` for the organizations named. */
+export function createSsoTestFeatureFlags(optedIn: readonly string[] = []): FeatureFlagApi {
+  return createApiFixture<FeatureFlagApi>({
+    isEnabled: async (flagKey, target) =>
+      flagKey === "self_serve_sso" &&
+      target.kind === "organization" &&
+      optedIn.includes(target.organizationId),
+  });
+}
+
 export function createSsoTestApp(
   input: Readonly<{
     config?: SsoConfig;
@@ -338,6 +349,7 @@ export function createSsoTestApp(
       auditLog: AuditLogApi;
       identity: IdentityApi;
       entitlements: EntitlementApi;
+      featureFlags: FeatureFlagApi;
     }>;
   }> = {},
 ): Promise<SsoApp> {
@@ -351,6 +363,7 @@ export function createSsoTestApp(
       auditLog: input.dependencies?.auditLog ?? createSsoTestAuditLog(),
       identity: input.dependencies?.identity ?? createSsoTestIdentity({ connections }),
       entitlements: input.dependencies?.entitlements ?? createSsoTestEntitlements(),
+      featureFlags: input.dependencies?.featureFlags ?? createSsoTestFeatureFlags(),
     },
     members: {
       logger: input.members?.logger ?? RecordingSsoGateLogger.create(),

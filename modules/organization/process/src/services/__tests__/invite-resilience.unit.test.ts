@@ -300,6 +300,7 @@ describe("InviteService resilience", () => {
         );
       });
 
+      /** @scenario "Two administrators extending at once extend it once" */
       it("loses quietly when the invite stopped being pending under it", async () => {
         mockPrisma.organizationInvite.updateMany.mockResolvedValue({
           count: 0,

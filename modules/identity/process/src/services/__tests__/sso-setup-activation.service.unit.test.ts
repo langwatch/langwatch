@@ -44,6 +44,7 @@ const connection = (over: Partial<SsoConnectionState> = {}): SsoConnectionState 
   source: "self-serve",
   verifiedDomains: ["acme.com"],
   domainVerifications: [DOMAIN_PROOF],
+  arrivalPolicyDecidedAtMs: 1_695_000_000_000,
   ...over,
 });
 
@@ -156,6 +157,19 @@ describe("taking a connection live", () => {
 
     await expect(activate(service)).rejects.toMatchObject({
       code: "sso_activation_break_glass_missing",
+    });
+    expect(activateConnection).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Saying nothing is not an answer, and going live says so" */
+  it("refuses when nobody has said who the connection admits", async () => {
+    const { service, activateConnection } = serviceOver({
+      row: connection({ arrivalPolicyDecidedAtMs: null }),
+      signIns: [{ userId: "user_ana", providerAccountId: "okta|ana", atMs: 1_699_000_000_000 }],
+    });
+
+    await expect(activate(service)).rejects.toMatchObject({
+      code: "sso_activation_arrivals_undecided",
     });
     expect(activateConnection).not.toHaveBeenCalled();
   });

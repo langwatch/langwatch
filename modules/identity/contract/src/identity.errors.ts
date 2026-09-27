@@ -292,6 +292,44 @@ export class SsoActivationBreakGlassMissingError extends SsoActivationPreconditi
   }
 }
 
+/** Nobody has said what this connection does with somebody it has never seen. */
+export class SsoActivationArrivalsUndecidedError extends SsoActivationPreconditionError {
+  constructor(detail: string) {
+    super("sso_activation_arrivals_undecided", "sso_activation_arrivals_undecided", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoActivationArrivalsUndecidedError";
+  }
+}
+
+/** Self-serve setup on an installation holding no genuine licence at startup (D05 tier 2);
+ *  the words name activating a licence and nothing internal. */
+export class SsoLicenseRequiredError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_license_required", "sso_license_required", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoLicenseRequiredError";
+  }
+}
+
+/** A hosted organization not opted in to setting single sign-on up itself (D05 tier 3);
+ *  the words offer a conversation and name no flag. */
+export class SsoSelfServeUnavailableError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_self_serve_unavailable", "sso_self_serve_unavailable", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoSelfServeUnavailableError";
+  }
+}
+
 /**
  * Teardown would leave people with no way in. The detail carries how many
  * users for the log; the copy tells the operator what to do about it, which

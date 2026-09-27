@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoSelfServeContext } from "@langwatch/enterprise-sso-contract";
+import {
+  SsoLicenseRequiredError,
+  SsoSelfServeUnavailableError,
+} from "@langwatch/identity-contract";
+
+import { ssoSelfServeAvailability } from "../rules/sso-self-serve-availability.rules.ts";
 
 /**
  * What the installation's licence may authorize (D05 tier 2).
@@ -97,5 +103,21 @@ export class SsoSelfServeContextService {
       optedIn:
         deployment === "hosted" ? await this.deps.optIn.isOptedIn({ organizationId }) : false,
     };
+  }
+
+  /** Setup is available, or refused with the one thing that would change that. */
+  async assertAvailable({ organizationId }: { organizationId: string }): Promise<void> {
+    const availability = ssoSelfServeAvailability(await this.resolve({ organizationId }));
+    if (availability.available) return;
+    if (availability.refusal === "not_opted_in") {
+      throw new SsoSelfServeUnavailableError(
+        `organization ${organizationId} is not opted in to self-serve single sign-on setup`,
+      );
+    }
+    throw new SsoLicenseRequiredError(
+      availability.refusal === "license_restart_required"
+        ? `organization ${organizationId}: a licence was activated after this process started`
+        : `organization ${organizationId}: the installation holds no genuine licence`,
+    );
   }
 }
