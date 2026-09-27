@@ -8,8 +8,8 @@ export type UiPromptEditorDrawerProps = {
   onSave?: (prompt: {
     id: string;
     name: string;
-    version?: number;
-    versionId?: string;
+    version: number;
+    versionId: string;
     inputs?: { identifier: string; type: string }[];
     // json_schema flows to the target so structured outputs stay field-selectable
     // in the comparison config — see promptEditorCallbacks.onSave.

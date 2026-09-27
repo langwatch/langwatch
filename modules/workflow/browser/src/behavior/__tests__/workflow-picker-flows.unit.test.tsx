@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import type { AgentWithFields } from "@langwatch/agent-contract";
+import type { WireOf } from "@langwatch/api/web";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type { Component, NodeWithOptionalPosition } from "@langwatch/workflow-contract";
 import { act } from "react";
@@ -73,11 +74,11 @@ const evaluator = {
   workflowId: null,
   copiedFromEvaluatorId: null,
   archivedAt: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
   fields: [{ identifier: "output", type: "str" }],
   outputFields: [{ identifier: "passed", type: "bool" }],
-} satisfies EvaluatorWithFields;
+} satisfies WireOf<EvaluatorWithFields>;
 
 const agent = {
   id: "agent-1",
@@ -86,14 +87,14 @@ const agent = {
   workflowId: null,
   copiedFromAgentId: null,
   archivedAt: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
   type: "http",
   config: { url: "https://example.com", method: "GET" },
   inputFields: [],
   outputFields: [],
   fieldsResolved: true,
-} satisfies AgentWithFields;
+} satisfies WireOf<AgentWithFields>;
 
 beforeEach(() => {
   vi.clearAllMocks();

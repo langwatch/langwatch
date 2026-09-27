@@ -1,4 +1,5 @@
 import type { AgentWithFields } from "@langwatch/agent-contract";
+import type { WireOf } from "@langwatch/api/web";
 import type { Component, NodeWithOptionalPosition } from "@langwatch/workflow-contract";
 import { useCallback, useRef } from "react";
 
@@ -6,14 +7,14 @@ import { buildAgentNodeData } from "../model/agent-node-data.ts";
 import { useWorkflowStore } from "./use-workflow-store.ts";
 
 export type AgentPickerCallbacks = {
-  onSelect: (agent: AgentWithFields) => void;
+  onSelect: (agent: WireOf<AgentWithFields>) => void;
   onCreateNew: () => void;
   onClose: () => void;
 };
 
 export type AgentPicker = {
   register: (callbacks: AgentPickerCallbacks) => void;
-  registerCreation: (onSave: (agent: AgentWithFields) => void) => void;
+  registerCreation: (onSave: (agent: WireOf<AgentWithFields>) => void) => void;
   openList: () => void;
   openTypeSelector: () => void;
   close: () => void;
@@ -33,7 +34,7 @@ export function useWorkflowAgentPickerFlow(port: AgentPicker) {
       const nodeId = item.node.id;
 
       pendingAgentRef.current = nodeId;
-      const applyAgent = (agent: AgentWithFields) => {
+      const applyAgent = (agent: WireOf<AgentWithFields>) => {
         if (!pendingAgentRef.current) {
           return;
         }

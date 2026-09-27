@@ -6,11 +6,14 @@
 
 import type { ComponentType } from "react";
 
+import type { UiAddOrEditDatasetDrawerProps } from "../../declarations.ts";
 import type {
   UiAgentListDrawerProps,
   UiAgentTypeSelectorDrawerProps,
   UiAgentWorkflowEditorDrawerProps,
 } from "./agent-drawers.ts";
+import type { UiAutomationDrawerProps } from "./automation-drawers.ts";
+import type { UiSelectDatasetDrawerProps } from "./dataset-drawers.ts";
 import type {
   UiCodeEvaluatorEditorDrawerProps,
   UiEvaluatorCategorySelectorDrawerProps,
@@ -28,10 +31,12 @@ import type {
 
 /** Entries land owner by owner; until a drawer has one, its props read as an open record. */
 export type UiDrawerMap = {
+  addOrEditDataset: UiAddOrEditDatasetDrawerProps;
   agentList: UiAgentListDrawerProps;
   agentTestingCaseEditor: UiAgentTestingCaseEditorDrawerProps;
   agentTypeSelector: UiAgentTypeSelectorDrawerProps;
   agentWorkflowEditor: UiAgentWorkflowEditorDrawerProps;
+  automation: UiAutomationDrawerProps;
   codeEvaluatorEditor: UiCodeEvaluatorEditorDrawerProps;
   evaluatorCategorySelector: UiEvaluatorCategorySelectorDrawerProps;
   evaluatorEditor: UiEvaluatorEditorDrawerProps;
@@ -41,6 +46,7 @@ export type UiDrawerMap = {
   promptEditor: UiPromptEditorDrawerProps;
   promptList: UiPromptListDrawerProps;
   scenarioRunDetail: UiScenarioRunDetailDrawerProps;
+  selectDataset: UiSelectDatasetDrawerProps;
   workflowSelectorForEvaluator: UiWorkflowSelectorForEvaluatorDrawerProps;
 };
 

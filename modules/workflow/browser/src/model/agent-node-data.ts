@@ -1,4 +1,5 @@
-import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
+import type { AgentWithFields } from "@langwatch/agent-contract";
+import type { WireOf } from "@langwatch/api/web";
 import type {
   AgentComponent,
   Field,
@@ -6,6 +7,8 @@ import type {
   HttpHeader,
   HttpMethod,
 } from "@langwatch/workflow-contract";
+
+type TypedAgent = WireOf<AgentWithFields>;
 
 /**
  * Translation layer between an agent library record and the workflow DSL

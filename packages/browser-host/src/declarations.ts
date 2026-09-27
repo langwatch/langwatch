@@ -7,7 +7,7 @@
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import type { AnnotationFormState } from "@langwatch/annotation-contract";
-import type { MappingState } from "@langwatch/dataset-contract";
+import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
 import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import type { TimeInput } from "@langwatch/time";
@@ -48,7 +48,7 @@ export type UiParameterLineFieldProps = {
 };
 
 /** A dataset column as a dataset surface names it: its name and its type's name. */
-export type UiDatasetColumn = { name: string; type: string };
+export type UiDatasetColumn = DatasetColumn;
 
 /** What a screen hands dataset's lent create-or-edit drawer. */
 export type UiAddOrEditDatasetDrawerProps = {

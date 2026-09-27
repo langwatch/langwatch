@@ -3,19 +3,19 @@
  */
 
 import { Button, HStack, Text } from "@chakra-ui/react";
-import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
+import {
+  getComplexProps,
+  type UiSelectDatasetDrawerProps,
+  useDrawer,
+} from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Database } from "lucide-react";
 
 import { datasetApi } from "../../behavior/dataset-api.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
-import { DatasetPickerList, type DatasetPickerSelection } from "../blocks/dataset-picker-list.tsx";
+import { DatasetPickerList } from "../blocks/dataset-picker-list.tsx";
 
-export type SelectDatasetDrawerProps = {
-  open?: boolean;
-  onClose?: () => void;
-  onSelect?: (dataset: DatasetPickerSelection) => void;
-};
+export type SelectDatasetDrawerProps = UiSelectDatasetDrawerProps;
 
 export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
   const { closeDrawer } = useDrawer();

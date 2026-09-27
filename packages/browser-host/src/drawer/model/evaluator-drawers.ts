@@ -1,5 +1,5 @@
 import type { WireOf } from "@langwatch/api/web";
-import type { Evaluator } from "@langwatch/evaluator-contract";
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type {
   ComparisonEvaluatorConfig,
   LocalEvaluatorConfig,
@@ -93,7 +93,7 @@ export type UiCodeEvaluatorEditorDrawerProps = {
 export type UiEvaluatorListDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSelect?: (evaluator: WireOf<Evaluator>) => void;
+  onSelect?: (evaluator: WireOf<EvaluatorWithFields>) => void;
   onCreateNew?: () => void;
   filterEvaluatorType?: string;
   title?: string;

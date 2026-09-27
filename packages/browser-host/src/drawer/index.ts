@@ -75,6 +75,8 @@ export type {
   UiEvaluatorMappingsConfig,
   UiWorkflowSelectorForEvaluatorDrawerProps,
 } from "./model/evaluator-drawers.ts";
+export type { UiAutomationDrawerProps } from "./model/automation-drawers.ts";
+export type { UiSelectDatasetDrawerProps } from "./model/dataset-drawers.ts";
 export type { UiFoundryDrawerProps } from "./model/ops-drawers.ts";
 export type { UiInviteMemberDrawerProps } from "./model/organization-drawers.ts";
 export type { UiPromptEditorDrawerProps, UiPromptListDrawerProps } from "./model/prompt-drawers.ts";
