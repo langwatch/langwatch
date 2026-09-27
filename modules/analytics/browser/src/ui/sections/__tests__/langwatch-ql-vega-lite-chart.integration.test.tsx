@@ -248,7 +248,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       it("carries an accessible name and description, and takes no focus", async () => {
         withChakra(chart({ ariaLabel: "Chart of the result of run 4" }));
 
-        const view = await screen.findByRole("img", {
+        const view = await screen.findByRole("figure", {
           name: "Chart of the result of run 4",
         });
         const describedBy = view.getAttribute("aria-describedby");
@@ -450,7 +450,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         const state = await screen.findByTestId("lwql-chart-failure");
         expect(failureCode(), name).toBe(code);
         expect(state.textContent?.length ?? 0, name).toBeGreaterThan(20);
-        expect(screen.queryByRole("img"), name).toBeNull();
+        expect(screen.queryByRole("figure"), name).toBeNull();
         seen.add(state.textContent ?? "");
 
         unmount();
@@ -506,7 +506,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       // to survive it: without that, this is a chart that never comes back.
       await waitFor(() => expect(screen.queryByTestId("lwql-chart-failure")).toBeNull());
       expect(vega.state.calls).toHaveLength(2);
-      await screen.findByRole("img");
+      await screen.findByRole("figure");
     });
 
     /** @scenario "No renderer path performs network or file loading" */

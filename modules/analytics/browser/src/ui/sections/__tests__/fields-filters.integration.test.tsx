@@ -121,7 +121,7 @@ describe("FieldsFilters", () => {
       // undefined, crashing the drawer. Fixed with optional chaining.
       expect(() =>
         renderComponent({
-          filters: undefined as unknown as Record<FilterField, string[]>,
+          filters: undefined,
         }),
       ).not.toThrow();
     });

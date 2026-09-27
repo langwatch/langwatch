@@ -191,7 +191,7 @@ describe("chart mode", () => {
         withChakra(<ChartModeHost result={RESULT} submittedLabel="run 4" />);
 
         expect(
-          await screen.findByRole("img", {
+          await screen.findByRole("figure", {
             name: "Chart of the result of run 4",
           }),
         ).toBeInTheDocument();

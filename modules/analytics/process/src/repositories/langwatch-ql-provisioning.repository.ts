@@ -46,7 +46,7 @@ export abstract class LangWatchQLProvisioningRepository {
   }): Promise<ConfigStoreLwqlEntity[]>;
   abstract probeOwner(input: { names: LwqlAccessModelIdentity }): Promise<LwqlAccessModelOwner>;
   abstract queryRows(sql: string): Promise<Record<string, unknown>[]>;
-  abstract findKeyMapHashes(input: { table: string }): Promise<string[]>;
+  abstract findKeyMapHashes(input: { table: string; tenantId: string }): Promise<string[]>;
   abstract insertKeyMapRows(input: {
     table: string;
     rows: readonly LwqlKeyMapInsertRow[];

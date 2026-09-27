@@ -43,6 +43,7 @@ import { ChevronDown, X } from "react-feather";
 import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 
+import type { AnalyticsFilterOption } from "../../../behavior/analytics-api.ts";
 import { SaveAsViewButton } from "./save-as-view-button.tsx";
 
 /** An unparsable bound falls back to the slider's own end of the range. */
@@ -173,6 +174,14 @@ const BOOLEAN_FILTER_IDS: FilterField[] = [
   "evaluations.state",
 ];
 
+/** A picker with a selection is tinted, red when the filter is negated. */
+function selectionColors({ hasSelection, negated }: { hasSelection: boolean; negated: boolean }) {
+  if (!hasSelection) return { selectionBackground: "bg.muted", selectionForeground: "fg.muted" };
+  return negated
+    ? { selectionBackground: "red.subtle", selectionForeground: "red.fg" }
+    : { selectionBackground: "blue.subtle", selectionForeground: "blue.fg" };
+}
+
 function FieldsFilter({
   filterId,
   filter,
@@ -257,11 +266,10 @@ function FieldsFilter({
     [optionCount, setOpen],
   );
 
-  const hasSelection = currentStringList.length > 0;
-  const selectedBackground = negated ? "red.subtle" : "blue.subtle";
-  const selectionBackground = hasSelection ? selectedBackground : "bg.muted";
-  const selectedForeground = negated ? "red.fg" : "blue.fg";
-  const selectionForeground = hasSelection ? selectedForeground : "fg.muted";
+  const { selectionBackground, selectionForeground } = selectionColors({
+    hasSelection: currentStringList.length > 0,
+    negated,
+  });
 
   return (
     <Field.Root>
@@ -270,59 +278,60 @@ function FieldsFilter({
         open={open}
         onOpenChange={({ open }) => setOpen(open)}
       >
-        <Popover.Trigger asChild>
-          <Button
-            variant="subtle"
-            backgroundColor={selectionBackground}
-            size="sm"
-            width="100%"
-            fontWeight="normal"
-          >
-            <HStack width="full" gap={1}>
-              <Text color={selectionForeground} fontWeight="500" paddingRight={4}>
-                {currentStringList.length > 0 && negated ? "NOT " : ""}
-                {filter.name}
-              </Text>
-              {currentStringList.length > 0 ? (
-                <>
-                  <Text lineClamp={1}>{currentStringList.join(", ")}</Text>
-                  <Spacer />
-                  {currentStringList.length > 1 && (
-                    <Tag.Root
-                      justifyContent="center"
-                      display="flex"
-                      flexShrink={0}
-                      colorPalette={negated ? "red" : "blue"}
-                    >
-                      <Tag.Label>{currentStringList.length}</Tag.Label>
-                    </Tag.Root>
-                  )}
-                  <Tooltip content={`Clear ${filter.name.toLowerCase()} filter`}>
-                    <Button
-                      as={Box}
-                      role="button"
-                      variant="ghost"
-                      width="fit-content"
-                      display="flex"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFilter(filterId, []);
-                      }}
-                    >
-                      <X />
-                    </Button>
-                  </Tooltip>
-                </>
-              ) : (
-                <>
-                  <Text color="fg.subtle">Any</Text>
-                  <Spacer />
-                </>
-              )}
-              <ChevronDown />
-            </HStack>
-          </Button>
-        </Popover.Trigger>
+        <HStack width="full" gap={1}>
+          <Popover.Trigger asChild>
+            <Button
+              variant="subtle"
+              backgroundColor={selectionBackground}
+              size="sm"
+              flex={1}
+              minWidth={0}
+              fontWeight="normal"
+            >
+              <HStack width="full" gap={1}>
+                <Text color={selectionForeground} fontWeight="500" paddingRight={4}>
+                  {currentStringList.length > 0 && negated ? "NOT " : ""}
+                  {filter.name}
+                </Text>
+                {currentStringList.length > 0 ? (
+                  <>
+                    <Text lineClamp={1}>{currentStringList.join(", ")}</Text>
+                    <Spacer />
+                    {currentStringList.length > 1 && (
+                      <Tag.Root
+                        justifyContent="center"
+                        display="flex"
+                        flexShrink={0}
+                        colorPalette={negated ? "red" : "blue"}
+                      >
+                        <Tag.Label>{currentStringList.length}</Tag.Label>
+                      </Tag.Root>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text color="fg.subtle">Any</Text>
+                    <Spacer />
+                  </>
+                )}
+                <ChevronDown />
+              </HStack>
+            </Button>
+          </Popover.Trigger>
+          {currentStringList.length > 0 && (
+            <Tooltip content={`Clear ${filter.name.toLowerCase()} filter`}>
+              <Button
+                variant="ghost"
+                size="sm"
+                width="fit-content"
+                aria-label={`Clear ${filter.name.toLowerCase()} filter`}
+                onClick={() => setFilter(filterId, [])}
+              >
+                <X />
+              </Button>
+            </Tooltip>
+          )}
+        </HStack>
         <Popover.Content padding={0}>
           <Box position="sticky" top={0} zIndex="1" borderBottom="1px solid" borderColor="border">
             <InputGroup
@@ -333,7 +342,10 @@ function FieldsFilter({
               paddingX={2}
             >
               <Input
-                variant={"plain" as any}
+                // No box of its own: it sits inside the search row's frame.
+                bg="transparent"
+                borderWidth={0}
+                focusVisibleRing="none"
                 size="sm"
                 placeholder="Search..."
                 ref={searchRef}
@@ -737,7 +749,7 @@ function ListSelection({
 
     if (query) {
       return filterData.data?.options
-        .filter((option: any) => {
+        .filter((option: AnalyticsFilterOption) => {
           return option.label.toLowerCase().includes(query.toLowerCase());
         })
         .toSorted(sortingFn);
@@ -752,7 +764,9 @@ function ListSelection({
   // Check if we should show custom value option
   const hasExactMatch = useMemo(() => {
     if (!customValueQuery) return true;
-    return options.some((opt: any) => opt.label.toLowerCase() === customValueQuery.toLowerCase());
+    return options.some(
+      (opt: AnalyticsFilterOption) => opt.label.toLowerCase() === customValueQuery.toLowerCase(),
+    );
   }, [options, customValueQuery]);
 
   const showCustomValue = allowCustomValue && customValueQuery && !hasExactMatch;

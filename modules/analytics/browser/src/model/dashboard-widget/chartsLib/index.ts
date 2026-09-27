@@ -5,6 +5,7 @@
  */
 
 import { Temporal } from "@langwatch/time";
+import type * as RechartsLibrary from "recharts";
 
 type Row = Record<string, unknown>;
 
@@ -13,9 +14,14 @@ interface LWGlobal {
   navigate?: (target: string, params?: Record<string, unknown>) => void;
 }
 
+/** The one member of the frame's React the charts call; every element type arrives untyped. */
+interface FrameReact {
+  createElement(type: unknown, props: unknown, ...children: unknown[]): unknown;
+}
+
 declare const window: {
-  React: any;
-  Recharts: any;
+  React: FrameReact;
+  Recharts: typeof RechartsLibrary;
   LW?: LWGlobal;
 };
 
@@ -204,6 +210,16 @@ function projectionIndex(
 // module itself has no load-order dependency beyond React/Recharts having
 // already run (guaranteed by the frame document.s script order).
 // ---------------------------------------------------------------------------
+
+/** A cell's text: primitives as written, anything structured as JSON, never `[object Object]`. */
+function cellText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  return JSON.stringify(value) ?? "";
+}
 
 function react() {
   return window.React;
@@ -501,7 +517,7 @@ export function AreaTimeseries({
 
 /** A single series' <Bar>, with per-cell opacity for the projected region. */
 function projectedBar(
-  R: any,
+  R: typeof RechartsLibrary,
   opts: {
     key: string;
     dataKey: string;
@@ -908,7 +924,7 @@ export function Leaderboard({
           {
             style: { fontSize: 12, color: c.text, minWidth: 96, flexShrink: 0 },
           },
-          String(row[labelKey] ?? ""),
+          cellText(row[labelKey]),
         ),
         h(
           "div",
@@ -1096,7 +1112,7 @@ function Table({ data, height }: { data: Row[]; height?: number }) {
                     color: c.text,
                   },
                 },
-                String(row[col] ?? ""),
+                cellText(row[col]),
               ),
             ),
           ),

@@ -13,6 +13,7 @@ import {
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
+import type { SavedView as StoredSavedView } from "@langwatch/dashboard-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import type React from "react";
 import {
@@ -176,79 +177,66 @@ function toClientView(dbView: {
 // Hook
 // ---------------------------------------------------------------------------
 
-function useSavedViewsInternal() {
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
-  const router = useRouter();
-  const { filters } = useFilterParams();
-  const utils = api.useUtils();
+type ViewFilters = Partial<Record<FilterField, FilterParam>>;
+type SavedViewsRouter = ReturnType<typeof useRouter>;
+type SavedViewsUtils = ReturnType<typeof api.useUtils>;
+type Flag = { current: boolean };
 
+/**
+ * The stored selection, read synchronously during render on a project change (not in an effect)
+ * so it is available before any effect fires. React supports this pattern for derived state.
+ */
+function useStoredSelection(projectId: string) {
   const [selectedViewId, setSelectedViewIdState] = useState<string | null>(null);
-
   const skipNextMatchRef = useRef(false);
   const pendingRestoreRef = useRef(true);
-
-  // -- Read selectedViewId synchronously on projectId change ----------------
-  // This runs during render (not in an effect) so selectedViewId is available
-  // before any effects fire. React supports this pattern for derived state.
   const prevProjectIdRef = useRef("");
   if (projectId && projectId !== prevProjectIdRef.current) {
     prevProjectIdRef.current = projectId;
-    const storedId = readSelectedViewId(projectId);
-    setSelectedViewIdState(storedId);
+    setSelectedViewIdState(readSelectedViewId(projectId));
     pendingRestoreRef.current = true;
     skipNextMatchRef.current = true;
   }
+  return { selectedViewId, setSelectedViewIdState, skipNextMatchRef, pendingRestoreRef };
+}
 
-  // -- Fetch saved views from DB, seeded with localStorage cache -----------
+/** The project's saved views from the server, seeded with and written back to the local cache. */
+function useCustomViews(projectId: string) {
   const cachedViews = useMemo(() => {
     if (!projectId) return undefined;
-    const cached = readCachedViews(projectId);
-    return cached ?? undefined;
+    return readCachedViews(projectId) ?? undefined;
   }, [projectId]);
 
   const savedViewsQuery = api.savedViews.getAll.useQuery({ projectId }, { enabled: !!projectId });
-
-  const rawViews = savedViewsQuery.data;
+  const rawViews: StoredSavedView[] | undefined = savedViewsQuery.data;
   const isInitialized = savedViewsQuery.isFetched || cachedViews !== undefined;
 
   const customViews = useMemo(() => {
     if (rawViews) return rawViews.map(toClientView);
-    if (cachedViews) return cachedViews;
-    return [];
+    return cachedViews ?? [];
   }, [rawViews, cachedViews]);
 
-  // Write cache whenever server data arrives
   useEffect(() => {
     if (!projectId || !rawViews) return;
-    const clientViews = rawViews.map(toClientView);
-    writeCachedViews(projectId, clientViews);
+    writeCachedViews(projectId, rawViews.map(toClientView));
   }, [projectId, rawViews]);
 
-  // -- tRPC mutations ------------------------------------------------------
-  const createMutation = api.savedViews.create.useMutation({
-    onSuccess: () => {
-      void utils.savedViews.getAll.invalidate({ projectId });
-    },
-  });
-  const deleteMutation = api.savedViews.delete.useMutation({
-    onSuccess: () => {
-      void utils.savedViews.getAll.invalidate({ projectId });
-    },
-  });
-  const renameMutation = api.savedViews.rename.useMutation({
-    onSuccess: () => {
-      void utils.savedViews.getAll.invalidate({ projectId });
-    },
-  });
-  const reorderMutation = api.savedViews.reorder.useMutation({
-    onSuccess: () => {
-      void utils.savedViews.getAll.invalidate({ projectId });
-    },
-  });
+  return { customViews, isInitialized };
+}
 
-  // -- Filter actions -------------------------------------------------------
+/** The four writes, each refreshing the list once it lands. */
+function useSavedViewMutations(projectId: string, utils: SavedViewsUtils) {
+  const refresh = { onSuccess: () => void utils.savedViews.getAll.invalidate({ projectId }) };
+  return {
+    createMutation: api.savedViews.create.useMutation(refresh),
+    deleteMutation: api.savedViews.delete.useMutation(refresh),
+    renameMutation: api.savedViews.rename.useMutation(refresh),
+    reorderMutation: api.savedViews.reorder.useMutation(refresh),
+  };
+}
 
+/** Pushing a view's filters, query and period to the address, or clearing them. */
+function useViewNavigation(router: SavedViewsRouter) {
   const resetAllFilters = useCallback(() => {
     const cleanQuery = keepOnFilterReset(router.query);
     void router.push({ pathname: router.pathname, query: cleanQuery }, undefined, {
@@ -258,13 +246,8 @@ function useSavedViewsInternal() {
   }, [router]);
 
   const applyViewFilters = useCallback(
-    (
-      viewFilters: Partial<Record<FilterField, FilterParam>>,
-      query?: string,
-      period?: SavedView["period"],
-    ): Promise<boolean> => {
+    (viewFilters: ViewFilters, query?: string, period?: SavedView["period"]): Promise<boolean> => {
       const { startDate, endDate } = viewPeriodDates(period);
-
       const queryObj = buildViewQuery({
         routerQuery: router.query as Record<string, string | string[] | undefined>,
         viewFilters,
@@ -272,12 +255,8 @@ function useSavedViewsInternal() {
         startDate,
         endDate,
       });
-
       return router.push(
-        {
-          pathname: router.pathname,
-          query: queryObj as Record<string, string | string[]>,
-        },
+        { pathname: router.pathname, query: queryObj as Record<string, string | string[]> },
         undefined,
         { shallow: true, scroll: false },
       );
@@ -285,73 +264,121 @@ function useSavedViewsInternal() {
     [router],
   );
 
-  // -- Restore saved view on init -------------------------------------------
-  // Pushes the stored view's filters to the URL so it's bookmarkable/shareable.
-  // Note: useFilterParams already reads the same filters from localStorage on
-  // first render, so queries fire with correct filters immediately. This effect
-  // just syncs the URL to match.
+  return { resetAllFilters, applyViewFilters };
+}
+
+/**
+ * Pushes the stored view's filters to the URL so it's bookmarkable/shareable. useFilterParams
+ * already reads the same filters from localStorage on first render, so queries fire with the
+ * right filters immediately; this only syncs the URL to match.
+ */
+function useRestoreStoredView(input: {
+  projectId: string;
+  isInitialized: boolean;
+  selectedViewId: string | null;
+  customViews: SavedView[];
+  asPath: string;
+  pendingRestoreRef: Flag;
+  skipNextMatchRef: Flag;
+  applyViewFilters: ReturnType<typeof useViewNavigation>["applyViewFilters"];
+}) {
+  const { projectId, isInitialized } = input;
   useEffect(() => {
     if (!isInitialized || !projectId) return;
-
-    pendingRestoreRef.current = false;
-
+    input.pendingRestoreRef.current = false;
+    const { selectedViewId } = input;
     if (!selectedViewId || selectedViewId === "all-traces") return;
-
-    // Only restore when there are no filter/date/query params in the actual URL.
-    // We check router.asPath (not `filters` from useFilterParams) because
-    // useFilterParams now includes a localStorage fallback — so `filters` may
-    // be populated even when the URL itself is clean.
-    if (urlCarriesViewParams(router.asPath)) return;
-
-    const customView = customViews.find((v: any) => v.id === selectedViewId);
-    if (customView) {
-      skipNextMatchRef.current = true;
-      void applyViewFilters(customView.filters, customView.query, customView.period);
-    }
+    // The actual URL, not `filters`: useFilterParams falls back to localStorage, so `filters`
+    // may be populated even when the URL itself is clean.
+    if (urlCarriesViewParams(input.asPath)) return;
+    const customView = input.customViews.find((v) => v.id === selectedViewId);
+    if (!customView) return;
+    input.skipNextMatchRef.current = true;
+    void input.applyViewFilters(customView.filters, customView.query, customView.period);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, projectId]);
+}
 
-  // -- View selection -------------------------------------------------------
+/** Selecting a view by its pill; clicking the selected one returns to all traces. */
+function useViewSelection(input: {
+  projectId: string;
+  customViews: SavedView[];
+  selectedViewId: string | null;
+  setSelectedViewIdState: (viewId: string | null) => void;
+  skipNextMatchRef: Flag;
+  navigation: ReturnType<typeof useViewNavigation>;
+}) {
+  const { projectId, customViews, selectedViewId, setSelectedViewIdState, skipNextMatchRef } =
+    input;
+  const { resetAllFilters, applyViewFilters } = input.navigation;
 
   const selectView = useCallback(
     (viewId: string) => {
       skipNextMatchRef.current = true;
-
       if (viewId === "all-traces") {
         setSelectedViewIdState("all-traces");
         writeSelectedViewId(projectId, "all-traces");
         resetAllFilters();
         return;
       }
-
-      const customView = customViews.find((v: any) => v.id === viewId);
-      if (customView) {
-        setSelectedViewIdState(viewId);
-        writeSelectedViewId(projectId, viewId);
-        void applyViewFilters(customView.filters, customView.query, customView.period);
-      }
+      const customView = customViews.find((v) => v.id === viewId);
+      if (!customView) return;
+      setSelectedViewIdState(viewId);
+      writeSelectedViewId(projectId, viewId);
+      void applyViewFilters(customView.filters, customView.query, customView.period);
     },
-    [customViews, projectId, resetAllFilters, applyViewFilters],
+    [
+      customViews,
+      projectId,
+      resetAllFilters,
+      applyViewFilters,
+      setSelectedViewIdState,
+      skipNextMatchRef,
+    ],
   );
 
-  const handleViewClick = useCallback(
-    (viewId: string) => {
-      if (viewId === selectedViewId) {
-        selectView("all-traces");
-      } else {
-        selectView(viewId);
-      }
-    },
+  return useCallback(
+    (viewId: string) => selectView(viewId === selectedViewId ? "all-traces" : viewId),
     [selectedViewId, selectView],
   );
+}
 
-  // -- Save / delete / rename / reorder -------------------------------------
+/** The optimistic row a new view shows as until the server answers with the stored one. */
+function optimisticStoredView(input: {
+  view: SavedView;
+  projectId: string;
+  order: number;
+}): StoredSavedView {
+  const { view, projectId, order } = input;
+  return {
+    id: view.id,
+    projectId,
+    userId: null,
+    name: view.name,
+    filters: view.filters,
+    query: view.query ?? null,
+    period: view.period ?? null,
+    order,
+    kind: "v1-traces-filter",
+    createdAt: toDate(nowInstant()),
+    updatedAt: toDate(nowInstant()),
+  };
+}
 
-  const saveView = useCallback(
+/** Saving the address as a view, optimistically, then pointing the selection at the stored id. */
+function useSaveView(input: {
+  projectId: string;
+  filters: ViewFilters;
+  router: SavedViewsRouter;
+  utils: SavedViewsUtils;
+  createMutation: ReturnType<typeof useSavedViewMutations>["createMutation"];
+  setSelectedViewIdState: (viewId: string | null) => void;
+}) {
+  const { projectId, filters, router, utils, createMutation, setSelectedViewIdState } = input;
+  return useCallback(
     (name: string, scope: "project" | "myself" = "project") => {
       const trimmedName = name.slice(0, MAX_VIEW_NAME_LENGTH);
       const queryParam = (router.query.query as string) || undefined;
-
       const period = periodFromUrlDates({
         startDate: router.query.startDate as string | undefined,
         endDate: router.query.endDate as string | undefined,
@@ -366,34 +393,16 @@ function useSavedViewsInternal() {
         ...(period ? { period } : {}),
       };
 
-      utils.savedViews.getAll.setData({ projectId }, (old: any) => {
-        if (!old) return old;
-        return [
-          ...old,
-          {
-            ...optimisticView,
-            projectId,
-            filters: optimisticView.filters as Record<string, unknown>,
-            period: optimisticView.period ?? null,
-            query: optimisticView.query ?? null,
-            order: old.length,
-            createdAt: toDate(nowInstant()),
-            updatedAt: toDate(nowInstant()),
-          } as (typeof old)[number],
-        ];
-      });
+      utils.savedViews.getAll.setData({ projectId }, (old: StoredSavedView[] | undefined) =>
+        old
+          ? [...old, optimisticStoredView({ view: optimisticView, projectId, order: old.length })]
+          : old,
+      );
 
       createMutation.mutate(
+        { projectId, name: trimmedName, filters, query: queryParam, period, scope },
         {
-          projectId,
-          name: trimmedName,
-          filters: filters as Record<string, unknown>,
-          query: queryParam,
-          period,
-          scope,
-        },
-        {
-          onSuccess: (newView: { id: string }) => {
+          onSuccess: (newView: StoredSavedView) => {
             setSelectedViewIdState(newView.id);
             writeSelectedViewId(projectId, newView.id);
           },
@@ -411,90 +420,171 @@ function useSavedViewsInternal() {
       projectId,
       createMutation,
       utils.savedViews.getAll,
+      setSelectedViewIdState,
     ],
   );
+}
+
+/** Deleting, renaming and reordering, each applied to the cached list before the server answers. */
+function useViewEdits(input: {
+  projectId: string;
+  selectedViewId: string | null;
+  setSelectedViewIdState: (viewId: string | null) => void;
+  resetAllFilters: () => void;
+  utils: SavedViewsUtils;
+  mutations: ReturnType<typeof useSavedViewMutations>;
+}) {
+  const { projectId, selectedViewId, setSelectedViewIdState, resetAllFilters, utils } = input;
+  const { deleteMutation, renameMutation, reorderMutation } = input.mutations;
+  const views = utils.savedViews.getAll;
 
   const deleteView = useCallback(
     (viewId: string) => {
       const newSelectedId = selectedViewId === viewId ? "all-traces" : selectedViewId;
-
-      utils.savedViews.getAll.setData({ projectId }, (old: any) =>
+      views.setData({ projectId }, (old: StoredSavedView[] | undefined) =>
         old ? withoutView(old, viewId) : old,
       );
-
       setSelectedViewIdState(newSelectedId);
       writeSelectedViewId(projectId, newSelectedId);
-
-      if (selectedViewId === viewId) {
-        resetAllFilters();
-      }
-
+      if (selectedViewId === viewId) resetAllFilters();
       deleteMutation.mutate({ projectId, viewId });
     },
-    [selectedViewId, projectId, resetAllFilters, deleteMutation, utils.savedViews.getAll],
+    [selectedViewId, projectId, resetAllFilters, deleteMutation, views, setSelectedViewIdState],
   );
 
   const renameView = useCallback(
     (viewId: string, newName: string) => {
       const trimmedName = newName.slice(0, MAX_VIEW_NAME_LENGTH);
-
-      utils.savedViews.getAll.setData({ projectId }, (old: any) =>
+      views.setData({ projectId }, (old: StoredSavedView[] | undefined) =>
         old ? withViewRenamed(old, viewId, trimmedName) : old,
       );
-
       renameMutation.mutate({ projectId, viewId, name: trimmedName });
     },
-    [projectId, renameMutation, utils.savedViews.getAll],
+    [projectId, renameMutation, views],
   );
 
   const reorderViews = useCallback(
     (newOrder: SavedView[]) => {
       const viewIds = newOrder.map((v) => v.id);
-
-      utils.savedViews.getAll.setData({ projectId }, (old: any) =>
+      views.setData({ projectId }, (old: StoredSavedView[] | undefined) =>
         old ? inViewOrder(old, viewIds) : old,
       );
-
       reorderMutation.mutate({ projectId, viewIds });
     },
-    [projectId, reorderMutation, utils.savedViews.getAll],
+    [projectId, reorderMutation, views],
   );
 
-  // -- View matching --------------------------------------------------------
+  return { deleteView, renameView, reorderViews };
+}
 
-  const currentQuery = (router.query.query as string) || undefined;
-  const urlStartDate = router.query.startDate as string | undefined;
-  const urlEndDate = router.query.endDate as string | undefined;
+/**
+ * Highlights the view the address matches. Only the UI highlight: the stored selection changes
+ * only through explicit pill clicks, so filters added on top of a saved view keep the default.
+ */
+function useMatchedViewHighlight(input: {
+  filters: ViewFilters;
+  query: SavedViewsRouter["query"];
+  customViews: SavedView[];
+  isInitialized: boolean;
+  projectId: string;
+  selection: ReturnType<typeof useStoredSelection>;
+}) {
+  const { filters, customViews, isInitialized, projectId } = input;
+  const { selectedViewId, setSelectedViewIdState, skipNextMatchRef, pendingRestoreRef } =
+    input.selection;
+  const currentQuery = (input.query.query as string) || undefined;
+  const urlStartDate = input.query.startDate as string | undefined;
+  const urlEndDate = input.query.endDate as string | undefined;
   const urlHasDateParams = !!urlStartDate || !!urlEndDate;
 
-  const matchedViewId = useMemo(() => {
-    return findMatchingView({
-      currentFilters: filters,
-      currentQuery,
-      customViews,
-      urlStartDate,
-      urlEndDate,
-      urlHasDateParams,
-    });
-  }, [filters, currentQuery, customViews, urlStartDate, urlEndDate, urlHasDateParams]);
+  const matchedViewId = useMemo(
+    () =>
+      findMatchingView({
+        currentFilters: filters,
+        currentQuery,
+        customViews,
+        urlStartDate,
+        urlEndDate,
+        urlHasDateParams,
+      }),
+    [filters, currentQuery, customViews, urlStartDate, urlEndDate, urlHasDateParams],
+  );
 
   useEffect(() => {
-    if (!isInitialized) return;
-    if (pendingRestoreRef.current) return;
-
+    if (!isInitialized || pendingRestoreRef.current) return;
     if (skipNextMatchRef.current) {
       skipNextMatchRef.current = false;
       return;
     }
+    if (matchedViewId !== selectedViewId) setSelectedViewIdState(matchedViewId);
+  }, [
+    matchedViewId,
+    isInitialized,
+    selectedViewId,
+    projectId,
+    pendingRestoreRef,
+    skipNextMatchRef,
+    setSelectedViewIdState,
+  ]);
+}
 
-    // Only update the UI highlight — don't persist to localStorage.
-    // The stored selection should only change via explicit pill clicks
-    // (handleViewClick/selectView), so adding extra filters on top of a
-    // saved view doesn't lose the user's default selection.
-    if (matchedViewId !== selectedViewId) {
-      setSelectedViewIdState(matchedViewId);
-    }
-  }, [matchedViewId, isInitialized, selectedViewId, projectId]);
+function useSavedViewsInternal() {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
+  const router = useRouter();
+  const { filters } = useFilterParams();
+  const utils = api.useUtils();
+
+  const selection = useStoredSelection(projectId);
+  const { selectedViewId, setSelectedViewIdState, skipNextMatchRef, pendingRestoreRef } = selection;
+  const { customViews, isInitialized } = useCustomViews(projectId);
+  const mutations = useSavedViewMutations(projectId, utils);
+  const navigation = useViewNavigation(router);
+
+  useRestoreStoredView({
+    projectId,
+    isInitialized,
+    selectedViewId,
+    customViews,
+    asPath: router.asPath,
+    pendingRestoreRef,
+    skipNextMatchRef,
+    applyViewFilters: navigation.applyViewFilters,
+  });
+
+  const handleViewClick = useViewSelection({
+    projectId,
+    customViews,
+    selectedViewId,
+    setSelectedViewIdState,
+    skipNextMatchRef,
+    navigation,
+  });
+  const saveView = useSaveView({
+    projectId,
+    filters,
+    router,
+    utils,
+    createMutation: mutations.createMutation,
+    setSelectedViewIdState,
+  });
+  const edits = useViewEdits({
+    projectId,
+    selectedViewId,
+    setSelectedViewIdState,
+    resetAllFilters: navigation.resetAllFilters,
+    utils,
+    mutations,
+  });
+
+  useMatchedViewHighlight({
+    filters,
+    query: router.query,
+    customViews,
+    isInitialized,
+    projectId,
+    selection,
+  });
 
   return {
     defaultViews: [{ id: "all-traces", name: "All Traces", origin: null }] as DefaultView[],
@@ -503,10 +593,8 @@ function useSavedViewsInternal() {
     isInitialized,
     handleViewClick,
     saveView,
-    deleteView,
-    renameView,
-    reorderViews,
-    resetAllFilters,
+    ...edits,
+    resetAllFilters: navigation.resetAllFilters,
   };
 }
 

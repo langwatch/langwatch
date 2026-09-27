@@ -91,11 +91,11 @@ function LangWatchQLChartCanvas({
   return (
     <Box hidden={isRefused} display={isRefused ? "none" : void 0}>
       <Box
-        // The label lives on this wrapper, never the mount point: Vega
-        // writes its own role="graphics-document" and aria-label onto the
-        // element it embeds into, so a label there would not survive.
-        // role="img" also keeps that inner labelling from being read twice.
-        role="img"
+        // The label lives on this figure, never the mount point: Vega writes its
+        // own role="graphics-document" and aria-label onto the element it embeds
+        // into, so a label there would not survive.
+        as="figure"
+        margin={0}
         aria-label={ariaLabel ?? "Chart of the query result"}
         aria-describedby={descriptionId}
         aria-busy={status === "embedding"}

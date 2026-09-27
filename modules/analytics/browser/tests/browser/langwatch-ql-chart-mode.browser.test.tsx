@@ -137,7 +137,7 @@ describe("LangWatchQL chart mode in real Chromium", () => {
         // The accessible name survives a REAL embed: Vega writes its own
         // `role`/`aria-label` onto the embedded element, so the name must
         // live on a wrapper Vega never touches — invisible to the jsdom suite.
-        expect(chartView()).toHaveAttribute("role", "img");
+        expect(chartView()?.tagName).toBe("FIGURE");
         expect(chartView()?.getAttribute("aria-label")).toContain("Chart of the result of SELECT");
         expect(chartView()?.getAttribute("aria-label")).not.toContain("Vega visualization");
 

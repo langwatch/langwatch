@@ -183,8 +183,17 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
   }
 
   /** @param table Already qualified and validated by `keyMapTableQualifiedName`. */
-  async findKeyMapHashes({ table }: { table: string }): Promise<string[]> {
-    const rows = await this.queryRows(`SELECT DISTINCT KeyHash FROM ${table}`);
+  async findKeyMapHashes({
+    table,
+    tenantId,
+  }: {
+    table: string;
+    tenantId: string;
+  }): Promise<string[]> {
+    const rows = await this.client.rows(
+      `SELECT DISTINCT KeyHash FROM ${table} WHERE TenantId = {tenantId:String}`,
+      { tenantId },
+    );
     return rows.flatMap((row) => {
       const hash = row.KeyHash;
       return typeof hash === "string" ? [hash] : [];

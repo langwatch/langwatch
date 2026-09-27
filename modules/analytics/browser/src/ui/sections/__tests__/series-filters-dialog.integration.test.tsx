@@ -56,14 +56,14 @@ describe("the series filter editor", () => {
       it("renders rather than throwing on the absent filter record", () => {
         expect(() =>
           renderDialog({
-            filters: void 0 as unknown as Record<FilterField, FilterParam>,
+            filters: undefined,
           }),
         ).not.toThrow();
       });
 
       it("offers every filter field with nothing selected", () => {
         renderDialog({
-          filters: void 0 as unknown as Record<FilterField, FilterParam>,
+          filters: undefined,
         });
 
         expect(screen.getByText("Origin")).toBeInTheDocument();

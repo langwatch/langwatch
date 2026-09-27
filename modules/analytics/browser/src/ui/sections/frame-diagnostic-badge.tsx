@@ -23,12 +23,10 @@ export function FrameDiagnosticBadge({
         top={1}
         right={1}
         color="orange.solid"
-        aria-label="This widget reported a problem"
-        role="img"
         data-testid="frame-diagnostic-badge"
         lineHeight={0}
       >
-        <TriangleAlert size={14} />
+        <TriangleAlert size={14} aria-label="This widget reported a problem" />
       </Box>
     </Tooltip>
   );
