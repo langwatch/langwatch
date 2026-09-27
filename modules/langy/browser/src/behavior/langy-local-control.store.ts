@@ -60,6 +60,14 @@ interface LangyLocalControlState {
   reset: (conversationId: string | null) => void;
 }
 
+/** An entry for a conversation nobody is reading: not kept, nor folded into the open one. */
+function isForeign(
+  state: LangyLocalControlState,
+  conversationId: string | null | undefined,
+): boolean {
+  return !!conversationId && state.conversationId !== conversationId;
+}
+
 export const useLangyLocalControlStore = create<LangyLocalControlState>((set, get) => ({
   conversationId: null,
   waits: {},
@@ -69,9 +77,7 @@ export const useLangyLocalControlStore = create<LangyLocalControlState>((set, ge
 
   recordWait: ({ conversationId, wait }) => {
     const state = get();
-    // An entry for a conversation nobody is reading is not worth keeping,
-    // and folding it into the open one would show the wrong card.
-    if (conversationId && state.conversationId !== conversationId) return;
+    if (isForeign(state, conversationId)) return;
     // The live stream is replayed from its start on every attach, so the
     // `pending` entry that raised a card arrives again after the card was
     // answered. A card only ever moves forward.
@@ -85,7 +91,7 @@ export const useLangyLocalControlStore = create<LangyLocalControlState>((set, ge
 
   recordWorkspace: ({ conversationId, workspace }) => {
     const state = get();
-    if (conversationId && state.conversationId !== conversationId) return;
+    if (isForeign(state, conversationId)) return;
     set({
       workspace,
       workspaceRevision: state.workspaceRevision + 1,
@@ -94,7 +100,7 @@ export const useLangyLocalControlStore = create<LangyLocalControlState>((set, ge
 
   recordWorkspaceState: ({ conversationId, connected }) => {
     const state = get();
-    if (conversationId && state.conversationId !== conversationId) return;
+    if (isForeign(state, conversationId)) return;
     if (state.workspaceConnected === connected) return;
     // The first read is not a change, it is the starting point: the queries
     // watching the revision are fetching their own first answer anyway.

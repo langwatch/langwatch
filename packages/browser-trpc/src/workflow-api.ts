@@ -24,6 +24,7 @@ import type {
   DatasetApiValidateNameInput,
   DatasetApiValidateNameOutput,
 } from "@langwatch/dataset-contract";
+import type { evaluationTrpc } from "@langwatch/evaluation-contract";
 import type {
   EvaluatorApiCreateInput,
   EvaluatorApiCreateOutput,
@@ -61,6 +62,7 @@ import type {
   PromptUpdateTrpcInput,
   PromptUpdateTrpcOutput,
 } from "@langwatch/prompt-contract";
+import type { secretTrpc } from "@langwatch/secret-contract";
 import type { workflowTrpc, workflowOptimizationTrpc } from "@langwatch/workflow-contract";
 
 /** Where a workflow lives, as the copy lineage tooltip spells it out. */
@@ -185,7 +187,9 @@ type BorrowedProcedures = {
     update: UnpublishedMutation;
   };
   evaluations: {
-    availableCustomEvaluators: UnpublishedQuery;
+    availableCustomEvaluators: ContractApiMap<
+      typeof evaluationTrpc
+    >["evaluations"]["availableCustomEvaluators"];
     availableEvaluators: UnpublishedQuery;
     runEvaluation: UnpublishedMutation;
     warmupLambda: UnpublishedMutation;
@@ -283,7 +287,7 @@ type BorrowedProcedures = {
     rename: UnpublishedMutation;
     reorder: UnpublishedMutation;
   };
-  secrets: { list: UnpublishedQuery };
+  secrets: { list: ContractApiMap<typeof secretTrpc>["secrets"]["list"] };
   storedObjects: { headById: UnpublishedQuery };
   traces: {
     getFieldNames: UnpublishedQuery;

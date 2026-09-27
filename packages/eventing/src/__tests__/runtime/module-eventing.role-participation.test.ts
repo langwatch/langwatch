@@ -210,11 +210,11 @@ describe("given one module declaration installed by an api process and a worker"
       expect(instance?.state).toEqual({ handled: 1 });
       // One append, by the process that drained the job. Two would mean the
       // api executed the command as well as staging it.
-      const stored = await eventStore.getEvents(
-        AGGREGATE_ID,
-        { tenantId: createTenantId(TENANT_ID) },
-        "trace",
-      );
+      const stored = await eventStore.getEvents({
+        aggregateId: AGGREGATE_ID,
+        context: { tenantId: createTenantId(TENANT_ID) },
+        aggregateType: "trace",
+      });
       expect(stored.map((event) => event.type)).toEqual(["producer.recorded"]);
       expect(installedAs.map((installed) => installed.participation)).toEqual([
         "consume",

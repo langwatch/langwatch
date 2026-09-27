@@ -1,5 +1,6 @@
+import type { AnalyticsService, TimeseriesBucket } from "@langwatch/analytics-contract";
 import type {
-  AutomationLimitNextStep,
+  CustomGraph,
   GraphTriggerEvaluationReason,
   GraphTriggerEvaluationResult,
   GraphTriggerSweepCandidate,
@@ -22,12 +23,14 @@ import type {
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
-import type { LimitEmailKind } from "../channels/automation-runaway-notice.channel.ts";
 import type {
   LogOverflowIntent,
   NotifyDigestIntent,
   PersistMatchIntent,
 } from "../eventing/trigger-settlement.intent.ts";
+import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
+import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
+import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
 
 // Re-exported: several files in this module still import these names from
@@ -173,37 +176,6 @@ export type AutomationWebhookStoredParams = {
 
 export type ClaimLease = { key: string; token: string };
 
-/** Explicit members ports used by Automation's containment policy. */
-export interface AutomationRunawayPort {
-  countProjectTraces24h(projectId: string): Promise<number>;
-  notificationRecipients(params: { projectId: string; triggerId: string }): Promise<string[]>;
-  sendLimitEmail(params: {
-    to: string[];
-    kind: LimitEmailKind;
-    automationName: string;
-    projectName: string;
-    dailyCeiling: number;
-    skippedToday: number;
-    actionUrl: string;
-    /** Only ever passed for a `ceiling_reached` notice. */
-    nextStep?: AutomationLimitNextStep;
-  }): Promise<void>;
-  /**
-   * Where this project's organization can go for a higher ceiling. Called
-   * only for a `ceiling_reached` breach, never for a pause.
-   */
-  findNextStep(projectId: string): Promise<AutomationLimitNextStep | undefined>;
-  claimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | "already-claimed">;
-  releaseClaim(lease: ClaimLease): Promise<void>;
-  projectName(projectId: string): Promise<string>;
-  automationUrl(params: { projectId: string; triggerId: string }): Promise<string>;
-  onCeilingBreach(): void;
-  onAutoPaused(reason: string): void;
-  onContainmentFailed(): void;
-  error(fields: Record<string, unknown>, message: string): void;
-  info(fields: Record<string, unknown>, message: string): void;
-}
-
 export interface TestFireEmail {
   recipients: string[];
   subject: string;
@@ -329,3 +301,132 @@ export abstract class AutomationRunawayMetricsSink {
   abstract onAutoPaused(reason: string): void;
   abstract onContainmentFailed(): void;
 }
+
+export type GraphActionParams = {
+  members?: string[] | null;
+  slackWebhook?: string | null;
+  threshold?: number;
+  operator?: string;
+  timePeriod?: number;
+  seriesName?: string;
+  slackDelivery?: "webhook" | "bot";
+  slackBotToken?: string;
+  slackChannelId?: string;
+  [key: string]: unknown;
+};
+
+export type TimeseriesFilterValue =
+  | string[]
+  | Record<string, string[]>
+  | Record<string, Record<string, string[]>>;
+
+export type TimeseriesPipeline = {
+  field: "trace_id" | "user_id" | "thread_id" | "customer_id";
+  aggregation: "sum" | "avg" | "min" | "max";
+};
+
+export type GraphSeries = {
+  name?: string;
+  metric: string;
+  key?: string;
+  subkey?: string;
+  aggregation:
+    | "terms"
+    | "cardinality"
+    | "avg"
+    | "sum"
+    | "min"
+    | "max"
+    | "median"
+    | "p99"
+    | "p95"
+    | "p90";
+  pipeline?: TimeseriesPipeline;
+  filters?: Record<string, TimeseriesFilterValue>;
+  asPercent?: boolean;
+};
+
+export type TimeseriesInputType = {
+  projectId: string;
+  startDate: number;
+  endDate: number;
+  query?: string;
+  filters: Record<string, TimeseriesFilterValue>;
+  traceIds?: string[];
+  negateFilters?: boolean;
+  series: GraphSeries[];
+  groupBy?: string;
+  groupByKey?: string;
+  timeScale?: "full" | number;
+  timeZone: string;
+};
+
+export type TimeseriesResult = {
+  previousPeriod: TimeseriesBucket[];
+  currentPeriod: TimeseriesBucket[];
+};
+
+export type TimeseriesReadOptions = { maxResultRows?: number };
+
+export type StoredGraphConfig = {
+  series: GraphSeries[];
+  groupBy?: string;
+  groupByKey?: string;
+  timeScale?: "full" | number;
+};
+
+export type GraphTriggerEvaluationDeps = {
+  triggers: TriggerRepository;
+  customGraphs: CustomGraphRepository;
+  projects: AutomationProjectDirectory;
+  analytics: AnalyticsService;
+  triggerSent: GraphTriggerSentRepository;
+  notifier: AutomationGraphNotifier;
+  logger: AutomationLogger;
+  slackTokens: AutomationSlackBotTokenDecryptor;
+  dispatchErrors: AutomationDispatchError;
+  clock: AutomationClock;
+  baseHost: string;
+};
+
+export type ProjectIdentity = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+export type EvaluateGraphTriggerResult = GraphTriggerEvaluationResult;
+export type EvaluationReason = GraphTriggerEvaluationReason;
+
+export type GraphEvaluationRequest = {
+  deps: GraphTriggerEvaluationDeps;
+  triggerId: string;
+  projectId: string;
+  reason: GraphTriggerEvaluationReason;
+};
+
+export type GraphEvaluationPlan = {
+  request: GraphEvaluationRequest;
+  trigger: Trigger;
+  customGraph: CustomGraph;
+  customGraphId: string;
+  params: GraphActionParams;
+  threshold: number;
+  operator: string;
+  timePeriod: number;
+  seriesName: string;
+  series: GraphSeries;
+  graph: StoredGraphConfig;
+  now: Instant;
+  startDate: Instant;
+  timeseriesInput: TimeseriesInputType;
+};
+
+export type GraphSeriesEvaluation = {
+  currentValue: number;
+  previousValue: number | null;
+  currentPoints: { timestamp: string; value: number }[];
+  previousPoints: { timestamp: string; value: number }[];
+};
+
+export const GRAPH_TRIGGER_MAX_RESULT_ROWS = 10_000;

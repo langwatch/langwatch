@@ -4,7 +4,6 @@
  * document already carries, so a rename here renames an integrator's client.
  */
 
-import { BadRequestError, NotFoundError } from "@langwatch/api/rest";
 import type { AuthzDeclaredScopeId } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -189,7 +188,7 @@ describe("the dataset REST declaration", () => {
 
   describe("when one dataset is read whole", () => {
     it("asks for it under the family's own read ceiling", async () => {
-      const getDatasetWithRecords = vi.fn(async () => ({
+      const getDatasetWithinLimit = vi.fn(async () => ({
         dataset: { id: "dataset-1", name: "One", slug: "one", columnTypes: [] },
         records: [],
         truncated: false,
@@ -197,29 +196,15 @@ describe("the dataset REST declaration", () => {
 
       await answer(
         "getApiDatasetBySlugOrId",
-        completeDatasetApi({ getDatasetWithRecords: getDatasetWithRecords as never }),
+        completeDatasetApi({ getDatasetWithinLimit: getDatasetWithinLimit as never }),
         { slugOrId: "one" },
       );
 
-      expect(getDatasetWithRecords).toHaveBeenCalledWith({
+      expect(getDatasetWithinLimit).toHaveBeenCalledWith({
         slugOrId: "one",
         projectId: "project-1",
         limitMb: 25,
       });
-    });
-
-    it("refuses rather than truncating when the read exceeds that ceiling", async () => {
-      const app = completeDatasetApi({
-        getDatasetWithRecords: (async () => ({
-          dataset: { id: "dataset-1", name: "One", slug: "one", columnTypes: [] },
-          records: [],
-          truncated: true,
-        })) as never,
-      });
-
-      await expect(answer("getApiDatasetBySlugOrId", app, { slugOrId: "one" })).rejects.toThrow(
-        BadRequestError,
-      );
     });
   });
 
@@ -298,19 +283,6 @@ describe("the dataset REST declaration", () => {
           entry: { input: "hi" },
         }),
       ).resolves.toEqual({ status: 201, body: stored });
-    });
-  });
-
-  describe("when a batch delete matches no entry", () => {
-    it("answers 404 rather than reporting nothing was deleted", async () => {
-      const app = completeDatasetApi({ deleteRecords: (async () => ({ count: 0 })) as never });
-
-      await expect(
-        answer("deleteApiDatasetBySlugOrIdRecords", app, {
-          slugOrId: "one",
-          recordIds: ["record-1"],
-        }),
-      ).rejects.toThrow(NotFoundError);
     });
   });
 });

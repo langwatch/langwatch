@@ -5,11 +5,18 @@
  */
 import { PayloadStagingUnavailableError } from "@langwatch/stored-object-contract";
 
-import { PayloadStaging, type StagedPayload } from "#repositories/payload-staging.repository";
+import {
+  PayloadStagingRepository,
+  type StagedPayload,
+} from "#repositories/payload-staging.repository";
 
-export class AbsentPayloadStagingAdapter extends PayloadStaging {
-  static create(): AbsentPayloadStagingAdapter {
-    return new AbsentPayloadStagingAdapter();
+export class AbsentPayloadStagingService extends PayloadStagingRepository {
+  static create(): AbsentPayloadStagingService {
+    return new AbsentPayloadStagingService();
+  }
+
+  private constructor() {
+    super();
   }
 
   stage(): Promise<StagedPayload> {

@@ -45,14 +45,14 @@ import {
 } from "../eventing/tracked-event-sync.subscriber.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { leanForProjection } from "../rules/trace-projection-lean.rules.ts";
-import { ModelCatalogTraceModelCostAdapter } from "./model-catalog.trace-model-cost.service.ts";
-import { OtelTraceEvaluationLoopMetricsAdapter } from "./otel.trace-evaluation-loop-metrics.service.ts";
 import { OtlpSpanCostEnrichmentService } from "./span-cost-enrichment.service.ts";
 import { OtlpSpanTokenEstimationService } from "./span-token-estimation.service.ts";
-import { TraceIoExtractionAdapter } from "./trace-io-extraction-adapter.service.ts";
-import { TraceMediaReferenceAdapter } from "./trace-media-reference.service.ts";
+import { TraceEvaluationLoopMetricsService } from "./trace-evaluation-loop-metrics.service.ts";
+import { TraceIoExtractionAdapterService } from "./trace-io-extraction-adapter.service.ts";
+import { TraceMediaReferenceService } from "./trace-media-reference.service.ts";
+import { TraceModelCostService } from "./trace-model-cost.service.ts";
 import type { TraceProcessingCommandsService } from "./trace-processing-commands.service.ts";
-import { TraceSpanNormalizationAdapter } from "./trace-span-normalization-adapter.service.ts";
+import { TraceSpanNormalizationAdapterService } from "./trace-span-normalization-adapter.service.ts";
 
 export interface TraceProcessingPeers {
   codingAgents: Pick<CodingAgentApi, "contributeReceivedSpan">;
@@ -132,10 +132,10 @@ export class TraceProcessingPipelineService {
         defaultRetentionDays,
       }),
       canonicalisation,
-      ioExtraction: TraceIoExtractionAdapter.create(canonicalisation),
-      mediaReferences: TraceMediaReferenceAdapter.create(),
-      modelCosts: ModelCatalogTraceModelCostAdapter.create(),
-      spanNormalization: TraceSpanNormalizationAdapter.create(canonicalisation),
+      ioExtraction: TraceIoExtractionAdapterService.create(canonicalisation),
+      mediaReferences: TraceMediaReferenceService.create(),
+      modelCosts: TraceModelCostService.create(),
+      spanNormalization: TraceSpanNormalizationAdapterService.create(canonicalisation),
       prepareEventForProjection: (event) => leanForProjection(event),
       recordSpanCommand: EventingRecordSpanAdapter.create({
         piiRedaction: {
@@ -169,7 +169,7 @@ export class TraceProcessingPipelineService {
 
   #reactions(): Parameters<typeof buildTraceProcessingConsumer>[1] {
     const { peers, commands } = this.input;
-    const normalization = TraceSpanNormalizationAdapter.create(this.input.canonicalisation);
+    const normalization = TraceSpanNormalizationAdapterService.create(this.input.canonicalisation);
     const refusing = (capability: string) => () => Promise.reject(this.#refuse(capability));
     const resolveOrigin = createDeferredOriginHandler((data) => commands.resolveOrigin(data));
     return {
@@ -182,7 +182,7 @@ export class TraceProcessingPipelineService {
         featureFlags: peers.featureFlags,
         monitors: peers.monitors,
         evaluation: { send: (data) => peers.evaluations.queueTraceEvaluation(data) },
-        metrics: OtelTraceEvaluationLoopMetricsAdapter.create(),
+        metrics: TraceEvaluationLoopMetricsService.create(),
       }),
       customEvaluationSync: createCustomEvaluationSyncHandler({
         reportEvaluation: (data) => peers.evaluations.reportEvaluation(data),

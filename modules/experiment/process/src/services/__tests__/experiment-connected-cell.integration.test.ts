@@ -35,21 +35,24 @@ import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator
  * The studio boundary the grading evaluators reach, scripted rather than
  * dialled.
  */
-const ports = {
-  attachments: createNoAttachmentsFixture(),
-  studio: {
-    postEvent: async ({
-      event,
-      onEvent,
-    }: {
-      event: { type: string; payload: Record<string, any> };
-      onEvent: (event: StudioServerEvent) => void;
-    }) => {
-      scripted.dispatched.push(event);
-      for (const serverEvent of scripted.component) onEvent(serverEvent);
+const ports = createApiFixture<ExperimentRunCollaborators>(
+  {
+    attachments: createNoAttachmentsFixture(),
+    studio: {
+      postEvent: async ({
+        event,
+        onEvent,
+      }: {
+        event: { type: string; payload: Record<string, any> };
+        onEvent: (event: StudioServerEvent) => void;
+      }) => {
+        scripted.dispatched.push(event);
+        for (const serverEvent of scripted.component) onEvent(serverEvent);
+      },
     },
   },
-} as unknown as ExperimentRunCollaborators;
+  "ports",
+);
 
 /** The enrichment the run does before posting: identity, in a test. */
 const workflows = createApiFixture<WorkflowApi>({
@@ -151,7 +154,7 @@ const run = async ({
   now?: () => number;
 }): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
-  for await (const event of ExperimentRunOrchestratorService.executeConnectedCell({
+  for await (const event of ExperimentRunOrchestratorService.create().executeConnectedCell({
     cell,
     projectId: "p1",
     agent,
@@ -326,7 +329,7 @@ describe("given a connected agent column", () => {
     it("fails the row with the busy code once the budget ends", async () => {
       const events: EvaluationV3Event[] = [];
       let clock = 0;
-      for await (const event of ExperimentRunOrchestratorService.executeConnectedCell({
+      for await (const event of ExperimentRunOrchestratorService.create().executeConnectedCell({
         cell: makeCell(),
         projectId: "p1",
         agent,
@@ -411,10 +414,13 @@ describe("given a personal development agent of another person", () => {
       ownerName: null,
     });
   });
-  const ownershipPorts = {
-    ...ports,
-    connectedAgentOwnership: { assertRunnable },
-  } as unknown as ExperimentRunCollaborators;
+  const ownershipPorts = createApiFixture<ExperimentRunCollaborators>(
+    {
+      ...ports,
+      connectedAgentOwnership: { assertRunnable },
+    },
+    "ports",
+  );
 
   const stateWithConnectedTarget = (): EvaluationsV3State => ({
     name: "Evaluation",
@@ -446,7 +452,7 @@ describe("given a personal development agent of another person", () => {
     it("refuses the run with the owner-only code", async () => {
       const events: EvaluationV3Event[] = [];
       await expect(async () => {
-        for await (const event of ExperimentRunOrchestratorService.runOrchestrator(
+        for await (const event of ExperimentRunOrchestratorService.create().runOrchestrator(
           inputFor({ id: "user_me", label: "user" }),
         )) {
           events.push(event);
@@ -465,7 +471,7 @@ describe("given a personal development agent of another person", () => {
     /** @scenario "Another person's development agent is refused" */
     it("refuses it too", async () => {
       await expect(async () => {
-        for await (const event of ExperimentRunOrchestratorService.runOrchestrator(
+        for await (const event of ExperimentRunOrchestratorService.create().runOrchestrator(
           inputFor(undefined),
         )) {
           void event;

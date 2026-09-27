@@ -11,8 +11,8 @@ import type { Instant } from "@langwatch/time";
 import type { WebhookEndpointView } from "@langwatch/webhook-contract";
 import { z } from "zod";
 
+import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
 import type { PendingEnvelope } from "../services/webhook-batch-planner.service.ts";
-import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
 
 export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as const;
 export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE = "lw.gateway.spend.confirmed" as const;

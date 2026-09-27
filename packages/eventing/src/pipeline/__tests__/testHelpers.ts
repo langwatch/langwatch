@@ -42,9 +42,9 @@ export function createMockEventStore<T extends Event>(): {
     getEventsOccurredSince: vi.fn().mockResolvedValue([]),
     getEventsUpTo: vi
       .fn()
-      .mockImplementation(async (aggregateId, context, aggregateType, upToEvent) => {
+      .mockImplementation(async ({ aggregateId, context, aggregateType, upToEvent }) => {
         // Default implementation: get all events and filter
-        const allEvents = await mockStore.getEvents(aggregateId, context, aggregateType);
+        const allEvents = await mockStore.getEvents({ aggregateId, context, aggregateType });
         const upToIndex = allEvents.findIndex((e: T) => e.id === upToEvent.id);
         if (upToIndex === -1) {
           throw new Error(`Event ${upToEvent.id} not found in aggregate ${aggregateId}`);

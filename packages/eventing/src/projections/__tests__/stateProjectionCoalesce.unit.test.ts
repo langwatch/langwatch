@@ -40,11 +40,11 @@ describe("state projection coalescing wiring", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
       vi.spyOn(queueManager, "initializeStateProjectionQueues").mockImplementation(() => void 0);
-      const router = new ProjectionRouter<Event>(
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.PIPELINE_NAME,
+      const router = new ProjectionRouter<Event>({
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         queueManager,
-      );
+      });
       router.registerStateProjection(stateProjectionOf({ name: "batched", coalesceMaxBatch: 500 }));
       router.initializeStateProjectionQueues();
     });

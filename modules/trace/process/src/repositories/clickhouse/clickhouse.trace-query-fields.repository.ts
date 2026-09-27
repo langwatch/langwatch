@@ -1,12 +1,12 @@
 import type { CategoricalRead, FieldDef, FieldNeeds, RangeRead } from "@langwatch/trace-contract";
 import { UNSUPPORTED } from "@langwatch/trace-contract";
 
-import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "../../rules/trace-facet-registry.rules.ts";
 import {
   type ExpressionCategoricalDef,
   type RangeFacetDef,
 } from "../../rules/trace-facet-registry.rules.ts";
-import { ClickHouseTraceQueryCustomFieldsAdapter } from "./clickhouse.trace-query-custom-fields.repository.ts";
+import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./clickhouse.trace-facet-registry.mapper.ts";
+import { ClickHouseTraceQueryCustomFieldsRepository } from "./clickhouse.trace-query-custom-fields.repository.ts";
 import { INSTANT_EVAL_FIELD_DEFS } from "./clickhouse.trace-query-instant-eval-fields.repository.ts";
 import { META_FIELD_DEFS } from "./clickhouse.trace-query-meta-fields.repository.ts";
 import { ClickHouseTraceQueryTranslatorsRepository } from "./clickhouse.trace-query-translators.repository.ts";
@@ -214,7 +214,7 @@ export const FIELD_DEFS = {
   status: traceQueryFieldsRepository.categoricalFacet("status"),
   origin: traceQueryFieldsRepository.categoricalFacet("origin"),
   service: traceQueryFieldsRepository.categoricalFacet("service"),
-  model: ClickHouseTraceQueryCustomFieldsAdapter.MODEL_DEF,
+  model: ClickHouseTraceQueryCustomFieldsRepository.MODEL_DEF,
   user: traceQueryFieldsRepository.categoricalFacet("user"),
   conversation: traceQueryFieldsRepository.categoricalFacet("conversation"),
   customer: traceQueryFieldsRepository.categoricalFacet("customer"),
@@ -231,7 +231,7 @@ export const FIELD_DEFS = {
   selectedPrompt: traceQueryFieldsRepository.categoricalFacet("selectedPrompt"),
   lastUsedPrompt: traceQueryFieldsRepository.categoricalFacet("lastUsedPrompt"),
   promptVersion: traceQueryFieldsRepository.rangeFacet("promptVersion"),
-  label: ClickHouseTraceQueryCustomFieldsAdapter.LABEL_DEF,
+  label: ClickHouseTraceQueryCustomFieldsRepository.LABEL_DEF,
   cost: traceQueryFieldsRepository.rangeFacet("cost"),
   duration: traceQueryFieldsRepository.rangeFacet("duration"),
   tokens: traceQueryFieldsRepository.rangeFacet("tokens"),
@@ -242,7 +242,7 @@ export const FIELD_DEFS = {
   tokensPerSecond: traceQueryFieldsRepository.rangeFacet("tokensPerSecond"),
   spans: traceQueryFieldsRepository.rangeFacet("spans"),
   size: traceQueryFieldsRepository.rangeFacet("size"),
-  evaluator: ClickHouseTraceQueryCustomFieldsAdapter.EVALUATOR_DEF,
+  evaluator: ClickHouseTraceQueryCustomFieldsRepository.EVALUATOR_DEF,
   evaluatorStatus: traceQueryFieldsRepository.crossCategoricalFacet(
     "evaluatorStatus",
     "evaluations",

@@ -13,7 +13,7 @@ import {
   type TargetResultEvent,
   targetResultEventSchema,
 } from "./experiment-run-events.process.ts";
-import { ExperimentRunIds } from "./experiment-run-id.process.ts";
+import { generateDeterministicResultId } from "./experiment-run-id.process.ts";
 
 /**
  * The `DateTime64(3)` columns. The ClickHouse client serialises a `Date`; an
@@ -98,7 +98,7 @@ export class ExperimentRunResultStorageMapProjection
   }
 
   mapExperimentRunTargetResult(event: TargetResultEvent): ClickHouseExperimentRunResultRecord {
-    const id = ExperimentRunIds.generateDeterministicResultId({
+    const id = generateDeterministicResultId({
       tenantId: event.tenantId,
       runId: event.data.runId,
       index: event.data.index,
@@ -140,7 +140,7 @@ export class ExperimentRunResultStorageMapProjection
   mapExperimentRunEvaluatorResult(
     event: EvaluatorResultEvent,
   ): ClickHouseExperimentRunResultRecord {
-    const id = ExperimentRunIds.generateDeterministicResultId({
+    const id = generateDeterministicResultId({
       tenantId: event.tenantId,
       runId: event.data.runId,
       index: event.data.index,

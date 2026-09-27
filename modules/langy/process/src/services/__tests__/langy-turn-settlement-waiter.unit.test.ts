@@ -112,4 +112,35 @@ describe("awaitTurnSettlement", () => {
     expect(settlement).toEqual({ kind: "stopped" });
     expect(mockDisconnect).toHaveBeenCalled();
   });
+
+  /** @scenario "A wait is satisfied only by the turn this request started" */
+  it("keeps waiting past another turn's settlement until its own turn settles", async () => {
+    const otherTurnPage = {
+      ...settledPage,
+      events: [
+        {
+          ...settledPage.events[0],
+          id: "evt-0",
+          data: {
+            ...settledPage.events[0]!.data,
+            turnId: "turn-2",
+            parts: [{ type: "text", text: "not mine" }],
+          },
+        },
+      ],
+    };
+    mockGetEventsAfter.mockResolvedValueOnce(otherTurnPage).mockResolvedValue(settledPage);
+    mockFollow.mockImplementation(async function* () {
+      yield { id: "1-1", entry: { type: "end" } };
+    });
+
+    const settlement = await awaitTurnSettlement({
+      ...args,
+      signal: AbortSignal.timeout(5_000),
+      pollIntervalMs: 5,
+    });
+
+    expect(settlement).toMatchObject({ kind: "settled", settlement: { text: "from the fold" } });
+    expect(mockGetEventsAfter.mock.calls.length).toBeGreaterThan(1);
+  });
 });

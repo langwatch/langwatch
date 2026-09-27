@@ -1,7 +1,7 @@
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { FACET_REGISTRY } from "../../../rules/trace-facet-registry.rules.ts";
+import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
 import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 
 const traceQueryRepository = ClickHouseTraceQueryRepository.create();

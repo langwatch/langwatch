@@ -117,25 +117,33 @@ function buildSimulationProcessingPipelineDefinition(
     )
     .withProcessManager(deps.scenarioRunExecution.name, deps.scenarioRunExecution.process)
     .withProcessManager(deps.scenarioEvaluations.name, deps.scenarioEvaluations.process)
-    .withCommandInstance("queueRun", QueueRunCommand, deps.queueRunCommand)
+    .withCommandInstance({
+      name: "queueRun",
+      handlerClass: QueueRunCommand,
+      instance: deps.queueRunCommand,
+    })
     .withCommand("startRun", commands.startRun)
     .withCommand("messageSnapshot", commands.messageSnapshot)
     .withCommand("textMessageStart", commands.textMessageStart)
     .withCommand("textMessageEnd", commands.textMessageEnd)
-    .withCommandInstance("finishRun", FinishRunCommand, deps.finishRunCommand)
-    .withCommandInstance(
-      "recordEvaluations",
-      RecordEvaluationsCommand,
-      deps.recordEvaluationsCommand,
-    )
+    .withCommandInstance({
+      name: "finishRun",
+      handlerClass: FinishRunCommand,
+      instance: deps.finishRunCommand,
+    })
+    .withCommandInstance({
+      name: "recordEvaluations",
+      handlerClass: RecordEvaluationsCommand,
+      instance: deps.recordEvaluationsCommand,
+    })
     .withCommand("cancelRun", commands.cancelRun)
     .withCommand("deleteRun", commands.deleteRun)
     .withCommand("recordAgentInstance", commands.recordAgentInstance)
-    .withCommandInstance(
-      "computeRunMetrics",
-      ComputeRunMetricsCommand,
-      deps.computeRunMetricsCommand,
-      {
+    .withCommandInstance({
+      name: "computeRunMetrics",
+      handlerClass: ComputeRunMetricsCommand,
+      instance: deps.computeRunMetricsCommand,
+      options: {
         deduplication: {
           makeId: (
             ...args: Parameters<typeof ComputeRunMetricsCommand.makeJobId>
@@ -144,7 +152,7 @@ function buildSimulationProcessingPipelineDefinition(
           ttlMs: 60_000,
         },
       },
-    )
+    })
     .build();
 }
 

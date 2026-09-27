@@ -6,6 +6,7 @@
 import {
   LangyConversationIdUnadoptableError,
   LangyModelNotConfiguredError,
+  LangySessionKeyScopeError,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -19,7 +20,6 @@ import type {
   LangyWorkerWarmInput,
 } from "../../channels/langy-worker.channel.ts";
 import { LangyFinalPartsService } from "../langy-final-parts.service.ts";
-import { LangySessionKeyScopeError } from "../langy-session-key-scope.error.ts";
 import { LangyTurnWarmService } from "../langy-turn-warm.service.ts";
 
 const SESSION = { user: { id: "user-1" } };

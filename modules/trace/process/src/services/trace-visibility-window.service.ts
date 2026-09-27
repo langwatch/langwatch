@@ -1,6 +1,12 @@
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { nowInstant } from "@langwatch/time";
-import type { ErrorCapture, Span, SpanInputOutput, Trace } from "@langwatch/trace-contract";
+import type {
+  ErrorCapture,
+  LegacySpanInputOutput,
+  Span,
+  SpanInputOutput,
+  Trace,
+} from "@langwatch/trace-contract";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -37,7 +43,7 @@ const toErrorTeaser = (error: ErrorCapture | null | undefined): ErrorCapture | n
 };
 
 const toSpanIOTeaser = (
-  io: SpanInputOutput | null | undefined,
+  io: LegacySpanInputOutput | null | undefined,
 ): SpanInputOutput | null | undefined => {
   if (!io) {
     return io;

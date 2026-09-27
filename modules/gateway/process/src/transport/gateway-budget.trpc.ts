@@ -12,7 +12,6 @@ import {
   type GatewayBudgetWithSeats,
 } from "@langwatch/gateway-contract";
 import { toDate } from "@langwatch/time";
-import { TRPCError } from "@trpc/server";
 
 import { GatewayProviderLabelService } from "../services/gateway-provider-label.service.ts";
 
@@ -125,11 +124,10 @@ export const gatewayBudgetTrpcTransport = defineTrpcRouter(GatewayApi, gatewayBu
   .withPermission("gatewayBudgets:view")
   .handle(async ({ app, input }) => {
     await app.assertOrganizationExists(input.organizationId);
-    const detail = await app.findBudgetDetail({
+    const detail = await app.getBudgetDetail({
       id: input.id,
       organizationId: input.organizationId,
     });
-    if (!detail) throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
 
     const providerLabels = await app.resolveProviderLabels([detail.budget]);
 

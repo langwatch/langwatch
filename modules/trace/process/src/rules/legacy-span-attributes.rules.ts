@@ -9,7 +9,7 @@ import type {
   ChatMessage,
   ErrorCapture,
   RAGChunk,
-  SpanInputOutput,
+  LegacySpanInputOutput,
 } from "@langwatch/trace-contract";
 import { NormalizedStatusCode } from "@langwatch/trace-contract";
 
@@ -68,13 +68,13 @@ function isLegacyWrapper(v: unknown): v is { type: string; value: unknown } {
 }
 
 /**
- * Unwraps a {type, value} wrapper into a proper SpanInputOutput.
+ * Unwraps a {type, value} wrapper into a proper LegacySpanInputOutput.
  */
 function unwrapLegacyWrapper(
   wrapper: { type: string; value: unknown },
   _spanAttributes: NormalizedAttributes,
   _attrKey: string,
-): SpanInputOutput {
+): LegacySpanInputOutput {
   const { type, value } = wrapper;
   if (type === "chat_messages" && Array.isArray(value)) {
     return {
@@ -94,7 +94,7 @@ function unwrapLegacyWrapper(
     return {
       type,
       value: toJsonSerializable(value),
-    } as unknown as SpanInputOutput;
+    };
   }
 
   return { type: "json", value: toJsonSerializable(value) };
@@ -154,7 +154,7 @@ function readAnnotatedValue(
   value: unknown,
   spanAttributes: NormalizedAttributes,
   key: "langwatch.input" | "langwatch.output",
-): SpanInputOutput {
+): LegacySpanInputOutput {
   if (isLegacyWrapper(value)) {
     return unwrapLegacyWrapper(value, spanAttributes, key);
   }
@@ -168,7 +168,7 @@ function readAnnotatedValue(
   const isResultType =
     annotatedType === "evaluation_result" || annotatedType === "guardrail_result";
   if (key === "langwatch.output" && isResultType) {
-    return { type: annotatedType, value: toJsonSerializable(value) } as unknown as SpanInputOutput;
+    return { type: annotatedType, value: toJsonSerializable(value) };
   }
 
   if (annotatedType === "text" || typeof value === "string") {
@@ -183,7 +183,7 @@ function readAnnotatedValue(
  * gen_ai.input.messages, langwatch.input, or gen_ai.tool.call.arguments (semconv-native
  * emitters whose ingest path never lifted them into langwatch.input).
  */
-export function extractInput(spanAttributes: NormalizedAttributes): SpanInputOutput | null {
+export function extractInput(spanAttributes: NormalizedAttributes): LegacySpanInputOutput | null {
   // Priority 1: gen_ai.input.messages → always chat_messages
   const genAiInputMessages = spanAttributes["gen_ai.input.messages"];
   if (genAiInputMessages !== undefined) {
@@ -213,7 +213,7 @@ export function extractInput(spanAttributes: NormalizedAttributes): SpanInputOut
  * A raw semconv payload: parse JSON strings into a `json` payload, keep
  * anything else as text (mirrors how the langwatch.* branches infer type).
  */
-function parseJsonOrText(value: unknown): SpanInputOutput {
+function parseJsonOrText(value: unknown): LegacySpanInputOutput {
   if (typeof value === "string") {
     try {
       const parsed = JSON.parse(value) as unknown;
@@ -235,7 +235,7 @@ function parseJsonOrText(value: unknown): SpanInputOutput {
  * Extracts output from canonical span attributes only. After canonicalization, output is at:
  * gen_ai.output.messages, langwatch.output, or gen_ai.tool.call.result (semconv-native emitters).
  */
-export function extractOutput(spanAttributes: NormalizedAttributes): SpanInputOutput | null {
+export function extractOutput(spanAttributes: NormalizedAttributes): LegacySpanInputOutput | null {
   // Priority 1: gen_ai.output.messages → always chat_messages
   const genAiOutputMessages = spanAttributes["gen_ai.output.messages"];
   if (genAiOutputMessages !== undefined) {

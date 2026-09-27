@@ -45,8 +45,8 @@ vi.mock("@langwatch/browser-host/errors", () => ({
 
 // Stub the monaco editor and the variables section so the test stays focused on
 // the drawer's create-vs-edit behavior without pulling in heavy editors.
-vi.mock("@langwatch/workflow-browser/surfaces/code-editor-transport", () => ({
-  CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
+vi.mock("../evaluator-code-editor.tsx", () => ({
+  EvaluatorCodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
 }));
 vi.mock("@langwatch/prompt-browser-kit", async (importOriginal) => ({
   ...(await importOriginal<typeof promptBrowserKitModule>()),

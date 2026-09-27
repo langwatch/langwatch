@@ -9,7 +9,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { McpApiKeyCipher } from "../app/hosted-mcp-members.ts";
+import type { McpApiKeyCipher } from "../app/hosted-mcp.members.ts";
 import type { McpOAuthTokenRepository } from "../repositories/mcp-oauth-token.repository.ts";
 
 const logger = createLogger("langwatch:mcp");

@@ -102,6 +102,7 @@ import {
   type SimulationRunData,
   type SimulationScenarioRunInput,
   type SimulationUpdateWatchInput,
+  type VoiceMediaUpgrade,
   type SimulationBatchSummaryRest,
   type SimulationRunListInput,
   type SimulationRunListResponse,
@@ -184,6 +185,8 @@ import {
 } from "../services/simulation-processing.service.ts";
 import { SimulationRunViewService } from "../services/simulation-run-view.service.ts";
 import { SimulationUpdateStreamService } from "../services/simulation-update-stream.service.ts";
+import { VoiceMediaDoorService } from "../services/voice-media-door.service.ts";
+import { VoiceNonceRegistryService } from "../services/voice-nonce-registry.service.ts";
 import { VoiceSessionService } from "../services/voice-session.service.ts";
 import { buildScenarioComposition } from "./scenario-composition.build.ts";
 
@@ -218,6 +221,8 @@ export interface ScenarioAppDependencies {
   runViews: SimulationRunViewService;
   /** "Talk to it": browser voice sessions and their recordings. */
   voiceSessions: VoiceSessionService;
+  /** The worker's media door: hands a Twilio upgrade to the child that owns the call. */
+  voiceMedia: VoiceMediaDoorService;
 }
 
 /**
@@ -393,6 +398,7 @@ export class ScenarioApp implements ScenarioApi {
     const broadcast = redis
       ? scenarioEventBroadcastChannels.live.create(redis)
       : scenarioEventBroadcastChannels.memory.create();
+    const voiceNonces = VoiceNonceRegistryService.create();
     const memoryCancellations = MemoryScenarioCancellationChannel.create();
     const cancellations = redis
       ? RedisScenarioCancellationPublisherChannel.create(redis)
@@ -472,6 +478,7 @@ export class ScenarioApp implements ScenarioApi {
       }),
       platformLinks,
       runViews: SimulationRunViewService.create({ simulations, platformLinks }),
+      voiceMedia: VoiceMediaDoorService.create({ nonces: voiceNonces }),
       voiceSessions: VoiceSessionService.compose({
         peers: setup.dependencies,
         scenarios,
@@ -520,6 +527,7 @@ export class ScenarioApp implements ScenarioApi {
           },
         },
         executor: ScenarioExecutorService.create({
+          voiceNonces,
           peers: setup.dependencies,
           scenarios,
           simulations,
@@ -1122,6 +1130,10 @@ export class ScenarioApp implements ScenarioApi {
     signal?: AbortSignal;
   }): AsyncIterable<SimulationStreamFrame> {
     return this.#dependencies.updates.watch(input);
+  }
+
+  acceptVoiceMediaUpgrade(upgrade: VoiceMediaUpgrade): void {
+    this.#dependencies.voiceMedia.accept(upgrade);
   }
 
   watchSimulationUpdates(input: SimulationUpdateWatchInput): AsyncIterable<SimulationStreamFrame> {

@@ -27,11 +27,6 @@
       "langwatch-declaration-source": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx",
       "types": "./dist/ui/sections/evaluators/evaluator-editor-shared.d.ts",
       "default": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx"
-    },
-    "./available-evaluators": {
-      "langwatch-declaration-source": "./src/available-evaluators.ts",
-      "types": "./dist/available-evaluators.d.ts",
-      "default": "./src/available-evaluators.ts"
     }
   },
   "scripts": {

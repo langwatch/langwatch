@@ -6,9 +6,9 @@ import { ClickHouseTraceQueryValuesRepository } from "./clickhouse.trace-query-v
 const traceQuerySubqueryRepository = ClickHouseTraceQuerySubqueryRepository.create();
 const traceQueryValuesRepository = ClickHouseTraceQueryValuesRepository.create();
 
-export class ClickHouseTraceQueryCustomFieldsAdapter {
-  static create(): ClickHouseTraceQueryCustomFieldsAdapter {
-    return new ClickHouseTraceQueryCustomFieldsAdapter();
+export class ClickHouseTraceQueryCustomFieldsRepository {
+  static create(): ClickHouseTraceQueryCustomFieldsRepository {
+    return new ClickHouseTraceQueryCustomFieldsRepository();
   }
 
   /**

@@ -5,12 +5,16 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { Cluster, Redis } from "ioredis";
 
+import { mcpSessionRelayChannels } from "../channels/mcp-session-relay-channels.registry.ts";
+import { RedisMcpOAuthClientRepository } from "../repositories/redis/redis.mcp-oauth-client.repository.ts";
+import { RedisMcpOAuthTokenRepository } from "../repositories/redis/redis.mcp-oauth-token.repository.ts";
+import { RedisMcpSessionRepository } from "../repositories/redis/redis.mcp-session.repository.ts";
 import { AuthzMcpSessionGrantService } from "../services/authz-mcp-session-grant.service.ts";
 import { GovernanceMcpSessionToolsService } from "../services/governance-mcp-session-tools.service.ts";
 import { HeaderMcpClientAddressService } from "../services/header-mcp-client-address.service.ts";
+import { McpEndpointService, type McpHandler } from "../services/mcp-endpoint.service.ts";
 import { ProjectMcpProjectLookupService } from "../services/project-mcp-project-lookup.service.ts";
-import { createMcpHandler, type McpHandler } from "../transport/hosted-mcp.api.ts";
-import type { HostedMcpDependencies } from "./hosted-mcp-members.ts";
+import type { HostedMcpDependencies } from "./hosted-mcp.members.ts";
 
 /**
  * Shapes restated rather than imported: a module depends on contracts.
@@ -63,7 +67,7 @@ export class HostedMcpApp implements HostedMcpApiContract {
       );
     }
 
-    return new HostedMcpApp({
+    return HostedMcpApp.fromDependencies({
       redis: members.redis,
       projects: ProjectMcpProjectLookupService.create({ projects: dependencies.projects }),
       grants: AuthzMcpSessionGrantService.create({ authorization: dependencies.authorization }),
@@ -76,7 +80,20 @@ export class HostedMcpApp implements HostedMcpApiContract {
     });
   }
 
+  /** The app over collaborators already built, as a suite or another composition holds them. */
+  static fromDependencies(dependencies: HostedMcpDependencies): HostedMcpApp {
+    return new HostedMcpApp(dependencies);
+  }
+
+  /** A fresh endpoint, with its own sessions, caches and reaper, over this process's stores. */
   createHandler(): McpHandler {
-    return createMcpHandler(this.#dependencies);
+    const { redis, ...collaborators } = this.#dependencies;
+    return McpEndpointService.create({
+      ...collaborators,
+      sessionRecords: RedisMcpSessionRepository.create({ redis }),
+      relay: mcpSessionRelayChannels.live.create({ redis }),
+      oauthTokenRecords: RedisMcpOAuthTokenRepository.create({ redis }),
+      oauthClients: RedisMcpOAuthClientRepository.create({ redis }),
+    });
   }
 }

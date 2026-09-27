@@ -227,11 +227,11 @@ describe("EventSourcingService - Recovery Flows", () => {
       await expect(service.storeEvents([event1], context)).resolves.not.toThrow();
 
       // Verify event1 is stored (even though map failed)
-      const eventsBefore = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const eventsBefore = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       expect(eventsBefore).toHaveLength(1);
       expect(eventsBefore[0]?.id).toBe(event1.id);
 
@@ -240,11 +240,11 @@ describe("EventSourcingService - Recovery Flows", () => {
       expect(mapDef.map).toHaveBeenCalledTimes(2);
 
       // Verify both events are stored
-      const eventsAfter = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const eventsAfter = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       expect(eventsAfter).toHaveLength(2);
 
       // Fix map
@@ -254,11 +254,11 @@ describe("EventSourcingService - Recovery Flows", () => {
       await service.storeEvents([event1], context);
 
       // event1 is only stored once (duplicate prevention)
-      const finalEvents = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const finalEvents = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       const event1Count = finalEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
       expect(finalEvents).toHaveLength(2);

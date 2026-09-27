@@ -5,15 +5,15 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.service.ts";
 import { SpanCostService } from "../span-cost.service.ts";
 import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
+import { TraceModelCostService } from "../trace-model-cost.service.ts";
 
 /** Per-span cost computation: matches trace-summary fold accumulation and
  * non-billable cost split. */
 
 const canonicalisation = TraceCanonicalisationService.create();
-const modelCosts = ModelCatalogTraceModelCostAdapter.create();
+const modelCosts = TraceModelCostService.create();
 const spanCostService = SpanCostService.create({ modelCosts });
 
 function createTestSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {

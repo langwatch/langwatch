@@ -1,7 +1,8 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { CustomEvaluator } from "@langwatch/evaluation-contract";
-import { AVAILABLE_EVALUATORS, type EvaluatorDefinition } from "@langwatch/evaluator-contract";
+import { evaluatorCatalogueWith } from "@langwatch/evaluator-browser-kit";
+import type { EvaluatorDefinition } from "@langwatch/evaluator-contract";
 import { getInputsOutputs } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 
@@ -15,40 +16,22 @@ export const useAvailableEvaluators = ():
     { enabled: !!project },
   );
 
-  const availableEvaluators = useMemo(() => {
-    if (!availableCustomEvaluators.data) {
-      return undefined;
-    }
-    return {
-      ...AVAILABLE_EVALUATORS,
-      ...Object.fromEntries(
-        (availableCustomEvaluators.data ?? []).map((evaluator: CustomEvaluator) => {
-          const dsl = JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl));
-          const { inputs } = getInputsOutputs(dsl?.edges, dsl?.nodes);
-          const requiredFields = inputs.map((input) => input.identifier);
-
-          return [
-            `custom/${evaluator.id}`,
-            {
-              name: evaluator.name,
-              description: describeCustomEvaluator(evaluator),
-              category: "custom",
-              isGuardrail: false,
-              requiredFields: requiredFields,
-              optionalFields: [],
-              settings: {},
-              result: {},
-              envVars: [],
-            },
-          ];
-        }),
-      ),
-    };
-  }, [availableCustomEvaluators.data]);
-
-  return availableEvaluators;
+  return useMemo(
+    () =>
+      availableCustomEvaluators.data
+        ? evaluatorCatalogueWith(availableCustomEvaluators.data.map(summarizeCustomEvaluator))
+        : undefined,
+    [availableCustomEvaluators.data],
+  );
 };
 
-function describeCustomEvaluator(evaluator: CustomEvaluator): string {
-  return typeof evaluator.description === "string" ? evaluator.description : "";
+function summarizeCustomEvaluator(evaluator: CustomEvaluator) {
+  const dsl = JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl));
+  const { inputs } = getInputsOutputs(dsl?.edges, dsl?.nodes);
+  return {
+    id: evaluator.id,
+    name: evaluator.name,
+    description: evaluator.description,
+    requiredFields: inputs.map((input) => input.identifier),
+  };
 }

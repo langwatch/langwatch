@@ -29,12 +29,16 @@ import { type MembersRead, type RateLimiter } from "@langwatch/process-stores/me
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareViewer, ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
   TraceCapabilityUnavailableError,
   type ExportProgressEvent,
   type Protections,
+  type TraceFacetsAnswer,
+  type TraceFacetsQuery,
+  discoverResultSchema,
+  traceFacetValuesResponseSchema,
   type TraceEditOverlayPatch,
   TraceIngestionUnavailableError,
   recordCapturedSpanInputSchema,
@@ -143,7 +147,11 @@ import {
   traceConfig,
   TraceIdAmbiguousError,
   TraceNotFoundError,
+  TrackedEventInvalidError,
+  trackEventRESTParamsValidatorSchema,
   SpanNotFoundError,
+  traceListPageSchema,
+  type TracesConversationContext,
   changeTraceNameInputSchema,
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
@@ -245,18 +253,28 @@ import {
 const TRACKED_EVENT_KSUID_RESOURCE = "trackedevent";
 import type * as traceContractModule from "@langwatch/trace-contract";
 
+import {
+  traceDerivedAttrPrefixes,
+  traceReadMapperPorts,
+} from "../rules/trace-read-mapper-ports.rules.ts";
+import {
+  buildContentPrivacy,
+  buildSpanContentRedactions,
+  mapSpanToDetail,
+  readDroppedFromParams,
+  readPiiIncompleteFromParams,
+  redactV2Content,
+  toConversationContextTurn,
+} from "../rules/trace-read-mappers.rules.ts";
 import type {
   CollectorEvaluationReport,
   CollectorSpanIngest,
 } from "../services/trace-collector-dispatch.service.ts";
 import { TraceExportProgressService } from "../services/trace-export-progress.service.ts";
+import { TraceFacetValuesService } from "../services/trace-facet-values.service.ts";
 import { AmbiguousTraceIdPrefixError } from "../services/trace-legacy-read.service.ts";
 import { TraceSharedReadService } from "../services/trace-shared-read.service.ts";
 import { TraceTranscriptReadService } from "../services/trace-transcript-read.service.ts";
-import {
-  traceDerivedAttrPrefixes,
-  traceReadMapperPorts,
-} from "../transport/api-trpc/trace-read-mapper-ports.ts";
 import type {
   TraceLegacyReads,
   TraceLegacySearchFields,
@@ -264,6 +282,13 @@ import type {
 } from "../transport/trace-legacy.rest.ts";
 
 const logger = createLogger("langwatch:trace:app");
+
+const FACETS_DAY_MS = 24 * 60 * 60 * 1000;
+
+/** One facets window bound as epoch milliseconds, whichever way it was written. */
+function facetWindowBound(value: string): number {
+  return /^\d+$/.test(value) ? Number(value) : toEpochMs(value);
+}
 
 /** Who a write is attributed to. */
 export interface TraceCaller {
@@ -316,6 +341,7 @@ export type TracesListReader = Readonly<{
     prefix: string;
     limit?: number;
   }): Promise<string[]>;
+  resolveFacetKey(input: { field: string; protections: Protections }): string;
   getDiscover(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
@@ -1048,6 +1074,215 @@ export class TraceApp implements TraceApi, CollectorApp {
     } finally {
       this.cleanupTenantEmitter(input.projectId);
     }
+  }
+
+  async readConversationContextForViewer(input: {
+    projectId: string;
+    conversationId: string;
+    viewerUserId: string;
+  }): Promise<TracesConversationContext> {
+    const protections = await this.resolveViewerProtections({
+      projectId: input.projectId,
+      userId: input.viewerUserId,
+    });
+    // Window: conversation membership is timeless; cap at 1y to keep
+    // partition pruning effective.
+    const now = nowInstant().epochMilliseconds;
+    const timeRange = { from: now - 365 * 24 * 60 * 60 * 1000, to: now };
+    const filterWhere = {
+      sql: "Attributes['gen_ai.conversation.id'] = {threadConversationId:String}",
+      params: { threadConversationId: input.conversationId },
+    };
+    const page = traceListPageSchema.parse(
+      await this.readTraceList({
+        tenantId: input.projectId,
+        timeRange,
+        sort: { columnId: "time", direction: "asc" },
+        page: 1,
+        pageSize: 200,
+        filterWhere,
+        visibilityCutoffMs: protections.visibilityCutoffMs,
+      }),
+    );
+    const turns = page.items.map((t) =>
+      toConversationContextTurn({
+        trace: t,
+        protections,
+        contentPrivacy: traceReadMapperPorts.contentPrivacy,
+      }),
+    );
+
+    return {
+      conversationId: input.conversationId,
+      turns,
+      total: turns.length,
+    };
+  }
+
+  async readSpanDetailForViewer(input: {
+    projectId: string;
+    traceId: string;
+    spanId: string;
+    occurredAtMs?: number;
+    viewerUserId: string;
+  }): Promise<SpanDetail> {
+    const protections = await this.resolveViewerProtections({
+      projectId: input.projectId,
+      userId: input.viewerUserId,
+    });
+    const [span, rawEvents] = await Promise.all([
+      this.findSpan({
+        projectId: input.projectId,
+        traceId: input.traceId,
+        spanId: input.spanId,
+        visibilityCutoffMs: protections.visibilityCutoffMs,
+        occurredAtMs: input.occurredAtMs,
+      }),
+      this.readSpanEvents({
+        projectId: input.projectId,
+        traceId: input.traceId,
+        spanId: input.spanId,
+        occurredAtMs: input.occurredAtMs,
+      }),
+    ]);
+
+    if (!span) throw new SpanNotFoundError(input.spanId);
+
+    // Coding-agent spans store their content in the trace's OTLP LOGS, not on
+    // the span row — join it on here, BEFORE protections, so it goes through
+    // the same redaction pass as any other span content.
+    let targetSpan = span;
+    if (this.isCodingAgentShapedSpan(span)) {
+      const needsSiblingRefs =
+        typeof (span.params as Record<string, unknown> | null)?.request_id === "string";
+      const [logRows, summaryRows] = await Promise.all([
+        this.readTraceLogRecords({
+          projectId: input.projectId,
+          traceId: input.traceId,
+          occurredAtMs: input.occurredAtMs,
+        }),
+        needsSiblingRefs
+          ? this.readSpanSummaries({
+              projectId: input.projectId,
+              traceId: input.traceId,
+              occurredAtMs: input.occurredAtMs,
+            })
+          : Promise.resolve([]),
+      ]);
+      targetSpan = this.enrichSpanFromCodingAgentLogs({
+        span,
+        modelCallRefs: this.mapCodingAgentSummaryRows(summaryRows),
+        logRows,
+      });
+    }
+
+    const redactions = buildSpanContentRedactions(
+      [targetSpan],
+      protections,
+      traceReadMapperPorts.spanProtection,
+    );
+    const protectedSpan = traceReadMapperPorts.spanProtection.applySpanProtections(
+      targetSpan,
+      protections,
+      redactions,
+    );
+    const spanDetail = mapSpanToDetail(
+      protectedSpan,
+      rawEvents.map((e) => ({
+        name: e.event_type,
+        timeUnixMs:
+          typeof e.timestamps.started_at === "number"
+            ? e.timestamps.started_at
+            : parseInt(String(e.timestamps.started_at), 10),
+        attributes: traceReadMapperPorts.spanProtection.redactObject(
+          Object.fromEntries([
+            ...e.event_details.map((d): [string, unknown] => [d.key, d.value]),
+            ...e.metrics.map((m): [string, unknown] => [m.key, m.value]),
+          ]),
+          redactions,
+        ),
+      })),
+      traceReadMapperPorts.spanDisplay,
+    );
+
+    const redactedDetail = redactV2Content(
+      spanDetail,
+      protections,
+      traceReadMapperPorts.contentPrivacy,
+    );
+    const detailParams = spanDetail.params as Record<string, unknown> | null;
+    redactedDetail.contentPrivacy = buildContentPrivacy(
+      protections,
+      readDroppedFromParams(detailParams, traceReadMapperPorts.contentPrivacy),
+    );
+    redactedDetail.piiAnalysisIncomplete = readPiiIncompleteFromParams(
+      detailParams,
+      traceReadMapperPorts.contentPrivacy,
+    );
+    redactedDetail.restrictedAttributes = protections.restrictedAttributes ?? null;
+
+    return redactedDetail;
+  }
+
+  /** `GET /api/traces/facets`: the discovery payload, or one field's paged values. */
+  async readTraceFacetsForApiKey(input: {
+    projectId: string;
+    query: TraceFacetsQuery;
+    apiKeyId: string | null;
+    userId: string | null;
+  }): Promise<TraceFacetsAnswer> {
+    const { field, prefix, limit, offset, startDate, endDate } = input.query;
+    // One clock read for both ends, so the default window is exactly one day.
+    const now = nowInstant().epochMilliseconds;
+    const timeRange = {
+      from: startDate === undefined ? now - FACETS_DAY_MS : facetWindowBound(startDate),
+      to: endDate === undefined ? now : facetWindowBound(endDate),
+    };
+    if (field === undefined) {
+      return discoverResultSchema.parse(
+        await this.readDiscover({ tenantId: input.projectId, timeRange }),
+      );
+    }
+    const protections = await this.resolveApiKeyProtections({
+      projectId: input.projectId,
+      apiKeyId: input.apiKeyId,
+      userId: input.userId,
+    });
+    const facetKey = this.#dependencies.traces.list.resolveFacetKey({ field, protections });
+    const result = await this.readFacetValues({
+      tenantId: input.projectId,
+      timeRange: TraceFacetValuesService.visibleWindow({ timeRange, facetKey, protections }),
+      facetKey,
+      limit,
+      offset,
+      ...(prefix === undefined ? {} : { prefix }),
+    });
+    return traceFacetValuesResponseSchema.parse({
+      values: result.values,
+      total: result.totalDistinct,
+      hasMore: offset + result.values.length < result.totalDistinct,
+    });
+  }
+
+  /** No `query` at all is the vocabulary read; a `query`, empty included, asks for counts. */
+  async readDiscoverForQuery(input: {
+    projectId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    query?: string | null;
+    evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+  }): Promise<DiscoverResult> {
+    if (input.query === null || input.query === undefined) {
+      return this.readDiscover({ tenantId: input.projectId, timeRange: input.timeRange });
+    }
+    return this.readFilteredFacets({
+      projectId: input.projectId,
+      timeRange: input.timeRange,
+      query: input.query,
+      evalRuns: await this.findExplorerEvalRuns({
+        projectId: input.projectId,
+        evalRuns: input.evalRuns,
+      }),
+    });
   }
 
   /** Trimmed first, so the event always carries a canonical name. */
@@ -2564,6 +2799,46 @@ export class TraceApp implements TraceApi, CollectorApp {
   /** A rejected payload, kept in the log rather than in the customer's body. */
   reportError(error: unknown): void {
     logger.error({ error }, "the tracked-event route rejected a payload");
+  }
+
+  /** What both tracked-event addresses do; a body that fails to parse or validate is a 400. */
+  async trackEventFromRequest(input: {
+    projectId: string;
+    raw: string | Uint8Array | undefined;
+  }): Promise<{ message: "Event tracked" }> {
+    const text = typeof input.raw === "string" ? input.raw : new TextDecoder().decode(input.raw);
+    let rawBody: Record<string, unknown>;
+    try {
+      rawBody = JSON.parse(text);
+    } catch {
+      throw new TrackedEventInvalidError("Bad request");
+    }
+    const body = this.#validTrackedEvent({ rawBody, projectId: input.projectId });
+    const eventId = body.event_id ?? this.generateEventId();
+    try {
+      await this.recordTrackedEvent({ project: { id: input.projectId }, body, eventId });
+    } catch (error) {
+      logger.error({ error }, "unable to dispatch tracked event span");
+    }
+    return { message: "Event tracked" };
+  }
+
+  #validTrackedEvent({
+    rawBody,
+    projectId,
+  }: {
+    rawBody: Record<string, unknown>;
+    projectId: string;
+  }): TrackEventRESTParamsValidator {
+    try {
+      const body = trackEventRESTParamsValidatorSchema.parse(rawBody);
+      this.assertPredefinedEventPayload(rawBody);
+      return body;
+    } catch (error) {
+      logger.error({ error, body: rawBody, projectId }, "invalid event received");
+      this.reportError(error);
+      throw new TrackedEventInvalidError(this.describeValidationError(error));
+    }
   }
 
   /**

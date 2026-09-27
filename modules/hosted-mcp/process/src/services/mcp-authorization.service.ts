@@ -7,10 +7,17 @@ import { randomBytes } from "node:crypto";
 
 import { nowInstant, type TimeInput } from "@langwatch/time";
 
-import type { HostedMcpRedis } from "../app/hosted-mcp-members.ts";
-import { McpOAuthClientRegistryService } from "./mcp-oauth-client-registry.service.ts";
+import type { McpOAuthClientRepository } from "../repositories/mcp-oauth-client.repository.ts";
+import type { McpOAuthTokenRepository } from "../repositories/mcp-oauth-token.repository.ts";
+import {
+  buildAuthorizeAnswer,
+  classifyPostedFields,
+  parsePostedApproval,
+  type McpApprovalOutcome,
+  type McpAuthorizeAnswer,
+} from "../rules/mcp-authorize.rules.ts";
 
-const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
+export type { McpApprovalOutcome, McpAuthorizeAnswer } from "../rules/mcp-authorize.rules.ts";
 const AUTH_CODE_TTL_SECONDS = 600;
 
 /** 256 bits, the length every other one-time OAuth credential here is minted at. */
@@ -33,20 +40,6 @@ export type McpAuthorizeProject = Readonly<{
   /** When the project was archived, in whatever shape the host holds one. */
   archivedAt: TimeInput | null;
 }>;
-
-/**
- * What one approval decided. Everything before `approved` is a refusal RFC 6749
- * §4.1.2.1 has a word for, and the transport decides which of them the client
- * may be told about at its own redirect URI.
- */
-export type McpApprovalOutcome =
-  | Readonly<{ kind: "approved"; code: string }>
-  | Readonly<{ kind: "unregistered-client" }>
-  | Readonly<{ kind: "unregistered-redirect" }>
-  | Readonly<{ kind: "challenge-missing" }>
-  | Readonly<{ kind: "challenge-method-unsupported" }>
-  | Readonly<{ kind: "denied" }>
-  | Readonly<{ kind: "unavailable" }>;
 
 /** One approval, as the consent page posted it. */
 export type McpApprovalRequest = Readonly<{
@@ -76,8 +69,10 @@ export interface McpAuthorizationCollaborators {
   isDemoProject(input: { projectId: string }): boolean;
   /** The at-rest cipher the embedded credential is written under. */
   encrypt(value: string): string;
-  /** Where the code lives for its ten minutes. Null means no code can be minted. */
-  redis: HostedMcpRedis | null;
+  /** The registrations a client_id and its redirect URIs are checked against. */
+  clients: McpOAuthClientRepository;
+  /** Where the code lives for its ten minutes. Unavailable means no code can be minted. */
+  codes: McpOAuthTokenRepository;
 }
 
 export class McpAuthorizationService {
@@ -94,13 +89,43 @@ export class McpAuthorizationService {
   }
 
   /**
+   * The consent page's post, whole: who is signed in, the fields they approved, and the answer
+   * the browser follows next. A blank or absent field is a refusal this route words itself.
+   */
+  async authorize({
+    approverId,
+    raw,
+  }: {
+    approverId: string | undefined;
+    raw: string;
+  }): Promise<McpAuthorizeAnswer> {
+    if (approverId === undefined) return { status: 401, body: { error: "Not authenticated" } };
+
+    const fields = parsePostedApproval(raw);
+    if (!fields) return { status: 400, body: { error: "Invalid body" } };
+
+    const checked = classifyPostedFields(fields);
+    if (checked.kind === "refused") return { status: 400, body: { error: checked.error } };
+    const { projectId, clientId, redirectUri } = checked;
+
+    const outcome = await this.approve({
+      approver: { user: { id: approverId } },
+      projectId,
+      clientId,
+      redirectUri,
+      codeChallenge: fields.code_challenge,
+      codeChallengeMethod: fields.code_challenge_method,
+    });
+    return buildAuthorizeAnswer({ outcome, redirectUri, state: fields.state });
+  }
+
+  /**
    * RFC 6749 §10.6 first: a code is only ever issued to a redirect_uri registered
    * for this client_id. Whoever crafts the authorization request can be an attacker
    * rather than the approving user, and would otherwise be handed the code.
    */
   async approve(request: McpApprovalRequest): Promise<McpApprovalOutcome> {
-    const registered = await McpOAuthClientRegistryService.get({
-      redis: this.#collaborators.redis,
+    const registered = await this.#collaborators.clients.getByClientId({
       clientId: request.clientId,
     });
 
@@ -117,7 +142,8 @@ export class McpAuthorizationService {
    * refusal can be carried back to the client rather than left on our own page.
    */
   async #approveVerifiedClient(request: McpApprovalRequest): Promise<McpApprovalOutcome> {
-    if (!request.codeChallenge) return { kind: "challenge-missing" };
+    const { codeChallenge } = request;
+    if (!codeChallenge) return { kind: "challenge-missing" };
 
     // S256 is the only method the discovery document advertises, and the token
     // endpoint verifies every code as S256 regardless of what was requested.
@@ -131,11 +157,9 @@ export class McpAuthorizationService {
 
     if (!project) return { kind: "denied" };
 
-    const redis = this.#collaborators.redis;
+    if (!this.#collaborators.codes.isAvailable()) return { kind: "unavailable" };
 
-    if (!redis) return { kind: "unavailable" };
-
-    return { kind: "approved", code: await this.#mint({ redis, request, project }) };
+    return { kind: "approved", code: await this.#mint({ request, codeChallenge, project }) };
   }
 
   /**
@@ -165,19 +189,20 @@ export class McpAuthorizationService {
 
   /** The code, and the entry the token exchange redeems it against. */
   async #mint({
-    redis,
     request,
+    codeChallenge,
     project,
   }: {
-    redis: HostedMcpRedis;
     request: McpApprovalRequest;
+    codeChallenge: string;
     project: McpAuthorizeProject;
   }): Promise<string> {
     const code = randomBytes(AUTH_CODE_BYTES).toString("base64url");
 
-    await redis.set(
-      `${REDIS_AUTH_CODE_PREFIX}${code}`,
-      JSON.stringify({
+    await this.#collaborators.codes.storeAuthorizationCode({
+      code,
+      ttlSeconds: AUTH_CODE_TTL_SECONDS,
+      record: {
         projectId: project.id,
         encryptedApiKey: this.#collaborators.encrypt(project.apiKey),
         // Captured here so MCP tools that need a caller identity (governance
@@ -185,7 +210,7 @@ export class McpAuthorizationService {
         // OAuth-flowing user instead of falling back to a project-wide
         // identity. Read at the token-exchange step.
         userId: request.approver.user.id,
-        codeChallenge: request.codeChallenge,
+        codeChallenge,
         codeChallengeMethod: request.codeChallengeMethod ?? "S256",
         // Bound here so the token endpoint can require the exchange to present
         // the exact same client_id + redirect_uri this authorization was
@@ -193,10 +218,8 @@ export class McpAuthorizationService {
         clientId: request.clientId,
         redirectUri: request.redirectUri,
         expiresAt: nowInstant().epochMilliseconds + AUTH_CODE_TTL_SECONDS * 1000,
-      }),
-      "EX",
-      AUTH_CODE_TTL_SECONDS,
-    );
+      },
+    });
 
     return code;
   }

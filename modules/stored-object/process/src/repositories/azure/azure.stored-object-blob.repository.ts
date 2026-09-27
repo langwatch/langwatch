@@ -1,10 +1,9 @@
 /**
- * AzureBlobStoredObjectDriverAdapter — stored-object bytes over Azure Blob
+ * AzureStoredObjectBlobRepository — stored-object bytes over Azure Blob
  * Storage.
  */
 import crypto from "node:crypto";
 import { Readable } from "node:stream";
-import type * as webModule from "node:stream/web";
 
 import {
   getStoredObjectStorageScheme,
@@ -14,9 +13,12 @@ import {
 } from "@langwatch/stored-object-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
-import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
+import {
+  getAzureBlobToken,
+  invalidateAzureBlobToken,
+} from "#repositories/azure/azure.blob-token.store";
+import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
 import type { AzureCredentials } from "#services/azure-blob-credentials.service";
-import { AzureBlobTokenProviderAdapter } from "#services/azure-blob-token-provider.service";
 
 interface ParsedAzureBlobUri {
   accountName: string;
@@ -214,9 +216,9 @@ function normalizeEndpoint(endpointBaseUrl: string): string {
  * The stored-object byte driver for Azure Blob Storage. Talks REST directly so
  * we don't pull in the full @azure/storage-blob SDK for one driver.
  */
-export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDriver {
-  static create(credentials: AzureCredentials): AzureBlobStoredObjectDriverAdapter {
-    return new AzureBlobStoredObjectDriverAdapter(credentials);
+export class AzureStoredObjectBlobRepository implements StoredObjectBlobRepository {
+  static create(credentials: AzureCredentials): AzureStoredObjectBlobRepository {
+    return new AzureStoredObjectBlobRepository(credentials);
   }
 
   private constructor(private readonly credentials: AzureCredentials) {}
@@ -255,7 +257,7 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
         `Azure Blob GET returned empty body for ${redactStoredObjectStorageUri(uri)}`,
       );
     }
-    return Readable.fromWeb(response.body as unknown as webModule.ReadableStream<Uint8Array>);
+    return Readable.from(webChunks(response.body), { objectMode: false });
   }
 
   async put(uri: string, bytes: Buffer, mediaType: string): Promise<void> {
@@ -382,7 +384,8 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
   }
 
   /**
-   * Idempotently creates container for test setup; not part of StoredObjectStorageDriver interface.
+   * Idempotently creates container for test setup; not part of the StoredObjectBlobRepository
+   * interface.
    */
   async ensureContainer(container: string): Promise<void> {
     const endpoint = this.resolvedEndpoint();
@@ -458,7 +461,7 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
       };
     }
 
-    const token = await AzureBlobTokenProviderAdapter.getAzureBlobToken(this.credentials);
+    const token = await getAzureBlobToken(this.credentials);
     return {
       "x-ms-date": date,
       "x-ms-version": xMsVersion,
@@ -518,7 +521,7 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
     }
 
     if (response.status === 401) {
-      AzureBlobTokenProviderAdapter.invalidateAzureBlobToken(this.credentials);
+      invalidateAzureBlobToken(this.credentials);
       const retryHeaders = await buildHeaders();
       return fetch(url, {
         method,
@@ -541,5 +544,20 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
     }
 
     return response;
+  }
+}
+
+/** The body's chunks as they arrive; a consumer that stops early cancels the download. */
+async function* webChunks(body: ReadableStream<Uint8Array>): AsyncGenerator<Uint8Array> {
+  const reader = body.getReader();
+  let finished = false;
+  try {
+    while (!finished) {
+      const next = await reader.read();
+      finished = next.done;
+      if (next.value) yield next.value;
+    }
+  } finally {
+    if (!finished) await reader.cancel();
   }
 }

@@ -1,5 +1,6 @@
 // Real implementations everywhere; only the two stores are mocked.
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
   CONTENT_KEY_CATALOG,
@@ -9,7 +10,8 @@ import {
 import { buildDisplayInput, stringifySpanIO } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 
-import { TraceApp } from "../../../../app/trace.app.ts";
+import { createTraceAppHarness } from "../../../../app/__tests__/support/trace-app.harness.ts";
+import type { TraceLogRecordReader, TracesSpanReader } from "../../../../app/trace.app.ts";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
@@ -22,32 +24,26 @@ import {
   redactObject,
 } from "../../../../rules/trace-read-redaction.rules.ts";
 import type { TracesReadMembers } from "../../../../services/trace-transcript-read.service.ts";
-
-/** One of the two stores the read is driven from. */
-export type TranscriptStoreMock = ReturnType<
-  typeof vi.fn<(...args: unknown[]) => Promise<unknown[]>>
->;
+import type { TraceViewerProtectionService } from "../../../../services/trace-viewer-protection.service.ts";
 
 // Real TraceApp required: readSpans decides tenant key and visibility cutoff.
 export function createTranscriptApp(
   codingAgents: CodingAgentApi,
-  protections?: { resolve(input: unknown): Promise<unknown> },
-): {
-  app: TraceApp;
-  getSpansByTraceId: TranscriptStoreMock;
-  getLogsByTraceId: TranscriptStoreMock;
-} {
-  const getSpansByTraceId = vi.fn<(...args: unknown[]) => Promise<unknown[]>>();
-  const getLogsByTraceId = vi.fn<(...args: unknown[]) => Promise<unknown[]>>();
-  const app = TraceApp.create({
+  protections?: Partial<TraceViewerProtectionService>,
+) {
+  const getSpansByTraceId = vi.fn<TracesSpanReader["getSpansByTraceId"]>();
+  const getLogsByTraceId = vi.fn<TraceLogRecordReader["getLogsByTraceId"]>();
+  const app = createTraceAppHarness({
+    codingAgents,
+    ...(protections
+      ? { protections: createApiFixture<TraceViewerProtectionService>(protections, "protections") }
+      : {}),
     traces: {
-      spans: { getSpansByTraceId },
-      logRecords: { getLogsByTraceId },
+      spans: createApiFixture<TracesSpanReader>({ getSpansByTraceId }, "spans"),
+      logRecords: createApiFixture<TraceLogRecordReader>({ getLogsByTraceId }, "logRecords"),
       canonicalisation: undefined,
     },
-    codingAgents,
-    protections,
-  } as unknown as Parameters<typeof TraceApp.create>[0]);
+  });
   return { app, getSpansByTraceId, getLogsByTraceId };
 }
 

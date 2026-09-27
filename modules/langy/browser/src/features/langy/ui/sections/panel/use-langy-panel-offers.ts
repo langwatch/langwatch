@@ -6,7 +6,7 @@ import { type RefObject, useCallback, useEffect, useState } from "react";
 
 import { LANGY_CODE_ACCESS_ASK_AGAIN } from "../../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
 import type { LangyPanelSend } from "../../../behavior/panel/use-langy-panel-send.ts";
-import type { LangyProposal, ProposalHandlers } from "../message-content.tsx";
+import type { LangyProposal, ProposalHandlers } from "../langy-proposal-card.tsx";
 
 /**
  * Applies a proposal through the page's own handler for its kind — once: one already applying,

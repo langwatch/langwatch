@@ -2,6 +2,7 @@ import { Button, Heading, HStack, IconButton, Spacer } from "@chakra-ui/react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { findSeriesIdentifier } from "@langwatch/automation-contract";
+import { customGraphInputSchema } from "@langwatch/dashboard-contract";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { BarChart2, Bell } from "lucide-react";
 import { useMemo, type MouseEvent } from "react";
@@ -9,7 +10,6 @@ import { useMemo, type MouseEvent } from "react";
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { GraphFilterIndicator } from "../elements/graph-filter-indicator.tsx";
-import type { CustomGraphInput } from "./custom-graph.tsx";
 import { GraphCardMenu } from "./graph-card-menu.tsx";
 
 type GraphCardTrigger = { id: string; active: boolean; alertType: string | null };
@@ -110,17 +110,15 @@ export function GraphCardHeader({
     }
 
     // Try to generate a title from the graph data
-    if (graph && typeof graph === "object" && "series" in graph) {
-      const graphInput = graph as CustomGraphInput;
-      if (graphInput.series && graphInput.series.length > 0) {
-        const seriesNames = graphInput.series
+    const graphInput = customGraphInputSchema.safeParse(graph);
+    const seriesNames = graphInput.success
+      ? graphInput.data.series
           .map((s) => s.name)
           .filter(Boolean)
-          .join(", ");
-        if (seriesNames) {
-          return seriesNames.replace(/,([^,]*)$/, " and$1");
-        }
-      }
+          .join(", ")
+      : "";
+    if (seriesNames) {
+      return seriesNames.replace(/,([^,]*)$/, " and$1");
     }
 
     return "Untitled Graph";

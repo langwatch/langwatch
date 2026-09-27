@@ -8,11 +8,15 @@ import {
   reserveNavigate,
   useLangyStore,
 } from "@langwatch/langy-browser-kit";
-import type { LangyResourceContext, LangyStreamEntry } from "@langwatch/langy-contract";
+import type { LangyResourceContext } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 import { type RefObject, useMemo, useRef } from "react";
 
-import { api, type LangyTrpcClient } from "../../../../behavior/langy-api.ts";
+import {
+  api,
+  type LangyStreamWireEntry,
+  type LangyTrpcClient,
+} from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
 import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
 import { isOnPageOwningAction } from "../../../../model/ui-actions/manifest-routes.ts";
@@ -86,7 +90,7 @@ function dispatchUiActionToPage({
   getHandlers,
 }: {
   client: LangyTrpcClient;
-  entry: { actionId: string; kind: string; payload: unknown };
+  entry: Extract<LangyStreamWireEntry, { type: "ui" }>;
   projectId: string | undefined;
   seen: Set<string>;
   getHandlers: () => LangyUiActionHandlers;
@@ -100,7 +104,7 @@ function dispatchUiActionToPage({
   if (!projectId || !conversationId) return;
 
   void executeUiAction({
-    entry,
+    entry: { actionId: entry.actionId, kind: entry.kind, payload: entry.payload },
     turnId,
     seen,
     getHandlers,
@@ -135,7 +139,7 @@ function followNavigateInstruction({
   seen,
   router,
 }: {
-  entry: Extract<LangyStreamEntry, { type: "navigate" }>;
+  entry: Extract<LangyStreamWireEntry, { type: "navigate" }>;
   seen: Set<string>;
   router: Router;
 }): void {
@@ -148,7 +152,7 @@ function followNavigateInstruction({
 
 /** ADR-129: the fast path that puts a waiting card up before the durable tail lands. */
 function recordLocalWait(
-  entry: Extract<LangyStreamEntry, { type: "local_permission" | "question" }>,
+  entry: Extract<LangyStreamWireEntry, { type: "local_permission" | "question" }>,
 ): void {
   const wait =
     entry.type === "local_permission"
@@ -160,7 +164,9 @@ function recordLocalWait(
   });
 }
 
-function recordLocalWorkspace(entry: Extract<LangyStreamEntry, { type: "local_workspace" }>): void {
+function recordLocalWorkspace(
+  entry: Extract<LangyStreamWireEntry, { type: "local_workspace" }>,
+): void {
   useLangyLocalControlStore.getState().recordWorkspace({
     conversationId: useLangyStore.getState().activeConversationId,
     workspace: {

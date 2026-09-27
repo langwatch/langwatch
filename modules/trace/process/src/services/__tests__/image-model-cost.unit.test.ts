@@ -1,7 +1,7 @@
 import type { NormalizedAttributes } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
+import { computeSpanCost } from "../../rules/trace-span-cost-matching.rules.ts";
 
 // Catalog rates under test (model-catalog.overlay.json), per token, from
 // OpenAI's pricing page: gpt-image-2 $5 text in, $8 image in, $30 image out
@@ -25,7 +25,7 @@ const costOf = ({
   promptTokens?: number;
   completionTokens?: number;
 }): number =>
-  TraceSpanCostMatchingService.computeSpanCost({
+  computeSpanCost({
     attrs: attrs as NormalizedAttributes,
     promptTokens,
     completionTokens,

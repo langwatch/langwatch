@@ -26,3 +26,12 @@ export const updateWebhookEndpointCommandSchema = z.object({
   ...webhookDeliveryControlsSchema.partial().shape,
 });
 export type UpdateWebhookEndpointCommand = z.infer<typeof updateWebhookEndpointCommandSchema>;
+
+/** An update plus the status the caller asked for, applied as one change. */
+export const applyWebhookEndpointChangesCommandSchema = z.object({
+  ...updateWebhookEndpointCommandSchema.shape,
+  status: z.enum(["ACTIVE", "DISABLED"]).optional(),
+});
+export type ApplyWebhookEndpointChangesCommand = z.infer<
+  typeof applyWebhookEndpointChangesCommandSchema
+>;

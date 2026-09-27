@@ -22,6 +22,7 @@ import {
   type LangWatchQLAvailability,
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
+  type LangWatchQLPassInput,
   type LangWatchQLKeyReach,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
@@ -490,9 +491,8 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
         traces: new TraceApiHydrationSource(dependencies.traces),
       }),
       compute: LangWatchQLHydrationComputeService.create({ renderer: dependencies.traces }),
-      // The statement is run through this same door, so the hydration reaches
-      // it late: the bounds and the eval-function gate apply to it too.
-      runner: { executeLangWatchQL: (input) => this.executeLangWatchQL(input) },
+      // The page is a pass: the statement re-validated, then read inside its wrapper.
+      runner: { executeLangWatchQLPass: (input) => this.executeLangWatchQLPass(input) },
     });
   }
 
@@ -720,6 +720,15 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
       (await this.#isInstantEvalsEnabled(input.project.id));
 
     return this.#dependencies.langWatchQL.execute({ ...input, isInstantEvalsEnabled });
+  }
+
+  /** One instant-eval read, its statement gated exactly as {@link executeLangWatchQL} gates it. */
+  async executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> {
+    const isInstantEvalsEnabled =
+      statementMightCallEvalFunction(input.sql) &&
+      (await this.#isInstantEvalsEnabled(input.project.id));
+
+    return this.#dependencies.langWatchQL.executePass({ ...input, isInstantEvalsEnabled });
   }
 
   /** This project's eval-function rollout, the one answer both paths above read. */

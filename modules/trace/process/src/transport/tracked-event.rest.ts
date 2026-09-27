@@ -1,7 +1,6 @@
 import {
   badRequestSchema,
   baseResponses,
-  BadRequestError,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   resolver,
@@ -12,16 +11,12 @@ import { moduleApi } from "@langwatch/kernel/module-api";
  * canonical; `POST /api/track_event` is the older name, forwarding rather
  * than redirecting (a 307 drops the body for some clients).
  */
-import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import {
-  type TrackEventRESTParamsValidator,
   trackEventResponseSchema,
   trackEventRESTParamsValidatorSchema,
 } from "@langwatch/trace-contract";
 import { HTTPException } from "hono/http-exception";
-
-const logger = createLogger("langwatch:api:events");
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
@@ -36,26 +31,11 @@ const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPR
  * error types rather than restating the widened ones here.
  */
 export interface TrackedEventMembers {
-  /**
-   * Refuses a payload whose `event_type` is one of the predefined kinds but
-   * whose body does not match that kind's schema. Throws; a payload naming a
-   * custom event type is left alone.
-   */
-  assertPredefinedEventPayload(rawBody: Record<string, unknown>): void;
-  /** A fresh tracked-event id, for a caller that did not send one. */
-  generateEventId(): string;
-  /** Dispatches the event's span through the trace-processing pipeline. */
-  recordTrackedEvent(
-    input: Readonly<{
-      project: Readonly<{ id: string }>;
-      body: TrackEventRESTParamsValidator;
-      eventId: string;
-    }>,
-  ): Promise<void>;
-  /** Reports a rejected payload to the application's error sink. */
-  reportError(error: unknown): void;
-  /** A readable message for a validation failure, in the caller's 400 body. */
-  describeValidationError(error: unknown): string;
+  /** Parses, validates and dispatches one posted event; a bad body refuses with a 400. */
+  trackEventFromRequest(input: {
+    projectId: string;
+    raw: string | Uint8Array | undefined;
+  }): Promise<{ message: "Event tracked" }>;
 }
 
 export const TrackedEventApi = moduleApi<TrackedEventMembers>()("trace");
@@ -64,55 +44,6 @@ export const TrackedEventApi = moduleApi<TrackedEventMembers>()("trace");
 export const TRACKED_EVENT_LEGACY_PATH = "/api/track_event";
 /** The URL this family actually registers. */
 export const TRACKED_EVENT_CANONICAL_PATH = "/api/events/track";
-
-/**
- * What both addresses do. One body behind two routes, the way the monolith
- * shared a service between `/api/track_event` and the canonical route, so the
- * older name cannot drift from the newer one.
- */
-async function recordTrackedEvent({
-  app,
-  raw,
-  scope,
-}: {
-  app: TrackedEventMembers;
-  raw: string | Uint8Array | undefined;
-  scope: Readonly<{ id: string }>;
-}): Promise<{ message: "Event tracked" }> {
-  let rawBody: Record<string, unknown>;
-  try {
-    rawBody = JSON.parse(raw as string) as Record<string, unknown>;
-  } catch {
-    throw new BadRequestError("Bad request");
-  }
-
-  let body: TrackEventRESTParamsValidator;
-  try {
-    body = trackEventRESTParamsValidatorSchema.parse(rawBody);
-  } catch (error) {
-    logger.error({ error, body: rawBody, projectId: scope.id }, "invalid event received");
-    app.reportError(error);
-    throw new BadRequestError(app.describeValidationError(error));
-  }
-
-  try {
-    app.assertPredefinedEventPayload(rawBody);
-  } catch (error) {
-    logger.error({ error, body: rawBody, projectId: scope.id }, "invalid event received");
-    app.reportError(error);
-    throw new BadRequestError(app.describeValidationError(error));
-  }
-
-  const eventId = body.event_id ?? app.generateEventId();
-
-  try {
-    await app.recordTrackedEvent({ project: { id: scope.id }, body, eventId });
-  } catch (error) {
-    logger.error({ error }, "unable to dispatch tracked event span");
-  }
-
-  return { message: "Event tracked" as const };
-}
 
 export const trackedEventRest = defineRestRouter(TrackedEventApi)
   .withNamespace("events")
@@ -142,7 +73,7 @@ export const trackedEventRest = defineRestRouter(TrackedEventApi)
       },
     },
   })
-  .handle(recordTrackedEvent)
+  .handle(({ app, raw, scope }) => app.trackEventFromRequest({ projectId: scope.id, raw }))
 
   .build();
 
@@ -170,5 +101,5 @@ export const trackedEventLegacyPathRest = defineRestRouter(TrackedEventApi)
     tags: ["Events"],
     requestBody: { schema: trackEventRESTParamsValidatorSchema },
   })
-  .handle(recordTrackedEvent)
+  .handle(({ app, raw, scope }) => app.trackEventFromRequest({ projectId: scope.id, raw }))
   .build();

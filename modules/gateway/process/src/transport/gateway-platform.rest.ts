@@ -44,7 +44,7 @@ import {
   type GatewayBudgetScope,
   type VirtualKeyBudgetInput,
 } from "@langwatch/gateway-contract";
-import { nowInstant, Temporal, type Instant } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 import { resolveVirtualKeySpendWindow } from "../rules/gateway-spend-window.rules.ts";
@@ -91,16 +91,6 @@ function actorUserIdOf(actor: GatewayCaller): string {
     return caller.id;
   }
   throw new Error("gateway platform route resolved no actor id");
-}
-
-/**
- * A PATCH field's tri-state carried through: absent means no change, `null`
- * means clear it, a date means set it.
- */
-function toExpiresAtPatchValue(expiresAt: Date | null | undefined): Instant | null | undefined {
-  if (expiresAt === undefined) return undefined;
-  if (expiresAt === null) return null;
-  return Temporal.Instant.fromEpochMilliseconds(expiresAt.getTime());
 }
 
 function scopesFromWire(
@@ -292,9 +282,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       traceProjectId: input.trace_project_id ?? null,
       routingPolicyId: input.routing_policy_id ?? null,
       routingMode: input.routing_mode && toStoredEnum(input.routing_mode),
-      expiresAt: input.expires_at
-        ? Temporal.Instant.fromEpochMilliseconds(input.expires_at.getTime())
-        : null,
+      expiresAt: input.expires_at ?? null,
       budget: parseBudgetWire(app, input.budget),
       config: input.config,
       externalId: input.external_id,
@@ -387,7 +375,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       traceProjectId: input.trace_project_id,
       routingPolicyId: input.routing_policy_id,
       routingMode: input.routing_mode && toStoredEnum(input.routing_mode),
-      expiresAt: toExpiresAtPatchValue(input.expires_at),
+      expiresAt: input.expires_at,
       budget: parseBudgetWire(app, input.budget),
       config: input.config,
       externalId: input.external_id,

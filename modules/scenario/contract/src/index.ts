@@ -85,6 +85,7 @@ export {
 } from "./voice/voice-limits.ts";
 export type { CallRecord, CallTurn } from "./voice/call-record.ts";
 export * from "./voice/voice-session.errors.ts";
+export type { VoiceMediaUpgrade } from "./voice/voice-media-upgrade.ts";
 export {
   browserTranscriptToCallRecord,
   VOICE_RUN_ID_PREFIX,
@@ -93,14 +94,6 @@ export {
   type CallTurnRole,
 } from "./voice/call-record.ts";
 export * from "./voice/voice-session.schemas.ts";
-export { VoiceNonceRegistry } from "./voice/voice-nonce-registry.ts";
-export { handOffVoiceSocket } from "./voice/voice-socket-handoff.ts";
-export {
-  handleVoiceNonceRegisterMessage,
-  VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE,
-  VOICE_NONCE_REGISTER_MESSAGE,
-  type VoiceMediaUpgradeRefusedMessage,
-} from "./voice/voice-nonce-handoff.ts";
 export {
   runEvaluatorDefinitionSchema,
   runEvaluatorFieldSchema,

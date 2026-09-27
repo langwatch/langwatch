@@ -3,22 +3,20 @@
  * @see specs/instant-evals/instant-eval-api.feature
  */
 
-import type {
-  LangWatchQLAcceptedStatement,
-  LangWatchQLAppFunctionCall,
-  LangWatchQLColumn,
-  LangWatchQLExecuteInput,
-  LangWatchQLJudgementCall,
-  LangWatchQLQueryResult,
-  LangWatchQLValidationInput,
+import {
+  LWQL_PASS_AFTER_TRACE_PARAMETER,
+  type LangWatchQLAcceptedStatement,
+  type LangWatchQLAppFunctionCall,
+  type LangWatchQLColumn,
+  type LangWatchQLPassInput,
+  type LangWatchQLJudgementCall,
+  type LangWatchQLQueryResult,
+  type LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
-import {
-  INSTANT_EVAL_AFTER_PARAMETER,
-  INSTANT_EVAL_PAGE_PARAMETER,
-} from "../../rules/instant-eval-composition.rules.ts";
+import { INSTANT_EVAL_PAGE_PARAMETER } from "../../rules/instant-eval-composition.rules.ts";
 import {
   InstantEvalRowSourceService,
   type InstantEvalStatementRunner,
@@ -92,11 +90,11 @@ class ScriptedAnalytics implements InstantEvalStatementValidator {
 
 /** A row source whose probe answers the projection the suite states. */
 class ProbeOnlyRunner implements InstantEvalStatementRunner {
-  readonly asked: LangWatchQLExecuteInput[] = [];
+  readonly asked: LangWatchQLPassInput[] = [];
 
   constructor(private readonly columns: readonly LangWatchQLColumn[]) {}
 
-  async executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+  async executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> {
     this.asked.push(input);
 
     return {
@@ -163,7 +161,7 @@ describe("given a statement a run could execute", () => {
       await accept(statements);
 
       expect(runner.asked).toHaveLength(1);
-      expect(runner.asked[0]?.sql).toContain("LIMIT 0");
+      expect(runner.asked[0]?.pass).toEqual({ kind: "probe" });
     });
   });
 });
@@ -231,7 +229,7 @@ describe("given a statement a job cannot fill the parameters of", () => {
       const { statements, analytics } = harness();
 
       await expect(
-        accept(statements, { [INSTANT_EVAL_AFTER_PARAMETER]: "t1" }),
+        accept(statements, { [LWQL_PASS_AFTER_TRACE_PARAMETER]: "t1" }),
       ).rejects.toMatchObject({ code: "instant_eval_query_invalid" });
       expect(analytics.askedToValidate).toBe(0);
     });

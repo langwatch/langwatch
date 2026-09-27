@@ -32,6 +32,14 @@ Feature: Every installed module boots in the process that installs it
     And scim's own directory pipeline hosts the move
 
   @integration
+  Scenario: The worker forwards coding-agent spans, logs and metric points to coding-agent
+    Given the worker's installed modules over memory stores
+    When the worker process boots
+    Then the trace pipeline hosts the coding-agent span dispatch
+    And the log pipeline hosts the coding-agent log dispatch
+    And the metric pipeline hosts the coding-agent metric dispatch
+
+  @integration
   Scenario: The worker routes span recording to the trace pipeline
     Given the worker's installed modules over memory stores and a live event store
     When the worker process boots

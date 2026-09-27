@@ -17,24 +17,28 @@ import {
 } from "@langwatch/webhook-contract";
 
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
+import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
 import {
-  WebhookDestinationService,
+  describeDestination,
+  findUrlProblem,
+  isRoleArn,
+  sqsCredentialMode,
   type WebhookDestinationConfig,
   type WebhookUrlProblemCode,
-} from "../../services/webhook-destination.service.ts";
+} from "../../rules/webhook-destination.rules.ts";
 import {
-  WebhookEndpointConfiguration,
-  WebhookEndpointPolicyService,
+  assertValidDeliveryControls,
+  webhookEndpointConfiguration,
+  type WebhookEndpointConfiguration,
   WEBHOOK_AUTO_DISABLE_AFTER_MS,
   WEBHOOK_DISABLED_REASON_AUTO,
   WEBHOOK_DISABLED_REASON_MANUAL,
-} from "../../services/webhook-endpoint-policy.service.ts";
+} from "../../rules/webhook-endpoint-policy.rules.ts";
 import type { WebhookEndpointRepository } from "../webhook-endpoint.repository.ts";
 import { PrismaWebhookRetentionRepository } from "./prisma.webhook-retention.repository.ts";
 
 const logger = createLogger("langwatch:webhooks:endpoint-service");
 const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
-const destinations = WebhookDestinationService.create();
 
 /**
  * This surface's wording for each admission rule. The rule itself lives in the
@@ -171,12 +175,11 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
 
   static readonly tables = prismaTables("WebhookEndpoint", "WebhookEndpointDelivery");
   private readonly configuration: WebhookEndpointConfiguration;
-  private readonly policy = WebhookEndpointPolicyService.create();
   private readonly prisma: WebhookEndpointDatabase;
 
   private constructor(private readonly deps: WebhookEndpointDeps) {
     this.prisma = deps.prisma;
-    this.configuration = deps.configuration ?? WebhookEndpointConfiguration.create();
+    this.configuration = deps.configuration ?? webhookEndpointConfiguration();
   }
 
   static create(deps: WebhookEndpointDeps): PrismaWebhookEndpointRepository {
@@ -202,7 +205,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       this.deps.secrets,
     );
     PrismaWebhookEndpointRepository.assertValidEvents(params.enabledEvents);
-    this.policy.assertValidDeliveryControls(params);
+    assertValidDeliveryControls(params);
     const secret = PrismaWebhookEndpointRepository.newSecret();
     const data: Prisma.WebhookEndpointUncheckedCreateInput = {
       id: this.deps.ids.newEndpointId(),
@@ -271,7 +274,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
         : {};
     if (params.enabledEvents !== undefined)
       PrismaWebhookEndpointRepository.assertValidEvents(params.enabledEvents);
-    this.policy.assertValidDeliveryControls(params);
+    assertValidDeliveryControls(params);
     const data: Prisma.WebhookEndpointUncheckedUpdateInput = { ...sqsUpdate };
     if (params.url !== undefined) data.url = params.url;
     if (params.enabledEvents !== undefined) {
@@ -704,7 +707,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       await this.deps.notifyAutoDisabled?.({
         organizationId,
         endpointId: endpoint.id,
-        destination: this.policy.describeDestination(endpoint),
+        destination: describeDestination(endpoint),
         failingSince: fromDate(failingSince),
       });
     } catch (error) {
@@ -847,7 +850,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     // an endpoint that can deliver. Operator opt-in for local development and
     // internal receivers relaxes the origin here exactly as it relaxes the
     // local-address fence on the send.
-    const problem = destinations.findUrlProblem(url, configuration.allowInsecureLocalUrls);
+    const problem = findUrlProblem(url, configuration.allowInsecureLocalUrls);
     if (problem) {
       throw new WebhookEndpointValidationError(URL_PROBLEM_MESSAGES[problem]);
     }
@@ -856,7 +859,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
   /** Where an endpoint delivers, in one line, for a log or a notification. */
   private static toSqsView(endpoint: WebhookEndpoint): SqsDestinationView | null {
     if (endpoint.destinationKind !== "sqs" || !endpoint.sqsQueueUrl) return null;
-    const parsed = destinations.findSqsQueueUrl(endpoint.sqsQueueUrl);
+    const parsed = parseSqsQueueUrl(endpoint.sqsQueueUrl);
     return {
       queueUrl: endpoint.sqsQueueUrl,
       // Every stored queue URL passed admission, so the parse succeeds. The
@@ -865,7 +868,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       region: parsed?.region ?? "",
       accountId: parsed?.accountId ?? "",
       queueName: parsed?.queueName ?? "",
-      credentialMode: destinations.sqsCredentialMode({
+      credentialMode: sqsCredentialMode({
         roleArn: endpoint.sqsRoleArn,
         accessKeyId: endpoint.sqsAccessKeyId,
       }),
@@ -887,7 +890,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     sqs: SqsDestinationInput,
     configuration: WebhookEndpointConfiguration,
   ): void {
-    const inspection = destinations.inspectSqsQueueUrl(sqs.queueUrl);
+    const inspection = inspectSqsQueueUrl(sqs.queueUrl);
     if (!inspection.ok) {
       throw new WebhookEndpointValidationError(
         inspection.problem === "fifo"
@@ -896,7 +899,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       );
     }
 
-    if (sqs.roleArn && !destinations.isRoleArn(sqs.roleArn)) {
+    if (sqs.roleArn && !isRoleArn(sqs.roleArn)) {
       throw new WebhookEndpointValidationError(
         "sqs.role_arn must be an IAM role ARN, like arn:aws:iam::<account id>:role/<role name>",
       );
@@ -915,7 +918,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       );
     }
 
-    const mode = destinations.sqsCredentialMode({
+    const mode = sqsCredentialMode({
       roleArn: sqs.roleArn,
       accessKeyId: sqs.accessKeyId,
     });

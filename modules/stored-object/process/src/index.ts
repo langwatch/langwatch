@@ -1,18 +1,18 @@
 export { storedObjectServer } from "./stored-object.server.ts";
-export { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
-export { StoredObjectStorageRuntimeAdapter } from "./services/stored-object-storage-runtime.service.ts";
-export { AbsentPayloadStagingAdapter } from "./services/absent-payload-staging.service.ts";
+export { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
+export { StoredObjectStorageRuntimeService } from "./services/stored-object-storage-runtime.service.ts";
+export { AbsentPayloadStagingService } from "./services/absent-payload-staging.service.ts";
 
 // Restored: these names have consumers outside this module.
 export {
-  StoredObjectDestinationPolicyAdapter,
+  StoredObjectDestinationPolicyService,
   StoredObjectAzureDestination,
   StoredObjectProjectS3Config,
   type StoredObjectStorageSelection,
 } from "./services/stored-object-destination-policy.service.ts";
-export type { StoredObjectStorageDriver } from "./repositories/stored-object-blob.repository.ts";
+export type { StoredObjectBlobRepository } from "./repositories/stored-object-blob.repository.ts";
 export {
-  AzureBlobCredentialsAdapter,
+  AzureBlobCredentialsService,
   type AzureBlobCredentialsConfig,
   type AzureInjectedIdentity,
 } from "./services/azure-blob-credentials.service.ts";
@@ -32,15 +32,15 @@ export {
   parseMigrationTaskConfig,
 } from "./tasks/object-storage-migrate.task.ts";
 export {
-  ObjectStorageMigrationInventory,
+  ObjectStorageMigrationInventoryRepository,
   type MigrationDataset,
   type MigrationPageRequest,
   type MigrationProject,
 } from "./repositories/object-storage-migration-inventory.repository.ts";
 export { MigrationBlobS3Repository } from "#repositories/s3/s3.object-storage-migration-blob.repository";
-export { PayloadStaging } from "./repositories/payload-staging.repository.ts";
+export { PayloadStagingRepository } from "./repositories/payload-staging.repository.ts";
 export {
   PayloadStagingS3TargetRepository,
-  S3PayloadStagingAdapter,
+  S3PayloadStagingRepository,
   type PayloadStagingS3Target,
 } from "#repositories/s3/s3.payload-staging.repository";

@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * @integration
  * Verifies that filters encounter stale trace versions before version dedup collapses them.
  */
-import { FACET_REGISTRY } from "../../../rules/trace-facet-registry.rules.ts";
+import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
 import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {

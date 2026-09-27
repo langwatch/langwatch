@@ -160,12 +160,12 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     EventUtils.validateTenantId({ tenantId }, "TraceAnalyticsClickHouseRepository.upsertBatch");
     for (const { row } of entries) {
       if (row.tenantId !== tenantId) {
-        throw new SecurityError(
-          "TraceAnalyticsClickHouseRepository.upsertBatch",
-          "all rows in a single batch must share the same tenantId",
+        throw new SecurityError({
+          operation: "TraceAnalyticsClickHouseRepository.upsertBatch",
+          message: "all rows in a single batch must share the same tenantId",
           tenantId,
-          { mismatchedTenantId: row.tenantId },
-        );
+          context: { mismatchedTenantId: row.tenantId },
+        });
       }
     }
 

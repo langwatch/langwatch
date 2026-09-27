@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
-import type { DatasetMigrationRepository } from "#repositories/dataset-migration.repository";
+import type { DatasetMigrationService } from "#services/dataset-migration.service";
 
 const logger = createLogger("langwatch:tasks:backfill-dataset-content-to-object-storage");
 
@@ -38,7 +38,7 @@ export class DatasetContentBackfillSweep {
 }
 
 /** What the sweep needs of the migration repository, and nothing more. */
-export type DatasetContentMigration = Pick<DatasetMigrationRepository, "run">;
+export type DatasetContentMigration = Pick<DatasetMigrationService, "run">;
 
 /**
  * The task-launcher entry — `pnpm --filter @langwatch/tasks task dataset-content-backfill`.

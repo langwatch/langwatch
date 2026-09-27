@@ -183,12 +183,12 @@ export class LangyConversationReadService {
       return { events: [], cursor: after, truncated: false };
     }
 
-    const all = await this.deps.events.getEventsOccurredSince(
-      conversationId,
-      { tenantId: createTenantId(projectId) },
-      "langy_conversation",
-      Math.max(0, after.acceptedAt - REHYDRATION_WINDOW_MS),
-    );
+    const all = await this.deps.events.getEventsOccurredSince({
+      aggregateId: conversationId,
+      context: { tenantId: createTenantId(projectId) },
+      aggregateType: "langy_conversation",
+      occurredAtFromMs: Math.max(0, after.acceptedAt - REHYDRATION_WINDOW_MS),
+    });
 
     const turnTypes: readonly string[] = LANGY_CONVERSATION_TURN_EVENT_TYPES;
     const tail = all.filter(
@@ -251,12 +251,12 @@ export class LangyConversationReadService {
       return { waits: [], workspaceConnected: false };
     }
 
-    const all = await this.deps.events.getEventsOccurredSince(
-      conversationId,
-      { tenantId: createTenantId(projectId) },
-      "langy_conversation",
-      0,
-    );
+    const all = await this.deps.events.getEventsOccurredSince({
+      aggregateId: conversationId,
+      context: { tenantId: createTenantId(projectId) },
+      aggregateType: "langy_conversation",
+      occurredAtFromMs: 0,
+    });
 
     return {
       waits: recordWaitsOf(foldWaitTurns(all)),

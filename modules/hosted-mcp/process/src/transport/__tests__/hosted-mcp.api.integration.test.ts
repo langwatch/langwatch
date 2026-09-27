@@ -19,9 +19,9 @@ import {
   vi,
 } from "vitest";
 
-import type { McpLiveProjectLookup } from "../../app/hosted-mcp-members.ts";
+import { HostedMcpApp } from "../../app/hosted-mcp.app.ts";
+import type { McpLiveProjectLookup } from "../../app/hosted-mcp.members.ts";
 import {
-  createMcpHandler,
   HeaderMcpClientAddressService,
   McpApiKeyCipher,
   McpProjectLookup,
@@ -333,53 +333,54 @@ async function sendRequest({
 // Test suite
 // ---------------------------------------------------------------------------
 
+// One server for every group below; the groups only keep each callback small.
+let server: Server;
+let handler: McpHandler;
+
+beforeAll(async () => {
+  handler = HostedMcpApp.fromDependencies({
+    redis: redisDouble(mockRedis),
+    projects: new FakeProjectLookup(),
+    grants: sessionGrant,
+    cipher: new ReversibleTestCipher(),
+    address: HeaderMcpClientAddressService.create(),
+    baseHost: "https://app.langwatch.ai",
+  }).createHandler();
+
+  server = createServer((req, res) => {
+    handler.handleRequest(req, res);
+  });
+
+  await new Promise<void>((done) => {
+    server.listen(0, "127.0.0.1", done);
+  });
+});
+
+afterAll(async () => {
+  await handler.closeAllSessions();
+  await new Promise<void>((done) => {
+    server.close(() => done());
+  });
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockRedis.get.mockImplementation((key: string) => redisGetWithRegisteredClient(key));
+  mockRedis.call.mockResolvedValue(null);
+  mockRedis.set.mockResolvedValue("OK");
+  mockRedis.del.mockResolvedValue(1);
+  mockRedis.expire.mockResolvedValue(1);
+  mockRedis.sadd.mockResolvedValue(1);
+  mockRedis.srem.mockResolvedValue(1);
+  mockRedis.smembers.mockResolvedValue([]);
+  mockRedis.exists.mockResolvedValue(0);
+  sessionGrant.granted = true;
+  sessionGrant.asked.length = 0;
+});
+
+// --- Route Mounting ---
+
 describe("Feature: MCP HTTP Server In-App Integration", () => {
-  let server: Server;
-  let handler: McpHandler;
-
-  beforeAll(async () => {
-    handler = createMcpHandler({
-      redis: redisDouble(mockRedis),
-      projects: new FakeProjectLookup(),
-      grants: sessionGrant,
-      cipher: new ReversibleTestCipher(),
-      address: HeaderMcpClientAddressService.create(),
-      baseHost: "https://app.langwatch.ai",
-    });
-
-    server = createServer((req, res) => {
-      handler.handleRequest(req, res);
-    });
-
-    await new Promise<void>((done) => {
-      server.listen(0, "127.0.0.1", done);
-    });
-  });
-
-  afterAll(async () => {
-    await handler.closeAllSessions();
-    await new Promise<void>((done) => {
-      server.close(() => done());
-    });
-  });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockRedis.get.mockImplementation((key: string) => redisGetWithRegisteredClient(key));
-    mockRedis.call.mockResolvedValue(null);
-    mockRedis.set.mockResolvedValue("OK");
-    mockRedis.del.mockResolvedValue(1);
-    mockRedis.expire.mockResolvedValue(1);
-    mockRedis.sadd.mockResolvedValue(1);
-    mockRedis.srem.mockResolvedValue(1);
-    mockRedis.smembers.mockResolvedValue([]);
-    mockRedis.exists.mockResolvedValue(0);
-    sessionGrant.granted = true;
-    sessionGrant.asked.length = 0;
-  });
-
-  // --- Route Mounting ---
-
   describe("when Streamable HTTP transport is accessed at /mcp", () => {
     it("responds with 200 and mcp-session-id header", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
@@ -498,7 +499,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(mockRedis.call).toHaveBeenCalledWith("GETDEL", `mcp:auth_code:${code}`);
     });
   });
+});
 
+describe("Feature: MCP HTTP Server In-App Integration", () => {
   describe("when two clients redeem the same authorization code concurrently", () => {
     it("issues one token and rejects the spent exchange", async () => {
       const code = randomUUID();
@@ -641,7 +644,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(body.error).toBe("invalid_grant");
     });
   });
+});
 
+describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Security: redirect_uri / client_id binding (RFC 6749 §10.6, §4.1.3), and dynamic client
   // registration persistence (RFC 7591) --- /mcp/authorize binds an issued code to the exact
   // client_id + redirect_uri it validated (see mcp-authorize.rolebinding.unit.test.ts for the
@@ -948,7 +953,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
     });
   });
+});
 
+describe("Feature: MCP HTTP Server In-App Integration", () => {
   describe("when a direct API key is used as Bearer token", () => {
     it("validates against the database and accepts the connection", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
@@ -1027,7 +1034,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   // --- Grant re-validation (specs/security/hosted-mcp-grant-fidelity.feature) ---
+});
 
+describe("Feature: MCP HTTP Server In-App Integration", () => {
   describe("given an OAuth bearer minted through the approval flow for a person", () => {
     async function mintBearer(): Promise<string> {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
@@ -1250,7 +1259,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   // --- CORS ---
+});
 
+describe("Feature: MCP HTTP Server In-App Integration", () => {
   describe("when a request to /mcp includes an Origin header", () => {
     it("includes CORS headers in the response", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
@@ -1464,11 +1475,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     it("does not import any main app modules", async () => {
       // The mcp-server package's create-mcp-server.ts should not import
       // from the main app (~/server/db, ~/server/app-layer, etc.)
-      const mcpServerDir = resolve(
-        import.meta.dirname,
-        "../../../../../..",
-        "mcp/typescript/src",
-      );
+      const mcpServerDir = resolve(import.meta.dirname, "../../../../../..", "mcp/typescript/src");
       const createMcpServerSrc = readFileSync(join(mcpServerDir, "create-mcp-server.ts"), "utf-8");
       // Should not import from the main app
       expect(createMcpServerSrc).not.toContain("~/server/");
@@ -1478,7 +1485,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   // --- Tool Availability ---
+});
 
+describe("Feature: MCP HTTP Server In-App Integration", () => {
   describe("when a client lists available tools via /mcp", () => {
     it("includes observability, platform, and documentation tools", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());

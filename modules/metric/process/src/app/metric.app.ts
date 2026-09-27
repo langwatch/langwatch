@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -16,6 +17,7 @@ import {
 import type { OtlpDoorRequest } from "@langwatch/otlp";
 import { TraceApi } from "@langwatch/trace-contract";
 
+import { createCodingAgentMetricFactsDispatchSubscriber } from "../eventing/coding-agent-metric-facts-dispatch.subscriber.ts";
 import {
   ClickHouseMetricDataPointAppendRepository,
   createMetricClickHouseResolver,
@@ -38,6 +40,7 @@ export type MetricInfrastructure = Readonly<{
 type MetricDependencies = Readonly<{
   dataPrivacy: typeof DataPrivacyApi;
   traces: typeof TraceApi;
+  codingAgents: typeof CodingAgentApi;
 }>;
 type MetricSetup = FeatureSetup<MetricDependencies, MetricInfrastructure, MetricServerConfig>;
 
@@ -48,6 +51,8 @@ export class MetricApp implements MetricApiContract {
   static readonly dependencies: MetricDependencies = {
     dataPrivacy: DataPrivacyApi,
     traces: TraceApi,
+    /** Lifts a received point's session facts onto its own pipeline. */
+    codingAgents: CodingAgentApi,
   };
   /** The run this module's durable processing needs, over ClickHouse only. */
   static readonly reads = ["clickhouse"] as const;
@@ -76,6 +81,9 @@ export class MetricApp implements MetricApiContract {
       }),
       defaultRetentionDays: METRIC_DEFAULT_RETENTION_DAYS,
       metricCommandShardCount: resolveMetricCommandShardCount(config.processingShards),
+      subscribers: [
+        createCodingAgentMetricFactsDispatchSubscriber({ codingAgents: dependencies.codingAgents }),
+      ],
     }).build();
     const service = MetricService.create({ preparation });
     const app: MetricApp = new MetricApp(

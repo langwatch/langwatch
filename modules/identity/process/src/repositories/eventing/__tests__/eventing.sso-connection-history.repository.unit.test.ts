@@ -89,7 +89,10 @@ function repositoryOver(eventsByTenant: Record<string, SsoConnectionEvent[]>): {
   // A real store filters by BOTH the tenant and the aggregate id; so does
   // this one, or a connection id belonging to nobody in this tenant would
   // "find" another connection's events purely by sharing a bucket.
-  const getEvents: EventStore<SsoConnectionEvent>["getEvents"] = async (aggregateId, context) => {
+  const getEvents: EventStore<SsoConnectionEvent>["getEvents"] = async ({
+    aggregateId,
+    context,
+  }) => {
     requestedTenants.push(context.tenantId);
     return (eventsByTenant[context.tenantId] ?? []).filter(
       (event) => event.aggregateId === aggregateId,

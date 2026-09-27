@@ -16,7 +16,7 @@ import type { EvaluationRunFloorLookup } from "../evaluation.repository.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseResolver,
-} from "./evaluation-clickhouse-client.ts";
+} from "./clickhouse.evaluation-session.store.ts";
 import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repository.ts";
 
 const TABLE_NAME = "evaluation_runs" as const;

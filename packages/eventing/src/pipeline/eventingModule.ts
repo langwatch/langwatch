@@ -5,6 +5,7 @@
  */
 import type { FeatureEventing, FeatureEventingSetup } from "@langwatch/kernel";
 
+import type { Event, Projection } from "../domain/types.ts";
 import type { ProcessStore } from "../process-manager/stores/processStore.types.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";
 import type { EventSourcedQueueProcessor } from "./../queues/queue.types.ts";
@@ -72,10 +73,16 @@ export interface EventingModule<Repositories, App, Definition> extends FeatureEv
 export function defineEventingModule<
   Repositories,
   App,
-  const Definition extends StaticPipelineDefinition<any, any, any>,
+  EventType extends Event,
+  Projections extends Record<string, Projection>,
+  Commands extends RegisteredCommand,
 >(
-  declaration: EventingModule<Repositories, App, Definition>,
-): EventingModule<Repositories, App, Definition> {
+  declaration: EventingModule<
+    Repositories,
+    App,
+    StaticPipelineDefinition<EventType, Projections, Commands>
+  >,
+): EventingModule<Repositories, App, StaticPipelineDefinition<EventType, Projections, Commands>> {
   const pipeline = declaration.pipeline.trim();
   if (!pipeline) {
     throw new ConfigurationError(
@@ -95,7 +102,9 @@ export function defineEventingModule<
           connect: (bound: Readonly<{ app: App; commands: Readonly<Record<string, unknown>> }>) =>
             connect({
               app: bound.app,
-              commands: bound.commands as EventingCommands<Definition>,
+              commands: bound.commands as EventingCommands<
+                StaticPipelineDefinition<EventType, Projections, Commands>
+              >,
             }),
         }
       : {}),

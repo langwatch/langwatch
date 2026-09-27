@@ -7,7 +7,6 @@ import { defineTrpcRouter } from "@langwatch/api/trpc";
 import {
   GatewayApi,
   gatewayCacheRuleTrpc,
-  GatewayCacheRuleNotFoundError,
   type GatewayCacheRuleResource,
 } from "@langwatch/gateway-contract";
 
@@ -59,10 +58,7 @@ export const gatewayCacheRuleTrpcTransport = defineTrpcRouter(GatewayApi, gatewa
   .withPermission("gatewayCacheRules:view")
   .handle(async ({ app, input }) => {
     await app.assertOrganizationExists(input.organizationId);
-    const row = await app.findCacheRule({ id: input.id, organizationId: input.organizationId });
-    if (!row) throw new GatewayCacheRuleNotFoundError();
-
-    return toDto(row);
+    return toDto(await app.getCacheRule({ id: input.id, organizationId: input.organizationId }));
   })
 
   .procedure("create")

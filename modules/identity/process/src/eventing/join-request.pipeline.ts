@@ -110,31 +110,31 @@ export function defineJoinRequestPipeline(deps: JoinRequestPipelineDeps): JoinRe
         store: deps.joinRequestProjectionStore,
       }),
     )
-    .withCommandInstance(
-      "requestJoin",
-      RequestJoinCommand,
-      new RequestJoinCommand(deps.joinRequestGuards),
-    )
-    .withCommandInstance(
-      "approveJoin",
-      ApproveJoinCommand,
-      new ApproveJoinCommand(deps.joinRequestGuards),
-    )
-    .withCommandInstance(
-      "rejectJoin",
-      RejectJoinCommand,
-      new RejectJoinCommand(deps.joinRequestGuards),
-    )
-    .withCommandInstance(
-      "withdrawJoin",
-      WithdrawJoinCommand,
-      new WithdrawJoinCommand(deps.joinRequestGuards),
-    )
-    .withCommandInstance(
-      "expireJoin",
-      ExpireJoinCommand,
-      new ExpireJoinCommand(deps.joinRequestGuards),
-    );
+    .withCommandInstance({
+      name: "requestJoin",
+      handlerClass: RequestJoinCommand,
+      instance: new RequestJoinCommand(deps.joinRequestGuards),
+    })
+    .withCommandInstance({
+      name: "approveJoin",
+      handlerClass: ApproveJoinCommand,
+      instance: new ApproveJoinCommand(deps.joinRequestGuards),
+    })
+    .withCommandInstance({
+      name: "rejectJoin",
+      handlerClass: RejectJoinCommand,
+      instance: new RejectJoinCommand(deps.joinRequestGuards),
+    })
+    .withCommandInstance({
+      name: "withdrawJoin",
+      handlerClass: WithdrawJoinCommand,
+      instance: new WithdrawJoinCommand(deps.joinRequestGuards),
+    })
+    .withCommandInstance({
+      name: "expireJoin",
+      handlerClass: ExpireJoinCommand,
+      instance: new ExpireJoinCommand(deps.joinRequestGuards),
+    });
 
   return builder
     .withProcessManager(JOIN_REQUEST_LIFECYCLE_PROCESS_NAME, (pm) =>

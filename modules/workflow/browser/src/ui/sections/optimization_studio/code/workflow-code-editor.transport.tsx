@@ -39,7 +39,7 @@ function useEditorTransport() {
     { enabled: Boolean(project?.id) },
   );
   const secretNames = useMemo(
-    () => (secrets.data ?? []).map((secret: any) => secret.name),
+    () => (secrets.data ?? []).map((secret) => secret.name),
     [secrets.data],
   );
 

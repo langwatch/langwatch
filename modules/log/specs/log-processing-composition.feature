@@ -37,6 +37,13 @@ Feature: Composing durable log processing
     Then the pipeline mounts its coding-agent dispatch subscriber
     And nothing is reported at boot about a missing Coding Agent pipeline
 
+  @unit
+  Scenario: Each received log record is forwarded to coding-agent once per record
+    Given the coding-agent dispatch on the log pipeline
+    When the same received log record is delivered twice
+    Then each delivery forwards the record to coding-agent unchanged
+    And both deliveries share one deduplication identity, apart from any other record
+
   @integration
   Scenario: The api process serves every OTLP signal at its own module's door
     Given the api process installed over memory stores

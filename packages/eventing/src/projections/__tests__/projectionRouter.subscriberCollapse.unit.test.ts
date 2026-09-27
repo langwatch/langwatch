@@ -74,11 +74,11 @@ describe("ProjectionRouter subscriber dispatch over a coalesced batch", () => {
       getProjectionSubscriberQueue: vi.fn().mockReturnValue({ send }),
     });
 
-    const router = new ProjectionRouter<Event>(
-      TEST_CONSTANTS.AGGREGATE_TYPE,
-      TEST_CONSTANTS.PIPELINE_NAME,
+    const router = new ProjectionRouter<Event>({
+      aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+      pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       queueManager,
-    );
+    });
 
     const store = createMockFoldProjectionStore<{ count: number }>();
     (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
@@ -92,12 +92,9 @@ describe("ProjectionRouter subscriber dispatch over a coalesced batch", () => {
     router.registerSubscriber("counter", subscriber);
     router.initializeFoldQueues();
 
-    const initialize = queueManager.initializeProjectionQueues as ReturnType<typeof vi.fn>;
-    const onEventBatch = initialize.mock.calls[0]?.[2] as (
-      projectionName: string,
-      events: Event[],
-      context: unknown,
-    ) => Promise<void>;
+    const [request] = vi.mocked(queueManager.initializeProjectionQueues).mock.calls[0] ?? [];
+    const onEventBatch = request?.onEventBatch;
+    if (!onEventBatch) throw new Error("the router registered no batch callback");
 
     await onEventBatch("counter", events, { tenantId });
 

@@ -1,5 +1,6 @@
 import { CLI_LOGIN_KEY_NAME_PREFIX, HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
 
+import { clauseField, isClause } from "./clause-field.ts";
 import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
 
 /**
@@ -34,14 +35,6 @@ const READ_ACTIONS = new Set([
   "aggregate",
   "groupBy",
 ]);
-
-/**
- * Read one top-level key off a WHERE clause of unknown shape. The clause comes
- * off `Prisma.MiddlewareParams["args"]`, so it is genuinely untyped input and
- * every bound below has to narrow before it reads.
- */
-const clauseField = (clause: unknown, key: string): unknown =>
-  clause && typeof clause === "object" ? (clause as Record<string, unknown>)[key] : undefined;
 
 /**
  * A reserved, system-managed key name. `ApiKeyService.create` refuses any
@@ -447,10 +440,10 @@ const validateRecursive = (where: unknown, passes: (clause: unknown) => boolean)
 };
 
 function assertCreateOrganizationId(params: GuardParams, model: string): void {
-  const data = params.args?.data;
-  const records = Array.isArray(data) ? data : [data];
+  const data = clauseField(params.args, "data");
+  const records: unknown[] = Array.isArray(data) ? data : [data];
   const everyRecordHasOrg = records.every(
-    (record) => record && typeof record.organizationId === "string",
+    (record) => typeof clauseField(record, "organizationId") === "string",
   );
   if (!everyRecordHasOrg) {
     throw new Error(
@@ -460,8 +453,8 @@ function assertCreateOrganizationId(params: GuardParams, model: string): void {
 }
 
 function assertWhereObject(params: GuardParams, model: string): Record<string, unknown> {
-  const where = params.args?.where;
-  if (where && typeof where === "object") return where;
+  const where = clauseField(params.args, "where");
+  if (isClause(where)) return where;
 
   throw new Error(
     `The ${params.action} action on the ${model} model requires an 'organizationId' or row id in the where clause`,
@@ -503,8 +496,8 @@ function assertOrganizationPredicate({
 function assertUpsertCreateOrganizationId(params: GuardParams, model: string): void {
   if (params.action !== "upsert") return;
 
-  const createData = params.args?.create;
-  if (!createData || typeof createData.organizationId !== "string") {
+  const createData = clauseField(params.args, "create");
+  if (typeof clauseField(createData, "organizationId") !== "string") {
     throw new Error(
       `The upsert action on the ${model} model requires an 'organizationId' in the create payload`,
     );

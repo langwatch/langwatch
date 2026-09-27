@@ -7,3 +7,4 @@ export {
 } from "./model/evaluation-results.ts";
 export * from "./ui/elements/evaluator-result-chip.tsx";
 export * from "./model/evaluation-status.ts";
+export * from "./model/custom-evaluator-catalogue.ts";

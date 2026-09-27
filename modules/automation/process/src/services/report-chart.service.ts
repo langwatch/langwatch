@@ -92,25 +92,24 @@ async function mapWithConcurrency<T, R>(
 
 /** The report's chart panels: what each graph in a source renders for one window. */
 export class ReportChartService {
-  static create(): ReportChartService {
-    return new ReportChartService();
+  static create(deps: ReportChartDeps): ReportChartService {
+    return new ReportChartService(deps);
   }
 
-  private constructor() {}
+  private constructor(private readonly deps: ReportChartDeps) {}
 
-  static async loadReportCharts({
-    deps,
+  async loadReportCharts({
     source,
     projectId,
     from,
     to,
   }: {
-    deps: ReportChartDeps;
     source: ReportSource;
     projectId: string;
     from: number;
     to: number;
   }): Promise<ReportChart[]> {
+    const deps = this.deps;
     const graphs = await loadGraphs({ deps, source, projectId });
 
     // Panels are independent queries, so overlap them rather than paying eight

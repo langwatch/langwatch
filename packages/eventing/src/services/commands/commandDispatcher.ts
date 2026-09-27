@@ -55,32 +55,30 @@ export interface ProcessCommandParams<
  */
 function validateHandlerEvents(events: unknown, commandType: CommandType): void {
   if (!events) {
-    throw new ValidationError(
-      `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
-      "events",
-      void 0,
-      { commandType },
-    );
+    throw new ValidationError({
+      reason: `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
+      field: "events",
+      value: void 0,
+      context: { commandType },
+    });
   }
 
   if (!Array.isArray(events)) {
-    throw new ValidationError(
-      `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
-      "events",
-      undefined,
-      { commandType },
-    );
+    throw new ValidationError({
+      reason: `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
+      field: "events",
+      context: { commandType },
+    });
   }
 
   for (let i = 0; i < events.length; i++) {
     const event = events[i];
     if (!event) {
-      throw new ValidationError(
-        `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
-        "events",
-        undefined,
-        { commandType, index: i },
-      );
+      throw new ValidationError({
+        reason: `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
+        field: "events",
+        context: { commandType, index: i },
+      });
     }
 
     if (!EventUtils.isValidEvent(event)) {
@@ -92,17 +90,16 @@ function validateHandlerEvents(events: unknown, commandType: CommandType): void 
               .join(", ")}`
           : "Unknown validation error";
 
-      throw new ValidationError(
-        `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}.`,
-        "events",
-        undefined,
-        {
+      throw new ValidationError({
+        reason: `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}.`,
+        field: "events",
+        context: {
           commandType,
           index: i,
           zodIssues:
             parseResult.success === false ? mapValidationIssues(parseResult.error.issues) : void 0,
         },
-      );
+      });
     }
   }
 }
@@ -253,12 +250,11 @@ function resolveBatchTenantId(args: {
   const tenantId = createTenantId(String(validatedPayloads[0]!.tenantId));
   for (const validated of validatedPayloads) {
     if (createTenantId(String(validated.tenantId)) !== tenantId) {
-      throw new ValidationError(
-        `Coalesced batch for command type "${commandType}" mixes tenants. All payloads in one group share a tenant.`,
-        "tenantId",
-        undefined,
-        { commandType },
-      );
+      throw new ValidationError({
+        reason: `Coalesced batch for command type "${commandType}" mixes tenants. All payloads in one group share a tenant.`,
+        field: "tenantId",
+        context: { commandType },
+      });
     }
   }
   return tenantId;

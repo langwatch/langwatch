@@ -63,7 +63,11 @@ import type {
 } from "./trace-query.contract.ts";
 import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
 import type { TraceRecord } from "./trace-record.ts";
-import type { TraceMetadataUpdate } from "./trace-rest.schemas.ts";
+import type {
+  TraceFacetsAnswer,
+  TraceFacetsQuery,
+  TraceMetadataUpdate,
+} from "./trace-rest.schemas.ts";
 import type {
   ScenarioRoleMetrics,
   ScenarioRoleMetricsInput,
@@ -92,6 +96,7 @@ import type {
   TraceDerivedEventsInput,
   TraceSummaryLookupInput,
 } from "./trace.queries.ts";
+import type { TracesConversationContext } from "./trace.responses.ts";
 import type { NormalizedSpan } from "./trace.spans.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 
@@ -231,6 +236,34 @@ export interface TraceApi extends TraceOtlpIngestApi {
     eventName: "trace_updated" | "discover_updated";
     signal?: AbortSignal;
   }): AsyncIterable<unknown>;
+  /** One conversation's turns, oldest first, through the viewer's protections. */
+  readConversationContextForViewer(input: {
+    projectId: string;
+    conversationId: string;
+    viewerUserId: string;
+  }): Promise<TracesConversationContext>;
+  /** One span's detail through the viewer's protections; refuses with `SpanNotFoundError`. */
+  readSpanDetailForViewer(input: {
+    projectId: string;
+    traceId: string;
+    spanId: string;
+    occurredAtMs?: number;
+    viewerUserId: string;
+  }): Promise<SpanDetail>;
+  /** `GET /api/traces/facets` for an API key: the discovery payload, or one field's paged values. */
+  readTraceFacetsForApiKey(input: {
+    projectId: string;
+    query: TraceFacetsQuery;
+    apiKeyId: string | null;
+    userId: string | null;
+  }): Promise<TraceFacetsAnswer>;
+  /** The discover vocabulary, or the facet counts under `query` when one is given. */
+  readDiscoverForQuery(input: {
+    projectId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    query?: string | null;
+    evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+  }): Promise<DiscoverResult>;
   /** Renames a trace after trimming; a name out of bounds refuses with `ValidationError`. */
   renameTrace(
     input: { projectId: string; traceId: string; newName: string },

@@ -146,12 +146,12 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
         spanNormalization: runtime.spanNormalization,
       }),
     )
-    .withCommandInstance(
-      "recordSpan",
-      EventingRecordSpanAdapter,
-      options.recordSpanCommand,
-      recordSpanOptions,
-    )
+    .withCommandInstance({
+      name: "recordSpan",
+      handlerClass: EventingRecordSpanAdapter,
+      instance: options.recordSpanCommand,
+      options: recordSpanOptions,
+    })
     .withCommand("assignTopic", EventingTraceTopicAdapter)
     .withCommand("recordLogContribution", commands.recordLogContributionCommand, {
       coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,

@@ -4,7 +4,6 @@ import {
   defineRestRouter,
   InternalServerError,
   MANAGEMENT_API_VERSION,
-  NotFoundError,
   projectRestFacts,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
@@ -306,13 +305,11 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .withOutput(datasetRestDetailResponseSchema)
       .withDocs({ description: "Get a dataset by its slug or id." })
       .handle(async ({ app, input, scope }, project) => {
-        const { dataset, records, truncated } = await app.getDatasetWithRecords({
+        const { dataset, records } = await app.getDatasetWithinLimit({
           slugOrId: input.slugOrId,
           projectId: scope.id,
           limitMb: MAX_LIMIT_MB,
         });
-
-        if (truncated) throw new BadRequestError(`Dataset size exceeds ${MAX_LIMIT_MB}MB limit`);
 
         return {
           id: dataset.id,
@@ -409,17 +406,13 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .withPermission("datasets:manage")
       .withOutput(datasetRestRecordsDeletedSchema)
       .withDocs({ description: "Delete records from a dataset by IDs" })
-      .handle(async ({ app, input, scope }) => {
-        const result = await app.deleteRecords({
+      .handle(async ({ app, input, scope }) =>
+        app.deleteMatchingRecords({
           slugOrId: input.slugOrId,
           projectId: scope.id,
           recordIds: input.recordIds,
-        });
-
-        if (result.count === 0) throw new NotFoundError("No matching records found");
-
-        return { deletedCount: result.count };
-      })
+        }),
+      )
       .build()
   );
 }

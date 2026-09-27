@@ -150,6 +150,7 @@ export const tracesConversationContextSchema = z.object({
   ),
   total: z.number(),
 });
+export type TracesConversationContext = z.infer<typeof tracesConversationContextSchema>;
 
 /** `changeName`: the trace and the name it now carries. */
 export const tracesChangedNameSchema = z.object({ traceId: z.string(), newName: z.string() });

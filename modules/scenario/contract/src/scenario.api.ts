@@ -91,6 +91,7 @@ import type {
   SimulationStreamFrame,
   SimulationSetData,
 } from "./simulation.ts";
+import type { VoiceMediaUpgrade } from "./voice/voice-media-upgrade.ts";
 import type {
   VoiceRecordingStream,
   VoiceRunAudioRequest,
@@ -382,6 +383,8 @@ export interface ScenarioApi {
   }): AsyncIterable<SimulationStreamFrame>;
   /** Registers one open browser tab, and hands back how to retire it. */
   startTabPresence(registration: ScenarioTabRegistration): Promise<ScenarioTabPresence>;
+  /** Hands one Twilio media upgrade to the scenario child that registered its nonce. */
+  acceptVoiceMediaUpgrade(upgrade: VoiceMediaUpgrade): void;
   /** One tab's live stream: its parked navigate first, then the project's frames. */
   watchSimulationUpdates(input: SimulationUpdateWatchInput): AsyncIterable<SimulationStreamFrame>;
 

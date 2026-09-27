@@ -4,10 +4,7 @@
  * the answer. @see specs/instant-evals/instant-eval-pipeline.feature
  */
 
-import type {
-  LangWatchQLExecuteInput,
-  LangWatchQLQueryResult,
-} from "@langwatch/analytics-contract";
+import type { LangWatchQLPassInput, LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantEvalKeyColumns } from "../../rules/instant-eval-composition.rules.ts";
@@ -35,11 +32,11 @@ function result(overrides: Partial<LangWatchQLQueryResult> = {}): LangWatchQLQue
 
 /** An Analytics peer that records what it was asked and answers one result. */
 class RecordingRunner implements InstantEvalStatementRunner {
-  readonly asked: LangWatchQLExecuteInput[] = [];
+  readonly asked: LangWatchQLPassInput[] = [];
 
   constructor(private readonly answer: LangWatchQLQueryResult) {}
 
-  async executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+  async executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> {
     this.asked.push(input);
     return this.answer;
   }
@@ -62,8 +59,9 @@ describe("given a statement a run is about to read", () => {
       const columns = await source.probe({ caller: CALLER, protections: PROTECTIONS, sql: SQL });
 
       expect(columns).toEqual([{ name: "TraceId", type: "String" }]);
-      expect(analytics.asked[0]?.sql).toContain("LIMIT 0");
-      expect(analytics.asked[0]?.project).toEqual(CALLER);
+      expect(analytics.asked).toEqual([
+        { project: CALLER, protections: PROTECTIONS, sql: SQL, pass: { kind: "probe" } },
+      ]);
     });
   });
 
@@ -168,10 +166,13 @@ describe("given a page of keys", () => {
         },
       ]);
       expect(page.hasMore).toBe(true);
-      expect(analytics.asked[0]?.parameters).toMatchObject({
-        instant_eval_after_trace_id: "t0",
-        instant_eval_after_span_id: "s0",
+      expect(analytics.asked[0]?.pass).toEqual({
+        kind: "keys",
+        keyColumns: ["ThreadId", "SpanId", "OccurredAt"],
+        limit: 2,
+        after: { traceId: "t0", spanId: "s0" },
       });
+      expect(analytics.asked[0]?.sql).toBe(SQL);
     });
   });
 
@@ -190,7 +191,12 @@ describe("given a page of keys", () => {
       });
 
       expect(keys).toEqual([{ traceId: "t1", threadId: "", spanId: "", occurredAt: null }]);
-      expect(analytics.asked[0]?.parameters).toMatchObject({ instant_eval_buckets: 100 });
+      expect(analytics.asked[0]?.pass).toEqual({
+        kind: "sample",
+        keyColumns: [],
+        limit: 50,
+        buckets: 100,
+      });
     });
   });
 });

@@ -5,6 +5,7 @@ import {
   type AnnotationScore as StoredAnnotationScore,
   type AnnotationWithUser as Annotation,
 } from "@langwatch/annotation-contract";
+import { fromDate, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 /**
@@ -158,7 +159,7 @@ function filterThreadTraces(
       for (const field of data.selectedFields!) {
         const traceMapping = TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
         if (traceMapping) {
-          filteredTrace[field] = traceMapping.mapping(threadTrace, "", "", {});
+          filteredTrace[field] = traceMapping.mapping({ trace: threadTrace, key: "", subkey: "" });
         } else {
           filteredTrace[field] = threadTrace[field as keyof TraceWithAnnotations];
         }
@@ -367,7 +368,6 @@ export function buildAnnotationRecord({
   const suggestion = oneLine(annotation.expectedOutput ?? "");
   const suggestionKey =
     suggestionLabel(annotation) === "suggested input" ? "suggested_input" : "expected_output";
-  const createdAt = new Date(annotation.createdAt as unknown as string | number | Date);
 
   return {
     author: readableAnnotationAuthor(annotation),
@@ -376,31 +376,80 @@ export function buildAnnotationRecord({
     ...(typeof annotation.isThumbsUp === "boolean" ? { is_thumbs_up: annotation.isThumbsUp } : {}),
     ...(Object.keys(scores).length > 0 ? { score: scores } : {}),
     ...(suggestion ? { [suggestionKey]: suggestion } : {}),
-    ...(Number.isNaN(createdAt.getTime()) ? {} : { created_at: createdAt.toISOString() }),
+    ...createdAtField(annotation.createdAt),
   };
+}
+
+/** One read of a trace mapping: the trace, the key and subkey the column picked, and context. */
+export type TraceMappingInput = {
+  trace: TraceWithAnnotations;
+  key: string;
+  subkey: string;
+  data?: {
+    annotationScoreOptions?: AnnotationScore[];
+    allTraces?: TraceWithAnnotations[];
+    selectedFields?: string[];
+  };
+};
+
+const looseRecordSchema = z.record(z.string(), z.unknown());
+const scoreOptionSchema = z.object({ value: z.unknown(), reason: z.unknown() }).partial();
+
+/** One score option's recorded value or reason, read off the annotation's options by name. */
+function scoreOptionField(input: {
+  scoreOptions: object;
+  subkey: string;
+  field: "value" | "reason";
+}): unknown {
+  const option = scoreOptionSchema.safeParse(
+    looseRecordSchema.parse(input.scoreOptions)[input.subkey],
+  );
+  return option.success ? option.data[input.field] : undefined;
+}
+
+/** An annotation's timestamp as `created_at` (ISO-8601, milliseconds); nothing when unreadable. */
+function createdAtField(value: unknown): { created_at?: string } {
+  try {
+    if (value instanceof Date) {
+      return { created_at: fromDate(value).toString({ fractionalSecondDigits: 3 }) };
+    }
+    if (typeof value === "number") {
+      const instant = Temporal.Instant.fromEpochMilliseconds(value);
+      return { created_at: instant.toString({ fractionalSecondDigits: 3 }) };
+    }
+    if (typeof value === "string") {
+      return { created_at: Temporal.Instant.from(value).toString({ fractionalSecondDigits: 3 }) };
+    }
+  } catch {
+    return {};
+  }
+  return {};
 }
 
 export const TRACE_MAPPINGS = {
   trace_id: {
-    mapping: (trace: TraceWithAnnotations) => trace.trace_id,
+    mapping: ({ trace }: TraceMappingInput) => trace.trace_id,
   },
   thread_id: {
-    mapping: (trace: TraceWithAnnotations) => trace.metadata?.thread_id ?? "",
+    mapping: ({ trace }: TraceMappingInput) => trace.metadata?.thread_id ?? "",
   },
   timestamp: {
-    mapping: (trace: TraceWithAnnotations) => new Date(trace.timestamps.started_at).toISOString(),
+    mapping: ({ trace }: TraceMappingInput) =>
+      Temporal.Instant.fromEpochMilliseconds(trace.timestamps.started_at).toString({
+        fractionalSecondDigits: 3,
+      }),
   },
   input: {
-    mapping: (trace: TraceWithAnnotations) => trace.input?.value ?? "",
+    mapping: ({ trace }: TraceMappingInput) => trace.input?.value ?? "",
   },
   output: {
-    mapping: (trace: TraceWithAnnotations) => trace.output?.value ?? "",
+    mapping: ({ trace }: TraceMappingInput) => trace.output?.value ?? "",
   },
   contexts: {
-    mapping: (trace: TraceWithAnnotations) => getRAGChunks(trace.spans ?? []),
+    mapping: ({ trace }: TraceMappingInput) => getRAGChunks(trace.spans ?? []),
   },
   "contexts.string_list": {
-    mapping: (trace: TraceWithAnnotations) => {
+    mapping: ({ trace }: TraceMappingInput) => {
       try {
         return getRAGInfo(trace.spans ?? []).contexts ?? [];
       } catch {
@@ -409,22 +458,22 @@ export const TRACE_MAPPINGS = {
     },
   },
   "metrics.total_cost": {
-    mapping: (trace: TraceWithAnnotations) => trace.metrics?.total_cost ?? 0,
+    mapping: ({ trace }: TraceMappingInput) => trace.metrics?.total_cost ?? 0,
   },
   "metrics.first_token_ms": {
-    mapping: (trace: TraceWithAnnotations) => trace.metrics?.first_token_ms ?? 0,
+    mapping: ({ trace }: TraceMappingInput) => trace.metrics?.first_token_ms ?? 0,
   },
   "metrics.total_time_ms": {
-    mapping: (trace: TraceWithAnnotations) => trace.metrics?.total_time_ms ?? 0,
+    mapping: ({ trace }: TraceMappingInput) => trace.metrics?.total_time_ms ?? 0,
   },
   "metrics.prompt_tokens": {
-    mapping: (trace: TraceWithAnnotations) => trace.metrics?.prompt_tokens ?? 0,
+    mapping: ({ trace }: TraceMappingInput) => trace.metrics?.prompt_tokens ?? 0,
   },
   "metrics.completion_tokens": {
-    mapping: (trace: TraceWithAnnotations) => trace.metrics?.completion_tokens ?? 0,
+    mapping: ({ trace }: TraceMappingInput) => trace.metrics?.completion_tokens ?? 0,
   },
   "metrics.total_tokens": {
-    mapping: (trace: TraceWithAnnotations) =>
+    mapping: ({ trace }: TraceMappingInput) =>
       (trace.metrics?.prompt_tokens ?? 0) + (trace.metrics?.completion_tokens ?? 0),
   },
   spans: {
@@ -451,7 +500,7 @@ export const TRACE_MAPPINGS = {
           label: propKey,
         }));
     },
-    mapping: (trace: TraceWithAnnotations, key: string, subkey: string) => {
+    mapping: ({ trace, key, subkey }: TraceMappingInput) => {
       const traceSpans = esSpansToDatasetSpans(trace.spans ?? []);
       if (!key) {
         return traceSpans;
@@ -465,17 +514,17 @@ export const TRACE_MAPPINGS = {
       if (!subkey || subkey === "*") {
         return filteredSpans;
       }
-      return filteredSpans.map((span) => span[subkey as keyof DatasetSpan]);
+      return filteredSpans.map((span) => looseRecordSchema.parse(span)[subkey]);
     },
     expandable_by: "spans.all.span_id",
   },
   "spans.llm.input": {
-    mapping: (trace: TraceWithAnnotations) =>
+    mapping: ({ trace }: TraceMappingInput) =>
       trace.spans?.filter((span) => span.type === "llm")?.map((span) => span.input?.value) ?? [],
     expandable_by: "spans.llm.span_id",
   },
   "spans.llm.output": {
-    mapping: (trace: TraceWithAnnotations) =>
+    mapping: ({ trace }: TraceMappingInput) =>
       trace.spans?.filter((span) => span.type === "llm")?.map((span) => span.output?.value) ?? [],
     expandable_by: "spans.llm.span_id",
   },
@@ -498,12 +547,12 @@ export const TRACE_MAPPINGS = {
         label: reservedKeys.includes(key) ? `${key}` : key,
       }));
     },
-    mapping: (trace: TraceWithAnnotations, key: string) => {
+    mapping: ({ trace, key }: TraceMappingInput) => {
       // Handle * as wildcard - return full metadata object
       if (key === "*") {
         return trace.metadata;
       }
-      return key ? (trace.metadata?.[key] as any) : JSON.stringify(trace.metadata);
+      return key ? trace.metadata?.[key] : JSON.stringify(trace.metadata);
     },
   },
   evaluations: {
@@ -535,7 +584,7 @@ export const TRACE_MAPPINGS = {
           label: propKey,
         }));
     },
-    mapping: (trace: TraceWithAnnotations, key: string, subkey: string) => {
+    mapping: ({ trace, key, subkey }: TraceMappingInput) => {
       if (!key) {
         return trace.evaluations ?? [];
       }
@@ -575,12 +624,7 @@ export const TRACE_MAPPINGS = {
         label: option.name,
       }));
     },
-    mapping: (
-      trace: TraceWithAnnotations,
-      key: string,
-      subkey: string,
-      data: { annotationScoreOptions?: AnnotationScore[] },
-    ) => {
+    mapping: ({ trace, key, subkey, data = {} }: TraceMappingInput) => {
       const annotations = trace.annotations ?? [];
       const spanNamesById =
         !key || key === "ai_readable" ? buildSpanNameIndex(trace.spans ?? []) : undefined;
@@ -621,10 +665,18 @@ export const TRACE_MAPPINGS = {
           annotation.scoreOptions !== null
         ) {
           if (key === "score") {
-            return (annotation.scoreOptions as any)[subkey]?.value;
+            return scoreOptionField({
+              scoreOptions: annotation.scoreOptions,
+              subkey,
+              field: "value",
+            });
           }
           if (key === "score.reason") {
-            return (annotation.scoreOptions as any)[subkey]?.reason;
+            return scoreOptionField({
+              scoreOptions: annotation.scoreOptions,
+              subkey,
+              field: "reason",
+            });
           }
         }
         const scoreOptions = () =>
@@ -679,7 +731,7 @@ export const TRACE_MAPPINGS = {
         label: event,
       }));
     },
-    mapping: (trace: TraceWithAnnotations, key: string, subkey: string) => {
+    mapping: ({ trace, key, subkey }: TraceMappingInput) => {
       if (!key) {
         return trace.events;
       }
@@ -705,26 +757,10 @@ export const TRACE_MAPPINGS = {
     expandable_by: "events.event_id",
   },
   threads: {
-    mapping: (
-      trace: TraceWithAnnotations,
-      _key: string,
-      _subkey: string,
-      data: {
-        allTraces?: TraceWithAnnotations[];
-        selectedFields?: string[];
-      },
-    ) => filterThreadTraces(trace, data),
+    mapping: ({ trace, data = {} }: TraceMappingInput) => filterThreadTraces(trace, data),
   },
   threads_until_current: {
-    mapping: (
-      trace: TraceWithAnnotations,
-      _key: string,
-      _subkey: string,
-      data: {
-        allTraces?: TraceWithAnnotations[];
-        selectedFields?: string[];
-      },
-    ) =>
+    mapping: ({ trace, data = {} }: TraceMappingInput) =>
       filterThreadTraces(trace, data, (t) => {
         return t.timestamps.started_at <= trace.timestamps.started_at;
       }),
@@ -741,27 +777,7 @@ export const TRACE_MAPPINGS = {
       key: string;
       label: string;
     }[];
-    mapping:
-      | ((trace: TraceWithAnnotations) => string | number | object | undefined | unknown[])
-      | ((
-          trace: TraceWithAnnotations,
-          key: string,
-        ) => string | number | object | undefined | unknown[])
-      | ((
-          trace: TraceWithAnnotations,
-          key: string,
-          subkey: string,
-        ) => string | number | object | undefined | unknown[])
-      | ((
-          trace: TraceWithAnnotations,
-          key: string,
-          subkey: string,
-          data: {
-            annotationScoreOptions?: AnnotationScore[];
-            allTraces?: TraceWithAnnotations[];
-            selectedFields?: string[];
-          },
-        ) => string | number | object | undefined | unknown[]);
+    mapping: (input: TraceMappingInput) => unknown;
     expandable_by?: keyof typeof TRACE_EXPANSIONS;
   }
 >;
@@ -833,15 +849,15 @@ const DEFAULT_TRACE_FIELDS: (keyof typeof TRACE_MAPPINGS)[] = ["trace_id", "inpu
 export const extractTracesFields = (
   traces: TraceWithAnnotations[],
   selectedFields: (keyof typeof TRACE_MAPPINGS)[],
-): Record<string, any>[] => {
+): Record<string, unknown>[] => {
   // When no fields are selected, extract default fields so the data is useful
   const fields = selectedFields.length > 0 ? selectedFields : DEFAULT_TRACE_FIELDS;
   return traces.map((trace) => {
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
     for (const field of fields) {
       const traceMapping = TRACE_MAPPINGS[field];
       if (traceMapping) {
-        result[field] = traceMapping.mapping(trace, "", "", {});
+        result[field] = traceMapping.mapping({ trace, key: "", subkey: "" });
       }
     }
     return result;
@@ -1022,12 +1038,9 @@ export function mergeThreadAndTraceMappings(
   };
 }
 
-const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
-  try {
-    return z.array(datasetSpanSchema).parse(spans);
-  } catch {
-    return spans as any;
-  }
+const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] | Span[] => {
+  const parsed = z.array(datasetSpanSchema).safeParse(spans);
+  return parsed.success ? parsed.data : spans;
 };
 
 function isExpandedColumnValue(
@@ -1078,10 +1091,11 @@ export const mapTraceToDatasetEntry = (
             ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
             : undefined;
 
-        let value = source_?.mapping(expandedTrace, key!, subkey!, {
-          annotationScoreOptions,
-          allTraces,
-          selectedFields,
+        let value: unknown = source_?.mapping({
+          trace: expandedTrace,
+          key: key!,
+          subkey: subkey!,
+          data: { annotationScoreOptions, allTraces, selectedFields },
         });
 
         // An expanded trace holds exactly one of whatever it was expanded by,

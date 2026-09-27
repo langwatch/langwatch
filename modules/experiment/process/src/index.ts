@@ -13,13 +13,15 @@ export {
 } from "./repositories/redis/redis.experiment-run-processing.repository.ts";
 export {
   ClickHouseExperimentRunProcessingRepository,
-  type ExperimentRunProcessingPipeline,
   type ExperimentRunEventingIdLookup,
   type ExperimentRunEventingResultRecord,
   type ExperimentRunEventingState,
   type ExperimentRunEventingStateRepository,
-  type ClickhouseExperimentRunProcessingRepository,
 } from "./repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
+export type {
+  ClickhouseExperimentRunProcessingRepository,
+  ExperimentRunProcessingPipeline,
+} from "./eventing/experiment-run-processing.pipeline.ts";
 export type {
   ExperimentAppDependencies,
   ExperimentModelCosts,
@@ -73,7 +75,6 @@ export type {
 export type {
   ExecutionDataInputs,
   ExecutionDataServices,
-  LoadedDataset,
   LoadedExecutionData,
   LoadedWorkflow,
 } from "./services/experiment-execution-data.service.ts";

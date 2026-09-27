@@ -9,9 +9,10 @@ import type Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  billingStripeWebhookRest,
-  type BillingStripeWebhookApi,
-} from "../billing-stripe-webhook.rest.ts";
+  StripeWebhookReceiptService,
+  type StripeWebhookEvents,
+} from "../../services/billing-stripe-webhook-receipt.service.ts";
+import { billingStripeWebhookRest } from "../billing-stripe-webhook.rest.ts";
 
 const declaration = billingStripeWebhookRest.router();
 
@@ -29,8 +30,8 @@ const EVENT: Stripe.Event = {
 
 const dispatchesEvents = vi.fn<() => boolean>();
 const findSigningSecret = vi.fn<() => string | undefined>();
-const constructEvent = vi.fn<BillingStripeWebhookApi["constructEvent"]>();
-const handleEvent = vi.fn<BillingStripeWebhookApi["handleEvent"]>();
+const constructEvent = vi.fn<StripeWebhookEvents["constructEvent"]>();
+const handleEvent = vi.fn<StripeWebhookEvents["handleEvent"]>();
 
 function mounted() {
   const runtime = createRestRuntime({
@@ -42,7 +43,13 @@ function mounted() {
   });
 
   return runtime.mount(declaration, {
-    app: () => ({ dispatchesEvents, findSigningSecret, constructEvent, handleEvent }),
+    app: () =>
+      StripeWebhookReceiptService.create({
+        dispatchesEvents,
+        findSigningSecret,
+        constructEvent,
+        handleEvent,
+      }),
     credential: "public",
     onError: canonicalErrorResponse,
   });

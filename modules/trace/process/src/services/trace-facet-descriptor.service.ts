@@ -16,13 +16,13 @@ import type {
 } from "@langwatch/trace-contract";
 
 import type {
+  FacetCatalog,
   ExpressionCategoricalDef,
   FacetDefinition,
   RangeFacetDef,
 } from "#rules/trace-facet-registry.rules";
 
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
-import { TABLE_TIME_COLUMNS } from "../rules/trace-facet-registry.rules.ts";
 import { scopeTraceFilterToTable } from "../rules/trace-facet-scope.rules.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";
@@ -32,16 +32,19 @@ export class TraceFacetDescriptorService {
   private constructor(
     private readonly repository: TraceListRead,
     private readonly topicNaming: TraceTopicNamingService,
+    private readonly facets: FacetCatalog,
   ) {}
 
   static create({
     repository,
     topicNaming,
+    facets,
   }: {
     repository: TraceListRead;
     topicNaming: TraceTopicNamingService;
+    facets: FacetCatalog;
   }): TraceFacetDescriptorService {
-    return new TraceFacetDescriptorService(repository, topicNaming);
+    return new TraceFacetDescriptorService(repository, topicNaming, facets);
   }
 
   async buildDescriptor({
@@ -152,7 +155,7 @@ export class TraceFacetDescriptorService {
         tenantId: params.tenantId,
         timeRange: params.timeRange,
         table: def.table,
-        timeColumn: TABLE_TIME_COLUMNS[def.table],
+        timeColumn: this.facets.timeColumns[def.table],
         facetExpression: def.expression,
         limit,
         offset: 0,
@@ -207,7 +210,7 @@ export class TraceFacetDescriptorService {
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       table: def.table,
-      timeColumn: TABLE_TIME_COLUMNS[def.table],
+      timeColumn: this.facets.timeColumns[def.table],
       column: def.expression,
       ...(filterWhere ? { filterWhere } : {}),
     });

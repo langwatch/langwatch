@@ -30,13 +30,13 @@ import { Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { automationServer } from "../../automation.server.ts";
 import {
   SettlementProjectService,
   settlementContext,
   settlementSummary,
   settlementTrace,
-} from "../../fixtures/settlement.fixtures.ts";
+} from "../../__tests__/fixtures/settlement.fixtures.ts";
+import { automationServer } from "../../automation.server.ts";
 import { AutomationPersistCapService } from "../../services/persist-cap.service.ts";
 
 const CONFIG: AutomationServerConfig = {

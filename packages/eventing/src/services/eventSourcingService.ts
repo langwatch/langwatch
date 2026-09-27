@@ -109,12 +109,15 @@ export class EventSourcingService<
     });
 
     // Create ProjectionRouter (no event store needed — incremental only)
-    this.router = new ProjectionRouter<EventType, ProjectionTypes>(
+    this.router = new ProjectionRouter<EventType, ProjectionTypes>({
       aggregateType,
       pipelineName,
-      this.queueManager,
-      { executionTarget, replayMarkerChecker, retentionPolicyResolver, killSwitch },
-    );
+      queueManager: this.queueManager,
+      executionTarget,
+      replayMarkerChecker,
+      retentionPolicyResolver,
+      killSwitch,
+    });
 
     this.registerFoldProjections(foldProjections, aggregateType, eventStore);
     this.registerStateProjections(stateProjections);
@@ -203,12 +206,12 @@ export class EventSourcingService<
           aggregateId: string;
           occurredAtMs?: number;
         }) => {
-          const events = await capturedEventStore.getEvents(
-            ctx.aggregateId,
-            { tenantId: createTenantId(ctx.tenantId) },
-            capturedAggregateType,
-            ctx.occurredAtMs,
-          );
+          const events = await capturedEventStore.getEvents({
+            aggregateId: ctx.aggregateId,
+            context: { tenantId: createTenantId(ctx.tenantId) },
+            aggregateType: capturedAggregateType,
+            anchorOccurredAtMs: ctx.occurredAtMs,
+          });
           return [...events].toSorted((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
         };
       }
@@ -224,12 +227,12 @@ export class EventSourcingService<
           aggregateId: string;
           upToEvent: Event;
         }) => {
-          const events = await capturedEventStore.getEventsUpTo(
-            ctx.aggregateId,
-            { tenantId: createTenantId(ctx.tenantId) },
-            capturedAggregateType,
-            ctx.upToEvent as EventType,
-          );
+          const events = await capturedEventStore.getEventsUpTo({
+            aggregateId: ctx.aggregateId,
+            context: { tenantId: createTenantId(ctx.tenantId) },
+            aggregateType: capturedAggregateType,
+            upToEvent: ctx.upToEvent as EventType,
+          });
           return [...events].toSorted((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
         };
       }
@@ -293,12 +296,12 @@ export class EventSourcingService<
           aggregateId: string;
           upToEvent: Event;
         }) => {
-          const events = await capturedEventStore.getEventsUpTo(
-            ctx.aggregateId,
-            { tenantId: createTenantId(ctx.tenantId) },
-            capturedAggregateType,
-            ctx.upToEvent as EventType,
-          );
+          const events = await capturedEventStore.getEventsUpTo({
+            aggregateId: ctx.aggregateId,
+            context: { tenantId: createTenantId(ctx.tenantId) },
+            aggregateType: capturedAggregateType,
+            upToEvent: ctx.upToEvent as EventType,
+          });
           return [...events].toSorted((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
         };
       }

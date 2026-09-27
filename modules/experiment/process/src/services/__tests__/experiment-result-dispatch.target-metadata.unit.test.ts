@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ExperimentExecutionDataService } from "../experiment-execution-data.service.ts";
+import { promptLoadKey } from "../../rules/experiment-execution-data.rules.ts";
 import { ExperimentResultDispatchService } from "../experiment-result-dispatch.service.ts";
 
 const dispatches = ExperimentResultDispatchService.create();
@@ -82,7 +82,7 @@ describe("buildTargetMetadata — the judge model recorded on a run", () => {
     it("records each column's own version, not whichever loaded last", () => {
       const loadedPrompts = new Map([
         [
-          ExperimentExecutionDataService.promptLoadKey({
+          promptLoadKey({
             promptId: "prompt-1",
             promptVersionNumber: 1,
           }),
@@ -92,7 +92,7 @@ describe("buildTargetMetadata — the judge model recorded on a run", () => {
           } as any,
         ],
         [
-          ExperimentExecutionDataService.promptLoadKey({
+          promptLoadKey({
             promptId: "prompt-1",
             promptVersionNumber: 2,
           }),

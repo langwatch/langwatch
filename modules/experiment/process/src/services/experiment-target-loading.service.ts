@@ -10,11 +10,8 @@ import { createLogger } from "@langwatch/observability";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 
-import {
-  ExperimentExecutionDataService,
-  type ExecutionDataServices,
-  type LoadedWorkflow,
-} from "./experiment-execution-data.service.ts";
+import { promptLoadKey, workflowLoadKey } from "../rules/experiment-execution-data.rules.ts";
+import type { ExecutionDataServices, LoadedWorkflow } from "./experiment-execution-data.service.ts";
 
 const logger = createLogger("langwatch:experiment:target-loading");
 
@@ -45,7 +42,7 @@ export class ExperimentTargetLoadingService {
   }
 
   /** Every prompt version a prompt target names, keyed by prompt id and version. */
-  static async loadPrompts({
+  async loadPrompts({
     projectId,
     targets,
     services,
@@ -56,7 +53,7 @@ export class ExperimentTargetLoadingService {
         continue;
       }
 
-      const key = ExperimentExecutionDataService.promptLoadKey(target);
+      const key = promptLoadKey(target);
       if (loaded.has(key)) {
         continue;
       }
@@ -99,7 +96,7 @@ export class ExperimentTargetLoadingService {
    * Every agent an agent target names. `getById` throws rather than returning a nullable, so a
    * deleted agent is translated into the same sentinel shape the other loaders return.
    */
-  static async loadAgents({
+  async loadAgents({
     projectId,
     targets,
     services,
@@ -132,7 +129,7 @@ export class ExperimentTargetLoadingService {
    * wraps: that agent has no code of its own, only a pointer, so the run dispatches the linked
    * workflow exactly as a direct workflow target would.
    */
-  static async loadWorkflows({
+  async loadWorkflows({
     projectId,
     targets,
     services,
@@ -141,16 +138,16 @@ export class ExperimentTargetLoadingService {
     loadedAgents: Map<string, Agent>;
   }): Promise<Map<string, LoadedWorkflow> | LoadFailure> {
     const loaded = new Map<string, LoadedWorkflow>();
-    for (const request of ExperimentTargetLoadingService.workflowRequests({
+    for (const request of this.workflowRequests({
       targets,
       loadedAgents,
     })) {
-      const key = ExperimentExecutionDataService.workflowLoadKey(request);
+      const key = workflowLoadKey(request);
       if (loaded.has(key)) {
         continue;
       }
 
-      const result = await ExperimentTargetLoadingService.loadPublishedWorkflow({
+      const result = await this.loadPublishedWorkflow({
         projectId,
         services,
         ...request,
@@ -166,7 +163,7 @@ export class ExperimentTargetLoadingService {
   }
 
   /** Direct workflow targets in order, then the workflow each workflow-typed agent links to. */
-  private static workflowRequests({
+  private workflowRequests({
     targets,
     loadedAgents,
   }: {
@@ -199,7 +196,7 @@ export class ExperimentTargetLoadingService {
   }
 
   /** The evaluators both the evaluator configs and the evaluator targets name. */
-  static async loadEvaluators({
+  async loadEvaluators({
     projectId,
     targets,
     evaluators,
@@ -242,7 +239,7 @@ export class ExperimentTargetLoadingService {
     return loaded;
   }
 
-  private static async loadPublishedWorkflow({
+  private async loadPublishedWorkflow({
     projectId,
     services,
     workflowId,

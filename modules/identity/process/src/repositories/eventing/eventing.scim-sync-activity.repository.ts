@@ -37,11 +37,11 @@ export class EventingScimSyncActivityRepository extends ScimSyncActivityReposito
     limit: number;
   }): Promise<readonly ScimSyncActivityEntry[]> {
     const store = await this.eventStore();
-    const events = await store.getEvents(
-      scimSyncIdFor({ connectionId }),
-      { tenantId: createTenantId(organizationId) },
-      SCIM_SYNC_AGGREGATE_TYPE,
-    );
+    const events = await store.getEvents({
+      aggregateId: scimSyncIdFor({ connectionId }),
+      context: { tenantId: createTenantId(organizationId) },
+      aggregateType: SCIM_SYNC_AGGREGATE_TYPE,
+    });
     return events.map(toActivityEntry).toSorted(newestFirst).slice(0, limit);
   }
 }

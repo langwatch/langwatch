@@ -4,7 +4,11 @@ import type {
   EvaluationV3Event,
   ExecutionCell,
 } from "@langwatch/experiment-contract";
-import type { StudioServerEvent, StudioWorkflow, WorkflowApi } from "@langwatch/workflow-contract";
+import {
+  parseStudioWorkflow,
+  type StudioServerEvent,
+  type WorkflowApi,
+} from "@langwatch/workflow-contract";
 /**
  * Tests ExperimentRunOrchestratorService.executeWorkflowCell with a fake studio
  * boundary port fed scripted events instead of live NLP services.
@@ -23,41 +27,51 @@ const scripted: {
   dispatched: { type: string; payload: Record<string, any> }[];
 } = { flow: [], component: [], componentThrows: undefined, dispatched: [] };
 
-const ports = {
-  attachments: createNoAttachmentsFixture(),
-  studio: {
-    postEvent: async ({
-      event,
-      onEvent,
-    }: {
-      event: { type: string; payload: Record<string, any> };
-      onEvent: (event: StudioServerEvent) => void;
-    }) => {
-      scripted.dispatched.push(event);
-      if (event.type === "execute_component") {
-        if (scripted.componentThrows) throw scripted.componentThrows;
-        for (const serverEvent of scripted.component) onEvent(serverEvent);
-        return;
-      }
-      for (const serverEvent of scripted.flow) onEvent(serverEvent);
+const ports = createApiFixture<ExperimentRunCollaborators>(
+  {
+    attachments: createNoAttachmentsFixture(),
+    studio: {
+      postEvent: async ({
+        event,
+        onEvent,
+      }: {
+        event: { type: string; payload: Record<string, any> };
+        onEvent: (event: StudioServerEvent) => void;
+      }) => {
+        scripted.dispatched.push(event);
+        if (event.type === "execute_component") {
+          if (scripted.componentThrows) throw scripted.componentThrows;
+          for (const serverEvent of scripted.component) onEvent(serverEvent);
+          return;
+        }
+        for (const serverEvent of scripted.flow) onEvent(serverEvent);
+      },
     },
   },
-} as unknown as ExperimentRunCollaborators;
+  "ports",
+);
 
 const workflows = createApiFixture<WorkflowApi>({
   enrichStudioEvent: async ({ event }) => event,
   prepareStudioEvent: async ({ event }) => event,
 });
 
-const workflowDsl = {
+const workflowDsl = parseStudioWorkflow({
+  workflow_id: "workflow-1",
+  spec_version: "1.4",
+  name: "Workflow",
+  icon: "x",
+  description: "x",
+  version: "1",
   nodes: [
-    { id: "entry", type: "entry", data: {} },
-    { id: "llm", type: "signature", data: {} },
-    { id: "eval_1", type: "evaluator", data: { name: "Exact match" } },
-    { id: "end", type: "end", data: {} },
+    { id: "entry", type: "entry", position: { x: 0, y: 0 }, data: {} },
+    { id: "llm", type: "signature", position: { x: 0, y: 0 }, data: {} },
+    { id: "eval_1", type: "evaluator", position: { x: 0, y: 0 }, data: { name: "Exact match" } },
+    { id: "end", type: "end", position: { x: 0, y: 0 }, data: {} },
   ],
   edges: [],
-} as unknown as StudioWorkflow;
+  state: {},
+});
 
 const makeCell = (overrides?: Partial<ExecutionCell>): ExecutionCell => ({
   rowIndex: 0,
@@ -101,7 +115,7 @@ const gradingEvaluator = (sourceField: string): EvaluatorConfig => ({
 
 const run = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
-  for await (const event of ExperimentRunOrchestratorService.executeWorkflowCell({
+  for await (const event of ExperimentRunOrchestratorService.create().executeWorkflowCell({
     cell,
     projectId: "p1",
     workflowDsl,

@@ -45,10 +45,10 @@ export class EventingIdentityHistoryRepository extends IdentityHistoryRepository
     if (!store) {
       throw new Error("identity history cannot read: the event-sourcing stack is unavailable");
     }
-    return store.getEvents(
-      userId,
-      { tenantId: createTenantId(userId) },
-      USER_IDENTITY_AGGREGATE_TYPE,
-    );
+    return store.getEvents({
+      aggregateId: userId,
+      context: { tenantId: createTenantId(userId) },
+      aggregateType: USER_IDENTITY_AGGREGATE_TYPE,
+    });
   }
 }

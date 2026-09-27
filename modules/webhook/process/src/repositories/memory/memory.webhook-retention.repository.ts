@@ -1,7 +1,7 @@
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { WebhookRetentionRepository } from "../webhook-retention.repository.ts";
-import type { MemoryWebhookDatabase } from "./memory.webhook-database.ts";
+import type { MemoryWebhookDatabase } from "./memory.webhook.database.ts";
 
 export class MemoryWebhookRetentionRepository implements WebhookRetentionRepository {
   private constructor(private readonly database: MemoryWebhookDatabase) {}

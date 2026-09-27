@@ -18,6 +18,10 @@ import {
   type ScenarioChildEnvironment,
 } from "../app/scenario.app.ts";
 import {
+  handleVoiceNonceRegisterMessage,
+  isVoiceNonceRegisterMessage,
+} from "../channels/voice-nonce-handoff.channels.ts";
+import {
   encodeScenarioEgressPolicy,
   SCENARIO_EGRESS_POLICY_ENV,
   type ScenarioEgressPolicy,
@@ -32,6 +36,7 @@ import type {
   ExecutionJobData,
   ScenarioExecutionPoolService,
 } from "./scenario-execution-pool.service.ts";
+import type { VoiceNonceRegistryService } from "./voice-nonce-registry.service.ts";
 
 const logger = createLogger("langwatch:scenarios:child-process");
 
@@ -87,6 +92,8 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
   static create(options: {
     config: ScenarioChildProcessConfig;
     pool: ScenarioExecutionPoolService;
+    /** Where a voice child registers the media nonce the worker's door will be dialled with. */
+    nonces: VoiceNonceRegistryService;
   }): NodeScenarioChildService {
     return new NodeScenarioChildService(options);
   }
@@ -95,6 +102,7 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
     private readonly options: {
       config: ScenarioChildProcessConfig;
       pool: ScenarioExecutionPoolService;
+      nonces: VoiceNonceRegistryService;
     },
   ) {}
 
@@ -137,11 +145,22 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
       args: spawnConfig.args,
     });
 
+    // A voice child mints its own Twilio stream nonce and registers it before it
+    // dials; that round trip needs an IPC slot no other target's child has.
+    const isVoiceChild = input.jobData.target.type === "voice";
     const child = spawn(spawnConfig.command, spawnConfig.args, {
       env: childEnvironment,
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: isVoiceChild ? ["pipe", "pipe", "pipe", "ipc"] : ["pipe", "pipe", "pipe"],
       cwd: this.options.config.packageRoot,
     });
+    if (isVoiceChild) {
+      child.on("message", (message: unknown) => {
+        if (!isVoiceNonceRegisterMessage(message)) return;
+        child.send?.(
+          handleVoiceNonceRegisterMessage({ message, child, registry: this.options.nonces }),
+        );
+      });
+    }
     log("info", "Child process spawned", {
       pid: child.pid,
       spawnMs: nowInstant().epochMilliseconds - spawnStartedAt,

@@ -299,3 +299,18 @@ export class PayloadStagingUnavailableError extends HandledError {
     this.name = "PayloadStagingUnavailableError";
   }
 }
+
+/** One caller read more files in the window than the byte door allows; retry after the wait. */
+export class StoredObjectFilesRateLimitedError extends HandledError {
+  declare readonly code: "stored_object_files_rate_limited";
+
+  constructor(retryAfterMs: number) {
+    super("stored_object_files_rate_limited", "Too many file reads; retry shortly.", {
+      httpStatus: 429,
+      retryable: true,
+      fault: "customer",
+      meta: { retryAfterMs },
+    });
+    this.name = "StoredObjectFilesRateLimitedError";
+  }
+}

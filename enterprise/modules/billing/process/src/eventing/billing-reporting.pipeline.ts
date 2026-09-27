@@ -70,11 +70,11 @@ export class BillingReportingPipeline {
       }),
     })
       .withEvents([])
-      .withCommandInstance(
-        "reportUsageForMonth",
-        ReportUsageForMonthCommandHandler,
-        reportUsageForMonthCommand,
-        {
+      .withCommandInstance({
+        name: "reportUsageForMonth",
+        handlerClass: ReportUsageForMonthCommandHandler,
+        instance: reportUsageForMonthCommand,
+        options: {
           delay: 300_000, // 5 min delay (initial + re-trigger)
           deduplication: {
             makeId: (p: { organizationId: string; billingMonth: string }) =>
@@ -82,7 +82,7 @@ export class BillingReportingPipeline {
             ttlMs: 310_000, // 310s > 300s delay; replace preserves self-dispatch
           },
         },
-      )
+      })
       .build();
   }
 

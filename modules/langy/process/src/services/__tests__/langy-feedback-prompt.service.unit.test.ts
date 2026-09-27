@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { LangyFeedbackPromptRedis } from "../../app/langy.members.ts";
+import {
+  type LangyFeedbackPromptRedis,
+  LangyFeedbackPromptRedisRepository,
+} from "../../repositories/redis/redis.langy-feedback-prompt.repository.ts";
 import {
   FEEDBACK_LONG_CONVERSATION_ANSWERS,
   FEEDBACK_QUIET_PERIOD_MS,
@@ -22,7 +25,8 @@ function memoryRedis(): LangyFeedbackPromptRedis & { store: Map<string, string> 
 }
 
 function service(redis: LangyFeedbackPromptRedis | null, now = NOW): LangyFeedbackPromptService {
-  return LangyFeedbackPromptService.create({ redis, now: () => now });
+  const prompts = redis ? LangyFeedbackPromptRedisRepository.create({ redis }) : null;
+  return LangyFeedbackPromptService.create({ prompts, now: () => now });
 }
 
 describe("LangyFeedbackPromptService", () => {

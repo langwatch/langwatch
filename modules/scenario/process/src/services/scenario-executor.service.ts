@@ -27,6 +27,7 @@ import { ScenarioFailureHandlerService } from "./scenario-failure-handler.servic
 import { ScenarioProcessorMetricsService } from "./scenario-processor-metrics.service.ts";
 import { ScenarioProcessorService } from "./scenario-processor.service.ts";
 import type { ScenarioService } from "./scenario.service.ts";
+import type { VoiceNonceRegistryService } from "./voice-nonce-registry.service.ts";
 
 const logger = createLogger("langwatch:scenarios:executor");
 
@@ -59,6 +60,8 @@ export type ScenarioExecutorHost = Readonly<{
 }>;
 
 type ScenarioExecutorInput = Readonly<{
+  /** The worker's one nonce registry, shared with its media door. */
+  voiceNonces: VoiceNonceRegistryService;
   peers: ScenarioExecutorPeers;
   scenarios: ScenarioService;
   simulations: SimulationService;
@@ -145,7 +148,11 @@ export class ScenarioExecutorService {
       execution,
       pool,
       cancellations: this.input.cancellationSubscriptions,
-      childProcesses: NodeScenarioChildService.create({ config: this.#childConfig(), pool }),
+      childProcesses: NodeScenarioChildService.create({
+        config: this.#childConfig(),
+        pool,
+        nonces: this.input.voiceNonces,
+      }),
       metrics: ScenarioProcessorMetricsService.create(),
     });
   }

@@ -10,7 +10,6 @@ export { langyServer } from "./langy.server.ts";
 export { type LangyNavigateProject } from "./app/langy.members.ts";
 export type { LangyNavigateResourceLocator } from "./app/langy.members.ts";
 export type { LangyNavigateResourceKind } from "./rules/langy-navigate-resources.rules.ts";
-export type { LangyRelayCompositionOptions } from "./services/langy-postgres.service.ts";
 export type { LangyDatabase } from "./repositories/prisma/langy-database.mapper.ts";
 export type { LangyTurnTechnicalMembers } from "./services/langy-turn.service.ts";
 export { type LangySessionKeyMetrics } from "./app/langy.members.ts";
@@ -104,7 +103,7 @@ export {
   EventingLangyConversationAdapter,
   type EventingLangyConversationAdapterOptions,
   type RedisLangyConversationRuntimeRepository,
-} from "./repositories/redis/redis.langy-conversation-runtime.repository.ts";
+} from "./eventing/langy-conversation-runtime.pipeline.ts";
 export {
   LangyMaintenanceService,
   type LangyMaintenancePipelineDeps,

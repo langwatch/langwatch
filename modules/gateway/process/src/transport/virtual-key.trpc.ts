@@ -4,9 +4,8 @@
  * service-authorized; the plaintext key answers only from create and rotate.
  */
 import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
-import { GatewayApi, virtualKeyTrpc, GatewayWindow } from "@langwatch/gateway-contract";
-import { type Instant, nowInstant, Temporal, type TimeInput, toEpochMs } from "@langwatch/time";
-import { TRPCError } from "@trpc/server";
+import { GatewayApi, virtualKeyTrpc } from "@langwatch/gateway-contract";
+import { type Instant, Temporal, type TimeInput, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
 /** The expiry a request carries, as the application reads it. */
@@ -73,43 +72,9 @@ export const virtualKeyTrpcTransport = defineTrpcRouter(GatewayApi, virtualKeyTr
     reason: `${RESOLVER_AUTHORIZED}; spend is reported only for keys visible to the caller's membership in this organization`,
     permissions: ["virtualKeys:view"],
   })
-  .handle(async ({ app, input, actor }) => {
-    // Without the spend source there is no number to report. Refusing by name
-    // lets the column render "unavailable" instead of a confident $0.00 that
-    // cannot be told apart from a key that genuinely spent nothing.
-    if (!app.isSpendSourceAvailable()) {
-      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "spend_source_unavailable" });
-    }
-
-    const keys = await app.listVisibleVirtualKeys({
-      organizationId: input.organizationId,
-      userId: actor.id,
-    });
-    const now = nowInstant();
-    const virtualKeyIds = keys.map((k) => k.id);
-    const [spend, directBudgets] = await Promise.all([
-      app.spendByVirtualKey({
-        organizationId: input.organizationId,
-        virtualKeyIds,
-        window: { fromDate: GatewayWindow.startOfCurrentMonthUTC(now), toDate: now },
-      }),
-      app.loadDirectBudgetsForKeys({
-        organizationId: input.organizationId,
-        virtualKeyIds,
-        now,
-      }),
-    ]);
-
-    // Every visible key gets a row. With the spend source present, a missing
-    // entry means the key genuinely spent nothing, so zero is the honest
-    // render rather than an ambiguous blank.
-    return keys.map((k) => ({
-      virtualKeyId: k.id,
-      spentUsd: spend.get(k.id)?.spentUsd ?? "0",
-      requests: spend.get(k.id)?.requests ?? 0,
-      budget: directBudgets.get(k.id) ?? null,
-    }));
-  })
+  .handle(({ app, input, actor }) =>
+    app.listVirtualKeySpendThisMonth({ organizationId: input.organizationId, userId: actor.id }),
+  )
 
   // Takes a draft (picked scopes, no key row yet) so the list is answerable
   // before the key is created.
@@ -119,67 +84,9 @@ export const virtualKeyTrpcTransport = defineTrpcRouter(GatewayApi, virtualKeyTr
     reason: `${RESOLVER_AUTHORIZED}; for an existing key, its visibility in this organization, and for a draft, manage on every scope in it, both checked before any budget data is read`,
     permissions: ["virtualKeys:view", "virtualKeys:manage"],
   })
-  .handle(async ({ app, input, actor }, caller) => {
-    // For an existing key the caller must SEE it, and resolution binds to
-    // STORED ownership; caller-supplied scopes, destination and principal are
-    // ignored, or an organization-wide key could leak a sibling's data.
-    if (input.virtualKeyId) {
-      const vk = await app.getVisibleVirtualKeyForUser({
-        organizationId: input.organizationId,
-        id: input.virtualKeyId,
-        userId: actor.id,
-      });
-
-      return app.listApplicableBudgets({
-        target: {
-          organizationId: input.organizationId,
-          virtualKeyId: vk.id,
-          scopes: vk.scopes.map((scope) => ({
-            scopeType: scope.scopeType,
-            scopeId: scope.scopeId,
-          })),
-          traceProjectId: vk.traceProjectId,
-          principalUserId: vk.principalUserId,
-        },
-      });
-    }
-
-    // For a draft: the caller must hold `virtualKeys:manage` on every draft
-    // scope AND on the chosen trace destination - the exact boundary `create`
-    // will hold them to. Previewing a target's budgets must not be cheaper
-    // than creating a key against it.
-    await app.authorizeVirtualKeyScopeSelection({
-      actor: caller,
-      organizationId: input.organizationId,
-      scopes: input.scopes,
-      traceProjectId: input.traceProjectId,
-    });
-
-    // The principal id is still pinned to the organization: even an authorized
-    // caller must not resolve another tenant's rows.
-    if (input.principalUserId) {
-      const member = await app.isOrganizationMember({
-        organizationId: input.organizationId,
-        userId: input.principalUserId,
-      });
-      if (!member) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "principalUserId is not a member of this organization.",
-        });
-      }
-    }
-
-    return app.listApplicableBudgets({
-      target: {
-        organizationId: input.organizationId,
-        virtualKeyId: null,
-        scopes: input.scopes,
-        traceProjectId: input.traceProjectId ?? null,
-        principalUserId: input.principalUserId ?? null,
-      },
-    });
-  })
+  .handle(({ app, input, actor }, caller) =>
+    app.listApplicableBudgetsForSelection({ selection: input, userId: actor.id, caller }),
+  )
 
   .procedure("create")
   .withFacts(gatewaySessionFact)

@@ -6,10 +6,11 @@ import {
   type LangyEventCursor,
   type LangyTurnProjectionState,
   seedLangyTurnProjection,
-  type LangyStreamEntry,
 } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 import { create } from "zustand";
+
+import type { LangyStreamWireEntry } from "../../../../behavior/langy-api.ts";
 
 /**
  * The developer drawer's record of what actually crossed the wire — in BOTH directions,
@@ -34,7 +35,7 @@ export type LangyDevLogRecord =
       lane: "stream";
       /** The turn this entry belonged to, or null before one was adopted. */
       turnId: string | null;
-      entry: LangyStreamEntry;
+      entry: LangyStreamWireEntry;
     })
   | (TapeBase & {
       lane: "outbound";
@@ -78,7 +79,7 @@ interface LangyDevLogState {
   setScrub: (seq: number | null) => void;
   setRecording: (recording: boolean) => void;
   /** INBOUND stream lane — every live turn-stream entry. */
-  record: (entry: LangyStreamEntry, turnId: string | null) => void;
+  record: (entry: LangyStreamWireEntry, turnId: string | null) => void;
   /** OUTBOUND lane — what this client asked the server to do. */
   recordOutbound: (kind: "send" | "stop", label: string, detail: unknown) => void;
   /** DURABLE lane — one recorded event off the tail fetch (the event log). */
@@ -321,7 +322,7 @@ export function toolCallsFrom(records: LangyDevLogRecord[]): DevToolCall[] {
 }
 
 /** One scannable line per record, for the unified Log view. */
-function streamRecordSummary(entry: LangyStreamEntry): string {
+function streamRecordSummary(entry: LangyStreamWireEntry): string {
   if (entry.type === "delta") {
     return entry.text.length > 60 ? `${entry.text.slice(0, 60)}…` : entry.text;
   }

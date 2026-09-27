@@ -48,9 +48,9 @@ function Harness({
     expandedCells: new Set<string>(),
     editingCell,
     selectedCell: undefined,
-    setCellValue: (datasetId, row, columnId, next) => {
-      setCellValue(datasetId, row, columnId, next);
-      setValue(next);
+    setCellValue: (cell) => {
+      setCellValue(cell);
+      setValue(cell.value);
     },
     setEditingCell,
     setSelectedCell: vi.fn(),
@@ -206,7 +206,12 @@ describe("AttachmentCell", () => {
       await user.upload(fileInput(), pictureFile());
 
       await waitFor(() =>
-        expect(setCellValue).toHaveBeenCalledWith(DATASET_ID, 0, COLUMN_ID, storedPicture.url),
+        expect(setCellValue).toHaveBeenCalledWith({
+          datasetId: DATASET_ID,
+          row: 0,
+          columnId: COLUMN_ID,
+          value: storedPicture.url,
+        }),
       );
       expect(await screen.findByRole("img")).toHaveAttribute("src", storedPicture.url);
 
@@ -230,7 +235,12 @@ describe("AttachmentCell", () => {
       await user.upload(fileInput(), documentFile());
 
       await waitFor(() =>
-        expect(setCellValue).toHaveBeenCalledWith(DATASET_ID, 0, COLUMN_ID, storedDocument.url),
+        expect(setCellValue).toHaveBeenCalledWith({
+          datasetId: DATASET_ID,
+          row: 0,
+          columnId: COLUMN_ID,
+          value: storedDocument.url,
+        }),
       );
       expect(await screen.findByText("report.pdf")).toBeInTheDocument();
     });
@@ -303,7 +313,12 @@ describe("AttachmentCell", () => {
       await user.upload(fileInput(), pictureFile());
 
       await waitFor(() =>
-        expect(setCellValue).toHaveBeenCalledWith(DATASET_ID, 0, COLUMN_ID, storedPicture.url),
+        expect(setCellValue).toHaveBeenCalledWith({
+          datasetId: DATASET_ID,
+          row: 0,
+          columnId: COLUMN_ID,
+          value: storedPicture.url,
+        }),
       );
     });
 
@@ -314,7 +329,12 @@ describe("AttachmentCell", () => {
 
       await user.click(screen.getByRole("button", { name: "Clear image" }));
 
-      expect(setCellValue).toHaveBeenCalledWith(DATASET_ID, 0, COLUMN_ID, "");
+      expect(setCellValue).toHaveBeenCalledWith({
+        datasetId: DATASET_ID,
+        row: 0,
+        columnId: COLUMN_ID,
+        value: "",
+      });
       expect(await screen.findByRole("button", { name: "Upload" })).toBeInTheDocument();
     });
   });

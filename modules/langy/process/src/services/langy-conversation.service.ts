@@ -27,12 +27,12 @@ import { LangyConversationTurnService } from "./langy-conversation-turn.service.
  * ClickHouse prune weekly partitions instead of cold-scanning the history.
  */
 export interface LangyConversationEventsReader {
-  getEventsOccurredSince(
-    aggregateId: string,
-    context: { tenantId: TenantId },
-    aggregateType: "langy_conversation",
-    occurredAtFromMs: number,
-  ): Promise<readonly LangyConversationProcessingEvent[]>;
+  getEventsOccurredSince(request: {
+    aggregateId: string;
+    context: { tenantId: TenantId };
+    aggregateType: "langy_conversation";
+    occurredAtFromMs: number;
+  }): Promise<readonly LangyConversationProcessingEvent[]>;
 }
 
 export interface LangyConversationRuntime {

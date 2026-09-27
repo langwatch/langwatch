@@ -45,27 +45,27 @@ export function AddRowsFromCSVModal({
   );
 
   const [recordEntries, setRecordEntries] = useState<DatasetRecordEntry[]>([]);
-  const [CSVHeaders, setCSVHeaders] = useState([]);
+  const [CSVHeaders, setCSVHeaders] = useState<string[]>([]);
   const [hasErrors, setErrors] = useState<string[]>([]);
-  const [csvUploaded, setCSVUploaded] = useState([]);
+  const [csvUploaded, setCSVUploaded] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [canUpload, setCanUpload] = useState(false);
   const uploadRecords = api.datasetRecord.create.useMutation();
 
-  const preprocessCSV = (csv: any) => {
-    setCSVHeaders(csv.slice(0, 1)[0]);
+  const preprocessCSV = (csv: string[][]) => {
+    setCSVHeaders(csv[0] ?? []);
     setCSVUploaded(csv);
   };
 
-  function safeGetRowValue(row: any[], headers: string[], key: string): string {
+  function safeGetRowValue(row: string[], headers: string[], key: string): string {
     const index = headers.indexOf(key);
-    return index !== -1 ? row[index] : "";
+    return index !== -1 ? (row[index] ?? "") : "";
   }
 
   const setupRecordsUpload = (mappings: Record<string, string>) => {
     const records: DatasetRecordEntry[] = [];
 
-    csvUploaded.slice(1).forEach((row: any) => {
+    csvUploaded.slice(1).forEach((row) => {
       const entry: DatasetRecordEntry = {
         id: generate(RECORD_KSUID_RESOURCE).toString(),
       };

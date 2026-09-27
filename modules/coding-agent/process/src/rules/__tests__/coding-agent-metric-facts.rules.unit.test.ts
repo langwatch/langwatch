@@ -1,0 +1,264 @@
+/**
+ * The metric→session lift, driven with canonical datapoints — the
+ * shape metric-processing actually stores. Temporality decides the converged
+ * unit: cumulative → the series (replace), delta → the point (sum once).
+ * @see specs/coding-agent/session-aggregate.feature
+ * @see specs/coding-agent/personal-usage.feature
+ */
+
+import type { ContributeMetricFactsCommandData } from "@langwatch/coding-agent-contract";
+import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
+import { describe, expect, it } from "vitest";
+
+import { liftMetricContribution } from "../coding-agent-metric-facts.rules.ts";
+
+const SERIES_ID = "a".repeat(64);
+const POINT_ID = "b".repeat(64);
+
+/**
+ * A stored metric fixture uses the contract's canonical KeyValue-array shape.
+ * Sorting pins the same order the producer persists without importing its
+ * private rules into this module.
+ */
+function encodedValueOf(value: unknown) {
+  if (typeof value === "boolean") return { type: "bool", value };
+  if (typeof value === "number") return { type: "double", value };
+  return { type: "string", value: String(value) };
+}
+
+function encodeAttributes(attributes: Record<string, unknown>): string {
+  return JSON.stringify(
+    Object.entries(attributes)
+      .map(([key, value]) => ({
+        key,
+        value: encodedValueOf(value),
+      }))
+      .toSorted((left, right) => left.key.localeCompare(right.key)),
+  );
+}
+
+const BASE_DATA_POINT: CanonicalMetricDataPoint = {
+  tenantId: "tenant-1",
+  organizationId: "org-1",
+  pointId: POINT_ID,
+  seriesId: SERIES_ID,
+  resourceSchemaUrl: "",
+  resourceAttributesJson: "[]",
+  resourceAttributeKeys: [],
+  scopeSchemaUrl: "",
+  scopeName: "",
+  scopeVersion: "",
+  scopeAttributesJson: "[]",
+  scopeAttributeKeys: [],
+  metricName: "",
+  metricDescription: "",
+  metricUnit: "",
+  metricKind: "sum",
+  aggregationTemporality: "cumulative",
+  isMonotonic: true,
+  pointAttributesJson: "[]",
+  pointAttributeKeys: [],
+  startTimeUnixNano: "0",
+  timeUnixNano: "1500000000",
+  timeUnixMs: 1_500,
+  flags: 0,
+  valueType: "none",
+  valueInt: null,
+  valueDouble: null,
+  count: null,
+  sum: null,
+  min: null,
+  max: null,
+  explicitBounds: [],
+  bucketCounts: [],
+  exponentialScale: null,
+  exponentialZeroThreshold: null,
+  zeroCount: null,
+  positiveOffset: null,
+  positiveBucketCounts: [],
+  negativeOffset: null,
+  negativeBucketCounts: [],
+  summaryQuantilesJson: "[]",
+  canonicalPayload: "",
+  canonicalSizeBytes: 0,
+  occurredAt: 1_500,
+  acceptedAt: 1_500,
+};
+
+function dataPoint({
+  metricName,
+  attributes = {},
+  temporality = "cumulative",
+  valueDouble = null,
+  valueInt = null,
+  pointId = POINT_ID,
+  seriesId = SERIES_ID,
+  resourceAttributes = {},
+}: {
+  metricName: string;
+  attributes?: Record<string, unknown>;
+  temporality?: "delta" | "cumulative" | "unspecified";
+  valueDouble?: number | null;
+  valueInt?: string | null;
+  pointId?: string;
+  seriesId?: string;
+  resourceAttributes?: Record<string, unknown>;
+}): CanonicalMetricDataPoint {
+  return {
+    ...BASE_DATA_POINT,
+    pointId,
+    seriesId,
+    metricName,
+    metricUnit: "USD",
+    metricKind: "sum",
+    aggregationTemporality: temporality,
+    scopeName: "com.anthropic.claude_code",
+    pointAttributesJson: encodeAttributes(attributes),
+    resourceAttributesJson: encodeAttributes(resourceAttributes),
+    timeUnixMs: 1_500,
+    valueType: valueTypeOf(valueDouble, valueInt),
+    valueDouble,
+    valueInt,
+  };
+}
+
+function makeLift() {
+  const dispatched: ContributeMetricFactsCommandData[] = [];
+  const lift = (point: CanonicalMetricDataPoint): void => {
+    const lifted = liftMetricContribution(point);
+    if (lifted.outcome === "contributes") dispatched.push(lifted.contribution);
+  };
+  return { lift, dispatched };
+}
+
+describe("liftMetricContribution", () => {
+  describe("when the same canonical metric point is lifted twice", () => {
+    it("resolves to one converged series contribution", () => {
+      const { lift, dispatched } = makeLift();
+      const event = dataPoint({
+        metricName: "claude_code.cost.usage",
+        attributes: { "session.id": "sess-redelivery" },
+        valueDouble: 1.25,
+      });
+
+      lift(event);
+      lift(event);
+
+      const durable = new Map(
+        dispatched.map((contribution) => [
+          `${contribution.tenantId}:${contribution.sessionId}:${contribution.seriesId}`,
+          contribution,
+        ]),
+      );
+      expect(dispatched).toHaveLength(2);
+      expect(durable.size).toBe(1);
+    });
+  });
+
+  describe("when a Cowork session's metric arrives", () => {
+    /** @scenario Cowork telemetry that shares Claude Code's event vocabulary is still Cowork */
+    it("labels the contribution claude_cowork from the resource service", () => {
+      const { lift, dispatched } = makeLift();
+
+      // Claude Code's metric vocabulary and scope; only the resource-level
+      // service.name says cowork. Without the service signal this would
+      // first-writer-win the session's agent to claude_code.
+      lift(
+        dataPoint({
+          metricName: "claude_code.cost.usage",
+          attributes: { "session.id": "cw-sess-1" },
+          temporality: "cumulative",
+          valueDouble: 0.5,
+          resourceAttributes: { "service.name": "cowork" },
+        }),
+      );
+
+      expect(dispatched).toHaveLength(1);
+      expect(dispatched[0]!.agent).toBe("claude_cowork");
+      expect(dispatched[0]!.sessionId).toBe("cw-sess-1");
+    });
+  });
+
+  describe("when a cumulative coding-agent metric carries the session key", () => {
+    /** @scenario a session that sent only metrics still appears */
+    it("contributes the series' converged total, keyed by the series", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(
+        dataPoint({
+          metricName: "claude_code.cost.usage",
+          attributes: { "session.id": "sess-1", model: "claude-fable-5" },
+          temporality: "cumulative",
+          valueDouble: 1.25,
+        }),
+      );
+
+      expect(dispatched).toHaveLength(1);
+      const [contribution] = dispatched;
+      expect(contribution!.sessionId).toBe("sess-1");
+      expect(contribution!.seriesId).toBe(SERIES_ID);
+      expect(contribution!.value).toBe(1.25);
+      expect(contribution!.agent).toBe("claude_code");
+      expect(contribution!.attributes.model).toBe("claude-fable-5");
+    });
+  });
+
+  describe("when the same counter arrives as delta points", () => {
+    // A delta must sum exactly once, so each point is its own converged
+    // unit — a re-delivery replaces that one row instead of adding to it.
+    it("keys the contribution by the point, not the series", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(
+        dataPoint({
+          metricName: "claude_code.lines_of_code.count",
+          attributes: { "session.id": "sess-1", type: "added" },
+          temporality: "delta",
+          valueInt: "42",
+        }),
+      );
+
+      expect(dispatched[0]!.seriesId).toBe(POINT_ID);
+      expect(dispatched[0]!.value).toBe(42);
+    });
+  });
+
+  describe("when a coding-agent metric carries no session key", () => {
+    // Codex and Copilot metrics are fleet-level by design upstream; they
+    // stay in the canonical metric tables.
+    it("contributes nothing", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(
+        dataPoint({
+          metricName: "claude_code.token.usage",
+          attributes: { type: "input" },
+          valueInt: "100",
+        }),
+      );
+
+      expect(dispatched).toHaveLength(0);
+    });
+  });
+
+  describe("when an unrelated metric passes by", () => {
+    it("is ignored", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(
+        dataPoint({
+          metricName: "http.server.duration",
+          attributes: { "session.id": "sess-1" },
+          valueDouble: 12,
+        }),
+      );
+
+      expect(dispatched).toHaveLength(0);
+    });
+  });
+});
+
+function valueTypeOf(valueDouble: number | null, valueInt: string | null) {
+  if (valueDouble !== null) return "double";
+  return valueInt !== null ? "int" : "none";
+}

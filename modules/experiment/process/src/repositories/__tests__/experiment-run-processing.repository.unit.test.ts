@@ -1,11 +1,11 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import { createTenantId, type AppendStore, type FoldProjectionStore } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
+import { buildExperimentRunProcessingPipeline } from "../../eventing/experiment-run-processing.pipeline.ts";
 import type { ClickHouseExperimentRunResultRecord } from "../../eventing/experiment-run-result-storage.projection.ts";
 import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
 import type { WorkflowEvaluationRunner } from "../../eventing/experiment-workflow-evaluation.subscriber.ts";
-import type { ExperimentRunProcessingPipeline } from "../clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { RedisExperimentRunProcessingRepository } from "../redis/redis.experiment-run-processing.repository.ts";
 
 /**
@@ -84,38 +84,25 @@ function compose(options: { foldCacheTtlSeconds?: number } = {}) {
   const set = vi.fn(async (..._args: unknown[]) => "OK");
   const redis = { get: vi.fn(async () => null), set };
 
-  const pipeline: ExperimentRunProcessingPipeline = RedisExperimentRunProcessingRepository.create({
+  const repository = RedisExperimentRunProcessingRepository.create({
     resolveClient: resolveClient as never,
     defaultRetentionDays: () => 49,
     redis: redis as never,
     ...(options.foldCacheTtlSeconds === undefined
       ? {}
       : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
-  }).buildProcessing(createApiFixture<WorkflowEvaluationRunner>({}, "workflowEvaluations"));
+  });
+  const pipeline = buildExperimentRunProcessingPipeline({
+    workflowEvaluations: createApiFixture<WorkflowEvaluationRunner>({}, "workflowEvaluations"),
+    experimentRunStateFoldStore: repository.stateFoldStore(),
+    experimentRunItemAppendStore: repository.itemStore(),
+  });
 
-  return { pipeline, insert, resolveClient, redis, set };
+  return { pipeline, repository, insert, resolveClient, redis, set };
 }
 
-function runStateStore(
-  pipeline: ExperimentRunProcessingPipeline,
-): FoldProjectionStore<ExperimentRunStateData> {
-  const fold = pipeline.foldProjections.get("experimentRunState");
-  expect(fold, "the pipeline registered no experimentRunState fold").toBeDefined();
-  return (fold!.definition as unknown as { store: FoldProjectionStore<ExperimentRunStateData> })
-    .store;
-}
-
-function runItemStore(
-  pipeline: ExperimentRunProcessingPipeline,
-): AppendStore<ClickHouseExperimentRunResultRecord> {
-  const map = pipeline.mapProjections.get("experimentRunResultStorage");
-  expect(map, "the pipeline registered no experimentRunResultStorage map").toBeDefined();
-  return (map!.definition as unknown as { store: AppendStore<ClickHouseExperimentRunResultRecord> })
-    .store;
-}
-
-async function storeThrough(pipeline: ExperimentRunProcessingPipeline): Promise<void> {
-  await runStateStore(pipeline).store(foldedState(), {
+async function storeThrough(repository: RedisExperimentRunProcessingRepository): Promise<void> {
+  await repository.stateFoldStore().store(foldedState(), {
     aggregateId: "experiment_1:run_1",
     tenantId: createTenantId("project_alpha"),
   });
@@ -150,9 +137,9 @@ describe("ClickHouseExperimentRunProcessingAdapter", () => {
   describe("when a run's folded state is stored", () => {
     /** @scenario "Run state is written through the client this graph resolved" */
     it("resolves the client for the tenant the state names", async () => {
-      const { pipeline, resolveClient, insert } = compose();
+      const { repository, resolveClient, insert } = compose();
 
-      await storeThrough(pipeline);
+      await storeThrough(repository);
 
       // The client this composition resolved, for the tenant the fold names.
       // A pipeline handed any other client registers the identical routing
@@ -163,9 +150,9 @@ describe("ClickHouseExperimentRunProcessingAdapter", () => {
 
     /** @scenario "Run state is written through the client this graph resolved" */
     it("stamps the row with the retention the substrate already carries", async () => {
-      const { pipeline, insert } = compose();
+      const { repository, insert } = compose();
 
-      await storeThrough(pipeline);
+      await storeThrough(repository);
 
       // 49 is the `defaultRetentionDays` this adapter was composed with, not a
       // number configured a second time. Two graphs stamping different
@@ -180,9 +167,9 @@ describe("ClickHouseExperimentRunProcessingAdapter", () => {
 
     /** @scenario "Both graphs cache the run-state fold under one keyspace" */
     it("writes the cache entry under the keyspace the App also reads", async () => {
-      const { pipeline, set } = compose();
+      const { repository, set } = compose();
 
-      await storeThrough(pipeline);
+      await storeThrough(repository);
 
       // Frozen twin: `PipelineRegistry.registerExperimentRunPipeline` caches
       // under `experiment_runs` too, and the two graphs share one Redis. A
@@ -195,9 +182,9 @@ describe("ClickHouseExperimentRunProcessingAdapter", () => {
   describe("when one run result is appended", () => {
     /** @scenario "Run items are written through the same client and retention" */
     it("writes it to the run-item table through the client this graph resolved", async () => {
-      const { pipeline, resolveClient, insert } = compose();
+      const { repository, resolveClient, insert } = compose();
 
-      await runItemStore(pipeline).append(runItem(), {
+      await repository.itemStore().append(runItem(), {
         aggregateId: "experiment_1:run_1",
         tenantId: createTenantId("project_alpha"),
       });
@@ -214,18 +201,18 @@ describe("ClickHouseExperimentRunProcessingAdapter", () => {
   describe("given a fold cache TTL named by the process", () => {
     /** @scenario "Producer and consumer honour one fold cache TTL" */
     it("writes cache entries with that TTL", async () => {
-      const { pipeline, set } = compose({ foldCacheTtlSeconds: 900 });
+      const { repository, set } = compose({ foldCacheTtlSeconds: 900 });
 
-      await storeThrough(pipeline);
+      await storeThrough(repository);
 
       expect(set.mock.calls[0]!.slice(2)).toEqual(["EX", 900]);
     });
 
     /** @scenario "Producer and consumer honour one fold cache TTL" */
     it("falls back to the replication-lag floor when the process names none", async () => {
-      const { pipeline, set } = compose();
+      const { repository, set } = compose();
 
-      await storeThrough(pipeline);
+      await storeThrough(repository);
 
       expect(set.mock.calls[0]!.slice(2)).toEqual(["EX", FOLD_CACHE_FLOOR_SECONDS]);
     });

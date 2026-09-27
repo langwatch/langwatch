@@ -27,11 +27,12 @@ import WebSocket from "ws";
 
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
 import type { LocalControlRuntime } from "../../app/langy.members.ts";
-import { RedisLangyLocalControlRuntimeRepository } from "../../repositories/redis/redis.langy-local-control-runtime.repository.ts";
+import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
 import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
 import type { LocalCallLookup } from "../../services/langy-local-call-dispatcher.service.ts";
 import { LocalControlConnectionService } from "../../services/langy-local-control-connection.service.ts";
 import { LocalControlLongPollService } from "../../services/langy-local-control-long-poll.service.ts";
+import { LangyLocalControlRuntimeService } from "../../services/langy-local-control-runtime.service.ts";
 import { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
 import {
   CONTROL_CONNECT_PATH,
@@ -138,8 +139,9 @@ const apiKeys = createApiFixture<ApiKeyApi>({
 });
 
 function testPorts(store: SessionStateStore) {
-  const runtime = RedisLangyLocalControlRuntimeRepository.create({
+  const runtime = LangyLocalControlRuntimeService.create({
     store,
+    presence: LangyLocalPresenceRedisRepository.create({ store }),
     projects: {
       getOrganizationId: async () => organizationId,
       getSlug: async () => "acme-shop",

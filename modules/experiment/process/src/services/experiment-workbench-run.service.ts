@@ -100,17 +100,19 @@ export class ExperimentWorkbenchRunService {
     }
     const runInputs = inputsParse.data;
 
-    const prepared = await ExperimentSavedStateExecutionService.prepareSavedStateExecution({
-      experiments: this.experiments,
-      services: this.runLoop.services,
-      projectId,
-      slug,
-      runInputs: {
-        data: runInputs.data,
-        datasetId: runInputs.dataset_id,
-        parameters: runInputs.parameters,
+    const prepared = await ExperimentSavedStateExecutionService.create().prepareSavedStateExecution(
+      {
+        experiments: this.experiments,
+        services: this.runLoop.services,
+        projectId,
+        slug,
+        runInputs: {
+          data: runInputs.data,
+          datasetId: runInputs.dataset_id,
+          parameters: runInputs.parameters,
+        },
       },
-    });
+    );
     if ("error" in prepared) {
       return { kind: "refused", status: prepared.status, error: prepared.error };
     }
@@ -118,7 +120,7 @@ export class ExperimentWorkbenchRunService {
     const scope: ExecutionScope = runInputs.row_indices
       ? { type: "rows", rowIndices: runInputs.row_indices }
       : { type: "full" };
-    const carriedOverCells = ExperimentSavedStateExecutionService.planSavedRunCarryOver({
+    const carriedOverCells = ExperimentSavedStateExecutionService.create().planSavedRunCarryOver({
       prepared,
       scope,
     });
@@ -149,7 +151,7 @@ export class ExperimentWorkbenchRunService {
 
     if (input.acceptsEvents) {
       const { ports } = runLoopOf(this.runLoop);
-      const orchestrator = ExperimentRunOrchestratorService.runOrchestrator({
+      const orchestrator = ExperimentRunOrchestratorService.create().runOrchestrator({
         projectId,
         experimentId: experiment.id,
         scope,
@@ -196,7 +198,7 @@ export class ExperimentWorkbenchRunService {
 
     const { ports, progress } = runLoopOf(this.runLoop);
 
-    const dataResult = await ExperimentExecutionDataService.loadExecutionData({
+    const dataResult = await ExperimentExecutionDataService.create().loadExecutionData({
       projectId,
       dataset: input.dataset,
       targets: input.targets,
@@ -246,7 +248,7 @@ export class ExperimentWorkbenchRunService {
       parameters: input.parameters,
     });
 
-    const orchestrator = ExperimentRunOrchestratorService.runOrchestrator({
+    const orchestrator = ExperimentRunOrchestratorService.create().runOrchestrator({
       projectId,
       experimentId: input.experimentId,
       scope: input.scope,

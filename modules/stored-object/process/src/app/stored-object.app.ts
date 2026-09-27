@@ -3,7 +3,7 @@
  * and they are not one operation: the portable capability answers metadata and
  * an async iterable, the byte surface needs the ROW. Each has its own name.
  */
-import { browserCallerOfRequest } from "@langwatch/api/rest";
+import type { RequestActor } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { ProcessMembers, RateLimiter } from "@langwatch/process-stores/members";
@@ -38,16 +38,19 @@ import type { ExternalImageChannel } from "../channels/external-image.channel.ts
 import { HttpExternalImageChannel } from "../channels/http/http.external-image.channel.ts";
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
 import { ImageProxyService } from "../services/image-proxy.service.ts";
+import {
+  StoredObjectFileReadService,
+  type StoredObjectFileAllowance,
+  type StoredObjectFileCaller,
+} from "../services/stored-object-file-read.service.ts";
 import type { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
-import type {
-  StoredObjectFileAllowance,
-  StoredObjectFileApi,
-  StoredObjectFileCaller,
-} from "../transport/stored-object-file.rest.ts";
+import type { StoredObjectFileApi } from "../transport/stored-object-file.rest.ts";
 import { buildStoredObjectInfrastructure } from "./stored-object-composition.build.ts";
 import type {
   StoredObjectDelivery,
+  StoredObjectFileBytes,
+  StoredObjectFileReadInput,
   StoredObjectFileReader,
   StoredObjectFileStreamRead,
   StoredObjectStorage,
@@ -158,6 +161,7 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
   readonly #permissions: AuthzApi;
   readonly #rateLimiter: RateLimiter;
   readonly #images: ImageProxyService;
+  readonly #files: StoredObjectFileReadService;
 
   private constructor(parts: {
     storage: StoredObjectService;
@@ -171,6 +175,18 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
     this.#permissions = parts.permissions;
     this.#rateLimiter = parts.rateLimiter;
     this.#images = parts.images;
+    this.#files = StoredObjectFileReadService.create({
+      identify: (input) => this.identify(input),
+      countRead: (input) => this.countRead(input),
+      assertProjectPermission: (input) => this.assertProjectPermission(input),
+      resolveOwner: (input) => this.resolveOwner(input),
+      readById: (input) => this.readById(input),
+    });
+  }
+
+  /** `GET /api/files/...`: one object's bytes, counted and authorized in the door's order. */
+  readFile(input: StoredObjectFileReadInput): Promise<StoredObjectFileBytes> {
+    return this.#files.read(input);
   }
 
   /** `GET /api/image-proxy`: an outside picture fetched behind the egress fence. */
@@ -178,11 +194,9 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
     return this.#images.proxy(input);
   }
 
-  /** Who the process's own browser verifier admitted on this request, before the handler ran. */
-  async identify({ request }: { request: Request }): Promise<StoredObjectFileCaller> {
-    const userId = browserCallerOfRequest(request)?.userId;
-
-    return userId ? { userId } : {};
+  /** Who the process's own browser verifier admitted: the session's person, when there is one. */
+  async identify({ actor }: { actor: RequestActor | null }): Promise<StoredObjectFileCaller> {
+    return actor?.type === "user" ? { userId: actor.id } : {};
   }
 
   /** One fixed-window count of the caller's reads, on the process's own limiter. */

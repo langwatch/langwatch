@@ -14,11 +14,8 @@ import type {
 } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
-import {
-  ExperimentExecutionDataService,
-  type LoadedEvaluators,
-  type LoadedWorkflow,
-} from "./experiment-execution-data.service.ts";
+import { promptLoadKey, workflowLoadKey } from "../rules/experiment-execution-data.rules.ts";
+import type { LoadedEvaluators, LoadedWorkflow } from "./experiment-execution-data.service.ts";
 
 export class ExperimentResultDispatchService {
   static create(): ExperimentResultDispatchService {
@@ -82,7 +79,7 @@ export class ExperimentResultDispatchService {
     }
 
     if (t.type === "prompt" && t.promptId) {
-      const loadedPrompt = loadedPrompts.get(ExperimentExecutionDataService.promptLoadKey(t));
+      const loadedPrompt = loadedPrompts.get(promptLoadKey(t));
       if (loadedPrompt?.model) {
         return loadedPrompt.model;
       }
@@ -125,7 +122,7 @@ export class ExperimentResultDispatchService {
     loadedWorkflows?: Map<string, LoadedWorkflow>;
   }): string | null {
     if (t.type === "prompt" && t.promptId) {
-      return loadedPrompts.get(ExperimentExecutionDataService.promptLoadKey(t))?.name ?? null;
+      return loadedPrompts.get(promptLoadKey(t))?.name ?? null;
     }
 
     if (t.type === "agent" && t.dbAgentId) {
@@ -137,7 +134,7 @@ export class ExperimentResultDispatchService {
     }
 
     if (t.type === "workflow" && t.workflowId) {
-      return loadedWorkflows?.get(ExperimentExecutionDataService.workflowLoadKey(t))?.name ?? null;
+      return loadedWorkflows?.get(workflowLoadKey(t))?.name ?? null;
     }
 
     return null;

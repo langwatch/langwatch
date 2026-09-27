@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type EvaluationExecutionResult,
   type EvaluationRunData,
@@ -107,8 +106,9 @@ export class TestMonitorLookup implements Pick<MonitorApi, "getById"> {
   constructor(private readonly monitor: MonitorWithEvaluator | null) {}
 }
 
-export function createTestTraceApi() {
-  const getEvaluationSpans = vi.fn(
+/** The two trace reads an execution makes, each a spy that answers empty. */
+export class TestTraceApi implements Pick<TraceApi, "getEvaluationSpans" | "getEvaluationEvents"> {
+  readonly getEvaluationSpans = vi.fn(
     async (_input: {
       tenantId: string;
       traceId: string;
@@ -116,18 +116,14 @@ export function createTestTraceApi() {
     }): Promise<EvaluationTraceSpan[]> => [],
   );
 
-  const getEvaluationEvents = vi.fn(
+  readonly getEvaluationEvents = vi.fn(
     async (_input: {
       tenantId: string;
       traceId: string;
       occurredAtMs?: number;
     }): Promise<EvaluationTraceEvent[]> => [],
   );
-
-  return createApiFixture<TraceApi>({ getEvaluationSpans, getEvaluationEvents });
 }
-
-export type TestTraceApi = ReturnType<typeof createTestTraceApi>;
 
 export class TestEvaluationService {
   readonly executeForTrace = vi.fn(
@@ -266,7 +262,7 @@ export function buildExecutionDeps(
   executionReceipt: TestEvaluationExecutionReceipt;
 } {
   const monitors = new TestMonitorLookup(options.monitor ?? buildMonitor());
-  const traces = createTestTraceApi();
+  const traces = new TestTraceApi();
   const evaluations = new TestEvaluationService();
   if (options.executionResult)
     evaluations.executeForTrace.mockResolvedValue(options.executionResult);

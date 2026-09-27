@@ -59,6 +59,9 @@
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
+      "path": "../../gateway/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../github/contract/tsconfig.build.json"
     },
     {
@@ -93,6 +96,9 @@
     },
     {
       "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../secret/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/secrets/tsconfig.build.json"

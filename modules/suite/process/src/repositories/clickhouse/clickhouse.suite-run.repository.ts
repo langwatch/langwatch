@@ -78,19 +78,20 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
   ): Promise<void> {
     EventUtils.validateTenantId(context, "SuiteRunStateRepositoryClickHouse.storeProjection");
     if (!EventUtils.isValidProjection(projection)) {
-      throw new ValidationError(
-        "Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
-        "projection",
-        projection,
-      );
+      throw new ValidationError({
+        reason:
+          "Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
+        field: "projection",
+        value: projection,
+      });
     }
     if (projection.tenantId !== context.tenantId) {
-      throw new SecurityError(
-        "storeProjection",
-        `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
-        projection.tenantId,
-        { contextTenantId: context.tenantId },
-      );
+      throw new SecurityError({
+        operation: "storeProjection",
+        message: `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+        tenantId: projection.tenantId,
+        context: { contextTenantId: context.tenantId },
+      });
     }
     try {
       await this.options.clickhouse.insert({
@@ -129,12 +130,12 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
     EventUtils.validateTenantId(context, "SuiteRunStateRepositoryClickHouse.storeProjectionBatch");
     for (const projection of projections) {
       if (projection.tenantId !== context.tenantId) {
-        throw new SecurityError(
-          "storeProjectionBatch",
-          `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
-          projection.tenantId,
-          { contextTenantId: context.tenantId },
-        );
+        throw new SecurityError({
+          operation: "storeProjectionBatch",
+          message: `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+          tenantId: projection.tenantId,
+          context: { contextTenantId: context.tenantId },
+        });
       }
     }
     try {
@@ -172,14 +173,14 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
   }): StoreError {
     const errorMessage = input.error instanceof Error ? input.error.message : String(input.error);
     logger.warn({ ...input.logContext, error: input.error }, input.logMessage);
-    return new StoreError(
-      input.operation,
-      "SuiteRunStateRepositoryClickHouse",
-      `${input.message}: ${errorMessage}`,
-      classifyClickHouseError(input.error),
-      input.context,
-      input.error,
-    );
+    return new StoreError({
+      operation: input.operation,
+      store: "SuiteRunStateRepositoryClickHouse",
+      message: `${input.message}: ${errorMessage}`,
+      category: classifyClickHouseError(input.error),
+      context: input.context,
+      cause: input.error,
+    });
   }
 
   private static mapRowToState(row: Record<string, unknown>): SuiteRunStateData {

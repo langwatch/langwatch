@@ -85,7 +85,6 @@ describe("readCodingAgentTranscript", () => {
     it("answers an empty transcript rather than an error", async () => {
       getLogsByTraceId.mockResolvedValue([
         {
-          traceId: TRACE_ID,
           spanId: "aaaa432be48046f6",
           timeUnixMs: 100,
           body: "GET /users",

@@ -16,7 +16,7 @@ export interface StagedPayload {
   discard(): Promise<void>;
 }
 
-export abstract class PayloadStaging {
+export abstract class PayloadStagingRepository {
   abstract stage(input: {
     projectId: string;
     /** The path segment the parked object is filed under. */

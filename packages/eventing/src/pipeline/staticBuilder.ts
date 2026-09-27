@@ -467,15 +467,20 @@ export class PipelineBuilder<
     Payload extends TenantScopedPayload,
     Type extends CommandType,
     Name extends string,
-  >(
-    name: Name,
+  >({
+    name,
+    handlerClass,
+    instance,
+    options,
+  }: {
+    name: Name;
     handlerClass: { readonly schema: CommandSchema<Payload, Type> } & CommandHandlerClassStatic<
       NoInfer<Payload>,
       NoInfer<Type>
-    >,
-    instance: CommandHandler<Command<NoInfer<Payload>>, EventType>,
-    options?: CommandHandlerOptions<Payload>,
-  ): PipelineBuilder<
+    >;
+    instance: CommandHandler<Command<NoInfer<Payload>>, EventType>;
+    options?: CommandHandlerOptions<Payload>;
+  }): PipelineBuilder<
     EventType,
     RegisteredProjections,
     RegisteredCommands | { name: Name; payload: Payload },

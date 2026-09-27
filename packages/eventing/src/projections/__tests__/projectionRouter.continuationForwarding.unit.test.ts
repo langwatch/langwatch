@@ -32,15 +32,15 @@ describe("continuation forwarding", () => {
       });
 
       const seenContexts: unknown[] = [];
-      queueManager.initializeProjectionQueues(
-        {
+      queueManager.initializeProjectionQueues({
+        projections: {
           myFold: { name: "myFold", coalesceMaxBatch: 10 },
         },
-        async () => {},
-        async (_name, _events, context) => {
+        onEvent: async () => {},
+        onEventBatch: async (_name, _events, context) => {
           seenContexts.push(context);
         },
-      );
+      });
 
       const entry = [...registry.values()][0]!;
       const event = createTestEvent(
@@ -61,13 +61,12 @@ describe("continuation forwarding", () => {
   describe("when the router's batch callback receives a continuation context", () => {
     it("commits with the applied set extended rather than replaced", async () => {
       const queueManager = createMockQueueManager();
-      const initializeSpy = queueManager.initializeProjectionQueues as ReturnType<typeof vi.fn>;
 
-      const router = new ProjectionRouter(
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.PIPELINE_NAME,
+      const router = new ProjectionRouter({
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         queueManager,
-      );
+      });
 
       const stored: { appliedEventIds?: readonly string[] }[] = [];
       const store: FoldProjectionStore<{ count: number }> = {
@@ -91,11 +90,9 @@ describe("continuation forwarding", () => {
 
       // The batch callback the router handed the queue manager — the exact
       // function the runtime invokes for a coalesced fold batch.
-      const onEventBatch = initializeSpy.mock.calls[0]![2] as (
-        name: string,
-        events: Event[],
-        context: Record<string, unknown>,
-      ) => Promise<void>;
+      const [request] = vi.mocked(queueManager.initializeProjectionQueues).mock.calls[0] ?? [];
+      const onEventBatch = request?.onEventBatch;
+      if (!onEventBatch) throw new Error("the router registered no batch callback");
 
       const tenantId = createTestTenantId();
       const makeEvents = (ids: string[]) =>

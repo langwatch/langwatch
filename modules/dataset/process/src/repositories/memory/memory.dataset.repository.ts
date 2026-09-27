@@ -94,7 +94,7 @@ export class MemoryDatasetRepository implements DatasetRepository {
   }
 
   async create(input: DatasetCreateInput): Promise<Dataset> {
-    const now = this.#database.now();
+    const now = toDate(this.#database.now());
     this.#nextId += 1;
     const row: DatasetRow = {
       id: `dataset_${this.#nextId}`,
@@ -132,7 +132,7 @@ export class MemoryDatasetRepository implements DatasetRepository {
       name: input.name,
       slug: input.slug,
       columnTypes: input.columnTypes,
-      updatedAt: this.#database.now(),
+      updatedAt: toDate(this.#database.now()),
     };
 
     this.#database.putDataset(updated);
@@ -151,7 +151,7 @@ export class MemoryDatasetRepository implements DatasetRepository {
       ...row,
       slug: input.slug,
       archivedAt: input.archivedAt ? toDate(input.archivedAt) : null,
-      updatedAt: this.#database.now(),
+      updatedAt: toDate(this.#database.now()),
     };
 
     this.#database.putDataset(updated);
@@ -165,7 +165,7 @@ export class MemoryDatasetRepository implements DatasetRepository {
       ...row,
       slug: input.slug,
       archivedAt: null,
-      updatedAt: this.#database.now(),
+      updatedAt: toDate(this.#database.now()),
     };
 
     this.#database.putDataset(updated);
@@ -182,7 +182,7 @@ export class MemoryDatasetRepository implements DatasetRepository {
     const updated: DatasetRow = {
       ...row,
       mapping: input.mapping,
-      updatedAt: this.#database.now(),
+      updatedAt: toDate(this.#database.now()),
     };
 
     this.#database.putDataset(updated);

@@ -21,6 +21,7 @@ export * from "./query-reference.ts";
 export * from "./analytics.lwql-time-window.ts";
 export * from "./series-points.ts";
 export * from "./analytics.timeseries.ts";
+export * from "./analytics.chart-series.ts";
 export * from "./analytics.evaluation.ts";
 export {
   BUILDER_CHART_KIND,

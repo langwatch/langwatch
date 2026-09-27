@@ -83,7 +83,7 @@ export type DatasetEditorActions = {
   upsertExternalRecord: (record: EditorRecord) => void;
   /** Display-sync removal counterpart to upsertExternalRecord. */
   removeExternalRecord: (recordId: string) => void;
-  setCellValue: (datasetId: string, row: number, columnId: string, value: string) => void;
+  setCellValue: (args: { datasetId: string; row: number; columnId: string; value: string }) => void;
   addRow: () => number;
   deleteSelectedRows: () => void;
   setEditingCell: (cell: CellPosition | undefined) => void;
@@ -146,7 +146,7 @@ export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
       set({ records: get().records.filter((r) => r.id !== recordId) });
     },
 
-    setCellValue: (_datasetId, row, columnId, value) => {
+    setCellValue: ({ row, columnId, value }) => {
       const { columns, records, dbDatasetId, pendingSavedChanges } = get();
       const column = columns.find((c) => c.id === columnId);
       if (!column) return;

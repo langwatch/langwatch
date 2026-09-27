@@ -6,39 +6,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  type LangyGithubPrCountRedis,
+  LangyGithubPrCountRedisRepository,
+} from "../../repositories/redis/redis.langy-github-pr-count.repository.ts";
+import {
   LANGY_GITHUB_PRS_PER_DAY,
-  LangyGithubPrCounter,
   LangyGithubPrQuotaService,
 } from "../langy-github-pr-quota.service.ts";
 
-const get = vi.fn();
-const incr = vi.fn();
-const decr = vi.fn();
-const expire = vi.fn();
+const get = vi.fn<(key: string) => Promise<string | null>>();
+const incr = vi.fn<(key: string, amount: number) => Promise<number>>();
+const decr = vi.fn<(key: string) => Promise<number>>();
+const expire = vi.fn<(key: string, seconds: number) => Promise<number>>();
+const floored = vi.fn<(script: string, numKeys: number, ...args: string[]) => Promise<unknown>>();
 
-/** The composed counter, when a deployment has one. */
-class FakeCounter extends LangyGithubPrCounter {
-  async count(key: string): Promise<number> {
-    const raw: unknown = await get(key);
-    return typeof raw === "string" ? Number.parseInt(raw, 10) : 0;
-  }
-  incr(key: string) {
-    return incr(key) as Promise<number>;
-  }
-  decr(key: string) {
-    return decr(key) as Promise<number>;
-  }
-  incrby(key: string, amount: number) {
-    return incr(key, amount) as Promise<number>;
-  }
-  expire(key: string, seconds: number) {
-    return expire(key, seconds) as Promise<unknown>;
-  }
-}
+/** The deployment's Redis, as the count repository drives it. */
+const redis: LangyGithubPrCountRedis = { get, incrby: incr, decr, expire, eval: floored };
 
-const counter = new FakeCounter();
-const quota = LangyGithubPrQuotaService.create({ counter });
-const quotaWithoutCounter = LangyGithubPrQuotaService.create({ counter: null });
+const counts = LangyGithubPrCountRedisRepository.create({ redis });
+const quota = LangyGithubPrQuotaService.create({ counts });
+const quotaWithoutCounter = LangyGithubPrQuotaService.create({ counts: null });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -165,10 +152,11 @@ describe("LangyGithubPrQuotaService.reservePermit", () => {
 
 describe("LangyGithubPrQuotaService.releasePermit", () => {
   describe("when called for a turn that opened no PR", () => {
-    it("DECRs to return the slot to the daily pool", async () => {
-      decr.mockResolvedValue(4);
+    it("gives the slot back through the floored decrement, never below zero", async () => {
+      floored.mockResolvedValue(4);
       await quota.releasePermit({ userId: "u1" });
-      expect(decr).toHaveBeenCalledTimes(1);
+      expect(floored).toHaveBeenCalledTimes(1);
+      expect(floored.mock.calls[0]?.[2]).toMatch(/^langy:gh:prs:u1:/);
     });
   });
 

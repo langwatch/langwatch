@@ -1,5 +1,5 @@
 /**
- * Unit tests for AzureBlobStoredObjectDriverAdapter. The driver talks the Azure Blob REST
+ * Unit tests for AzureStoredObjectBlobRepository. The driver talks the Azure Blob REST
  * API directly via global `fetch`, so we stub `fetch` to verify:
  * @vitest-environment node
  */
@@ -11,7 +11,7 @@ import {
   mintAzureBlobStoredObjectUri,
   ObjectNotFoundError,
 } from "@langwatch/stored-object-contract";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 // Token-mode tests isolate the driver from real @azure/identity network
 // calls — token acquisition itself is covered by
@@ -20,16 +20,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // responses.
 const getAzureBlobTokenMock = vi.fn();
 const invalidateAzureBlobTokenMock = vi.fn();
-vi.mock("#services/azure-blob-token-provider.service", () => ({
-  AzureBlobTokenProviderAdapter: {
-    getAzureBlobToken: (...args: unknown[]) => getAzureBlobTokenMock(...args),
-    invalidateAzureBlobToken: (...args: unknown[]) => invalidateAzureBlobTokenMock(...args),
-  },
+vi.mock("#repositories/azure/azure.blob-token.store", () => ({
+  getAzureBlobToken: (...args: unknown[]) => getAzureBlobTokenMock(...args),
+  invalidateAzureBlobToken: (...args: unknown[]) => invalidateAzureBlobTokenMock(...args),
 }));
 
-import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
-import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
-import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
+import { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
+import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
+import { StoredObjectStorageRegistryService } from "#services/stored-object-storage-registry.service";
 
 const ACCOUNT_NAME = "lwtestacct";
 // Base64-encoded 256-bit key — arbitrary fixed value for deterministic signature tests.
@@ -39,13 +37,13 @@ const BLOB_PATH = "proj-1/abc123";
 const URI = `azure-blob://${ACCOUNT_NAME}/${CONTAINER}/${BLOB_PATH}`;
 
 // We capture every fetch call here so each test asserts request shape.
-let fetchSpy: ReturnType<typeof vi.fn>;
+let fetchSpy: Mock<typeof globalThis.fetch>;
 let originalFetch: typeof globalThis.fetch;
 
 beforeEach(() => {
   originalFetch = globalThis.fetch;
-  fetchSpy = vi.fn();
-  globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch;
+  fetchSpy = vi.fn<typeof globalThis.fetch>();
+  globalThis.fetch = fetchSpy;
   getAzureBlobTokenMock.mockReset();
   invalidateAzureBlobTokenMock.mockReset();
 });
@@ -55,8 +53,18 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+/** One recorded fetch call, refusing a call that carried no request options. */
+function callOf(index: number): [string, RequestInit] {
+  const call = fetchSpy.mock.calls[index];
+  const [url, init] = call ?? [];
+  if (typeof url !== "string" || !init) {
+    throw new Error(`fetch call ${index} was not a URL string with request options`);
+  }
+  return [url, init];
+}
+
 function newDriver() {
-  return AzureBlobStoredObjectDriverAdapter.create({
+  return AzureStoredObjectBlobRepository.create({
     mode: "sharedKey",
     accountName: ACCOUNT_NAME,
     accountKey: ACCOUNT_KEY,
@@ -66,7 +74,7 @@ function newDriver() {
 function newTokenModeDriver(
   mode: "workloadIdentity" | "managedIdentity" | "azureCli" = "workloadIdentity",
 ) {
-  return AzureBlobStoredObjectDriverAdapter.create({
+  return AzureStoredObjectBlobRepository.create({
     mode,
     accountName: ACCOUNT_NAME,
     identity: {},
@@ -74,7 +82,7 @@ function newTokenModeDriver(
 }
 
 /** Stub for non-Azure registry slots; tests assert routing only. */
-class NeverCalledDriver implements StoredObjectStorageDriver {
+class NeverCalledDriver implements StoredObjectBlobRepository {
   get(): Promise<Readable> {
     throw new Error("not expected to be called in this suite");
   }
@@ -89,7 +97,7 @@ class NeverCalledDriver implements StoredObjectStorageDriver {
   }
 }
 
-describe("AzureBlobStoredObjectDriverAdapter", () => {
+describe("AzureStoredObjectBlobRepository", () => {
   // Restored in a hook, never inline: a rejected assertion between
   // useFakeTimers() and an inline restore would leave every subsequent test
   // in this file on a frozen clock, failing somewhere unrelated.
@@ -122,7 +130,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
       // GET — same bytes come back.
       fetchSpy.mockResolvedValueOnce(new Response(payload, { status: 200 }));
 
-      const registry = StoredObjectStorageRegistryAdapter.create({
+      const registry = StoredObjectStorageRegistryService.create({
         s3: new NeverCalledDriver(),
         file: new NeverCalledDriver(),
         "azure-blob": azure,
@@ -136,8 +144,8 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
 
       // Both PUT and GET hit the azure-blob endpoint (proves the registry
       // routed to the Azure driver and didn't sneak through S3 / file).
-      const [putUrl] = fetchSpy.mock.calls[0]!;
-      const [getUrl] = fetchSpy.mock.calls[1]!;
+      const [putUrl] = callOf(0);
+      const [getUrl] = callOf(1);
       expect(putUrl).toContain(".blob.core.windows.net");
       expect(getUrl).toContain(".blob.core.windows.net");
     });
@@ -166,7 +174,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
       const stream = await driver.get(URI);
 
       expect(fetchSpy).toHaveBeenCalledOnce();
-      const [url, init] = fetchSpy.mock.calls[0]!;
+      const [url, init] = callOf(0);
       // Public-cloud endpoint shape — account name in the host position,
       // container + blob path concatenated with single slashes.
       expect(url).toBe(`https://${ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER}/${BLOB_PATH}`);
@@ -212,7 +220,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
       const bytes = Buffer.from("payload", "utf8");
       await driver.put(URI, bytes, "image/png");
 
-      const [url, init] = fetchSpy.mock.calls[0]!;
+      const [url, init] = callOf(0);
       expect(url).toBe(`https://${ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER}/${BLOB_PATH}`);
       expect(init.method).toBe("PUT");
       const headers = init.headers as Record<string, string>;
@@ -250,7 +258,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
 
       await driver.delete(URI);
 
-      const [, init] = fetchSpy.mock.calls[0]!;
+      const [, init] = callOf(0);
       expect(init.method).toBe("DELETE");
       const headers = init.headers as Record<string, string>;
       expect(headers.Authorization).toMatch(new RegExp(`^SharedKey ${ACCOUNT_NAME}:`));
@@ -292,7 +300,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
       await driver.ensureContainer(CONTAINER);
 
       expect(fetchSpy).toHaveBeenCalledOnce();
-      const [url, init] = fetchSpy.mock.calls[0]!;
+      const [url, init] = callOf(0);
       expect(url).toBe(
         `https://${ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER}?restype=container`,
       );
@@ -338,7 +346,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date(KAT_TIMESTAMP));
 
-      const driver = AzureBlobStoredObjectDriverAdapter.create({
+      const driver = AzureStoredObjectBlobRepository.create({
         mode: "sharedKey",
         accountName: KAT_ACCOUNT_NAME,
         accountKey: KAT_ACCOUNT_KEY,
@@ -347,7 +355,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
       await driver.put(KAT_URI, KAT_BODY, "application/octet-stream");
 
-      const [, init] = fetchSpy.mock.calls[0]!;
+      const [, init] = callOf(0);
       const headers = init.headers as Record<string, string>;
       expect(headers.Authorization).toBe(KAT_EXPECTED_AUTH);
     });
@@ -386,7 +394,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
 
   describe("when an alternate endpoint is configured (e.g. Azurite emulator)", () => {
     it("uses the configured endpoint instead of the public-cloud hostname", async () => {
-      const driver = AzureBlobStoredObjectDriverAdapter.create({
+      const driver = AzureStoredObjectBlobRepository.create({
         mode: "sharedKey",
         accountName: ACCOUNT_NAME,
         accountKey: ACCOUNT_KEY,
@@ -396,7 +404,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
 
       await driver.get(URI);
 
-      const [url] = fetchSpy.mock.calls[0]!;
+      const [url] = callOf(0);
       expect(url).toBe(`http://127.0.0.1:10000/devstoreaccount1/${CONTAINER}/${BLOB_PATH}`);
     });
   });
@@ -410,13 +418,13 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
     const PATH_STYLE_TIMESTAMP = "Wed, 23 Oct 2013 09:49:06 GMT";
     const PATH_STYLE_BODY = Buffer.from("hello world"); // 11 bytes
     const PATH_STYLE_URI = `azure-blob://${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`;
-    let pathStyleDriver: AzureBlobStoredObjectDriverAdapter;
+    let pathStyleDriver: AzureStoredObjectBlobRepository;
 
     beforeEach(() => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date(PATH_STYLE_TIMESTAMP));
 
-      pathStyleDriver = AzureBlobStoredObjectDriverAdapter.create({
+      pathStyleDriver = AzureStoredObjectBlobRepository.create({
         mode: "sharedKey",
         accountName: PATH_STYLE_ACCOUNT,
         accountKey: ACCOUNT_KEY,
@@ -456,7 +464,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
         .update(stringToSign, "utf8")
         .digest("base64");
 
-      const [, init] = fetchSpy.mock.calls[0]!;
+      const [, init] = callOf(0);
       const headers = init.headers as Record<string, string>;
       expect(headers.Authorization).toBe(`SharedKey ${PATH_STYLE_ACCOUNT}:${expectedSignature}`);
     });
@@ -490,7 +498,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
         .update(wrongStringToSign, "utf8")
         .digest("base64");
 
-      const [, init] = fetchSpy.mock.calls[0]!;
+      const [, init] = callOf(0);
       const headers = init.headers as Record<string, string>;
       expect(headers.Authorization).not.toBe(`SharedKey ${PATH_STYLE_ACCOUNT}:${wrongSignature}`);
     });
@@ -522,7 +530,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
         await run();
 
         expect(fetchSpy).toHaveBeenCalledOnce();
-        const [, init] = fetchSpy.mock.calls[0]!;
+        const [, init] = callOf(0);
         const headers = init.headers as Record<string, string>;
         expect(headers.Authorization).toBe("Bearer bearer-token-value");
         expect(headers.Authorization).not.toMatch(/^SharedKey/);
@@ -596,16 +604,16 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
     it("produces the same Authorization header for a host-style and a path-style endpoint, neither carrying a SharedKey signature", async () => {
       getAzureBlobTokenMock.mockResolvedValue("same-bearer-token");
 
-      const hostStyleDriver = AzureBlobStoredObjectDriverAdapter.create({
+      const hostStyleDriver = AzureStoredObjectBlobRepository.create({
         mode: "workloadIdentity",
         accountName: ACCOUNT_NAME,
         identity: {},
       });
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
       await hostStyleDriver.put(URI, Buffer.from("x"), "application/octet-stream");
-      const hostHeaders = fetchSpy.mock.calls[0]![1].headers as Record<string, string>;
+      const hostHeaders = callOf(0)[1].headers as Record<string, string>;
 
-      const pathStyleDriver = AzureBlobStoredObjectDriverAdapter.create({
+      const pathStyleDriver = AzureStoredObjectBlobRepository.create({
         mode: "workloadIdentity",
         accountName: ACCOUNT_NAME,
         identity: {},
@@ -613,7 +621,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
       });
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
       await pathStyleDriver.put(URI, Buffer.from("x"), "application/octet-stream");
-      const pathHeaders = fetchSpy.mock.calls[1]![1].headers as Record<string, string>;
+      const pathHeaders = callOf(1)[1].headers as Record<string, string>;
 
       expect(hostHeaders.Authorization).toBe("Bearer same-bearer-token");
       expect(pathHeaders.Authorization).toBe("Bearer same-bearer-token");
@@ -637,7 +645,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
       expect(exists).toBe(true);
       expect(fetchSpy).toHaveBeenCalledTimes(2);
       expect(invalidateAzureBlobTokenMock).toHaveBeenCalledOnce();
-      const [, retryInit] = fetchSpy.mock.calls[1]!;
+      const [, retryInit] = callOf(1);
       expect((retryInit.headers as Record<string, string>).Authorization).toBe(
         "Bearer fresh-token",
       );

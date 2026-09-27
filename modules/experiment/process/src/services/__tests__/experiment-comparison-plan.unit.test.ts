@@ -112,7 +112,7 @@ describe("ExperimentRunOrchestratorService.generateComparisonCells given a compa
   const runWith = (target: EvaluationsV3State["targets"][0]) => {
     const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
     state.targets.push(target);
-    return ExperimentRunOrchestratorService.generateComparisonCells({
+    return ExperimentRunOrchestratorService.create().generateComparisonCells({
       scopedRowIndices: undefined,
       state,
       datasetRows: createTestDataset(2),
@@ -143,7 +143,7 @@ describe("ExperimentRunOrchestratorService.generateComparisonCells given a compa
       expect(skipReasons[0]?.kind).toBe("too-few-variants");
       expect(skipReasons[0]?.targetId).toBe("comparison-column");
       expect(
-        ExperimentRunOrchestratorService.comparisonSkipMessage(skipReasons[0]!).errorType,
+        ExperimentRunOrchestratorService.create().comparisonSkipMessage(skipReasons[0]!).errorType,
       ).toBe("TooFewComparisonVariants");
     });
   });
@@ -165,7 +165,7 @@ describe("ExperimentRunOrchestratorService.generateComparisonCells given a compa
       expect(skipReasons).toHaveLength(2);
       expect(skipReasons[0]?.kind).toBe("golden-not-set");
       expect(
-        ExperimentRunOrchestratorService.comparisonSkipMessage(skipReasons[0]!).errorType,
+        ExperimentRunOrchestratorService.create().comparisonSkipMessage(skipReasons[0]!).errorType,
       ).toBe("GoldenFieldNotSet");
     });
   });
@@ -187,7 +187,7 @@ describe("ExperimentRunOrchestratorService.generateComparisonCells given a compa
       expect(skipReasons).toHaveLength(2);
       expect(skipReasons[0]?.kind).toBe("variant-not-found");
       expect(
-        ExperimentRunOrchestratorService.comparisonSkipMessage(skipReasons[0]!).errorType,
+        ExperimentRunOrchestratorService.create().comparisonSkipMessage(skipReasons[0]!).errorType,
       ).toBe("ComparisonVariantNotFound");
     });
   });
@@ -210,12 +210,13 @@ describe("ExperimentRunOrchestratorService.generateComparisonCells given a compa
         },
       });
 
-      const { cells, skipReasons } = ExperimentRunOrchestratorService.generateComparisonCells({
-        scopedRowIndices: [1],
-        state,
-        datasetRows: createTestDataset(2),
-        completedTargetOutputs: new Map(),
-      });
+      const { cells, skipReasons } =
+        ExperimentRunOrchestratorService.create().generateComparisonCells({
+          scopedRowIndices: [1],
+          state,
+          datasetRows: createTestDataset(2),
+          completedTargetOutputs: new Map(),
+        });
 
       expect(cells).toHaveLength(0);
       expect(skipReasons).toHaveLength(1);

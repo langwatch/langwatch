@@ -60,7 +60,11 @@ function makeDeps({
 const WINDOW = { from: 0, to: 3_600_000 };
 
 function run({ deps, source }: { deps: ReportChartDeps; source: ReportSource }) {
-  return ReportChartService.loadReportCharts({ deps, source, projectId: "proj-1", ...WINDOW });
+  return ReportChartService.create(deps).loadReportCharts({
+    source,
+    projectId: "proj-1",
+    ...WINDOW,
+  });
 }
 
 describe("ReportChartService.loadReportCharts", () => {

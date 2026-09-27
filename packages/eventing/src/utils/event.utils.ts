@@ -224,14 +224,17 @@ function isValidProjection(projection: unknown): projection is Projection {
 /** Validates tenantId to prevent cross-tenant data leakage. */
 function validateTenantId(context: { tenantId?: string } | undefined, operation: string): void {
   if (!context) {
-    throw new SecurityError(
+    throw new SecurityError({
       operation,
-      `${operation} requires a context with tenantId for tenant isolation`,
-    );
+      message: `${operation} requires a context with tenantId for tenant isolation`,
+    });
   }
 
   if (!context.tenantId) {
-    throw new SecurityError(operation, `${operation} requires a tenantId for tenant isolation`);
+    throw new SecurityError({
+      operation,
+      message: `${operation} requires a tenantId for tenant isolation`,
+    });
   }
 
   // Use TenantIdSchema for consistent validation (handles empty strings, whitespace, etc.)
@@ -239,7 +242,7 @@ function validateTenantId(context: { tenantId?: string } | undefined, operation:
   if (!result.success) {
     const errorMessage =
       result.error.issues[0]?.message ?? "TenantId must be a non-empty string for tenant isolation";
-    throw new SecurityError(operation, errorMessage);
+    throw new SecurityError({ operation, message: errorMessage });
   }
 }
 

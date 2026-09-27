@@ -192,11 +192,11 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     // this tenant's ClickHouse. Refuse rather than cross the line.
     for (const record of records) {
       if (record.tenantId !== tenantId) {
-        throw new SecurityError(
-          "CodingAgentSessionEventsClickHouseRepository.ensure",
-          "session events batch spans multiple tenants",
+        throw new SecurityError({
+          operation: "CodingAgentSessionEventsClickHouseRepository.ensure",
+          message: "session events batch spans multiple tenants",
           tenantId,
-        );
+        });
       }
     }
 

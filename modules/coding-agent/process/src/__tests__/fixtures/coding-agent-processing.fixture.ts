@@ -265,6 +265,10 @@ export class TestModelProviderService implements ModelProviderApi {
     throw new Error("Not used by Coding Agent tests.");
   }
 
+  completeCodexDeviceSignIn(): Promise<never> {
+    throw new Error("Not used by Coding Agent tests.");
+  }
+
   getDefaultSnapshotUnattributed(): Promise<never> {
     throw new Error("Not used by Coding Agent tests.");
   }

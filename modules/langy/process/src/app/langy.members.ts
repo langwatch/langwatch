@@ -370,16 +370,6 @@ export abstract class LangyModel {
   abstract resolve(input: { projectId: string }): Promise<{ modelId: string }>;
 }
 
-/**
- * Private port for Langy's Redis-backed feedback cadence. The portable
- * contract exposes the two operations on LangyApi; Redis and the cadence
- * record do not become part of the feature boundary.
- */
-export abstract class LangyFeedbackPromptRedis {
-  abstract get: (key: string) => Promise<string | null>;
-  abstract set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
-}
-
 /** Command dispatchers injected from the event-sourcing pipeline registry. */
 type Dispatch<T> = (data: T & CommandEnvelope) => Promise<void>;
 

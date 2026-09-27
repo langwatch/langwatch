@@ -39,8 +39,8 @@ function services(tier: "free" | "paid" | "enterprise" = "free") {
 const load = (
   tier: "free" | "paid" | "enterprise",
   rowCount: number,
-): Promise<Awaited<ReturnType<typeof ExperimentExecutionDataService.loadExecutionData>>> =>
-  ExperimentExecutionDataService.loadExecutionData({
+): Promise<Awaited<ReturnType<ExperimentExecutionDataService["loadExecutionData"]>>> =>
+  ExperimentExecutionDataService.create().loadExecutionData({
     projectId: PROJECT_ID,
     dataset: { type: "inline", columns: [] },
     targets: [],

@@ -9,6 +9,7 @@ import { StalledRunsBackfillTask } from "./tasks/stalled-runs-backfill.task.ts";
 import { scenarioEventsRest } from "./transport/scenario-event.rest.ts";
 import { scenarioGenerateRest } from "./transport/scenario-generate.rest.ts";
 import { scenarioRunExportRest } from "./transport/scenario-run-export.rest.ts";
+import { createScenarioVoiceMediaDoor } from "./transport/scenario-voice-media.ws.ts";
 import { scenarioVoiceRest } from "./transport/scenario-voice.rest.ts";
 import { createScenarioRest, scenarioRestSurface } from "./transport/scenario.rest.ts";
 import { scenarioTrpcTransport } from "./transport/scenario.trpc.ts";
@@ -21,6 +22,7 @@ export const scenarioServer = defineServerModule("scenario")
   .withTransports(
     createScenarioRest(),
     createSimulationRunsRest(),
+    createScenarioVoiceMediaDoor(),
     scenarioEventsRest,
     scenarioGenerateRest,
     scenarioRunExportRest,

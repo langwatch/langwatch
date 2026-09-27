@@ -202,6 +202,57 @@ export type LangWatchQLExecuteInput = LangWatchQLRunContext &
     parameters?: Readonly<Record<string, unknown>>;
   }>;
 
+/** The key columns a pass may select beside `TraceId`, when the statement projects them. */
+export const LWQL_PASS_KEY_COLUMNS = ["ThreadId", "SpanId", "OccurredAt"] as const;
+export const langWatchQLPassKeyColumnSchema = z.enum(LWQL_PASS_KEY_COLUMNS);
+export type LangWatchQLPassKeyColumn = z.infer<typeof langWatchQLPassKeyColumnSchema>;
+
+export function isLangWatchQLPassKeyColumn(name: string): name is LangWatchQLPassKeyColumn {
+  return langWatchQLPassKeyColumnSchema.validate(name);
+}
+
+/** The parameters a pass binds itself: its key cursor and its sample's bucket count. */
+export const LWQL_PASS_AFTER_TRACE_PARAMETER = "instant_eval_after_trace_id";
+export const LWQL_PASS_AFTER_SPAN_PARAMETER = "instant_eval_after_span_id";
+export const LWQL_PASS_SAMPLE_BUCKET_PARAMETER = "instant_eval_buckets";
+
+const passRowCountSchema = z.number().int().positive();
+const passKeyColumnsSchema = z.array(langWatchQLPassKeyColumnSchema).readonly();
+
+/**
+ * The fixed wrappers Analytics composes around an accepted statement, by kind. A caller names
+ * one and never writes the wrapper's SQL. @see specs/instant-evals/instant-eval-pipeline.feature
+ */
+export const langWatchQLPassSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("probe") }).strict(),
+  z.object({ kind: z.literal("count"), limit: passRowCountSchema }).strict(),
+  z
+    .object({
+      kind: z.literal("keys"),
+      keyColumns: passKeyColumnsSchema,
+      limit: passRowCountSchema,
+      after: z.object({ traceId: z.string(), spanId: z.string().nullable() }).strict().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("sample"),
+      keyColumns: passKeyColumnsSchema,
+      limit: passRowCountSchema,
+      buckets: passRowCountSchema,
+    })
+    .strict(),
+  z.object({ kind: z.literal("page"), traceIds: z.array(z.string()).readonly() }).strict(),
+]);
+export type LangWatchQLPass = z.infer<typeof langWatchQLPassSchema>;
+
+/** A statement re-validated by the full policy, then run inside the wrapper its pass names. */
+export type LangWatchQLPassInput = Pick<
+  LangWatchQLExecuteInput,
+  "project" | "protections" | "sql" | "parameters"
+> &
+  Readonly<{ pass: LangWatchQLPass }>;
+
 /**
  * One restricted execution over a SET of projects — every project an API key may read. Their
  * secrets become the tenant-capability set, so the query reads the union of their rows; an
@@ -267,6 +318,9 @@ export abstract class LangWatchQLService {
   ): Promise<LangWatchQLQueryResult>;
   abstract executeForProjects(
     input: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate,
+  ): Promise<LangWatchQLQueryResult>;
+  abstract executePass(
+    input: LangWatchQLPassInput & LangWatchQLEvalGate,
   ): Promise<LangWatchQLQueryResult>;
 }
 

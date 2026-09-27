@@ -54,6 +54,7 @@ import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./ru
 import { SupplyToken } from "./supply-token.ts";
 import type { Tier } from "./tiers.ts";
 import {
+  declaredForRole,
   mountDeclaredTransports,
   type DeclaredTransports,
   type FeatureTransportHosts,
@@ -459,10 +460,19 @@ export class ApplicationBuilder<
         // Now: all Apps exist, nothing serves yet. Only moment doors can be built.
         const hosts = this.openDoors((token) => provided.get(token));
         if (hosts.rest !== void 0 || hosts.trpc !== void 0 || hosts.websocket !== void 0) {
-          transports = mountDeclaredTransports({ declared, hosts });
+          transports = mountDeclaredTransports({
+            declared: declaredForRole(declared, "api"),
+            hosts,
+          });
         }
         // A bundle-only API still serves even when neither protocol has declarations.
         handler = this.state.serve?.();
+      }
+      const workerDoors = role === "worker" ? declaredForRole(declared, "worker") : [];
+      // A worker opens its doors only when a module declared one, so a factory never runs for none.
+      if (workerDoors.some((entry) => entry.transports.length > 0)) {
+        const hosts = this.openDoors((token) => provided.get(token));
+        if (hosts.rawsocket !== void 0) mountDeclaredTransports({ declared: workerDoors, hosts });
       }
     } catch (error) {
       apis.close();

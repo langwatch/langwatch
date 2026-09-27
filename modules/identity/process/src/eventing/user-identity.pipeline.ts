@@ -115,70 +115,86 @@ export function defineIdentityPipeline(deps: IdentityPipelineDeps): IdentityPipe
         store: deps.identityProjectionStore,
       }),
     )
-    .withCommandInstance(
-      "attachIdentifier",
-      AttachIdentifierCommand,
-      new AttachIdentifierCommand(deps.identityGuards),
-    )
-    .withCommandInstance(
-      "verifyIdentifier",
-      VerifyIdentifierCommand,
-      new VerifyIdentifierCommand(deps.identityGuards),
-    )
-    .withCommandInstance(
-      "markPrimary",
-      MarkPrimaryCommand,
-      new MarkPrimaryCommand(deps.identityGuards),
-    )
-    .withCommandInstance(
-      "detachIdentifier",
-      DetachIdentifierCommand,
-      new DetachIdentifierCommand(deps.identityGuards),
-    )
-    .withCommandInstance("eraseUser", EraseUserCommand, new EraseUserCommand(deps.identityGuards))
-    .withCommandInstance(
-      "proposeLink",
-      ProposeLinkCommand,
-      new ProposeLinkCommand(deps.identityGuards),
-    )
-    .withCommandInstance(
-      "confirmLink",
-      ConfirmLinkCommand,
-      new ConfirmLinkCommand(deps.linkProposalGuards),
-    )
-    .withCommandInstance(
-      "rejectLink",
-      RejectLinkCommand,
-      new RejectLinkCommand(deps.linkProposalGuards),
-    )
+    .withCommandInstance({
+      name: "attachIdentifier",
+      handlerClass: AttachIdentifierCommand,
+      instance: new AttachIdentifierCommand(deps.identityGuards),
+    })
+    .withCommandInstance({
+      name: "verifyIdentifier",
+      handlerClass: VerifyIdentifierCommand,
+      instance: new VerifyIdentifierCommand(deps.identityGuards),
+    })
+    .withCommandInstance({
+      name: "markPrimary",
+      handlerClass: MarkPrimaryCommand,
+      instance: new MarkPrimaryCommand(deps.identityGuards),
+    })
+    .withCommandInstance({
+      name: "detachIdentifier",
+      handlerClass: DetachIdentifierCommand,
+      instance: new DetachIdentifierCommand(deps.identityGuards),
+    })
+    .withCommandInstance({
+      name: "eraseUser",
+      handlerClass: EraseUserCommand,
+      instance: new EraseUserCommand(deps.identityGuards),
+    })
+    .withCommandInstance({
+      name: "proposeLink",
+      handlerClass: ProposeLinkCommand,
+      instance: new ProposeLinkCommand(deps.identityGuards),
+    })
+    .withCommandInstance({
+      name: "confirmLink",
+      handlerClass: ConfirmLinkCommand,
+      instance: new ConfirmLinkCommand(deps.linkProposalGuards),
+    })
+    .withCommandInstance({
+      name: "rejectLink",
+      handlerClass: RejectLinkCommand,
+      instance: new RejectLinkCommand(deps.linkProposalGuards),
+    })
     .withPostgresProjection(
       new MfaEnrollmentStateFoldProjection({
         store: deps.mfaProjectionStore,
       }),
     )
-    .withCommandInstance("enrollMfa", EnrollMfaCommand, new EnrollMfaCommand(deps.mfaGuards))
-    .withCommandInstance("confirmMfa", ConfirmMfaCommand, new ConfirmMfaCommand(deps.mfaGuards))
-    .withCommandInstance(
-      "expireMfaEnrollment",
-      ExpireMfaEnrollmentCommand,
-      new ExpireMfaEnrollmentCommand(deps.mfaGuards),
-    )
-    .withCommandInstance("disableMfa", DisableMfaCommand, new DisableMfaCommand(deps.mfaGuards))
-    .withCommandInstance(
-      "consumeBackupCode",
-      ConsumeBackupCodeCommand,
-      new ConsumeBackupCodeCommand(deps.mfaGuards),
-    )
-    .withCommandInstance(
-      "regenerateBackupCodes",
-      RegenerateBackupCodesCommand,
-      new RegenerateBackupCodesCommand(deps.mfaGuards),
-    )
-    .withCommandInstance(
-      "recordMfaVerificationFailure",
-      RecordMfaVerificationFailureCommand,
-      new RecordMfaVerificationFailureCommand(deps.mfaGuards),
-    )
+    .withCommandInstance({
+      name: "enrollMfa",
+      handlerClass: EnrollMfaCommand,
+      instance: new EnrollMfaCommand(deps.mfaGuards),
+    })
+    .withCommandInstance({
+      name: "confirmMfa",
+      handlerClass: ConfirmMfaCommand,
+      instance: new ConfirmMfaCommand(deps.mfaGuards),
+    })
+    .withCommandInstance({
+      name: "expireMfaEnrollment",
+      handlerClass: ExpireMfaEnrollmentCommand,
+      instance: new ExpireMfaEnrollmentCommand(deps.mfaGuards),
+    })
+    .withCommandInstance({
+      name: "disableMfa",
+      handlerClass: DisableMfaCommand,
+      instance: new DisableMfaCommand(deps.mfaGuards),
+    })
+    .withCommandInstance({
+      name: "consumeBackupCode",
+      handlerClass: ConsumeBackupCodeCommand,
+      instance: new ConsumeBackupCodeCommand(deps.mfaGuards),
+    })
+    .withCommandInstance({
+      name: "regenerateBackupCodes",
+      handlerClass: RegenerateBackupCodesCommand,
+      instance: new RegenerateBackupCodesCommand(deps.mfaGuards),
+    })
+    .withCommandInstance({
+      name: "recordMfaVerificationFailure",
+      handlerClass: RecordMfaVerificationFailureCommand,
+      instance: new RecordMfaVerificationFailureCommand(deps.mfaGuards),
+    })
     .build();
 }
 

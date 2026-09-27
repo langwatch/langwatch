@@ -32,12 +32,12 @@ export type { WebhookId, WebhookSecret } from "./app/webhook.app.ts";
 export type { WebhookClickHouseClientResolver } from "./repositories/clickhouse/clickhouse.webhook-events.repository.ts";
 export { webhookRepositories } from "./repositories/webhook-repositories.registry.ts";
 export type { WebhookRepositories } from "./repositories/webhook.repositories.ts";
-export type { WebhookEndpointConfigurationInput } from "./services/webhook-endpoint-policy.service.ts";
+export type { WebhookEndpointConfigurationInput } from "./rules/webhook-endpoint-policy.rules.ts";
 export type {
-  ParsedSqsQueueUrl,
   WebhookDestinationConfig,
   WebhookUrlProblemCode,
-} from "./services/webhook-destination.service.ts";
+} from "./rules/webhook-destination.rules.ts";
+export type { ParsedSqsQueueUrl } from "./rules/sqs-queue-url.rules.ts";
 export {
   WebhookDeliveryService,
   type WebhookDeliveryProcessDeps,
@@ -121,11 +121,11 @@ export {
   WebhookDestinationDispatchService,
   type WebhookDestinationDeps,
 } from "./services/webhook-destination-dispatch.service.ts";
-export { HttpWebhookDestinationService } from "./services/http.webhook-destination.service.ts";
+export { HttpWebhookDestinationService } from "./services/http-webhook-destination.service.ts";
 export type {
   AwsClientConfigResolver,
   SqsDestinationConfig,
-} from "./services/sqs.webhook-destination.service.ts";
+} from "./services/sqs-webhook-destination.service.ts";
 export { SqsWebhookDestinationChannel } from "./channels/sqs/sqs.webhook-destination.channel.ts";
 export type { SqsWebhookSender } from "./channels/webhook-destination.channel.ts";
 export type { SqsQueueUrlInspection, SqsQueueUrlProblem } from "./rules/sqs-queue-url.rules.ts";

@@ -132,6 +132,62 @@ function buildItems({
   ];
 }
 
+/** The page target a row names, for the spotlight; a row naming nothing lights nothing. */
+function spotlightFor(value: string): string | null {
+  const prefix = SPOTLIGHT_PREFIXES.find((candidate) => value.startsWith(candidate));
+  return prefix ? value.slice(prefix.length) : null;
+}
+
+/** The filtered offer, in the mode's group order (`#` is CONTEXT, and only context). */
+function paletteCollection({
+  items,
+  query,
+  mode,
+}: {
+  items: ReturnType<typeof buildItems>;
+  query: string;
+  mode: PaletteMode;
+}) {
+  const q = query.trim().toLowerCase();
+  const filtered = q ? items.filter((item) => item.searchText.includes(q)) : items;
+  const order = GROUP_ORDER[mode];
+  const sorted = [...filtered].toSorted((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
+  return createListCollection({
+    items: sorted,
+    itemToValue: (item) => item.value,
+    itemToString: (item) => item.label,
+  });
+}
+
+/** What picking a row does: a chip toggles; a skill fills the draft; a page target is absorbed. */
+function pickPaletteValue({
+  value,
+  onPickChip,
+  onPickSkill,
+  onClose,
+}: {
+  value: string;
+  onPickChip: (id: string) => void;
+  onPickSkill?: (skill: LangySkill) => void;
+  onClose: () => void;
+}): void {
+  if (value.startsWith("chip:")) {
+    onPickChip(value.slice("chip:".length));
+    return;
+  }
+  if (value.startsWith("skill:")) {
+    const id = value.slice("skill:".length);
+    const skill = LANGY_SKILLS.find((candidate) => candidate.id === id);
+    if (skill) onPickSkill?.(skill);
+    onClose();
+    return;
+  }
+  if (!value.startsWith("target:")) return;
+  const target = useLangyContextTargetStore.getState().targets[value.slice("target:".length)];
+  if (target) absorbContextTarget(target);
+  onClose();
+}
+
 export function LangyComposerPalette({
   mode,
   query,
@@ -164,12 +220,6 @@ export function LangyComposerPalette({
   // the user to match a label against nine of them. Cleared on the way out, so
   // a dismissed palette never leaves the page glowing.
   useEffect(() => () => setSpotlight(null), [setSpotlight]);
-  const spotlightFor = (value: string) => {
-    for (const prefix of SPOTLIGHT_PREFIXES) {
-      if (value.startsWith(prefix)) return value.slice(prefix.length);
-    }
-    return null;
-  };
 
   const items = useMemo(() => {
     const pageTargets = Object.values(registeredTargets).filter(
@@ -178,46 +228,13 @@ export function LangyComposerPalette({
     return buildItems({ mode, chips, pageTargets });
   }, [mode, chips, registeredTargets, activeChipIds]);
 
-  const collection = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = q ? items.filter((item) => item.searchText.includes(q)) : items;
-    // `#` is CONTEXT, and only context.
-    const order = GROUP_ORDER[mode];
-    const sorted = [...filtered].toSorted(
-      (a, b) => order.indexOf(a.group) - order.indexOf(b.group),
-    );
-    return createListCollection({
-      items: sorted,
-      itemToValue: (item) => item.value,
-      itemToString: (item) => item.label,
-    });
-  }, [items, query, mode]);
+  const collection = useMemo(() => paletteCollection({ items, query, mode }), [items, query, mode]);
 
   /** The groups actually present, in display order. */
   const groups = useMemo(() => {
     const present = new Set(collection.items.map((item) => item.group));
     return GROUP_ORDER[mode].filter((group) => present.has(group));
   }, [collection, mode]);
-
-  const pick = (value: string) => {
-    if (value.startsWith("chip:")) {
-      onPickChip(value.slice("chip:".length));
-      return;
-    }
-    if (value.startsWith("skill:")) {
-      const id = value.slice("skill:".length);
-      const skill = LANGY_SKILLS.find((candidate) => candidate.id === id);
-      if (skill) onPickSkill?.(skill);
-      onClose();
-      return;
-    }
-    if (value.startsWith("target:")) {
-      const target = useLangyContextTargetStore.getState().targets[value.slice("target:".length)];
-      if (target) absorbContextTarget(target);
-      onClose();
-      return;
-    }
-  };
 
   return (
     <Combobox.Root
@@ -231,7 +248,7 @@ export function LangyComposerPalette({
       onInputValueChange={(details) => onQueryChange(details.inputValue)}
       onValueChange={(details) => {
         const value = details.value?.[0];
-        if (value) pick(value);
+        if (value) pickPaletteValue({ value, onPickChip, onPickSkill, onClose });
       }}
       onOpenChange={(details) => {
         // Ark closes on Escape and on outside-click. Either way the user is

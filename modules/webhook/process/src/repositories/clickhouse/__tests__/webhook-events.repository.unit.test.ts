@@ -1,11 +1,10 @@
 /** Spec: specs/webhooks/webhook-endpoints.feature */
 import { describe, expect, it } from "vitest";
 
-import { WebhookEventsClickHouseRepository } from "../clickhouse.webhook-events.repository.ts";
 import {
-  createWebhookClickHouseResolver,
+  WebhookEventsClickHouseRepository,
   type WebhookRoutedClickHouse,
-} from "../webhook-clickhouse.resolver.ts";
+} from "../clickhouse.webhook-events.repository.ts";
 
 type Statement = { tenantId: string; sql: string; params: Record<string, unknown> };
 
@@ -46,9 +45,7 @@ describe("the emitted-events ClickHouse reads", () => {
       ],
       "proj-b": [spendRow({ tenant: "proj-b", id: "req-b1", atMs: 2000 })],
     });
-    const repository = WebhookEventsClickHouseRepository.create(
-      createWebhookClickHouseResolver(clickhouse),
-    );
+    const repository = WebhookEventsClickHouseRepository.forRoutedClickHouse(clickhouse);
 
     const page = await repository.readEmittedEventsPage({
       tenantIds: ["proj-a", "proj-b"],
@@ -69,9 +66,7 @@ describe("the emitted-events ClickHouse reads", () => {
     const { clickhouse, statements } = routedClickHouse({
       "proj-b": [spendRow({ tenant: "proj-b", id: "req-b1", atMs: 2000 })],
     });
-    const repository = WebhookEventsClickHouseRepository.create(
-      createWebhookClickHouseResolver(clickhouse),
-    );
+    const repository = WebhookEventsClickHouseRepository.forRoutedClickHouse(clickhouse);
 
     const found = await repository.findEmittedEventById({
       tenantIds: ["proj-a", "proj-b"],

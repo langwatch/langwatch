@@ -15,7 +15,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   type Entry,
   type Field,
-  type StudioWorkflow as WorkflowDSL,
+  parseStudioWorkflow,
   type WorkflowEvaluationRequest,
   type WorkflowEvaluationStarted,
   WorkflowNotFoundError,
@@ -98,7 +98,7 @@ export class WorkflowEvaluationService {
       state,
     });
     const runId = generateHumanReadableId();
-    const total = ExperimentRunOrchestratorService.countScopedCells({
+    const total = ExperimentRunOrchestratorService.create().countScopedCells({
       state,
       datasetRows: dataResult.datasetRows,
       scope: input.rowIndices ? { type: "rows", rowIndices: input.rowIndices } : { type: "full" },
@@ -162,7 +162,7 @@ export class WorkflowEvaluationService {
         }),
       };
     } catch (error) {
-      await ExperimentPollingRunService.failRegistered({
+      await ExperimentPollingRunService.create().failRegistered({
         error,
         runId: request.runId,
         experimentSlug: request.experimentSlug,
@@ -177,7 +177,7 @@ export class WorkflowEvaluationService {
     const { ports, prepared } = started;
     const { state, dataResult } = prepared;
 
-    await ExperimentPollingRunService.runRegistered({
+    await ExperimentPollingRunService.create().runRegistered({
       runId: request.runId,
       projectId: request.tenantId,
       projectSlug: request.projectSlug,
@@ -230,7 +230,7 @@ export class WorkflowEvaluationService {
       throw new WorkflowVersionRequiredError();
     }
 
-    const dsl = version.dsl as unknown as WorkflowDSL;
+    const dsl = parseStudioWorkflow(version.dsl);
     const entry = dsl.nodes.find((n) => n.type === "entry")?.data as Entry | undefined;
     const target = WorkflowEvaluationService.workflowTarget({
       workflow,
@@ -246,7 +246,7 @@ export class WorkflowEvaluationService {
         ? { resolvedDatasetId: datasetId, datasetRef: emptyDatasetRef(workflow.name) }
         : WorkflowEvaluationService.attachedDataset({ entry, workflowName: workflow.name });
 
-    const dataResult = await ExperimentExecutionDataService.loadExecutionData({
+    const dataResult = await ExperimentExecutionDataService.create().loadExecutionData({
       projectId,
       dataset: datasetRef,
       targets: [target],

@@ -13,13 +13,13 @@ import {
 import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
-import type { StoredObjectLegacyLocation } from "../repositories/stored-object-legacy-location.repository.ts";
+import type { StoredObjectLegacyLocationRepository } from "../repositories/stored-object-legacy-location.repository.ts";
 import type {
   LegacyStoredObjectRow,
-  StoredObjectLegacySource,
+  StoredObjectLegacySourceRepository,
 } from "../repositories/stored-object-legacy-source.repository.ts";
-import type { StoredObjectLegacyWriterDrain } from "../repositories/stored-object-legacy-writer-drain.repository.ts";
-import type { StoredObjectProjectSource } from "../repositories/stored-object-project-source.repository.ts";
+import type { StoredObjectLegacyWriterDrainRepository } from "../repositories/stored-object-legacy-writer-drain.repository.ts";
+import type { StoredObjectProjectSourceRepository } from "../repositories/stored-object-project-source.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
@@ -29,10 +29,10 @@ export const STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME =
   "stored-objects-clickhouse-import-v0" as const;
 
 export type ClickHouseImportStoredObjectMigrationOptions = Readonly<{
-  projects: StoredObjectProjectSource;
-  legacy: StoredObjectLegacySource;
-  locations: StoredObjectLegacyLocation;
-  drain: StoredObjectLegacyWriterDrain;
+  projects: StoredObjectProjectSourceRepository;
+  legacy: StoredObjectLegacySourceRepository;
+  locations: StoredObjectLegacyLocationRepository;
+  drain: StoredObjectLegacyWriterDrainRepository;
   records: StoredObjectRecordRepository;
   pageSize?: number;
   now?: () => Instant;
@@ -76,26 +76,10 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
     let unchanged = 0;
     for (const project of projects) {
       this.assertActive(input.signal);
-      const limit = this.options.pageSize ?? 250;
-      let afterId: string | undefined;
-      let isFullPage: boolean;
-      do {
-        const query: { projectId: string; afterId?: string; limit: number } = {
-          projectId: project.id,
-          limit,
-        };
-        if (afterId) query.afterId = afterId;
-        const page = await this.options.legacy.findPage(query);
-        for (const row of page) {
-          this.assertActive(input.signal);
-          scanned += 1;
-          const result = await this.importRow(row, project.id);
-          if (result === "imported") imported += 1;
-          else unchanged += 1;
-        }
-        isFullPage = page.length >= limit;
-        afterId = page.at(-1)?.id;
-      } while (isFullPage && afterId);
+      const counts = await this.importProject({ projectId: project.id, signal: input.signal });
+      scanned += counts.scanned;
+      imported += counts.imported;
+      unchanged += counts.unchanged;
     }
 
     const drain = initialDrain.valid
@@ -128,6 +112,34 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
         drainProved: false,
       },
     };
+  }
+
+  private async importProject({
+    projectId,
+    signal,
+  }: {
+    projectId: string;
+    signal?: AbortSignal | undefined;
+  }): Promise<{ scanned: number; imported: number; unchanged: number }> {
+    const counts = { scanned: 0, imported: 0, unchanged: 0 };
+    const limit = this.options.pageSize ?? 250;
+    let afterId: string | undefined;
+    let isFullPage: boolean;
+    do {
+      const query: { projectId: string; afterId?: string; limit: number } = { projectId, limit };
+      if (afterId) query.afterId = afterId;
+      const page = await this.options.legacy.findPage(query);
+      for (const row of page) {
+        this.assertActive(signal);
+        counts.scanned += 1;
+        const result = await this.importRow(row, projectId);
+        if (result === "imported") counts.imported += 1;
+        else counts.unchanged += 1;
+      }
+      isFullPage = page.length >= limit;
+      afterId = page.at(-1)?.id;
+    } while (isFullPage && afterId);
+    return counts;
   }
 
   private async importRow(

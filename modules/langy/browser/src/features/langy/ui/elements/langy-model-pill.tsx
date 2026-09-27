@@ -86,6 +86,47 @@ function groupModelsByGroup<T extends { profile: { group: LangyModelGroup } }>(
   })).filter((group) => group.items.length > 0);
 }
 
+/** What the pill says: the model's label, else its name, else why there is none yet. */
+function pillLabel({
+  optionLabel,
+  model,
+  modelsLoading,
+}: {
+  optionLabel: string | undefined;
+  model: string;
+  modelsLoading: boolean;
+}): string {
+  if (optionLabel) return optionLabel;
+  const name = model.split("/").slice(1).join("/");
+  if (name) return name;
+  return modelsLoading ? "Models are still loading…" : "Choose model";
+}
+
+/** The picker's rows: each model with its provider, search text, profile and default flag. */
+function modelItems({
+  selectOptions,
+  langyDefaultModel,
+}: {
+  selectOptions: { value: string; label: string; isCustom?: boolean }[];
+  langyDefaultModel: string | null | undefined;
+}): ModelItem[] {
+  return selectOptions.map((option) => {
+    const provider = option.value.split("/")[0] ?? "";
+    return {
+      value: option.value,
+      label: option.label,
+      provider,
+      searchText: `${provider} ${option.label}`.toLowerCase(),
+      isLangyDefault: option.value === langyDefaultModel,
+      profile: profileLangyModel({
+        modelId: option.value,
+        metadata: findModelById(option.value)[0],
+        isCustom: option.isCustom,
+      }),
+    };
+  });
+}
+
 /**
  * The composer's per-send model picker, as a compact rail pill: provider glyph + model name +
  * chevron, sized to its label and no bigger.
@@ -117,30 +158,12 @@ export const LangyModelPill = memo(function LangyModelPill({
   const currentProvider = model.split("/")[0] ?? "";
   const hasCurrentProvider = currentProvider in modelProviderIcons;
   const modelsLoading = options.length === 0 && selectOptions.length === 0;
-  const currentLabel =
-    modelOption?.label ||
-    model.split("/").slice(1).join("/") ||
-    (modelsLoading ? "Models are still loading…" : "Choose model");
+  const currentLabel = pillLabel({ optionLabel: modelOption?.label, model, modelsLoading });
 
   const [query, setQuery] = useState("");
 
-  const allItems = useMemo<ModelItem[]>(
-    () =>
-      selectOptions.map((option) => {
-        const provider = option.value.split("/")[0] ?? "";
-        return {
-          value: option.value,
-          label: option.label,
-          provider,
-          searchText: `${provider} ${option.label}`.toLowerCase(),
-          isLangyDefault: option.value === langyDefaultModel,
-          profile: profileLangyModel({
-            modelId: option.value,
-            metadata: findModelById(option.value)[0],
-            isCustom: option.isCustom,
-          }),
-        };
-      }),
+  const allItems = useMemo(
+    () => modelItems({ selectOptions, langyDefaultModel }),
     [selectOptions, langyDefaultModel],
   );
 

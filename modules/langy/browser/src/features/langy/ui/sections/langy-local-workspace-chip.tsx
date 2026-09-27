@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { describeError } from "../../../../behavior/errors.tsx";
 import { api } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
+import { parseLangyLocalWorkspace } from "../../../../model/langy-local-workspace.ts";
 
 export interface LangyLocalWorkspaceChipProps {
   projectId: string;
@@ -23,7 +24,7 @@ export function LangyLocalWorkspaceChip({
   const workspaceRevision = useLangyLocalControlStore((s) => s.workspaceRevision);
   const workspace = api.langy.getLocalWorkspace.useQuery(
     { projectId, conversationId },
-    { enabled: !!projectId && !!conversationId },
+    { select: parseLangyLocalWorkspace, enabled: !!projectId && !!conversationId },
   );
   const refetch = workspace.refetch;
   useEffect(() => {

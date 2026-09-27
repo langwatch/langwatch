@@ -1,6 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 
-import { McpSessionGrant } from "../app/hosted-mcp-members.ts";
+import { McpSessionGrant } from "../app/hosted-mcp.members.ts";
 import { MCP_AUTHORIZE_PERMISSION } from "./mcp-authorization.service.ts";
 
 /**

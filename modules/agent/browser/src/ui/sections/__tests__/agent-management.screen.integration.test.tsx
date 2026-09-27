@@ -84,6 +84,15 @@ const testRunFailure: { current: Error | null } = { current: null };
 const requestedTestRuns = vi.fn();
 const refetchAgents = vi.fn(async () => void 0);
 
+vi.mock("@langwatch/browser-host/drawer", () => ({
+  useDrawer: () => ({
+    openDrawer: vi.fn(),
+    closeDrawer: vi.fn(),
+    canGoBack: false,
+    goBack: vi.fn(),
+  }),
+}));
+
 vi.mock("../../../behavior/agent-api.ts", () => ({
   agentApi: {
     agents: {

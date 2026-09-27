@@ -61,16 +61,16 @@ const SINGLE_SPAN_FETCH_SETTINGS = {
  * path. Declared here, not imported, because the application's copy sits
  * behind its own path alias; scenario and experiment keep the same local copy.
  */
+type DateWrite<V> = V extends number
+  ? Date
+  : V extends number | null
+    ? Date | null
+    : V extends number[]
+      ? Date[]
+      : V;
+
 type WithDateWrites<T, K extends keyof T> = {
-  [P in keyof T]: P extends K
-    ? T[P] extends number
-      ? Date
-      : T[P] extends number | null
-        ? Date | null
-        : T[P] extends number[]
-          ? Date[]
-          : T[P]
-    : T[P];
+  [P in keyof T]: P extends K ? DateWrite<T[P]> : T[P];
 };
 
 type ClickHouseSpanWriteRecord = WithDateWrites<
@@ -188,12 +188,12 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageReposi
     const tenantId = spans[0]!.tenantId;
     for (const span of spans) {
       if (span.tenantId !== tenantId) {
-        throw new SecurityError(
-          "TraceSpanStorageClickHouseRepository.insertSpans",
-          "all spans in a single batch must share the same tenantId",
+        throw new SecurityError({
+          operation: "TraceSpanStorageClickHouseRepository.insertSpans",
+          message: "all spans in a single batch must share the same tenantId",
           tenantId,
-          { mismatchedTenantId: span.tenantId },
-        );
+          context: { mismatchedTenantId: span.tenantId },
+        });
       }
     }
 

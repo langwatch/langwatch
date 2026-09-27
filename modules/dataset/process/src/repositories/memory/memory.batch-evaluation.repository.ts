@@ -3,6 +3,7 @@ import {
   type BatchEvaluationSummary,
   DatasetNotFoundError,
 } from "@langwatch/dataset-contract";
+import { toDate } from "@langwatch/time";
 
 import type { BatchEvaluationRepository } from "../batch-evaluation.repository.ts";
 import type { DatasetRow } from "../dataset.repository.ts";
@@ -49,6 +50,8 @@ export class MemoryBatchEvaluationRepository implements BatchEvaluationRepositor
       .filter((row) => row.experimentId === input.experimentId)
       .map((row) => ({
         ...row,
+        createdAt: toDate(row.createdAt),
+        updatedAt: toDate(row.updatedAt),
         dataset: this.#dataset(row),
       }));
   }

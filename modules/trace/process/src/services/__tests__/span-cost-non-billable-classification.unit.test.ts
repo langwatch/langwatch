@@ -5,11 +5,11 @@ import {
   createInitState,
   createTestSpan,
 } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
-import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.service.ts";
 import { SpanCostService } from "../span-cost.service.ts";
+import { TraceModelCostService } from "../trace-model-cost.service.ts";
 
 const service = SpanCostService.create({
-  modelCosts: ModelCatalogTraceModelCostAdapter.create(),
+  modelCosts: TraceModelCostService.create(),
 });
 
 /**

@@ -8,19 +8,19 @@ import type {
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GraphAlertDispatchResult } from "../app/automation.members.ts";
+import {
+  GRAPH_TRIGGER_MAX_RESULT_ROWS,
+  type GraphAlertDispatchResult,
+  type GraphTriggerEvaluationDeps,
+  type TimeseriesResult,
+  type ProjectIdentity,
+} from "../app/automation.members.ts";
 import {
   type GraphTriggerSentRepository,
   type OpenGraphTriggerSent,
 } from "../repositories/graph-trigger-sent.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
 import { GraphTriggerEvaluatorService } from "../services/graph-trigger-evaluator.service.ts";
-import {
-  GRAPH_TRIGGER_MAX_RESULT_ROWS,
-  type GraphTriggerEvaluationDeps,
-  type TimeseriesResult,
-  type ProjectIdentity,
-} from "../services/trigger-evaluator.service.ts";
 
 class DispatchError extends Error {
   constructor(options: { message: string; retryable: boolean }) {

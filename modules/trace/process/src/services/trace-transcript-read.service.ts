@@ -13,7 +13,7 @@ import {
   mapSpansToDetailDtos,
   type TraceDerivedAttrPrefixes,
   type TraceReadMapperMembers,
-} from "../transport/api-trpc/trace-read-mappers.api.ts";
+} from "../rules/trace-read-mappers.rules.ts";
 
 /**
  * The ports this read needs that Trace does not own. Free of the metadata

@@ -74,6 +74,14 @@ Feature: Canonical project-secret lifecycle
     And it mounts no secret transport, rather than one that fails on every request
     And a host that already owns a secret service can still supply one
 
+  @unit
+  Scenario: The feature that owns a reserved name stores its credential once
+    Given application composition reserves a secret name for another feature
+    When that feature stores its credential under the name
+    Then the value is stored encrypted, attributed to the actor it names, outside the project limit
+    And a writer that raced it is answered with the value stored first
+    And a name that is not reserved is refused without a write
+
   Scenario: Product-owned secrets are hidden and immutable
     Given application composition reserves a secret name for another feature
     When a caller lists, reads, updates, deletes, or creates that name

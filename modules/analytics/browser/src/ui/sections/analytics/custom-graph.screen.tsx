@@ -32,6 +32,7 @@ import {
   type PipelineFields,
   type SharedFiltersInput,
 } from "@langwatch/analytics-browser-kit";
+import { customGraphInputSchema } from "@langwatch/dashboard-contract";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
@@ -1583,15 +1584,18 @@ export default function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMod
     return <Box padding={8}>Loading…</Box>;
   }
 
-  const graph = stored.data?.graph;
-  if (!graph) return null;
+  if (!stored.data?.graph) return null;
+  const graph = customGraphInputSchema.safeParse(stored.data.graph);
+  if (!graph.success) {
+    return <Box padding={8}>This chart was saved in a shape the chart builder cannot open.</Box>;
+  }
 
   const alert = formAlertOf(stored.data?.alert);
 
   return (
     <AnalyticsCustomGraphContent
       customId={graphId ?? ""}
-      graph={graph as unknown as CustomGraphInput}
+      graph={graph.data}
       name={stored.data?.name ?? ""}
       {...(stored.data?.filters
         ? {

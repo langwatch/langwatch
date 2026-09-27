@@ -35,7 +35,7 @@ function authoring(automation: Partial<AutomationService>) {
       actionParamsSchemaFor: () => ({ safeParse: (data: unknown) => ({ success: true, data }) }),
       persistActionParamsFor: async (_action, args) => args.incoming,
       redactActionParamsFor: (_action, params) => params,
-      findSlackBotToken: () => null,
+      findDecryptedSlackBotToken: () => null,
       decryptWebhookHeaders: () => ({}),
       decryptWebhookSigningSecrets: () => [],
     },

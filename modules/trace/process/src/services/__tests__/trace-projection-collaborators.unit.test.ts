@@ -24,11 +24,11 @@ import {
   IO_ATTR_KEYS,
   IO_PREVIEW_BYTES,
 } from "../../rules/trace-projection-lean.rules.ts";
-import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.service.ts";
 import { SpanCostService } from "../span-cost.service.ts";
 import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
 import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
-import { TraceMediaReferenceAdapter } from "../trace-media-reference.service.ts";
+import { TraceMediaReferenceService } from "../trace-media-reference.service.ts";
+import { TraceModelCostService } from "../trace-model-cost.service.ts";
 
 /**
  * The four collaborators the trace pipeline definition is built from, harvested
@@ -125,7 +125,7 @@ describe("given a span carrying semantic input and output attributes", () => {
 });
 
 describe("given the media reference port over the contract's format", () => {
-  const media = TraceMediaReferenceAdapter.create();
+  const media = TraceMediaReferenceService.create();
 
   describe("when references are collected, serialised, parsed and merged", () => {
     /** @scenario "a reference the projection wrote is read back whole" */
@@ -162,7 +162,7 @@ describe("given the media reference port over the contract's format", () => {
 });
 
 describe("given the fold-time cost estimate over the platform's model catalog", () => {
-  const modelCosts = ModelCatalogTraceModelCostAdapter.create();
+  const modelCosts = TraceModelCostService.create();
   const spanCost = SpanCostService.create({ modelCosts });
 
   describe("when a span names one model on its request and another on its response", () => {

@@ -36,11 +36,11 @@ function makeQueueManager() {
 }
 
 function makeRouter(...subscribers: EventSubscriberDefinition<Event>[]) {
-  const router = new ProjectionRouter<Event>(
+  const router = new ProjectionRouter<Event>({
     aggregateType,
-    TEST_CONSTANTS.PIPELINE_NAME,
-    makeQueueManager(),
-  );
+    pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+    queueManager: makeQueueManager(),
+  });
   for (const subscriber of subscribers) {
     router.registerEventSubscriber(subscriber);
   }
@@ -117,19 +117,17 @@ describe("subscriber enqueue-time contract", () => {
         // this switch's entire distinguishing claim.
         const asked: KillSwitchQuery[] = [];
         const killedTenant = createTestTenantId(`${tenantId}-killed`);
-        const router = new ProjectionRouter<Event>(
+        const router = new ProjectionRouter<Event>({
           aggregateType,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          makeQueueManager(),
-          {
-            killSwitch: new (class extends KillSwitch {
-              async isKilled(query: KillSwitchQuery): Promise<boolean> {
-                asked.push(query);
-                return query.tenantId === killedTenant;
-              }
-            })(),
-          },
-        );
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager: makeQueueManager(),
+          killSwitch: new (class extends KillSwitch {
+            async isKilled(query: KillSwitchQuery): Promise<boolean> {
+              asked.push(query);
+              return query.tenantId === killedTenant;
+            }
+          })(),
+        });
         router.registerEventSubscriber({
           name: "seamSubscriber",
           eventTypes: [],
@@ -179,19 +177,17 @@ describe("subscriber enqueue-time contract", () => {
         // cache read on the busiest path in the product to answer a question
         // that cannot change within one batch.
         let lookups = 0;
-        const router = new ProjectionRouter<Event>(
+        const router = new ProjectionRouter<Event>({
           aggregateType,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          makeQueueManager(),
-          {
-            killSwitch: new (class extends KillSwitch {
-              async isKilled(): Promise<boolean> {
-                lookups += 1;
-                return false;
-              }
-            })(),
-          },
-        );
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager: makeQueueManager(),
+          killSwitch: new (class extends KillSwitch {
+            async isKilled(): Promise<boolean> {
+              lookups += 1;
+              return false;
+            }
+          })(),
+        });
         router.registerEventSubscriber({
           name: "seamSubscriber",
           eventTypes: [],
@@ -453,11 +449,11 @@ describe("subscriber enqueue-time contract", () => {
           send: vi.fn().mockRejectedValue(new Error("queue unavailable")),
         } as never);
 
-        const router = new ProjectionRouter<Event>(
+        const router = new ProjectionRouter<Event>({
           aggregateType,
-          TEST_CONSTANTS.PIPELINE_NAME,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
         router.registerEventSubscriber({
           name: "seamSubscriber",
           eventTypes: [],

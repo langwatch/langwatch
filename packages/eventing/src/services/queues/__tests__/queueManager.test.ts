@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import { z } from "zod";
 
 import type { Command, CommandHandler } from "../../../commands/command.ts";
 import type { CommandHandlerClass } from "../../../commands/commandHandlerClass.ts";
 import { defineCommandSchema } from "../../../commands/commandSchema.ts";
+import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import type { CommandType } from "../../../domain/commandType.ts";
 import type { Event } from "../../../domain/types.ts";
 import type { DeduplicationStrategy, EventSourcedQueueProcessor } from "../../../queues/index.ts";
@@ -151,7 +151,10 @@ describe("QueueManager", () => {
 
       // Initialize all types
       manager.initializeHandlerQueues({ h1: createMockEventHandlerDefinition("h1") }, vi.fn());
-      manager.initializeProjectionQueues({ p1: createMockProjectionDefinition("p1") }, vi.fn());
+      manager.initializeProjectionQueues({
+        projections: { p1: createMockProjectionDefinition("p1") },
+        onEvent: vi.fn(),
+      });
       manager.initializeCommandQueues(
         [sealCommandClass({ name: "c1", handlerClass: createMockCommandHandlerClass("c1") })],
         vi.fn(),
@@ -205,7 +208,10 @@ describe("QueueManager", () => {
       });
 
       manager.initializeHandlerQueues({ h1: createMockEventHandlerDefinition("h1") }, vi.fn());
-      manager.initializeProjectionQueues({ p1: createMockProjectionDefinition("p1") }, vi.fn());
+      manager.initializeProjectionQueues({
+        projections: { p1: createMockProjectionDefinition("p1") },
+        onEvent: vi.fn(),
+      });
 
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
@@ -294,7 +300,10 @@ describe("QueueManager", () => {
         globalJobRegistry,
       });
 
-      manager.initializeProjectionQueues({ p1: createMockProjectionDefinition("p1") }, vi.fn());
+      manager.initializeProjectionQueues({
+        projections: { p1: createMockProjectionDefinition("p1") },
+        onEvent: vi.fn(),
+      });
 
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
@@ -614,7 +623,7 @@ describe("QueueManager", () => {
       };
       const processProjectionEventCallback = vi.fn();
 
-      manager.initializeProjectionQueues(projections, processProjectionEventCallback);
+      manager.initializeProjectionQueues({ projections, onEvent: processProjectionEventCallback });
 
       expect(manager.hasProjectionQueues()).toBe(false);
     });
@@ -636,7 +645,7 @@ describe("QueueManager", () => {
       };
       const processProjectionEventCallback = vi.fn();
 
-      manager.initializeProjectionQueues(projections, processProjectionEventCallback);
+      manager.initializeProjectionQueues({ projections, onEvent: processProjectionEventCallback });
 
       // Registry entries exist for each projection
       expect(globalJobRegistry.has("test-pipeline:projection:projection1")).toBe(true);
@@ -657,10 +666,10 @@ describe("QueueManager", () => {
         globalJobRegistry,
       });
 
-      manager.initializeProjectionQueues(
-        { projection1: createMockProjectionDefinition("projection1") },
-        vi.fn(),
-      );
+      manager.initializeProjectionQueues({
+        projections: { projection1: createMockProjectionDefinition("projection1") },
+        onEvent: vi.fn(),
+      });
 
       const facade = manager.getProjectionQueue("projection1")!;
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
@@ -687,10 +696,10 @@ describe("QueueManager", () => {
         globalJobRegistry,
       });
 
-      manager.initializeProjectionQueues(
-        { projection1: createMockProjectionDefinition("projection1") },
-        vi.fn(),
-      );
+      manager.initializeProjectionQueues({
+        projections: { projection1: createMockProjectionDefinition("projection1") },
+        onEvent: vi.fn(),
+      });
 
       const entry = globalJobRegistry.get("test-pipeline:projection:projection1");
       expect(entry?.groupKeyFn).toBeDefined();
@@ -1059,10 +1068,10 @@ describe("QueueManager", () => {
         { handler1: createMockEventHandlerDefinition("handler1") },
         vi.fn(),
       );
-      manager.initializeProjectionQueues(
-        { projection1: createMockProjectionDefinition("projection1") },
-        vi.fn(),
-      );
+      manager.initializeProjectionQueues({
+        projections: { projection1: createMockProjectionDefinition("projection1") },
+        onEvent: vi.fn(),
+      });
       manager.initializeCommandQueues(
         [
           sealCommandClass({

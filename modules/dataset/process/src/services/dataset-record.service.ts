@@ -27,19 +27,19 @@ import {
 } from "@langwatch/dataset-contract";
 
 import {
+  DATASET_SEARCH_MAX_BYTES,
+  DATASET_SEARCH_MAX_ROWS,
+  DATASET_SEARCH_SCAN_BATCH,
+  matchesDatasetSearch,
+  normalizeDatasetSearch,
+} from "../rules/dataset-search.rules.ts";
+import {
   isDatasetRecordNotFound,
   limitDatasetRecordsByBytes,
   sanitizedEntry,
   selectDatasetRecords,
 } from "../rules/dataset-selection.rules.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
-import {
-  DATASET_SEARCH_MAX_BYTES,
-  DATASET_SEARCH_MAX_ROWS,
-  DATASET_SEARCH_SCAN_BATCH,
-  matchesDatasetSearch,
-  normalizeDatasetSearch,
-} from "./dataset-search.ts";
 import type { DatasetServiceOptions } from "./dataset.service.ts";
 
 type DatasetRecordServiceOptions = {

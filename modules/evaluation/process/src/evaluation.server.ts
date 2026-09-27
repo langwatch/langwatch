@@ -13,14 +13,14 @@ import type {
   ExecuteEvaluationCommandDeps,
 } from "./app/evaluation.members.ts";
 import { evaluationProcessingEventing } from "./eventing/evaluation-processing.pipeline.ts";
-import { ClickhouseMonitorPerformanceRepository } from "./repositories/clickhouse/clickhouse.monitor-performance.repository.ts";
-import type { EvaluationClickHouseResolver } from "./repositories/clickhouse/evaluation-clickhouse-client.ts";
+import type { EvaluationClickHouseResolver } from "./repositories/clickhouse/clickhouse.evaluation-session.store.ts";
 import { ClickHouseEvaluationRepository } from "./repositories/clickhouse/evaluation.repository.ts";
+import { ClickHouseMonitorPerformanceRepository } from "./repositories/clickhouse/monitor-performance.repository.ts";
 import { evaluationRepositories } from "./repositories/evaluation-repositories.registry.ts";
 import { PrismaEvaluationCostRepository } from "./repositories/prisma/prisma.evaluation-cost.repository.ts";
-import { DirectEvaluationExecutionReceiptService } from "./services/direct.evaluation-execution-receipt.service.ts";
 import { EvaluationCostService } from "./services/evaluation-cost.service.ts";
 import { EvaluationExecutionIntentService } from "./services/evaluation-execution-intent.service.ts";
+import { EvaluationExecutionReceiptService } from "./services/evaluation-execution-receipt.service.ts";
 import {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
@@ -33,6 +33,7 @@ import {
   type EvaluationInputOffloadConfig,
 } from "./services/evaluation-inputs-offload.service.ts";
 import { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";
+import { MonitorPerformanceService } from "./services/monitor-performance.service.ts";
 import { evaluationTrpcTransport } from "./transport/evaluation.trpc.ts";
 import { evaluationsLegacyRest } from "./transport/evaluations-legacy.rest.ts";
 
@@ -52,7 +53,7 @@ export const evaluationServer = defineServerModule("evaluation")
 export type EvaluationRunReads = ClickHouseEvaluationRepository;
 
 /** The monitors page's seven-day trend, for a process that reads it and executes nothing. */
-export type MonitorPerformanceReads = ClickhouseMonitorPerformanceRepository;
+export type MonitorPerformanceReads = MonitorPerformanceService;
 
 /** Evaluation's evaluator engine, once its collaborators are composed. */
 export type EvaluationEngine = EvaluationExecutionService;
@@ -81,8 +82,10 @@ export function createEvaluationRunReads(access: EvaluationClickHouseAccess): Ev
 export function createMonitorPerformanceReads(input: {
   resolveClickHouse: EvaluationClickHouseResolver;
 }): MonitorPerformanceReads {
-  return ClickhouseMonitorPerformanceRepository.create({
-    resolveClickHouse: input.resolveClickHouse,
+  return MonitorPerformanceService.create({
+    repository: ClickHouseMonitorPerformanceRepository.create({
+      resolveClient: input.resolveClickHouse,
+    }),
   });
 }
 
@@ -112,7 +115,7 @@ export function createEvaluationExecutionIntent(input: {
     azureSafetyCredentials: input.azureSafetyCredentials,
     settingsRecovery: input.settingsRecovery,
     inputsOffload: input.inputsOffload,
-    executionReceipt: DirectEvaluationExecutionReceiptService.create({
+    executionReceipt: EvaluationExecutionReceiptService.create({
       execution: input.execution,
       costs: input.costs,
     }),

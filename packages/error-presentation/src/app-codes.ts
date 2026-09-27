@@ -720,6 +720,7 @@ export const APP_ERROR_CODES = [
   "trace_not_found",
   "trace_project_required",
   "trace_sharing_disabled",
+  "tracked_event_invalid",
   "trigger_action_unsupported",
   "trigger_filters_required",
   "unauthorized",

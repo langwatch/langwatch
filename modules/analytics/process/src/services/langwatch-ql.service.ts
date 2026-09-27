@@ -9,7 +9,10 @@ import {
   LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
+  langWatchQLPassSchema,
   type LangWatchQLBudgetOverflowMode,
+  type LangWatchQLEvalGate,
+  type LangWatchQLPassInput,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLSchema,
@@ -22,6 +25,7 @@ import type {
   LangWatchQLExecutorRepository,
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
+import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { appendDefaultRowLimit } from "../rules/langwatch-ql-row-limit.rules.ts";
 import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
@@ -347,6 +351,61 @@ export class LangWatchQLService {
    */
   execute({ project, ...input }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
     return this.executeForProjects({ ...input, projects: [project] });
+  }
+
+  /**
+   * Re-validates the statement with the full policy, then runs it inside the fixed wrapper its
+   * pass names as the caller's restricted identity. Only the statement is walked: the wrapper
+   * holds it in a subquery, where the policy would refuse a top-level app function.
+   */
+  async executePass({
+    project,
+    protections,
+    sql,
+    parameters,
+    pass,
+    isInstantEvalsEnabled,
+  }: LangWatchQLPassInput & LangWatchQLEvalGate): Promise<LangWatchQLQueryResult> {
+    const wrapper = langWatchQLPassSchema.parse(pass);
+    const validation = this.validate({
+      projectId: project.id,
+      protections,
+      sql,
+      ...(parameters ? { parameters } : {}),
+      isInstantEvalsEnabled: isInstantEvalsEnabled === true,
+    });
+    resolveRunGranularityOrRefuseUnfilled({
+      declared: validation.parameters,
+      ...(parameters ? { parameters } : {}),
+      awaitingTimeWindow: validation.awaitingTimeWindow,
+    });
+
+    const { executor } = this.deps;
+    if (!executor) {
+      logger.error(
+        { projectIds: [project.id] },
+        "LangWatchQL pass refused: no restricted identity is provisioned",
+      );
+
+      throw new LangWatchQLUnavailableError();
+    }
+
+    const composed = langWatchQLPassSql({ sql, pass: wrapper });
+    const executionParameters = { ...validation.boundParameters, ...composed.parameters };
+    const execution = await executor.execute({
+      sql: composed.sql,
+      ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
+      tenantCapability: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
+    });
+
+    return {
+      columns: execution.columns,
+      rows: execution.rows,
+      statistics: execution.statistics,
+      diagnostics: [],
+      followsTimeWindow: false,
+      followsGranularity: false,
+    };
   }
 
   /** The same, over every project in the set — an API key's readable projects. */

@@ -153,6 +153,92 @@ export type LangyTurnSettlementWait =
   | { kind: "settled"; settlement: LangyTurnSettlement }
   | { kind: "stopped" };
 
+export type LangyGetPageInput = {
+  projectId: string;
+  userId: string;
+  limit: number;
+  cursor?: LangyConversationListCursor;
+  query?: string;
+};
+export type LangyGetEventsAfterInput = {
+  projectId: string;
+  conversationId: string;
+  userId: string;
+  after: { acceptedAt: number; eventId: string };
+};
+export type LangyFindByIdVisibleInput = {
+  id: string;
+  projectId: string;
+  userId: string;
+};
+export type LangyGetAllByConversationInput = {
+  conversationId: string;
+  projectId: string;
+  userId: string;
+};
+export type LangyDeleteByIdInput = { id: string; projectId: string; userId: string };
+export type LangyUpdateByIdInput = {
+  id: string;
+  projectId: string;
+  userId: string;
+  title?: string | null;
+  isShared?: boolean;
+};
+export type LangyForkByIdInput = {
+  id: string;
+  projectId: string;
+  userId: string;
+};
+export type LangyWarmConversationWorkerInput = {
+  projectId: string;
+  session: LangyCredentialSession;
+  requestedConversationId: string | null;
+  modelOverride?: string;
+};
+export type LangyRevokeWorkerSessionKeyInput = {
+  apiKeyId: string;
+  projectId: string;
+};
+export type LangyTurnExistsInput = {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+};
+export type LangyFindRunTokenInput = { projectId: string; conversationId: string };
+export type LangyRecordToolCallStartedInput = {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  toolCallId: string;
+  toolName: string;
+  command?: string;
+  input?: unknown;
+};
+export type LangyRecordToolCallCompletedInput = {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  toolCallId: string;
+  toolName: string;
+  isError?: boolean;
+  command?: string;
+  input?: unknown;
+  durationMs?: number;
+  errorText?: string;
+};
+export type LangyRecordTurnHandoffInput = {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  token: string;
+};
+export type LangyRecordPlanUpdatedInput = {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  items: { content: string; status: string }[];
+};
+
 /** The portable, callable Langy capability shared by process transports. */
 export interface LangyApi {
   ingestInternalTurnResult(input: LangyTurnResultInput): Promise<{ status: "accepted" }>;
@@ -164,19 +250,8 @@ export interface LangyApi {
   stopTurn(input: LangyStopTurnInput & { userId: string }): Promise<void>;
   findEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null>;
   openRelayConnection(): LangyRelayConnection;
-  getPage(input: {
-    projectId: string;
-    userId: string;
-    limit: number;
-    cursor?: LangyConversationListCursor;
-    query?: string;
-  }): Promise<LangyConversationListPage>;
-  getEventsAfter(input: {
-    projectId: string;
-    conversationId: string;
-    userId: string;
-    after: { acceptedAt: number; eventId: string };
-  }): Promise<LangyConversationEventPage>;
+  getPage(input: LangyGetPageInput): Promise<LangyConversationListPage>;
+  getEventsAfter(input: LangyGetEventsAfterInput): Promise<LangyConversationEventPage>;
   recordUserMessage(input: {
     projectId: string;
     conversationId: string;
@@ -191,97 +266,42 @@ export interface LangyApi {
     conversationId: string;
     userId: string;
   }): Promise<LangyLocalRecord>;
-  findByIdVisible(input: {
-    id: string;
-    projectId: string;
-    userId: string;
-  }): Promise<LangyConversationDetail | null>;
+  findByIdVisible(input: LangyFindByIdVisibleInput): Promise<LangyConversationDetail | null>;
   getById(input: {
     id: string;
     projectId: string;
     userId: string;
   }): Promise<LangyConversationDetail>;
-  getAllByConversation(input: {
-    conversationId: string;
-    projectId: string;
-    userId: string;
-  }): Promise<LangyMessageRow[]>;
-  deleteById(input: { id: string; projectId: string; userId: string }): Promise<boolean>;
-  updateById(input: {
-    id: string;
-    projectId: string;
-    userId: string;
-    title?: string | null;
-    isShared?: boolean;
-  }): Promise<LangyConversationDetail>;
-  forkById(input: {
-    id: string;
-    projectId: string;
-    userId: string;
-  }): Promise<{ conversation: LangyConversationDetail }>;
+  getAllByConversation(input: LangyGetAllByConversationInput): Promise<LangyMessageRow[]>;
+  deleteById(input: LangyDeleteByIdInput): Promise<boolean>;
+  updateById(input: LangyUpdateByIdInput): Promise<LangyConversationDetail>;
+  forkById(input: LangyForkByIdInput): Promise<{ conversation: LangyConversationDetail }>;
   startConversationTurn(input: LangyStartConversationTurnInput): Promise<{
     conversationId: string;
     turnId: string;
   }>;
   /** Holds until one turn settles on the fold, or `signal` ends the wait. */
   awaitTurnSettlement(input: LangyTurnSettlementWaitInput): Promise<LangyTurnSettlementWait>;
-  warmConversationWorker(input: {
-    projectId: string;
-    session: LangyCredentialSession;
-    requestedConversationId: string | null;
-    modelOverride?: string;
-  }): Promise<{ conversationId: string | null; warmed: boolean }>;
+  warmConversationWorker(
+    input: LangyWarmConversationWorkerInput,
+  ): Promise<{ conversationId: string | null; warmed: boolean }>;
   findModelsAllowedForProject(projectId: string): Promise<string[] | null>;
-  revokeWorkerSessionKey(input: {
-    apiKeyId: string;
-    projectId: string;
-  }): Promise<"revoked" | "already_revoked" | "not_found" | "refused">;
+  revokeWorkerSessionKey(
+    input: LangyRevokeWorkerSessionKeyInput,
+  ): Promise<"revoked" | "already_revoked" | "not_found" | "refused">;
   shouldAskFeedback(input: {
     userId: string;
     conversationId: string;
     assistantAnswerCount: number;
   }): Promise<boolean>;
   markFeedbackShown(input: { userId: string; conversationId: string }): Promise<void>;
-  turnExists(input: {
-    projectId: string;
-    conversationId: string;
-    turnId: string;
-  }): Promise<boolean>;
+  turnExists(input: LangyTurnExistsInput): Promise<boolean>;
   ingestAgentTurnResult(input: LangyTurnResultInput): Promise<void>;
-  findRunToken(input: { projectId: string; conversationId: string }): Promise<string | null>;
-  recordToolCallStarted(input: {
-    projectId: string;
-    conversationId: string;
-    turnId: string;
-    toolCallId: string;
-    toolName: string;
-    command?: string;
-    input?: unknown;
-  }): Promise<void>;
-  recordToolCallCompleted(input: {
-    projectId: string;
-    conversationId: string;
-    turnId: string;
-    toolCallId: string;
-    toolName: string;
-    isError?: boolean;
-    command?: string;
-    input?: unknown;
-    durationMs?: number;
-    errorText?: string;
-  }): Promise<void>;
-  recordTurnHandoff(input: {
-    projectId: string;
-    conversationId: string;
-    turnId: string;
-    token: string;
-  }): Promise<void>;
-  recordPlanUpdated(input: {
-    projectId: string;
-    conversationId: string;
-    turnId: string;
-    items: { content: string; status: string }[];
-  }): Promise<void>;
+  findRunToken(input: LangyFindRunTokenInput): Promise<string | null>;
+  recordToolCallStarted(input: LangyRecordToolCallStartedInput): Promise<void>;
+  recordToolCallCompleted(input: LangyRecordToolCallCompletedInput): Promise<void>;
+  recordTurnHandoff(input: LangyRecordTurnHandoffInput): Promise<void>;
+  recordPlanUpdated(input: LangyRecordPlanUpdatedInput): Promise<void>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount>;
   /** Mints a new project's gateway key so it is listed from day one; best effort, never raises. */

@@ -15,9 +15,9 @@ import {
 
 import { ClickHouseStoredObjectsRepository } from "../repositories/clickhouse/stored-objects.repository.ts";
 import { ObjectStorageStoredObjectStorageRepository } from "../repositories/object-storage/object-storage.stored-object-storage.repository.ts";
-import { PrometheusStoredObjectsTelemetryAdapter } from "../services/prometheus.stored-objects-telemetry.service.ts";
 import { StoredObjectStorageService } from "../services/stored-object-storage.service.ts";
 import { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
+import { StoredObjectsTelemetryService } from "../services/stored-objects-telemetry.service.ts";
 import { StoredObjectsService } from "../services/stored-objects.service.ts";
 import type { StoredObjectInfrastructure } from "./stored-object.app.ts";
 import {
@@ -152,7 +152,7 @@ export function buildStoredObjectInfrastructure(input: {
       }
       return mintStoredObjectUri({ destination, objectPath: `${projectId}/${sha256}` });
     },
-    telemetry: PrometheusStoredObjectsTelemetryAdapter.create(),
+    telemetry: StoredObjectsTelemetryService.create(),
   });
 
   return {

@@ -87,14 +87,15 @@ export class ColumnTypeChangeNotSupportedError extends HandledError {
  */
 export type DatasetConflictReason = "name_taken" | "stale_columns";
 
-export class DatasetConflictError extends Error {
+export class DatasetConflictError extends HandledError {
+  declare readonly code: "dataset_conflict";
   readonly reason: DatasetConflictReason;
 
   constructor(
     message = "A dataset with this name already exists",
     options: { reason?: DatasetConflictReason } = {},
   ) {
-    super(message);
+    super("dataset_conflict", message, { httpStatus: 409, fault: "customer" });
     this.name = "DatasetConflictError";
     this.reason = options.reason ?? "name_taken";
   }
@@ -224,9 +225,11 @@ export class DatasetNotReadyError extends HandledError {
  * re-run: not recoverable, or no staging key to re-read. Maps to 409.
  * ADR-032 I-RECOVER: recoverable only when there's something to recover from.
  */
-export class DatasetNotRetryableError extends Error {
+export class DatasetNotRetryableError extends HandledError {
+  declare readonly code: "dataset_not_retryable";
+
   constructor(message = "Dataset cannot be retried") {
-    super(message);
+    super("dataset_not_retryable", message, { httpStatus: 409, fault: "customer" });
     this.name = "DatasetNotRetryableError";
   }
 }
@@ -306,13 +309,16 @@ export class DatasetTooLargeToExportError extends HandledError {
  * type-convert) by buffering the dataset's rows in memory for the duration of
  * the advisory-locked transaction (ADR-032 v19). That buffer is bounded ONLY by
  */
-export class DatasetTooLargeToEditColumnsError extends Error {
+export class DatasetTooLargeToEditColumnsError extends HandledError {
+  declare readonly code: "dataset_too_large_to_edit_columns";
   readonly sizeBytes: number;
   readonly maxBytes: number;
 
   constructor({ sizeBytes, maxBytes }: { sizeBytes: number; maxBytes: number }) {
     super(
+      "dataset_too_large_to_edit_columns",
       "This dataset is too large to change column types in place yet. Reduce its size or contact support.",
+      { httpStatus: 413, fault: "customer", meta: { sizeBytes, maxBytes } },
     );
     this.name = "DatasetTooLargeToEditColumnsError";
     this.sizeBytes = sizeBytes;

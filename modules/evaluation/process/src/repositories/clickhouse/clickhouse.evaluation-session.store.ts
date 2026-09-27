@@ -1,11 +1,32 @@
+import type { ClickHouseSettings } from "@clickhouse/client";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
-import type {
-  EvaluationClickHouseClient,
-  EvaluationClickHouseInsert,
-  EvaluationClickHouseQuery,
-  EvaluationClickHouseResult,
-} from "./evaluation-clickhouse-client.ts";
+export type EvaluationClickHouseResult = {
+  json<T>(): Promise<T[]>;
+};
+
+export type EvaluationClickHouseInsert = {
+  table: string;
+  values: Record<string, unknown>[];
+  format: "JSONEachRow";
+  clickhouse_settings?: ClickHouseSettings;
+};
+
+export type EvaluationClickHouseQuery = {
+  query: string;
+  query_params: Record<string, unknown>;
+  format: "JSONEachRow";
+  clickhouse_settings?: ClickHouseSettings;
+};
+
+export type EvaluationClickHouseClient = {
+  insert(input: EvaluationClickHouseInsert): Promise<unknown>;
+  query(input: EvaluationClickHouseQuery): Promise<EvaluationClickHouseResult>;
+};
+
+export type EvaluationClickHouseResolver = (
+  tenantId: string,
+) => Promise<EvaluationClickHouseClient>;
 
 /**
  * One tenant's view of the process's routing ClickHouse member. A read runs

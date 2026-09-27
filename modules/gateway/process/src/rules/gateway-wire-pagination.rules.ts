@@ -55,18 +55,15 @@ export function decodePageCursor(encoded: string, arity: number): string[] | nul
 export function keysetAfter(columns: KeysetColumn[]): Record<string, unknown>[] {
   return columns.map((column, index) => {
     const branch: Record<string, unknown> = {};
+    // An instant crosses into the Prisma filter as the Date Prisma compares.
     for (const earlier of columns.slice(0, index)) {
-      branch[earlier.name] = prismaValue(earlier.value);
+      branch[earlier.name] =
+        typeof earlier.value === "object" ? toDate(earlier.value) : earlier.value;
     }
-    const value = prismaValue(column.value);
+    const value = typeof column.value === "object" ? toDate(column.value) : column.value;
     branch[column.name] = column.direction === "desc" ? { lt: value } : { gt: value };
     return branch;
   });
-}
-
-/** A key value as Prisma compares it: an instant crosses as the Date Prisma takes. */
-function prismaValue(value: string | number | Instant): string | number | Date {
-  return typeof value === "object" ? toDate(value) : value;
 }
 
 /**

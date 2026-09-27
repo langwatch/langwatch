@@ -17,6 +17,10 @@ import {
   readLocalFolderPick,
   writeLocalFolderPick,
 } from "../../../model/langy-code-access-pick.ts";
+import {
+  type LangyLocalWorkspaceRead,
+  parseLangyLocalWorkspace,
+} from "../../../model/langy-local-workspace.ts";
 import { LangyCopyButton } from "../../elements/langy-copy-button.tsx";
 
 /** The option ids the selection carries, so the message reads the same words. */
@@ -110,25 +114,13 @@ export function langyCodeAccessState({
   return "asking";
 }
 
-/** What `langy.getLocalWorkspace` answers, as the card reads it. */
-type LangyLocalWorkspaceStatus = {
-  connected: boolean;
-  workspace: {
-    root: string;
-    hostname: string;
-    gitBranch?: string | null;
-  } | null;
-  pendingRequest: { expiresAt: string } | null;
-  codeAccessPreference: "github" | null;
-};
-
 export function LangyCodeAccessCard(props: LangyCodeAccessCardProps) {
   const { projectId, conversationId } = props;
   const superseded = props.superseded ?? false;
   const workspaceRevision = useLangyLocalControlStore((s) => s.workspaceRevision);
   const workspace = api.langy.getLocalWorkspace.useQuery(
     { projectId, conversationId },
-    { enabled: !!projectId && !!conversationId && !superseded },
+    { select: parseLangyLocalWorkspace, enabled: !!projectId && !!conversationId && !superseded },
   );
 
   // The live stream says the folder came or went; the query says what it is.
@@ -156,7 +148,7 @@ function CodeAccessBody({
   onRefetch,
   ...props
 }: LangyCodeAccessCardProps & {
-  folder: LangyLocalWorkspaceStatus;
+  folder: LangyLocalWorkspaceRead;
   onRefetch: () => void;
 }) {
   const { projectId, conversationId, callId, onAskAgain, now } = props;

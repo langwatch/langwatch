@@ -11,6 +11,7 @@ import {
   ReversibleTestSecretEncryption,
   teamWithMembers,
 } from "../../app/__tests__/secret.fixture.ts";
+import { MemorySecretRepository } from "../../repositories/memory/memory.secret.repository.ts";
 import type {
   CreateStoredSecretInput,
   SecretIdentity,
@@ -234,5 +235,86 @@ describe("SecretService", () => {
         { id: "user-1" },
       ),
     ).rejects.toBeInstanceOf(SecretDuplicateError);
+  });
+
+  describe("when the feature that owns a reserved name stores its credential", () => {
+    function createReservedService() {
+      const repository = MemorySecretRepository.create();
+      const service = SecretService.create({
+        repository,
+        encryption: new ReversibleTestSecretEncryption(),
+        reservedNames: ["LANGY_KEY"],
+        maximumPerProject: 0,
+        ...teamWithMembers([]),
+      });
+
+      return { repository, service };
+    }
+
+    /** @scenario "The feature that owns a reserved name stores its credential once" */
+    it("stores it encrypted, outside the project limit, and still hides it", async () => {
+      const { repository, service } = createReservedService();
+
+      await expect(
+        service.createReserved({
+          projectId: "project-1",
+          name: "LANGY_KEY",
+          value: "vk-first",
+          actorId: "user-1",
+        }),
+      ).resolves.toEqual({ value: "vk-first" });
+      await expect(repository.findAllValues({ projectId: "project-1" })).resolves.toEqual([
+        { name: "LANGY_KEY", encryptedValue: "encrypted(vk-first)" },
+      ]);
+      await expect(service.list({ projectId: "project-1" })).resolves.toEqual([]);
+    });
+
+    /** @scenario "The feature that owns a reserved name stores its credential once" */
+    it("attributes the write to the actor it names", async () => {
+      const { repository, service } = createService();
+
+      await service.createReserved({
+        projectId: "project-1",
+        name: "LANGY_KEY",
+        value: "vk",
+        actorId: "user-7",
+      });
+
+      expect(repository.createCall).toHaveBeenCalledWith({
+        projectId: "project-1",
+        name: "LANGY_KEY",
+        encryptedValue: "encrypted(vk)",
+        actorId: "user-7",
+      });
+    });
+
+    /** @scenario "The feature that owns a reserved name stores its credential once" */
+    it("answers a racing writer with the value stored first", async () => {
+      const { service } = createReservedService();
+      const write = (value: string) =>
+        service.createReserved({ projectId: "project-1", name: "LANGY_KEY", value, actorId: "u" });
+
+      await write("vk-first");
+
+      await expect(write("vk-second")).resolves.toEqual({ value: "vk-first" });
+      await expect(service.getValues({ projectId: "project-1" })).resolves.toEqual({
+        LANGY_KEY: "vk-first",
+      });
+    });
+
+    /** @scenario "The feature that owns a reserved name stores its credential once" */
+    it("refuses a name that is not reserved, writing nothing", async () => {
+      const { repository, service } = createReservedService();
+
+      await expect(
+        service.createReserved({
+          projectId: "project-1",
+          name: "OPENAI_API_KEY",
+          value: "sk",
+          actorId: "user-1",
+        }),
+      ).rejects.toThrow("not a reserved project secret name");
+      await expect(repository.count({ projectId: "project-1" })).resolves.toBe(0);
+    });
   });
 });

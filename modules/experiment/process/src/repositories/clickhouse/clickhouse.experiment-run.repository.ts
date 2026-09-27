@@ -1,3 +1,4 @@
+import { TupleParam } from "@clickhouse/client";
 import type {
   ExperimentRun,
   ExperimentRunAggregate,
@@ -137,6 +138,11 @@ const parseRecord = (value: string | null): Record<string, unknown> | undefined 
 const runKey = (experimentId: string, runId: string): string => `${experimentId}:${runId}`;
 
 export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
+  /** The `(experiment, run)` pair a keyset query binds as one ClickHouse tuple parameter. */
+  static tupleParam(values: string[]): unknown {
+    return new TupleParam(values);
+  }
+
   static create(
     options: ClickHouseExperimentRunRepositoryOptions,
   ): ClickHouseExperimentRunRepository {

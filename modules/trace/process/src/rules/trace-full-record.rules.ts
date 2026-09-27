@@ -64,15 +64,7 @@ function toJsonValue(value: unknown): TraceRecordValue | null {
     typeof value === "number" ||
     typeof value === "boolean";
   if (isScalar) return value;
-  if (Array.isArray(value)) {
-    const values: TraceRecordValue[] = [];
-    for (const item of value) {
-      const parsed = toJsonValue(item);
-      if (parsed === null && item !== null) return null;
-      values.push(parsed);
-    }
-    return values;
-  }
+  if (Array.isArray(value)) return toJsonArray(value);
   if (!isRecord(value)) return null;
   const result: Record<string, TraceRecordValue> = {};
   for (const [key, child] of Object.entries(value)) {
@@ -81,6 +73,17 @@ function toJsonValue(value: unknown): TraceRecordValue | null {
     result[key] = parsed;
   }
   return result;
+}
+
+/** An array of JSON values, or null when any item is not one. */
+function toJsonArray(value: readonly unknown[]): TraceRecordValue[] | null {
+  const values: TraceRecordValue[] = [];
+  for (const item of value) {
+    const parsed = toJsonValue(item);
+    if (parsed === null && item !== null) return null;
+    values.push(parsed);
+  }
+  return values;
 }
 
 function isRecord(value: unknown): value is Record<string, TraceRecordValue> {

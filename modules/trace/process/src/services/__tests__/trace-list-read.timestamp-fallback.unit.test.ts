@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
  * raw span baseline of 0).
  */
 import { mapToTraceListItem } from "../../rules/trace-list-row.rules.ts";
-import { mapTraceSummaryToHeader } from "../../transport/api-trpc/trace-read-mappers.api.ts";
+import { mapTraceSummaryToHeader } from "../../rules/trace-read-mappers.rules.ts";
 
 const ANCHOR_MS = 1_787_122_009_599;
 

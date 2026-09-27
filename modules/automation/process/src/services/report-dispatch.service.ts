@@ -117,57 +117,52 @@ function scheduleLabel(cron: string, timezone: string): string {
   return `on schedule \`${cron}\` (${timezone})`;
 }
 
+/**
+ * The span a fire summarises: everything since the report's PREVIOUS scheduled slot, up to
+ * the slot being fired.
+ */
+function reportWindowMs({
+  cron,
+  timezone,
+  slot,
+}: {
+  cron: string;
+  timezone: string;
+  slot: Instant;
+}): number {
+  let previous: Instant | undefined;
+  try {
+    const [run] = new Cron(cron, { timezone }).previousRuns(1, toDate(slot));
+    previous = run === undefined ? undefined : fromDate(run);
+  } catch {
+    return WEEK_MS;
+  }
+
+  if (!previous) {
+    return WEEK_MS;
+  }
+
+  const span = slot.epochMilliseconds - previous.epochMilliseconds;
+  if (!Number.isFinite(span) || span <= 0) {
+    return WEEK_MS;
+  }
+
+  return Math.min(Math.max(span, MIN_WINDOW_MS), MAX_WINDOW_MS);
+}
+
 /** Sending one scheduled report: its window, its data, and the notify pipeline. */
 export class ReportDispatchService {
-  static create(): ReportDispatchService {
-    return new ReportDispatchService();
+  static create(deps: ReportDispatchDeps): ReportDispatchService {
+    return new ReportDispatchService(deps);
   }
 
-  private constructor() {}
-
-  /**
-   * The span a fire summarises: everything since the report's PREVIOUS scheduled slot, up to
-   * the slot being fired.
-   */
-  static reportWindowMs({
-    cron,
-    timezone,
-    slot,
-  }: {
-    cron: string;
-    timezone: string;
-    slot: Instant;
-  }): number {
-    let previous: Instant | undefined;
-    try {
-      const [run] = new Cron(cron, { timezone }).previousRuns(1, toDate(slot));
-      previous = run === undefined ? undefined : fromDate(run);
-    } catch {
-      return WEEK_MS;
-    }
-
-    if (!previous) {
-      return WEEK_MS;
-    }
-
-    const span = slot.epochMilliseconds - previous.epochMilliseconds;
-    if (!Number.isFinite(span) || span <= 0) {
-      return WEEK_MS;
-    }
-
-    return Math.min(Math.max(span, MIN_WINDOW_MS), MAX_WINDOW_MS);
-  }
+  private constructor(private readonly deps: ReportDispatchDeps) {}
 
   /**
    * ADR-044 Phase 3c: the scheduler's report handler. When a report's
    */
-  static async dispatchScheduledReport({
-    deps,
-    fire,
-  }: {
-    deps: ReportDispatchDeps;
-    fire: ReportFire;
-  }): Promise<void> {
+  async dispatchScheduledReport(fire: ReportFire): Promise<void> {
+    const deps = this.deps;
     const loaded = await findDispatch({ deps, fire });
     if (!loaded) {
       return;
@@ -188,7 +183,7 @@ export class ReportDispatchService {
     const to = fire.slot.epochMilliseconds;
     const from =
       to -
-      ReportDispatchService.reportWindowMs({
+      reportWindowMs({
         cron: report.schedule.cron,
         timezone: report.schedule.timezone,
         slot: fire.slot,

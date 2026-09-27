@@ -3,12 +3,17 @@ import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contra
 import { buildIntentFactories } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import { automationProcessDefinition } from "../../fixtures/pipeline-test-harness.ts";
+import { automationProcessDefinition } from "../../__tests__/fixtures/pipeline-test-harness.ts";
+import {
+  addPending,
+  digestBatchKey,
+  drainDue,
+  pagePersistMatches,
+} from "../../rules/trigger-settlement.rules.ts";
 import {
   MAX_PENDING_MATCHES,
   PERSIST_PAGE_MAX,
   type SettlementState,
-  TriggerSettlement,
 } from "../trigger-settlement.process.ts";
 
 const initialState = (): SettlementState => ({
@@ -32,10 +37,10 @@ describe("trigger settlement process", () => {
   describe("given a trace is already pending", () => {
     describe("when the trace matches again", () => {
       it("moves the durable settle wake later", () => {
-        const first = TriggerSettlement.addPending(initialState(), match(), 1_000);
-        const second = TriggerSettlement.addPending(first.state, match(), 10_000);
+        const first = addPending(initialState(), match(), 1_000);
+        const second = addPending(first.state, match(), 10_000);
 
-        expect(TriggerSettlement.findNextBoundary(second.state)).toBe(40_000);
+        expect(second.nextBoundary).toBe(40_000);
       });
     });
   });
@@ -61,7 +66,7 @@ describe("trigger settlement process", () => {
           overflowFlushed: 0,
         };
 
-        expect(TriggerSettlement.drainDue(state, 1_000).boundaries).toEqual([
+        expect(drainDue(state, 1_000).boundaries).toEqual([
           { key: 1_000, traceIds: ["trace-a", "trace-b"] },
         ]);
       });
@@ -86,17 +91,15 @@ describe("trigger settlement process", () => {
           overflowFlushed: 0,
         };
 
-        expect(TriggerSettlement.drainDue(state, 1_000).persistPages).toEqual([
+        expect(drainDue(state, 1_000).persistPages).toEqual([
           {
             traceIds: ["trace-a", "trace-b"],
-            pageKey: TriggerSettlement.digestBatchKey(["trace-a@30000-0", "trace-b@30000-0"]),
+            pageKey: digestBatchKey(["trace-a@30000-0", "trace-b@30000-0"]),
           },
         ]);
         // Identical state drains to byte-identical keys: what a revision
         // conflict re-runs and an event redelivery replay must produce.
-        expect(TriggerSettlement.drainDue(state, 1_000).persistPages).toEqual(
-          TriggerSettlement.drainDue(state, 1_000).persistPages,
-        );
+        expect(drainDue(state, 1_000).persistPages).toEqual(drainDue(state, 1_000).persistPages);
       });
 
       it("splits more settled matches than the page bound into multiple pages", () => {
@@ -105,16 +108,14 @@ describe("trigger settlement process", () => {
           settleWindowBucket: "30000-0",
         }));
 
-        const pages = TriggerSettlement.pagePersistMatches({ matches });
+        const pages = pagePersistMatches({ matches });
 
         expect(pages).toHaveLength(2);
         expect(pages[0]!.traceIds).toHaveLength(PERSIST_PAGE_MAX);
         expect(pages[1]!.traceIds).toHaveLength(3);
         expect(pages[0]!.pageKey).not.toBe(pages[1]!.pageKey);
         // Insertion order does not leak into the keys.
-        expect(TriggerSettlement.pagePersistMatches({ matches: [...matches].reverse() })).toEqual(
-          pages,
-        );
+        expect(pagePersistMatches({ matches: [...matches].reverse() })).toEqual(pages);
       });
 
       it("keeps the next future boundary durable", () => {
@@ -136,7 +137,7 @@ describe("trigger settlement process", () => {
           overflowFlushed: 0,
         };
 
-        expect(TriggerSettlement.drainDue(state, 1_000).nextBoundary).toBe(2_000);
+        expect(drainDue(state, 1_000).nextBoundary).toBe(2_000);
       });
     });
   });
@@ -187,10 +188,10 @@ describe("trigger settlement process", () => {
         // round's page cannot collide with the completed first round's
         // outbox row and be swallowed by the dedup.
         expect(firstWake.intents?.map((intent) => intent.messageKey)).toEqual([
-          `persist:${TriggerSettlement.digestBatchKey(["trace-1@30000-0"])}`,
+          `persist:${digestBatchKey(["trace-1@30000-0"])}`,
         ]);
         expect(secondWake.intents?.map((intent) => intent.messageKey)).toEqual([
-          `persist:${TriggerSettlement.digestBatchKey(["trace-1@30000-1"])}`,
+          `persist:${digestBatchKey(["trace-1@30000-1"])}`,
         ]);
       });
     });
@@ -231,7 +232,7 @@ describe("trigger settlement process", () => {
           }).intents?.map((intent) => intent.messageKey);
         };
 
-        const pageBody = `persist:${TriggerSettlement.digestBatchKey(["trace-1@30000-0"])}`;
+        const pageBody = `persist:${digestBatchKey(["trace-1@30000-0"])}`;
 
         expect(pageKeysOf({ triggerId: "trigger-1" })).toEqual([`process:trigger-1:${pageBody}`]);
         expect(pageKeysOf({ triggerId: "trigger-2" })).toEqual([`process:trigger-2:${pageBody}`]);
@@ -254,7 +255,7 @@ describe("trigger settlement process", () => {
           ]),
         );
 
-        const next = TriggerSettlement.addPending(
+        const next = addPending(
           { pendingMatches, overflowFlushed: 0 },
           match({ traceId: "newest" }),
           MAX_PENDING_MATCHES + 1,
@@ -311,7 +312,7 @@ describe("trigger settlement process", () => {
         // running flush count. Nothing is discarded.
         expect(evolution.intents).toEqual([
           {
-            messageKey: `persist:${TriggerSettlement.digestBatchKey(["trace-0@30000-0"])}`,
+            messageKey: `persist:${digestBatchKey(["trace-0@30000-0"])}`,
             intentType: "persistMatch",
             payload: {
               triggerId: "trigger-1",

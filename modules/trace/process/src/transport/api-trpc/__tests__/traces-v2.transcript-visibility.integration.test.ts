@@ -16,6 +16,7 @@ import {
 import type { Protections } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import type { TraceLogRecordReadRow } from "../../../app/trace.app.ts";
 import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
 import { TraceTranscriptReadService } from "../../../services/trace-transcript-read.service.ts";
 import {
@@ -160,7 +161,7 @@ describe("transcript captured-content matrix for an API-key caller", () => {
   }
 
   /** The exact path the REST route takes: protections for a project, no session. */
-  async function transcriptAsApiKeyCaller(logs: unknown[]) {
+  async function transcriptAsApiKeyCaller(logs: TraceLogRecordReadRow[]) {
     getLogsByTraceId.mockResolvedValue(logs);
     return traceTranscriptReadService.readCodingAgentTranscript({
       app,
@@ -172,7 +173,7 @@ describe("transcript captured-content matrix for an API-key caller", () => {
     });
   }
 
-  async function documentFor(logs: unknown[]) {
+  async function documentFor(logs: TraceLogRecordReadRow[]) {
     return JSON.stringify(await transcriptAsApiKeyCaller(logs));
   }
 

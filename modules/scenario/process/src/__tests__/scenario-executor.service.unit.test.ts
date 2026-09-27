@@ -12,6 +12,7 @@ import { MemoryScenarioCancellationChannel } from "../channels/memory/memory.sce
 import { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service.ts";
 import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
 import type { ScenarioService } from "../services/scenario.service.ts";
+import { VoiceNonceRegistryService } from "../services/voice-nonce-registry.service.ts";
 import {
   scenarioExecutorPeers,
   scenarioHostMembers,
@@ -22,6 +23,7 @@ function harness({ langwatchEndpoint }: { langwatchEndpoint: string | undefined 
   const channel = MemoryScenarioCancellationChannel.create();
   const owned: string[] = [];
   const executor = ScenarioExecutorService.create({
+    voiceNonces: VoiceNonceRegistryService.create(),
     peers: {
       ...scenarioExecutorPeers(),
       agents: createApiFixture<AgentApi>(),

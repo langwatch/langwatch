@@ -11,7 +11,7 @@ import type {
   LLMSpan,
   RAGSpan,
   Span,
-  SpanInputOutput,
+  LegacySpanInputOutput,
   Trace,
 } from "@langwatch/trace-contract";
 import Parse from "papaparse";
@@ -310,7 +310,7 @@ function nullableNumber(value: number | null | undefined): string {
  * Serialize a span input or output to a string for CSV export.
  * Structured types (chat_messages, json, list) are stringified as JSON.
  */
-function serializeSpanIO(io: SpanInputOutput | null | undefined): string {
+function serializeSpanIO(io: LegacySpanInputOutput | null | undefined): string {
   if (!io) return "";
   if (io.type === "chat_messages") {
     return JSON.stringify(io.value);

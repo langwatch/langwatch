@@ -20,7 +20,7 @@ import { batchRecordTrpcTransport } from "../batch-record.trpc.ts";
 import { datasetRecordTrpcTransport } from "../dataset-record.trpc.ts";
 import { datasetTrpcTransport } from "../dataset.trpc.ts";
 
-type Declaration = { router: TrpcRouterMount<never, never> };
+type Declaration = { router: TrpcRouterMount<DatasetApi, never> };
 type Handler = (args: {
   input: unknown;
   actor: { type: "user"; id: string };
@@ -51,10 +51,7 @@ function mounted(
     router: (record) => record,
   };
 
-  (declaration.router as unknown as (factory: TrpcProcedureFactory<object>, app: unknown) => void)(
-    runtime,
-    () => app,
-  );
+  declaration.router(runtime, () => app);
 
   return { permissions, handlers };
 }

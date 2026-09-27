@@ -75,11 +75,11 @@ describe("ProjectionRouter map-subscriber dispatch over a coalesced batch", () =
       getProjectionSubscriberQueue: vi.fn().mockReturnValue({ send }),
     });
 
-    const router = new ProjectionRouter<Event>(
-      TEST_CONSTANTS.AGGREGATE_TYPE,
-      TEST_CONSTANTS.PIPELINE_NAME,
+    const router = new ProjectionRouter<Event>({
+      aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+      pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       queueManager,
-    );
+    });
 
     const mapProj = createMockMapProjectionDefinition("spans", {
       store: createMockAppendStore<Record<string, unknown>>(),

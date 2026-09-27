@@ -31,10 +31,8 @@ export class PostgresDatasetRepositories {
   }: Pick<ProcessMembers, "prisma" | "objectStorage">): DatasetRepositories {
     return {
       ...PostgresDatasetTableRepositories.create({ prisma }),
-      migration: PrismaDatasetMigrationRepository.create({
-        database: prisma,
-        storage: ObjectStorageDatasetChunkRepository.create({ objectStorage }),
-      }),
+      migration: PrismaDatasetMigrationRepository.create({ database: prisma }),
+      migrationChunks: ObjectStorageDatasetChunkRepository.create({ objectStorage }),
     };
   }
 }

@@ -35,7 +35,7 @@ export class MemoryDatasetUsageRepository implements DatasetUsageRepository {
     const evaluations = this.#database
       .batchEvaluations()
       .filter(inScope)
-      .map((row) => row.createdAt.getTime());
+      .map((row) => row.createdAt.epochMilliseconds);
     const records = this.#database
       .records()
       .filter(inScope)

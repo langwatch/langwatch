@@ -53,7 +53,7 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
   ])("given $label", ({ aggregateId }) => {
     describe("when getEvents is called", () => {
       it("returns no events without touching ClickHouse", async () => {
-        const events = await store.getEvents(aggregateId, { tenantId }, aggregateType);
+        const events = await store.getEvents({ aggregateId, context: { tenantId }, aggregateType });
 
         expect(events).toEqual([]);
         expect(mockClickHouseClient.query).not.toHaveBeenCalled();
@@ -62,12 +62,12 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
 
     describe("when getEventsUpTo is called", () => {
       it("returns no events without touching ClickHouse", async () => {
-        const events = await store.getEventsUpTo(
+        const events = await store.getEventsUpTo({
           aggregateId,
-          { tenantId },
+          context: { tenantId },
           aggregateType,
           upToEvent,
-        );
+        });
 
         expect(events).toEqual([]);
         expect(mockClickHouseClient.query).not.toHaveBeenCalled();
@@ -76,13 +76,13 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
 
     describe("when countEventsBefore is called", () => {
       it("returns 0 without touching ClickHouse", async () => {
-        const count = await store.countEventsBefore(
+        const count = await store.countEventsBefore({
           aggregateId,
-          { tenantId },
+          context: { tenantId },
           aggregateType,
-          1000,
-          "event-1",
-        );
+          beforeTimestamp: 1000,
+          beforeEventId: "event-1",
+        });
 
         expect(count).toBe(0);
         expect(mockClickHouseClient.query).not.toHaveBeenCalled();
@@ -97,7 +97,7 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
           json: vi.fn().mockResolvedValue([]),
         });
 
-        await store.getEvents("trace-123", { tenantId }, aggregateType);
+        await store.getEvents({ aggregateId: "trace-123", context: { tenantId }, aggregateType });
 
         expect(mockClickHouseClient.query).toHaveBeenCalledWith(
           expect.objectContaining({

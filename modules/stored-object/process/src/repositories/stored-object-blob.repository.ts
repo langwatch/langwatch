@@ -3,7 +3,7 @@
  */
 import type { Readable } from "node:stream";
 
-export interface StoredObjectStorageDriver {
+export interface StoredObjectBlobRepository {
   /** Streams the bytes stored at `uri`, rejecting when there are none. */
   get(uri: string): Promise<Readable>;
 
@@ -21,4 +21,4 @@ export interface StoredObjectStorageDriver {
  * A provider the scheme registry builds on first use rather than at compose
  * time, for a backend whose credentials are not resolved yet.
  */
-export type StoredObjectStorageDriverFactory = () => StoredObjectStorageDriver | undefined;
+export type StoredObjectBlobRepositoryFactory = () => StoredObjectBlobRepository | undefined;

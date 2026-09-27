@@ -4,21 +4,21 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
-import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
+import { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
 import {
   type AzureCredentials,
   type AzureInjectedIdentity,
 } from "#services/azure-blob-credentials.service";
-import { AzureBlobCredentialsAdapter } from "#services/azure-blob-credentials.service";
-const { assertTokenModeTransportSafety } = AzureBlobCredentialsAdapter;
+import { AzureBlobCredentialsService } from "#services/azure-blob-credentials.service";
+const azureCredentials = AzureBlobCredentialsService.create();
 import { z } from "zod";
 
-import type { ObjectStorageMigrationInventory } from "#repositories/object-storage-migration-inventory.repository";
+import type { ObjectStorageMigrationInventoryRepository } from "#repositories/object-storage-migration-inventory.repository";
 import {
   MigrationCutoverAuditRedisRepository,
   type MigrationCutoverRedisConfig,
 } from "#repositories/redis/redis.object-storage-migration-audit.repository";
-import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
+import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
 
 import { createMigrationStorageEndpoint } from "../rules/object-storage-migration-transfer.rules.ts";
 import {
@@ -213,10 +213,10 @@ export function createMigrationTask({
   s3Driver,
 }: {
   config: MigrationTaskConfig;
-  inventory: ObjectStorageMigrationInventory;
+  inventory: ObjectStorageMigrationInventoryRepository;
   publishStoredObject: ObjectStorageMigrationDeps["publishStoredObject"];
   auditQueues: ObjectStorageMigrationDeps["auditQueues"];
-  s3Driver: StoredObjectStorageDriver;
+  s3Driver: StoredObjectBlobRepository;
 }): ObjectStorageMigrationService {
   const endpoints = {
     s3: createMigrationStorageEndpoint({
@@ -226,7 +226,7 @@ export function createMigrationTask({
     }),
     azure: createMigrationStorageEndpoint({
       provider: "azure",
-      driver: AzureBlobStoredObjectDriverAdapter.create(toAzureCredentials(config)),
+      driver: AzureStoredObjectBlobRepository.create(toAzureCredentials(config)),
       accountName: config.azure.accountName,
       container: config.azure.container,
     }),
@@ -280,7 +280,7 @@ export function toAzureCredentials(
   // a token-mode migration against an http:// endpoint would put a bearer
   // token on the wire in plaintext, and a sovereign endpoint without an
   // authority host would request tokens from the public-cloud issuer.
-  assertTokenModeTransportSafety({
+  azureCredentials.assertTokenModeTransportSafety({
     endpointBaseUrl: config.azure.endpoint,
     authorityHost: config.azure.authorityHost,
   });

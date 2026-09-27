@@ -22,7 +22,10 @@ import { MemoryIdentityStore } from "../repositories/memory/memory.identity.stor
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
-import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../testing.ts";
+import {
+  inMemoryIdentityReservations,
+  inMemoryIdentityUsers,
+} from "./support/identity-memory-repositories.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -154,11 +157,11 @@ describe("identity pipeline", () => {
 
         const eventStore = eventSourcing.getEventStore();
         expect(eventStore).toBeDefined();
-        const appended = await eventStore!.getEvents(
-          USER,
-          { tenantId: createTenantId(USER) },
-          USER_IDENTITY_AGGREGATE_TYPE,
-        );
+        const appended = await eventStore!.getEvents({
+          aggregateId: USER,
+          context: { tenantId: createTenantId(USER) },
+          aggregateType: USER_IDENTITY_AGGREGATE_TYPE,
+        });
         expect(appended).toHaveLength(1);
         expect(String(appended[0]!.tenantId)).toBe(USER);
       } finally {

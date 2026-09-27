@@ -3795,6 +3795,12 @@ const presentations = {
         : "Configure the destination first.";
     },
   },
+  tracked_event_invalid: {
+    title: "The event could not be recorded",
+    describe: () =>
+      "The event body is not valid JSON or does not match the event's shape. " +
+      "Check the event type and its fields, then send it again.",
+  },
   trigger_action_unsupported: {
     title: "This automation cannot do that",
     describe: () =>

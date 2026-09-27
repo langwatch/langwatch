@@ -7,6 +7,8 @@ import { createRestRuntime } from "@langwatch/api/rest";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { RedisMcpOAuthClientRepository } from "../../repositories/redis/redis.mcp-oauth-client.repository.ts";
+import { RedisMcpOAuthTokenRepository } from "../../repositories/redis/redis.mcp-oauth-token.repository.ts";
 import {
   McpAuthorizationService,
   MCP_AUTHORIZE_PERMISSION,
@@ -57,7 +59,8 @@ function harnessFor(options: { held: readonly string[]; approver?: McpApprover |
       },
       isDemoProject: () => false,
       encrypt: (value: string) => `encrypted:${value}`,
-      redis,
+      clients: RedisMcpOAuthClientRepository.create({ redis }),
+      codes: RedisMcpOAuthTokenRepository.create({ redis }),
     },
   });
 
@@ -72,7 +75,7 @@ function harnessFor(options: { held: readonly string[]; approver?: McpApprover |
   });
 
   const app = runtime.mount(mcpAuthorizeRest.router(), {
-    app: () => ({ approve: (request) => authorization.approve(request) }),
+    app: () => ({ authorize: (input) => authorization.authorize(input) }),
     onError: (error, context) => context.json({ error: String(error) }, 500),
   });
 

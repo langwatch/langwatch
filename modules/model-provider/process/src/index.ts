@@ -29,30 +29,30 @@ export type {
   ModelProviderEgressRequest,
   ModelProviderEgressResponse,
 } from "./app/model-provider.members.ts";
-export { EncryptedModelProviderCredentialAdapter } from "./services/encrypted.model-provider-api-key-credential.service.ts";
+export { PrismaModelProviderCredentialMapper } from "./repositories/prisma/prisma.model-provider-credential.mapper.ts";
 export {
-  RegistryModelProviderCatalogAdapter,
+  RegistryModelProviderCatalogService,
   type RegistryModelProviderCatalogOptions,
-} from "./services/registry.model-provider-catalog.service.ts";
+} from "./services/registry-model-provider-catalog.service.ts";
 export { modelProviderConnectionPingChannels } from "./channels/model-provider-connection-ping-channels.registry.ts";
-export { UnmanagedModelProviderGatewayAdapter } from "./services/unmanaged.model-provider-gateway.service.ts";
-export { HttpModelProviderCredentialProbeAdapter } from "./services/http.model-provider-credential-probe.service.ts";
-export { UnavailableModelProviderCredentialProbeAdapter } from "./services/unavailable.model-provider-credential-probe.service.ts";
+export { UnmanagedModelProviderGatewayService } from "./services/unmanaged-model-provider-gateway.service.ts";
+export { HttpModelProviderCredentialProbeService } from "./services/http-model-provider-credential-probe.service.ts";
+export { UnavailableModelProviderCredentialProbeService } from "./services/unavailable-model-provider-credential-probe.service.ts";
 export {
   CodexAccountService,
-  CodexOAuthModelProviderTokenRefresherAdapter,
   type CodexDeviceCode,
   type CodexPollResult,
-} from "./services/codex-oauth.model-provider-token-refresher.service.ts";
+} from "./services/codex-account.service.ts";
+export { CodexOAuthModelProviderTokenRefresherService } from "./services/codex-oauth-model-provider-token-refresher.service.ts";
 export { AiCallFailureService } from "./services/ai-call-failure.service.ts";
 export type { ModelCostPreviewSpanReader } from "./services/model-cost-preview.service.ts";
-export { WindowedModelProviderConnectionRateLimiterAdapter } from "./services/windowed.model-provider-connection-rate-limiter.service.ts";
+export { WindowedModelProviderConnectionRateLimiterService } from "./services/windowed-model-provider-connection-rate-limiter.service.ts";
 export {
-  SsrfModelProviderEgressAdapter,
+  SsrfModelProviderEgressService,
   type ModelProviderEgressPolicy,
-} from "./services/ssrf.model-provider-egress.service.ts";
-export { PrefixedModelProviderIdAdapter } from "./services/prefixed.model-provider-id.service.ts";
-export { VercelAiModelTranslationAdapter } from "./services/vercel-ai.model-translation.service.ts";
+} from "./services/ssrf-model-provider-egress.service.ts";
+export { PrefixedModelProviderIdService } from "./services/prefixed-model-provider-id.service.ts";
+export { VercelAiModelTranslationService } from "./services/vercel-ai-model-translation.service.ts";
 export {
   ModelProviderExecutionHandleService,
   type ModelProviderExecutionHandleInput,
@@ -62,10 +62,7 @@ export { pickMaxTokensCeiling } from "./rules/max-tokens-ceiling.rules.ts";
 export {
   getModelMetadataForFrontend,
   getProjectModelProviders,
-  getProjectModelProvidersForFrontend,
   type LegacyModelProviderExecution,
-  listOrgModelProvidersForFrontend,
-  listProjectModelProvidersForFrontend,
   mergeCustomModelMetadata,
   prepareEnvKeys,
   prepareLitellmParams,

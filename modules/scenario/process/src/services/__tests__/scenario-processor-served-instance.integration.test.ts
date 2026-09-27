@@ -27,6 +27,7 @@ import { NodeScenarioChildService } from "../node-scenario-child.service.ts";
 import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service.ts";
 import type { ExecutionJobData } from "../scenario-execution-pool.service.ts";
 import { ScenarioProcessorService } from "../scenario-processor.service.ts";
+import { VoiceNonceRegistryService } from "../voice-nonce-registry.service.ts";
 
 const JOB: ExecutionJobData = {
   projectId: "proj_served",
@@ -88,6 +89,7 @@ function buildProcessor() {
     cancellations: new SilentCancellations(),
     childProcesses: NodeScenarioChildService.create({
       pool,
+      nonces: VoiceNonceRegistryService.create(),
       config: {
         packageRoot: process.cwd(),
         sourcePath: `${process.cwd()}/src/scenario-child.entrypoint.ts`,

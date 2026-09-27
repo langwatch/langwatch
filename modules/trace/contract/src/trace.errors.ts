@@ -249,3 +249,13 @@ export class TraceCapabilityUnavailableError extends HandledError {
     this.name = "TraceCapabilityUnavailableError";
   }
 }
+
+/** A tracked-event body that does not parse or does not match its event type's shape. */
+export class TrackedEventInvalidError extends HandledError {
+  declare readonly code: "tracked_event_invalid";
+
+  constructor(message: string) {
+    super("tracked_event_invalid", message, { httpStatus: 400 });
+    this.name = "TrackedEventInvalidError";
+  }
+}

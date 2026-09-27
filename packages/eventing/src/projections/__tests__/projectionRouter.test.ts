@@ -43,11 +43,11 @@ describe("ProjectionRouter", () => {
     describe("when fold projection has eventTypes filter (inline)", () => {
       it("skips events that do not match the fold's eventTypes", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
@@ -96,11 +96,11 @@ describe("ProjectionRouter", () => {
           waitUntilReady: vi.fn().mockResolvedValue(void 0),
         });
 
-        router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         const fold = createMockFoldProjectionDefinition("filtered-fold", {
@@ -150,11 +150,11 @@ describe("ProjectionRouter", () => {
     describe("when a fold projection fails inline", () => {
       it("attempts all projections and throws AggregateError", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const failingStore = createMockFoldProjectionStore<{ count: number }>();
         (failingStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -196,11 +196,11 @@ describe("ProjectionRouter", () => {
     describe("when fold projection fails but map projections exist", () => {
       it("still dispatches to map projections", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const failingStore = createMockFoldProjectionStore<{ count: number }>();
         (failingStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -238,11 +238,11 @@ describe("ProjectionRouter", () => {
     describe("when both fold and map projections fail", () => {
       it("throws single AggregateError with all errors", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const foldStore = createMockFoldProjectionStore<{ count: number }>();
         (foldStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("fold failure"));
@@ -282,11 +282,11 @@ describe("ProjectionRouter", () => {
       /** @scenario "A projection subscriber runs only after a successful projection write" */
       it("does not dispatch to subscribers registered on that fold", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const failingStore = createMockFoldProjectionStore<{ count: number }>();
         (failingStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -323,11 +323,11 @@ describe("ProjectionRouter", () => {
     describe("when a map projection fails inline (only map registered)", () => {
       it("attempts all projections and throws AggregateError", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const failingStore = createMockAppendStore<Record<string, unknown>>();
         (failingStore.append as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -365,11 +365,11 @@ describe("ProjectionRouter", () => {
     describe("when a subscriber fails inline", () => {
       it("throws AggregateError", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
@@ -403,11 +403,11 @@ describe("ProjectionRouter", () => {
 
     describe("when a subscriber declares a shouldDispatch predicate", () => {
       const setupRouterWithFold = (queueManager: ReturnType<typeof createMockQueueManager>) => {
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
@@ -562,11 +562,11 @@ describe("ProjectionRouter", () => {
           hasProjectionSubscriberQueues: true,
           getProjectionSubscriberQueue: vi.fn().mockReturnValue({ send: mockSend }),
         });
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
@@ -601,11 +601,11 @@ describe("ProjectionRouter", () => {
           hasProjectionSubscriberQueues: true,
           getProjectionSubscriberQueue: vi.fn().mockReturnValue(undefined),
         });
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
@@ -643,11 +643,11 @@ describe("ProjectionRouter", () => {
           hasProjectionSubscriberQueues: true,
           getProjectionSubscriberQueue: vi.fn().mockReturnValue(undefined),
         });
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
@@ -685,11 +685,11 @@ describe("ProjectionRouter", () => {
       /** @scenario A subscriber without a relevance guard fires for every event */
       it("fires after map projection succeeds inline", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const mapStore = createMockAppendStore<Record<string, unknown>>();
         const mapProj = createMockMapProjectionDefinition("my-map", {
@@ -722,11 +722,11 @@ describe("ProjectionRouter", () => {
     describe("when a map projection fails", () => {
       it("does not dispatch to map subscribers", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const failingStore = createMockAppendStore<Record<string, unknown>>();
         (failingStore.append as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -762,11 +762,11 @@ describe("ProjectionRouter", () => {
     describe("when registering a map subscriber on a non-existent map", () => {
       it("throws ConfigurationError", () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const subscriber: SubscriberDispatchDefinition<Event> = {
           name: "orphan-subscriber",
@@ -784,11 +784,11 @@ describe("ProjectionRouter", () => {
     describe("when a custom key is provided", () => {
       it("calls store.get with the custom key", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -825,11 +825,11 @@ describe("ProjectionRouter", () => {
     describe("when no custom key is provided", () => {
       it("calls store.get with aggregateId", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -893,11 +893,11 @@ describe("ProjectionRouter", () => {
     describe("when several events for one aggregate are coalesced", () => {
       /** @scenario 'Coalescing still dispatches per-span subscribers for every event' */
       it("folds the batch once but fires subscribers for every event", async () => {
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          createMockQueueManager(),
-        );
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager: createMockQueueManager(),
+        });
         const store = createMockFoldProjectionStore();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
         const fold = batchFold(store);
@@ -936,11 +936,11 @@ describe("ProjectionRouter", () => {
       });
 
       it("evaluates shouldDispatch per coalesced event, not once per batch", async () => {
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          createMockQueueManager(),
-        );
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager: createMockQueueManager(),
+        });
         const store = createMockFoldProjectionStore();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
         const fold = batchFold(store);
@@ -975,11 +975,11 @@ describe("ProjectionRouter", () => {
       });
 
       it("dispatches subscribers in occurredAt order even when events arrive shuffled", async () => {
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          createMockQueueManager(),
-        );
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager: createMockQueueManager(),
+        });
         const store = createMockFoldProjectionStore();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
         const fold = batchFold(store);
@@ -1014,16 +1014,14 @@ describe("ProjectionRouter", () => {
       /** @scenario Batched fold projections use the tenant retention policy */
       it("stores the folded state with the tenant retention policy", async () => {
         const retentionPolicy = { traces: 30, scenarios: 60, experiments: 90 };
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          createMockQueueManager(),
-          {
-            retentionPolicyResolver: {
-              resolve: vi.fn().mockResolvedValue(retentionPolicy),
-            },
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager: createMockQueueManager(),
+          retentionPolicyResolver: {
+            resolve: vi.fn().mockResolvedValue(retentionPolicy),
           },
-        );
+        });
         const store = createMockFoldProjectionStore();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
         const fold = batchFold(store);
@@ -1051,12 +1049,12 @@ describe("ProjectionRouter", () => {
         const markerChecker = {
           check: vi.fn().mockResolvedValue("skip" as const),
         };
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-          { replayMarkerChecker: markerChecker },
-        );
+          replayMarkerChecker: markerChecker,
+        });
 
         const store = createMockAppendStore<Record<string, unknown>>();
         const mapProj = createMockMapProjectionDefinition("skipped-map", {
@@ -1084,12 +1082,12 @@ describe("ProjectionRouter", () => {
         const markerChecker = {
           check: vi.fn().mockResolvedValue("process" as const),
         };
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-          { replayMarkerChecker: markerChecker },
-        );
+          replayMarkerChecker: markerChecker,
+        });
 
         const store = createMockAppendStore<Record<string, unknown>>();
         const mapProj = createMockMapProjectionDefinition("allowed-map", {
@@ -1122,12 +1120,12 @@ describe("ProjectionRouter", () => {
         const markerChecker = {
           check: vi.fn().mockRejectedValue(deferError),
         };
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-          { replayMarkerChecker: markerChecker },
-        );
+          replayMarkerChecker: markerChecker,
+        });
 
         const store = createMockAppendStore<Record<string, unknown>>();
         const mapProj = createMockMapProjectionDefinition("deferred-map", {

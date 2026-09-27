@@ -37,6 +37,10 @@ import {
   type GatewaySignedJwt,
   type GatewaySpendByRequestTypeQuery,
   type GatewaySpendEventPage,
+  type GatewayCaller,
+  GatewayWindow,
+  type VirtualKeyApiApplicableBudgetsInput,
+  type VirtualKeySpendThisMonth,
   type GatewaySpendEventsPageQuery,
   type gatewayInternalBucketSpendAnswers,
   type gatewayInternalChangesAnswers,
@@ -110,6 +114,7 @@ import {
   type GatewayPrincipalSpendSummary,
   type GatewayPrincipalSpendWindow,
 } from "@langwatch/gateway-contract";
+import { ValidationError } from "@langwatch/handled-error";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
@@ -1443,6 +1448,15 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi {
     return this.#dependencies.budgetDecisions.findDetailById(input);
   }
 
+  async getBudgetDetail(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetDetail> {
+    const detail = await this.findBudgetDetail(input);
+    if (!detail) throw new GatewayBudgetNotFoundError();
+    return detail;
+  }
+
   createBudget(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource> {
     return this.#dependencies.budgetDecisions.create(input);
   }
@@ -1781,6 +1795,101 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi {
 
   isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean> {
     return this.#dependencies.isOrganizationMember(input);
+  }
+  async listApplicableBudgetsForSelection({
+    selection,
+    userId,
+    caller,
+  }: {
+    selection: VirtualKeyApiApplicableBudgetsInput;
+    userId: string;
+    caller: GatewayCaller;
+  }): Promise<GatewayApplicableBudget[]> {
+    const { organizationId } = selection;
+    // For an existing key the caller must SEE it, and resolution binds to STORED ownership:
+    // caller-supplied scopes, destination and principal are ignored.
+    if (selection.virtualKeyId) {
+      const vk = await this.getVisibleVirtualKeyForUser({
+        organizationId,
+        id: selection.virtualKeyId,
+        userId,
+      });
+      return this.listApplicableBudgets({
+        target: {
+          organizationId,
+          virtualKeyId: vk.id,
+          scopes: vk.scopes.map((scope) => ({
+            scopeType: scope.scopeType,
+            scopeId: scope.scopeId,
+          })),
+          traceProjectId: vk.traceProjectId,
+          principalUserId: vk.principalUserId,
+        },
+      });
+    }
+
+    // A draft is held to the exact boundary `create` holds it to: manage on every scope and on
+    // the chosen trace destination, and a principal pinned to this organization.
+    await this.authorizeVirtualKeyScopeSelection({
+      actor: caller,
+      organizationId,
+      scopes: selection.scopes,
+      traceProjectId: selection.traceProjectId,
+    });
+    await this.#assertOrganizationPrincipal({
+      organizationId,
+      principalUserId: selection.principalUserId,
+    });
+    return this.listApplicableBudgets({
+      target: {
+        organizationId,
+        virtualKeyId: null,
+        scopes: selection.scopes,
+        traceProjectId: selection.traceProjectId ?? null,
+        principalUserId: selection.principalUserId ?? null,
+      },
+    });
+  }
+
+  async #assertOrganizationPrincipal(input: {
+    organizationId: string;
+    principalUserId: string | null | undefined;
+  }): Promise<void> {
+    if (!input.principalUserId) return;
+    const member = await this.isOrganizationMember({
+      organizationId: input.organizationId,
+      userId: input.principalUserId,
+    });
+    if (member) return;
+    const message = "principalUserId is not a member of this organization.";
+    throw new ValidationError(message, { meta: { fieldErrors: { principalUserId: [message] } } });
+  }
+
+  async listVirtualKeySpendThisMonth(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<VirtualKeySpendThisMonth> {
+    if (!this.isSpendSourceAvailable()) throw new GatewaySpendSourceUnavailableError();
+
+    const keys = await this.listVisibleVirtualKeys(input);
+    const now = nowInstant();
+    const virtualKeyIds = keys.map((k) => k.id);
+    const [spend, directBudgets] = await Promise.all([
+      this.spendByVirtualKey({
+        organizationId: input.organizationId,
+        virtualKeyIds,
+        window: { fromDate: GatewayWindow.startOfCurrentMonthUTC(now), toDate: now },
+      }),
+      this.loadDirectBudgetsForKeys({ organizationId: input.organizationId, virtualKeyIds, now }),
+    ]);
+
+    // With the spend source present, a missing entry means the key genuinely spent nothing.
+    return keys.map((k) => ({
+      virtualKeyId: k.id,
+      spentUsd: spend.get(k.id)?.spentUsd ?? "0",
+      requests: spend.get(k.id)?.requests ?? 0,
+      budget: directBudgets.get(k.id) ?? null,
+    }));
   }
 
   actorForCredential(input: { projectId: string; credential: GatewayRequestCredential }): {

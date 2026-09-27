@@ -128,12 +128,14 @@ function validateCommandPayload<EventType extends Event, Payload extends TenantS
 ): Payload {
   const validation = cmdEntry.schema.validate(payload);
   if (validation.success) return validation.data;
-  throw new ValidationError(
-    `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
-    "payload",
-    undefined,
-    { commandType: cmdEntry.commandType, zodIssues: mapValidationIssues(validation.error.issues) },
-  );
+  throw new ValidationError({
+    reason: `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
+    field: "payload",
+    context: {
+      commandType: cmdEntry.commandType,
+      zodIssues: mapValidationIssues(validation.error.issues),
+    },
+  });
 }
 
 /**
@@ -173,6 +175,10 @@ function buildValidatingCommandFacade<EventType extends Event, Payload extends T
     waitUntilReady: baseFacade.waitUntilReady,
   };
 }
+
+type ProjectionQueueRequest<EventType extends Event> = Parameters<
+  QueueManager<EventType>["initializeProjectionQueues"]
+>[0];
 
 interface QueuedEventConsumerDefinition<E extends Event> {
   name: string;
@@ -524,7 +530,12 @@ export class QueueManager<EventType extends Event = Event> {
   // An arrow instance property: tests hold a QueueManager reference and
   // extract this member (e.g. via vi.spyOn) to assert on its calls, which is
   // unsafe against a method-shorthand member.
-  initializeProjectionQueues = (
+  initializeProjectionQueues = ({
+    projections,
+    onEvent,
+    onEventBatch,
+    lane = { queueType: "projection", jobPath: "fold" },
+  }: {
     projections: Record<
       string,
       {
@@ -534,22 +545,22 @@ export class QueueManager<EventType extends Event = Event> {
         coalesceMaxBatch?: number;
         options?: { disabled?: boolean };
       }
-    >,
+    >;
     onEvent: (
       projectionName: string,
       event: EventType,
       context: EventStoreReadContext<EventType>,
-    ) => Promise<void>,
+    ) => Promise<void>;
     onEventBatch?: (
       projectionName: string,
       events: EventType[],
       context: EventStoreReadContext<EventType>,
-    ) => Promise<void>,
-    lane: {
+    ) => Promise<void>;
+    lane?: {
       queueType: "projection" | "stateProjection";
       jobPath: "fold" | "state";
-    } = { queueType: "projection", jobPath: "fold" },
-  ): void => {
+    };
+  }): void => {
     if (!this.globalQueue) {
       return;
     }
@@ -617,13 +628,15 @@ export class QueueManager<EventType extends Event = Event> {
 
   // An arrow instance property, for the same reason as initializeProjectionQueues above.
   initializeStateProjectionQueues = (
-    projections: Parameters<QueueManager<EventType>["initializeProjectionQueues"]>[0],
-    onEvent: Parameters<QueueManager<EventType>["initializeProjectionQueues"]>[1],
-    onEventBatch?: Parameters<QueueManager<EventType>["initializeProjectionQueues"]>[2],
+    projections: ProjectionQueueRequest<EventType>["projections"],
+    onEvent: ProjectionQueueRequest<EventType>["onEvent"],
+    onEventBatch?: ProjectionQueueRequest<EventType>["onEventBatch"],
   ): void => {
-    this.initializeProjectionQueues(projections, onEvent, onEventBatch, {
-      queueType: "stateProjection",
-      jobPath: "state",
+    this.initializeProjectionQueues({
+      projections,
+      onEvent,
+      onEventBatch,
+      lane: { queueType: "stateProjection", jobPath: "state" },
     });
   };
 

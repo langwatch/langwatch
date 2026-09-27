@@ -3,11 +3,11 @@ import { generate } from "@langwatch/ksuid";
 
 import { type WebhookId, type WebhookSecret } from "../../app/webhook.app.ts";
 import type { WebhookRepositories } from "../webhook.repositories.ts";
-import { MemoryWebhookDatabase } from "./memory.webhook-database.ts";
 import { MemoryWebhookEndpointRepository } from "./memory.webhook-endpoint.repository.ts";
 import { MemoryWebhookEventsRepository } from "./memory.webhook-events.repository.ts";
 import { MemoryWebhookRetentionRepository } from "./memory.webhook-retention.repository.ts";
 import { MemoryWebhookTenantsRepository } from "./memory.webhook-tenants.repository.ts";
+import { MemoryWebhookDatabase } from "./memory.webhook.database.ts";
 
 class MemoryWebhookIds implements WebhookId {
   newEndpointId(): string {

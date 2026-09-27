@@ -20,6 +20,7 @@ import {
 
 import { type TraceAppDependencies } from "../app/trace.app.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import type * as traceLegacyReadRepositoryModule from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import {
@@ -30,7 +31,6 @@ import {
 import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
 import { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
-import { ModelCatalogTraceModelCostAdapter } from "../services/model-catalog.trace-model-cost.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
 import { SpanCostService } from "../services/span-cost.service.ts";
 import { type TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
@@ -46,6 +46,7 @@ import { TraceIOExtractionService } from "../services/trace-io-extraction.servic
 import { TraceLegacyReadService } from "../services/trace-legacy-read.service.ts";
 import { TraceListService } from "../services/trace-list-read.service.ts";
 import { LogRecordStorageService } from "../services/trace-log-record-read.service.ts";
+import { TraceModelCostService } from "../services/trace-model-cost.service.ts";
 import { TraceQueryClassificationService } from "../services/trace-query-classification.service.ts";
 import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
 import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
@@ -161,6 +162,7 @@ export function composeTraceAppDependencies(
     repository: options.repositories.list,
     evaluations: options.evaluations,
     topicService: options.topics,
+    facets: CLICKHOUSE_FACET_CATALOG,
   });
   const protections = TraceViewerProtectionService.create(options.protections);
   const summaryStore = options.summaryStore;
@@ -267,7 +269,7 @@ export function composeTraceAppDependencies(
     publicBaseUrl: options.publicBaseUrl,
     scenarioRoleMetrics: ScenarioRoleMetricsDerivationService.create({
       spans: options.repositories.derivationSpans,
-      spanCosts: SpanCostService.create({ modelCosts: ModelCatalogTraceModelCostAdapter.create() }),
+      spanCosts: SpanCostService.create({ modelCosts: TraceModelCostService.create() }),
     }),
     topicClustering: TraceTopicClusteringReadService.create({
       repository: options.repositories.clusteringSample,

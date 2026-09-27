@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 
-import type { JsonValue, NewOutboxMessage } from "@langwatch/eventing";
+import { ensureJsonSafe, type NewOutboxMessage } from "@langwatch/eventing";
 import type { WebhookEndpointView, WebhookEnvelope } from "@langwatch/webhook-contract";
 
 /** How soon to look again when the in-flight cap, not the delay, is holding. */
@@ -69,14 +69,12 @@ export class WebhookBatchPlannerService {
       messages.push({
         messageKey: `send:${batchId}`,
         intentType: "sendBatch",
-        // Envelope data is JSON by construction (spendRowToEnvelope emits
-        // only JSON primitives); the cast crosses the JsonValue boundary.
-        payload: {
+        payload: ensureJsonSafe({
           organizationId,
           endpointId: this.endpoint.id,
           batchId,
           envelopes: batchEntries.map((entry) => entry.envelope),
-        } as unknown as JsonValue,
+        }),
         traceCarrier: {},
       });
       inFlight++;

@@ -12,9 +12,9 @@ import {
   type PromptVersionAuthor,
   type PromptVersionRow,
 } from "../prompt-version.repository.ts";
-import type { MemoryPromptState } from "./memory-prompt.state.ts";
-import { clone, findVersions, schemaVersionOf } from "./memory-prompt.state.ts";
 import type { MemoryLlmConfigRepository } from "./memory.prompt.repository.ts";
+import type { MemoryPromptState } from "./memory.prompt.store.ts";
+import { clone, findVersions, schemaVersionOf } from "./memory.prompt.store.ts";
 
 export class MemoryLlmConfigVersionsRepository extends LlmConfigVersionsRepository {
   readonly #state: MemoryPromptState;

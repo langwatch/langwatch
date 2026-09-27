@@ -96,7 +96,7 @@ export function SecretsIndicator({ projectId, onInsertSecret }: SecretsIndicator
                   </Link>
                 </Box>
               ) : (
-                secrets.map((secret: any) => (
+                secrets.map((secret) => (
                   <HStack
                     key={secret.id}
                     as="button"

@@ -115,9 +115,9 @@ describe("given the stored-object module installed over memory stores", () => {
         path: `/api/files/${PROJECT}/${OBJECT_ID}`,
       });
 
-      expect({ status: read.status, body: read.body }).toEqual({
+      expect({ status: read.status, code: JSON.parse(read.body).code }).toEqual({
         status: 404,
-        body: '{"status":"not_found"}',
+        code: "stored_object_not_found",
       });
     });
   });
@@ -130,9 +130,9 @@ describe("given the stored-object module installed over memory stores", () => {
         path: `/api/files/${OBJECT_ID}`,
       });
 
-      expect({ status: read.status, body: read.body }).toEqual({
+      expect({ status: read.status, code: JSON.parse(read.body).code }).toEqual({
         status: 404,
-        body: '{"status":"not_found"}',
+        code: "stored_object_not_found",
       });
     });
   });
@@ -148,9 +148,9 @@ describe("given the stored-object module installed over memory stores", () => {
 
       expect({
         status: read.status,
-        body: read.body,
+        code: JSON.parse(read.body).code,
         retryAfter: read.headers["retry-after"],
-      }).toEqual({ status: 429, body: '{"error":"rate_limited"}', retryAfter: "30" });
+      }).toEqual({ status: 429, code: "stored_object_files_rate_limited", retryAfter: "30" });
     });
   });
 

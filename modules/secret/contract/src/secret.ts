@@ -71,6 +71,17 @@ export const createSecretInputSchema = z
   .strict();
 export type CreateSecretInput = z.infer<typeof createSecretInputSchema>;
 
+/** A product-owned credential under a reserved name, written by the feature that owns it. */
+export const createReservedSecretInputSchema = z
+  .object({
+    projectId: secretProjectIdSchema,
+    name: storedSecretNameSchema,
+    value: secretValueSchema,
+    actorId: secretActorIdSchema,
+  })
+  .strict();
+export type CreateReservedSecretInput = z.infer<typeof createReservedSecretInputSchema>;
+
 export const updateSecretInputSchema = z
   .object({
     projectId: secretProjectIdSchema,

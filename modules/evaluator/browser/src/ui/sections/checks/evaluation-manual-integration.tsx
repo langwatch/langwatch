@@ -169,227 +169,15 @@ export function EvaluationManualIntegration({
     },
   );
 
-  const PythonInstructions = ({ async }: { async: boolean }) => {
-    const nameParam = `\n        name="${name}",`;
-    const dataFields: string[] = [];
-
-    // Build data dict fields
-    if (evaluatorDefinition.requiredFields.includes("input")) {
-      dataFields.push(`"input": user_input`);
-    } else if (evaluatorDefinition.optionalFields.includes("input")) {
-      dataFields.push(`"input": user_input  # optional`);
-    }
-
-    if (evaluatorDefinition.requiredFields.includes("output")) {
-      dataFields.push(`"output": generated_response`);
-    } else if (evaluatorDefinition.optionalFields.includes("output")) {
-      dataFields.push(`"output": generated_response  # optional`);
-    }
-
-    if (evaluatorDefinition.requiredFields.includes("contexts")) {
-      dataFields.push(`"contexts": ["retrieved snippet 1", "retrieved snippet 2"]`);
-    } else if (evaluatorDefinition.optionalFields.includes("contexts")) {
-      dataFields.push(`"contexts": ["retrieved snippet 1", "retrieved snippet 2"]  # optional`);
-    }
-
-    if (evaluatorDefinition.requiredFields.includes("expected_output")) {
-      dataFields.push(`"expected_output": gold_answer`);
-    } else if (evaluatorDefinition.optionalFields.includes("expected_output")) {
-      dataFields.push(`"expected_output": gold_answer  # optional`);
-    }
-
-    if (evaluatorDefinition.requiredFields.includes("conversation")) {
-      dataFields.push(`"conversation": conversation_history`);
-    } else if (evaluatorDefinition.optionalFields.includes("conversation")) {
-      dataFields.push(`"conversation": conversation_history  # optional`);
-    }
-
-    const dataParam =
-      dataFields.length > 0
-        ? `\n        data={\n            ${dataFields.join(",\n            ")}\n        },`
-        : `\n        data={},`;
-
-    const settingsParams = storeSettingsOnCode
-      ? `\n        settings=${JSON.stringify(settings ?? {}, null, 2)
-          .replace(/true/g, "True")
-          .replace(/false/g, "False")
-          .split("\n")
-          .map((line, index) => (index === 0 ? line : "        " + line))
-          .join("\n")},`
-      : "";
-
-    const asGuardrailParam = isGuardrail ? `\n        as_guardrail=True,` : "";
-
-    return (
-      <VStack align="start" width="full" gap={3}>
-        <Text fontSize="14px">
-          Add this import at the top of the file where the LLM call happens:
-        </Text>
-        <Box className="markdown" width="full">
-          <RenderCode code={`import langwatch`} language="python" />
-        </Box>
-        {(!isOutputMandatory || !isGuardrail) && (
-          <>
-            <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
-            <Box className="markdown" width="full">
-              <RenderCode
-                code={`def llm_step():
-    ... # your existing code
-
-    ${isGuardrail ? "guardrail" : "result"} = ${
-      async ? `await langwatch.evaluation.async_evaluate` : `langwatch.evaluation.evaluate`
-    }(
-        "${checkSlug}",${dataParam}${nameParam}${settingsParams}${asGuardrailParam}
-    )
-${
-  isGuardrail
-    ? `
-    if not guardrail.passed:
-        # handle the guardrail here
-        return "I'm sorry, I can't do that."`
-    : `
-    print(result)`
-}`}
-                language="python"
-              />
-            </Box>
-          </>
-        )}
-      </VStack>
-    );
+  const snippet: SnippetContext = {
+    name,
+    evaluatorDefinition,
+    storeSettingsOnCode,
+    settings,
+    isGuardrail,
+    isOutputMandatory,
+    checkSlug,
   };
-
-  const TypeScriptInstructions = () => {
-    const nameParam = `\n        name: "${name}",`;
-    const dataFields: string[] = [];
-
-    // Build data object fields
-    if (evaluatorDefinition.requiredFields.includes("input")) {
-      dataFields.push(`input: message`);
-    } else if (evaluatorDefinition.optionalFields.includes("input")) {
-      dataFields.push(`input: message /* optional */`);
-    }
-
-    if (evaluatorDefinition.requiredFields.includes("output")) {
-      dataFields.push(`output: generatedResponse`);
-    } else if (evaluatorDefinition.optionalFields.includes("output")) {
-      dataFields.push(`output: generatedResponse /* optional */`);
-    }
-
-    if (evaluatorDefinition.requiredFields.includes("contexts")) {
-      dataFields.push(`contexts: ["retrieved snippet 1", "retrieved snippet 2"]`);
-    } else if (evaluatorDefinition.optionalFields.includes("contexts")) {
-      dataFields.push(`contexts: ["retrieved snippet 1", "retrieved snippet 2"] /* optional */`);
-    }
-
-    if (evaluatorDefinition.requiredFields.includes("expected_output")) {
-      dataFields.push(`expectedOutput: goldAnswer`);
-    } else if (evaluatorDefinition.optionalFields.includes("expected_output")) {
-      dataFields.push(`expectedOutput: goldAnswer /* optional */`);
-    }
-
-    if (evaluatorDefinition.requiredFields.includes("conversation")) {
-      dataFields.push(`conversation: conversationHistory`);
-    } else if (evaluatorDefinition.optionalFields.includes("conversation")) {
-      dataFields.push(`conversation: conversationHistory /* optional */`);
-    }
-
-    const dataParam =
-      dataFields.length > 0
-        ? `\n        data: {\n          ${dataFields.join(",\n          ")}\n        },`
-        : `\n        data: {},`;
-
-    const settingsParams = storeSettingsOnCode
-      ? `\n        settings: ${JSON.stringify(settings ?? {}, null, 2)
-          // remove quotes on json keys that have only safe characters in it
-          .replace(/"(\w+)"\s*:/g, "$1:")
-          .split("\n")
-          .map((line, index) => (index === 0 ? line : "      " + line))
-          .join("\n")},`
-      : "";
-
-    const asGuardrailParam = isGuardrail ? `\n        asGuardrail: true,` : "";
-
-    return (
-      <VStack align="start" width="full" gap={3}>
-        <Text fontSize="14px">
-          First, set up your traces and spans capturing as explained in the{" "}
-          <Link href="https://docs.langwatch.ai/integration/typescript/guide" isExternal>
-            documentation
-          </Link>
-          .
-        </Text>
-        {(!isOutputMandatory || !isGuardrail) && (
-          <>
-            <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
-            <Box className="markdown" width="full">
-              <RenderCode
-                code={`import { LangWatch } from "langwatch";
-
-const langwatch = new LangWatch();
-
-async function llmStep({ message }: { message: string }): Promise<string> {
-    ${isGuardrail ? "" : "// ... your existing code\n\n    "}// call the ${
-      isGuardrail ? "guardrail" : "evaluator"
-    }
-    const ${isGuardrail ? "guardrail" : "result"} = await langwatch.evaluations.evaluate(
-      "${checkSlug}",
-      {${dataParam}${nameParam}${settingsParams}${asGuardrailParam}
-      }
-    );
-${
-  isGuardrail
-    ? `
-    if (!guardrail.passed) {
-        // handle the guardrail here
-        return "I'm sorry, I can't do that.";
-    }
-
-    // ... your existing code`
-    : `
-    console.log(result);`
-}
-}`}
-                language="typescript"
-              />
-            </Box>
-          </>
-        )}
-      </VStack>
-    );
-  };
-
-  const GoInstructions = () => (
-    <VStack align="start" width="full" gap={3}>
-      <Text fontSize="14px">
-        First, set up your traces and spans capturing as explained in the{" "}
-        <Link href="https://github.com/langwatch/langwatch/tree/main/sdks/go" isExternal>
-          Go SDK documentation
-        </Link>
-        .
-      </Text>
-      {(!isOutputMandatory || !isGuardrail) && (
-        <>
-          <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
-          <Box className="markdown" width="full">
-            <RenderCode
-              code={buildGoEvaluationSnippet({
-                name,
-                checkSlug,
-                fields: [
-                  ...evaluatorDefinition.requiredFields,
-                  ...evaluatorDefinition.optionalFields,
-                ],
-                isGuardrail,
-                settingsJson: storeSettingsOnCode ? JSON.stringify(settings ?? {}) : null,
-              })}
-              language="go"
-            />
-          </Box>
-        </>
-      )}
-    </VStack>
-  );
 
   const settingsParamsCurl = storeSettingsOnCode
     ? `,\n  "settings": ${JSON.stringify(settings ?? {}, null, 2)
@@ -452,16 +240,16 @@ ${
         </Tabs.List>
 
         <Tabs.Content value="python" padding={0}>
-          <PythonInstructions async={false} />
+          <PythonInstructions async={false} snippet={snippet} />
         </Tabs.Content>
         <Tabs.Content value="python-async" padding={0}>
-          <PythonInstructions async={true} />
+          <PythonInstructions async={true} snippet={snippet} />
         </Tabs.Content>
         <Tabs.Content value="typescript" padding={0}>
-          <TypeScriptInstructions />
+          <TypeScriptInstructions snippet={snippet} />
         </Tabs.Content>
         <Tabs.Content value="go" padding={0}>
-          <GoInstructions />
+          <GoInstructions snippet={snippet} />
         </Tabs.Content>
         <Tabs.Content value="curl" padding={0}>
           <VStack align="start" width="full" gap={3}>
@@ -512,6 +300,243 @@ EOF`}
           </VStack>
         </Tabs.Content>
       </Tabs.Root>
+    </VStack>
+  );
+}
+
+type SnippetContext = {
+  name: string;
+  evaluatorDefinition: (typeof AVAILABLE_EVALUATORS)[keyof typeof AVAILABLE_EVALUATORS];
+  storeSettingsOnCode: boolean;
+  settings: Record<string, unknown>;
+  isGuardrail: boolean;
+  isOutputMandatory: boolean;
+  checkSlug: string | undefined;
+};
+
+const DATA_FIELDS = [
+  { field: "input", python: `"input": user_input`, typescript: `input: message` },
+  {
+    field: "output",
+    python: `"output": generated_response`,
+    typescript: `output: generatedResponse`,
+  },
+  {
+    field: "contexts",
+    python: `"contexts": ["retrieved snippet 1", "retrieved snippet 2"]`,
+    typescript: `contexts: ["retrieved snippet 1", "retrieved snippet 2"]`,
+  },
+  {
+    field: "expected_output",
+    python: `"expected_output": gold_answer`,
+    typescript: `expectedOutput: goldAnswer`,
+  },
+  {
+    field: "conversation",
+    python: `"conversation": conversation_history`,
+    typescript: `conversation: conversationHistory`,
+  },
+] as const;
+
+function dataFieldLines(
+  evaluatorDefinition: SnippetContext["evaluatorDefinition"],
+  language: "python" | "typescript",
+): string[] {
+  const optionalMark = language === "python" ? "  # optional" : " /* optional */";
+  return DATA_FIELDS.flatMap((entry) => {
+    if (evaluatorDefinition.requiredFields.includes(entry.field)) return [entry[language]];
+    if (evaluatorDefinition.optionalFields.includes(entry.field)) {
+      return [entry[language] + optionalMark];
+    }
+    return [];
+  });
+}
+
+function PythonInstructions({ async, snippet }: { async: boolean; snippet: SnippetContext }) {
+  const {
+    name,
+    evaluatorDefinition,
+    storeSettingsOnCode,
+    settings,
+    isGuardrail,
+    isOutputMandatory,
+    checkSlug,
+  } = snippet;
+  const nameParam = `\n        name="${name}",`;
+  const dataFields = dataFieldLines(evaluatorDefinition, "python");
+
+  const dataParam =
+    dataFields.length > 0
+      ? `\n        data={\n            ${dataFields.join(",\n            ")}\n        },`
+      : `\n        data={},`;
+
+  const settingsParams = storeSettingsOnCode
+    ? `\n        settings=${JSON.stringify(settings ?? {}, null, 2)
+        .replace(/true/g, "True")
+        .replace(/false/g, "False")
+        .split("\n")
+        .map((line, index) => (index === 0 ? line : "        " + line))
+        .join("\n")},`
+    : "";
+
+  const asGuardrailParam = isGuardrail ? `\n        as_guardrail=True,` : "";
+
+  return (
+    <VStack align="start" width="full" gap={3}>
+      <Text fontSize="14px">
+        Add this import at the top of the file where the LLM call happens:
+      </Text>
+      <Box className="markdown" width="full">
+        <RenderCode code={`import langwatch`} language="python" />
+      </Box>
+      {(!isOutputMandatory || !isGuardrail) && (
+        <>
+          <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
+          <Box className="markdown" width="full">
+            <RenderCode
+              code={`def llm_step():
+  ... # your existing code
+
+  ${isGuardrail ? "guardrail" : "result"} = ${
+    async ? `await langwatch.evaluation.async_evaluate` : `langwatch.evaluation.evaluate`
+  }(
+      "${checkSlug}",${dataParam}${nameParam}${settingsParams}${asGuardrailParam}
+  )
+${
+  isGuardrail
+    ? `
+  if not guardrail.passed:
+      # handle the guardrail here
+      return "I'm sorry, I can't do that."`
+    : `
+  print(result)`
+}`}
+              language="python"
+            />
+          </Box>
+        </>
+      )}
+    </VStack>
+  );
+}
+
+function TypeScriptInstructions({ snippet }: { snippet: SnippetContext }) {
+  const {
+    name,
+    evaluatorDefinition,
+    storeSettingsOnCode,
+    settings,
+    isGuardrail,
+    isOutputMandatory,
+    checkSlug,
+  } = snippet;
+  const nameParam = `\n        name: "${name}",`;
+  const dataFields = dataFieldLines(evaluatorDefinition, "typescript");
+
+  const dataParam =
+    dataFields.length > 0
+      ? `\n        data: {\n          ${dataFields.join(",\n          ")}\n        },`
+      : `\n        data: {},`;
+
+  const settingsParams = storeSettingsOnCode
+    ? `\n        settings: ${JSON.stringify(settings ?? {}, null, 2)
+        // remove quotes on json keys that have only safe characters in it
+        .replace(/"(\w+)"\s*:/g, "$1:")
+        .split("\n")
+        .map((line, index) => (index === 0 ? line : "      " + line))
+        .join("\n")},`
+    : "";
+
+  const asGuardrailParam = isGuardrail ? `\n        asGuardrail: true,` : "";
+
+  return (
+    <VStack align="start" width="full" gap={3}>
+      <Text fontSize="14px">
+        First, set up your traces and spans capturing as explained in the{" "}
+        <Link href="https://docs.langwatch.ai/integration/typescript/guide" isExternal>
+          documentation
+        </Link>
+        .
+      </Text>
+      {(!isOutputMandatory || !isGuardrail) && (
+        <>
+          <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
+          <Box className="markdown" width="full">
+            <RenderCode
+              code={`import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+async function llmStep({ message }: { message: string }): Promise<string> {
+  ${isGuardrail ? "" : "// ... your existing code\n\n    "}// call the ${
+    isGuardrail ? "guardrail" : "evaluator"
+  }
+  const ${isGuardrail ? "guardrail" : "result"} = await langwatch.evaluations.evaluate(
+    "${checkSlug}",
+    {${dataParam}${nameParam}${settingsParams}${asGuardrailParam}
+    }
+  );
+${
+  isGuardrail
+    ? `
+  if (!guardrail.passed) {
+      // handle the guardrail here
+      return "I'm sorry, I can't do that.";
+  }
+
+  // ... your existing code`
+    : `
+  console.log(result);`
+}
+}`}
+              language="typescript"
+            />
+          </Box>
+        </>
+      )}
+    </VStack>
+  );
+}
+
+function GoInstructions({ snippet }: { snippet: SnippetContext }) {
+  const {
+    name,
+    evaluatorDefinition,
+    storeSettingsOnCode,
+    settings,
+    isGuardrail,
+    isOutputMandatory,
+    checkSlug,
+  } = snippet;
+  return (
+    <VStack align="start" width="full" gap={3}>
+      <Text fontSize="14px">
+        First, set up your traces and spans capturing as explained in the{" "}
+        <Link href="https://github.com/langwatch/langwatch/tree/main/sdks/go" isExternal>
+          Go SDK documentation
+        </Link>
+        .
+      </Text>
+      {(!isOutputMandatory || !isGuardrail) && (
+        <>
+          <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
+          <Box className="markdown" width="full">
+            <RenderCode
+              code={buildGoEvaluationSnippet({
+                name,
+                checkSlug,
+                fields: [
+                  ...evaluatorDefinition.requiredFields,
+                  ...evaluatorDefinition.optionalFields,
+                ],
+                isGuardrail,
+                settingsJson: storeSettingsOnCode ? JSON.stringify(settings ?? {}) : null,
+              })}
+              language="go"
+            />
+          </Box>
+        </>
+      )}
     </VStack>
   );
 }

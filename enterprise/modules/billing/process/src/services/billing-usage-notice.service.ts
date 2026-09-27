@@ -8,8 +8,14 @@ import type {
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
-import { IncomingWebhook, type IncomingWebhookSendArguments } from "@slack/webhook";
 
+import { billingSlackChannels } from "../channels/billing-slack-channels.registry.ts";
+import type {
+  BillingSlackChannel,
+  BillingSlackMessage,
+} from "../channels/billing-slack.channel.ts";
+import { hubspotFormChannels } from "../channels/hubspot-form-channels.registry.ts";
+import type { HubspotFormChannel } from "../channels/hubspot-form.channel.ts";
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
 import type { UsageLimitEmailChannel } from "../channels/usage-limit-email.channel.ts";
 import {
@@ -34,7 +40,6 @@ import {
 const logger = createLogger("ee:notification-service");
 
 const DEFAULT_APP_URL = "https://app.langwatch.ai";
-const EXTERNAL_SERVICE_TIMEOUT_MS = 10_000;
 
 // ---------------------------------------------------------------------------
 // Exported types
@@ -68,8 +73,8 @@ type NotificationServiceOptions = {
     hubspotReachedLimitFormId?: string;
     hubspotFormId?: string;
   };
-  createSlackWebhook?: (url: string) => Pick<IncomingWebhook, "send">;
-  fetchFn?: typeof fetch;
+  slack?: BillingSlackChannel;
+  hubspotForms?: HubspotFormChannel;
   errorReporter?: BillingErrorReporter;
   usageLimitEmail?: UsageLimitEmailChannel;
 };
@@ -84,20 +89,15 @@ type NotificationServiceOptions = {
  */
 export class NotificationService {
   private readonly config: NotificationServiceOptions["config"];
-  private readonly createSlackWebhook: (url: string) => Pick<IncomingWebhook, "send">;
-  private readonly fetchFn: typeof fetch;
+  private readonly slack: BillingSlackChannel;
+  private readonly hubspotForms: HubspotFormChannel;
   private readonly errorReporter: BillingErrorReporter;
   private readonly usageLimitEmail: UsageLimitEmailChannel;
 
   private constructor(options: NotificationServiceOptions) {
     this.config = options.config;
-    this.createSlackWebhook =
-      options?.createSlackWebhook ??
-      ((url) =>
-        new IncomingWebhook(url, {
-          timeout: EXTERNAL_SERVICE_TIMEOUT_MS,
-        }));
-    this.fetchFn = options?.fetchFn ?? (((...args) => fetch(...args)) as typeof fetch);
+    this.slack = options.slack ?? billingSlackChannels.live.create();
+    this.hubspotForms = options.hubspotForms ?? hubspotFormChannels.live.create();
     this.errorReporter = options.errorReporter ?? NullBillingErrorReporter.create();
     this.usageLimitEmail = options.usageLimitEmail ?? usageLimitEmailChannels.memory.create();
   }
@@ -130,7 +130,7 @@ export class NotificationService {
     errorLog,
   }: {
     channelUrl?: string;
-    body: IncomingWebhookSendArguments;
+    body: BillingSlackMessage;
     missingConfigLog?: string;
     errorLog: string;
   }): Promise<void> {
@@ -143,8 +143,7 @@ export class NotificationService {
     }
 
     try {
-      const webhook = this.createSlackWebhook(channelUrl);
-      await webhook.send(body);
+      await this.slack.send({ webhookUrl: channelUrl, message: body });
     } catch (error) {
       logger.error({ error }, errorLog);
       this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
@@ -232,7 +231,7 @@ export class NotificationService {
   async sendSlackSubscriptionEvent(payload: SubscriptionNotificationPayload): Promise<void> {
     const adminLink = this.getAdminLink(payload.organizationId);
 
-    let blocks: IncomingWebhookSendArguments["blocks"];
+    let blocks: BillingSlackMessage["blocks"];
     switch (payload.type) {
       case "prospective":
         blocks = prospectiveBlocks({ payload, adminLink });
@@ -384,27 +383,16 @@ export class NotificationService {
     errorLog: string;
   }): Promise<void> {
     const formData = { submittedAt: nowInstant().epochMilliseconds, ...body };
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_SERVICE_TIMEOUT_MS);
 
     try {
-      const response = await this.fetchFn(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-        signal: controller.signal,
-      });
+      const receipt = await this.hubspotForms.submit({ url, body: formData });
 
-      if (!response.ok) {
-        this.errorReporter.capture(new Error(`${rejectedMessage}: ${response.status}`));
+      if (!receipt.ok) {
+        this.errorReporter.capture(new Error(`${rejectedMessage}: ${receipt.status}`));
       }
     } catch (error) {
       logger.error({ error }, errorLog);
       this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
-    } finally {
-      clearTimeout(timeoutId);
     }
   }
 

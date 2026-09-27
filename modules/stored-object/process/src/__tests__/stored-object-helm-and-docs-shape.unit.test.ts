@@ -342,7 +342,7 @@ describe("Route handlers delegate to the service and never touch the repository 
       // The declaration is handed the application the process mounted it over,
       // so the assertion is that it dispatches through that seam at all and
       // still never names a repository.
-      expect(route).toContain("app.readById(");
+      expect(route).toContain("app.readFile(");
       expect(route).not.toContain("stored-objects.repository");
     });
   });

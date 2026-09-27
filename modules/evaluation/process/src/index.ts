@@ -26,7 +26,7 @@ export type {
 export type {
   EvaluationClickHouseResolver,
   EvaluationClickHouseClient,
-} from "./repositories/clickhouse/evaluation-clickhouse-client.ts";
+} from "./repositories/clickhouse/clickhouse.evaluation-session.store.ts";
 export {
   EvaluationInputsOffloadService,
   EVAL_INPUTS_INLINE_MAX_BYTES,
@@ -40,6 +40,6 @@ export {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
 } from "./services/evaluation-execution.service.ts";
-export { OtelEvaluationExecutionMetricsService } from "./services/otel.evaluation-execution-metrics.service.ts";
-export { DirectEvaluationExecutionReceiptService } from "./services/direct.evaluation-execution-receipt.service.ts";
-export { ClickhouseMonitorPerformanceRepository as MonitorPerformanceAdapter } from "./repositories/clickhouse/clickhouse.monitor-performance.repository.ts";
+export { EvaluationExecutionMetricsService } from "./services/evaluation-execution-metrics.service.ts";
+export { EvaluationExecutionReceiptService } from "./services/evaluation-execution-receipt.service.ts";
+export { createMonitorPerformanceReads } from "./evaluation.server.ts";

@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import { EventingTraceTopicAssignment } from "../../eventing/trace-topic-assignment.commands.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { ModelCatalogTraceModelCostAdapter } from "../../services/model-catalog.trace-model-cost.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../../services/scenario-role-metrics-derivation.service.ts";
 import { SpanCostService } from "../../services/span-cost.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceModelCostService } from "../../services/trace-model-cost.service.ts";
 import { TraceTopicClusteringReadService } from "../../services/trace-topic-clustering-read.service.ts";
 import { TraceApp, type TraceAppDependencies } from "../trace.app.ts";
 import type { TraceLegacyRead } from "../trace.members.ts";
@@ -131,7 +131,7 @@ describe("TraceApi operations the worker pipelines call", () => {
         scenarioRoleMetrics: ScenarioRoleMetricsDerivationService.create({
           spans: MemoryTraceRepositories.create().derivationSpans,
           spanCosts: SpanCostService.create({
-            modelCosts: ModelCatalogTraceModelCostAdapter.create(),
+            modelCosts: TraceModelCostService.create(),
           }),
         }),
       });

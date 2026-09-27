@@ -54,41 +54,48 @@ export async function resolveThreadMappingsIntoData(params: {
   const threadTraces = threadId ? await getThreadTraces(threadId) : [];
 
   for (const [targetField, mappingConfig] of Object.entries(mappings.mapping)) {
-    if (!("type" in mappingConfig && mappingConfig.type === "thread")) {
-      continue;
-    }
-
-    if (!("source" in mappingConfig) || !mappingConfig.source) {
-      continue;
-    }
-
-    const source = mappingConfig.source;
-
-    if (!threadId) {
-      // No thread_id: resolve to empty value
-      data[targetField] = "";
-      continue;
-    }
-
-    const traces = threadTraces;
-
-    if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
-      if (source === "formatted_traces") {
-        data[targetField] = (
-          await Promise.all(traces.map((t) => spanDigest.format(t.spans ?? [])))
-        ).join("\n\n---\n\n");
-      } else {
-        // Unknown server-only source: degrade gracefully instead of crashing the evaluation loop
-        data[targetField] = "";
-      }
-    } else {
-      const threadSource = source as keyof typeof THREAD_MAPPINGS;
-      const selectedFields =
-        ("selectedFields" in mappingConfig ? mappingConfig.selectedFields : undefined) ?? [];
-      data[targetField] = THREAD_MAPPINGS[threadSource].mapping(
-        { thread_id: threadId, traces },
-        selectedFields as (keyof typeof TRACE_MAPPINGS)[],
-      );
-    }
+    const outcome = await resolveThreadField({ mappingConfig, threadId, threadTraces, spanDigest });
+    if (outcome.resolved) data[targetField] = outcome.value;
   }
+}
+
+type ThreadFieldOutcome = { resolved: true; value: unknown } | { resolved: false };
+
+async function resolveThreadField({
+  mappingConfig,
+  threadId,
+  threadTraces,
+  spanDigest,
+}: {
+  mappingConfig: MappingState["mapping"][string];
+  threadId: string | null | undefined;
+  threadTraces: Awaited<ReturnType<GetThreadTraces>>;
+  spanDigest: EvaluationSpanDigest;
+}): Promise<ThreadFieldOutcome> {
+  if (!("type" in mappingConfig && mappingConfig.type === "thread")) return { resolved: false };
+  if (!("source" in mappingConfig) || !mappingConfig.source) return { resolved: false };
+
+  const source = mappingConfig.source;
+
+  // No thread_id: resolve to empty value
+  if (!threadId) return { resolved: true, value: "" };
+
+  if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
+    // Unknown server-only source: degrade gracefully instead of crashing the evaluation loop
+    if (source !== "formatted_traces") return { resolved: true, value: "" };
+
+    const formatted = await Promise.all(threadTraces.map((t) => spanDigest.format(t.spans ?? [])));
+    return { resolved: true, value: formatted.join("\n\n---\n\n") };
+  }
+
+  const threadSource = source as keyof typeof THREAD_MAPPINGS;
+  const selectedFields =
+    ("selectedFields" in mappingConfig ? mappingConfig.selectedFields : undefined) ?? [];
+  return {
+    resolved: true,
+    value: THREAD_MAPPINGS[threadSource].mapping(
+      { thread_id: threadId, traces: threadTraces },
+      selectedFields as (keyof typeof TRACE_MAPPINGS)[],
+    ),
+  };
 }

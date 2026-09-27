@@ -115,15 +115,41 @@ describe("EventStoreProducerOnly", () => {
             aggregateId: "aggregate-1",
           }),
         ],
-        ["getEvents", store.getEvents("aggregate-1", readContext, "trace")],
+        [
+          "getEvents",
+          store.getEvents({
+            aggregateId: "aggregate-1",
+            context: readContext,
+            aggregateType: "trace",
+          }),
+        ],
         [
           "getEventsOccurredSince",
-          store.getEventsOccurredSince("aggregate-1", readContext, "trace", 0),
+          store.getEventsOccurredSince({
+            aggregateId: "aggregate-1",
+            context: readContext,
+            aggregateType: "trace",
+            occurredAtFromMs: 0,
+          }),
         ],
-        ["getEventsUpTo", store.getEventsUpTo("aggregate-1", readContext, "trace", {} as Event)],
+        [
+          "getEventsUpTo",
+          store.getEventsUpTo({
+            aggregateId: "aggregate-1",
+            context: readContext,
+            aggregateType: "trace",
+            upToEvent: {} as Event,
+          }),
+        ],
         [
           "countEventsBefore",
-          store.countEventsBefore("aggregate-1", readContext, "trace", 0, "event-1"),
+          store.countEventsBefore({
+            aggregateId: "aggregate-1",
+            context: readContext,
+            aggregateType: "trace",
+            beforeTimestamp: 0,
+            beforeEventId: "event-1",
+          }),
         ],
       ];
 

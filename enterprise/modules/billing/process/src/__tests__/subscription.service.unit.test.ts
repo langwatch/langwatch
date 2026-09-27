@@ -1,4 +1,8 @@
-import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
+import {
+  BillingPriceCatalogue,
+  PlanTypes,
+  SubscriptionStatus,
+} from "@langwatch/enterprise-billing-contract";
 import { stripeDouble } from "@langwatch/test-harness/client-doubles/stripe";
 import { Temporal } from "@langwatch/time";
 import Stripe from "stripe";
@@ -7,9 +11,10 @@ import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { type BillingSubscriptionRepository, type BillingSubscriptionNotifier } from "../index.ts";
 import { type BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
-import type { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
-import { type SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
+import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 import {
   BillingSubscriptionService,
   RECENT_INVOICES_LIMIT,
@@ -74,11 +79,16 @@ const createMockRepository = (): {
   updateQuantities: vi.fn(),
 });
 
-const createMockItemCalculator = () => ({
-  getItemsToUpdate: vi.fn().mockReturnValue([]),
-  createItemsToAdd: vi.fn().mockReturnValue([]),
-  prices: { LAUNCH: "price_launch", FREE: undefined } as any,
-});
+const TEST_PRICES = BillingPriceCatalogue.create("test").prices;
+
+const createMockItemCalculator = () =>
+  Object.assign(
+    SubscriptionItemCalculatorService.create({ ...TEST_PRICES, LAUNCH: "price_launch" }),
+    {
+      getItemsToUpdate: vi.fn().mockReturnValue([]),
+      createItemsToAdd: vi.fn().mockReturnValue([]),
+    },
+  );
 
 const createMockOrganizationRepository = (): {
   [K in keyof BillingAccountFactsRepository]: Mock<BillingAccountFactsRepository[K]>;
@@ -94,12 +104,29 @@ const createMockNotifier = (): BillingSubscriptionNotifier => ({
 });
 
 const createMockSeatEventService = () =>
-  ({
-    createSeatEventCheckout: vi.fn(),
-    updateSeatEventItems: vi.fn(),
-    previewProration: vi.fn(),
-    seatEventBillingPortalUrl: vi.fn(),
-  }) as unknown as SeatEventSubscriptionService;
+  Object.assign(
+    SeatEventSubscriptionService.create({
+      stripe: stripeDouble(),
+      database: {
+        subscription: {
+          findMany: vi.fn(),
+          updateMany: vi.fn(),
+          update: vi.fn(),
+          create: vi.fn(),
+        },
+        organizationInvite: { deleteMany: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
+        $transaction: vi.fn(),
+      },
+      prices: TEST_PRICES,
+      customerCurrency: StripeCustomerCurrencyService.create(StripeErrorTranslatorService.create()),
+    }),
+    {
+      createSeatEventCheckout: vi.fn(),
+      updateSeatEventItems: vi.fn(),
+      previewProration: vi.fn(),
+      seatEventBillingPortalUrl: vi.fn(),
+    },
+  );
 
 const createServiceWithSeatEventFns = ({
   repository,
@@ -118,7 +145,7 @@ const createServiceWithSeatEventFns = ({
     repository,
     organizationRepository: orgRepo,
     stripe: stripeDouble(stripeInstance),
-    itemCalculator: calc as unknown as SubscriptionItemCalculatorService,
+    itemCalculator: calc,
     seatEventService,
     notifier: createMockNotifier(),
     stripeErrors: StripeErrorTranslatorService.create(),
@@ -138,7 +165,7 @@ describe("BillingSubscriptionService", () => {
         repository: createMockRepository(),
         organizationRepository: createMockOrganizationRepository(),
         stripe: stripeDouble(createMockStripe()),
-        itemCalculator: createMockItemCalculator() as unknown as SubscriptionItemCalculatorService,
+        itemCalculator: createMockItemCalculator(),
         notifier: createMockNotifier(),
         stripeErrors: StripeErrorTranslatorService.create(),
       });
@@ -161,7 +188,7 @@ describe("BillingSubscriptionService", () => {
       repository,
       organizationRepository: organizationRepository,
       stripe: stripeDouble(stripe),
-      itemCalculator: itemCalculator as unknown as SubscriptionItemCalculatorService,
+      itemCalculator: itemCalculator,
       notifier: createMockNotifier(),
       stripeErrors: StripeErrorTranslatorService.create(),
     });

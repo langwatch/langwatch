@@ -6,7 +6,7 @@
 import type { EventSourcing } from "@langwatch/eventing";
 
 import type { LangyConversationCommands } from "../app/langy.members.ts";
-import { RedisLangyConversationProducerRepository } from "../repositories/redis/redis.langy-conversation-producer.repository.ts";
+import { RedisLangyConversationProducerRepository } from "./langy-conversation-producer.pipeline.ts";
 
 const LANGY_CONVERSATION_PIPELINE_NAME = "langy_conversation_processing";
 

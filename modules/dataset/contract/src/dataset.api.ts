@@ -1,6 +1,7 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-record.trpc.ts";
+import type { DatasetApiDeleteInput } from "./dataset.schemas.ts";
 import type {
   AppendStoredObjectToDatasetInput,
   CopyDatasetInput,
@@ -72,6 +73,8 @@ export interface DatasetApi {
   }): Promise<Dataset>;
   archiveDataset: (input: DatasetLookupInput) => Promise<{ id: string; archived: true }>;
   restoreDataset(input: { datasetId: string; projectId: string }): Promise<{ success: true }>;
+  /** Archives the dataset, or restores it when `undo` is set (tRPC `deleteById`). */
+  archiveOrRestoreDataset: (input: DatasetApiDeleteInput) => Promise<{ success: true }>;
   copyDataset(input: CopyDatasetInput): Promise<Dataset>;
   /**
    * The same copy, on behalf of a person: the caller's reach into the SOURCE
@@ -85,6 +88,10 @@ export interface DatasetApi {
       entrySelection?: DatasetEntrySelection;
     },
   ) => Promise<DatasetWithRecords>;
+  /** The whole dataset, refused with a 400 when it exceeds `limitMb` rather than truncated. */
+  getDatasetWithinLimit: (
+    input: DatasetLookupInput & { limitMb: number },
+  ) => Promise<DatasetWithRecords>;
   getDatasetPage(input: DatasetPageInput): Promise<DatasetPage>;
   findDatasetPage(input: DatasetPageInput): Promise<DatasetPage | null>;
   getDatasetHead(input: DatasetLookupInput): Promise<DatasetHead>;
@@ -94,6 +101,8 @@ export interface DatasetApi {
     input: UpdateDatasetRecordInput & { recordId: string },
   ): Promise<DatasetRecordMutationResult>;
   deleteRecords: (input: DeleteDatasetRecordsInput) => Promise<{ count: number }>;
+  /** Entries removed by id, refused with a 404 when none matched. */
+  deleteMatchingRecords: (input: DeleteDatasetRecordsInput) => Promise<{ deletedCount: number }>;
   /** Deprecated with the multipart upload routes; retires in the next release (ADR-158 §8). */
   createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,

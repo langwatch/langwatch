@@ -1,29 +1,31 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
+import { ExecuteEvaluationCommand } from "../../eventing/evaluation-execution.intent.ts";
 import { EvaluationProcessingProducerService } from "../evaluation-processing-producer.service.ts";
 import { createEvaluationProcessingPipeline } from "../evaluation-processing.service.ts";
 
 /** The producer's definition, as a host receives it. */
 const producer = () =>
-  EvaluationProcessingProducerService.createPipeline({
-    processName: "langwatch-api",
-  });
+  EvaluationProcessingProducerService.create({ processName: "langwatch-api" }).build();
 
 /** The consumer's, built from stores and handlers a caller would supply. */
 const consumer = () =>
   createEvaluationProcessingPipeline({
-    evalRunStore: { store: async () => undefined, get: async () => null },
-    evaluationAnalyticsStore: { store: async () => undefined, get: async () => null },
+    evalRunStore: { store: async () => undefined, get: async () => ({ kind: "empty" }) },
+    evaluationAnalyticsStore: {
+      store: async () => undefined,
+      get: async () => ({ kind: "empty" }),
+    },
     evaluationAnalyticsRollupAppendStore: { append: async () => undefined },
-    executeEvaluationCommand: { handle: async () => [] },
+    executeEvaluationCommand: ExecuteEvaluationCommand.create({
+      execute: () => Promise.reject(new Error("not executed in this test")),
+    }),
     automations: {
       handleEvaluationTriggerMatch: async () => undefined,
       handleEvaluationGraphTriggerActivity: async () => undefined,
     },
-  } as never) as unknown as {
-    metadata: { name: string; commands: readonly { name: string }[] };
-  };
+  });
 
 describe("given a process that only SENDS evaluation commands", () => {
   it("builds the same pipeline the consumer registers, not a producer's subset", () => {

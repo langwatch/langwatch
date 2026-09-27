@@ -166,204 +166,21 @@ vi.mock("@ai-sdk/react", () => ({
 
 // The whole Langy tRPC surface, served from `scenarioRef`.
 vi.mock("../../../../../behavior/langy-api.ts", async () => {
-  const React = await import("react");
-  // Peripheral menus in the panel header (GitHub connect, etc.) each pull
-  // their own tRPC queries these tests do not care about; the shared harness
-  // answers every one of them inert. Only the langy surface and the model
-  // picker below are explicit.
+  const { listPage, useScenarioInfiniteListQuery, useScenarioQuery } =
+    await import("../../../__tests__/support/scenario-queries.ts");
+  // Peripheral menus in the panel header each pull their own tRPC queries these
+  // tests do not care about; the shared harness answers every one of them inert.
   const { createTrpcUtils, modelProviderRouter, withFallback } =
     await import("../../../__tests__/support/langy-api-mock.ts");
 
-  // A minimal, `enabled`-honouring stand-in for a tRPC query: one async resolution per
-  // arm / refetch / invalidate, loading → success | error, no retries.
-  const useScenarioQuery = <TData,>(
-    resolve: () => Promise<TData>,
-    enabled: boolean,
-    subscribeInvalidation = false,
+  const resolveListPage = async (
+    input: { projectId: string; limit: number; query?: string },
+    cursor?: { lastActivityAtMs: number | null; id: string },
   ) => {
-    const version = React.useSyncExternalStore(
-      (notify: () => void) => {
-        if (!subscribeInvalidation) return () => undefined;
-        listListeners.add(notify);
-        return () => listListeners.delete(notify);
-      },
-      () => (subscribeInvalidation ? listState.version : 0),
-    );
-    const [nonce, setNonce] = React.useState(0);
-    const [state, setState] = React.useState<{
-      status: "loading" | "success" | "error";
-      data: TData | undefined;
-      error: unknown;
-      fetched: boolean;
-    }>({ status: "loading", data: undefined, error: null, fetched: false });
-
-    React.useEffect(() => {
-      if (!enabled) return;
-      let cancelled = false;
-      resolve()
-        .then((data) => {
-          if (!cancelled) setState({ status: "success", data, error: null, fetched: true });
-        })
-        .catch((error) => {
-          if (!cancelled)
-            setState({
-              status: "error",
-              data: undefined,
-              error,
-              fetched: true,
-            });
-        });
-      return () => {
-        cancelled = true;
-      };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [enabled, nonce, version]);
-
-    return {
-      data: state.data,
-      // isLoading, not isFetching: React Query v4 reports a DISABLED
-      // query as status "loading" forever, and the panel deliberately disables
-      // the list while closed — so the production hook reads isLoading.
-      // Mirror that: only a query that is BOTH enabled AND still loading counts.
-      isLoading: enabled && state.status === "loading",
-      isFetching: enabled && state.status === "loading",
-      isPlaceholderData: false,
-      isFetched: state.fetched,
-      isError: state.status === "error",
-      error: state.error,
-      refetch: () => {
-        setNonce((n) => n + 1);
-        return Promise.resolve();
-      },
-    };
-  };
-
-  type ListInput = { projectId: string; limit: number; query?: string };
-  type ListCursor = { lastActivityAtMs: number | null; id: string };
-
-  const resolveListPage = async (input: ListInput, cursor?: ListCursor) => {
     const scenario = scenarioRef.current;
     if (scenario.slowList) await scenario.slowList.gate;
     if (scenario.failList) throw new Error("list unavailable");
-    const query = input.query?.trim().toLowerCase();
-    const visible = scenario.conversations
-      .filter((conversation) => (query ? conversation.title?.toLowerCase().includes(query) : true))
-      .toSorted((a, b) => {
-        const byActivity = b.lastActivityAtMs - a.lastActivityAtMs;
-        return byActivity !== 0 ? byActivity : b.id.localeCompare(a.id);
-      });
-    const cursorIndex = cursor
-      ? visible.findIndex(
-          (conversation) =>
-            conversation.id === cursor.id &&
-            conversation.lastActivityAtMs === cursor.lastActivityAtMs,
-        )
-      : -1;
-    const start = cursorIndex >= 0 ? cursorIndex + 1 : 0;
-    const items = visible.slice(start, start + input.limit);
-    const last = items.at(-1);
-    return {
-      items,
-      nextCursor:
-        start + items.length < visible.length && last
-          ? { lastActivityAtMs: last.lastActivityAtMs, id: last.id }
-          : null,
-    };
-  };
-
-  const useScenarioInfiniteListQuery = (input: ListInput, enabled: boolean) => {
-    const version = React.useSyncExternalStore(
-      (notify: () => void) => {
-        listListeners.add(notify);
-        return () => listListeners.delete(notify);
-      },
-      () => listState.version,
-    );
-    const [nonce, setNonce] = React.useState(0);
-    const [isFetchingNextPage, setIsFetchingNextPage] = React.useState(false);
-    const [state, setState] = React.useState<{
-      status: "loading" | "success" | "error";
-      data:
-        | {
-            pages: Awaited<ReturnType<typeof resolveListPage>>[];
-            pageParams: (ListCursor | undefined)[];
-          }
-        | undefined;
-      error: unknown;
-      fetched: boolean;
-    }>({ status: "loading", data: undefined, error: null, fetched: false });
-
-    React.useEffect(() => {
-      if (!enabled) return;
-      let cancelled = false;
-      setState((previous) => ({
-        ...previous,
-        status: "loading",
-        error: null,
-      }));
-      resolveListPage(input)
-        .then((page) => {
-          if (!cancelled) {
-            setState({
-              status: "success",
-              data: { pages: [page], pageParams: [undefined] },
-              error: null,
-              fetched: true,
-            });
-          }
-        })
-        .catch((error) => {
-          if (!cancelled) {
-            setState({
-              status: "error",
-              data: undefined,
-              error,
-              fetched: true,
-            });
-          }
-        });
-      return () => {
-        cancelled = true;
-      };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [enabled, input.projectId, input.limit, input.query, nonce, version]);
-
-    const fetchNextPage = async () => {
-      const cursor = state.data?.pages.at(-1)?.nextCursor ?? undefined;
-      if (!cursor) return;
-      setIsFetchingNextPage(true);
-      try {
-        const page = await resolveListPage(input, cursor);
-        setState((previous) => ({
-          status: "success",
-          data: {
-            pages: [...(previous.data?.pages ?? []), page],
-            pageParams: [...(previous.data?.pageParams ?? []), cursor],
-          },
-          error: null,
-          fetched: true,
-        }));
-      } finally {
-        setIsFetchingNextPage(false);
-      }
-    };
-
-    return {
-      data: state.data,
-      isLoading: enabled && state.status === "loading" && state.data === undefined,
-      isFetching: enabled && state.status === "loading",
-      isPlaceholderData: state.status === "loading" && state.data !== undefined,
-      isFetched: state.fetched,
-      isError: state.status === "error",
-      error: state.error,
-      refetch: () => {
-        setNonce((n) => n + 1);
-        return Promise.resolve();
-      },
-      fetchNextPage,
-      hasNextPage: !!state.data?.pages.at(-1)?.nextCursor,
-      isFetchingNextPage,
-    };
+    return listPage({ conversations: scenario.conversations, input, cursor });
   };
 
   // The React Query utils tree, shared by useUtils() and useContext(). Only
@@ -386,7 +203,12 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
         ) => {
           const enabled = opts?.enabled !== false;
           spies.listQuery(input, enabled);
-          return useScenarioInfiniteListQuery(input, enabled);
+          return useScenarioInfiniteListQuery({
+            input,
+            enabled,
+            channel: { listeners: listListeners, state: listState },
+            resolvePage: resolveListPage,
+          });
         },
       },
       modelsAllowed: {
@@ -401,8 +223,8 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
           input: { projectId: string; conversationId: string },
           opts?: { enabled?: boolean },
         ) =>
-          useScenarioQuery(
-            async () => ({
+          useScenarioQuery({
+            resolve: async () => ({
               messages: (scenarioRef.current.messagesById[input.conversationId] ?? []).map((m) => ({
                 id: m.id,
                 role: m.role,
@@ -414,8 +236,8 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
               inFlightTurnId:
                 scenarioRef.current.turnInFlightById[input.conversationId]?.turnId ?? null,
             }),
-            opts?.enabled !== false,
-          ),
+            enabled: opts?.enabled !== false,
+          }),
       },
       deleteConversation: {
         useMutation: (opts?: { onSuccess?: (result: unknown, variables: unknown) => void }) => ({

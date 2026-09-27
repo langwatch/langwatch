@@ -173,63 +173,91 @@ export class EvaluationDataService {
     const result: Record<string, unknown> = {};
 
     for (const [targetField, mappingConfig] of Object.entries(mappings.mapping)) {
-      const isThreadMapping =
-        ("type" in mappingConfig && mappingConfig.type === "thread") ||
-        ("source" in mappingConfig &&
-          (mappingConfig.source in THREAD_MAPPINGS ||
-            (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(mappingConfig.source)));
+      if (!("source" in mappingConfig)) continue;
 
-      if (isThreadMapping && "source" in mappingConfig) {
-        const source = mappingConfig.source;
-        if (!source) {
-          continue;
-        }
-
-        if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
-          if (source === "formatted_traces") {
-            result[targetField] = (
-              await Promise.all(threadTraces.map((t) => this.deps.spanDigest.format(t.spans ?? [])))
-            ).join("\n\n---\n\n");
-          }
-        } else {
-          const threadSource = source as keyof typeof THREAD_MAPPINGS;
-          const selectedFields =
-            ("selectedFields" in mappingConfig ? mappingConfig.selectedFields : undefined) ?? [];
-          result[targetField] = THREAD_MAPPINGS[threadSource].mapping(
-            { thread_id: threadId, traces: threadTraces },
-            selectedFields as (keyof typeof TRACE_MAPPINGS)[],
-          );
-        }
-      } else if ("source" in mappingConfig) {
-        // Regular trace mapping
-        if ((SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(mappingConfig.source)) {
-          if (mappingConfig.source === "formatted_trace") {
-            result[targetField] = await this.deps.spanDigest.format(trace.spans ?? []);
-          }
-        } else {
-          const traceMappingConfig: {
-            source: string;
-            key?: string;
-            subkey?: string;
-          } = {
-            source: mappingConfig.source,
-            key: mappingConfig.key,
-            subkey: mappingConfig.subkey,
-          };
-          const mapped = mapTraceToDatasetEntry(
-            trace,
-            { [targetField]: traceMappingConfig },
-            new Set(),
-            undefined,
-            undefined,
-          )[0];
-          result[targetField] = mapped?.[targetField];
-        }
-      }
+      const outcome = isThreadSourced(mappingConfig)
+        ? await this.resolveThreadSource({ mappingConfig, threadId, threadTraces })
+        : await this.resolveTraceSource({ targetField, mappingConfig, trace });
+      if (outcome.resolved) result[targetField] = outcome.value;
     }
 
     return result;
   }
+
+  private async resolveThreadSource({
+    mappingConfig,
+    threadId,
+    threadTraces,
+  }: {
+    mappingConfig: SourcedMapping;
+    threadId: string;
+    threadTraces: Trace[];
+  }): Promise<FieldOutcome> {
+    const source = mappingConfig.source;
+    if (!source) return { resolved: false };
+
+    if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
+      if (source !== "formatted_traces") return { resolved: false };
+
+      const formatted = await Promise.all(
+        threadTraces.map((t) => this.deps.spanDigest.format(t.spans ?? [])),
+      );
+      return { resolved: true, value: formatted.join("\n\n---\n\n") };
+    }
+
+    const threadSource = source as keyof typeof THREAD_MAPPINGS;
+    const selectedFields =
+      ("selectedFields" in mappingConfig ? mappingConfig.selectedFields : undefined) ?? [];
+    return {
+      resolved: true,
+      value: THREAD_MAPPINGS[threadSource].mapping(
+        { thread_id: threadId, traces: threadTraces },
+        selectedFields as (keyof typeof TRACE_MAPPINGS)[],
+      ),
+    };
+  }
+
+  private async resolveTraceSource({
+    targetField,
+    mappingConfig,
+    trace,
+  }: {
+    targetField: string;
+    mappingConfig: SourcedMapping;
+    trace: Trace;
+  }): Promise<FieldOutcome> {
+    if ((SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(mappingConfig.source)) {
+      if (mappingConfig.source !== "formatted_trace") return { resolved: false };
+
+      return { resolved: true, value: await this.deps.spanDigest.format(trace.spans ?? []) };
+    }
+
+    const traceMappingConfig: { source: string; key?: string; subkey?: string } = {
+      source: mappingConfig.source,
+      key: "key" in mappingConfig ? mappingConfig.key : undefined,
+      subkey: "subkey" in mappingConfig ? mappingConfig.subkey : undefined,
+    };
+    const mapped = mapTraceToDatasetEntry(
+      trace,
+      { [targetField]: traceMappingConfig },
+      new Set(),
+      undefined,
+      undefined,
+    )[0];
+    return { resolved: true, value: mapped?.[targetField] };
+  }
+}
+
+type SourcedMapping = Extract<MappingState["mapping"][string], { source: unknown }>;
+
+type FieldOutcome = { resolved: true; value: unknown } | { resolved: false };
+
+function isThreadSourced(mappingConfig: SourcedMapping): boolean {
+  return (
+    ("type" in mappingConfig && mappingConfig.type === "thread") ||
+    mappingConfig.source in THREAD_MAPPINGS ||
+    (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(mappingConfig.source)
+  );
 }
 
 function mapTraceFields(
@@ -237,9 +265,7 @@ function mapTraceFields(
   mapping_: MappingState,
 ): Record<string, string | number> | undefined {
   const mapping: MappingState =
-    "mapping" in mapping_
-      ? mapping_
-      : migrateLegacyMappings(mapping_ as unknown as Record<string, string>);
+    "mapping" in mapping_ ? mapping_ : migrateLegacyMappings(legacyMappingOf(mapping_));
 
   return mapTraceToDatasetEntry(
     trace,
@@ -255,4 +281,13 @@ function mapTraceFields(
     undefined,
     undefined,
   )[0];
+}
+
+/** A pre-`MappingState` monitor mapping: each target field names its trace source. */
+function legacyMappingOf(value: object): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
 }

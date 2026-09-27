@@ -77,6 +77,14 @@ export class TestCodingAgentService implements CodingAgentApi {
     return this.unused();
   }
 
+  contributeReceivedLogRecord(): Promise<never> {
+    return this.unused();
+  }
+
+  contributeReceivedMetricPoint(): Promise<never> {
+    return this.unused();
+  }
+
   githubWebBase(): string {
     throw new Error("unused coding agent capability");
   }

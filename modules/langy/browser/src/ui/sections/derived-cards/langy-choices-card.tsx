@@ -65,12 +65,135 @@ function ChoiceMark({ dead, marked, multi }: { dead: boolean; marked: boolean; m
   );
 }
 
+type Answer = (selection: LangyChoiceSelection) => void;
+
+/** One option, marked when chosen or picked; a dead reference is never selectable. */
+function ChoiceOption({
+  option,
+  refRow,
+  isChosen,
+  isPicked,
+  open,
+  answered,
+  multi,
+  onToggle,
+}: {
+  option: LangyDerivedChoicesCard["options"][number];
+  refRow: ChoicesRefRow;
+  isChosen: boolean;
+  isPicked: boolean;
+  open: boolean;
+  answered: boolean;
+  multi: boolean;
+  onToggle: () => void;
+}) {
+  const dead = refRow.state === "dead";
+  const marked = isChosen || isPicked;
+  const selectable = open && !dead;
+  const { primary, secondary } = optionRowText({ option, refRow });
+  return (
+    <chakra.button
+      type="button"
+      disabled={!selectable}
+      onClick={onToggle}
+      display="flex"
+      alignItems="center"
+      gap={2}
+      textAlign="left"
+      paddingX={2}
+      paddingY={1.5}
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor={marked ? "purple.emphasized" : "border.muted"}
+      borderRadius="md"
+      background={marked ? "bg.muted" : "transparent"}
+      cursor={selectable ? "pointer" : "default"}
+      opacity={dead || (answered && !isChosen) ? 0.55 : 1}
+      aria-disabled={!selectable}
+      aria-pressed={marked}
+      _hover={selectable ? { background: "bg.muted" } : undefined}
+      transition="background 120ms ease, border-color 120ms ease"
+    >
+      <Box flexShrink={0} color={choiceMarkColor({ marked, dead })} display="flex">
+        <ChoiceMark dead={dead} marked={marked} multi={multi} />
+      </Box>
+      <VStack align="stretch" gap={0} flex={1} minWidth={0}>
+        <Text textStyle="xs" color={dead ? "fg.muted" : "fg"} truncate>
+          {primary}
+        </Text>
+        {secondary ? (
+          <Text textStyle="2xs" color="fg.muted" truncate>
+            {secondary}
+          </Text>
+        ) : null}
+      </VStack>
+    </chakra.button>
+  );
+}
+
+/** "Other…": the reader's own answer, typed, sent as the selection's other text. */
+function OtherAnswer({ blockId, answer }: { blockId: string; answer: Answer }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState("");
+  const trimmed = text.trim();
+  const send = () => {
+    if (trimmed !== "") answer({ blockId, optionIds: [], otherText: trimmed });
+  };
+  if (!editing) {
+    return (
+      <Button
+        size="xs"
+        variant="ghost"
+        alignSelf="flex-start"
+        color="fg.muted"
+        onClick={() => setEditing(true)}
+      >
+        Other…
+      </Button>
+    );
+  }
+  return (
+    <HStack gap={1.5}>
+      <chakra.input
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") send();
+        }}
+        placeholder="Your own answer…"
+        flex={1}
+        textStyle="xs"
+        paddingX={2}
+        paddingY={1.5}
+        borderWidth="1px"
+        borderStyle="solid"
+        borderColor="border.muted"
+        borderRadius="md"
+        background="transparent"
+        color="fg"
+        _focus={{ borderColor: "purple.emphasized", outline: "none" }}
+      />
+      <Button size="xs" variant="outline" disabled={trimmed === ""} onClick={send}>
+        Send
+      </Button>
+    </HStack>
+  );
+}
+
+/** A picked set toggled one option at a time, for a multi-select card. */
+function togglePick(previous: Set<string>, optionId: string): Set<string> {
+  const next = new Set(previous);
+  if (next.has(optionId)) next.delete(optionId);
+  else next.add(optionId);
+  return next;
+}
+
 export function LangyChoicesCard({
   card,
   lockState,
   forming = false,
   onSelect,
-  refRows: refRowsInput,
+  refRows,
 }: {
   card: LangyDerivedChoicesCard;
   lockState: LangyChoicesLockState;
@@ -81,36 +204,21 @@ export function LangyChoicesCard({
   /** Fixture seam (gallery/tests): pre-resolved rows instead of fetching. */
   refRows?: ReadonlyMap<string, ChoicesRefRow>;
 }) {
-  const refRows = refRowsInput ?? new Map<string, ChoicesRefRow>();
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
-  const [otherOpen, setOtherOpen] = useState(false);
-  const [otherText, setOtherText] = useState("");
-
   const answered = lockState.status === "answered";
   const superseded = lockState.status === "superseded";
   const open = lockState.status === "open" && !forming && !!onSelect;
   const multi = card.multiSelect === true;
+  const chosen = new Set(lockState.status === "answered" ? lockState.optionIds : []);
 
-  const answer = (selection: LangyChoiceSelection): void => {
-    if (!open || !onSelect) return;
-    onSelect({ selection, card });
+  const answer: Answer = (selection) => {
+    if (open) onSelect?.({ selection, card });
   };
-
-  const toggle = (optionId: string): void => {
+  const toggle = (optionId: string) => {
     if (!open) return;
-    if (!multi) {
-      answer({ blockId: card.blockId, optionIds: [optionId] });
-      return;
-    }
-    setPicked((previous) => {
-      const next = new Set(previous);
-      if (next.has(optionId)) next.delete(optionId);
-      else next.add(optionId);
-      return next;
-    });
+    if (multi) setPicked((previous) => togglePick(previous, optionId));
+    else answer({ blockId: card.blockId, optionIds: [optionId] });
   };
-
-  const chosen = new Set(answered ? lockState.optionIds : []);
 
   return (
     <LangyDerivedCardFrame
@@ -135,59 +243,20 @@ export function LangyChoicesCard({
       }
     >
       <VStack align="stretch" gap={1}>
-        {card.options.map((option) => {
-          const refRow = refRows.get(option.id) ?? { state: "plain" as const };
-          const dead = refRow.state === "dead";
-          const isChosen = chosen.has(option.id);
-          const isPicked = picked.has(option.id);
-          const marked = isChosen || isPicked;
-          const markColor = choiceMarkColor({ marked, dead });
-          const selectable = open && !dead;
-
-          const { primary, secondary } = optionRowText({ option, refRow });
-
-          return (
-            <chakra.button
-              key={option.id}
-              type="button"
-              disabled={!selectable}
-              onClick={() => toggle(option.id)}
-              display="flex"
-              alignItems="center"
-              gap={2}
-              textAlign="left"
-              paddingX={2}
-              paddingY={1.5}
-              borderWidth="1px"
-              borderStyle="solid"
-              borderColor={isChosen || isPicked ? "purple.emphasized" : "border.muted"}
-              borderRadius="md"
-              background={isChosen || isPicked ? "bg.muted" : "transparent"}
-              cursor={selectable ? "pointer" : "default"}
-              opacity={dead || (answered && !isChosen) ? 0.55 : 1}
-              aria-disabled={!selectable}
-              aria-pressed={marked}
-              _hover={selectable ? { background: "bg.muted" } : undefined}
-              transition="background 120ms ease, border-color 120ms ease"
-            >
-              <Box flexShrink={0} color={markColor} display="flex">
-                <ChoiceMark dead={dead} marked={marked} multi={multi} />
-              </Box>
-              <VStack align="stretch" gap={0} flex={1} minWidth={0}>
-                <Text textStyle="xs" color={dead ? "fg.muted" : "fg"} truncate>
-                  {primary}
-                </Text>
-                {secondary ? (
-                  <Text textStyle="2xs" color="fg.muted" truncate>
-                    {secondary}
-                  </Text>
-                ) : null}
-              </VStack>
-            </chakra.button>
-          );
-        })}
-
-        {answered && lockState.otherText ? (
+        {card.options.map((option) => (
+          <ChoiceOption
+            key={option.id}
+            option={option}
+            refRow={refRows?.get(option.id) ?? { state: "plain" }}
+            isChosen={chosen.has(option.id)}
+            isPicked={picked.has(option.id)}
+            open={open}
+            answered={answered}
+            multi={multi}
+            onToggle={() => toggle(option.id)}
+          />
+        ))}
+        {lockState.status === "answered" && lockState.otherText ? (
           <HStack gap={1.5} paddingX={2} paddingY={1}>
             <Check size={12} color="var(--chakra-colors-purple-fg)" />
             <Text textStyle="xs" color="fg">
@@ -195,61 +264,9 @@ export function LangyChoicesCard({
             </Text>
           </HStack>
         ) : null}
-
-        {open && card.allowOther === true && otherOpen && (
-          <HStack gap={1.5}>
-            <chakra.input
-              value={otherText}
-              onChange={(event) => setOtherText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" || otherText.trim() === "") return;
-                answer({
-                  blockId: card.blockId,
-                  optionIds: [],
-                  otherText: otherText.trim(),
-                });
-              }}
-              placeholder="Your own answer…"
-              flex={1}
-              textStyle="xs"
-              paddingX={2}
-              paddingY={1.5}
-              borderWidth="1px"
-              borderStyle="solid"
-              borderColor="border.muted"
-              borderRadius="md"
-              background="transparent"
-              color="fg"
-              _focus={{ borderColor: "purple.emphasized", outline: "none" }}
-            />
-            <Button
-              size="xs"
-              variant="outline"
-              disabled={otherText.trim() === ""}
-              onClick={() =>
-                answer({
-                  blockId: card.blockId,
-                  optionIds: [],
-                  otherText: otherText.trim(),
-                })
-              }
-            >
-              Send
-            </Button>
-          </HStack>
-        )}
-        {open && card.allowOther === true && !otherOpen && (
-          <Button
-            size="xs"
-            variant="ghost"
-            alignSelf="flex-start"
-            color="fg.muted"
-            onClick={() => setOtherOpen(true)}
-          >
-            Other…
-          </Button>
-        )}
-
+        {open && card.allowOther === true ? (
+          <OtherAnswer blockId={card.blockId} answer={answer} />
+        ) : null}
         {superseded ? (
           <Text textStyle="2xs" color="fg.subtle" paddingX={2} paddingTop={0.5}>
             The conversation moved on. This question is closed.

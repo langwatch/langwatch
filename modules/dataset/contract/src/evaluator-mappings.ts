@@ -1,4 +1,4 @@
-import type { MappingState } from "./trace-mapping.ts";
+import { mappingStateSchema, type MappingState } from "./trace-mapping.ts";
 
 export const DEFAULT_MAPPINGS: MappingState = {
   mapping: {
@@ -33,9 +33,8 @@ export const mappingsReadEvaluationsSource = (mappings: MappingState | null): bo
   );
 
 export const migrateLegacyMappings = (mappings: Record<string, string>): MappingState => {
-  if (mappings.mapping) {
-    return mappings as any as MappingState;
-  }
+  const current = mappings.mapping ? mappingStateSchema.safeParse(mappings) : undefined;
+  if (current?.success) return current.data;
 
   const LEGACY_EVALUATOR_MAPPING_OPTIONS: Record<string, MappingState["mapping"][number]> = {
     spans: {

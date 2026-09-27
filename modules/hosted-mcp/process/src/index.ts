@@ -1,10 +1,5 @@
-export {
-  createMcpHandler,
-  HOSTED_MCP_FAMILY,
-  hostedMcpRoutePolicies,
-  registerHostedMcpRoutePolicies,
-  type McpHandler,
-} from "./transport/hosted-mcp.api.ts";
+export { HOSTED_MCP_FAMILY, hostedMcpRoutePolicies } from "./rules/mcp-routes.rules.ts";
+export type { McpHandler } from "./services/mcp-endpoint.service.ts";
 export { HeaderMcpClientAddressService } from "./services/header-mcp-client-address.service.ts";
 export {
   McpApiKeyCipher,
@@ -15,9 +10,10 @@ export {
   type HostedMcpDependencies,
   type HostedMcpRedis,
   type McpToolServer,
-} from "./app/hosted-mcp-members.ts";
+} from "./app/hosted-mcp.members.ts";
 export type {
   McpApprovalOutcome,
+  McpAuthorizeAnswer,
   McpApprovalRequest,
   McpApprover,
   McpAuthorizationCollaborators,

@@ -45,37 +45,41 @@ const COLLECTOR_MAX_PER_TRACE = 200;
  * The thread/user/customer/label keys moved inside `metadata`, and the door still accepts them
  * at the top level. Labels arrive as a string, a list, or an object of key/value pairs.
  */
-export function applyLegacyMetadataFields(body: Record<string, any>): void {
-  if (!("metadata" in body) || !body.metadata) {
-    body.metadata = {};
-    if ("thread_id" in body) {
-      body.metadata.thread_id = body.thread_id;
-    }
-    if ("user_id" in body) {
-      body.metadata.user_id = body.user_id;
-    }
-    if ("customer_id" in body) {
-      body.metadata.customer_id = body.customer_id;
-    }
-    if ("labels" in body && body.labels) {
-      body.metadata.labels = body.labels;
-    }
-  }
+/** The collector body before its schema parse: a JSON object the legacy rewrites edit in place. */
+export type CollectorBody = Record<string, unknown>;
 
-  const labels = body.metadata?.labels;
-  if (!labels) return;
-  if (typeof labels === "string") {
-    body.metadata.labels = [labels];
-    return;
-  }
-  if (Array.isArray(labels)) {
-    body.metadata.labels = labels;
-    return;
-  }
-  body.metadata.labels = Object.entries(labels).map(([key, value]) => `${key}: ${value as string}`);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function hasNoVerdict(evaluation: Record<string, any>): boolean {
+function metadataOf(body: CollectorBody): Record<string, unknown> {
+  if (isRecord(body.metadata)) return body.metadata;
+  // A truthy metadata of another shape is left for the schema to refuse.
+  if (body.metadata) return {};
+  const metadata: Record<string, unknown> = {};
+  for (const key of ["thread_id", "user_id", "customer_id"]) {
+    if (key in body) metadata[key] = body[key];
+  }
+  if ("labels" in body && body.labels) metadata.labels = body.labels;
+  body.metadata = metadata;
+  return metadata;
+}
+
+export function applyLegacyMetadataFields(body: CollectorBody): void {
+  const metadata = metadataOf(body);
+  const labels = metadata.labels;
+  if (!labels) return;
+  if (typeof labels === "string") {
+    metadata.labels = [labels];
+    return;
+  }
+  if (Array.isArray(labels)) return;
+  metadata.labels = isRecord(labels)
+    ? Object.entries(labels).map(([key, value]) => `${key}: ${String(value)}`)
+    : [];
+}
+
+function hasNoVerdict(evaluation: Record<string, unknown>): boolean {
   if (evaluation.status === "error" || evaluation.status === "skipped") return false;
 
   return (
@@ -89,11 +93,9 @@ function isNotMilliseconds(timestamp: unknown): boolean {
   return Boolean(timestamp) && String(timestamp).length !== 13;
 }
 
-function evaluationTimestampsNotMilliseconds(evaluation: Record<string, any>): boolean {
-  return (
-    isNotMilliseconds(evaluation.timestamps?.started_at) ||
-    isNotMilliseconds(evaluation.timestamps?.finished_at)
-  );
+function evaluationTimestampsNotMilliseconds(evaluation: Record<string, unknown>): boolean {
+  const timestamps = isRecord(evaluation.timestamps) ? evaluation.timestamps : {};
+  return isNotMilliseconds(timestamps.started_at) || isNotMilliseconds(timestamps.finished_at);
 }
 
 /**
@@ -101,10 +103,11 @@ function evaluationTimestampsNotMilliseconds(evaluation: Record<string, any>): b
  * with second-resolution timestamps.
  */
 export function findEvaluationRejection(
-  body: Record<string, any>,
+  body: CollectorBody,
   projectId: string,
 ): CollectorRejection | null {
-  for (const evaluation of body.evaluations ?? []) {
+  const evaluations = Array.isArray(body.evaluations) ? body.evaluations : [];
+  for (const evaluation of evaluations.filter(isRecord)) {
     if (hasNoVerdict(evaluation)) {
       logger.error(
         { projectId, evaluationId: evaluation.id },
@@ -120,7 +123,7 @@ export function findEvaluationRejection(
       };
     }
 
-    if (evaluation.error) {
+    if (isRecord(evaluation.error)) {
       evaluation.error.has_error = true;
     }
 
@@ -146,7 +149,7 @@ export function findEvaluationRejection(
 
 /** Refuses a `spans` field that is not an array, or one over the per-trace cap. */
 export function findSpansShapeRejection(
-  body: Record<string, any>,
+  body: CollectorBody,
   input: Readonly<{ projectId: string; traceId: string | null | undefined }>,
 ): CollectorRejection | null {
   const { projectId, traceId } = input;
@@ -165,8 +168,9 @@ export function findSpansShapeRejection(
     };
   }
 
-  if (body.spans?.length > COLLECTOR_MAX_PER_TRACE) {
-    logger.info({ projectId, spansCount: body.spans?.length, traceId }, "[429] Too many spans");
+  const spansCount = Array.isArray(body.spans) ? body.spans.length : 0;
+  if (spansCount > COLLECTOR_MAX_PER_TRACE) {
+    logger.info({ projectId, spansCount, traceId }, "[429] Too many spans");
 
     return {
       rejected: true,
@@ -275,7 +279,7 @@ function applyLegacySpanOutputs(span: Span): void {
   span.output = { type: "list", value: span.outputs };
 }
 
-function normaliseContext<T extends Record<string, any>>(context: T): T {
+function normaliseContext<T extends Record<string, unknown>>(context: T): T {
   return {
     ...context,
     ...(typeof context.document_id === "number"

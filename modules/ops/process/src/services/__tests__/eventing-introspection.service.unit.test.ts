@@ -8,6 +8,7 @@ import {
   defineAggregate,
   definePipeline,
   EventSchema,
+  sealPipelineDefinition,
   type FoldProjectionStore,
   type StateProjectionOptions,
   type StateProjectionStore,
@@ -50,7 +51,7 @@ function definitionWith({ stateOptions }: { stateOptions?: StateProjectionOption
 }
 
 function adapterFor(definition: ReturnType<typeof definitionWith>) {
-  return EventingIntrospectionService.create(() => [definition]);
+  return EventingIntrospectionService.create(() => [sealPipelineDefinition(definition)]);
 }
 
 describe("given a pipeline registering a state projection", () => {

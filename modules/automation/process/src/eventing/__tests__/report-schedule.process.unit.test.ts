@@ -3,7 +3,7 @@ import { buildIntentFactories, type ProcessEvolution } from "@langwatch/eventing
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { automationProcessDefinition } from "../../fixtures/pipeline-test-harness.ts";
+import { automationProcessDefinition } from "../../__tests__/fixtures/pipeline-test-harness.ts";
 import {
   REPORT_DISPATCH_MAX_ATTEMPTS,
   reportDispatchIntentSchema,

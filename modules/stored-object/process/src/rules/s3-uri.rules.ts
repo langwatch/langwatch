@@ -6,7 +6,7 @@ import {
 /**
  * Decomposes an `s3://<bucket>/<key>` address into its bucket and key.
  */
-function parseS3Uri(uri: string): { bucket: string; key: string } {
+export function parseS3Uri(uri: string): { bucket: string; key: string } {
   const scheme = getStoredObjectStorageScheme(uri);
   if (scheme !== "s3") {
     throw new UnsupportedStorageSchemeError({ uri, scheme, expectedScheme: "s3" });
@@ -30,14 +30,4 @@ function parseS3Uri(uri: string): { bucket: string; key: string } {
   }
 
   return { bucket, key };
-}
-
-export class S3UriRules {
-  private constructor() {}
-
-  static create(): S3UriRules {
-    return new S3UriRules();
-  }
-
-  static parseS3Uri = parseS3Uri;
 }

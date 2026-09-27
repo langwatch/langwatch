@@ -56,12 +56,14 @@ export const agentWeb = defineWebModule("agent")
     },
     agentConnectedDetail: {
       load: async () => ({
-        default: (await import("./ui/sections/connected-agent-drawer.tsx")).ConnectedAgentDrawer,
+        default: (await import("./ui/sections/routed-agent-drawers.tsx"))
+          .RoutedConnectedAgentDrawer,
       }),
     },
     agentConnectFromCode: {
       load: async () => ({
-        default: (await import("./ui/sections/connect-from-code-drawer.tsx")).ConnectFromCodeDrawer,
+        default: (await import("./ui/sections/routed-agent-drawers.tsx"))
+          .RoutedConnectFromCodeDrawer,
       }),
     },
     agentWorkflowEditor: {

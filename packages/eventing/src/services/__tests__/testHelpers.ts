@@ -15,7 +15,7 @@ import type {
   MapProjectionDefinition,
 } from "../../projections/mapProjection.types.ts";
 import type { EventStore, EventStoreReadContext } from "../../stores/eventStore.types.ts";
-import type { QueueManager } from "../queues/queueManager.ts";
+import { QueueManager } from "../queues/queueManager.ts";
 
 export const TEST_EVENT_TYPES = ["test.event.one", "test.event.two"] as const;
 /** A whole test event schema for `.withEvents`, the envelope plus one type literal and its data. */
@@ -40,27 +40,31 @@ export const TEST_COMMAND_TYPES = ["test.command.run"] as const;
  */
 export function createMockQueueManager(overrides?: {
   hasProjectionSubscriberQueues?: boolean;
-  getProjectionSubscriberQueue?: ReturnType<typeof vi.fn>;
+  getProjectionSubscriberQueue?: QueueManager<Event>["getProjectionSubscriberQueue"];
 }): QueueManager<Event> {
-  return {
-    hasProjectionQueues: vi.fn().mockReturnValue(false),
-    hasHandlerQueues: vi.fn().mockReturnValue(false),
-    hasSubscriberQueues: vi.fn().mockReturnValue(false),
-    hasProjectionSubscriberQueues: vi
-      .fn()
-      .mockReturnValue(overrides?.hasProjectionSubscriberQueues ?? false),
-    getProjectionQueue: vi.fn().mockReturnValue(undefined),
-    getHandlerQueue: vi.fn().mockReturnValue(undefined),
-    getSubscriberQueue: vi.fn().mockReturnValue(undefined),
-    getProjectionSubscriberQueue:
-      overrides?.getProjectionSubscriberQueue ?? vi.fn().mockReturnValue(undefined),
-    close: vi.fn().mockResolvedValue(void 0),
-    waitUntilReady: vi.fn().mockResolvedValue(void 0),
-    initializeProjectionQueues: vi.fn(),
-    initializeHandlerQueues: vi.fn(),
-    initializeSubscriberQueues: vi.fn(),
-    initializeProjectionSubscriberQueues: vi.fn(),
-  } as unknown as QueueManager<Event>;
+  const queueManager = new QueueManager<Event>({
+    aggregateType: createTestAggregateType(),
+    pipelineName: "test_pipeline",
+  });
+  vi.spyOn(queueManager, "hasProjectionQueues").mockReturnValue(false);
+  vi.spyOn(queueManager, "hasHandlerQueues").mockReturnValue(false);
+  vi.spyOn(queueManager, "hasSubscriberQueues").mockReturnValue(false);
+  vi.spyOn(queueManager, "hasProjectionSubscriberQueues").mockReturnValue(
+    overrides?.hasProjectionSubscriberQueues ?? false,
+  );
+  vi.spyOn(queueManager, "getProjectionQueue").mockReturnValue(undefined);
+  vi.spyOn(queueManager, "getHandlerQueue").mockReturnValue(undefined);
+  vi.spyOn(queueManager, "getSubscriberQueue").mockReturnValue(undefined);
+  vi.spyOn(queueManager, "getProjectionSubscriberQueue").mockImplementation(
+    overrides?.getProjectionSubscriberQueue ?? (() => undefined),
+  );
+  vi.spyOn(queueManager, "close").mockResolvedValue(void 0);
+  vi.spyOn(queueManager, "waitUntilReady").mockResolvedValue(void 0);
+  vi.spyOn(queueManager, "initializeProjectionQueues").mockReturnValue(void 0);
+  vi.spyOn(queueManager, "initializeHandlerQueues").mockReturnValue(void 0);
+  vi.spyOn(queueManager, "initializeSubscriberQueues").mockReturnValue(void 0);
+  vi.spyOn(queueManager, "initializeProjectionSubscriberQueues").mockReturnValue(void 0);
+  return queueManager;
 }
 
 /**
@@ -77,9 +81,9 @@ export function createMockEventStore<T extends Event>(): {
     getEventsOccurredSince: vi.fn().mockResolvedValue([]),
     getEventsUpTo: vi
       .fn()
-      .mockImplementation(async (aggregateId, context, aggregateType, upToEvent) => {
+      .mockImplementation(async ({ aggregateId, context, aggregateType, upToEvent }) => {
         // Default implementation: get all events and filter
-        const allEvents = await mockStore.getEvents(aggregateId, context, aggregateType);
+        const allEvents = await mockStore.getEvents({ aggregateId, context, aggregateType });
         const upToIndex = allEvents.findIndex((e: T) => e.id === upToEvent.id);
         if (upToIndex === -1) {
           throw new Error(`Event ${upToEvent.id} not found in aggregate ${aggregateId}`);

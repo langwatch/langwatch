@@ -83,16 +83,20 @@ export function payloadToRow(payload: DeliverPayload): WebhookSpendEventRow {
   };
 }
 
+/** An `endpoint:<id>` instance holds the coalescing buffer, not the delivery state. */
+function isEndpointStreamState(state: object): state is EndpointStreamState {
+  return "pending" in state && Array.isArray(state.pending);
+}
+
 export function deriveEndpointFlushTarget(
   state: WebhookDeliveryState,
   key: string,
 ): { endpointId: string; organizationId: string } | null {
-  if (!isEndpointStreamKey(key)) {
+  if (!isEndpointStreamKey(key) || !isEndpointStreamState(state)) {
     return null;
   }
 
-  const stream = state as unknown as EndpointStreamState;
-  const organizationId = stream.pending[0]?.envelope.data?.organization_id;
+  const organizationId = state.pending[0]?.envelope.data?.organization_id;
   if (typeof organizationId !== "string" || organizationId === "") {
     return null;
   }

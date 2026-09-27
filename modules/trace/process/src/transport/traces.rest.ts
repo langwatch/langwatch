@@ -11,16 +11,13 @@ import {
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
-import { nowInstant, toEpochMs } from "@langwatch/time";
+import { toEpochMs } from "@langwatch/time";
 import {
   TraceApi,
   ProjectionValidationError,
-  discoverResultSchema,
   traceFacetsQuerySchema,
   traceFacetsResponseSchema,
   traceFacetsAnswerSchema,
-  type TraceFacetsAnswer,
-  traceFacetValuesResponseSchema,
   traceFormatQuerySchema,
   traceIdParamsSchema,
   traceAmbiguousPrefixBodySchema,
@@ -36,7 +33,6 @@ import {
   type CompiledProjection,
   type Protections,
   type Trace,
-  type TraceFacetsQuery,
   type TraceSearchBody,
   type TraceSharedFiltersInput,
 } from "@langwatch/trace-contract";
@@ -51,12 +47,10 @@ import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.
 import { formatTraceSummaryDigest } from "#rules/trace-formatting.rules";
 import { tracePath } from "#rules/trace-platform-url.rules";
 import { compileProjection } from "#rules/trace-projection-compile.rules";
-import { TraceFacetValuesService } from "#services/trace-facet-values.service";
 
 const logger = createLogger("langwatch:api:traces");
 
 /** The default facets window when a caller sends no startDate. */
-const FACETS_DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The page a search answers when the caller named no size: the registry's
@@ -85,58 +79,6 @@ const FACETS_ERROR_ANSWERS = documentedResponses({
   422: badRequestSchema,
   500: badRequestSchema,
 });
-
-/** One facets window bound as epoch milliseconds, whichever way it was written. */
-function facetWindowBound(value: string): number {
-  return /^\d+$/.test(value) ? Number(value) : toEpochMs(value);
-}
-
-/** `GET /facets`: the discovery payload, or one field's paged values. */
-async function answerTraceFacets({
-  app,
-  input,
-  scope,
-  caller,
-}: {
-  app: TraceApi;
-  input: TraceFacetsQuery;
-  scope: { id: string };
-  caller: { apiKeyId: string | null; userId: string | null };
-}): Promise<TraceFacetsAnswer> {
-  const { field, prefix, limit, offset, startDate, endDate } = input;
-  // One clock read for both ends: two calls landing in different
-  // milliseconds would run the default window over a day.
-  const now = nowInstant().epochMilliseconds;
-  const timeRange = {
-    from: startDate === undefined ? now - FACETS_DAY_MS : facetWindowBound(startDate),
-    to: endDate === undefined ? now : facetWindowBound(endDate),
-  };
-
-  if (field === undefined) {
-    return discoverResultSchema.parse(await app.readDiscover({ tenantId: scope.id, timeRange }));
-  }
-
-  const protections = await app.resolveApiKeyProtections({
-    projectId: scope.id,
-    apiKeyId: caller.apiKeyId,
-    userId: caller.userId,
-  });
-  const facetKey = TraceFacetValuesService.resolveFacetKey({ field, protections });
-  const result = await app.readFacetValues({
-    tenantId: scope.id,
-    timeRange: TraceFacetValuesService.visibleWindow({ timeRange, facetKey, protections }),
-    facetKey,
-    limit,
-    offset,
-    ...(prefix === undefined ? {} : { prefix }),
-  });
-
-  return traceFacetValuesResponseSchema.parse({
-    values: result.values,
-    total: result.totalDistinct,
-    hasMore: offset + result.values.length < result.totalDistinct,
-  });
-}
 
 function formatTraceRow(
   trace: Trace,
@@ -408,8 +350,13 @@ export function createTracesRest(): Readonly<{
         ...FACETS_ERROR_ANSWERS,
       },
     })
-    .handle(async ({ app, input, scope }, _project, caller) =>
-      answerTraceFacets({ app, input, scope, caller }),
+    .handle(({ app, input, scope }, _project, caller) =>
+      app.readTraceFacetsForApiKey({
+        projectId: scope.id,
+        query: input,
+        apiKeyId: caller.apiKeyId,
+        userId: caller.userId,
+      }),
     );
 
   router = router

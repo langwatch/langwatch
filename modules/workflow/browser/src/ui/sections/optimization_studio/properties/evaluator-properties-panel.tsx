@@ -1,9 +1,7 @@
 import { Button, HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
 import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
-import { useAvailableEvaluators } from "@langwatch/evaluator-browser/available-evaluators";
 import DynamicZodForm from "@langwatch/evaluator-browser/dynamic-zod-form";
 import { EvaluatorEditorContent } from "@langwatch/evaluator-browser/evaluator-editor-content";
-import type { EvaluatorMappingsConfig } from "@langwatch/evaluator-browser/surfaces/evaluator-editor-shared";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -21,6 +19,7 @@ import { z } from "zod";
 import { useShallow } from "zustand/react/shallow";
 
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
+import { useAvailableEvaluators } from "../../../../behavior/use-available-evaluators.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {
   applyMappingChange,
@@ -242,7 +241,7 @@ function DbEvaluatorForm({
     [getWorkflow, node.id, setEdges, setNode, updateNodeInternals],
   );
 
-  const mappingsConfig: EvaluatorMappingsConfig = useMemo(
+  const mappingsConfig = useMemo(
     () => ({
       availableSources,
       initialMappings: inputMappings,
@@ -393,7 +392,7 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
 
     const evaluatorDefinition = availableEvaluators[evaluator as EvaluatorTypes];
 
-    const setDefaultSettings = (defaultValues: Record<string, any>, prefix: string) => {
+    const setDefaultSettings = (defaultValues: object, prefix: string) => {
       if (!defaultValues) return;
 
       Object.entries(defaultValues).forEach(([key, value]) => {

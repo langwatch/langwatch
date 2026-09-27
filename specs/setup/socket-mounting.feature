@@ -68,6 +68,30 @@ Feature: Sockets are declared like routes and mounted by the process
       When the worker boots the same module
       Then no door is opened and boot succeeds
 
+  Rule: A socket handed on unopened is a raw-socket door the worker hosts on its own port
+
+    @unit
+    Scenario: A declared raw-socket door mounts on the worker's own port
+      Given a module declares a raw-socket door among its transports
+      When the worker boots with a raw-socket host
+      Then the door is mounted on it, bound to the module's own application
+
+    @unit
+    Scenario: The api process never mounts a raw-socket door
+      When the api process boots the same module with its doors open
+      Then the raw-socket door is not mounted on any of them
+
+    @integration
+    Scenario: An upgrade on a declared pattern reaches the handler with its captured values
+      Given a raw-socket door declared at "/twilio/:nonce"
+      When a client upgrades "/twilio/abc"
+      Then the handler receives the raw socket with nonce "abc"
+
+    @integration
+    Scenario: An upgrade no pattern matches is refused 404 and the liveness path answers
+      When a client upgrades "/elsewhere" and requests "/healthz"
+      Then the upgrade is refused 404 and the liveness path answers 200
+
   Rule: The two sockets main served are declared by their modules
 
     @unit

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ModelCatalogTraceModelCostAdapter } from "../../../services/model-catalog.trace-model-cost.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../../../services/scenario-role-metrics-derivation.service.ts";
 import { SpanCostService } from "../../../services/span-cost.service.ts";
+import { TraceModelCostService } from "../../../services/trace-model-cost.service.ts";
 import { TraceDerivationSpanClickHouseRepository } from "../trace-derivation-span.repository.ts";
 
 /**
@@ -132,7 +132,7 @@ describe("given the per-role derivation over one trace", () => {
           resolveClient: async () => ch as never,
         }),
         spanCosts: SpanCostService.create({
-          modelCosts: ModelCatalogTraceModelCostAdapter.create(),
+          modelCosts: TraceModelCostService.create(),
         }),
       });
 
@@ -152,7 +152,7 @@ describe("given the per-role derivation over one trace", () => {
           resolveClient: async () => ch as never,
         }),
         spanCosts: SpanCostService.create({
-          modelCosts: ModelCatalogTraceModelCostAdapter.create(),
+          modelCosts: TraceModelCostService.create(),
         }),
       });
 
@@ -170,7 +170,7 @@ describe("given the per-role derivation over one trace", () => {
           resolveClient: async () => ch as never,
         }),
         spanCosts: SpanCostService.create({
-          modelCosts: ModelCatalogTraceModelCostAdapter.create(),
+          modelCosts: TraceModelCostService.create(),
         }),
       });
 

@@ -4,9 +4,9 @@
 import { getRoutePolicy } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";
 
-import type { McpLiveProjectLookup } from "../../app/hosted-mcp-members.ts";
+import { HostedMcpApp } from "../../app/hosted-mcp.app.ts";
+import type { McpLiveProjectLookup } from "../../app/hosted-mcp.members.ts";
 import {
-  createMcpHandler,
   HeaderMcpClientAddressService,
   hostedMcpRoutePolicies,
   HOSTED_MCP_FAMILY,
@@ -37,14 +37,14 @@ class PlainCipher extends McpApiKeyCipher {
 }
 
 function handler() {
-  return createMcpHandler({
+  return HostedMcpApp.fromDependencies({
     redis: null,
     projects: new NoProjects(),
     grants: new NoGrants(),
     cipher: new PlainCipher(),
     address: HeaderMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",
-  });
+  }).createHandler();
 }
 
 /** Every path the dispatcher claims, transcribed from its own switch. */

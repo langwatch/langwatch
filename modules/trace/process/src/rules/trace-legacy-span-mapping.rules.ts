@@ -9,7 +9,6 @@ import type {
 } from "@langwatch/trace-contract";
 import { safeUnflatten } from "@langwatch/trace-contract";
 
-import { TraceSpanCostMatchingService } from "../services/trace-span-cost-matching.service.ts";
 import {
   extractContexts,
   extractError,
@@ -19,6 +18,7 @@ import {
   findVendor,
 } from "./legacy-span-attributes.rules.ts";
 import { coerceToNumber } from "./trace-number-coercion.rules.ts";
+import { computeSpanCost } from "./trace-span-cost-matching.rules.ts";
 
 /**
  * Extracts metrics from canonical span attributes only.
@@ -47,7 +47,7 @@ function extractMetrics(spanAttributes: NormalizedAttributes): SpanMetrics | nul
     spanAttributes["gen_ai.usage.cache_creation.input_tokens"],
   );
 
-  const rawCost = TraceSpanCostMatchingService.computeSpanCost({
+  const rawCost = computeSpanCost({
     attrs: spanAttributes,
     promptTokens,
     completionTokens,

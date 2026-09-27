@@ -41,12 +41,9 @@ function createWithEntry() {
     getTenantId: (payload: Record<string, unknown>) => String(payload.tenantId),
     groupKeyFn: (payload: Record<string, unknown>) =>
       `${String(payload.tenantId)}/subscriber/testJob/x`,
+    scoreFn: () => 0,
   };
-  (
-    eventSourcing as unknown as {
-      _globalJobRegistry: Map<string, typeof entry>;
-    }
-  )._globalJobRegistry.set(
+  eventSourcing.globalJobRegistry.set(
     `${ROUTING.__pipelineName}:${ROUTING.__jobType}:${ROUTING.__jobName}`,
     entry,
   );

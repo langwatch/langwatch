@@ -50,11 +50,11 @@ export type PriorEventsRead = <Event>(query: PriorEventsQuery<Event>) => Promise
 
 /** The one event-log read the kernel takes off a runtime; the kernel binds the aggregate type. */
 export interface AggregateEventLog {
-  getEvents(
-    aggregateId: string,
-    context: Readonly<{ tenantId: string }>,
-    aggregateType: string,
-  ): Promise<readonly unknown[]>;
+  getEvents(request: {
+    aggregateId: string;
+    context: Readonly<{ tenantId: string }>;
+    aggregateType: string;
+  }): Promise<readonly unknown[]>;
 }
 
 /** The aggregate a built definition declares, read without asserting a shape it may not have. */
@@ -88,7 +88,7 @@ class OwnAggregateHistory {
         `${this.pipeline} reads its earlier events, but this process's eventing holds no event log.`,
       );
     }
-    const events = await log.getEvents(aggregateId, { tenantId }, aggregateType);
+    const events = await log.getEvents({ aggregateId, context: { tenantId }, aggregateType });
     return events.filter(accepts);
   };
 

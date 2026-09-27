@@ -63,13 +63,17 @@ const createMockLogger = () => ({
 describe("Error classes", () => {
   describe("SecurityError", () => {
     it("has correct name and CRITICAL category", () => {
-      const err = new SecurityError("op", "breach detected", "tenant-1");
+      const err = new SecurityError({
+        operation: "op",
+        message: "breach detected",
+        tenantId: "tenant-1",
+      });
       expect(err.name).toBe("SecurityError");
       expect(err.category).toBe(ErrorCategory.CRITICAL);
     });
 
     it("getLogContext() includes operation and tenantId", () => {
-      const err = new SecurityError("op", "breach", "t-1");
+      const err = new SecurityError({ operation: "op", message: "breach", tenantId: "t-1" });
       const ctx = err.getLogContext();
       expect(ctx).toMatchObject({
         errorName: "SecurityError",
@@ -83,13 +87,13 @@ describe("Error classes", () => {
 
   describe("ValidationError", () => {
     it("has correct name and CRITICAL category", () => {
-      const err = new ValidationError("bad input", "email", "notanemail");
+      const err = new ValidationError({ reason: "bad input", field: "email", value: "notanemail" });
       expect(err.name).toBe("ValidationError");
       expect(err.category).toBe(ErrorCategory.CRITICAL);
     });
 
     it("getLogContext() includes field, value, and reason", () => {
-      const err = new ValidationError("bad input", "email", "x");
+      const err = new ValidationError({ reason: "bad input", field: "email", value: "x" });
       const ctx = err.getLogContext();
       expect(ctx).toMatchObject({
         errorName: "ValidationError",
@@ -101,12 +105,12 @@ describe("Error classes", () => {
     });
 
     it("message omits field when not provided", () => {
-      const err = new ValidationError("missing data");
+      const err = new ValidationError({ reason: "missing data" });
       expect(err.message).toBe("[VALIDATION] missing data");
     });
 
     it("message includes field when provided", () => {
-      const err = new ValidationError("too long", "name");
+      const err = new ValidationError({ reason: "too long", field: "name" });
       expect(err.message).toBe("[VALIDATION] too long (field: name)");
     });
   });
@@ -132,22 +136,42 @@ describe("Error classes", () => {
 
   describe("StoreError", () => {
     it("has correct name", () => {
-      const err = new StoreError("insert", "clickhouse", "timeout", ErrorCategory.RECOVERABLE);
+      const err = new StoreError({
+        operation: "insert",
+        store: "clickhouse",
+        message: "timeout",
+        category: ErrorCategory.RECOVERABLE,
+      });
       expect(err.name).toBe("StoreError");
     });
 
     it("can be CRITICAL", () => {
-      const err = new StoreError("insert", "clickhouse", "corruption", ErrorCategory.CRITICAL);
+      const err = new StoreError({
+        operation: "insert",
+        store: "clickhouse",
+        message: "corruption",
+        category: ErrorCategory.CRITICAL,
+      });
       expect(err.category).toBe(ErrorCategory.CRITICAL);
     });
 
     it("can be RECOVERABLE", () => {
-      const err = new StoreError("query", "clickhouse", "timeout", ErrorCategory.RECOVERABLE);
+      const err = new StoreError({
+        operation: "query",
+        store: "clickhouse",
+        message: "timeout",
+        category: ErrorCategory.RECOVERABLE,
+      });
       expect(err.category).toBe(ErrorCategory.RECOVERABLE);
     });
 
     it("getLogContext() includes operation and store", () => {
-      const err = new StoreError("insert", "clickhouse", "fail", ErrorCategory.RECOVERABLE);
+      const err = new StoreError({
+        operation: "insert",
+        store: "clickhouse",
+        message: "fail",
+        category: ErrorCategory.RECOVERABLE,
+      });
       const ctx = err.getLogContext();
       expect(ctx).toMatchObject({
         errorName: "StoreError",
@@ -233,7 +257,7 @@ describe("Error classes", () => {
 describe("handleError", () => {
   describe("when given a BaseEventSourcingError", () => {
     it("throws when category is CRITICAL", () => {
-      const err = new SecurityError("op", "breach");
+      const err = new SecurityError({ operation: "op", message: "breach" });
       expect(() => handleError({ error: err, category: ErrorCategory.NON_CRITICAL })).toThrow(err);
     });
 
@@ -352,11 +376,13 @@ describe("handleError", () => {
 
 describe("categorizeError", () => {
   it("returns CRITICAL for SecurityError", () => {
-    expect(categorizeError(new SecurityError("op", "msg"))).toBe(ErrorCategory.CRITICAL);
+    expect(categorizeError(new SecurityError({ operation: "op", message: "msg" }))).toBe(
+      ErrorCategory.CRITICAL,
+    );
   });
 
   it("returns CRITICAL for ValidationError", () => {
-    expect(categorizeError(new ValidationError("reason"))).toBe(ErrorCategory.CRITICAL);
+    expect(categorizeError(new ValidationError({ reason: "reason" }))).toBe(ErrorCategory.CRITICAL);
   });
 
   it("returns RECOVERABLE for QueueError", () => {

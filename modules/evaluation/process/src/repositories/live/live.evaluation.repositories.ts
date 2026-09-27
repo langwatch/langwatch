@@ -1,7 +1,7 @@
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
 import { ClickHouseEvaluationSession } from "../clickhouse/clickhouse.evaluation-session.store.ts";
-import type { EvaluationClickHouseResolver } from "../clickhouse/evaluation-clickhouse-client.ts";
+import type { EvaluationClickHouseResolver } from "../clickhouse/clickhouse.evaluation-session.store.ts";
 import { ClickHouseEvaluationRepository } from "../clickhouse/evaluation.repository.ts";
 import { ClickHouseMonitorPerformanceRepository } from "../clickhouse/monitor-performance.repository.ts";
 import type { EvaluationRepositories } from "../evaluation.repositories.ts";

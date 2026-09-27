@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 
 const POPUP_WIDTH = 600;
@@ -50,86 +50,90 @@ function tryReadConnectResult(data: unknown): ConnectResult | null {
   };
 }
 
+const SUPERSEDED: ConnectResult = {
+  ok: false,
+  reason: "failed",
+  error: "Superseded by a new connect attempt",
+};
+const POPUP_BLOCKED: ConnectResult = {
+  ok: false,
+  reason: "popup-blocked",
+  error: "Popup blocked. Allow popups and try again.",
+};
+const CANCELLED: ConnectResult = { ok: false, reason: "cancelled", error: "Cancelled" };
+
+/**
+ * One GitHub App installation window at a time. The window reports back by `postMessage` from our
+ * own origin; closing it without finishing reads as cancelled, and a second connect while it is
+ * open focuses it and supersedes the first caller.
+ */
+class GitHubConnectWindow {
+  private popup: Window | null = null;
+  private resolver: ((result: ConnectResult) => void) | undefined;
+  private poll: number | undefined;
+
+  attach(): void {
+    window.addEventListener("message", this.onMessage);
+  }
+
+  connect(organizationId: string): Promise<ConnectResult> {
+    return new Promise((resolve) => {
+      if (this.popup && !this.popup.closed) {
+        this.popup.focus();
+        this.resolver?.(SUPERSEDED);
+        this.resolver = resolve;
+        return;
+      }
+      const organization = encodeURIComponent(organizationId);
+      const url = `/api/github/install?mode=popup&organizationId=${organization}`;
+      const popup = window.open(url, "github-install", popupFeatures());
+      if (!popup) {
+        resolve(POPUP_BLOCKED);
+        return;
+      }
+      this.popup = popup;
+      this.resolver = resolve;
+      this.poll = window.setInterval(this.watchClosed, 500);
+    });
+  }
+
+  dispose(): void {
+    window.removeEventListener("message", this.onMessage);
+    this.settle();
+  }
+
+  private readonly onMessage = (event: MessageEvent) => {
+    if (event.origin !== window.location.origin) return;
+    const result = tryReadConnectResult(event.data);
+    if (!result) return;
+    this.resolver?.(result);
+    this.settle();
+  };
+
+  private readonly watchClosed = () => {
+    if (!this.popup?.closed) return;
+    this.resolver?.(CANCELLED);
+    this.settle();
+  };
+
+  private settle(): void {
+    window.clearInterval(this.poll);
+    this.poll = undefined;
+    this.resolver = undefined;
+    this.popup = null;
+  }
+}
+
 /** Opens the GitHub App installation without discarding the current page. */
 export function useGitHubConnectPopup() {
-  const popupRef = useRef<Window | null>(null);
-  const resolverRef = useRef<((result: ConnectResult) => void) | null>(null);
-  const pollRef = useRef<number | null>(null);
-
-  const cleanup = useCallback(() => {
-    if (pollRef.current !== null) {
-      window.clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-
-    resolverRef.current = null;
-    popupRef.current = null;
-  }, []);
-
+  const [connectWindow] = useState(() => new GitHubConnectWindow());
   useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      if (event.origin !== window.location.origin) {
-        return;
-      }
-
-      const result = tryReadConnectResult(event.data);
-      if (!result) {
-        return;
-      }
-
-      resolverRef.current?.(result);
-      cleanup();
-    }
-
-    window.addEventListener("message", onMessage);
-
-    return () => {
-      window.removeEventListener("message", onMessage);
-      cleanup();
-    };
-  }, [cleanup]);
-
+    connectWindow.attach();
+    return () => connectWindow.dispose();
+  }, [connectWindow]);
   const connect = useCallback(
-    (organizationId: string): Promise<ConnectResult> =>
-      new Promise((resolve) => {
-        if (popupRef.current && !popupRef.current.closed) {
-          popupRef.current.focus();
-          resolverRef.current?.({
-            ok: false,
-            reason: "failed",
-            error: "Superseded by a new connect attempt",
-          });
-          resolverRef.current = resolve;
-          return;
-        }
-
-        const organization = encodeURIComponent(organizationId);
-        const url = `/api/github/install?mode=popup&organizationId=${organization}`;
-        const popup = window.open(url, "github-install", popupFeatures());
-        if (!popup) {
-          resolve({
-            ok: false,
-            reason: "popup-blocked",
-            error: "Popup blocked. Allow popups and try again.",
-          });
-          return;
-        }
-
-        popupRef.current = popup;
-        resolverRef.current = resolve;
-        pollRef.current = window.setInterval(() => {
-          if (popupRef.current?.closed) {
-            resolverRef.current?.({
-              ok: false,
-              reason: "cancelled",
-              error: "Cancelled",
-            });
-            cleanup();
-          }
-        }, 500);
-      }),
-    [cleanup],
+    (organizationId: string) => connectWindow.connect(organizationId),
+    [connectWindow],
   );
-
   return { connect };
 }

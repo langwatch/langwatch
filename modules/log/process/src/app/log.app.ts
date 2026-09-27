@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -18,6 +19,7 @@ import {
 import type { OtlpDoorRequest } from "@langwatch/otlp";
 import { TraceApi } from "@langwatch/trace-contract";
 
+import { createCodingAgentLogFactsDispatchSubscriber } from "../eventing/coding-agent-log-facts-dispatch.subscriber.ts";
 import { LogProcessingAdapter, type LogProcessingPipeline } from "../eventing/log.pipeline.ts";
 import { createLogClickHouseResolver } from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
 import { ClickHouseCanonicalLogRecordRepository } from "../repositories/clickhouse/clickhouse.canonical-log-record.repository.ts";
@@ -31,14 +33,23 @@ export type LogInfrastructure = Readonly<{
   clickhouse: ClickHouseQueryClient;
 }>;
 
-type LogDependencies = Readonly<{ dataPrivacy: typeof DataPrivacyApi; traces: typeof TraceApi }>;
+type LogDependencies = Readonly<{
+  dataPrivacy: typeof DataPrivacyApi;
+  traces: typeof TraceApi;
+  codingAgents: typeof CodingAgentApi;
+}>;
 type LogSetup = FeatureSetup<LogDependencies, LogInfrastructure, LogServerConfig>;
 
 /** The process-owned Log capability over private preparation, persistence and its pipeline. */
 export class LogApp implements LogApiContract {
   static readonly contract = LogApi;
   static readonly config = logConfig;
-  static readonly dependencies: LogDependencies = { dataPrivacy: DataPrivacyApi, traces: TraceApi };
+  static readonly dependencies: LogDependencies = {
+    dataPrivacy: DataPrivacyApi,
+    traces: TraceApi,
+    /** Lifts a received record's session facts onto its own pipeline. */
+    codingAgents: CodingAgentApi,
+  };
   /** The run this module's durable processing needs, over ClickHouse only. */
   static readonly reads = ["clickhouse"] as const;
 
@@ -73,6 +84,9 @@ export class LogApp implements LogApiContract {
       logCommandShardCount: CanonicalLogService.resolveLogCommandShardCount(
         config.processingShards,
       ),
+      subscribers: [
+        createCodingAgentLogFactsDispatchSubscriber({ codingAgents: dependencies.codingAgents }),
+      ],
     }).build();
     const app: LogApp = new LogApp(
       service,

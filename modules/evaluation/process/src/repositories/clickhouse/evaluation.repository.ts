@@ -12,7 +12,7 @@ import {
   EvaluationRunRepository,
   type EvaluationRunFloorLookup,
 } from "../evaluation.repository.ts";
-import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
+import type { EvaluationClickHouseResolver } from "./clickhouse.evaluation-session.store.ts";
 import { EvaluationRunClickHouseReadRepository } from "./evaluation-run-read.repository.ts";
 import { EvaluationRunClickHouseWriteRepository } from "./evaluation-run-write.repository.ts";
 

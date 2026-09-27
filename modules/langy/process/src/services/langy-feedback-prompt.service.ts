@@ -1,9 +1,9 @@
 import { nowInstant } from "@langwatch/time";
 
-import type { LangyFeedbackPromptRedis } from "../app/langy.members.ts";
+import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 
 /**
- * Private policy for Langy's Redis-backed feedback cadence. The portable
+ * Private policy for Langy's feedback cadence. The portable
  * contract exposes the two operations on LangyApi; Redis and the cadence
  * record do not become part of the feature boundary.
  */
@@ -11,25 +11,17 @@ import type { LangyFeedbackPromptRedis } from "../app/langy.members.ts";
 export const FEEDBACK_MIN_ANSWERS = 2;
 export const FEEDBACK_QUIET_PERIOD_MS = 3 * 24 * 60 * 60 * 1000;
 export const FEEDBACK_LONG_CONVERSATION_ANSWERS = 8;
-const RECORD_TTL_SECONDS = 30 * 24 * 60 * 60;
-
-interface LastAskRecord {
-  atMs: number;
-  conversationId: string;
-}
-
-const keyFor = (userId: string) => `langy:feedback:last-asked:${userId}`;
 
 export class LangyFeedbackPromptService {
   private constructor(
     private readonly deps: {
-      redis: LangyFeedbackPromptRedis | null;
+      prompts: LangyFeedbackPromptRepository | null;
       now?: () => number;
     },
   ) {}
 
   static create(options: {
-    redis: LangyFeedbackPromptRedis | null;
+    prompts: LangyFeedbackPromptRepository | null;
     now?: () => number;
   }): LangyFeedbackPromptService {
     return new LangyFeedbackPromptService(options);
@@ -45,49 +37,31 @@ export class LangyFeedbackPromptService {
     assistantAnswerCount: number;
   }): Promise<boolean> {
     if (input.assistantAnswerCount < FEEDBACK_MIN_ANSWERS) return false;
-    if (!this.deps.redis) return false;
-
-    let record: LastAskRecord | null;
+    if (!this.deps.prompts) return false;
+    let lastAsks;
     try {
-      record = parseRecord(await this.deps.redis.get(keyFor(input.userId)));
+      lastAsks = await this.deps.prompts.findLastAsked(input.userId);
     } catch {
       return false;
     }
-    if (!record) return true;
-    if (this.now() - record.atMs >= FEEDBACK_QUIET_PERIOD_MS) return true;
+    const [lastAsk] = lastAsks;
+    if (!lastAsk) return true;
+    if (this.now() - lastAsk.atMs >= FEEDBACK_QUIET_PERIOD_MS) return true;
     return (
       input.assistantAnswerCount >= FEEDBACK_LONG_CONVERSATION_ANSWERS &&
-      record.conversationId !== input.conversationId
+      lastAsk.conversationId !== input.conversationId
     );
   }
 
   async markShown(input: { userId: string; conversationId: string }): Promise<void> {
-    if (!this.deps.redis) return;
+    if (!this.deps.prompts) return;
     try {
-      await this.deps.redis.set(
-        keyFor(input.userId),
-        JSON.stringify({ atMs: this.now(), conversationId: input.conversationId }),
-        "EX",
-        RECORD_TTL_SECONDS,
-      );
+      await this.deps.prompts.recordAsked({
+        userId: input.userId,
+        lastAsk: { atMs: this.now(), conversationId: input.conversationId },
+      });
     } catch {
       // A cadence write is best-effort. The worst case is one extra ask.
     }
-  }
-}
-
-function parseRecord(raw: string | null): LastAskRecord | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<LastAskRecord>;
-    if (typeof parsed.atMs !== "number" || !Number.isFinite(parsed.atMs)) {
-      return null;
-    }
-    return {
-      atMs: parsed.atMs,
-      conversationId: typeof parsed.conversationId === "string" ? parsed.conversationId : "",
-    };
-  } catch {
-    return null;
   }
 }

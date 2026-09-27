@@ -2,9 +2,9 @@ import type { WebhookDispatchRateLimiter, WebhookEgressService } from "@langwatc
 
 import type { WebhookDestination } from "../app/webhook.app.ts";
 import type { SqsWebhookSender } from "../channels/webhook-destination.channel.ts";
-import { HttpWebhookDestinationService } from "./http.webhook-destination.service.ts";
-import { SqsWebhookDestinationService } from "./sqs.webhook-destination.service.ts";
-import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
+import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
+import { HttpWebhookDestinationService } from "./http-webhook-destination.service.ts";
+import { SqsWebhookDestinationService } from "./sqs-webhook-destination.service.ts";
 
 /**
  * What a process must hold before it can deliver to either transport.

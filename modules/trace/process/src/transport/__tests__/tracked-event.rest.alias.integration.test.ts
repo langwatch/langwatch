@@ -4,8 +4,11 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * Both tracked-event URLs on the in-memory runtime, posted to for real: what a
  * pre-rename SDK release receives is the fact under test, not the declaration.
  */
-import { createRestRuntime, HttpError, type RestErrorHandler } from "@langwatch/api/rest";
+import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { HandledError } from "@langwatch/handled-error";
+import { TrackedEventInvalidError } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   TRACKED_EVENT_CANONICAL_PATH,
@@ -17,27 +20,27 @@ import {
 
 const PROJECT_ID = "project-1";
 
-/** Stands in for the process boundary: renders the `BadRequestError` the
- * handler throws the same flat `{ error }` shape production's canonical
- * envelope answers for any status-carrying error. */
+/** Stands in for the process boundary: a handled refusal as a flat `{ error }` at its status. */
 const renderRefusal: RestErrorHandler = (error, context) =>
-  error instanceof HttpError
-    ? context.json({ error: error.message }, error.status)
+  error instanceof HandledError
+    ? new Response(JSON.stringify({ error: error.message }), {
+        status: error.httpStatus,
+        headers: { "content-type": "application/json" },
+      })
     : context.json({ error: "unhandled" }, 500);
 
 /** Mounts one family and records every event its handler dispatches. */
 function mounted(family: typeof trackedEventRest, options: { rejects: boolean }) {
   const recorded: { projectId: string; eventId: string }[] = [];
   const app = createApiFixture<TrackedEventMembers>({
-    assertPredefinedEventPayload: () => {
-      if (options.rejects) throw new Error("vote out of range");
+    trackEventFromRequest: async ({ projectId, raw }) => {
+      if (options.rejects) {
+        throw new TrackedEventInvalidError("metrics.vote is outside the allowed range");
+      }
+      const body = z.object({ event_id: z.string().optional() }).parse(JSON.parse(String(raw)));
+      recorded.push({ projectId, eventId: body.event_id ?? "generated-event-id" });
+      return { message: "Event tracked" };
     },
-    generateEventId: () => "generated-event-id",
-    recordTrackedEvent: async ({ project, eventId }) => {
-      recorded.push({ projectId: project.id, eventId });
-    },
-    reportError: () => undefined,
-    describeValidationError: () => "metrics.vote is outside the allowed range",
   });
   const runtime = createRestRuntime({
     identity: {

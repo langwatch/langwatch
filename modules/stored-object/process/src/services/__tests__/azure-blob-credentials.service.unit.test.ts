@@ -8,9 +8,11 @@ import {
   AzureBackendMisconfiguredError,
   type AzureBlobCredentialsConfig,
   type AzureInjectedIdentity,
-  AzureBlobCredentialsAdapter,
+  AzureBlobCredentialsService,
 } from "../azure-blob-credentials.service.ts";
-const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
+const azureCredentials = AzureBlobCredentialsService.create();
+const resolveAzureCredentials: AzureBlobCredentialsService["resolve"] = (input) =>
+  azureCredentials.resolve(input);
 
 function sharedKeyConfig(
   overrides: Partial<AzureBlobCredentialsConfig> = {},

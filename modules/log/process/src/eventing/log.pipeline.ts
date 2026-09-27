@@ -98,7 +98,7 @@ export class LogProcessingAdapter {
 
 /**
  * The registration: the app builds the definition and the senders are bound back once built
- * (ADR-144). Cross-pipeline subscribers wait for the peer's `*Api` operation.
+ * (ADR-144). Cross-pipeline subscribers forward through the peer's `*Api` operation.
  * @see modules/log/adrs/001-log-processing-boundary.md
  */
 export const logEventing = defineEventingModule({

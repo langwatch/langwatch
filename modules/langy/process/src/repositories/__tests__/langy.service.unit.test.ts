@@ -12,18 +12,21 @@ import { LangyFeedbackPromptService } from "../../services/langy-feedback-prompt
 import type { LangyMessageService } from "../../services/langy-message.service.ts";
 import type { LangyTurnService } from "../../services/langy-turn.service.ts";
 import { LangyService } from "../../services/langy.service.ts";
+import { LangyFeedbackPromptRedisRepository } from "../redis/redis.langy-feedback-prompt.repository.ts";
 
 function feedbackPrompt() {
   const values = new Map<string, string>();
   return {
     service: LangyFeedbackPromptService.create({
-      redis: {
-        get: async (key: string) => values.get(key) ?? null,
-        set: async (key: string, value: string) => {
-          values.set(key, value);
-          return "OK" as const;
+      prompts: LangyFeedbackPromptRedisRepository.create({
+        redis: {
+          get: async (key: string) => values.get(key) ?? null,
+          set: async (key: string, value: string) => {
+            values.set(key, value);
+            return "OK";
+          },
         },
-      } as never,
+      }),
     }),
     values,
   };

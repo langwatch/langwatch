@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { EVALUATION_EVENT_TYPES } from "@langwatch/evaluation-contract";
-import type {
-  AppendStore,
-  Event,
-  MapProjectionDefinition,
-  ProjectionStoreContext,
-} from "@langwatch/eventing";
+import type { AppendStore, Event, MapProjectionDefinition } from "@langwatch/eventing";
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 
@@ -14,6 +9,7 @@ import type {
   BillableEventsMeterRepository,
   BillableEventRecord,
 } from "../repositories/billable-events-meter.repository.ts";
+import { BillableEventsMeterAppendService } from "../services/billable-events-meter-append.service.ts";
 import type { BillingTenantOrganizationService } from "../services/tenant-organization.service.ts";
 
 /**
@@ -60,13 +56,10 @@ export class BillableEventsMeterProjection {
     meter: BillableEventsMeterRepository;
     organizations: BillingTenantOrganizationService;
   }): BillableEventsMeterProjection {
-    return new BillableEventsMeterProjection(options.meter, options.organizations);
+    return new BillableEventsMeterProjection(BillableEventsMeterAppendService.create(options));
   }
 
-  private constructor(
-    private readonly meter: BillableEventsMeterRepository,
-    private readonly organizations: BillingTenantOrganizationService,
-  ) {}
+  private constructor(private readonly store: AppendStore<BillableEventRecord>) {}
 
   /** One lane per event, because two rows for one event deduplicate on read. */
   static groupKey(event: Event): string {
@@ -124,31 +117,7 @@ export class BillableEventsMeterProjection {
         eventTimestamp: event.createdAt,
       }),
 
-      store: this.store(),
-    };
-  }
-
-  /**
-   * The append side, as a value rather than a class: `AppendStore` is one
-   * method the projection calls, and the collaborators it closes over are this
-   * adapter's own.
-   *
-   * A failed insert throws so the queue redelivers it. That is the correct
-   * trade for a meter: a redelivered row carries the same deduplication key
-   * and collapses on read, while a swallowed one is revenue that was never
-   * counted and leaves no trace to reconcile from.
-   */
-  private store(): AppendStore<BillableEventRecord> {
-    return {
-      append: async (
-        record: BillableEventRecord,
-        _context: ProjectionStoreContext,
-      ): Promise<void> => {
-        const organizationId = await this.organizations.findOrganizationId(record.tenantId);
-        if (!organizationId) return;
-
-        await this.meter.insert({ record, organizationId });
-      },
+      store: this.store,
     };
   }
 }

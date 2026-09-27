@@ -146,7 +146,7 @@ export function FloatingCellEditor({
       return;
     }
 
-    setCellValue(datasetId, row, columnId, result.normalized);
+    setCellValue({ datasetId, row, columnId, value: result.normalized });
     setValidationError(false);
     setEditingCell(void 0);
   }, [columnId, dataType, datasetId, editValue, row, setCellValue, setEditingCell]);
@@ -247,7 +247,7 @@ export function FloatingCellEditor({
               variant={editValue.toLowerCase() === "true" ? "solid" : "outline"}
               colorPalette="green"
               onClick={() => {
-                setCellValue(datasetId, row, columnId, "true");
+                setCellValue({ datasetId, row, columnId, value: "true" });
                 setEditingCell(void 0);
               }}
               onMouseDown={(event) => event.preventDefault()}
@@ -259,7 +259,7 @@ export function FloatingCellEditor({
               variant={editValue.toLowerCase() === "false" ? "solid" : "outline"}
               colorPalette="red"
               onClick={() => {
-                setCellValue(datasetId, row, columnId, "false");
+                setCellValue({ datasetId, row, columnId, value: "false" });
                 setEditingCell(void 0);
               }}
               onMouseDown={(event) => event.preventDefault()}

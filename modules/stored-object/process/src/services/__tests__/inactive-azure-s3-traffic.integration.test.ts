@@ -12,16 +12,16 @@ import { Readable } from "node:stream";
 import { mintS3StoredObjectUri } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 
-import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
+import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
 
 import {
   StoredObjectAzureDestination,
-  StoredObjectDestinationPolicyAdapter,
+  StoredObjectDestinationPolicyService,
   StoredObjectProjectS3Config,
   type StoredObjectProjectBucket,
   type StoredObjectStorageSelection,
 } from "../stored-object-destination-policy.service.ts";
-import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.service.ts";
+import { StoredObjectStorageRegistryService } from "../stored-object-storage-registry.service.ts";
 
 const INCOMPLETE_AZURE = "Azure Blob is configured with sharedKey auth and no account key";
 
@@ -42,7 +42,7 @@ class StubProjectS3Config extends StoredObjectProjectS3Config {
   }
 }
 
-function memoryS3Driver(): StoredObjectStorageDriver {
+function memoryS3Driver(): StoredObjectBlobRepository {
   const objects = new Map<string, Buffer>();
   return {
     put: async (uri, bytes) => {
@@ -65,7 +65,7 @@ async function roundTripS3Object(input: {
   privateBucket: string | null;
   projectId: string;
 }) {
-  const policy = StoredObjectDestinationPolicyAdapter.create({
+  const policy = StoredObjectDestinationPolicyService.create({
     selection: input.selection,
     projects: new StubProjectS3Config(input.privateBucket),
   });
@@ -74,7 +74,7 @@ async function roundTripS3Object(input: {
     throw new Error(`expected an S3 destination, resolved ${destination.kind}`);
   }
 
-  const registry = StoredObjectStorageRegistryAdapter.create({
+  const registry = StoredObjectStorageRegistryService.create({
     s3: memoryS3Driver(),
     file: memoryS3Driver(),
     // Building the driver is what would read the incomplete settings. The

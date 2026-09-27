@@ -10,19 +10,19 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   MigrationDataset,
   MigrationProject,
-  ObjectStorageMigrationInventory,
+  ObjectStorageMigrationInventoryRepository,
 } from "#repositories/object-storage-migration-inventory.repository";
 
-import type { StoredObjectStorageDriver } from "../../repositories/stored-object-blob.repository.ts";
+import type { StoredObjectBlobRepository } from "../../repositories/stored-object-blob.repository.ts";
 import { createMigrationStorageEndpoint } from "../../rules/object-storage-migration-transfer.rules.ts";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import {
   ObjectStorageMigrationService,
   type QueueMigrationBlocker,
 } from "../object-storage-migration.service.ts";
-import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.service.ts";
+import { StoredObjectStorageRegistryService } from "../stored-object-storage-registry.service.ts";
 
-class MemoryDriver implements StoredObjectStorageDriver {
+class MemoryDriver implements StoredObjectBlobRepository {
   readonly objects = new Map<string, Buffer>();
   readonly puts: string[] = [];
   readonly deletes: string[] = [];
@@ -116,7 +116,7 @@ const setup = ({
       current.map((candidate) => (candidate.id === row.id ? row : candidate)),
     );
   };
-  const inventory: ObjectStorageMigrationInventory = {
+  const inventory: ObjectStorageMigrationInventoryRepository = {
     findProjectsPage: vi.fn(async (request) => pageById(projects, request)),
     findStoredObjectsPage: vi.fn(async (projectId, request) =>
       pageById(rows.get(projectId) ?? [], request),
@@ -502,7 +502,7 @@ describe("Feature: Object storage provider parity and migration", () => {
       }
 
       const result = await state.migration.finalize();
-      const activeRegistry = StoredObjectStorageRegistryAdapter.create({
+      const activeRegistry = StoredObjectStorageRegistryService.create({
         s3: destinationProvider === "s3" ? state.destinationDriver : state.sourceDriver,
         file: new MemoryDriver(),
         "azure-blob":

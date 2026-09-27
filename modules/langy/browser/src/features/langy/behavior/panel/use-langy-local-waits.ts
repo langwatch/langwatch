@@ -19,6 +19,7 @@ import {
   langyQuestionWaitsByToolCall,
   routeLangyChoiceAnswer,
 } from "../../../../model/langy-local-waits.ts";
+import { parseLangyLocalWorkspace } from "../../../../model/langy-local-workspace.ts";
 import { toEngineParts } from "../../model/langy-engine-parts.ts";
 import { useLangyLocalRecord } from "../data/use-langy-local-record.ts";
 import { useLangyDevLog } from "../stores/langy-dev-log.ts";
@@ -92,7 +93,7 @@ export function useLangyLocalWaits({
 
   const localWorkspace = api.langy.getLocalWorkspace.useQuery(
     { projectId: projectId ?? "", conversationId: activeConversationId ?? "" },
-    { enabled: !!projectId && !!activeConversationId },
+    { select: parseLangyLocalWorkspace, enabled: !!projectId && !!activeConversationId },
   );
 
   return {
