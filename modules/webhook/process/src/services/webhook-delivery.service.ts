@@ -40,7 +40,7 @@ import {
 } from "../rules/webhook-delivery-contract.rules.ts";
 import {
   deriveEndpointFlushTarget,
-  isEndpointStreamState,
+  isDeliveryState,
   onAdmission,
   onSpendOutcome,
   payloadToRow,
@@ -159,7 +159,7 @@ export class WebhookDeliveryService {
         .intent("flushEndpoint", flushEndpointSchema, this.runFlushEndpoint())
         .intent("sendBatch", sendBatchSchema, this.runWebhookSendBatch())
         .on(webhookSpendDeliveryRequestedEventSchema, (state, { spend }, context) => {
-          if (isEndpointStreamState(state)) return { state };
+          if (!isDeliveryState(state)) return { state };
           switch (spend.type) {
             case GATEWAY_SPEND_ADMITTED_EVENT_TYPE:
               return onAdmission({ state, ctx: context, admit: spend.data });

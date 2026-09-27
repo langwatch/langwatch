@@ -1,5 +1,5 @@
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender } from "@langwatch/eventing";
+import type { EventingCommandSender, ProcessStore } from "@langwatch/eventing";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 /**
  * The webhook feature's application: what both doors (tRPC and REST) call.
@@ -140,7 +140,6 @@ type WebhookSetup = FeatureSetup<
 
 /** What the worker's delivery process manager is composed from; built only when consuming. */
 type WebhookDeliveryParts = Readonly<{
-  processStore: WebhookRepositories["processStore"];
   endpoints: WebhookEndpointRepository;
   retention: WebhookRepositories["retention"];
   getPlan: WebhookDeliveryProcessDeps["getPlan"];
@@ -191,7 +190,6 @@ export class WebhookApp implements WebhookApiContract {
       }),
     });
     app.#delivery = {
-      processStore: input.repositories.processStore,
       endpoints: input.repositories.endpoints,
       retention: input.repositories.retention,
       getPlan: (organizationId) => entitlement.getActivePlan({ organizationId }),
@@ -206,14 +204,16 @@ export class WebhookApp implements WebhookApiContract {
   /** webhook_delivery for this role: the worker also hosts the delivery process manager. */
   deliveryPipeline({
     participation,
+    processStore,
   }: {
     participation: EventingParticipation;
+    processStore: ProcessStore;
   }): WebhookDeliveryDefinition {
     const parts = this.#delivery;
     if (participation === "produce" || !parts) return buildWebhookDeliveryPipeline({});
     return buildWebhookDeliveryPipeline({
       deliveryProcess: WebhookDeliveryService.create({
-        processStore: parts.processStore,
+        processStore,
         endpoints: parts.endpoints,
         pruneExpiredIdempotencyReceipts: (now) =>
           parts.retention.pruneExpiredIdempotencyReceipts({ now }),

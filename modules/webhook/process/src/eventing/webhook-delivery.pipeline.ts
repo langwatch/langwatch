@@ -44,7 +44,7 @@ export function buildWebhookDeliveryPipeline(input: {
 
 export const webhookDeliveryEventing = defineEventingModule({
   pipeline: WEBHOOK_DELIVERY_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<WebhookRepositories, WebhookApp>) =>
-    app.deliveryPipeline({ participation }),
+  build: ({ app, participation, processStore }: EventingSetup<WebhookRepositories, WebhookApp>) =>
+    app.deliveryPipeline({ participation, processStore }),
   connect: ({ app, commands }) => app.connectDelivery(commands),
 });

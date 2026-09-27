@@ -289,10 +289,15 @@ export const endpointStreamStateSchema = z.object({
 });
 export type EndpointStreamState = z.infer<typeof endpointStreamStateSchema>;
 
-/** One process name keeps two instance kinds: a request's delivery and an endpoint's stream. */
+/** The hourly retention claim (processKey `maintenance`): a compare-and-set row no handler folds. */
+const maintenanceClaimStateSchema = z.object({ lastRunMs: z.number() });
+export type MaintenanceClaimState = z.infer<typeof maintenanceClaimStateSchema>;
+
+/** One process name keeps three instance kinds: a request's delivery, an endpoint's stream, the claim. */
 export const webhookProcessStateSchema = z.union([
   webhookDeliveryStateSchema,
   endpointStreamStateSchema,
+  maintenanceClaimStateSchema,
 ]);
 export type WebhookProcessState = z.infer<typeof webhookProcessStateSchema>;
 

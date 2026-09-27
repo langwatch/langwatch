@@ -84,8 +84,13 @@ export function payloadToRow(payload: DeliverPayload): WebhookSpendEventRow {
   };
 }
 
+/** A request's delivery instance, as against an endpoint stream or the maintenance claim. */
+export function isDeliveryState(state: WebhookProcessState): state is WebhookDeliveryState {
+  return "attribution" in state;
+}
+
 /** An `endpoint:<id>` instance holds the coalescing buffer, not the delivery state. */
-export function isEndpointStreamState(state: WebhookProcessState): state is EndpointStreamState {
+function isEndpointStreamState(state: WebhookProcessState): state is EndpointStreamState {
   return "pending" in state && Array.isArray(state.pending);
 }
 

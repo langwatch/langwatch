@@ -416,6 +416,18 @@ Feature: Webhook endpoints, signed outbound event delivery
       When the stream's wake fires
       Then the buffered envelope is delivered to the endpoint once
 
+    @unit
+    Scenario: A memory-tier worker delivers a completed gateway request to its endpoint
+      Given a worker installed over memory stores with one active HTTP endpoint
+      When gateway hands over a request's admitted and confirmed spend steps
+      Then the endpoint's delivery log records one attempt
+
+    @unit
+    Scenario: An operator wake on the delivery maintenance claim leaves it as it was
+      Given the hourly maintenance claim stored under the delivery process
+      When an operator wakes it from the ops console
+      Then the claim is read and committed unchanged
+
     @integration
     Scenario: Under backpressure batches grow toward the size cap
       Given an endpoint capped at one in-flight send with a slow receiver
