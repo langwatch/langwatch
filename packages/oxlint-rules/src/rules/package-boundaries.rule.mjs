@@ -134,7 +134,7 @@ function importedNames(node) {
 }
 
 /** §13: an installation test installs its peers' process modules for real. */
-function isPeerInstallation(file, target, subpath, node) {
+function isPeerInstallation({ file, target, subpath, node }) {
   if (!file.isTest || subpath !== ".") return false;
   const installers = new Set([
     `${camelCase(target.module)}Server`,
@@ -160,10 +160,10 @@ function peerData(target) {
   };
 }
 
-function crossModuleFinding(file, target, subpath, node) {
+function crossModuleFinding({ file, target, subpath, node }) {
   if (target.role === "contract" || target.module === file.module) return undefined;
   if (target.role === "browser-kit" && BROWSER_ROLES.has(file.role)) return undefined;
-  if (isTestSeam(file, subpath, target) || isPeerInstallation(file, target, subpath, node)) {
+  if (isTestSeam(file, subpath, target) || isPeerInstallation({ file, target, subpath, node })) {
     return undefined;
   }
 
@@ -187,8 +187,8 @@ function outsideModuleFinding(file, target, subpath) {
   return undefined;
 }
 
-function ownershipFinding(file, target, subpath, node) {
-  if (file.module) return crossModuleFinding(file, target, subpath, node);
+function ownershipFinding({ file, target, subpath, node }) {
+  if (file.module) return crossModuleFinding({ file, target, subpath, node });
 
   return outsideModuleFinding(file, target, subpath);
 }
@@ -197,7 +197,7 @@ function isCoreSource(file) {
   return !file.enterprise && file.role !== "other";
 }
 
-function packageFindings(file, specifier, cwd, node) {
+function packageFindings({ file, specifier, cwd, node }) {
   const found = modulePackageOf(cwd, specifier);
   if (!found) return [];
   const { pkg: target, subpath } = found;
@@ -205,7 +205,7 @@ function packageFindings(file, specifier, cwd, node) {
   if (!target.exports.has(subpath)) {
     findings.push({ messageId: "sealedExports", data: { subpath, package: target.name } });
   }
-  const shape = directionFinding(file, target) ?? ownershipFinding(file, target, subpath, node);
+  const shape = directionFinding(file, target) ?? ownershipFinding({ file, target, subpath, node });
   if (shape) findings.push({ messageId: shape, data: { specifier, ...peerData(target) } });
   if (isCoreSource(file) && target.enterprise && target.role !== "contract") {
     findings.push({ messageId: "coreImportsEnterprise", data: { specifier } });
@@ -214,7 +214,7 @@ function packageFindings(file, specifier, cwd, node) {
   return findings;
 }
 
-function specifierFindings(file, specifier, cwd, node) {
+function specifierFindings({ file, specifier, cwd, node }) {
   const replacement = retiredReplacement(specifier);
   if (replacement)
     return [{ messageId: "retiredPackageRuntime", data: { specifier, replacement } }];
@@ -224,7 +224,7 @@ function specifierFindings(file, specifier, cwd, node) {
     const escape = escapeFinding(file, specifier, cwd);
     if (escape) findings.push(escape);
   }
-  findings.push(...packageFindings(file, specifier, cwd, node));
+  findings.push(...packageFindings({ file, specifier, cwd, node }));
   if (file.module && SCHEMA_BINDING.has(specifier)) {
     findings.push({ messageId: "schemaBoundary", data: { specifier } });
   }
@@ -306,7 +306,12 @@ export const boundaryRule = defineRule({
   create(context, file) {
     const check = (node) => {
       if (typeof node?.value !== "string") return;
-      for (const finding of specifierFindings(file, node.value, context.cwd, node)) {
+      for (const finding of specifierFindings({
+        file,
+        specifier: node.value,
+        cwd: context.cwd,
+        node,
+      })) {
         context.report({ node, ...finding });
       }
     };

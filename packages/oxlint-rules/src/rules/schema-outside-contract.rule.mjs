@@ -39,12 +39,12 @@ function importSourceOf(context, identifier) {
  * at the local `z` or another top-level const it builds. An identifier
  * imported from elsewhere stops the chain unmarked - the extend/pick/omit/merge exemption.
  */
-function isAuthoredHere(node, context, locals, seen) {
+function isAuthoredHere({ node, context, locals, seen }) {
   const value = unwrap(node);
   if (value?.type !== "CallExpression" || value.callee.type !== "MemberExpression") return false;
   const object = unwrap(value.callee.object);
 
-  if (object.type !== "Identifier") return isAuthoredHere(object, context, locals, seen);
+  if (object.type !== "Identifier") return isAuthoredHere({ node: object, context, locals, seen });
 
   const source = importSourceOf(context, object);
   if (ZOD_ENTRYPOINTS.has(source)) return true;
@@ -52,7 +52,9 @@ function isAuthoredHere(node, context, locals, seen) {
   if (seen.has(object.name)) return false;
 
   const local = locals.get(object.name);
-  return local ? isAuthoredHere(local, context, locals, new Set(seen).add(object.name)) : false;
+  return local
+    ? isAuthoredHere({ node: local, context, locals, seen: new Set(seen).add(object.name) })
+    : false;
 }
 
 function constDeclarationOf(statement) {
@@ -107,7 +109,8 @@ export const schemaOutsideContractRule = defineRule({
         for (const { declarator, exported } of candidates) {
           const name = declarator.id.name;
           if (!name.endsWith("Schema") && !exported) continue;
-          if (!isAuthoredHere(declarator.init, context, locals, new Set())) continue;
+          if (!isAuthoredHere({ node: declarator.init, context, locals, seen: new Set() }))
+            continue;
 
           context.report({
             node: declarator,

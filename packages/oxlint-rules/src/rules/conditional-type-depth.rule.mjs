@@ -19,7 +19,12 @@ export const conditionalTypeDepthRule = defineRule({
   create(context, file) {
     return {
       Program(program) {
-        for (const finding of reportsFor(context, file, "conditional-type-depth", program)) {
+        for (const finding of reportsFor({
+          context,
+          file,
+          policy: "conditional-type-depth",
+          program,
+        })) {
           context.report({
             node: finding.node,
             messageId: "stateTheShape",
