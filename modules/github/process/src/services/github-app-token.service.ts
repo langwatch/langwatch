@@ -2,14 +2,6 @@ import { createHash } from "node:crypto";
 
 import type { GithubRepository } from "@langwatch/github-contract";
 
-import { githubApiChannels } from "../channels/github-api-channels.registry.ts";
-import { GithubInstallationNotFoundError } from "../channels/github-api.channel.ts";
-import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
-import {
-  GITHUB_READ_PULL_PERMISSIONS,
-  GITHUB_WRITE_PERMISSIONS,
-} from "../rules/github-app-permissions.rules.ts";
-import { GithubHostService } from "../services/github-host.service.ts";
 import type {
   GithubAppClient,
   GithubAppTokenCache,
@@ -17,15 +9,23 @@ import type {
   GithubInstallationToken,
   GithubPullRequestSummary,
   MintInstallationTokenInput,
-} from "./github.app.ts";
-import type { GithubHost } from "./github.members.ts";
+} from "../app/github.app.ts";
+import type { GithubHost } from "../app/github.members.ts";
+import { githubApiChannels } from "../channels/github-api-channels.registry.ts";
+import { GithubInstallationNotFoundError } from "../channels/github-api.channel.ts";
+import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
+import {
+  GITHUB_READ_PULL_PERMISSIONS,
+  GITHUB_WRITE_PERMISSIONS,
+} from "../rules/github-app-permissions.rules.ts";
+import { GithubHostService } from "./github-host.service.ts";
 
 const INSTALLATION_TOKEN_CACHE_TTL_SEC = 50 * 60;
 const LIVENESS_RECHECK_TTL_SEC = 5 * 60;
 const LIVENESS_FAILURE_BACKOFF_SEC = 60;
 
 /** This process's shared token cache in front of the raw GitHub App client. */
-export class RedisGithubAppTokenCache implements GithubAppTokenCache {
+export class GithubAppTokenService implements GithubAppTokenCache {
   static create({
     appId,
     privateKey,
@@ -36,9 +36,9 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
     privateKey: string;
     tokenCache: GithubTokenCacheRepository;
     host?: GithubHost;
-  }): RedisGithubAppTokenCache {
+  }): GithubAppTokenService {
     const api = githubApiChannels.live.create(appId, privateKey, host);
-    return new RedisGithubAppTokenCache(api, tokenCache, host);
+    return new GithubAppTokenService(api, tokenCache, host);
   }
 
   private constructor(
@@ -55,7 +55,7 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
     repositoryIds?: string[];
     permissions?: Record<string, string>;
   }): string {
-    return RedisGithubAppTokenCache.computeRepoScopeKey(input);
+    return GithubAppTokenService.computeRepoScopeKey(input);
   }
 
   static computeRepoScopeKey(input: {

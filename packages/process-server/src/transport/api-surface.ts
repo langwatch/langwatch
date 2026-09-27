@@ -6,6 +6,7 @@ import {
   SurfaceUnconfiguredError,
   SurfaceUnverifiedError,
   type RateLimiter,
+  type RawHttpHost,
   type WebSocketHost,
 } from "@langwatch/api";
 import { ApiKeyApi, type ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
@@ -82,6 +83,8 @@ export type ApiSurfaceComposition = Readonly<{
   selection: TransportSelection;
   /** The process's one upgrade router, where every declared socket protocol mounts. */
   sockets: WebSocketHost;
+  /** The raw HTTP doors, answered ahead of every route as main answered MCP. */
+  doors: RawHttpHost;
 }>;
 
 export function apiSurface(
@@ -218,8 +221,10 @@ class ApiSurface {
     rest: RestHost | undefined;
     trpc: TrpcHost | undefined;
     websocket: WebSocketHost;
+    rawhttp: RawHttpHost;
   } {
-    return { rest: this.#rest, trpc: this.#trpc, websocket: this.composition.sockets };
+    const { sockets, doors } = this.composition;
+    return { rest: this.#rest, trpc: this.#trpc, websocket: sockets, rawhttp: doors };
   }
 
   serve(): NodeHandler {
@@ -244,7 +249,7 @@ class ApiSurface {
       mux.route(path, api, { onFailure: answerApiFailure, exact: true });
     for (const document of selected.documents)
       mux.route(document.path, FramedDocument.create(document));
-    return mux.route("/", page).handler;
+    return composition.doors.ahead(mux.route("/", page).handler);
   }
 
   #projectDoor(): RestIdentity {
@@ -402,14 +407,6 @@ class ApiSurface {
         });
 
         return { headers };
-      }),
-      bindRestMiddleware(userAvatarCaller, async (context) => {
-        const caller = await this.sessions.read(context.req.raw);
-
-        return {
-          apiKeyProjectId: caller?.apiKeyProjectId ?? null,
-          userId: caller?.userId ?? null,
-        };
       }),
       bindRestMiddleware(projectRestFacts, (context) => {
         const credential = this.#projectCredentials.get(context.req.raw);
@@ -578,11 +575,6 @@ const adminAuthSession = defineRestMiddleware(
 const adminAuditRequest = defineRestMiddleware(
   "adminAuditRequest",
   z.object({ headers: z.record(z.string(), z.string()) }),
-);
-
-const userAvatarCaller = defineRestMiddleware(
-  "userAvatarCaller",
-  z.object({ apiKeyProjectId: z.string().nullable(), userId: z.string().nullable() }),
 );
 
 const callerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());

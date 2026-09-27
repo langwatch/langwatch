@@ -4,9 +4,7 @@ import type {
   CodingAgentReadMetrics,
   CodingAgentSessionListReadOutcome,
 } from "../app/coding-agent.members.ts";
-
-export const CODING_AGENT_SESSION_LIST_READ_METRIC_NAME =
-  "coding_agent_session_list_read_duration_milliseconds";
+import { CODING_AGENT_SESSION_LIST_READ_METRIC_NAME } from "../rules/coding-agent-read-metrics.rules.ts";
 
 /** Read-duration histogram; unpublished until root passes readMetrics. */
 export class OtelCodingAgentReadMetricsService implements CodingAgentReadMetrics {

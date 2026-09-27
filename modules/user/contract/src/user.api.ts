@@ -12,12 +12,7 @@ import type {
 } from "@langwatch/organization-contract";
 
 import type { UserCodeAccessPreference } from "./user-code-access.ts";
-import type {
-  MeProject,
-  MePersonalCredential,
-  MeUsage,
-  UserAvatarCaller,
-} from "./user-rest.schemas.ts";
+import type { MeProject, MePersonalCredential, MeUsage } from "./user-rest.schemas.ts";
 import type {
   UserBrowserSession,
   UserBrowserSessionEnded,
@@ -44,8 +39,6 @@ import type {
   SetOwnFirstPasswordInput,
   UnlinkUserAccountInput,
   UnlinkUserAccountOutcome,
-  UserAvatarObjectRead,
-  UserAvatarReadAllowance,
   UserCaller,
   UserEmailInput,
   UserLinkedAccount,
@@ -195,14 +188,6 @@ export interface UserApi {
   }): Promise<MeUsage>;
   /** The identity of the project a calling key belongs to, for `/api/me/project`. */
   getKeyProject(input: { projectId: string }): Promise<MeProject>;
-  /** Counts one caller's avatar reads, before any object is looked up. */
-  countAvatarRead(input: {
-    caller: UserAvatarCaller;
-    windowSeconds: number;
-    max: number;
-  }): Promise<UserAvatarReadAllowance>;
-  /** One avatar's row and, when the bytes are there, a stream of them. */
-  readAvatarObject(input: { projectId: string; id: string }): Promise<UserAvatarObjectRead>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(): Promise<UserUsageCount>;
   /** The same figures for one organization, counted over the members the caller names. */

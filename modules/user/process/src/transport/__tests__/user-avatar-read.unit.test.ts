@@ -1,22 +1,23 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
- * The gate that makes `/api/user-avatar` safe to read broadly, through the
- * real declaration.
+ * The avatar door through its real declaration: bytes, the module's refusal,
+ * and the throttle that runs before any lookup.
  * Spec: specs/settings/user-avatar-upload.feature
  */
-import { createRestRuntime, bindRestMiddleware } from "@langwatch/api/rest";
-import type { UserApi, UserAvatarObjectRead } from "@langwatch/user-contract";
+import { createRestRuntime } from "@langwatch/api/rest";
+import { UserAvatarNotFoundError } from "@langwatch/user-contract";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { userAvatarCaller, userAvatarRest } from "../user-avatar.rest.ts";
+import type { ServableUserAvatar } from "../../rules/user-avatar-read.rules.ts";
+import { type UserAvatarFileApi, userAvatarRest } from "../user-avatar.rest.ts";
 
 describe("given the avatar route", () => {
   describe("when the object is a user avatar", () => {
     /** @scenario The avatar route serves an object whose purpose and owner kind are the avatar ones */
     it("serves the bytes with the stored media type and a private cache", async () => {
-      const api = mountAvatars(available());
+      const api = mountAvatars({ read: async () => available() });
 
       const response = await api.fetch("/api/user-avatar/project-9/object-1");
 
@@ -27,54 +28,11 @@ describe("given the avatar route", () => {
     });
   });
 
-  describe("when the object carries a purpose that is not the avatar one", () => {
-    /** @scenario "An object that is not a user avatar is refused rather than served" */
-    it("refuses with the avatar not-found code, serving no bytes", async () => {
-      const api = mountAvatars(
-        available({ purpose: "trace_content", ownerKind: "span", mediaType: "audio/mpeg" }),
-      );
-
-      const response = await api.fetch("/api/user-avatar/project-9/object-1");
-
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toMatchObject({ error: "avatar_not_found" });
-    });
-  });
-
-  describe("when the object is tagged as an avatar but was produced by a span", () => {
-    /** @scenario "An object that is not a user avatar is refused rather than served" */
-    it("refuses on the OWNER KIND, so a forged purpose alone opens nothing", async () => {
-      const api = mountAvatars(available({ ownerKind: "span" }));
-
-      const response = await api.fetch("/api/user-avatar/project-9/object-1");
-
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toMatchObject({ error: "avatar_not_found" });
-    });
-  });
-
-  describe("when there is no object at all", () => {
-    /** @scenario "A URL with no avatar behind it is refused the same way as a foreign object" */
-    it("answers the SAME code as a refused object, so the route is no existence oracle", async () => {
-      const api = mountAvatars(null);
-
-      const response = await api.fetch("/api/user-avatar/project-9/object-1");
-
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toMatchObject({ error: "avatar_not_found" });
-    });
-  });
-
-  describe("when the row is an avatar but its bytes are gone", () => {
-    /** @scenario "A URL with no avatar behind it is refused the same way as a foreign object" */
-    it("answers that same code rather than confirming the id exists", async () => {
+  describe("when the module refuses the object", () => {
+    it("answers the avatar not-found code, serving no bytes", async () => {
       const api = mountAvatars({
-        status: "missing",
-        metadata: {
-          byteLength: 3,
-          mediaType: "image/png",
-          purpose: "user_avatar",
-          ownerKind: "user",
+        read: async () => {
+          throw new UserAvatarNotFoundError("object-1");
         },
       });
 
@@ -88,10 +46,11 @@ describe("given the avatar route", () => {
   describe("when the caller has already read too many avatars", () => {
     it("answers the throttle rather than looking the object up", async () => {
       let looked = false;
-      const api = mountAvatars(available(), {
-        allowance: { allowed: false, resetAt: 1_000 },
-        onRead: () => {
+      const api = mountAvatars({
+        allowed: false,
+        read: async () => {
           looked = true;
+          return available();
         },
       });
 
@@ -117,42 +76,23 @@ function streamOf(bytes: Uint8Array): ReadableStream {
   });
 }
 
-/** One avatar read, defaulted to a real avatar so a case changes only its point. */
-function available(
-  overrides: { purpose?: string; ownerKind?: string; mediaType?: string } = {},
-): UserAvatarObjectRead {
+/** A servable avatar, as the module hands it to the door. */
+function available(): ServableUserAvatar {
   return {
     status: "available",
     metadata: {
       byteLength: 3,
-      mediaType: overrides.mediaType ?? "image/png",
-      purpose: overrides.purpose ?? "user_avatar",
-      ownerKind: overrides.ownerKind ?? "user",
+      mediaType: "image/png",
+      purpose: "user_avatar",
+      ownerKind: "user",
     },
     stream: streamOf(Uint8Array.from([1, 2, 3])),
   };
 }
 
-/**
- * The family over a session-authenticated caller. The dual-credential verifier
- * is the process's, and the handler keys its count on what that verifier left
- * behind — so a binding setting nothing would fail before any refusal.
- */
-function mountAvatars(
-  read: UserAvatarObjectRead,
-  options: {
-    allowance?: { allowed: boolean; resetAt: number };
-    onRead?: () => void;
-  } = {},
-) {
-  const app = createApiFixture<UserApi>({
-    countAvatarRead: async () => options.allowance ?? { allowed: true, resetAt: 0 },
-    readAvatarObject: async () => {
-      options.onRead?.();
-
-      return read;
-    },
-  });
+/** The family over a session-authenticated caller, counted by a limiter the case decides. */
+function mountAvatars(options: { read: UserAvatarFileApi["getAvatarBytes"]; allowed?: boolean }) {
+  const app = createApiFixture<UserAvatarFileApi>({ getAvatarBytes: options.read });
 
   const runtime = createRestRuntime({
     identity: {
@@ -161,14 +101,12 @@ function mountAvatars(
       },
       identify: () => ({ actor: { type: "user", id: "user-1" } as const, scope: null }),
     },
+    rateLimiter: { check: async () => ({ allowed: options.allowed ?? true }) },
   });
 
   const hono = runtime.mount(userAvatarRest.router(), {
     app: () => app,
     credential: "browser",
-    facts: [
-      bindRestMiddleware(userAvatarCaller, () => ({ apiKeyProjectId: null, userId: "user-1" })),
-    ],
     onError: renderHandled,
   });
 

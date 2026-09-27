@@ -29,7 +29,7 @@ import {
   projectWithTeamSchema,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
-import type { Instant } from "@langwatch/time";
+import { type Instant, Temporal } from "@langwatch/time";
 import { TestProjectApi } from "./test-project-api.ts";
 import type { CodingAgentBillingPolicy, CodingAgentClock } from "../../app/coding-agent.members.ts";
 import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
@@ -248,6 +248,11 @@ export class TestClock implements CodingAgentClock {
 
   nowMs(): number {
     return this.value;
+  }
+
+  /** The process clock member's reading of the same instant. */
+  now(): Instant {
+    return Temporal.Instant.fromEpochMilliseconds(this.value);
   }
 
   set(value: number): void {

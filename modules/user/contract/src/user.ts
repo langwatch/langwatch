@@ -282,9 +282,6 @@ export type UserSecureAccountOffer = z.infer<typeof userSecureAccountOfferSchema
 /** A display name as the account accepts it: trimmed, then 1-120 characters. */
 export const userProfileNameSchema = z.string().trim().min(1).max(120);
 
-/** What one count of a caller's avatar reads answers. */
-export type UserAvatarReadAllowance = Readonly<{ allowed: boolean; resetAt: number }>;
-
 /** What an avatar object carries beside its bytes. */
 export type UserAvatarObjectMetadata = Readonly<{
   byteLength: number;

@@ -9,6 +9,8 @@ import {
   GithubOrganizationMembershipRequiredError,
   type GithubApi,
   type GithubConnectionAuditEntry,
+  type GithubPullRequestLiveStatus,
+  type GithubPullRequestRef,
 } from "@langwatch/github-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
@@ -20,10 +22,13 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 export interface GithubConnectionApi {
   /** This module's own GitHub capability, as the process composed it. */
   github(): GithubApi;
-  /** The organization a project belongs to; an orphan project has none. */
-  findOrganizationForProject(projectId: string): Promise<string | undefined>;
   /** Where a connection command is recorded. */
   recordAudit(entry: GithubConnectionAuditEntry): Promise<void>;
+  /** A project's pull requests' live state; none where the project has no organization. */
+  getProjectPullRequestLiveStatuses(input: {
+    projectId: string;
+    refs: readonly GithubPullRequestRef[];
+  }): Promise<{ statuses: GithubPullRequestLiveStatus[] }>;
 }
 
 export const GithubConnectionApi = moduleApi<GithubConnectionApi>()("github");
@@ -81,18 +86,7 @@ export const githubTrpcTransport = defineTrpcRouter(GithubConnectionApi, githubT
   // the project, never taken from the client.
   .procedure("pullRequestLiveStatus")
   .withPermission("traces:view")
-  .handle(async ({ app, input }) => {
-    const organizationId = await app.findOrganizationForProject(input.projectId);
-
-    if (!organizationId) return { statuses: [] };
-
-    const statuses = await app.github().getLivePullRequestStatuses({
-      organizationId,
-      refs: input.refs,
-    });
-
-    return { statuses: [...statuses] };
-  })
+  .handle(({ app, input }) => app.getProjectPullRequestLiveStatuses(input))
 
   .procedure("disconnect")
   .withPermission("organization:manage")

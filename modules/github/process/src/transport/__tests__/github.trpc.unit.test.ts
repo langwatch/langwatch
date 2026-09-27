@@ -3,6 +3,7 @@
  * The `github.*` procedures over the real tRPC runtime.
  * @see specs/integrations/github-connection.feature
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import { GithubNotConnectedError, type GithubApi } from "@langwatch/github-contract";
 import { initTRPC } from "@trpc/server";
@@ -11,31 +12,27 @@ import { describe, expect, it, vi } from "vitest";
 import { githubTrpcTransport, type GithubConnectionApi } from "../github.trpc.ts";
 import { githubTrpcTestMembers, type GithubTrpcTestContext } from "./github.trpc.harness.ts";
 
-function githubStub(overrides: Partial<GithubApi>): GithubApi {
-  return overrides as GithubApi;
-}
-
 function mount({
   isOrganizationMember = true,
-  findOrganizationForProject = async () => "org-1" as string | undefined,
-  github = {} as Partial<GithubApi>,
+  github = {},
+  getProjectPullRequestLiveStatuses = async () => ({ statuses: [] }),
   permits = () => true,
 }: {
   isOrganizationMember?: boolean;
-  findOrganizationForProject?: () => Promise<string | undefined>;
   github?: Partial<GithubApi>;
+  getProjectPullRequestLiveStatuses?: GithubConnectionApi["getProjectPullRequestLiveStatuses"];
   permits?: (permission: string) => boolean;
 } = {}) {
   const recordAudit = vi.fn<() => Promise<void>>(async () => {});
-  const service = githubStub({
+  const service = createApiFixture<GithubApi>({
     isOrganizationMember: async () => isOrganizationMember,
     ...github,
   });
-  const connection: GithubConnectionApi = {
+  const connection = createApiFixture<GithubConnectionApi>({
     github: () => service,
-    findOrganizationForProject,
     recordAudit,
-  };
+    getProjectPullRequestLiveStatuses,
+  });
   const { members, asked } = githubTrpcTestMembers(permits);
   const trpc = initTRPC.context<GithubTrpcTestContext>().create();
   const router = createTrpcRuntime<GithubTrpcTestContext>({
@@ -96,7 +93,6 @@ describe("the github tRPC namespace", () => {
             installUrl: null,
           }),
           listRepositoriesForOrganization: async () => [],
-          getLivePullRequestStatuses: async () => [],
           disconnect: async () => ({ uninstallUrl: "https://github.com/x" }),
         },
       });
@@ -200,18 +196,20 @@ describe("the github tRPC namespace", () => {
     });
   });
 
-  describe("when the project belongs to no organization", () => {
-    it("answers with no pull-request statuses rather than reaching GitHub", async () => {
-      const getLivePullRequestStatuses = vi.fn<() => never>();
-      const { caller } = mount({
-        findOrganizationForProject: async () => undefined,
-        github: { getLivePullRequestStatuses },
-      });
+  describe("when a project's pull-request statuses are asked for", () => {
+    it("hands the project and refs to one operation and answers with its statuses", async () => {
+      const getProjectPullRequestLiveStatuses = vi.fn<
+        GithubConnectionApi["getProjectPullRequestLiveStatuses"]
+      >(async () => ({ statuses: [] }));
+      const { caller } = mount({ getProjectPullRequestLiveStatuses });
 
       const result = await caller.pullRequestLiveStatus({ projectId: "project-1", refs: [] });
 
       expect(result).toEqual({ statuses: [] });
-      expect(getLivePullRequestStatuses).not.toHaveBeenCalled();
+      expect(getProjectPullRequestLiveStatuses).toHaveBeenCalledWith({
+        projectId: "project-1",
+        refs: [],
+      });
     });
   });
 });

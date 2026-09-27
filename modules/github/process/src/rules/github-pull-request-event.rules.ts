@@ -1,8 +1,6 @@
 import type { GithubPullRequestEvent } from "@langwatch/github-contract";
 import { z } from "zod";
 
-import type { GithubPullRequestEventParser } from "../app/github.members.ts";
-
 const githubPullRequestEventSchema = z.object({
   action: z.string(),
   installation: z.object({ id: z.union([z.number(), z.string()]) }).nullish(),
@@ -29,47 +27,39 @@ const githubPullRequestEventSchema = z.object({
   }),
 });
 
-export class GithubPullRequestEventRules implements GithubPullRequestEventParser {
-  static create(): GithubPullRequestEventRules {
-    return new GithubPullRequestEventRules();
+export function parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
+  const parsed = githubPullRequestEventSchema.safeParse(payload);
+  if (!parsed.success) {
+    return null;
   }
 
-  private constructor() {}
-
-  parse(payload: unknown): GithubPullRequestEvent | null {
-    const parsed = githubPullRequestEventSchema.safeParse(payload);
-    if (!parsed.success) {
-      return null;
-    }
-
-    const { action, installation, repository, pull_request: pull } = parsed.data;
-    const headRepository = pull.head.repo?.full_name;
-    if (installation?.id == null || !headRepository) {
-      return null;
-    }
-    const normalizedRepository = repository.full_name.toLowerCase();
-    if (headRepository.toLowerCase() !== normalizedRepository) {
-      return null;
-    }
-
-    return {
-      action,
-      installationId: String(installation.id),
-      repositoryOwner: repository.owner.login,
-      repositoryName: repository.name,
-      headBranch: pull.head.ref,
-      pullRequest: {
-        number: pull.number,
-        htmlUrl: pull.html_url,
-        title: pull.title,
-        state: pull.state,
-        draft: pull.draft ?? false,
-        mergedAt: pull.merged_at ?? null,
-        closedAt: pull.closed_at ?? null,
-        createdAt: pull.created_at,
-        updatedAt: pull.updated_at,
-        authorLogin: pull.user?.login ?? null,
-      },
-    };
+  const { action, installation, repository, pull_request: pull } = parsed.data;
+  const headRepository = pull.head.repo?.full_name;
+  if (installation?.id == null || !headRepository) {
+    return null;
   }
+  const normalizedRepository = repository.full_name.toLowerCase();
+  if (headRepository.toLowerCase() !== normalizedRepository) {
+    return null;
+  }
+
+  return {
+    action,
+    installationId: String(installation.id),
+    repositoryOwner: repository.owner.login,
+    repositoryName: repository.name,
+    headBranch: pull.head.ref,
+    pullRequest: {
+      number: pull.number,
+      htmlUrl: pull.html_url,
+      title: pull.title,
+      state: pull.state,
+      draft: pull.draft ?? false,
+      mergedAt: pull.merged_at ?? null,
+      closedAt: pull.closed_at ?? null,
+      createdAt: pull.created_at,
+      updatedAt: pull.updated_at,
+      authorLogin: pull.user?.login ?? null,
+    },
+  };
 }

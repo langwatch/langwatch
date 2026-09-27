@@ -53,10 +53,8 @@ export {
 } from "./transport/coding-agent.rest.ts";
 export { codingAgentV1Rest, codingAgentV1RestCaller } from "./transport/coding-agent-v1.rest.ts";
 export { codingAgentTrpcTransport } from "./transport/coding-agent.trpc.ts";
-export {
-  CODING_AGENT_SESSION_LIST_READ_METRIC_NAME,
-  OtelCodingAgentReadMetricsService,
-} from "./services/coding-agent-read-metrics-otel.service.ts";
+export { OtelCodingAgentReadMetricsService } from "./services/coding-agent-read-metrics-otel.service.ts";
+export { CODING_AGENT_SESSION_LIST_READ_METRIC_NAME } from "./rules/coding-agent-read-metrics.rules.ts";
 export type {
   CodingAgentViewerVisibility,
   CodingAgentViewerVisibilityReader,

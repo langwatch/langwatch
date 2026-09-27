@@ -34,10 +34,10 @@ describe("the user-avatar REST family", () => {
       }
     });
 
-    it("writes its own bytes, and names the caller the counter keys on", () => {
+    it("answers with image bytes, counted per caller before any lookup", () => {
       for (const route of declaration.routes) {
-        expect(route.rawResponse?.produces).toEqual(["image/*"]);
-        expect(route.middleware?.map((fact) => fact.name)).toEqual(["userAvatarCaller"]);
+        expect(route.response).toMatchObject({ kind: "bytes", produces: ["image/*"] });
+        expect(route.rateLimit).toEqual({ requests: 240, seconds: 60 });
       }
     });
   });
