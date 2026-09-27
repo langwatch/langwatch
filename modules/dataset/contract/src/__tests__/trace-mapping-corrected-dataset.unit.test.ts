@@ -38,15 +38,15 @@ describe("mapping a corrected trace into a dataset", () => {
         patch: correctedOutputPatch,
       });
 
-      const [row] = mapTraceToDatasetEntry(
-        corrected as never,
-        {
+      const [row] = mapTraceToDatasetEntry({
+        trace: corrected as never,
+        mapping: {
           trace_id: { source: "trace_id" },
           input: { source: "input" },
           output: { source: "output" },
         },
-        new Set(),
-      );
+        expansions: new Set(),
+      });
 
       expect(row).toEqual({
         trace_id: "trace-1",
@@ -86,14 +86,14 @@ describe("mapping a corrected trace into a dataset", () => {
         },
       });
 
-      const [row] = mapTraceToDatasetEntry(
-        corrected as never,
-        {
+      const [row] = mapTraceToDatasetEntry({
+        trace: corrected as never,
+        mapping: {
           environment: { source: "metadata", key: "environment" },
           reviewer: { source: "metadata", key: "reviewer" },
         },
-        new Set(),
-      );
+        expansions: new Set(),
+      });
 
       expect(row).toEqual({ environment: "production", reviewer: undefined });
       expect(capturedMetadataTrace.metadata.environment).toBe("staging");

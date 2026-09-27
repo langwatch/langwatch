@@ -237,13 +237,11 @@ export class EvaluationDataService {
       key: "key" in mappingConfig ? mappingConfig.key : undefined,
       subkey: "subkey" in mappingConfig ? mappingConfig.subkey : undefined,
     };
-    const mapped = mapTraceToDatasetEntry(
+    const mapped = mapTraceToDatasetEntry({
       trace,
-      { [targetField]: traceMappingConfig },
-      new Set(),
-      undefined,
-      undefined,
-    )[0];
+      mapping: { [targetField]: traceMappingConfig },
+      expansions: new Set(),
+    })[0];
     return { resolved: true, value: mapped?.[targetField] };
   }
 }
@@ -267,20 +265,11 @@ function mapTraceFields(
   const mapping: MappingState =
     "mapping" in mapping_ ? mapping_ : migrateLegacyMappings(legacyMappingOf(mapping_));
 
-  return mapTraceToDatasetEntry(
+  return mapTraceToDatasetEntry({
     trace,
-    mapping.mapping as Record<
-      string,
-      {
-        source: string;
-        key?: string;
-        subkey?: string;
-      }
-    >,
-    new Set(),
-    undefined,
-    undefined,
-  )[0];
+    mapping: mapping.mapping as Record<string, { source: string; key?: string; subkey?: string }>,
+    expansions: new Set(),
+  })[0];
 }
 
 /** A pre-`MappingState` monitor mapping: each target field names its trace source. */

@@ -123,77 +123,21 @@ export const useDatasetRecordSync = ({
     if (datasetsToSync.length === 0) return;
 
     const timeoutId = setTimeout(() => {
-      for (const dbDatasetId of datasetsToSync) {
-        const recordChanges = pendingChangesRef.current[dbDatasetId];
-        if (!recordChanges) continue;
-
-        const recordsToDelete: string[] = [];
-        const recordsToUpdate: string[] = [];
-
-        for (const [recordId, changes] of Object.entries(recordChanges)) {
-          if (!changes || Object.keys(changes).length === 0) continue;
-
-          if ("_delete" in changes && changes._delete === true) {
-            recordsToDelete.push(recordId);
-          } else {
-            recordsToUpdate.push(recordId);
-          }
-        }
-
-        if (recordsToDelete.length > 0) {
-          handleSyncStart();
-          deleteRef.current.mutate(
-            {
-              projectId,
-              datasetId: dbDatasetId,
-              recordIds: recordsToDelete,
-            },
-            {
-              onSuccess: () => {
-                for (const recordId of recordsToDelete) {
-                  clearPendingChange(dbDatasetId, recordId);
-                }
-                // Mark before draining: if this delete is the batch's last op,
-                // handleSyncSuccess fires the count refresh in this same call.
-                batchHadDeleteRef.current = true;
-                handleSyncSuccess();
-              },
-              onError: (error: { message: string }) => {
-                console.error("Failed to delete saved records:", error);
-                handleSyncError(error);
-              },
-            },
-          );
-        }
-
-        for (const recordId of recordsToUpdate) {
-          // Send the full record: the backend replaces the entire entry
-          const fullRecord = resolveFullRecordRef.current(dbDatasetId, recordId);
-          if (!fullRecord) continue;
-
-          const { id: _id, ...recordData } = fullRecord;
-
-          handleSyncStart();
-          updateRef.current.mutate(
-            {
-              projectId,
-              datasetId: dbDatasetId,
-              recordId,
-              updatedRecord: recordData,
-            },
-            {
-              onSuccess: () => {
-                clearPendingChange(dbDatasetId, recordId);
-                handleSyncSuccess();
-              },
-              onError: (error: { message: string }) => {
-                console.error("Failed to sync saved record:", error);
-                handleSyncError(error);
-              },
-            },
-          );
-        }
-      }
+      syncPendingDatasets({
+        projectId,
+        datasetIds: datasetsToSync,
+        pending: pendingChangesRef.current,
+        deleteMutation: deleteRef.current,
+        updateMutation: updateRef.current,
+        resolveFullRecord: resolveFullRecordRef.current,
+        clearPendingChange,
+        start: handleSyncStart,
+        succeed: handleSyncSuccess,
+        fail: handleSyncError,
+        markDeleted: () => {
+          batchHadDeleteRef.current = true;
+        },
+      });
     }, DATASET_SYNC_DEBOUNCE_MS);
 
     return () => clearTimeout(timeoutId);
@@ -206,3 +150,107 @@ export const useDatasetRecordSync = ({
     handleSyncError,
   ]);
 };
+
+type RecordSyncMutations = {
+  deleteMutation: Pick<ReturnType<typeof api.datasetRecord.deleteMany.useMutation>, "mutate">;
+  updateMutation: Pick<ReturnType<typeof api.datasetRecord.update.useMutation>, "mutate">;
+};
+
+/** Which of one dataset's pending changes are deletions and which are full-record updates. */
+function splitRecordChanges(recordChanges: NonNullable<PendingSavedChanges[string]>): {
+  recordsToDelete: string[];
+  recordsToUpdate: string[];
+} {
+  const recordsToDelete: string[] = [];
+  const recordsToUpdate: string[] = [];
+  for (const [recordId, changes] of Object.entries(recordChanges)) {
+    if (!changes || Object.keys(changes).length === 0) continue;
+    if ("_delete" in changes && changes._delete === true) recordsToDelete.push(recordId);
+    else recordsToUpdate.push(recordId);
+  }
+  return { recordsToDelete, recordsToUpdate };
+}
+
+/** Drains every named dataset's pending changes, one dataset at a time. */
+function syncPendingDatasets({
+  datasetIds,
+  pending,
+  ...rest
+}: Omit<Parameters<typeof syncDatasetChanges>[0], "dbDatasetId" | "recordChanges"> & {
+  datasetIds: string[];
+  pending: PendingSavedChanges;
+}): void {
+  for (const dbDatasetId of datasetIds) {
+    syncDatasetChanges({ ...rest, dbDatasetId, recordChanges: pending[dbDatasetId] });
+  }
+}
+
+/** Drains one dataset's pending changes: one batch delete, then a full-record update each. */
+function syncDatasetChanges({
+  projectId,
+  dbDatasetId,
+  recordChanges,
+  deleteMutation,
+  updateMutation,
+  resolveFullRecord,
+  clearPendingChange,
+  start,
+  succeed,
+  fail,
+  markDeleted,
+}: RecordSyncMutations & {
+  projectId: string;
+  dbDatasetId: string;
+  recordChanges: PendingSavedChanges[string] | undefined;
+  resolveFullRecord: DatasetRecordSyncParams["resolveFullRecord"];
+  clearPendingChange: DatasetRecordSyncParams["clearPendingChange"];
+  start: () => void;
+  succeed: () => void;
+  fail: (error: { message: string }) => void;
+  markDeleted: () => void;
+}): void {
+  if (!recordChanges) return;
+  const { recordsToDelete, recordsToUpdate } = splitRecordChanges(recordChanges);
+
+  if (recordsToDelete.length > 0) {
+    start();
+    deleteMutation.mutate(
+      { projectId, datasetId: dbDatasetId, recordIds: recordsToDelete },
+      {
+        onSuccess: () => {
+          for (const recordId of recordsToDelete) clearPendingChange(dbDatasetId, recordId);
+          // Mark before draining: if this delete is the batch's last op, the
+          // success handler fires the count refresh in this same call.
+          markDeleted();
+          succeed();
+        },
+        onError: (error) => {
+          console.error("Failed to delete saved records:", error);
+          fail(error);
+        },
+      },
+    );
+  }
+
+  for (const recordId of recordsToUpdate) {
+    // Send the full record: the backend replaces the entire entry
+    const fullRecord = resolveFullRecord(dbDatasetId, recordId);
+    if (!fullRecord) continue;
+
+    const { id: _id, ...recordData } = fullRecord;
+    start();
+    updateMutation.mutate(
+      { projectId, datasetId: dbDatasetId, recordId, updatedRecord: recordData },
+      {
+        onSuccess: () => {
+          clearPendingChange(dbDatasetId, recordId);
+          succeed();
+        },
+        onError: (error) => {
+          console.error("Failed to sync saved record:", error);
+          fail(error);
+        },
+      },
+    );
+  }
+}

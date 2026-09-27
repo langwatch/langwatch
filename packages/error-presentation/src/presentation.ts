@@ -3391,6 +3391,23 @@ const presentations = {
     title: "That column's type can't be changed",
     describe: () => "Add a new column with the type you need, then move the values across.",
   },
+  dataset_conflict: {
+    title: "That conflicts with another dataset",
+    describe: () => "Pick a different name, or reload to see the dataset as it is now.",
+  },
+  dataset_not_retryable: {
+    title: "There's nothing to retry",
+    describe: () => "This dataset has no failed import to run again.",
+  },
+  dataset_too_large_to_edit_columns: {
+    // A limit, not a breakage: the change would rewrite more rows than one edit can hold.
+    title: "This dataset is too large to change column types",
+    describe: () => "Make the dataset smaller, or add a new column with the type you need.",
+  },
+  stored_object_files_rate_limited: {
+    title: "Too many files opened at once",
+    describe: () => "Wait a moment, then open the file again.",
+  },
   dataset_not_ready: {
     // A state, not a breakage — the rows are still being prepared. Waiting is
     // a real action, so this is not the "we've been notified" shape.

@@ -718,7 +718,11 @@ export class DatasetTraceMapper extends AutomationDatasetMapper {
         (value): value is keyof typeof TRACE_EXPANSIONS => value in TRACE_EXPANSIONS,
       ),
     );
-    return mapTraceToDatasetEntry(traceSchema.parse(input.trace), input.mapping, expansions);
+    return mapTraceToDatasetEntry({
+      trace: traceSchema.parse(input.trace),
+      mapping: input.mapping,
+      expansions,
+    });
   }
 }
 

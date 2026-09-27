@@ -1058,21 +1058,22 @@ function isExpandedColumnValue(
   return isExpandableColumn && Array.isArray(value);
 }
 
-export const mapTraceToDatasetEntry = (
-  trace: TraceWithAnnotations,
+export const mapTraceToDatasetEntry = ({
+  trace,
+  mapping,
+  expansions,
+  annotationScoreOptions,
+  allTraces,
+}: {
+  trace: TraceWithAnnotations;
   mapping: Record<
     string,
-    {
-      source: string;
-      key?: string;
-      subkey?: string;
-      selectedFields?: string[];
-    }
-  >,
-  expansions: Set<keyof typeof TRACE_EXPANSIONS>,
-  annotationScoreOptions?: AnnotationScore[],
-  allTraces?: TraceWithAnnotations[],
-): Record<string, string | number>[] => {
+    { source: string; key?: string; subkey?: string; selectedFields?: string[] }
+  >;
+  expansions: Set<keyof typeof TRACE_EXPANSIONS>;
+  annotationScoreOptions?: AnnotationScore[] | undefined;
+  allTraces?: TraceWithAnnotations[] | undefined;
+}): Record<string, string | number>[] => {
   let expandedTraces: TraceWithAnnotations[] = [trace];
 
   for (const expansion of expansions) {
@@ -1116,13 +1117,7 @@ export const mapTraceToDatasetEntry = (
   );
 };
 
-type StringTypeToType = {
-  string: string;
-  number: number;
-  "string[]": string[];
-  object: Record<string, any>;
-  array: any[];
-};
+type ConvertibleType = "string" | "number" | "string[]" | "object" | "array";
 
 // Returns the unwrapped .value if v is an OTel typed-object wrapper ({ type, value } with exactly
 // those two own keys and a string type). Returns undefined to signal "no unwrap needed" — this
@@ -1136,67 +1131,63 @@ const unwrapTypedObject = (v: unknown): unknown => {
   return obj.value;
 };
 
-export const convertTo = <T extends keyof StringTypeToType>(
-  value: unknown,
-  type: T,
-): StringTypeToType[T] | undefined => {
-  // Unwrap OTel typed-object wrappers first so downstream coercion sees the bare value.
-  // OTel SDK auto-wraps span IO as { type: <string>, value: <any> }; evaluators
-  // need bare values. (#3875)
+/**
+ * A mapped value coerced to the column type an evaluator reads. OTel typed-object
+ * wrappers ({ type, value }) are unwrapped first, since evaluators need bare values (#3875).
+ */
+export function convertTo(value: unknown, type: "string"): string | undefined;
+export function convertTo(value: unknown, type: "number"): number | undefined;
+export function convertTo(value: unknown, type: "string[]"): string[] | undefined;
+export function convertTo(value: unknown, type: "object"): Record<string, unknown> | undefined;
+export function convertTo(value: unknown, type: "array"): unknown[] | undefined;
+export function convertTo(value: unknown, type: ConvertibleType): unknown {
   const unwrapped = unwrapTypedObject(value);
-  const subject: any = unwrapped === undefined ? value : unwrapped;
-  if (subject === null || subject === undefined) {
-    return undefined;
-  }
-  if (type === "string") {
-    return (typeof subject === "string" ? subject : JSON.stringify(subject)) as StringTypeToType[T];
-  }
-  if (type === "number") {
-    return Number(subject) as StringTypeToType[T];
-  }
+  const subject = unwrapped === undefined ? value : unwrapped;
+  if (subject === null || subject === undefined) return undefined;
+  if (type === "string") return typeof subject === "string" ? subject : JSON.stringify(subject);
+  if (type === "number") return Number(subject);
   if (Array.isArray(subject) && type === "string[]") {
-    return subject.map((v) => convertTo(v, "string")) as unknown as StringTypeToType[T];
+    return subject.map((v) => convertTo(v, "string"));
   }
-  const isEncodedStringToStructuredType =
-    typeof subject === "string" && (type === "object" || type === "string[]" || type === "array");
-
-  if (isEncodedStringToStructuredType) {
+  if (
+    typeof subject === "string" &&
+    (type === "object" || type === "string[]" || type === "array")
+  ) {
     const decoded = decodeEncodedStructure(subject, type);
     if (decoded.kind === "decoded") return decoded.value;
   }
-  return subject as unknown as StringTypeToType[T];
-};
+  return subject;
+}
 
 /** A JSON string read as an object, string[] or array; wrapped whole when it will not parse. */
-const decodeEncodedStructure = <T extends keyof StringTypeToType>(
+const decodeEncodedStructure = (
   subject: string,
-  type: T,
-): { kind: "decoded"; value: StringTypeToType[T] } | { kind: "undecodable" } => {
+  type: "object" | "string[]" | "array",
+): { kind: "decoded"; value: unknown } | { kind: "undecodable" } => {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(subject);
-    if (!Array.isArray(parsed) && typeof parsed === "object") {
-      return { kind: "decoded", value: parsed as unknown as StringTypeToType[T] };
-    }
-    if (Array.isArray(parsed)) {
-      const value = type === "string[]" ? parsed.map((v) => convertTo(v, "string")) : parsed;
-      return { kind: "decoded", value: value as unknown as StringTypeToType[T] };
-    }
-    throw new Error("Failed to parse to a valid type, falling back");
+    parsed = JSON.parse(subject);
   } catch {
-    if (type === "string[]") {
-      return {
-        kind: "decoded",
-        value: [convertTo(subject, "string")] as unknown as StringTypeToType[T],
-      };
-    }
-    if (type === "array") {
-      return { kind: "decoded", value: [subject] as unknown as StringTypeToType[T] };
-    }
-    if (type === "object") {
-      return { kind: "decoded", value: { _json: subject } as unknown as StringTypeToType[T] };
-    }
-    return { kind: "undecodable" };
+    return undecodable(subject, type);
   }
+  if (Array.isArray(parsed)) {
+    return {
+      kind: "decoded",
+      value: type === "string[]" ? parsed.map((v) => convertTo(v, "string")) : parsed,
+    };
+  }
+  if (typeof parsed === "object") return { kind: "decoded", value: parsed };
+  return undecodable(subject, type);
+};
+
+/** The fallback for a string that is not the JSON structure asked for. */
+const undecodable = (
+  subject: string,
+  type: "object" | "string[]" | "array",
+): { kind: "decoded"; value: unknown } => {
+  if (type === "string[]") return { kind: "decoded", value: [convertTo(subject, "string")] };
+  if (type === "array") return { kind: "decoded", value: [subject] };
+  return { kind: "decoded", value: { _json: subject } };
 };
 
 // ============================================================================
