@@ -22,10 +22,7 @@ import { MemoryIdentityStore } from "../repositories/memory/memory.identity.stor
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
-import {
-  inMemoryIdentityReservations,
-  inMemoryIdentityUsers,
-} from "./support/identity-memory-repositories.ts";
+import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../testing.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
