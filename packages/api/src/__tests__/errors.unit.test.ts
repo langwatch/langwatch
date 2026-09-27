@@ -105,12 +105,19 @@ describe("formatError", () => {
      * The version-gated union envelope died with the bare alias (ADR 002 §5):
      * there is no request shape left that carries the legacy `error` field.
      */
+    /** @scenario "A REST refusal carries its fields at the root of the body" */
     it("never carries the legacy error field", () => {
       const err = new NotFoundError("not_found", "Resource", "abc");
 
       const { body } = formatError({ err });
 
       expect(body).not.toHaveProperty("error");
+      expect(body).toMatchObject({
+        code: "not_found",
+        type: "not_found",
+        message: "not_found",
+        retryable: false,
+      });
     });
 
     describe("given the back-compat `kind` alias", () => {

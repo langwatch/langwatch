@@ -38,6 +38,32 @@ function scriptedClient(answer: (command: string, input: object) => Promise<obje
   return { client, sent };
 }
 
+describe("given an S3 account as the deployment configures it", () => {
+  describe("when the deployment names a real AWS region", () => {
+    /** @scenario "S3 client honors S3_REGION env for real AWS deployments instead of the R2/MinIO 'auto' default" */
+    it("hands that region to the client", async () => {
+      const client = s3Client({ ...account, region: "eu-central-1" });
+
+      await expect(client.config.region()).resolves.toBe("eu-central-1");
+    });
+  });
+
+  describe("when no region is configured for an R2 or MinIO endpoint", () => {
+    /** @scenario "S3 client defaults region to 'auto' for R2 and MinIO compatibility" */
+    it("hands the client the 'auto' region", async () => {
+      for (const endpoint of ["https://example.r2.cloudflarestorage.com", "http://minio:9000"]) {
+        const client = s3Client({
+          bucket: "objects",
+          endpoint,
+          credentials: account.credentials,
+        });
+
+        await expect(client.config.region()).resolves.toBe("auto");
+      }
+    });
+  });
+});
+
 describe("given object storage on S3", () => {
   describe("when a module writes a body", () => {
     it("streams it with its declared length and type, and answers its digest", async () => {

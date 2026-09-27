@@ -177,6 +177,22 @@ function streamedUpload(fileBytes: number) {
   return { body, pulled: () => pulled };
 }
 
+/** A multipart body naming only the given fields and, optionally, one CSV file. */
+function multipartBody(fields: Record<string, string>, file?: string) {
+  const parts = Object.entries(fields).map(
+    ([name, value]) =>
+      `--${BOUNDARY}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
+  );
+  if (file !== void 0) {
+    parts.push(
+      `--${BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="data.csv"\r\n` +
+        `Content-Type: text/csv\r\n\r\n${file}\r\n`,
+    );
+  }
+
+  return new Blob([...parts, `--${BOUNDARY}--\r\n`]).stream();
+}
+
 describe("the mounted dataset REST family", () => {
   describe("when the project's datasets are listed", () => {
     /** @scenario "List datasets with page and limit parameters" */
@@ -750,6 +766,98 @@ describe("the mounted dataset REST family", () => {
       expect(storeAttachmentUpload).toHaveBeenCalledWith(
         expect.objectContaining({ projectId: "project-1", filename: "big.csv" }),
       );
+    });
+  });
+
+  describe("when a multipart body posted to the deprecated upload pair is incomplete", () => {
+    /** @scenario "Upload without a file field returns 422" */
+    it("refuses an upload into a dataset that attaches no file", async () => {
+      const createDatasetFromUpload = vi.fn();
+      const uploadToExistingDataset = vi.fn();
+      const { sendStream } = mount({ createDatasetFromUpload, uploadToExistingDataset });
+
+      const response = await sendStream("/api/dataset/empty/upload", multipartBody({}));
+
+      expect(response.status).toBe(422);
+      expect(uploadToExistingDataset).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Create + upload requires a name field" */
+    it("refuses a create that carries a file but no name", async () => {
+      const createDatasetFromUpload = vi.fn();
+      const uploadToExistingDataset = vi.fn();
+      const { sendStream } = mount({ createDatasetFromUpload, uploadToExistingDataset });
+
+      const response = await sendStream("/api/dataset/upload", multipartBody({}, "input\nhello\n"));
+
+      expect(response.status).toBe(422);
+      expect(createDatasetFromUpload).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Create + upload requires a file field" */
+    it("refuses a create that carries a name but no file", async () => {
+      const createDatasetFromUpload = vi.fn();
+      const uploadToExistingDataset = vi.fn();
+      const { sendStream } = mount({ createDatasetFromUpload, uploadToExistingDataset });
+
+      const response = await sendStream("/api/dataset/upload", multipartBody({ name: "No File" }));
+
+      expect(response.status).toBe(422);
+      expect(createDatasetFromUpload).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Create + upload fails when slug conflicts with existing dataset" */
+    it("answers 409 when the name's slug is already taken", async () => {
+      const { sendStream } = mount({
+        createDatasetFromUpload: vi.fn(async () => {
+          throw domainError("DatasetConflictError", "slug taken");
+        }),
+      });
+
+      const response = await sendStream(
+        "/api/dataset/upload",
+        multipartBody({ name: "Duplicate" }, "input\nhello\n"),
+      );
+
+      expect(response.status).toBe(409);
+    });
+  });
+
+  describe("when the deprecated upload pair is posted without a usable credential", () => {
+    const refusedMount = () => {
+      const createDatasetFromUpload = vi.fn();
+      const uploadToExistingDataset = vi.fn();
+      const mounted = mount({ createDatasetFromUpload, uploadToExistingDataset }, { refuse: true });
+
+      return { ...mounted, createDatasetFromUpload, uploadToExistingDataset };
+    };
+
+    /** @scenario "Upload without API key returns 401" */
+    it("refuses a create-and-upload before the application is reached", async () => {
+      const { sendStream, createDatasetFromUpload, uploadToExistingDataset } = refusedMount();
+
+      const response = await sendStream(
+        "/api/dataset/upload",
+        multipartBody({ name: "New" }, "input\nhello\n"),
+      );
+
+      expect(response.status).toBe(401);
+      expect(createDatasetFromUpload).not.toHaveBeenCalled();
+      expect(uploadToExistingDataset).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Upload to existing without API key returns 401" */
+    it("refuses an upload into a dataset before the application is reached", async () => {
+      const { sendStream, createDatasetFromUpload, uploadToExistingDataset } = refusedMount();
+
+      const response = await sendStream(
+        "/api/dataset/some-dataset/upload",
+        multipartBody({}, "input\nhello\n"),
+      );
+
+      expect(response.status).toBe(401);
+      expect(uploadToExistingDataset).not.toHaveBeenCalled();
+      expect(createDatasetFromUpload).not.toHaveBeenCalled();
     });
   });
 
