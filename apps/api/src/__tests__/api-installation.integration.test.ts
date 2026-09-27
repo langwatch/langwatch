@@ -240,6 +240,67 @@ describe("the api process installation", () => {
     }
   });
 
+  it("answers the hosted MCP approval step from the installed hosted-mcp module", async () => {
+    const { runtime } = await bootApi();
+
+    try {
+      const closed = {
+        authenticate: () => {
+          throw new Error("the approval step resolves its caller optionally.");
+        },
+      };
+      const signedIn = (request: Request) =>
+        request.headers.get("x-test-user")
+          ? { actor: { type: "user" as const, id: "user-1" }, scope: null }
+          : null;
+      const host = RestHost.create({
+        identities: {
+          project: closed,
+          organization: closed,
+          apiKey: closed,
+          scimToken: closed,
+          "instance-admin": closed,
+          browser: { ...closed, identifyOptional: ({ request }) => signedIn(request) },
+        },
+        bearers: () => closed,
+        audit: { record: async () => {} },
+      });
+      const isApproval = (transport: { protocol: string; namespace?: string }) =>
+        transport.protocol === "rest" && transport.namespace === "mcp-authorize";
+      const owner = serverModules.find((module) => (module.transports ?? []).some(isApproval));
+      const approval = owner?.transports?.find(isApproval);
+      if (!owner || !approval) throw new Error("no installed module declares mcp-authorize");
+      expect(owner.name).toBe("hosted-mcp");
+      host.mount(approval.router(), () => runtime.service(owner.apiContract));
+      const post = (headers: Record<string, string>) =>
+        host.app.fetch(
+          new Request("http://api.test/api/mcp/authorize", {
+            method: "POST",
+            headers: { "content-type": "application/json", ...headers },
+            body: JSON.stringify({
+              projectId: "project-1",
+              redirect_uri: "http://127.0.0.1:9999/cb",
+              client_id: "never-registered",
+            }),
+          }),
+        );
+
+      const signedOut = await post({});
+      const unregistered = await post({ "x-test-user": "yes" });
+
+      expect({ status: signedOut.status, body: await signedOut.json() }).toEqual({
+        status: 401,
+        body: { error: "Not authenticated" },
+      });
+      expect({ status: unregistered.status, body: await unregistered.json() }).toEqual({
+        status: 400,
+        body: { error: "Unknown or unregistered client_id" },
+      });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   /** @scenario "The api process serves every OTLP signal at its own module's door" */
   it("answers every OTLP signal from its owner's door, canonically and under an alias", async () => {
     const { runtime } = await bootApi();

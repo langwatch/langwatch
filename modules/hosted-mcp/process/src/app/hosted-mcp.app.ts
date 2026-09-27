@@ -9,11 +9,14 @@ import { mcpSessionRelayChannels } from "../channels/mcp-session-relay-channels.
 import { RedisMcpOAuthClientRepository } from "../repositories/redis/redis.mcp-oauth-client.repository.ts";
 import { RedisMcpOAuthTokenRepository } from "../repositories/redis/redis.mcp-oauth-token.repository.ts";
 import { RedisMcpSessionRepository } from "../repositories/redis/redis.mcp-session.repository.ts";
+import type { McpAuthorizeAnswer } from "../rules/mcp-authorize.rules.ts";
 import { AuthzMcpSessionGrantService } from "../services/authz-mcp-session-grant.service.ts";
 import { GovernanceMcpSessionToolsService } from "../services/governance-mcp-session-tools.service.ts";
 import { HeaderMcpClientAddressService } from "../services/header-mcp-client-address.service.ts";
+import { McpAuthorizationService } from "../services/mcp-authorization.service.ts";
 import { McpEndpointService, type McpHandler } from "../services/mcp-endpoint.service.ts";
 import { ProjectMcpProjectLookupService } from "../services/project-mcp-project-lookup.service.ts";
+import type { McpAuthorizeApi } from "../transport/mcp-authorize.rest.ts";
 import type { HostedMcpDependencies } from "./hosted-mcp.members.ts";
 
 /**
@@ -44,7 +47,7 @@ type HostedMcpDependenciesMap = Readonly<{
 type HostedMcpSetup = FeatureSetup<HostedMcpDependenciesMap, HostedMcpInfrastructure, undefined>;
 
 /** Owns the hosted MCP session transport's collaborators for one process. */
-export class HostedMcpApp implements HostedMcpApiContract {
+export class HostedMcpApp implements HostedMcpApiContract, McpAuthorizeApi {
   static readonly contract = HostedMcpApi;
   static readonly dependencies: HostedMcpDependenciesMap = {
     projects: ProjectApi,
@@ -54,9 +57,15 @@ export class HostedMcpApp implements HostedMcpApiContract {
   static readonly reads = ["redis", "encryption", "publicBaseUrl"] as const;
 
   #dependencies: HostedMcpDependencies;
+  /** The consent page's approval step; absent where a suite composed the endpoint alone. */
+  #authorization: McpAuthorizationService | undefined;
 
-  private constructor(dependencies: HostedMcpDependencies) {
+  private constructor(
+    dependencies: HostedMcpDependencies,
+    authorization: McpAuthorizationService | undefined,
+  ) {
     this.#dependencies = dependencies;
+    this.#authorization = authorization;
   }
 
   /** Refuses by name: a deployment naming no `BASE_HOST` cannot mount MCP. */
@@ -67,22 +76,51 @@ export class HostedMcpApp implements HostedMcpApiContract {
       );
     }
 
-    return HostedMcpApp.fromDependencies({
-      redis: members.redis,
-      projects: ProjectMcpProjectLookupService.create({ projects: dependencies.projects }),
-      grants: AuthzMcpSessionGrantService.create({ authorization: dependencies.authorization }),
-      cipher: members.encryption,
-      address: HeaderMcpClientAddressService.create(),
-      baseHost: members.publicBaseUrl,
-      sessionTools: GovernanceMcpSessionToolsService.create({
-        governance: dependencies.governance,
-      }),
+    const { projects, authorization } = dependencies;
+    const approvals = McpAuthorizationService.create({
+      collaborators: {
+        findProject: async ({ projectId }) => {
+          const project = await projects.findById(projectId);
+          return (
+            project && { id: project.id, apiKey: project.apiKey, archivedAt: project.archivedAt }
+          );
+        },
+        mayApprove: ({ approver, projectId, permission }) =>
+          authorization.hasPermission({ userId: approver.user.id, projectId, permission }),
+        isDemoProject: (input) => authorization.isDemoProject(input),
+        encrypt: (value) => members.encryption.encrypt(value),
+        clients: RedisMcpOAuthClientRepository.create({ redis: members.redis }),
+        codes: RedisMcpOAuthTokenRepository.create({ redis: members.redis }),
+      },
     });
+
+    return new HostedMcpApp(
+      {
+        redis: members.redis,
+        projects: ProjectMcpProjectLookupService.create({ projects: dependencies.projects }),
+        grants: AuthzMcpSessionGrantService.create({ authorization: dependencies.authorization }),
+        cipher: members.encryption,
+        address: HeaderMcpClientAddressService.create(),
+        baseHost: members.publicBaseUrl,
+        sessionTools: GovernanceMcpSessionToolsService.create({
+          governance: dependencies.governance,
+        }),
+      },
+      approvals,
+    );
   }
 
   /** The app over collaborators already built, as a suite or another composition holds them. */
   static fromDependencies(dependencies: HostedMcpDependencies): HostedMcpApp {
-    return new HostedMcpApp(dependencies);
+    return new HostedMcpApp(dependencies, undefined);
+  }
+
+  /** `POST /api/mcp/authorize`, main's approval step of the hosted MCP OAuth flow. */
+  authorize(input: { approverId: string | undefined; raw: string }): Promise<McpAuthorizeAnswer> {
+    if (!this.#authorization) {
+      throw new Error("This hosted MCP app was composed without its approval step");
+    }
+    return this.#authorization.authorize(input);
   }
 
   /** A fresh endpoint, with its own sessions, caches and reaper, over this process's stores. */
