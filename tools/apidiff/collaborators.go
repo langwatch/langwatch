@@ -7,7 +7,9 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,8 +24,9 @@ const (
 	throwawayLwqlReaderPassword     = "apidiff-lwql-reader-password-000000000000000"
 
 	// Instant Evals are offered only where a judge is configured. The key
-	// never reaches a judge: JEV_BASE_URL is a dead https loopback port, so a
-	// judged column fails the same way on both sides.
+	// reaches only the stub judge (collaborators-judge.go); JEV_BASE_URL falls back to
+	// a dead https loopback port when no stub runs, and a judged column then
+	// fails the same way on both sides.
 	throwawayJudgeKey     = "apidiff-throwaway-jev-key"
 	throwawayJudgeBaseURL = "https://127.0.0.1:9"
 
@@ -48,12 +51,14 @@ var collaboratorEnvKeys = []string{
 	"LWQL_ACCESS_MODEL_SQL_SINGLE_NODE", "SKIP_LWQL_PROVISION",
 	"JEV_API_KEY", "JEV_BASE_URL", "JEV_MODEL", "INSTANT_EVAL_CLASSIFIER",
 	"LANGY_AGENT_URL", "LANGY_INTERNAL_SECRET", "SEED_EMAIL_DOMAIN", "LW_GATEWAY_BASE_URL",
+	"NODE_EXTRA_CA_CERTS",
 }
 
 // collaboratorEnv is one instance's collaborator configuration. Each side gets
 // its own restricted LangWatchQL user: both converge on one ClickHouse server,
 // and a shared user would carry whichever side's grants converged last.
 func collaboratorEnv(instanceName, langyAgentURL string) []string {
+	judgeURL := throwawayJudgeBaseURL
 	env := []string{
 		"LWQL_CLICKHOUSE_PASSWORD=" + throwawayLwqlClickHousePassword,
 		"LWQL_POSTGRES_READER_PASSWORD=" + throwawayLwqlReaderPassword,
@@ -61,10 +66,16 @@ func collaboratorEnv(instanceName, langyAgentURL string) []string {
 		"LWQL_ACCESS_MODEL_MODE=sql",
 		"LWQL_ACCESS_MODEL_SQL_SINGLE_NODE=true",
 		"JEV_API_KEY=" + throwawayJudgeKey,
-		"JEV_BASE_URL=" + throwawayJudgeBaseURL,
 		"SEED_EMAIL_DOMAIN=" + seedEmailDomain,
 		"LW_GATEWAY_BASE_URL=" + throwawayGatewayBaseURL,
 	}
+	if judge := judgeBeside(langyAgentURL); judge != nil {
+		judgeURL = judge.url
+		env = append(env, "NODE_EXTRA_CA_CERTS="+judge.caPath)
+	} else if inherited := inheritedCABundle(); inherited != "" {
+		env = append(env, "NODE_EXTRA_CA_CERTS="+inherited)
+	}
+	env = append(env, "JEV_BASE_URL="+judgeURL)
 	if langyAgentURL != "" {
 		env = append(env, "LANGY_AGENT_URL="+langyAgentURL, "LANGY_INTERNAL_SECRET="+throwawayLangyInternalSecret)
 	}
@@ -74,11 +85,16 @@ func collaboratorEnv(instanceName, langyAgentURL string) []string {
 // langyAgentStub stands in for the Langy agent manager (services/langyagent)
 // on both sides. It accepts every warm, dispatch and cancel, and reports no
 // live worker to a probe, which is all an API needs to mint a conversation
-// and a turn. Each side is served under its own path prefix.
+// and a turn. Each side is served under its own path prefix. The stub judge
+// starts and stops with it, found from the agent URL by judgeBeside.
 type langyAgentStub struct {
 	server   *http.Server
 	listener net.Listener
+	judge    *judgeStub
 }
+
+// judgeStubs maps a Langy stub's address to the judge started beside it.
+var judgeStubs sync.Map
 
 func startLangyAgentStub() (*langyAgentStub, error) {
 	var listenConfig net.ListenConfig
@@ -86,7 +102,13 @@ func startLangyAgentStub() (*langyAgentStub, error) {
 	if err != nil {
 		return nil, fmt.Errorf("langy agent stub: %w", err)
 	}
-	stub := &langyAgentStub{listener: listener}
+	judge, err := startJudgeStub()
+	if err != nil {
+		_ = listener.Close()
+		return nil, err
+	}
+	stub := &langyAgentStub{listener: listener, judge: judge}
+	judgeStubs.Store(listener.Addr().String(), judge)
 	stub.server = &http.Server{Handler: http.HandlerFunc(langyAgentStubHandler), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		if serveErr := stub.server.Serve(listener); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
@@ -105,6 +127,23 @@ func (stub *langyAgentStub) Close() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = stub.server.Shutdown(ctx)
+	judgeStubs.Delete(stub.listener.Addr().String())
+	stub.judge.Close()
+}
+
+// judgeBeside is the stub judge started with the Langy stub an agent URL
+// names, or nil when that URL names none.
+func judgeBeside(langyAgentURL string) *judgeStub {
+	parsed, err := url.Parse(langyAgentURL)
+	if err != nil || parsed.Host == "" {
+		return nil
+	}
+	judge, ok := judgeStubs.Load(parsed.Host)
+	if !ok {
+		return nil
+	}
+	typed, _ := judge.(*judgeStub)
+	return typed
 }
 
 // langyAgentStubHandler answers the manager's four routes the way a manager
