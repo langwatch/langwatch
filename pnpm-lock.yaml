@@ -11408,6 +11408,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../packages/ksuid
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
