@@ -40,15 +40,21 @@ import { StripePricesSyncTask } from "./tasks/stripe-prices-sync.task.ts";
 import { billingStripeWebhookRest } from "./transport/billing-stripe-webhook.rest.ts";
 import { connectedBillingTrpcTransport } from "./transport/connected-billing.trpc.ts";
 import { currencyTrpcTransport } from "./transport/currency.trpc.ts";
+import { subscriptionTrpcTransport } from "./transport/subscription.trpc.ts";
 
 /**
- * Billing as an installed module: the connected-billing door and the Stripe
- * callback; the factories below serve today's callers.
+ * Billing as an installed module: the connected-billing, currency and subscription
+ * doors and the Stripe callback; the factories below serve today's callers.
  */
 export const billingServer = defineServerModule("billing")
   .withRepositories(billingRepositories)
   .withApp(BillingApp)
-  .withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport)
+  .withTransports(
+    connectedBillingTrpcTransport,
+    billingStripeWebhookRest,
+    currencyTrpcTransport,
+    subscriptionTrpcTransport,
+  )
   .withEventing(connectedBillingEventing)
   .withEventing(billingReportingEventing)
   .withTasks(async ({ secrets }) => [

@@ -1,4 +1,5 @@
 import {
+  type DataRetentionApi,
   PLATFORM_DEFAULT_RETENTION_DAYS,
   retentionCategories,
 } from "@langwatch/data-retention-contract";
@@ -47,7 +48,12 @@ type BillingSubscriptionLifecycleOptions = {
     prices: StripePriceMap;
   };
   host: BillingWebhookHost;
+  /** Data-retention's rules, which a first seat activation stamps at the platform default. */
+  retention: SeatRetentionRules;
 };
+
+/** The two data-retention operations seat provisioning reads and writes. */
+export type SeatRetentionRules = Pick<DataRetentionApi, "listOrganizationRules" | "setForScope">;
 
 export class BillingSubscriptionLifecycleService {
   static create(options: BillingSubscriptionLifecycleOptions): BillingSubscriptionLifecycleService {
@@ -59,6 +65,7 @@ export class BillingSubscriptionLifecycleService {
   private readonly stripe: Stripe;
   private readonly itemCalculator: BillingSubscriptionLifecycleOptions["itemCalculator"];
   private readonly host: BillingWebhookHost;
+  private readonly retention: SeatRetentionRules;
   private readonly bestEffort = BestEffortService.create();
 
   private constructor(options: BillingSubscriptionLifecycleOptions) {
@@ -67,6 +74,7 @@ export class BillingSubscriptionLifecycleService {
     this.stripe = options.stripe;
     this.itemCalculator = options.itemCalculator;
     this.host = options.host;
+    this.retention = options.retention;
   }
 
   async handleSubscriptionDeleted({
@@ -417,7 +425,7 @@ export class BillingSubscriptionLifecycleService {
     // licenseHandler.provisionMissingRetentionPolicies.
     let covered: Set<string>;
     try {
-      const existing = await this.host.listOrganizationRetentionRules({
+      const existing = await this.retention.listOrganizationRules({
         organizationId,
       });
       covered = new Set(
@@ -443,7 +451,7 @@ export class BillingSubscriptionLifecycleService {
       }
 
       try {
-        await this.host.setOrganizationRetention({
+        await this.retention.setForScope({
           scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
           category,
           retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,

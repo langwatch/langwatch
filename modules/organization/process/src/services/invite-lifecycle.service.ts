@@ -9,6 +9,7 @@ import {
   InviteNotFoundError,
   OrganizationNotFoundError,
   type OrganizationInvite,
+  type OrganizationUserRole,
 } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -236,6 +237,33 @@ export class InviteLifecycleService {
       role: input.role,
       subscriptionId: input.subscriptionId,
     });
+  }
+
+  /** A seat checkout's held invitations, skipping any address already invited here. */
+  async createPaymentPendingInvites({
+    organizationId,
+    subscriptionId,
+    invites,
+  }: {
+    organizationId: string;
+    subscriptionId: string;
+    invites: readonly { email: string; role: OrganizationUserRole; teamIds: string }[];
+  }): Promise<void> {
+    for (const invite of invites) {
+      if (await this.invites.hasOpenInviteForEmail({ email: invite.email, organizationId })) {
+        continue;
+      }
+      await this.createPaymentPendingInvite({ ...invite, organizationId, subscriptionId });
+    }
+  }
+
+  /** Drops the held invitations of abandoned seat checkouts. */
+  async cancelPaymentPendingInvites(input: {
+    organizationId: string;
+    subscriptionIds: readonly string[];
+  }): Promise<void> {
+    if (input.subscriptionIds.length === 0) return;
+    await this.invites.deletePaymentPendingInvites(input);
   }
 
   /**

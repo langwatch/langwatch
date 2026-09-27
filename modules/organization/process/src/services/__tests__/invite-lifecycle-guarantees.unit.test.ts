@@ -111,3 +111,60 @@ describe("given two PAYMENT_PENDING invites bought on the same subscription", ()
     });
   });
 });
+
+describe("given a seat checkout naming one address already invited here", () => {
+  describe("when its invitations are held until payment", () => {
+    it("holds one for the new address and skips the one already invited", async () => {
+      const invites = new FakeOrganizationInviteRepository();
+      invites.seedOrganization(makeOrganization({ id: "org-1" }));
+      invites.seedInvite(
+        makeInvite({ id: "invite-open", email: "a@acme.com", status: "PENDING", expiration: null }),
+      );
+      const service = InviteLifecycleService.create(makeInviteDeps({ invites }));
+
+      await service.createPaymentPendingInvites({
+        organizationId: "org-1",
+        subscriptionId: "sub-1",
+        invites: [
+          { email: "a@acme.com", role: "MEMBER", teamIds: "team-1" },
+          { email: "b@acme.com", role: "MEMBER", teamIds: "team-1" },
+        ],
+      });
+
+      const held = await invites.findPaymentPendingInvites({
+        subscriptionId: "sub-1",
+        organizationId: "org-1",
+      });
+      expect(held.map((invite) => invite.email)).toEqual(["b@acme.com"]);
+    });
+  });
+
+  describe("when that checkout is abandoned", () => {
+    it("drops the invitations it held", async () => {
+      const invites = new FakeOrganizationInviteRepository();
+      invites.seedOrganization(makeOrganization({ id: "org-1" }));
+      invites.seedInvite(
+        makeInvite({
+          id: "invite-held",
+          email: "b@acme.com",
+          status: "PAYMENT_PENDING",
+          subscriptionId: "sub-1",
+          expiration: null,
+        }),
+      );
+      const service = InviteLifecycleService.create(makeInviteDeps({ invites }));
+
+      await service.cancelPaymentPendingInvites({
+        organizationId: "org-1",
+        subscriptionIds: ["sub-1"],
+      });
+
+      expect(
+        await invites.findPaymentPendingInvites({
+          subscriptionId: "sub-1",
+          organizationId: "org-1",
+        }),
+      ).toEqual([]);
+    });
+  });
+});

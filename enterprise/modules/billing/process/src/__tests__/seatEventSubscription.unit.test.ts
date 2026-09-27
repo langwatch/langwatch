@@ -1,8 +1,12 @@
 import { SubscriptionStatus, type StripePriceMap } from "@langwatch/enterprise-billing-contract";
 import Stripe from "stripe";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
-import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import type { SeatEventSubscriptionRepository } from "../repositories/seat-event-subscription.repository.ts";
+import {
+  type SeatCheckoutInvites,
+  SeatEventSubscriptionService,
+} from "../services/seat-event-subscription.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 
@@ -43,46 +47,39 @@ const createMockStripe = () => ({
   },
 });
 
-const createMockDb = () => ({
-  subscription: {
-    findMany: vi.fn().mockResolvedValue([]),
-    findFirst: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    updateMany: vi.fn(),
-  },
-  organizationInvite: {
-    findFirst: vi.fn(),
-    create: vi.fn(),
-    deleteMany: vi.fn(),
-  },
-  $transaction: vi.fn((fn: (tx: any) => Promise<any>) =>
-    fn({
-      subscription: {
-        create: vi.fn().mockResolvedValue({ id: "sub_new_1" }),
-      },
-      organizationInvite: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        create: vi.fn(),
-      },
-    }),
-  ),
+const createMockSubscriptions = (): {
+  [K in keyof SeatEventSubscriptionRepository]: Mock<SeatEventSubscriptionRepository[K]>;
+} => ({
+  findSeatCandidates: vi.fn().mockResolvedValue([]),
+  cancelPendingSeatCheckouts: vi.fn().mockResolvedValue([]),
+  createPendingSeatCheckout: vi.fn().mockResolvedValue({ id: "sub_new_1" }),
+  reactivateWithSeats: vi.fn(),
+});
+
+const createMockInvites = (): {
+  [K in keyof SeatCheckoutInvites]: Mock<SeatCheckoutInvites[K]>;
+} => ({
+  createPaymentPendingInvites: vi.fn(),
+  cancelPaymentPendingInvites: vi.fn(),
 });
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe("seatEventSubscription", () => {
   let stripe: ReturnType<typeof createMockStripe>;
-  let db: ReturnType<typeof createMockDb>;
+  let subscriptions: ReturnType<typeof createMockSubscriptions>;
+  let invites: ReturnType<typeof createMockInvites>;
   let service: SeatEventSubscriptionService;
 
   beforeEach(() => {
     vi.clearAllMocks();
     stripe = createMockStripe();
-    db = createMockDb();
+    subscriptions = createMockSubscriptions();
+    invites = createMockInvites();
     service = SeatEventSubscriptionService.create({
       stripe: stripe as any,
-      database: db as any,
+      subscriptions,
+      invites,
       prices,
       customerCurrency: StripeCustomerCurrencyService.create(StripeErrorTranslatorService.create()),
     });
@@ -127,7 +124,7 @@ describe("seatEventSubscription", () => {
   describe("previewProration()", () => {
     describe("when active subscription exists with a seat item", () => {
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription());
       });
 
@@ -361,7 +358,7 @@ describe("seatEventSubscription", () => {
         // Stripe reports `unit_amount: null` for tiered and metered prices.
         // Falling back to zero rendered "$0" as the new billing amount beside a
         // button that charges the card.
-        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription({ unitAmount: null }));
         stripe.invoices.createPreview.mockResolvedValue({
           currency: "usd",
@@ -381,7 +378,7 @@ describe("seatEventSubscription", () => {
 
     describe("when the subscription is scheduled for cancellation", () => {
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue(
           seatSubscription({ canceledAt: 1700000000, interval: "year" }),
         );
@@ -434,7 +431,7 @@ describe("seatEventSubscription", () => {
 
     describe("when no subscription exists at all", () => {
       it("raises subscription_sync_failed", async () => {
-        db.subscription.findMany.mockResolvedValue([]);
+        subscriptions.findSeatCandidates.mockResolvedValue([]);
 
         await expect(
           service.previewProration({
@@ -448,7 +445,7 @@ describe("seatEventSubscription", () => {
     describe("when the active subscription has no billing-provider link", () => {
       /** @scenario "An active subscription with no billing-provider link is named as such" */
       it("raises subscription_not_linked instead of the retryable sync error", async () => {
-        db.subscription.findMany.mockResolvedValue([
+        subscriptions.findSeatCandidates.mockResolvedValue([
           { id: "sub_db_1", stripeSubscriptionId: null, status: "ACTIVE" },
         ]);
 
@@ -466,7 +463,7 @@ describe("seatEventSubscription", () => {
         // `cancel()` keeps stripeSubscriptionId, so a churned subscription is a
         // permanent tombstone. Ranking by recency alone let it answer for an
         // organization whose live plan was never linked.
-        db.subscription.findMany.mockResolvedValue([
+        subscriptions.findSeatCandidates.mockResolvedValue([
           {
             id: "sub_db_tombstone",
             stripeSubscriptionId: "sub_stripe_dead",
@@ -492,7 +489,7 @@ describe("seatEventSubscription", () => {
         // status against any organization with no uniqueness check behind it.
         // Preferring the linked row would charge the older plan even when the
         // newer one was added to supersede it.
-        db.subscription.findMany.mockResolvedValue([
+        subscriptions.findSeatCandidates.mockResolvedValue([
           { id: "sub_db_new", stripeSubscriptionId: null, status: "ACTIVE" },
           {
             id: "sub_db_old",
@@ -512,7 +509,7 @@ describe("seatEventSubscription", () => {
 
       /** @scenario "Two active subscriptions refuse a seat change rather than picking one" */
       it("refuses the update too, so nothing is charged", async () => {
-        db.subscription.findMany.mockResolvedValue([
+        subscriptions.findSeatCandidates.mockResolvedValue([
           {
             id: "sub_db_a",
             stripeSubscriptionId: "sub_stripe_a",
@@ -532,14 +529,14 @@ describe("seatEventSubscription", () => {
           }),
         ).rejects.toMatchObject({ code: "subscription_ambiguous" });
         expect(stripe.subscriptions.update).not.toHaveBeenCalled();
-        expect(db.subscription.update).not.toHaveBeenCalled();
+        expect(subscriptions.reactivateWithSeats).not.toHaveBeenCalled();
       });
     });
 
     describe("when a newer cancelled subscription sits above a live one", () => {
       /** @scenario "A live subscription outranks a more recent cancelled one" */
       it("acts on the live subscription", async () => {
-        db.subscription.findMany.mockResolvedValue([
+        subscriptions.findSeatCandidates.mockResolvedValue([
           {
             id: "sub_db_new",
             stripeSubscriptionId: "sub_stripe_dead",
@@ -571,7 +568,7 @@ describe("seatEventSubscription", () => {
     describe("when only a cancelled subscription remains", () => {
       /** @scenario "Seat updates can reverse a scheduled cancellation" */
       it("acts on it, so a scheduled cancellation can be reversed", async () => {
-        db.subscription.findMany.mockResolvedValue([
+        subscriptions.findSeatCandidates.mockResolvedValue([
           {
             id: "sub_db_1",
             stripeSubscriptionId: "sub_stripe_1",
@@ -597,7 +594,7 @@ describe("seatEventSubscription", () => {
 
     describe("when Stripe subscription is not active", () => {
       it("raises subscription_sync_failed", async () => {
-        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue({
           status: "canceled",
           items: { data: [] },
@@ -614,7 +611,7 @@ describe("seatEventSubscription", () => {
 
     describe("when no seat item found on subscription", () => {
       it("raises subscription_sync_failed for a missing seat item", async () => {
-        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue({
           status: "active",
           items: {
@@ -637,7 +634,7 @@ describe("seatEventSubscription", () => {
   describe("updateSeatEventItems()", () => {
     describe("when active subscription exists with a seat item", () => {
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription());
         stripe.subscriptions.update.mockResolvedValue({});
       });
@@ -682,7 +679,7 @@ describe("seatEventSubscription", () => {
           }),
         ).rejects.toMatchObject({ code: "billing_quote_expired" });
         expect(stripe.subscriptions.update).not.toHaveBeenCalled();
-        expect(db.subscription.update).not.toHaveBeenCalled();
+        expect(subscriptions.reactivateWithSeats).not.toHaveBeenCalled();
       });
 
       /** @scenario "A quote too old to honour is refused rather than repriced" */
@@ -715,20 +712,16 @@ describe("seatEventSubscription", () => {
           totalMembers: 8,
         });
 
-        expect(db.subscription.update).toHaveBeenCalledWith({
-          where: { id: "sub_db_1" },
-          data: {
-            status: SubscriptionStatus.ACTIVE,
-            maxMembers: 8,
-            endDate: null,
-          },
+        expect(subscriptions.reactivateWithSeats).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          maxMembers: 8,
         });
       });
     });
 
     describe("when subscription is scheduled for cancellation", () => {
       it("reactivates by setting cancel_at_period_end to false", async () => {
-        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue(
           seatSubscription({ canceledAt: 1700000000 }),
         );
@@ -751,7 +744,7 @@ describe("seatEventSubscription", () => {
     describe("when no subscription exists at all", () => {
       /** @scenario "A seat update that cannot proceed fails instead of resolving quietly" */
       it("raises subscription_sync_failed instead of resolving as a silent no-op", async () => {
-        db.subscription.findMany.mockResolvedValue([]);
+        subscriptions.findSeatCandidates.mockResolvedValue([]);
 
         await expect(
           service.updateSeatEventItems({
@@ -766,7 +759,7 @@ describe("seatEventSubscription", () => {
     describe("when the active subscription has no billing-provider link", () => {
       /** @scenario "An unlinked subscription blocks the seat update itself" */
       it("raises subscription_not_linked so the seat update cannot pass as a success", async () => {
-        db.subscription.findMany.mockResolvedValue([
+        subscriptions.findSeatCandidates.mockResolvedValue([
           { id: "sub_db_1", stripeSubscriptionId: null, status: "ACTIVE" },
         ]);
 
@@ -777,13 +770,13 @@ describe("seatEventSubscription", () => {
           }),
         ).rejects.toMatchObject({ code: "subscription_not_linked" });
         expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
-        expect(db.subscription.update).not.toHaveBeenCalled();
+        expect(subscriptions.reactivateWithSeats).not.toHaveBeenCalled();
       });
     });
 
     describe("when Stripe subscription status is not active", () => {
       it("raises subscription_sync_failed", async () => {
-        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue({
           status: "canceled",
           items: { data: [] },
@@ -801,7 +794,7 @@ describe("seatEventSubscription", () => {
 
     describe("when no seat item found on Stripe subscription", () => {
       it("raises subscription_sync_failed for the missing seat item", async () => {
-        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue({
           status: "active",
           items: {
@@ -825,7 +818,7 @@ describe("seatEventSubscription", () => {
   describe("createSeatEventCheckout()", () => {
     describe("when stale PENDING subscriptions exist", () => {
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([{ id: "stale_sub_1" }, { id: "stale_sub_2" }]);
+        subscriptions.cancelPendingSeatCheckouts.mockResolvedValue(["stale_sub_1", "stale_sub_2"]);
 
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session",
@@ -842,23 +835,8 @@ describe("seatEventSubscription", () => {
           membersToAdd: 3,
         });
 
-        expect(db.subscription.updateMany).toHaveBeenCalledWith({
-          where: {
-            organizationId: "org_1",
-            plan: {
-              in: [
-                "GROWTH_SEAT_EUR_MONTHLY",
-                "GROWTH_SEAT_EUR_ANNUAL",
-                "GROWTH_SEAT_USD_MONTHLY",
-                "GROWTH_SEAT_USD_ANNUAL",
-              ],
-            },
-            status: SubscriptionStatus.PENDING,
-          },
-          data: {
-            status: SubscriptionStatus.CANCELLED,
-            endDate: expect.any(Date),
-          },
+        expect(subscriptions.cancelPendingSeatCheckouts).toHaveBeenCalledWith({
+          organizationId: "org_1",
         });
       });
 
@@ -872,19 +850,16 @@ describe("seatEventSubscription", () => {
           membersToAdd: 3,
         });
 
-        expect(db.organizationInvite.deleteMany).toHaveBeenCalledWith({
-          where: {
-            organizationId: "org_1",
-            status: "PAYMENT_PENDING",
-            subscriptionId: { in: ["stale_sub_1", "stale_sub_2"] },
-          },
+        expect(invites.cancelPaymentPendingInvites).toHaveBeenCalledWith({
+          organizationId: "org_1",
+          subscriptionIds: ["stale_sub_1", "stale_sub_2"],
         });
       });
     });
 
     describe("when no stale subscriptions exist", () => {
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([]);
+        subscriptions.findSeatCandidates.mockResolvedValue([]);
 
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session",
@@ -901,13 +876,13 @@ describe("seatEventSubscription", () => {
           membersToAdd: 2,
         });
 
-        expect(db.organizationInvite.deleteMany).not.toHaveBeenCalled();
+        expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
       });
     });
 
     describe("when creating checkout session", () => {
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([]);
+        subscriptions.findSeatCandidates.mockResolvedValue([]);
 
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session_abc",
@@ -1009,7 +984,7 @@ describe("seatEventSubscription", () => {
 
     describe("when the Stripe customer already has a fixed currency", () => {
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([]);
+        subscriptions.findSeatCandidates.mockResolvedValue([]);
         stripe.customers.retrieve.mockResolvedValue({
           id: "cus_1",
           currency: "eur",
@@ -1062,7 +1037,7 @@ describe("seatEventSubscription", () => {
 
     describe("when the provider rate-limits the currency lookup", () => {
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([]);
+        subscriptions.findSeatCandidates.mockResolvedValue([]);
         stripe.customers.retrieve.mockRejectedValue(
           new Stripe.errors.StripeRateLimitError({
             message: "slow down",
@@ -1100,15 +1075,15 @@ describe("seatEventSubscription", () => {
           .catch(() => undefined);
 
         expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
-        expect(db.$transaction).not.toHaveBeenCalled();
-        expect(db.subscription.updateMany).not.toHaveBeenCalled();
-        expect(db.organizationInvite.deleteMany).not.toHaveBeenCalled();
+        expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
+        expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
+        expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
       });
     });
 
     describe("when the provider is unreachable during the currency lookup", () => {
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([]);
+        subscriptions.findSeatCandidates.mockResolvedValue([]);
         stripe.customers.retrieve.mockRejectedValue(
           new Stripe.errors.StripeConnectionError({
             message: "network down",
@@ -1138,7 +1113,7 @@ describe("seatEventSubscription", () => {
       const lookupError = new Error("socket hang up");
 
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([]);
+        subscriptions.findSeatCandidates.mockResolvedValue([]);
         stripe.customers.retrieve.mockRejectedValue(lookupError);
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session",
@@ -1176,15 +1151,15 @@ describe("seatEventSubscription", () => {
           .catch(() => undefined);
 
         expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
-        expect(db.$transaction).not.toHaveBeenCalled();
-        expect(db.subscription.updateMany).not.toHaveBeenCalled();
-        expect(db.organizationInvite.deleteMany).not.toHaveBeenCalled();
+        expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
+        expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
+        expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
       });
     });
 
     describe("when the Stripe customer is fixed to a currency we do not sell in", () => {
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([]);
+        subscriptions.findSeatCandidates.mockResolvedValue([]);
         stripe.customers.retrieve.mockResolvedValue({
           id: "cus_1",
           currency: "gbp",
@@ -1220,15 +1195,15 @@ describe("seatEventSubscription", () => {
           .catch(() => undefined);
 
         expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
-        expect(db.$transaction).not.toHaveBeenCalled();
-        expect(db.subscription.updateMany).not.toHaveBeenCalled();
-        expect(db.organizationInvite.deleteMany).not.toHaveBeenCalled();
+        expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
+        expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
+        expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
       });
     });
 
     describe("when the Stripe customer has been deleted", () => {
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([]);
+        subscriptions.findSeatCandidates.mockResolvedValue([]);
         stripe.customers.retrieve.mockResolvedValue({
           id: "cus_1",
           deleted: true,
@@ -1264,15 +1239,15 @@ describe("seatEventSubscription", () => {
           .catch(() => undefined);
 
         expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
-        expect(db.$transaction).not.toHaveBeenCalled();
-        expect(db.subscription.updateMany).not.toHaveBeenCalled();
-        expect(db.organizationInvite.deleteMany).not.toHaveBeenCalled();
+        expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
+        expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
+        expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
       });
     });
 
     describe("when the Stripe customer has no currency yet", () => {
       it("uses the requested currency, since nothing is fixed", async () => {
-        db.subscription.findMany.mockResolvedValue([]);
+        subscriptions.findSeatCandidates.mockResolvedValue([]);
         stripe.customers.retrieve.mockResolvedValue({
           id: "cus_1",
           currency: null,

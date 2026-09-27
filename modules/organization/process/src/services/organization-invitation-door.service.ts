@@ -21,6 +21,7 @@ import {
   type OrganizationInviteResent,
   type OrganizationListedInvite,
   type OrganizationPendingInviteApplied,
+  type OrganizationUserRole,
 } from "@langwatch/organization-contract";
 import { toDate } from "@langwatch/time";
 
@@ -137,6 +138,22 @@ export class OrganizationInvitationDoorService {
     const { invite } = await this.deps.invitations.extend(input);
 
     return { invite: inviteOnWire(invite) };
+  }
+
+  createPaymentPending(
+    input: Readonly<{
+      organizationId: string;
+      subscriptionId: string;
+      invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
+    }>,
+  ): Promise<void> {
+    return this.deps.invitations.createPaymentPending(input);
+  }
+
+  cancelPaymentPending(
+    input: Readonly<{ organizationId: string; subscriptionIds: readonly string[] }>,
+  ): Promise<void> {
+    return this.deps.invitations.cancelPaymentPending(input);
   }
 
   approvePaymentPending(

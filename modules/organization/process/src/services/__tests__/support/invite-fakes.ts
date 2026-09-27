@@ -331,6 +331,24 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
     return invite;
   }
 
+  async deletePaymentPendingInvites({
+    organizationId,
+    subscriptionIds,
+  }: {
+    organizationId: string;
+    subscriptionIds: readonly string[];
+  }): Promise<number> {
+    const held = Array.from(this.invitesById.values()).filter(
+      (invite) =>
+        invite.organizationId === organizationId &&
+        invite.status === "PAYMENT_PENDING" &&
+        invite.subscriptionId !== null &&
+        subscriptionIds.includes(invite.subscriptionId),
+    );
+    for (const invite of held) this.invitesById.delete(invite.id);
+    return held.length;
+  }
+
   async findPaymentPendingInvites({
     subscriptionId,
     organizationId,
@@ -387,8 +405,22 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
     return this.adminEmailsByOrganization.get(organizationId) ?? [];
   }
 
-  hasOpenInviteForEmail =
-    unsupported<OrganizationInviteRepository["hasOpenInviteForEmail"]>("hasOpenInviteForEmail");
+  async hasOpenInviteForEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const now = nowInstant().epochMilliseconds;
+    return Array.from(this.invitesById.values()).some(
+      (invite) =>
+        invite.organizationId === organizationId &&
+        invite.email.toLowerCase() === email.trim().toLowerCase() &&
+        (invite.status === "PENDING" || invite.status === "PAYMENT_PENDING") &&
+        (invite.expiration === null || invite.expiration.epochMilliseconds > now),
+    );
+  }
   findMemberEmails =
     unsupported<OrganizationInviteRepository["findMemberEmails"]>("findMemberEmails");
   findTeamIdsInOrganization = unsupported<

@@ -57,6 +57,8 @@ function invitationStub(create: OrganizationInvitations["create"]): Organization
     resend: unreachable("resend"),
     extend: unreachable("extend"),
     approvePaymentPending: unreachable("approvePaymentPending"),
+    createPaymentPending: unreachable("createPaymentPending"),
+    cancelPaymentPending: unreachable("cancelPaymentPending"),
     list: unreachable("list"),
     findByCode: unreachable("findByCode"),
     matchToAcceptor: unreachable("matchToAcceptor"),

@@ -15,7 +15,10 @@ import {
   BillingCheckoutCompletionService,
   type InviteApprover,
 } from "./billing-checkout-completion.service.ts";
-import { BillingSubscriptionLifecycleService } from "./billing-subscription-lifecycle.service.ts";
+import {
+  BillingSubscriptionLifecycleService,
+  type SeatRetentionRules,
+} from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:webhookService");
@@ -105,6 +108,7 @@ export class EEWebhookService implements WebhookService {
     licensePrivateKey,
     getPostHog,
     host,
+    retention,
     connectedBilling,
   }: {
     subscriptionRepository: BillingWebhookSubscriptionRepository;
@@ -117,6 +121,7 @@ export class EEWebhookService implements WebhookService {
     licensePrivateKey?: string;
     getPostHog?: () => PostHog | null;
     host: BillingWebhookHost;
+    retention: SeatRetentionRules;
     connectedBilling?: ConnectedBillingInvoiceEvents;
   }) {
     this.subscriptionRepository = subscriptionRepository;
@@ -138,6 +143,7 @@ export class EEWebhookService implements WebhookService {
       inviteApprover,
       getPostHog,
       host,
+      retention,
     });
     this.lifecycle = BillingSubscriptionLifecycleService.create({
       subscriptionRepository,
@@ -145,6 +151,7 @@ export class EEWebhookService implements WebhookService {
       stripe,
       itemCalculator,
       host,
+      retention,
     });
   }
 
@@ -159,6 +166,7 @@ export class EEWebhookService implements WebhookService {
     licensePrivateKey?: string;
     getPostHog?: () => PostHog | null;
     host: BillingWebhookHost;
+    retention: SeatRetentionRules;
     connectedBilling?: ConnectedBillingInvoiceEvents;
   }): EEWebhookService {
     return new EEWebhookService(options);

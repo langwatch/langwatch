@@ -9,6 +9,7 @@ import {
   PlanTypes,
   SeatBillingUnavailableError,
   stripePricesFile,
+  type SubscriptionInvite,
   type StripePriceName,
   SubscriptionCreationFailedError,
   UserEmailRequiredError,
@@ -294,7 +295,7 @@ export class BillingSubscriptionService {
     customerId: string;
     currency?: Currency;
     billingInterval?: BillingInterval;
-    invites: { email: string; role: string }[];
+    invites: readonly SubscriptionInvite[];
   }): Promise<{ url: string | null }> {
     if (!this.seatEventService) {
       throw new SeatBillingUnavailableError();

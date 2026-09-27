@@ -1,6 +1,6 @@
 /**
- * The Stripe callback main served at `POST /api/webhooks/stripe`, answered by
- * the installed billing module over memory stores (ARCHITECTURE.md §13).
+ * Billing's doors as main served them — the Stripe callback at `POST /api/webhooks/stripe`,
+ * and the `subscription` and `currency` tRPC routers — over memory stores (ARCHITECTURE.md §13).
  * @vitest-environment node
  * @see enterprise/modules/billing/specs/stripe-webhook.feature
  */
@@ -54,5 +54,30 @@ describe("the api process installation", () => {
     } finally {
       await runtime.stop();
     }
+  });
+
+  it("serves main's subscription and currency procedures from the installed billing module", () => {
+    const billing = serverModules.find((module) => module.name === "billing");
+    const procedures = (billing?.transports ?? []).flatMap((transport) => {
+      if (transport.protocol !== "trpc" || !("contract" in transport)) return [];
+      const { contract } = transport;
+      if (typeof contract !== "object" || contract === null || !("members" in contract)) return [];
+      const { members } = contract;
+      if (typeof members !== "object" || members === null) return [];
+      return Object.keys(members).map((name) => `${transport.namespace}.${name}`);
+    });
+
+    expect(procedures).toEqual(
+      expect.arrayContaining([
+        "subscription.create",
+        "subscription.manage",
+        "subscription.addTeamMemberOrEvents",
+        "subscription.upgradeWithInvites",
+        "subscription.previewProration",
+        "subscription.getLastSubscription",
+        "subscription.listInvoices",
+        "currency.detectCurrency",
+      ]),
+    );
   });
 });

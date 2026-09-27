@@ -5,6 +5,7 @@ import type {
   OrganizationInviteValidation,
   OrganizationListedInvite,
   OrganizationPendingInviteApplied,
+  OrganizationUserRole,
 } from "@langwatch/organization-contract";
 
 import type { PersonalWorkspaceResourceIds } from "../repositories/organization.repository.ts";
@@ -300,6 +301,16 @@ export interface OrganizationInvitations {
   ): Promise<Readonly<{ invite: OrganizationInvite }>>;
   approvePaymentPending(
     input: Readonly<{ subscriptionId: string; organizationId: string }>,
+  ): Promise<void>;
+  createPaymentPending(
+    input: Readonly<{
+      organizationId: string;
+      subscriptionId: string;
+      invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
+    }>,
+  ): Promise<void>;
+  cancelPaymentPending(
+    input: Readonly<{ organizationId: string; subscriptionIds: readonly string[] }>,
   ): Promise<void>;
   list(
     input: Readonly<{ organizationId: string }>,

@@ -4,7 +4,6 @@ import {
   type Currency as CurrencyType,
   type BillingInterval,
   createCheckoutLineItems,
-  GROWTH_SEAT_PLAN_TYPES,
   isGrowthSeatPrice,
   NoActiveSubscriptionError,
   resolveGrowthSeatPlanType,
@@ -13,14 +12,14 @@ import {
   SubscriptionNotLinkedError,
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant, Temporal, toDate } from "@langwatch/time";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { nowInstant, Temporal } from "@langwatch/time";
 import type Stripe from "stripe";
 
+import type { SeatEventSubscriptionRepository } from "../repositories/seat-event-subscription.repository.ts";
 import {
   type InviteInput,
-  type SeatEventDatabase,
   type SeatEventProrationQuote,
   quotedAmounts,
   resolveProrationDate,
@@ -28,58 +27,56 @@ import {
 } from "../rules/seat-event-quote.rules.ts";
 import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service.ts";
 
+/** Organization's side of a seat checkout: the invitations it holds until payment. */
+export type SeatCheckoutInvites = Pick<
+  OrganizationApi,
+  "createPaymentPendingInvites" | "cancelPaymentPendingInvites"
+>;
+
 const logger = createLogger("langwatch:billing:seatEventSubscription");
 
 export class SeatEventSubscriptionService {
   private readonly stripe: Stripe;
-  private readonly db: SeatEventDatabase;
+  private readonly subscriptions: SeatEventSubscriptionRepository;
+  private readonly invites: SeatCheckoutInvites;
   private readonly prices: StripePriceMap;
   private readonly customerCurrency: StripeCustomerCurrencyService;
 
   private constructor({
     stripe,
-    db,
+    subscriptions,
+    invites,
     prices,
     customerCurrency,
   }: {
     stripe: Stripe;
-    db: SeatEventDatabase;
+    subscriptions: SeatEventSubscriptionRepository;
+    invites: SeatCheckoutInvites;
     prices: StripePriceMap;
     customerCurrency: StripeCustomerCurrencyService;
   }) {
     this.stripe = stripe;
-    this.db = db;
+    this.subscriptions = subscriptions;
+    this.invites = invites;
     this.prices = prices;
     this.customerCurrency = customerCurrency;
   }
 
   static create(options: {
     stripe: Stripe;
-    database: SeatEventDatabase;
+    subscriptions: SeatEventSubscriptionRepository;
+    invites: SeatCheckoutInvites;
     prices: StripePriceMap;
     customerCurrency: StripeCustomerCurrencyService;
   }): SeatEventSubscriptionService {
-    return new SeatEventSubscriptionService({
-      stripe: options.stripe,
-      db: options.database,
-      prices: options.prices,
-      customerCurrency: options.customerCurrency,
-    });
+    return new SeatEventSubscriptionService(options);
   }
 
   /**
    * The subscription a seat change should act on, or a named reason there isn't one.
    */
   private async findSeatSubscription(organizationId: string) {
-    const candidates = await this.db.subscription.findMany({
-      where: {
-        organizationId,
-        status: {
-          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED],
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const candidates = await this.subscriptions.findSeatCandidates({ organizationId });
 
     const linked = (subscription: (typeof candidates)[number]) =>
       subscription.stripeSubscriptionId !== null;
@@ -274,28 +271,11 @@ export class SeatEventSubscriptionService {
    * PAYMENT_PENDING invites that hung off them.
    */
   private async cancelAbandonedCheckouts(organizationId: string): Promise<void> {
-    const where = {
+    const staleSubIds = await this.subscriptions.cancelPendingSeatCheckouts({ organizationId });
+    if (staleSubIds.length === 0) return;
+    await this.invites.cancelPaymentPendingInvites({
       organizationId,
-      plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
-      status: SubscriptionStatus.PENDING,
-    };
-    const staleSubs = await this.db.subscription.findMany({ where, select: { id: true } });
-    const staleSubIds = staleSubs.map((s) => s.id);
-
-    await this.db.subscription.updateMany({
-      where,
-      data: { status: SubscriptionStatus.CANCELLED, endDate: toDate(nowInstant()) },
-    });
-    if (staleSubIds.length === 0) {
-      return;
-    }
-
-    await this.db.organizationInvite.deleteMany({
-      where: {
-        organizationId,
-        status: "PAYMENT_PENDING",
-        subscriptionId: { in: staleSubIds },
-      },
+      subscriptionIds: staleSubIds,
     });
   }
 
@@ -313,49 +293,17 @@ export class SeatEventSubscriptionService {
     billingInterval: BillingInterval;
     invites?: InviteInput[];
   }): Promise<{ id: string }> {
-    return this.db.$transaction(async (tx) => {
-      const sub = await tx.subscription.create({
-        data: {
-          organizationId,
-          status: SubscriptionStatus.PENDING,
-          plan: resolveGrowthSeatPlanType({
-            currency: checkoutCurrency,
-            interval: billingInterval,
-          }),
-          maxMembers: membersToAdd,
-        },
-      });
-
-      for (const invite of invites ?? []) {
-        // Skip duplicates: an existing PENDING or PAYMENT_PENDING invite.
-        const existing = await tx.organizationInvite.findFirst({
-          where: {
-            email: invite.email,
-            organizationId,
-            status: { in: ["PENDING", "PAYMENT_PENDING"] },
-            OR: [{ expiration: { gt: toDate(nowInstant()) } }, { expiration: null }],
-          },
-        });
-        if (existing) {
-          continue;
-        }
-
-        await tx.organizationInvite.create({
-          data: {
-            email: invite.email,
-            inviteCode: generate("billinginvite").toString(),
-            expiration: null,
-            organizationId,
-            teamIds: invite.teamIds,
-            role: invite.role,
-            status: "PAYMENT_PENDING",
-            subscriptionId: sub.id,
-          },
-        });
-      }
-
-      return sub;
+    const subscription = await this.subscriptions.createPendingSeatCheckout({
+      organizationId,
+      plan: resolveGrowthSeatPlanType({ currency: checkoutCurrency, interval: billingInterval }),
+      maxMembers: membersToAdd,
     });
+    await this.invites.createPaymentPendingInvites({
+      organizationId,
+      subscriptionId: subscription.id,
+      invites: invites ?? [],
+    });
+    return subscription;
   }
 
   async updateSeatEventItems({
@@ -396,14 +344,7 @@ export class SeatEventSubscriptionService {
     );
 
     // Restore DB record to ACTIVE with updated seat count
-    await this.db.subscription.update({
-      where: { id: subscription.id },
-      data: {
-        status: SubscriptionStatus.ACTIVE,
-        maxMembers: totalMembers,
-        endDate: null,
-      },
-    });
+    await this.subscriptions.reactivateWithSeats({ id: subscription.id, maxMembers: totalMembers });
 
     return { success: true };
   }

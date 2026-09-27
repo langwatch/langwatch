@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.billing-webhook-host.channel.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
+import type { SeatRetentionRules } from "../../services/billing-subscription-lifecycle.service.ts";
 import type { MeteredUsageWarningService } from "../../services/metered-usage-warning.service.ts";
 import { StripeWebhookSignatureService } from "../../services/stripe-webhook-signature.service.ts";
 import { type ConnectedBillingPeers, BillingApp } from "../billing.app.ts";
@@ -78,6 +79,7 @@ function billingApp({
     webhook: {
       signing: StripeWebhookSignatureService.create(webhookSecret),
       host: MemoryBillingWebhookHostChannel.create(),
+      retention: createApiFixture<SeatRetentionRules>({}),
     },
   });
   return { app, asked: registry.asked, audited: registry.audited, repositories };
@@ -321,6 +323,18 @@ describe("the currency BillingApp detects", () => {
       expect(() => app.detectCurrency({ headers: {} })).toThrow(
         expect.objectContaining({ status: 404 }),
       );
+    });
+  });
+});
+
+describe("the subscription door BillingApp serves", () => {
+  describe("given a deployment that composed no subscription door", () => {
+    it("answers not found, as main mounted no subscription router there", async () => {
+      const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
+
+      await expect(app.listInvoices({ organizationId: ACME })).rejects.toMatchObject({
+        status: 404,
+      });
     });
   });
 });

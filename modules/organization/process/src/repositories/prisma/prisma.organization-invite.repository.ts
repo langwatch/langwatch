@@ -425,6 +425,23 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     return membership != null;
   }
 
+  async deletePaymentPendingInvites({
+    organizationId,
+    subscriptionIds,
+  }: {
+    organizationId: string;
+    subscriptionIds: readonly string[];
+  }): Promise<number> {
+    const { count } = await this.prisma.organizationInvite.deleteMany({
+      where: {
+        organizationId,
+        status: "PAYMENT_PENDING",
+        subscriptionId: { in: [...subscriptionIds] },
+      },
+    });
+    return count;
+  }
+
   async findPaymentPendingInvites({
     subscriptionId,
     organizationId,

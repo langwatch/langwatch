@@ -590,6 +590,21 @@ export interface OrganizationApi {
   applyPendingInvite(
     input: Readonly<{ userId: string; organizationId: string; email: string }>,
   ): Promise<OrganizationPendingInviteApplied>;
+  /**
+   * Holds a seat checkout's invitations until it is paid, as main's billing did; an address
+   * that already holds an open invitation here is skipped.
+   */
+  createPaymentPendingInvites(
+    input: Readonly<{
+      organizationId: string;
+      subscriptionId: string;
+      invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
+    }>,
+  ): Promise<void>;
+  /** Drops the held invitations of seat checkouts that were abandoned. */
+  cancelPaymentPendingInvites(
+    input: Readonly<{ organizationId: string; subscriptionIds: readonly string[] }>,
+  ): Promise<void>;
   /** Opens the invitations a completed seat checkout paid for, as main's billing webhook did. */
   approvePaymentPendingInvites(
     input: Readonly<{ subscriptionId: string; organizationId: string }>,
