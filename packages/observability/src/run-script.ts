@@ -1,3 +1,5 @@
+import { nowInstant } from "@langwatch/time";
+
 /**
  * The top-level runner every one-shot Node script boots through: prints one
  * structured error line synchronously if the script fails.
@@ -50,7 +52,7 @@ export function writeScriptWarning({
   process.stdout.write(
     `${JSON.stringify({
       level: "warn",
-      time: new Date().toISOString(),
+      time: nowInstant().toString({ fractionalSecondDigits: 3 }),
       service: name,
       msg,
       ...fields,
@@ -82,7 +84,7 @@ export function scriptFailureRecord({
 
   return {
     level: "error",
-    time: new Date().toISOString(),
+    time: nowInstant().toString({ fractionalSecondDigits: 3 }),
     service: name,
     msg: `${name} failed`,
     error: {
@@ -115,7 +117,7 @@ export function processFailureLine({
     (typeof error === "string" || error === void 0 ? error : JSON.stringify(error));
   return `${JSON.stringify({
     level: "fatal",
-    time: new Date().toISOString(),
+    time: nowInstant().toString({ fractionalSecondDigits: 3 }),
     service,
     msg: message === void 0 ? event : `${event}: ${message}`,
     ...(error === void 0

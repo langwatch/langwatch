@@ -8,7 +8,7 @@ import { CreateFunctionCommand, UpdateFunctionConfigurationCommand } from "@aws-
 import { describe, expect, it } from "vitest";
 
 import type { StudioLambdaConfig } from "../../rules/nlp-lambda-config.rules.ts";
-import { AwsNlpLambdaArnResolverChannel } from "../aws/aws.nlp-lambda-arn-resolver.channel.ts";
+import { AwsNlpLambdaArnResolverChannel } from "../aws.nlp-lambda-arn-resolver.channel.ts";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:langwatch_nlp-project-1";
 

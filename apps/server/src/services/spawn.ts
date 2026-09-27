@@ -85,14 +85,16 @@ export function supervise({
   mkdirSync(dirname(logPath), { recursive: true });
   mkdirSync(dirname(pidPath), { recursive: true });
 
+  const first = launchAttempt({ spec, logPath });
   const state = makeSupervisionState({
     spec,
     bus,
     restartPolicy,
     logPath,
     pidPath,
+    firstChild: first.child,
   });
-  spawnAttempt(state);
+  superviseAttempt(state, first);
 
   return {
     name: spec.name,
@@ -112,12 +114,14 @@ function makeSupervisionState({
   restartPolicy,
   logPath,
   pidPath,
+  firstChild,
 }: {
   spec: SpawnSpec;
   bus: EventBus;
   restartPolicy: RestartPolicy;
   logPath: string;
   pidPath: string;
+  firstChild: ChildProcess;
 }): SupervisionState {
   const state: SupervisionState = {
     spec,
@@ -125,7 +129,7 @@ function makeSupervisionState({
     restartPolicy,
     logPath,
     pidPath,
-    currentChild: null as unknown as ChildProcess,
+    currentChild: firstChild,
     stopped: false,
     hasBeenHealthy: false,
     restartCount: 0,
@@ -142,17 +146,29 @@ function makeSupervisionState({
   return state;
 }
 
-/** Launch (or relaunch, on restart) the child and wire its termination to `handleExit`. */
-function spawnAttempt(state: SupervisionState): void {
-  const logStream = createWriteStream(state.logPath, { flags: "a" });
-  const child = nodeSpawn(state.spec.command, state.spec.args, {
-    env: state.spec.env,
-    cwd: state.spec.cwd,
+type Attempt = Readonly<{ child: ChildProcess; logStream: WriteStream }>;
+
+/** Opens the service's log and starts one child process. */
+function launchAttempt({ spec, logPath }: { spec: SpawnSpec; logPath: string }): Attempt {
+  const logStream = createWriteStream(logPath, { flags: "a" });
+  const child = nodeSpawn(spec.command, spec.args, {
+    env: spec.env,
+    cwd: spec.cwd,
     stdio: ["ignore", "pipe", "pipe"],
     detached: false,
   });
-  state.currentChild = child;
+  return { child, logStream };
+}
 
+/** Relaunch on restart: a fresh child becomes the current one and is supervised. */
+function spawnAttempt(state: SupervisionState): void {
+  const attempt = launchAttempt({ spec: state.spec, logPath: state.logPath });
+  state.currentChild = attempt.child;
+  superviseAttempt(state, attempt);
+}
+
+/** Records the child's pid, pipes its output, and wires its termination to `handleExit`. */
+function superviseAttempt(state: SupervisionState, { child, logStream }: Attempt): void {
   if (typeof child.pid === "number") {
     writeFileSync(state.pidPath, String(child.pid));
   }

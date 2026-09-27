@@ -217,38 +217,52 @@ export function linkExternalMemberPeers(appRootDir: string): string[] {
   ];
   const linked: string[] = [];
   for (const memberDir of memberDirs) {
-    const pkgPath = join(memberDir, "package.json");
-    if (!existsSync(pkgPath)) continue;
-    let peers: string[] = [];
-    try {
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as {
-        peerDependencies?: Record<string, string>;
-      };
-      peers = Object.keys(pkg.peerDependencies ?? {});
-    } catch {
-      continue;
-    }
-    for (const name of peers) {
-      const target = join(appNodeModules, ...name.split("/"));
-      if (!existsSync(target)) continue;
-      const linkPath = join(memberDir, "node_modules", ...name.split("/"));
-      // existsSync follows symlinks, so it says false for a dangling link
-      // whose directory entry is still there — and symlinkSync would then
-      // die with EEXIST. lstat sees the entry itself: keep it when it
-      // resolves, replace it when it dangles (a re-install after an app
-      // tree wipe leaves exactly that).
-      if (lstatSafely(linkPath)) {
-        if (existsSync(linkPath)) continue;
-        // unlinkSync, not rmSync: rm stats the TARGET, and on a dangling
-        // link it silently does nothing — unlink removes the entry itself.
-        unlinkSync(linkPath);
+    for (const name of peerNamesOf(memberDir)) {
+      if (linkPeer({ memberDir, name, appNodeModules })) {
+        linked.push(`${basename(memberDir)}:${name}`);
       }
-      mkdirSync(dirname(linkPath), { recursive: true });
-      symlinkSync(relative(dirname(linkPath), target), linkPath);
-      linked.push(`${basename(memberDir)}:${name}`);
     }
   }
   return linked;
+}
+
+/** A member's declared peerDependencies; none when it has no readable package.json. */
+function peerNamesOf(memberDir: string): string[] {
+  const pkgPath = join(memberDir, "package.json");
+  if (!existsSync(pkgPath)) return [];
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as {
+      peerDependencies?: Record<string, string>;
+    };
+    return Object.keys(pkg.peerDependencies ?? {});
+  } catch {
+    return [];
+  }
+}
+
+/** Links one peer to the app's copy; false when there is none or a live link is already there. */
+function linkPeer({
+  memberDir,
+  name,
+  appNodeModules,
+}: {
+  memberDir: string;
+  name: string;
+  appNodeModules: string;
+}): boolean {
+  const target = join(appNodeModules, ...name.split("/"));
+  if (!existsSync(target)) return false;
+  const linkPath = join(memberDir, "node_modules", ...name.split("/"));
+  // existsSync follows symlinks, so it says false for a dangling link whose entry is still there,
+  // and symlinkSync would then die with EEXIST. lstat sees the entry: keep it when it resolves.
+  if (lstatSafely(linkPath)) {
+    if (existsSync(linkPath)) return false;
+    // unlinkSync, not rmSync: rm stats the TARGET and silently skips a dangling link.
+    unlinkSync(linkPath);
+  }
+  mkdirSync(dirname(linkPath), { recursive: true });
+  symlinkSync(relative(dirname(linkPath), target), linkPath);
+  return true;
 }
 
 function listDirs(dir: string): string[] {

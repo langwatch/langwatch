@@ -133,28 +133,7 @@ export function configureLogger(configuration: LoggerConfiguration): void {
 export function createLoggerFactory(configuration: LoggerConfiguration = {}): LoggerFactory {
   const resolved = resolveLoggerConfiguration(configuration);
   const loggerCache = new Map<string, PinoLogger>();
-  let sharedTransport: DestinationStream | null = null;
-  let isTransportInitialized = false;
-
-  const getSharedTransport = (): DestinationStream | null => {
-    if (!isNodeRuntime || isTransportInitialized) {
-      return sharedTransport;
-    }
-    isTransportInitialized = true;
-
-    if (resolved.environment === "test") {
-      return null;
-    }
-
-    try {
-      sharedTransport = buildTransport(resolved);
-    } catch (error) {
-      console.error("Failed to create pino transport, falling back to stdout:", error);
-      sharedTransport = null;
-    }
-
-    return sharedTransport;
-  };
+  const getSharedTransport = sharedTransportOf(resolved);
 
   const create = (name: string, options?: CreateLoggerOptions): PinoLogger => {
     const key = options?.disableContext ? `-${name}` : `+${name}`;
@@ -172,6 +151,28 @@ export function createLoggerFactory(configuration: LoggerConfiguration = {}): Lo
   };
 
   return { createLogger: create, reset: () => loggerCache.clear() };
+}
+
+/** The one pino transport a factory's loggers share, built on first use; none under test. */
+function sharedTransportOf(
+  resolved: ReturnType<typeof resolveLoggerConfiguration>,
+): () => DestinationStream | null {
+  let sharedTransport: DestinationStream | null = null;
+  let isTransportInitialized = false;
+
+  return () => {
+    if (!isNodeRuntime || isTransportInitialized) return sharedTransport;
+    isTransportInitialized = true;
+    if (resolved.environment === "test") return null;
+
+    try {
+      sharedTransport = buildTransport(resolved);
+    } catch (error) {
+      console.error("Failed to create pino transport, falling back to stdout:", error);
+      sharedTransport = null;
+    }
+    return sharedTransport;
+  };
 }
 
 /** Drops the memoised loggers; only tests need this, between cases. */

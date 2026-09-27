@@ -21,8 +21,8 @@ import {
   NLP_LAMBDA_NAME_PREFIX,
   buildStudioLambdaEnvironment,
   type StudioLambdaConfig,
-} from "../../rules/nlp-lambda-config.rules.ts";
-import { type NlpLambdaArnResolver } from "../nlp-lambda.channel.ts";
+} from "../rules/nlp-lambda-config.rules.ts";
+import { type NlpLambdaArnResolver } from "./nlp-lambda.channel.ts";
 
 const LOG_GROUP_ROOT = "/aws/lambda/";
 const LOG_RETENTION_DAYS = 365;

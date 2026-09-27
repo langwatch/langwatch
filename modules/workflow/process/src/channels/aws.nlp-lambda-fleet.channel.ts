@@ -18,7 +18,7 @@ import {
 import type { Logger } from "@langwatch/observability";
 import { Temporal, type Instant } from "@langwatch/time";
 
-import type { NlpLambdaFleet, NlpLambdaFunction } from "../../app/workflow.app.ts";
+import type { NlpLambdaFleet, NlpLambdaFunction } from "../app/workflow.app.ts";
 
 const LOG_GROUP_ROOT = "/aws/lambda/";
 

@@ -17,41 +17,20 @@ import { detectConflicts } from "./port-conflict/detect.ts";
 import { resolvePortConflicts } from "./port-conflict/resolve.ts";
 import { inspectPredeps, printDoctorTable } from "./predeps/detect-only.ts";
 import { runPredeps } from "./predeps/runner.ts";
+import { runtime as serviceRuntime } from "./services/runtime.ts";
 import { captureUserEnv } from "./shared/env.ts";
 import { paths } from "./shared/paths.ts";
 import { detectPlatform } from "./shared/platform.ts";
 import { allocatePorts, PORT_BASE_DEFAULT } from "./shared/ports.ts";
-import {
-  placeholderRuntime,
-  type RuntimeApi,
-  type RuntimeContext,
-  type ServiceHandle,
-} from "./shared/runtime-placeholder.ts";
+import type { RuntimeApi, RuntimeContext, ServiceHandle } from "./shared/runtime-contract.ts";
 
 declare const __LANGWATCH_VERSION__: string;
 const VERSION = typeof __LANGWATCH_VERSION__ !== "undefined" ? __LANGWATCH_VERSION__ : "0.0.0-dev";
 
-async function loadRuntime(): Promise<RuntimeApi> {
-  try {
-    // services/runtime.ts is julia's lane — see specs/npx-installer/03-services.feature.
-    const real = await import("./services/runtime.ts" as any);
-    if (real?.runtime) return real.runtime;
-    console.warn(
-      chalk.yellow(
-        "⚠ services/runtime.ts loaded but does not export `runtime` — falling back to placeholder",
-      ),
-    );
-    return placeholderRuntime;
-  } catch (err) {
-    console.warn(chalk.yellow(`⚠ failed to load services/runtime.ts: ${(err as Error).message}`));
-    return placeholderRuntime;
-  }
-}
-
 /**
  * Routed through `RuntimeApi.scaffoldEnv` rather than calling `shared/env.ts`
  * directly, so the CLI stays behind the same contract `services/runtime.ts`
- * implements (and the placeholder stands in for, before it exists).
+ * implements.
  */
 async function ensureEnvFile(
   runtime: RuntimeApi,
@@ -126,7 +105,7 @@ program
 
     const predeps = await runPredeps({ config: orchestrator, yes: opts.yes, version: VERSION });
 
-    const runtime = await loadRuntime();
+    const runtime: RuntimeApi = serviceRuntime;
     const ctx: RuntimeContext = {
       ports,
       paths,
@@ -247,7 +226,7 @@ program
     printBanner(VERSION);
     const orchestrator = resolveLocalOrchestratorConfig(process.env);
     await runPredeps({ config: orchestrator, yes: opts.yes, version: VERSION });
-    const runtime = await loadRuntime();
+    const runtime: RuntimeApi = serviceRuntime;
     const base = PORT_BASE_DEFAULT;
     const ports = allocatePorts(base);
     const ctx: RuntimeContext = {

@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { LambdaWorkflowStudioStreamChannel } from "../aws/aws.lambda-workflow-studio-stream.channel.ts";
+import { LambdaWorkflowStudioStreamChannel } from "../aws.lambda-workflow-studio-stream.channel.ts";
 import {
   type NlpLambdaFunctionReader,
   type NlpLambdaStreamInvoke,

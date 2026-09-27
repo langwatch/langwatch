@@ -69,48 +69,56 @@ export function makeInstallPanelRouter(): InstallPanelRouter {
   } as InstallPanelRouter & { onInstallFinished(fn: () => void): void };
 }
 
+type PanelTask = { output?: string; skip: (msg?: string) => void };
+type FinishAwareRouter = InstallPanelRouter & { onInstallFinished(fn: () => void): void };
+
+/** Appends a log line to the panel's tail, dropping blanks and the oldest line past the cap. */
+function pushTailLine(ring: string[], line: string): boolean {
+  const trimmed = line.replace(/\r/g, "").trim();
+  if (trimmed.length === 0) return false;
+  ring.push(trimmed);
+  if (ring.length > RING_SIZE) ring.shift();
+  return true;
+}
+
+/** One service's panel: tails its log until it is healthy, crashes, or was cached. */
+function runInstallPanel({
+  router,
+  spec,
+  task,
+}: {
+  router: InstallPanelRouter;
+  spec: (typeof INSTALL_TASKS)[number];
+  task: PanelTask;
+}): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const ring: string[] = [];
+    let started = false;
+
+    router.subscribe(spec.service, (ev) => {
+      if (ev.type === "starting") started = true;
+      else if (ev.type === "log") {
+        if (pushTailLine(ring, ev.line)) task.output = ring.join("\n");
+      } else if (ev.type === "healthy") resolve();
+      else if (ev.type === "crashed")
+        reject(new Error(`${spec.service} crashed (exit ${ev.code})`));
+    });
+
+    (router as FinishAwareRouter).onInstallFinished(() => {
+      if (!started) {
+        task.skip("(cached)");
+        resolve();
+      }
+    });
+  });
+}
+
 // Render install-phase panels, one per service. Start before installServices().
 export function renderInstallPanels(router: InstallPanelRouter): Promise<void> {
   const tasks = new Listr(
     INSTALL_TASKS.map((spec) => ({
       title: spec.title,
-      task: (_: unknown, task: { output?: string; skip: (msg?: string) => void }) =>
-        new Promise<void>((resolve, reject) => {
-          const ring: string[] = [];
-          let started = false;
-
-          router.subscribe(spec.service, (ev) => {
-            if (ev.type === "starting") {
-              started = true;
-              return;
-            }
-            if (ev.type === "log") {
-              const trimmed = ev.line.replace(/\r/g, "").trim();
-              if (trimmed.length === 0) return;
-              ring.push(trimmed);
-              if (ring.length > RING_SIZE) ring.shift();
-              task.output = ring.join("\n");
-              return;
-            }
-            if (ev.type === "healthy") {
-              resolve();
-              return;
-            }
-            if (ev.type === "crashed") {
-              reject(new Error(`${spec.service} crashed (exit ${ev.code})`));
-              return;
-            }
-          });
-
-          (
-            router as InstallPanelRouter & { onInstallFinished(fn: () => void): void }
-          ).onInstallFinished(() => {
-            if (!started) {
-              task.skip("(cached)");
-              resolve();
-            }
-          });
-        }),
+      task: (_: unknown, task: PanelTask) => runInstallPanel({ router, spec, task }),
     })),
     {
       concurrent: true,

@@ -4,25 +4,26 @@
  * Spec: specs/setup/test-teardown-safety.feature
  */
 
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { cleanupTestRows } from "../cleanup-test-rows.ts";
+import { prismaDouble } from "../client-doubles/prisma.double.ts";
 
 function recordingPrisma() {
   const calls: { model: string; where: unknown }[] = [];
-  const handler: ProxyHandler<Record<string, unknown>> = {
-    get(_target, model: string) {
-      return {
-        deleteMany: vi.fn(async (args: { where: unknown }) => {
-          calls.push({ model, where: args.where });
-          return { count: 0 };
-        }),
-      };
+  const recorder = (model: string) => ({
+    deleteMany: async (args?: { where?: unknown }) => {
+      calls.push({ model, where: args?.where });
+      return { count: 0 };
     },
-  };
+  });
   return {
-    prisma: new Proxy({}, handler) as unknown as PrismaClient,
+    prisma: prismaDouble({
+      organization: recorder("organization"),
+      team: recorder("team"),
+      project: recorder("project"),
+      modelProvider: recorder("modelProvider"),
+    }),
     calls,
   };
 }
@@ -164,7 +165,7 @@ describe("cleanupTestRows refusal rules", () => {
 
   describe("given a model that resolves to something without deleteMany", () => {
     it("reports it as not a Prisma delegate, instead of crashing", async () => {
-      const prisma = { organization: {} } as unknown as PrismaClient;
+      const prisma = prismaDouble({ organization: { deleteMany: undefined } });
 
       await expect(cleanupTestRows(prisma, [["organization", { id: "org_a" }]])).rejects.toThrow(
         /organization is not a Prisma delegate with deleteMany/,
