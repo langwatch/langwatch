@@ -76,6 +76,17 @@ export function isResolvableProviderId(modelProviderId: string | undefined): boo
   return !!modelProviderId && modelProviderId !== "new";
 }
 
+/** Every stored row of one provider type: the guided step edits the first one. */
+export function findModelProvidersOfType<T extends { provider: string }>({
+  providers,
+  providerKey,
+}: {
+  providers: readonly T[];
+  providerKey: string;
+}): T[] {
+  return providers.filter((candidate) => candidate.provider === providerKey);
+}
+
 /**
  * Resolves a single row by id. Shared by the editor form's edit-target memo
  * and the drawer's title lookup, so the two can never resolve different rows

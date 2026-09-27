@@ -2780,3 +2780,65 @@ describe("a route whose answer stands for a while", () => {
     expect(() => route().withCache({ ttlSeconds: 60, tag: " " })).toThrow(/under no tag/);
   });
 });
+
+interface WaitlistApi {
+  join(input: { email: string }): Promise<void>;
+}
+
+const WaitlistApi = moduleApi<WaitlistApi>()("ops");
+
+const waitlist = defineRestRouter(WaitlistApi)
+  .withNamespace("waitlist")
+  .withVersion(VERSION)
+  .post("/", "joinWaitlist")
+  .withAccess(publicRoute({ reason: "waitlist sign-up; reads no project data" }))
+  .withInput(z.object({ email: z.string().email() }))
+  .handle(async ({ app, input }) => app.join({ email: input.email }))
+  .build();
+
+function waitlistApp(): Hono {
+  return createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
+    },
+  }).mount(waitlist.router(), {
+    app: () => ({ join: async () => {} }),
+    credential: "project",
+    onError: createErrorHandler(),
+  });
+}
+
+async function refusedFields(app: Hono, path: string, body: unknown) {
+  const response = await app.request(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const refusal = z
+    .object({
+      code: z.string(),
+      reasons: z.array(z.object({ meta: z.object({ field: z.string() }) })),
+    })
+    .parse(await response.json());
+
+  return {
+    status: response.status,
+    code: refusal.code,
+    fields: refusal.reasons.map((reason) => reason.meta.field),
+  };
+}
+
+describe("two REST families behind different doors", () => {
+  describe("when a request to either is rejected on its values", () => {
+    /** @scenario "Both classes answer the same way on every family the process mounts" */
+    it("answers 422 validation_error naming the offending field on each", async () => {
+      const projectKeyed = await refusedFields(secretsApp(), "/api/secrets", { name: 42 });
+      const publicFamily = await refusedFields(waitlistApp(), "/api/waitlist", {
+        email: "not-an-address",
+      });
+
+      expect(projectKeyed).toEqual({ status: 422, code: "validation_error", fields: ["name"] });
+      expect(publicFamily).toEqual({ status: 422, code: "validation_error", fields: ["email"] });
+    });
+  });
+});

@@ -312,6 +312,7 @@ describe("DatasetUploadService", () => {
     });
 
     describe("when the uploaded file describes different columns", () => {
+      /** @scenario "Upload fails when file columns do not match dataset columns" */
       it("refuses the upload as a column mismatch", async () => {
         const row = datasetRow({
           slug: "strict",
@@ -325,7 +326,12 @@ describe("DatasetUploadService", () => {
             filename: "other.csv",
             content: "question,answer\nwhat,that\n",
           }),
-        ).rejects.toMatchObject({ name: "UploadValidationError", kind: "column_mismatch" });
+        ).rejects.toMatchObject({
+          name: "UploadValidationError",
+          kind: "column_mismatch",
+          code: "validation_error",
+          httpStatus: 422,
+        });
         expect(inlineRecords).toHaveLength(0);
       });
     });

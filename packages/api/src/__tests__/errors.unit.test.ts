@@ -1,4 +1,5 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HTTPException } from "hono/http-exception";
 import { describe, expect, it, vi } from "vitest";
 import { type ZodError, z } from "zod";
 
@@ -64,6 +65,38 @@ describe("formatError", () => {
       expect(body.retryable).toBe(false);
     });
 
+    /** @scenario "A known failure is normalised by Hono to a client-safe body" */
+    it("answers the class's status and meta with the code as its message", () => {
+      const err = new TestError(
+        "conversation_not_owned",
+        "This conversation belongs to someone else",
+        {
+          httpStatus: 403,
+          meta: { conversationId: "conversation-1" },
+        },
+      );
+
+      const { status, body } = formatError({ err });
+
+      expect(status).toBe(403);
+      expect(body).toMatchObject({
+        code: "conversation_not_owned",
+        message: "conversation_not_owned",
+        meta: { conversationId: "conversation-1" },
+      });
+      expect(JSON.stringify(body)).not.toContain("belongs to someone else");
+    });
+
+    /** @scenario "A validation failure answers the status its class named" */
+    it("answers a validation_error at the status its class named", () => {
+      const err = new TestError("validation_error", "The name is taken", { httpStatus: 400 });
+
+      const { status, body } = formatError({ err });
+
+      expect(status).toBe(400);
+      expect(body).toMatchObject({ code: "validation_error", type: "validation_error" });
+    });
+
     /** @scenario "A handled error carries remediation for agent consumers" */
     it("keeps trusted handled remediation metadata lossless", () => {
       const err = new TestError("query_memory_exceeded", "Query used too much memory", {
@@ -121,11 +154,13 @@ describe("formatError", () => {
     });
 
     describe("given the back-compat `kind` alias", () => {
+      /** @scenario "An external contract wins over cross-transport symmetry" */
       it("emits `kind` equal to `code`", () => {
         const err = new NotFoundError("not_found", "Resource", "abc");
         const { body } = formatError({ err });
         expect(body.kind).toBe("not_found");
         expect(body.kind).toBe(body.code);
+        expect(body).not.toHaveProperty("error");
       });
 
       it("emits `kind` for synthesized error bodies too", () => {
@@ -286,6 +321,42 @@ describe("formatError", () => {
   // -------------------------------------------------------------------------
 
   describe("when given an Error with a status property", () => {
+    /** @scenario "A framework refusal keeps the status it was raised with" */
+    it("keeps the status of the framework's own refusal", () => {
+      const err = new HTTPException(404, { message: "No such route here" });
+
+      const { status, body } = formatError({ err });
+
+      expect(status).toBe(404);
+      expect(body).toMatchObject({ code: "http_error", message: "http_error" });
+      expect(JSON.stringify(body)).not.toContain("No such route");
+    });
+
+    /** @scenario "A framework refusal raised through a second copy of the framework is still a refusal" */
+    it("keeps the status of a refusal from another copy of the framework", () => {
+      class ForeignHTTPException extends Error {
+        constructor(readonly status: number) {
+          super("Not Found from a second copy");
+        }
+      }
+
+      const { status, body } = formatError({ err: new ForeignHTTPException(404) });
+
+      expect(status).toBe(404);
+      expect(body).toMatchObject({ code: "http_error", message: "http_error" });
+    });
+
+    /** @scenario "A framework refusal at 5xx still collapses to the generic body" */
+    it("collapses a 5xx framework refusal to internal_error", () => {
+      const err = new HTTPException(503, { message: "Upstream pool drained" });
+
+      const { status, body } = formatError({ err });
+
+      expect(status).toBe(503);
+      expect(body).toMatchObject({ code: "internal_error", message: "internal_error" });
+      expect(JSON.stringify(body)).not.toContain("Upstream pool");
+    });
+
     it("uses the status as the HTTP code", () => {
       const err = Object.assign(new Error("Forbidden"), { status: 403 });
       const { status, body } = formatError({ err });

@@ -133,7 +133,8 @@ export function ProviderScreen({
             modelProviderId="new"
             organizationId={organizationId}
             projectId={projectId}
-            onSaved={() => void onSaved(selected)}
+            guided
+            onSaved={(saved) => void onSaved(selected, saved)}
           />
         </Box>
 

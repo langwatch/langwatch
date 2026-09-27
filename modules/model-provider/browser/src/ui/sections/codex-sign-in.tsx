@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Link, Spinner, Text, VStack } from "@chakra-ui/react";
-import { Check, ExternalLink, LogOut, RefreshCw } from "lucide-react";
+import { Check, Copy, ExternalLink, LogOut, RefreshCw } from "lucide-react";
+import { useState } from "react";
 
 import {
   type CodexSignInPhase,
@@ -14,11 +15,14 @@ import type { ScopeAssignment } from "../../model/scope-assignment.ts";
  * phases only; settings passes `setAsCodingDefaults: false` and asks separately post-connect.
  */
 export function CodexSignIn({
+  guided = false,
   projectId,
   scopes,
   setAsCodingDefaults,
   onConnected,
 }: {
+  /** Onboarding's wording: the account is named ChatGPT, as the plan it runs on. */
+  guided?: boolean;
   projectId: string;
   /** Where the provider row saves — callers pass the widest manageable scope. */
   scopes: ScopeAssignment[];
@@ -47,9 +51,9 @@ export function CodexSignIn({
     );
   }
   if (phase.name === "pending") {
-    return <PendingApprovalPanel pending={phase} onCancel={signIn.cancel} />;
+    return <PendingApprovalPanel guided={guided} pending={phase} onCancel={signIn.cancel} />;
   }
-  return <StartPanel phase={phase} onStart={() => void signIn.begin()} />;
+  return <StartPanel guided={guided} phase={phase} onStart={() => void signIn.begin()} />;
 }
 
 /** Connected state: who is signed in, plus re-authenticate / disconnect. */
@@ -103,9 +107,11 @@ function ConnectedPanel({
 
 /** Pending state: the one-time code, the OpenAI link, and the poll spinner. */
 function PendingApprovalPanel({
+  guided,
   pending,
   onCancel,
 }: {
+  guided: boolean;
   pending: Extract<CodexSignInPhase, { name: "pending" }>;
   onCancel: () => void;
 }) {
@@ -122,6 +128,7 @@ function PendingApprovalPanel({
         >
           {pending.userCode}
         </Text>
+        {guided && <CopyCodeButton code={pending.userCode} />}
         <Button asChild size="sm" colorPalette="orange">
           {/* The link recipe's own text colour would override the solid
               button's white label, and Langy's leave-confirmation dialog
@@ -141,7 +148,9 @@ function PendingApprovalPanel({
       </HStack>
       <HStack gap={2} color="fg.muted">
         <Spinner size="xs" />
-        <Text fontSize="xs">Waiting for you to approve in the browser…</Text>
+        <Text fontSize="xs">
+          {guided ? "Waiting for ChatGPT…" : "Waiting for you to approve in the browser…"}
+        </Text>
         <Button size="2xs" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
@@ -150,8 +159,38 @@ function PendingApprovalPanel({
   );
 }
 
+function startLabel({ phase, guided }: { phase: CodexSignInPhase; guided: boolean }): string {
+  if (phase.name === "error" && phase.timedOut) return "Start sign-in again";
+  return guided ? "Sign in with ChatGPT" : "Sign in with OpenAI";
+}
+
+/** Copies the one-time code and confirms with a check. */
+function CopyCodeButton({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      size="xs"
+      variant="ghost"
+      aria-label={copied ? "Code copied" : "Copy code"}
+      onClick={() => {
+        void navigator.clipboard.writeText(code).then(() => setCopied(true));
+      }}
+    >
+      {copied ? <Check size={13} /> : <Copy size={13} />}
+    </Button>
+  );
+}
+
 /** Idle / starting / error state: the pitch line and the sign-in button. */
-function StartPanel({ phase, onStart }: { phase: CodexSignInPhase; onStart: () => void }) {
+function StartPanel({
+  guided,
+  phase,
+  onStart,
+}: {
+  guided: boolean;
+  phase: CodexSignInPhase;
+  onStart: () => void;
+}) {
   return (
     <VStack align="stretch" gap={2}>
       {phase.name === "error" ? (
@@ -170,7 +209,7 @@ function StartPanel({ phase, onStart }: { phase: CodexSignInPhase; onStart: () =
           loading={phase.name === "starting"}
           onClick={onStart}
         >
-          {phase.name === "error" && phase.timedOut ? "Start sign-in again" : "Sign in with OpenAI"}
+          {startLabel({ phase, guided })}
         </Button>
       </Box>
     </VStack>

@@ -72,8 +72,8 @@ Feature: Handled errors — the handled-error boundary
     When the suite reads every message they are constructed with
     Then none of them names an environment variable, an internal host or an address
       # those go in the log line beside the throw, where the trace id ties them
-      # back; nothing on a handled error is sensitive, by definition — and a
-      # REST caller IS shown this sentence, see the Hono scenario below
+      # back; nothing on a handled error is sensitive, by definition. A REST
+      # caller is shown the code, not this sentence (#5984), see the Hono scenario below
 
   @unit @bdd @domain-errors
   Scenario: A known failure is normalised by Hono to a client-safe body
@@ -81,9 +81,8 @@ Feature: Handled errors — the handled-error boundary
     When the client calls that route
     Then the HTTP status is 403
     And the response body carries code "conversation_not_owned" with its meta
-    And the body's `error` field is that code, so a consumer never guesses from the status
-    And the body's `message` field is the error's own sentence, which is why it
-      must be written customer-safe
+    And the body's `message` field is that code, never the error's own sentence
+    So the words a customer reads come from the presentation registry keyed by the code (#5984)
     And no stack trace or internal detail is present
 
   @unit @bdd @domain-errors
@@ -91,14 +90,14 @@ Feature: Handled errors — the handled-error boundary
     Given a route raises the HTTP framework's own refusal with status 404
     When the client calls that route
     Then the HTTP status is 404
-    And the body carries the refusal's own sentence
+    And the body carries code "http_error", never the refusal's own sentence
 
   @unit @bdd @domain-errors
   Scenario: A framework refusal raised through a second copy of the framework is still a refusal
     Given a route raises a refusal carrying status 404 from a second copy of the HTTP framework
     When the client calls that route
     Then the HTTP status is 404
-    And the body carries the refusal's own sentence
+    And the body carries code "http_error", never the refusal's own sentence
     So a refusal never becomes a 500 because two packages resolved the framework differently
 
   @unit @bdd @domain-errors
@@ -106,7 +105,7 @@ Feature: Handled errors — the handled-error boundary
     Given a route raises the HTTP framework's own refusal with status 503
     When the client calls that route
     Then the HTTP status is 503
-    And the body says only that an unknown error occurred
+    And the body carries code "internal_error", never the refusal's own sentence
 
   @unit @bdd @domain-errors
   Scenario: Validation failures travel the one handled-error channel
@@ -180,24 +179,18 @@ Feature: Handled errors — the handled-error boundary
     So the shared behaviour is a default, never an override
 
   # --------------------------------------------------------------------------
-  # One status for one code, across the whole management surface
-  #
-  # The two statuses above are only worth stating if a caller gets the same one
-  # wherever it asks. `validation_error` is raised at two different statuses
-  # around the tree — the shared REST validator names 422, several module
-  # contracts name 400 — so the canonical envelope reconciles them in the one
-  # place every family's refusals pass through. A surface that answered 422 on
-  # one family and 400 on the next would teach callers to branch on the family
-  # rather than on the code.
+  # One code, one status per class: the status a refusal answers is the one
+  # the class that raised it names (#5984); the canonical envelope reconciles
+  # nothing, so `ValidationError` answers 422 wherever it is raised.
   # --------------------------------------------------------------------------
 
   @unit @bdd @domain-errors
-  Scenario: A validation failure answers 422 whatever status its class named
+  Scenario: A validation failure answers the status its class named
     Given a refusal of code "validation_error" raised at 400 by its own class
     When it reaches the canonical error envelope
-    Then the response status is 422
-    And the envelope's type is "unprocessable_entity"
-    So one code cannot mean two statuses on one surface
+    Then the response status is 400
+    And the envelope's code and type are both "validation_error"
+    So the status is decided once, by the class that raised it
 
   @integration @bdd @domain-errors
   Scenario: Both classes answer the same way on every family the process mounts
@@ -233,8 +226,9 @@ Feature: Handled errors — the handled-error boundary
 
   @unit @bdd @domain-errors
   Scenario: An external contract wins over cross-transport symmetry
-    Given published SDKs read the REST body's `error` field as a string
-    Then that body stays flat at the root rather than nesting under `error`
+    Given clients still read the REST body's older `kind` discriminant
+    Then the body carries `kind` beside `code`, holding the same value
+    And that body stays flat at the root rather than nesting under `error`
     So consistency is pursued only where no caller contract forbids it
 
   # @unimplemented: 404 and 422 are pinned incidentally by the tRPC formatter
