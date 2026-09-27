@@ -104,7 +104,7 @@ export async function requestSignUpVerificationToken(
   email: string,
 ): Promise<string> {
   const response = await request.post("/api/trpc/auth.requestSignUpVerification?batch=1", {
-    data: { "0": { json: { email } } },
+    data: { "0": { email } },
   });
   return signUpVerificationTokenAfterResponse(response, email);
 }
@@ -221,28 +221,26 @@ export async function thenTheLinkSignsMeInWithNoSecondPrompt(
 export async function givenMyAccountHasAWorkspace(page: Page): Promise<void> {
   const getAll = await page.request.get(
     "/api/trpc/organization.getAll?batch=1&input=" +
-      encodeURIComponent(JSON.stringify({ "0": { json: {} } })),
+      encodeURIComponent(JSON.stringify({ "0": {} })),
   );
   const data = (await getAll.json().catch(() => null)) as {
     "0"?: {
       result?: {
-        data?: { json?: { teams?: { projects?: unknown[] }[] }[] };
+        data?: { teams?: { projects?: unknown[] }[] }[];
       };
     };
   } | null;
-  const orgs = data?.["0"]?.result?.data?.json ?? [];
+  const orgs = data?.["0"]?.result?.data ?? [];
   const hasProject = orgs.some((o) => (o.teams ?? []).some((t) => (t.projects ?? []).length > 0));
   if (hasProject) return;
 
   const response = await page.request.post("/api/trpc/onboarding.initializeOrganization?batch=1", {
     data: {
       "0": {
-        json: {
-          orgName: "Front Door Test Org",
-          projectName: "Front Door Test Project",
-          language: "other",
-          framework: "other",
-        },
+        orgName: "Front Door Test Org",
+        projectName: "Front Door Test Project",
+        language: "other",
+        framework: "other",
       },
     },
   });
@@ -365,7 +363,7 @@ export async function givenARegisteredAccount(
   const addressProof = await requestSignUpAddressProof(page.request, email);
   const response = await page.request.post("/api/trpc/user.register?batch=1", {
     data: {
-      "0": { json: { addressProof, email, password } },
+      "0": { addressProof, email, password },
     },
   });
   if (!response.ok()) {
