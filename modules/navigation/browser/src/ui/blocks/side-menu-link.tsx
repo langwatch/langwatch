@@ -1,6 +1,6 @@
 /** Navigation menu entry (moved from platform/app; uses this package's NavigationLink). */
 
-import { Badge, Box, HStack, Text } from "@chakra-ui/react";
+import { Badge, Box, chakra, HStack, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 import { useEffect, useRef } from "react";
@@ -191,12 +191,13 @@ export const SideMenuLink = ({
   if (unavailableReason) {
     return (
       <Tooltip content={unavailableReason} positioning={{ placement: "right" }} showArrow>
-        <Box
+        <chakra.button
+          type="button"
+          display="block"
           width="full"
-          role="link"
+          textAlign="start"
           aria-disabled="true"
           aria-label={label}
-          tabIndex={0}
           opacity={0.4}
           cursor="not-allowed"
         >
@@ -210,7 +211,7 @@ export const SideMenuLink = ({
             legacy={legacy}
             legacyLabel={legacyLabel}
           />
-        </Box>
+        </chakra.button>
       </Tooltip>
     );
   }

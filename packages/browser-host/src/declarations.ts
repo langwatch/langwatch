@@ -172,7 +172,7 @@ export type UiEditModelProviderFormProps = {
   organizationId?: string | undefined;
   projectId?: string | undefined;
   /** What "the credential is saved" means to a surface that is not the settings drawer. */
-  onSaved?: () => void;
+  onSaved?: (saved: { chatModel?: string }) => void;
   /** Onboarding's presentation: Connect wording, model pills, no settings chrome. */
   guided?: boolean;
 };
