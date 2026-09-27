@@ -30,7 +30,7 @@ not be completed — the same ladder as `apidiff`.
    - and only then does it become a `haven up --agent --detach` stack under
      its own run-scoped slug, with haven's own automatic prep doing migrate and
      seed. With `-no-haven`, visualdiff provisions the old way instead:
-     `pnpm install --offline` and `pnpm run start:prepare:files` in each
+     `pnpm install --prefer-offline` and `pnpm run start:prepare:files` in each
      worktree, then each ref's stack starts on its own ports - the base at
      `-base-port` (5670 by default), the candidate ten above it, so the two can
      never collide. A modular checkout runs `dev:ui`, `dev:api` and
@@ -192,7 +192,7 @@ comparison is decided, fsynced before the run continues, so `tail -f
 `Classification` above, because this is a live triage feed rather than the
 rule-based report. A flow's lines carry `flow` and `index` instead of
 `route`. `module` is a best-effort guess at the owning module, from
-`apps/ui/src/features/catalogue.json`'s feature `root` segments (matched
+the module directory names in `modules/catalogue.json` (matched
 against the route's first path segment or the flow id's leading word, plural
 tried too); empty when nothing matches. `evidence` paths are relative to the
 run root. The last line of a run (or a recapture) is always
@@ -283,7 +283,7 @@ routes.
 tools/visualdiff/                    the Go CLI: boot, wait, seed, classify, report, teardown
 tools/visualdiff/haven.go            the haven boot path: slugs, up, readiness, teardown, worktree prepare
 tools/visualdiff/findings_stream.go  findings.jsonl: the live tracker, the file writer, run+recapture's shared capture path
-tools/visualdiff/catalogue.go        the module guess, from apps/ui/src/features/catalogue.json
+tools/visualdiff/catalogue.go        the module guess, from modules/catalogue.json
 tools/visualdiff/recapture.go        `visualdiff recapture`: replays named routes against a -keep run's own stacks
 tools/havenrun/                      what visualdiff and apidiff share to boot through haven
 cmd/visualdiff/main.go               the entry point

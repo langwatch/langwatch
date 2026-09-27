@@ -6,14 +6,14 @@ import (
 	"testing"
 )
 
-// testCatalogue is a small fixture standing in for
-// apps/ui/src/features/catalogue.json: enough features to exercise an exact
-// route-segment match, the singular/plural fallback, and an unmatched route.
+// testCatalogue is a small fixture standing in for modules/catalogue.json:
+// enough features to exercise an exact route-segment match, the
+// singular/plural fallback, and an unmatched route.
 const testCatalogue = `{
   "version": 0,
   "features": [
-    {"id": "analytics", "root": "analytics", "uses": {"screens": ["@langwatch/analytics-browser/screens/analytics"], "surfaces": []}},
-    {"id": "annotations", "root": "annotation", "uses": {"screens": ["@langwatch/annotation-browser/annotations"], "surfaces": []}}
+    {"id": "analytics", "root": "modules/analytics", "classification": "core", "subjects": ["analytics"]},
+    {"id": "annotation", "root": "modules/annotation", "classification": "core", "subjects": ["annotation"]}
   ]
 }`
 

@@ -493,13 +493,13 @@ func (steps *executor) addWorktree(ctx context.Context, stack Stack) error {
 }
 
 // PrepareCommands are the two steps a fresh worktree needs before it can
-// boot: an offline install (every version this run compares is already in the
-// store, so the network is not on the critical path) and the generated files
-// — Prisma client, evaluator types, SDK build — without which the stack does
-// not start at all.
+// boot: an install that prefers the store (the base ref's lockfile can pin a
+// version the candidate's install never fetched, so the network stays
+// available for those) and the generated files, Prisma client, evaluator
+// types, SDK build, without which the stack does not start at all.
 func PrepareCommands() []commandSpec {
 	return []commandSpec{
-		{name: "pnpm", args: []string{"install", "--offline"}},
+		{name: "pnpm", args: []string{"install", "--prefer-offline"}},
 		{name: "pnpm", args: []string{"run", "start:prepare:files"}},
 	}
 }

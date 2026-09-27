@@ -225,7 +225,10 @@ jobs:
           RUN_DIR: ${{ runner.temp }}/visualdiff-run
         run: |
           set +e
-          go run ./cmd/visualdiff run \
+          # Built rather than `go run`, which reports every non-zero exit as 1
+          # and would read an operational error (2) as findings.
+          go build -o "$RUNNER_TEMP/visualdiff" ./cmd/visualdiff || { echo "exit_code=2" >> "$GITHUB_OUTPUT"; echo "run_dir=$RUN_DIR" >> "$GITHUB_OUTPUT"; exit 0; }
+          "$RUNNER_TEMP/visualdiff" run \
             -no-haven \
             -base origin/main \
             -candidate HEAD \

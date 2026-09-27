@@ -127,7 +127,10 @@ jobs:
           LEDGER_FILE: ${{ runner.temp }}/apidiff-ledger.json
         run: |
           set +e
-          go run ./cmd/apidiff run \
+          # Built rather than `go run`, which reports every non-zero exit as 1
+          # and would read an operational error (2) as differences found.
+          go build -o "$RUNNER_TEMP/apidiff" ./cmd/apidiff || { echo "exit_code=2" >> "$GITHUB_OUTPUT"; exit 0; }
+          "$RUNNER_TEMP/apidiff" run \
             -no-haven \
             -main-ref origin/main \
             -branch-dir . \
