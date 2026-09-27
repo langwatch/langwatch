@@ -20,6 +20,7 @@
   "pnpm-lock.yaml",
   "dev/patches/",
   "tsconfig.base.json",
+  "tsconfig.shared.json",
   "apps/server/package.json",
   "plugins/langwatch/package.json",
   "services/langyworker/package.json",
