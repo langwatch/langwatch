@@ -2,18 +2,22 @@ import {
   type AuthzGrantsService as AuthzGrantsServiceContract,
   type AuthzService as AuthzServiceContract,
 } from "@langwatch/authz-contract";
-import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
-import { EventingAuthzAdapter } from "../eventing/authz-grant.pipeline.ts";
+import { type AuthzGrantPipeline, EventingAuthzAdapter } from "../eventing/authz-grant.pipeline.ts";
 import {
   type AuthzLedgerDatabase,
   type EventingAuthzLedgerAdapterOptions,
   EventingAuthzLedgerAdapter,
 } from "../eventing/authz-grant.store.ts";
 import {
+  type AttachGrantLedgerInput,
   type AuthzEngineLedger,
+  type ChangeGrantRoleLedgerInput,
+  type DefineRoleLedgerInput,
+  type DeleteRoleLedgerInput,
   LegacyImportAuthzGrantMigration,
+  type RevokeGrantLedgerInput,
 } from "../migrations/legacy-import.authz-grant.migration.ts";
 import type { AuthzDatabase, AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
@@ -88,7 +92,7 @@ export type PostgresAuthzAdapterOptions = {
 };
 
 /** Public Eventing definition only; concrete projection/store types stay private. */
-export type AuthzPipeline = StaticPipelineDefinition<any, any, any>;
+export type AuthzPipeline = AuthzGrantPipeline;
 
 export type PostgresAuthzBuild = Readonly<{
   authz: AuthzServiceContract;
@@ -109,7 +113,7 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
     return (await this.dispatcher.commands()).commands;
   }
 
-  async attachGrant(args: Parameters<AuthzEngineLedger["attachGrant"]>[0]): Promise<void> {
+  async attachGrant(args: AttachGrantLedgerInput): Promise<void> {
     const { organizationId, commandId, grant } = args;
     await (
       await this.commands()
@@ -121,7 +125,7 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
     });
   }
 
-  async defineRole(args: Parameters<AuthzEngineLedger["defineRole"]>[0]): Promise<void> {
+  async defineRole(args: DefineRoleLedgerInput): Promise<void> {
     const { organizationId, commandId, role, actor } = args;
     await (
       await this.commands()
@@ -134,7 +138,7 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
     });
   }
 
-  async changeGrantRole(args: Parameters<AuthzEngineLedger["changeGrantRole"]>[0]): Promise<void> {
+  async changeGrantRole(args: ChangeGrantRoleLedgerInput): Promise<void> {
     await (
       await this.commands()
     ).changeGrantRole.send({
@@ -143,7 +147,7 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
     });
   }
 
-  async revokeGrant(args: Parameters<AuthzEngineLedger["revokeGrant"]>[0]): Promise<void> {
+  async revokeGrant(args: RevokeGrantLedgerInput): Promise<void> {
     await (
       await this.commands()
     ).revokeGrant.send({
@@ -152,7 +156,7 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
     });
   }
 
-  async deleteRole(args: Parameters<AuthzEngineLedger["deleteRole"]>[0]): Promise<void> {
+  async deleteRole(args: DeleteRoleLedgerInput): Promise<void> {
     await (
       await this.commands()
     ).deleteRole.send({
@@ -251,5 +255,33 @@ export class PostgresAuthzAdapter {
     });
 
     return { authz, grants, pipeline, migration };
+  }
+}
+
+/** Every model the grants ledger's consumer half writes, and no other. */
+export type AuthzGrantPipelineDatabase = AuthzProjectionDatabase & AuthzAuditDatabase;
+
+export type PostgresAuthzPipelineOptions = {
+  /** The composition root's own typed client, handed down with no cast. */
+  database: AuthzGrantPipelineDatabase;
+};
+
+/**
+ * Postgres CONSUMER pipeline (producer is PostgresAuthzAdapter). Takes two
+ * bindings (guarded writer, audit trail); no dispatcher, no connect (ADR-092).
+ */
+export class PostgresAuthzPipelineAdapter {
+  static create(options: PostgresAuthzPipelineOptions): PostgresAuthzPipelineAdapter {
+    return new PostgresAuthzPipelineAdapter(options);
+  }
+
+  private constructor(private readonly options: PostgresAuthzPipelineOptions) {}
+
+  build(): AuthzPipeline {
+    const { database } = this.options;
+    return EventingAuthzAdapter.build({
+      authzGrantsWriteStore: PrismaAuthzProjectionRepository.create(database),
+      authzAuditTrailStore: PrismaAuthzAuditRepository.create(database),
+    });
   }
 }

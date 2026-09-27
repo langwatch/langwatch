@@ -12,11 +12,14 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  inMemoryIdentityReservations,
+  inMemoryIdentityUsers,
+} from "../../__tests__/support/identity-memory-repositories.ts";
 import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
 import { CryptoIdentifierIdentityService } from "../../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
 import { IdentityService } from "../../services/identity.service.ts";
-import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
 import { identityEventsFor } from "../identity-events.intent.ts";
 import {
   IdentityLedgerStore,

@@ -4,7 +4,7 @@ import type { Instant } from "@langwatch/time";
 import { Counter } from "prom-client";
 
 import type { AuthzCutoverRepository } from "../repositories/authz-cutover.repository.ts";
-import { PerOrganizationCachedGateStore } from "../stores/memory/memory.per-organization-cached-gate.store.ts";
+import { PerOrganizationCachedGateService } from "./per-organization-cached-gate.service.ts";
 
 export const ENGINE_GATE_CACHE_TTL_MS = 60_000;
 
@@ -19,7 +19,7 @@ const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = ["finalized"];
 export type AuthzCutoverGateOptions = {
   repository: AuthzCutoverRepository;
   logger?: Logger;
-  cache?: PerOrganizationCachedGateStore;
+  cache?: PerOrganizationCachedGateService;
 };
 
 /**
@@ -28,7 +28,7 @@ export type AuthzCutoverGateOptions = {
  * heads; `isOn` reports and falls back to legacy for ordinary checks.
  */
 export class AuthzCutoverGateService {
-  private readonly cache: PerOrganizationCachedGateStore;
+  private readonly cache: PerOrganizationCachedGateService;
   private readonly logger: Logger;
 
   static create(options: AuthzCutoverGateOptions): AuthzCutoverGateService {
@@ -39,7 +39,7 @@ export class AuthzCutoverGateService {
     this.logger = options.logger ?? createLogger("langwatch:authz:engine-gate");
     this.cache =
       options.cache ??
-      PerOrganizationCachedGateStore.create({
+      PerOrganizationCachedGateService.create({
         name: "authz-engine-gate",
         ttlMs: ENGINE_GATE_CACHE_TTL_MS,
       });

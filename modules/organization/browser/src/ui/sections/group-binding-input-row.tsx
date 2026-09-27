@@ -1,4 +1,5 @@
 import { Badge, Box, Button, createListCollection, HStack, Input, Text } from "@chakra-ui/react";
+import { teamUserRoleSchema } from "@langwatch/authz-contract";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
 import { Search } from "lucide-react";
@@ -39,9 +40,22 @@ export function SourceBadge({ scimSource }: { scimSource: string | null }) {
 
 // ── Types + constants ─────────────────────────────────────────────────────────
 
+type LabelledItem = { label: string; value: string };
+
+function filterByLabel({ items, search }: { items: LabelledItem[]; search: string }) {
+  if (!search) return items;
+  const needle = search.toLowerCase();
+  return items.filter((item) => item.label.toLowerCase().includes(needle));
+}
+
+/** A `CUSTOM:<id>` picker value names a custom role; any other value names none. */
+function customRoleIdOfValue(value: string): string | undefined {
+  return value.startsWith("CUSTOM:") ? value.slice("CUSTOM:".length) : undefined;
+}
+
 export type PendingBinding = {
   roleValue: string;
-  role: string;
+  role: TeamUserRole;
   customRoleId?: string;
   customRoleName?: string;
   scopeType: RoleBindingScopeType;
@@ -255,10 +269,7 @@ export const BindingInputRow = forwardRef<
     [teams.data],
   );
   const teamItems = useMemo(
-    () =>
-      teamSearch
-        ? allTeamItems.filter((t) => t.label.toLowerCase().includes(teamSearch.toLowerCase()))
-        : allTeamItems,
+    () => filterByLabel({ items: allTeamItems, search: teamSearch }),
     [allTeamItems, teamSearch],
   );
   const teamCollection = useMemo(() => createListCollection({ items: teamItems }), [teamItems]);
@@ -272,12 +283,7 @@ export const BindingInputRow = forwardRef<
     [teams.data],
   );
   const projectTeamItems = useMemo(
-    () =>
-      projectTeamSearch
-        ? allProjectTeamItems.filter((t) =>
-            t.label.toLowerCase().includes(projectTeamSearch.toLowerCase()),
-          )
-        : allProjectTeamItems,
+    () => filterByLabel({ items: allProjectTeamItems, search: projectTeamSearch }),
     [allProjectTeamItems, projectTeamSearch],
   );
   const projectTeamCollection = useMemo(
@@ -294,10 +300,7 @@ export const BindingInputRow = forwardRef<
     [teams.data, projectTeamId],
   );
   const projectItems = useMemo(
-    () =>
-      projectSearch
-        ? allProjectItems.filter((p) => p.label.toLowerCase().includes(projectSearch.toLowerCase()))
-        : allProjectItems,
+    () => filterByLabel({ items: allProjectItems, search: projectSearch }),
     [allProjectItems, projectSearch],
   );
   const projectCollection = useMemo(
@@ -316,7 +319,7 @@ export const BindingInputRow = forwardRef<
     const cname = cid ? customRoles.data?.find((r) => r.id === cid)?.name : undefined;
     return {
       roleValue,
-      role: cid ? "CUSTOM" : roleValue,
+      role: cid ? TeamUserRole.CUSTOM : teamUserRoleSchema.parse(roleValue),
       customRoleId: cid,
       customRoleName: cname,
       scopeType,
@@ -360,13 +363,8 @@ export const BindingInputRow = forwardRef<
         value={[roleValue]}
         onValueChange={(e) => {
           const v = e.value[0] ?? defaultRoleValue;
-          if (v.startsWith("CUSTOM:")) {
-            setRoleValue(v);
-            setCustomRoleId(v.slice(7));
-          } else {
-            setRoleValue(v);
-            setCustomRoleId(undefined);
-          }
+          setRoleValue(v);
+          setCustomRoleId(customRoleIdOfValue(v));
           setIsDirty(true);
         }}
         size="sm"
@@ -571,7 +569,7 @@ export function AddBindingForm({
         addBinding.mutate({
           organizationId,
           groupId,
-          role: b.role as any,
+          role: b.role,
           customRoleId: b.customRoleId,
           scopeType: b.scopeType,
           scopeId: b.scopeId,

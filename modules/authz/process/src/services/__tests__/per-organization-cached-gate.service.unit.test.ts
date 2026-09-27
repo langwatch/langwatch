@@ -3,13 +3,13 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import {
-  PerOrganizationCachedGateStore,
-  type PerOrganizationCachedGateStoreOptions,
-} from "../memory.per-organization-cached-gate.store.ts";
+  PerOrganizationCachedGateService,
+  type PerOrganizationCachedGateServiceOptions,
+} from "../per-organization-cached-gate.service.ts";
 
-describe("PerOrganizationCachedGateStore", () => {
-  function gate(overrides?: Partial<PerOrganizationCachedGateStoreOptions>) {
-    return PerOrganizationCachedGateStore.create({
+describe("PerOrganizationCachedGateService", () => {
+  function gate(overrides?: Partial<PerOrganizationCachedGateServiceOptions>) {
+    return PerOrganizationCachedGateService.create({
       name: "test-gate",
       ttlMs: 60_000,
       ...overrides,

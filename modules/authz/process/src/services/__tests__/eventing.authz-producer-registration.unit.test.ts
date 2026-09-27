@@ -8,7 +8,7 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 // Routing keys are cross-process contract; test builds definition through adapter.
 import { describe, expect, it, vi } from "vitest";
 
-import { PostgresAuthzAdapter } from "../../app/postgres-authz.build.ts";
+import { PostgresAuthzAdapter } from "../../app/authz-composition.build.ts";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
 import {
   AuthzGrantsCommandDispatcher,

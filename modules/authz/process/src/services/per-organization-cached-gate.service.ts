@@ -6,7 +6,7 @@ type InFlightEntry = { promise: Promise<boolean>; isStale: boolean };
 
 export const MAX_CACHE_ENTRIES = 5_000;
 
-export type PerOrganizationCachedGateStoreOptions = {
+export type PerOrganizationCachedGateServiceOptions = {
   name: string;
   ttlMs: number;
   maxEntries?: number;
@@ -18,16 +18,18 @@ export type PerOrganizationCachedGateStoreOptions = {
  * Bounded per-organization boolean cache. Cold reads coalesce and an
  * invalidation revokes an in-flight read's right to repopulate the cache.
  */
-export class PerOrganizationCachedGateStore {
+export class PerOrganizationCachedGateService {
   private readonly cached = new Map<string, CacheEntry>();
   private readonly inFlight = new Map<string, InFlightEntry>();
   private readonly logger: Logger;
 
-  static create(options: PerOrganizationCachedGateStoreOptions): PerOrganizationCachedGateStore {
-    return new PerOrganizationCachedGateStore(options);
+  static create(
+    options: PerOrganizationCachedGateServiceOptions,
+  ): PerOrganizationCachedGateService {
+    return new PerOrganizationCachedGateService(options);
   }
 
-  private constructor(private readonly options: PerOrganizationCachedGateStoreOptions) {
+  private constructor(private readonly options: PerOrganizationCachedGateServiceOptions) {
     this.logger = options.logger ?? createLogger("langwatch:authz:per-organization-cached-gate");
   }
 

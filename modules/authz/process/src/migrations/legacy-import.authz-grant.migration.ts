@@ -62,42 +62,52 @@ const MAX_REPORTED = 50;
  * A send while the queue is unavailable throws `AuthzLedgerUnavailableError`, which parks
  * the organization naming the queue as the cause; the runner retries on a later pass.
  */
+export type AttachGrantLedgerInput = {
+  organizationId: string;
+  commandId: string;
+  grant: GrantFact & { actor: GrantsLedgerActor };
+};
+
+export type DefineRoleLedgerInput = {
+  organizationId: string;
+  commandId: string;
+  role: RoleFact;
+  actor: GrantsLedgerActor;
+};
+
+export type ChangeGrantRoleLedgerInput = {
+  organizationId: string;
+  commandId: string;
+  grantId: string;
+  from: string | null;
+  to: string;
+  actor: GrantsLedgerActor;
+  occurredAtMs: number;
+};
+
+export type RevokeGrantLedgerInput = {
+  organizationId: string;
+  commandId: string;
+  grantId: string;
+  reason: string;
+  actor: GrantsLedgerActor;
+  occurredAtMs: number;
+};
+
+export type DeleteRoleLedgerInput = {
+  organizationId: string;
+  commandId: string;
+  roleId: string;
+  actor: GrantsLedgerActor;
+  occurredAtMs: number;
+};
+
 export interface AuthzEngineLedger {
-  attachGrant(args: {
-    organizationId: string;
-    commandId: string;
-    grant: GrantFact & { actor: GrantsLedgerActor };
-  }): Promise<void>;
-  defineRole(args: {
-    organizationId: string;
-    commandId: string;
-    role: RoleFact;
-    actor: GrantsLedgerActor;
-  }): Promise<void>;
-  changeGrantRole(args: {
-    organizationId: string;
-    commandId: string;
-    grantId: string;
-    from: string | null;
-    to: string;
-    actor: GrantsLedgerActor;
-    occurredAtMs: number;
-  }): Promise<void>;
-  revokeGrant(args: {
-    organizationId: string;
-    commandId: string;
-    grantId: string;
-    reason: string;
-    actor: GrantsLedgerActor;
-    occurredAtMs: number;
-  }): Promise<void>;
-  deleteRole(args: {
-    organizationId: string;
-    commandId: string;
-    roleId: string;
-    actor: GrantsLedgerActor;
-    occurredAtMs: number;
-  }): Promise<void>;
+  attachGrant(args: AttachGrantLedgerInput): Promise<void>;
+  defineRole(args: DefineRoleLedgerInput): Promise<void>;
+  changeGrantRole(args: ChangeGrantRoleLedgerInput): Promise<void>;
+  revokeGrant(args: RevokeGrantLedgerInput): Promise<void>;
+  deleteRole(args: DeleteRoleLedgerInput): Promise<void>;
 }
 
 export type LegacyImportAuthzGrantMigrationOptions = {

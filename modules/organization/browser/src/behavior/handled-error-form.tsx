@@ -39,12 +39,11 @@ export function readHandledError(error: unknown): HandledErrorShape | null {
 export const FORM_SERVER_ERROR = "root.serverError";
 
 /**
- * As much of a react-hook-form as these two helpers touch — structural and
- * deliberately loose, since the forms passed in are typed by their own value
- * shapes, and narrowing `setError` to `string` would make every caller cast.
+ * As much of a react-hook-form as these two helpers touch. `setError` is a
+ * method so a form typed by its own field paths still fits without a cast.
  */
 type MinimalForm = {
-  setError: (name: any, error: { type: string; message: string }) => void;
+  setError(name: string, error: { type: string; message: string }): void;
   formState: { errors: Record<string, unknown> };
 };
 

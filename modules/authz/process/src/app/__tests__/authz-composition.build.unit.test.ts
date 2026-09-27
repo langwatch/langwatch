@@ -12,7 +12,7 @@ import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
 } from "../../services/authz-grants-command-dispatcher.service.ts";
-import { PostgresAuthzAdapter } from "../postgres-authz.build.ts";
+import { PostgresAuthzAdapter } from "../authz-composition.build.ts";
 
 class RecordingDispatcher extends AuthzGrantsCommandDispatcher {
   calls = 0;

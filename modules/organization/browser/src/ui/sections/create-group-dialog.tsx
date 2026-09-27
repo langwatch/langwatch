@@ -64,7 +64,7 @@ export function CreateGroupDialog({
         organizationId,
         name: name.trim(),
         bindings: pendingBindings.map((b) => ({
-          role: b.role as any,
+          role: b.role,
           customRoleId: b.customRoleId,
           scopeType: b.scopeType,
           scopeId: b.scopeId,

@@ -35,7 +35,7 @@ import {
   PostgresAuthzAdapter,
   type AuthzPipeline,
   type PostgresAuthzAdapterOptions,
-} from "./postgres-authz.build.ts";
+} from "./authz-composition.build.ts";
 
 /**
  * Private server-side compatibility seam for callers whose legacy operations

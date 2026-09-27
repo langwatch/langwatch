@@ -4,9 +4,12 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  inMemoryIdentityReservations,
+  inMemoryIdentityUsers,
+} from "../../__tests__/support/identity-memory-repositories.ts";
 import type { IdentityBirthLedger } from "../../app/identity.members.ts";
 import type { IdentityNewbornRepository } from "../../repositories/identity-newborn.repository.ts";
-import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
 import { CryptoIdentifierIdentityService } from "../crypto-identifier-identity.service.ts";
 import { IdentityBirthService } from "../identity-birth.service.ts";
 /**

@@ -4,14 +4,12 @@ import {
   GRANT_REVOKED_EVENT_TYPE,
 } from "@langwatch/authz-contract";
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthzGrantsEvent } from "../../eventing/authz-grant.events.ts";
-import type { AuthzGrantProjection } from "../../eventing/authz-grant.projection.ts";
-import {
-  type AuthzGrantPipelineDatabase,
-  PostgresAuthzPipelineAdapter,
-} from "../postgres-authz-pipeline.build.ts";
+import { PostgresAuthzPipelineAdapter } from "../authz-composition.build.ts";
 
 const ORGANIZATION = "organization_acme";
 const GRANT = "grant_1";
@@ -19,14 +17,15 @@ const ACTOR = { type: "user", id: "user_admin" } as const;
 
 function recordingDatabase(options: { guard?: number; grantRow?: unknown } = {}) {
   const executeRaw = vi.fn(
-    async (_statement: TemplateStringsArray, ..._values: unknown[]) => options.guard ?? 1,
+    async (_statement: Prisma.Sql | TemplateStringsArray, ..._values: unknown[]) =>
+      options.guard ?? 1,
   );
   const grantFindUnique = vi.fn(async () => options.grantRow ?? null);
   const roleBindingUpsert = vi.fn(async () => undefined);
   const roleBindingDeleteMany = vi.fn(async () => ({ count: 0 }));
   const shareLinkDeleteMany = vi.fn(async () => ({ count: 0 }));
   const auditCreateMany = vi.fn(async () => ({ count: 1 }));
-  const database = {
+  const database = prismaDouble({
     grant: {
       findUnique: grantFindUnique,
       updateMany: vi.fn(async () => ({ count: 1 })),
@@ -58,9 +57,11 @@ function recordingDatabase(options: { guard?: number; grantRow?: unknown } = {})
       upsert: vi.fn(async () => undefined),
     },
     auditLog: { createMany: auditCreateMany },
-    $transaction: vi.fn(async (writes: Promise<unknown>[]) => Promise.all(writes)),
+    $transaction: vi.fn(async (writes: unknown) =>
+      Array.isArray(writes) ? Promise.all(writes) : undefined,
+    ),
     $executeRaw: executeRaw,
-  } as unknown as AuthzGrantPipelineDatabase;
+  });
 
   return {
     database,
@@ -77,12 +78,6 @@ function compose(options: { guard?: number; grantRow?: unknown } = {}) {
   const recording = recordingDatabase(options);
   const pipeline = PostgresAuthzPipelineAdapter.create({ database: recording.database }).build();
   return { ...recording, pipeline };
-}
-
-function grantsProjection(pipeline: ReturnType<typeof compose>["pipeline"]): AuthzGrantProjection {
-  const registered = pipeline.mapProjections.get("authzGrantsWrite");
-  expect(registered, "the pipeline registered no authzGrantsWrite projection").toBeDefined();
-  return registered!.definition as unknown as AuthzGrantProjection;
 }
 
 type AuthzGrantsEventBody = AuthzGrantsEvent extends infer E
@@ -122,8 +117,15 @@ function attachedEvent(): AuthzGrantsEvent {
 }
 
 async function applyAttached(composed: ReturnType<typeof compose>): Promise<void> {
-  const projection = grantsProjection(composed.pipeline);
-  await projection.store.append(projection.map(attachedEvent()), {} as ProjectionStoreContext);
+  const registered = composed.pipeline.mapProjections.get("authzGrantsWrite");
+  expect(registered, "the pipeline registered no authzGrantsWrite projection").toBeDefined();
+  await registered?.open(async (projection, consumes) => {
+    const event = attachedEvent();
+    if (!consumes(event)) throw new Error("authzGrantsWrite does not consume grant.attached");
+    const record = projection.map(event);
+    if (record === null) throw new Error("authzGrantsWrite mapped grant.attached to nothing");
+    await projection.store.append(record, {} as ProjectionStoreContext);
+  });
 }
 
 describe("PostgresAuthzPipelineAdapter", () => {
@@ -198,7 +200,9 @@ describe("PostgresAuthzPipelineAdapter", () => {
       await applyAttached(composed);
 
       expect(composed.executeRaw).toHaveBeenCalledTimes(1);
-      const statement = composed.executeRaw.mock.calls[0]?.[0] ?? [];
+      const sent = composed.executeRaw.mock.calls[0]?.[0];
+      expect(sent, "the projection sent no statement").toBeDefined();
+      const statement = sent && "strings" in sent ? sent.strings : [...(sent ?? [])];
       expect(statement.join("?")).toContain('INSERT INTO "Grant"');
       // The guard is part of the statement, never a read-then-write.
       expect(statement.join("?")).toContain('WHERE "Grant"."occurredAt" < EXCLUDED."occurredAt"');
