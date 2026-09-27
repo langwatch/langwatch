@@ -83,7 +83,7 @@ func readJob(root, id string) domain.JobRecord {
 // readState parses a job's state.json. Unreadable or malformed reads as absent:
 // the age rule then decides, which is the conservative answer.
 func readState(dir string) (stateFile, bool) {
-	b, err := os.ReadFile(filepath.Join(dir, "state.json"))
+	b, err := readFileNoAtime(filepath.Join(dir, "state.json"))
 	if err != nil {
 		return stateFile{}, false
 	}
@@ -109,7 +109,7 @@ func recordTimes(dir string) (newestMtime, newestAtime time.Time) {
 		if mt := info.ModTime(); mt.After(newestMtime) {
 			newestMtime = mt
 		}
-		if at, ok := accessTime(info); ok && at.After(newestAtime) {
+		if at, ok := fileAccessTime(info); ok && at.After(newestAtime) {
 			newestAtime = at
 		}
 	}
@@ -133,12 +133,22 @@ func newestTimes(dir string) (newestMtime, newestAtime time.Time) {
 		if mt := info.ModTime(); mt.After(newestMtime) {
 			newestMtime = mt
 		}
-		if at, ok := accessTime(info); ok && at.After(newestAtime) {
+		if at, ok := fileAccessTime(info); ok && at.After(newestAtime) {
 			newestAtime = at
 		}
 		return nil
 	})
 	return newestMtime, newestAtime
+}
+
+// fileAccessTime is a file's atime; a directory's is unknown. Listing a
+// directory moves its atime on Linux, and this scan and Size's du both list
+// every directory, so a directory's atime only records haven looking at it.
+func fileAccessTime(info fs.FileInfo) (time.Time, bool) {
+	if info.IsDir() {
+		return time.Time{}, false
+	}
+	return accessTime(info)
 }
 
 // Size reports how much disk a job directory occupies, via `du -sk` — the same
