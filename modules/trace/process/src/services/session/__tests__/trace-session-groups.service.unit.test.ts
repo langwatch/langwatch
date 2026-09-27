@@ -109,6 +109,10 @@ class TestCodingAgentApi {
     throw new Error("Not used by session group tests: listForProject.");
   }
 
+  readSessionEventsPage(): never {
+    throw new Error("Not used by session group tests: readSessionEventsPage.");
+  }
+
   githubWebBase(): never {
     throw new Error("Not used by session group tests: githubWebBase.");
   }

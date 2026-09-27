@@ -33,6 +33,10 @@ export class TestCodingAgentService implements CodingAgentApi {
     return this.unused();
   }
 
+  readSessionEventsPage(): Promise<never> {
+    return this.unused();
+  }
+
   findBySessionId(): Promise<never> {
     return this.unused();
   }

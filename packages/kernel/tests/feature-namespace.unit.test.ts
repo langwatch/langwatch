@@ -46,6 +46,7 @@ const EXPECTED_PUBLIC_NAMESPACES = {
   project: "projects",
   prompt: "prompts",
   role: "roles",
+  rum: "rums",
   "sample-agents": "sample-agents",
   scenario: "scenarios",
   secret: "secrets",
