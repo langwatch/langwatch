@@ -7,6 +7,7 @@ import {
   DatasetNotFoundError,
   type DatasetNormalizePayload,
   type AppendStoredObjectToDatasetInput,
+  type BatchEvaluationEntry,
   type BatchEvaluationRecord,
   type BatchEvaluationSummary,
   type CopyDatasetInput,
@@ -276,6 +277,10 @@ export class DatasetApp implements DatasetApi {
     }
   }
 
+  findBySlug(input: { projectId: string; slug: string }): Promise<Dataset[]> {
+    return this.#datasets.findBySlug(input);
+  }
+
   /** Several datasets by id, for the references an evaluation names. */
   getByIds(input: { projectId: string; datasetIds: string[] }): Promise<Dataset[]> {
     return this.#datasets.getByIds(input);
@@ -463,6 +468,10 @@ export class DatasetApp implements DatasetApi {
   /** One row per experiment and dataset: how many ran, cost, mean score. */
   summariseBatchEvaluations(input: { projectId: string }): Promise<BatchEvaluationSummary[]> {
     return this.#batchEvaluations.summariseByExperiment(input);
+  }
+
+  createBatchEvaluation(input: BatchEvaluationEntry): Promise<void> {
+    return this.#batchEvaluations.create(input);
   }
 
   /**

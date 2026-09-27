@@ -2,6 +2,7 @@ import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluationApi, type ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type {
@@ -9,6 +10,7 @@ import type {
   EventingCommandSender,
   QueueSendOptions,
 } from "@langwatch/eventing";
+import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -34,6 +36,8 @@ async function installed() {
       "feature-flag": createApiFixture<FeatureFlagApi>(),
       evaluator: createApiFixture<EvaluatorApi>(),
       monitor: createApiFixture<MonitorApi>(),
+      dataset: createApiFixture<DatasetApi>(),
+      experiment: createApiFixture<ExperimentApi>(),
       automation: createApiFixture<AutomationApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
       "data-retention": createApiFixture<DataRetentionApi>(),

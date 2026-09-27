@@ -1,6 +1,7 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import {
   AZURE_SAFETY_ENV_VARS,
   EvaluationApi,
@@ -34,6 +35,7 @@ import {
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import { ExperimentApi } from "@langwatch/experiment-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
@@ -48,7 +50,11 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type {
   EvaluationCustomEvaluators,
+  EvaluationExecution,
+  EvaluationExecutionIntent,
+  EvaluationInputsResolution,
   EvaluationInstallEnvironment,
+  EvaluationRetentionFloor,
   EvaluationReport,
   EvaluationRescore,
   EvaluationRunAnalytics,
@@ -68,11 +74,13 @@ import {
 } from "../services/evaluation-batch-log.service.ts";
 import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
 import { EvaluationCostService } from "../services/evaluation-cost.service.ts";
+import { EvaluationDatasetLookupService } from "../services/evaluation-dataset-lookup.service.ts";
 import { EvaluationEventingService } from "../services/evaluation-eventing.service.ts";
 import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
 import { EvaluationExecutionMetricsService } from "../services/evaluation-execution-metrics.service.ts";
 import { EvaluationExecutionReceiptService } from "../services/evaluation-execution-receipt.service.ts";
 import { EvaluationExecutionService } from "../services/evaluation-execution.service.ts";
+import { EvaluationExperimentRunService } from "../services/evaluation-experiment-run.service.ts";
 import { EvaluationFilterMatchingService } from "../services/evaluation-filter-matching.service.ts";
 import { FlaggedEvaluationInputsOffloadService } from "../services/evaluation-inputs-offload-switch.service.ts";
 import {
@@ -101,12 +109,6 @@ import { LangevalsClusteringService } from "../services/langevals-clustering.ser
 import { LangevalsEvaluatorService } from "../services/langevals-evaluator.service.ts";
 import { LangevalsPiiDetectionService } from "../services/langevals-pii-detection.service.ts";
 import { WorkflowEvaluationService } from "../services/workflow-evaluation.service.ts";
-import type {
-  EvaluationExecution,
-  EvaluationExecutionIntent,
-  EvaluationInputsResolution,
-  EvaluationRetentionFloor,
-} from "./evaluation.members.ts";
 
 export type EvaluationInfrastructure = Readonly<{
   retentionFloor: EvaluationRetentionFloor;
@@ -260,6 +262,10 @@ export class EvaluationApp implements EvaluationApiContract {
     automations: AutomationApi,
     /** Where the analytics folds and rollup are written. */
     analytics: AnalyticsApi,
+    /** The dataset a dataset evaluation names by slug, and the batch-evaluation rows it writes. */
+    datasets: DatasetApi,
+    /** The experiment and run history SDK batches and dataset evaluations are written into. */
+    experiments: ExperimentApi,
   };
   static readonly reads = reads("objectStorage");
   static readonly secrets = {
@@ -371,6 +377,8 @@ export class EvaluationApp implements EvaluationApiContract {
     const telemetry = EvaluationExecutionMetricsService.create();
     const unavailable = createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME);
     const monitorLookup = EvaluationMonitorLookupService.create(dependencies.monitors);
+    const datasets = EvaluationDatasetLookupService.create(dependencies.datasets);
+    const experiments = EvaluationExperimentRunService.create(dependencies.experiments);
     const costs = EvaluationCostService.create({ repository: repositories.costs });
     const azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     const inputs = EvaluationInputsOffloadService.create({
@@ -408,15 +416,20 @@ export class EvaluationApp implements EvaluationApiContract {
     return EvaluationApp.fromInfrastructure({
       infrastructure: {
         ...unavailable,
+        customEvaluators: {
+          findAll: (input) => dependencies.workflows.findEvaluatorWorkflows(input),
+        },
+        experiments,
+        experimentRuns: experiments,
         slugs: {
           findMonitorBySlug: (input) => monitorLookup.findMonitorBySlug(input),
-          findDatasetBySlug: (input) => unavailable.slugs.findDatasetBySlug(input),
+          findDatasetBySlug: (input) => datasets.findDatasetBySlug(input),
         },
         savedEvaluators: EvaluationSavedEvaluatorService.create(dependencies.evaluators),
         models: EvaluationModelCascadeService.create(dependencies.modelProviders),
         ledger: {
           recordCost: (input) => costs.recordEntry(input),
-          recordDatasetRow: (input) => unavailable.ledger.recordDatasetRow(input),
+          recordDatasetRow: (input) => datasets.recordDatasetRow(input),
         },
         retentionFloor: EvaluationRetentionFloorService.create(dependencies.retention),
         execution,

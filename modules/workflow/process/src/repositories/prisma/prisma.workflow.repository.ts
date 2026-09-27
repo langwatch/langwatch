@@ -70,6 +70,8 @@ const mapVersion = (row: unknown, includeDsl = true): WorkflowVersion => {
   });
 };
 
+const workflowVersionsRowSchema = z.object({ versions: z.array(z.unknown()) });
+
 export class PrismaWorkflowRepository extends WorkflowRepository {
   async findFieldSources(input: {
     projectId: string;
@@ -165,6 +167,19 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
     return rows.map(mapWorkflow);
   }
 
+  async findEvaluators(input: {
+    projectId: string;
+  }): Promise<(Workflow & { versions: WorkflowVersion[] })[]> {
+    const rows = await this.database.workflow.findMany({
+      where: { projectId: input.projectId, isEvaluator: true },
+      include: { versions: true },
+    });
+
+    return rows.map((row) => ({
+      ...mapWorkflow(row),
+      versions: workflowVersionsRowSchema.parse(row).versions.map((version) => mapVersion(version)),
+    }));
+  }
   async findVersions(input: {
     workflowId: string;
     projectId: string;

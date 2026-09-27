@@ -62,6 +62,9 @@ export abstract class WorkflowRepository {
     includeArchived?: boolean;
   }): Promise<WorkflowWithVersion | null>;
   abstract findAll(input: { projectId: string }): Promise<Workflow[]>;
+  abstract findEvaluators(input: {
+    projectId: string;
+  }): Promise<(Workflow & { versions: WorkflowVersion[] })[]>;
   abstract findVersions(input: {
     workflowId: string;
     projectId: string;

@@ -1,7 +1,19 @@
-import type { BatchEvaluationRecord, BatchEvaluationSummary } from "@langwatch/dataset-contract";
+import type {
+  BatchEvaluationEntry,
+  BatchEvaluationRecord,
+  BatchEvaluationSummary,
+} from "@langwatch/dataset-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 
 import type { BatchEvaluationRepository } from "../batch-evaluation.repository.ts";
+
+const prismaJsonInputSchema = z.custom<Prisma.InputJsonValue>((value) => value !== null);
+
+function jsonInput(value: Record<string, unknown>): Prisma.InputJsonValue {
+  return prismaJsonInputSchema.parse(z.json().parse(value));
+}
 
 export class PrismaBatchEvaluationRepository
   extends PrismaRepository.for("BatchEvaluation")
@@ -35,5 +47,9 @@ export class PrismaBatchEvaluationRepository
       where: { projectId: input.projectId, experimentId: input.experimentId },
       include: { dataset: true },
     });
+  }
+
+  async create(input: BatchEvaluationEntry): Promise<void> {
+    await this.prisma.batchEvaluation.create({ data: { ...input, data: jsonInput(input.data) } });
   }
 }

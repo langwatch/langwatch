@@ -49,6 +49,23 @@ export interface DatasetUsageCount {
   readonly firstBatchEvaluationAt?: number;
 }
 
+/** One batch-evaluation row a dataset evaluation writes against the dataset it ran over. */
+export type BatchEvaluationEntry = Readonly<{
+  id: string;
+  experimentId: string;
+  projectId: string;
+  data: Record<string, unknown>;
+  status: string;
+  score: number;
+  passed: boolean;
+  label: string | null;
+  details: string;
+  cost: number;
+  evaluation: string;
+  datasetSlug: string;
+  datasetId: string;
+}>;
+
 /** Callable capability exposed by the composed Dataset application. */
 export interface DatasetApi {
   upsertDataset: (input: {
@@ -65,6 +82,8 @@ export interface DatasetApi {
   listDatasets: (input: ListDatasetsInput) => Promise<DatasetListResult>;
   getBySlugOrId(input: DatasetLookupInput): Promise<Dataset>;
   findBySlugOrId(input: DatasetLookupInput): Promise<Dataset | null>;
+  /** The dataset holding exactly this slug, archived or not; empty when none does. */
+  findBySlug(input: { projectId: string; slug: string }): Promise<Dataset[]>;
   updateMapping(input: {
     datasetId: string;
     projectId: string;
@@ -124,6 +143,8 @@ export interface DatasetApi {
   renameDataset(input: { datasetId: string; projectId: string; name: string }): Promise<Dataset>;
   /** One row per experiment and dataset: how many ran, total cost, mean score. */
   summariseBatchEvaluations(input: { projectId: string }): Promise<BatchEvaluationSummary[]>;
+  /** One batch-evaluation row, written as `POST /api/dataset/evaluate` records it. */
+  createBatchEvaluation(input: BatchEvaluationEntry): Promise<void>;
   /** Every batch-evaluation record of the experiment the slug names. */
   listBatchEvaluations(input: {
     projectId: string;

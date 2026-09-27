@@ -113,6 +113,27 @@ Feature: Evaluation service boundary
     And an evaluator the project does not hold is refused with the owner's own code
 
   @unit
+  Scenario: An evaluate call reads the project's custom evaluators from the workflow module
+    Given a process that installs the evaluation feature beside a workflow owner
+    When an evaluate call names a custom/<workflowId> evaluator
+    Then the project's evaluator workflows come back, each carrying only its published version
+
+  @unit
+  Scenario: A dataset evaluation reads its dataset and writes its rows through the dataset module
+    Given a process that installs the evaluation feature beside a dataset owner
+    When a dataset evaluation names a dataset slug and scores an entry
+    Then the dataset's id comes back, and a slug the project does not hold answers no dataset
+    And the scored entry is written as a batch-evaluation row by the dataset owner
+
+  @unit
+  Scenario: An SDK batch is written into its experiment's run history through the experiment module
+    Given a process that installs the evaluation feature beside an experiment owner
+    When an SDK logs a batch of evaluation results
+    Then the experiment is found or created, and its run is started, filled and completed in that order
+    And an evaluator result carries the status the batch reported
+    And a dataset evaluation's experiment slug resolves through the same owner
+
+  @unit
   Scenario: An evaluate call reads the project's default models from the cascade
     Given a process that installs the evaluation feature beside a model provider owner
     When an evaluate call asks for the model a feature resolves to
