@@ -6,8 +6,9 @@ description: >-
 # `start:prepare:files` is a chain of four generators — the langevals evaluator
 # types, the Prisma client, the langy skill catalogue and the setup-skill
 # bodies. `ensure:built` then builds the workspace packages that resolve a
-# bundle rather than their own source: the TypeScript SDK, the MCP server,
-# ksuid and mail.
+# bundle rather than their own source: the TypeScript SDK (whose prebuild also
+# writes the gitignored src/internal/generated files), the MCP server, ksuid
+# and mail.
 # It costs 30-35s and every test, build and check job in this workflow pays it.
 # Across the shards that was several runner-minutes per push spent regenerating
 # byte-identical output from byte-identical committed inputs.
@@ -42,6 +43,7 @@ runs:
           modules/langy/browser/src/model/shared/langy/langySkills.generated.json
           modules/langy/process/src/rules/setup-skill-bodies.rules.ts
           sdks/typescript/dist
+          sdks/typescript/src/internal/generated
           mcp/typescript/dist
           packages/ksuid/dist
           packages/mail/dist
@@ -58,6 +60,15 @@ runs:
             'sdks/typescript/src/**',
             'sdks/typescript/package.json',
             'sdks/typescript/tsup.config.ts',
+            'sdks/typescript/copy-types.sh',
+            'sdks/typescript/scripts/**',
+            'feature-map.json',
+            'specs/api-reference/openapi-document.json',
+            'modules/evaluator/contract/src/evaluators.native.ts',
+            'modules/model-provider/contract/src/catalog/model-catalog.json',
+            'modules/scenario/contract/src/suite-fields.ts',
+            'modules/trace/contract/src/trace-format.schemas.ts',
+            'packages/redaction/src/**',
             'mcp/typescript/src/**',
             'mcp/typescript/package.json',
             'packages/ksuid/src/**',
