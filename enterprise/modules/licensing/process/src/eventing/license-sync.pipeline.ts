@@ -9,7 +9,6 @@ import {
   definePipeline,
   type EventingSetup,
   type StaticPipelineDefinition,
-  type Event,
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
@@ -32,7 +31,7 @@ export function buildLicenseSync({
   bootedAt = nowInstant().epochMilliseconds,
 }: EventingSetup<unknown, Pick<LicensingApp, "syncLicenses">> & {
   bootedAt?: number;
-}): StaticPipelineDefinition<Event> {
+}): StaticPipelineDefinition<never> {
   return definePipeline({
     name: LICENSE_SYNC_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),

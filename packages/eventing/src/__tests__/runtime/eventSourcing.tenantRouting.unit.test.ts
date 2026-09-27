@@ -8,7 +8,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EventSourcing } from "../../eventSourcing.ts";
 import type { EventSourcedQueueDefinition } from "../../queues/index.ts";
+import { parseTestJobPayload } from "../../services/__tests__/testHelpers.ts";
 import { QueueTenantMismatchError } from "../../services/errorHandling.ts";
+import { type JobLane, sealJobLane } from "../../services/queues/jobLane.ts";
 import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 
@@ -27,17 +29,27 @@ const ROUTING = {
  * group key was built with, `groupKeyFn` the hierarchical
  * `${tenantId}/${jobPath}/${domainKey}` key itself.
  */
-const laneEntry = (overrides: Partial<JobRegistryEntry> = {}): JobRegistryEntry => ({
-  process: vi.fn().mockResolvedValue(undefined),
-  processBatch: vi.fn().mockResolvedValue(undefined),
-  getTenantId: (payload: Record<string, unknown>) => String(payload.tenantId),
-  groupKeyFn: (payload: Record<string, unknown>) =>
-    `${String(payload.tenantId)}/map/testProjection/thing:x`,
-  scoreFn: () => 0,
-  ...overrides,
-});
+function laneEntry(overrides: Partial<JobLane<Record<string, unknown>>> = {}) {
+  const lane = {
+    parse: parseTestJobPayload,
+    process: vi.fn().mockResolvedValue(undefined),
+    processBatch: vi.fn().mockResolvedValue(undefined),
+    getTenantId: (payload: Record<string, unknown>) => String(payload.tenantId),
+    groupKeyFn: (payload: Record<string, unknown>) =>
+      `${String(payload.tenantId)}/map/testProjection/thing:x`,
+    scoreFn: () => 0,
+    ...overrides,
+  };
+  return { lane, entry: sealJobLane(lane, (id) => id) };
+}
 
-function createWithEntry(entry: JobRegistryEntry) {
+function createWithEntry({
+  lane,
+  entry,
+}: {
+  lane: ReturnType<typeof laneEntry>["lane"];
+  entry: JobRegistryEntry;
+}) {
   const eventSourcing = new EventSourcing({
     eventStore: EventStoreMemory.createForTesting(),
     queueFactory: (definition) => {
@@ -55,7 +67,7 @@ function createWithEntry(entry: JobRegistryEntry) {
     `${ROUTING.__pipelineName}:${ROUTING.__jobType}:${ROUTING.__jobName}`,
     entry,
   );
-  return { eventSourcing, entry };
+  return { eventSourcing, lane };
 }
 
 describe("the shared queue's tenant gate", () => {
@@ -65,14 +77,14 @@ describe("the shared queue's tenant gate", () => {
 
   describe("when the payload tenant matches the group-key tenant", () => {
     it("processes the job as today, with the clean payload", async () => {
-      const { eventSourcing, entry } = createWithEntry(laneEntry());
+      const { eventSourcing, lane } = createWithEntry(laneEntry());
 
       await captured.definition!.process(
         { ...ROUTING, tenantId: "tenant-a", value: "a" },
         { attempt: 1 },
       );
 
-      expect(entry.process).toHaveBeenCalledWith(
+      expect(lane.process).toHaveBeenCalledWith(
         { tenantId: "tenant-a", value: "a" },
         { attempt: 1 },
       );
@@ -86,14 +98,14 @@ describe("the shared queue's tenant gate", () => {
       // a tenant id carrying its own separator stages the job under one
       // tenant's group while the payload claims another scope. The group-key
       // segment ("tenant-a") and the accessor ("tenant-a/extra") disagree.
-      const { eventSourcing, entry } = createWithEntry(laneEntry());
+      const { eventSourcing, lane } = createWithEntry(laneEntry());
 
       const failure = await captured
         .definition!.process({ ...ROUTING, tenantId: "tenant-a/extra", value: "a" }, { attempt: 1 })
         .then(() => null)
         .catch((error: unknown) => error);
 
-      expect(entry.process).not.toHaveBeenCalled();
+      expect(lane.process).not.toHaveBeenCalled();
       expect(failure).toBeInstanceOf(QueueTenantMismatchError);
       expect(failure).toBeInstanceOf(NonRetryableGroupQueueError);
       // The property the group queue's failure classifier keys on: false
@@ -117,7 +129,7 @@ describe("the shared queue's tenant gate", () => {
           return `${String(event?.tenantId)}/fold/proj/reactor/sub/x`;
         },
       });
-      const { eventSourcing, entry } = createWithEntry(reactorEntry);
+      const { eventSourcing, lane } = createWithEntry(reactorEntry);
 
       const payload = {
         ...ROUTING,
@@ -127,20 +139,20 @@ describe("the shared queue's tenant gate", () => {
       };
       eventSourcing.globalJobRegistry.set(
         `${ROUTING.__pipelineName}:reactor:${ROUTING.__jobName}`,
-        reactorEntry,
+        reactorEntry.entry,
       );
 
       await expect(captured.definition!.process(payload, { attempt: 1 })).rejects.toBeInstanceOf(
         QueueTenantMismatchError,
       );
-      expect(entry.process).not.toHaveBeenCalled();
+      expect(lane.process).not.toHaveBeenCalled();
       await eventSourcing.close();
     });
   });
 
   describe("when a coalesced batch carries a misrouted payload", () => {
     it("refuses the whole batch — the batch handler never runs", async () => {
-      const { eventSourcing, entry } = createWithEntry(laneEntry());
+      const { eventSourcing, lane } = createWithEntry(laneEntry());
 
       await expect(
         captured.definition!.processBatch!(
@@ -151,15 +163,15 @@ describe("the shared queue's tenant gate", () => {
           { attempt: 2 },
         ),
       ).rejects.toBeInstanceOf(QueueTenantMismatchError);
-      expect(entry.processBatch).not.toHaveBeenCalled();
-      expect(entry.process).not.toHaveBeenCalled();
+      expect(lane.processBatch).not.toHaveBeenCalled();
+      expect(lane.process).not.toHaveBeenCalled();
       await eventSourcing.close();
     });
   });
 
   describe("when a coalesced batch's tenants all match their group keys", () => {
     it("processes the batch as today", async () => {
-      const { eventSourcing, entry } = createWithEntry(laneEntry());
+      const { eventSourcing, lane } = createWithEntry(laneEntry());
 
       await captured.definition!.processBatch!(
         [
@@ -169,7 +181,7 @@ describe("the shared queue's tenant gate", () => {
         { attempt: 2 },
       );
 
-      expect(entry.processBatch).toHaveBeenCalledWith(
+      expect(lane.processBatch).toHaveBeenCalledWith(
         [
           { tenantId: "tenant-a", value: "a" },
           { tenantId: "tenant-a", value: "b" },

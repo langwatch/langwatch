@@ -51,6 +51,7 @@ export class EventSourcingPipeline<
       subscribers: definition.subscribers,
       globalQueue: definition.globalQueue,
       globalJobRegistry: definition.globalJobRegistry,
+      parseEvent: definition.parseEvent,
       commandRegistrations: definition.commandRegistrations,
       globalRegistry: definition.globalRegistry,
       executionTarget: definition.executionTarget,

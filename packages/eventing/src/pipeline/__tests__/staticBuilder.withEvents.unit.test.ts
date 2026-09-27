@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
 import { defineAggregate } from "../../domain/definitions.ts";
-import { type Event, EventSchema } from "../../domain/types.ts";
+import { EventSchema } from "../../domain/types.ts";
 import { definePipeline, type PipelineBuilder } from "../staticBuilder.ts";
 
 const startedSchema = z.object({
@@ -27,11 +27,11 @@ describe("definePipeline(...).withEvents", () => {
     it("indexes the schemas by type and lists the aggregate's events from them", () => {
       const definition = testPipeline().withEvents([startedSchema, finishedSchema]).build();
 
-      expect([...(definition.eventSchemas?.keys() ?? [])]).toEqual([
+      expect([...(definition.eventSchemas.keys() ?? [])]).toEqual([
         "test.started",
         "test.finished",
       ]);
-      expect(definition.eventSchemas?.get("test.finished")).toBe(finishedSchema);
+      expect(definition.eventSchemas.get("test.finished")).toBe(finishedSchema);
       expect(definition.aggregate.events.map((event) => event.type)).toEqual([
         "test.started",
         "test.finished",
@@ -47,10 +47,10 @@ describe("definePipeline(...).withEvents", () => {
   });
 
   describe("when a pipeline declares no events", () => {
-    it("keeps the open event type", () => {
+    it("types its events as never, since none can be queued", () => {
       const builder = testPipeline().withEvents([]);
 
-      expectTypeOf<PipelineEventOf<typeof builder>>().toEqualTypeOf<Event>();
+      expectTypeOf<PipelineEventOf<typeof builder>>().toEqualTypeOf<never>();
     });
   });
 

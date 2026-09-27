@@ -12,6 +12,7 @@ import {
   createTestAggregateType,
   createTestEvent,
   createTestTenantId,
+  parseTestEvent,
 } from "../../services/__tests__/testHelpers.ts";
 import type { EventStoreReadContext } from "../../stores/eventStore.types.ts";
 import { ProjectionRegistry } from "../projectionRegistry.ts";
@@ -21,7 +22,7 @@ const ERROR = 50;
 
 function registryWithAProjection() {
   const { logger, lines } = createTestLogger();
-  const registry = new ProjectionRegistry({ logger });
+  const registry = new ProjectionRegistry({ logger, parseEvent: parseTestEvent });
   registry.registerFoldProjection(createMockFoldProjectionDefinition("any-fold"));
   return { registry, lines };
 }
@@ -113,7 +114,7 @@ describe("dispatching to a projection registry with no router", () => {
       /** @scenario "Work discarded without a throw is logged at error" */
       it("logs nothing, because there was no work to lose", async () => {
         const { logger, lines } = createTestLogger();
-        const registry = new ProjectionRegistry({ logger });
+        const registry = new ProjectionRegistry({ logger, parseEvent: parseTestEvent });
 
         await registry.dispatch(events, context);
 

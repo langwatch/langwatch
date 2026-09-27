@@ -8,6 +8,7 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "../../services/__tests__/testHelpers.ts";
 import { EventSourcingService } from "../../services/eventSourcingService.ts";
 import type { EventSubscriberDefinition } from "../eventSubscriber.types.ts";
@@ -39,6 +40,7 @@ describe("event subscribers", () => {
           handle,
         };
         const service = new EventSourcingService({
+          parseEvent: parseTestEvent,
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           aggregateType,
           allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -71,6 +73,7 @@ describe("event subscribers", () => {
           handle,
         };
         const service = new EventSourcingService({
+          parseEvent: parseTestEvent,
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           aggregateType,
           allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],

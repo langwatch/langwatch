@@ -9,7 +9,6 @@ import {
   definePipeline,
   type EventingSetup,
   type StaticPipelineDefinition,
-  type Event,
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
@@ -33,7 +32,7 @@ export const SCIM_MAINTENANCE_PIPELINE_NAME = "scim_maintenance";
 export function buildScimMaintenance({
   app,
   processStore,
-}: EventingSetup<unknown, Pick<ScimApp, "sweepExpiredRequests">>): StaticPipelineDefinition<Event> {
+}: EventingSetup<unknown, Pick<ScimApp, "sweepExpiredRequests">>): StaticPipelineDefinition<never> {
   return definePipeline({
     name: SCIM_MAINTENANCE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),

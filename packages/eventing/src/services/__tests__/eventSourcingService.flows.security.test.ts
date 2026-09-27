@@ -14,6 +14,7 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "./testHelpers.ts";
 
 describe("EventSourcingService - Security Flows", () => {
@@ -35,6 +36,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("tenantId is required in all contexts", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -54,6 +56,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("tenantId is validated before operations", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -73,6 +76,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("events are filtered by tenantId", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -104,6 +108,7 @@ describe("EventSourcingService - Security Flows", () => {
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -131,6 +136,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("missing tenantId causes errors", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -147,6 +153,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("invalid tenantId causes errors", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -182,6 +189,7 @@ describe("EventSourcingService - Security Flows", () => {
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -210,6 +218,7 @@ describe("EventSourcingService - Security Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const customAggregateType = "trace" as const;
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType: customAggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1],
@@ -232,6 +241,7 @@ describe("EventSourcingService - Security Flows", () => {
       const aggregateType2 = "test_aggregate" as const as AggregateType;
 
       const service1 = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType: aggregateType1,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1],
@@ -239,6 +249,7 @@ describe("EventSourcingService - Security Flows", () => {
       });
 
       const service2 = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType: aggregateType2,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1],
@@ -262,6 +273,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("stores enforce tenant isolation", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -299,6 +311,7 @@ describe("EventSourcingService - Security Flows", () => {
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -325,6 +338,7 @@ describe("EventSourcingService - Security Flows", () => {
       const context2 = createTestEventStoreReadContext(tenantId2);
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -361,6 +375,7 @@ describe("EventSourcingService - Security Flows", () => {
       const context2 = createTestEventStoreReadContext(tenantId2);
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],

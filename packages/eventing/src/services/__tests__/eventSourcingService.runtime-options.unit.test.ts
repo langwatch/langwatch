@@ -6,7 +6,11 @@ import { sealMapProjection } from "../../projections/sealedProjection.ts";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types.ts";
 import { EventSourcingService } from "../eventSourcingService.ts";
-import { createMockEventStore, createMockMapProjectionDefinition } from "./testHelpers.ts";
+import {
+  createMockEventStore,
+  createMockMapProjectionDefinition,
+  parseTestEvent,
+} from "./testHelpers.ts";
 
 const warningsIn = (lines: TestLogLines) => lines.filter((line) => line.level === 40);
 
@@ -27,6 +31,7 @@ describe("EventSourcingService runtime warning policy", () => {
   }) {
     const { logger, lines } = createTestLogger();
     new EventSourcingService<Event>({
+      parseEvent: parseTestEvent,
       pipelineName: "test-pipeline",
       aggregateType: "trace",
       allowedEventTypes: ["test.event"],
@@ -58,6 +63,7 @@ describe("EventSourcingService runtime warning policy", () => {
     expect(
       () =>
         new EventSourcingService<Event>({
+          parseEvent: parseTestEvent,
           pipelineName: "test-pipeline",
           aggregateType: "trace",
           allowedEventTypes: ["test.event"],

@@ -70,6 +70,8 @@ export interface EventSourcingPipelineDefinition<
   subscribers?: EventSubscriberDefinition<EventType>[];
   globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   globalJobRegistry?: Map<string, JobRegistryEntry>;
+  /** Parses a queued event with the pipeline's schema for its type (§9). */
+  parseEvent: (value: unknown) => EventType;
   commandRegistrations?: readonly SealedCommand<EventType>[];
   globalRegistry?: ProjectionRegistry<Event>;
   executionTarget?: ExecutionTarget;

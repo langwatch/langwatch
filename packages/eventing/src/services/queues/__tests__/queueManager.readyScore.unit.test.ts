@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import { z } from "zod";
 
 import type { Command, CommandHandler } from "../../../commands/command.ts";
 import type { CommandHandlerClass } from "../../../commands/commandHandlerClass.ts";
 import { defineCommandSchema } from "../../../commands/commandSchema.ts";
+import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import type { CommandType } from "../../../domain/commandType.ts";
 import type { Event } from "../../../domain/types.ts";
 import type { EventSourcedQueueProcessor } from "../../../queues/index.ts";
-import { createTestAggregateType } from "../../__tests__/testHelpers.ts";
+import {
+  createTestAggregateType,
+  parseTestEvent,
+  parseTestJobPayload,
+} from "../../__tests__/testHelpers.ts";
 import type { JobRegistryEntry } from "../queueManager.ts";
 import { QueueManager } from "../queueManager.ts";
 
@@ -53,6 +57,7 @@ function createMockCommandHandlerClass(): CommandHandlerClass<any, CommandType, 
 
 function createManager(globalJobRegistry: Map<string, JobRegistryEntry>) {
   return new QueueManager({
+    parseEvent: parseTestEvent,
     aggregateType: createTestAggregateType(),
     pipelineName: "test-pipeline",
     globalQueue: createMockSharedQueue(),
@@ -81,13 +86,14 @@ describe("QueueManager ready scores", () => {
       const registry = new Map<string, JobRegistryEntry>();
       createManager(registry).registerJob({
         name: "deferredCheck",
+        parse: parseTestJobPayload,
         process: vi.fn(),
       });
 
       const entry = registry.get("test-pipeline:job:deferredCheck");
 
-      expect(entry?.scoreFn({ tenantId: "t1" })).toBe(NOW);
-      expect(entry?.scoreFn({ tenantId: "t1", occurredAt: NOW - 30_000 })).toBe(NOW - 30_000);
+      expect(entry?.route({ tenantId: "t1" }).score).toBe(NOW);
+      expect(entry?.route({ tenantId: "t1", occurredAt: NOW - 30_000 }).score).toBe(NOW - 30_000);
     });
 
     /**
@@ -101,13 +107,14 @@ describe("QueueManager ready scores", () => {
       const registry = new Map<string, JobRegistryEntry>();
       createManager(registry).registerJob({
         name: "passThrough",
+        parse: parseTestJobPayload,
         process: vi.fn(),
       });
 
       const entry = registry.get("test-pipeline:job:passThrough");
 
-      expect(entry?.scoreFn({ tenantId: "t1", occurredAt: 0 })).toBe(0);
-      expect(entry?.scoreFn({ tenantId: "t1", occurredAt: Date.UTC(2021, 0, 1) })).toBe(
+      expect(entry?.route({ tenantId: "t1", occurredAt: 0 }).score).toBe(0);
+      expect(entry?.route({ tenantId: "t1", occurredAt: Date.UTC(2021, 0, 1) }).score).toBe(
         Date.UTC(2021, 0, 1),
       );
     });
@@ -116,11 +123,12 @@ describe("QueueManager ready scores", () => {
       const registry = new Map<string, JobRegistryEntry>();
       createManager(registry).registerJob({
         name: "customScore",
+        parse: parseTestJobPayload,
         process: vi.fn(),
         scoreFn: () => NOW - 1_000,
       });
 
-      expect(registry.get("test-pipeline:job:customScore")?.scoreFn({})).toBe(NOW - 1_000);
+      expect(registry.get("test-pipeline:job:customScore")?.route({}).score).toBe(NOW - 1_000);
     });
   });
 
@@ -142,13 +150,13 @@ describe("QueueManager ready scores", () => {
 
       const entry = registry.get("test-pipeline:command:readyScore");
 
-      expect(entry?.scoreFn({ tenantId: "t1", aggregateId: "a1" })).toBe(NOW);
+      expect(entry?.route({ tenantId: "t1", aggregateId: "a1" }).score).toBe(NOW);
       expect(
-        entry?.scoreFn({
+        entry?.route({
           tenantId: "t1",
           aggregateId: "a1",
           occurredAt: NOW - 42,
-        }),
+        }).score,
       ).toBe(NOW - 42);
     });
   });

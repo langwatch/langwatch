@@ -7,7 +7,7 @@ import {
   type DemoDataRunInput,
   type SeedRunReport,
 } from "@langwatch/enterprise-demo-data-contract";
-import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
+import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
@@ -56,7 +56,7 @@ export class DemoDataApp implements DemoDataApiContract {
 
   demoDataPipeline(deps: {
     deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
-  }): StaticPipelineDefinition<Event> {
+  }): StaticPipelineDefinition<never> {
     return buildDemoDataPipeline({
       run: () => this.#seeds.runScheduled(),
       deleteDispatchedBefore: deps.deleteDispatchedBefore,

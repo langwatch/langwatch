@@ -15,7 +15,11 @@ import {
 } from "../../__tests__/testHelpers.ts";
 import { QueuedCommandPayloadInvalidError, ValidationError } from "../../errorHandling.ts";
 import type { ProcessCommandBatchParams, ProcessCommandParams } from "../commandDispatcher.ts";
-import { processCommand, processCommandBatch } from "../commandDispatcher.ts";
+import {
+  parseQueuedCommandPayload,
+  processCommand,
+  processCommandBatch,
+} from "../commandDispatcher.ts";
 
 describe("processCommand", () => {
   const aggregateType: AggregateType = createTestAggregateType();
@@ -106,7 +110,7 @@ describe("processCommand", () => {
 
       await processCommand(params);
 
-      expect(commandSchema.validate).toHaveBeenCalledWith(validPayload);
+      expect(commandSchema.validate).not.toHaveBeenCalled();
       expect(handler.handle).toHaveBeenCalledOnce();
       expect(storeEventsFn).toHaveBeenCalledWith([event], {
         tenantId: createTenantId(String(validPayload.tenantId)),
@@ -129,7 +133,13 @@ describe("processCommand", () => {
 
       const params = createDefaultParams({ commandSchema });
 
-      const refusal = await processCommand(params).catch((error: unknown) => error);
+      const refusal = (() => {
+        try {
+          return parseQueuedCommandPayload(params, validPayload);
+        } catch (error) {
+          return error;
+        }
+      })();
       expect(refusal).toBeInstanceOf(QueuedCommandPayloadInvalidError);
       expect(refusal).toMatchObject({ retryable: false, commandName, commandType });
     });
@@ -266,7 +276,7 @@ describe("processCommandBatch", () => {
   const commandType: CommandType = "lw.obs.trace.record_span";
   const commandName = "recordSpan";
 
-  const payloadFor = (n: number): Record<string, unknown> => ({
+  const payloadFor = (n: number): { tenantId: string } & Record<string, unknown> => ({
     tenantId: TEST_CONSTANTS.TENANT_ID_VALUE,
     occurredAt: TEST_CONSTANTS.BASE_TIMESTAMP + n,
     id: `agg-${n}`,
@@ -356,36 +366,6 @@ describe("processCommandBatch", () => {
         expect(context).toEqual({
           tenantId: createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
         });
-      });
-    });
-  });
-
-  describe("given a payload that fails schema validation", () => {
-    describe("when the batch is processed", () => {
-      it("refuses the batch non-retryably and stores nothing", async () => {
-        const storeEventsFn = vi.fn();
-        const commandSchema = createEchoCommandSchema({
-          validate: vi.fn().mockImplementation((p: any) =>
-            p.id === "agg-1"
-              ? {
-                  success: false,
-                  error: {
-                    issues: [{ path: ["id"], message: "bad", code: "custom" }],
-                  },
-                }
-              : { success: true, data: p },
-          ),
-        });
-        const params = createDefaultBatchParams({
-          payloads: [payloadFor(0), payloadFor(1)],
-          commandSchema,
-          storeEventsFn,
-        });
-
-        const refusal = await processCommandBatch(params).catch((error: unknown) => error);
-        expect(refusal).toBeInstanceOf(QueuedCommandPayloadInvalidError);
-        expect(refusal).toMatchObject({ retryable: false });
-        expect(storeEventsFn).not.toHaveBeenCalled();
       });
     });
   });

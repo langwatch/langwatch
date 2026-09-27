@@ -83,6 +83,8 @@ export interface EventSourcingServiceOptions<
    * Global job registry shared across all pipelines.
    */
   globalJobRegistry?: Map<string, JobRegistryEntry>;
+  /** Parses a queued event with the pipeline's schema for its type (§9). */
+  parseEvent: (value: unknown) => EventType;
   /**
    * Command handler registrations for this pipeline.
    */

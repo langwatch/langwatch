@@ -2,7 +2,6 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
@@ -24,7 +23,7 @@ export const STORAGE_STATS_PIPELINE_NAME = "ops_storage_stats";
 export function buildStorageStats({
   app,
   processStore,
-}: EventingSetup<unknown, Pick<OpsApp, "measureStorage">>): StaticPipelineDefinition<Event> {
+}: EventingSetup<unknown, Pick<OpsApp, "measureStorage">>): StaticPipelineDefinition<never> {
   return definePipeline({
     name: STORAGE_STATS_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),

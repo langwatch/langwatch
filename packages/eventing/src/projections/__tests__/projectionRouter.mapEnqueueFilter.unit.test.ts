@@ -14,6 +14,7 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "../../services/__tests__/testHelpers.ts";
 import { type JobRegistryEntry, QueueManager } from "../../services/queues/queueManager.ts";
 import type { AppendStore, MapProjectionDefinition } from "../mapProjection.types.ts";
@@ -87,6 +88,7 @@ function makeQueuedRouter(projection: MapProjectionDefinition<SeamRecord, Event>
   };
 
   const queueManager = new QueueManager<Event>({
+    parseEvent: parseTestEvent,
     aggregateType,
     pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
     globalQueue,
@@ -113,6 +115,7 @@ function makeInlineRouter(projection: MapProjectionDefinition<SeamRecord, Event>
     aggregateType,
     pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
     queueManager: new QueueManager<Event>({
+      parseEvent: parseTestEvent,
       aggregateType,
       pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
     }),

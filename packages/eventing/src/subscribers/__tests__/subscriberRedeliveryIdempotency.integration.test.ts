@@ -4,7 +4,11 @@ import { type AggregateType, EventUtils } from "../..//index.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event } from "../../domain/types.ts";
 import { ProjectionRouter } from "../../projections/projectionRouter.ts";
-import { TEST_CONSTANTS, TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers.ts";
+import {
+  TEST_CONSTANTS,
+  TEST_EVENT_TYPES,
+  parseTestEvent,
+} from "../../services/__tests__/testHelpers.ts";
 import { QueueManager } from "../../services/queues/queueManager.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 
@@ -75,6 +79,7 @@ describe("subscriber redelivery", () => {
             aggregateType,
             pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
             queueManager: new QueueManager<Event>({
+              parseEvent: parseTestEvent,
               aggregateType,
               pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
             }),

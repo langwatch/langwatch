@@ -10,7 +10,9 @@ import {
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "../../services/__tests__/testHelpers.ts";
+import type { JobRegistryEntry } from "../../services/queues/jobLane.ts";
 import { QueueManager } from "../../services/queues/queueManager.ts";
 import type { FoldProjectionStore } from "../foldProjection.types.ts";
 import { ProjectionRouter } from "../projectionRouter.ts";
@@ -18,17 +20,13 @@ import { ProjectionRouter } from "../projectionRouter.ts";
 describe("continuation forwarding", () => {
   describe("when the queue manager's registry entry receives a batch delivery", () => {
     it("stamps deliveryAttempt and isDeliveryContinuation on the read context", async () => {
-      const registry = new Map<
-        string,
-        {
-          processBatch?: (events: Event[], delivery?: JobDelivery) => Promise<void>;
-        }
-      >();
+      const registry = new Map<string, JobRegistryEntry>();
       const queueManager = new QueueManager<Event>({
+        parseEvent: parseTestEvent,
         aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         globalQueue: {} as never,
-        globalJobRegistry: registry as never,
+        globalJobRegistry: registry,
       });
 
       const seenContexts: unknown[] = [];
@@ -49,7 +47,7 @@ describe("continuation forwarding", () => {
         createTestTenantId(),
       );
       const delivery: JobDelivery = { attempt: 2, isContinuation: true };
-      await entry.processBatch!([event], delivery);
+      await entry.readBatch!([event]).run(delivery);
 
       expect(seenContexts[0]).toMatchObject({
         deliveryAttempt: 2,

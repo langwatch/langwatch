@@ -38,9 +38,17 @@ export class ProjectionRegistry<EventType extends Event = Event> {
   private router?: ProjectionRouter<EventType>;
   private queueManager?: QueueManager<EventType>;
 
+  private readonly parseEvent: (value: unknown) => EventType;
+
   constructor({
+    parseEvent,
     logger = createLogger("langwatch:event-sourcing:projection-registry"),
-  }: { logger?: Logger } = {}) {
+  }: {
+    /** Parses a queued event with the schema its own pipeline declared for its type (§9). */
+    parseEvent: (value: unknown) => EventType;
+    logger?: Logger;
+  }) {
+    this.parseEvent = parseEvent;
     this.logger = logger;
   }
 
@@ -148,6 +156,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       pipelineName: "global",
       globalQueue,
       globalJobRegistry,
+      parseEvent: this.parseEvent,
     });
 
     // Create router — all projections are incremental

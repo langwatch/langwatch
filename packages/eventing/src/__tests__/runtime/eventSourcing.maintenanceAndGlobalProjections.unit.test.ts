@@ -11,6 +11,7 @@ import { EventSourcing } from "../../eventSourcing.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
 import { ProjectionRegistry } from "../../projections/projectionRegistry.ts";
+import { parseTestEvent } from "../../services/__tests__/testHelpers.ts";
 
 function eventlessPipeline(name: string) {
   return definePipeline({ name, aggregate: defineAggregate({ type: "global" }) }).withEvents([]);
@@ -42,7 +43,7 @@ describe("given a pipeline declaring a global map projection", () => {
     const definition = eventlessPipeline("billing_reporting")
       .withGlobalMapProjection(meter, [{ name: "meterDispatch", handle: async () => void 0 }])
       .build();
-    const registry = new ProjectionRegistry<Event>();
+    const registry = new ProjectionRegistry<Event>({ parseEvent: parseTestEvent });
 
     for (const projection of definition.globalProjections ?? []) projection.register(registry);
 

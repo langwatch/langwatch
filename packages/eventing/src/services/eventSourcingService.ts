@@ -74,6 +74,7 @@ export class EventSourcingService<
     replayMarkerChecker,
     retentionPolicyResolver,
     killSwitch,
+    parseEvent,
     warnWhenProjectionsRunInline = false,
   }: EventSourcingServiceOptions<EventType, ProjectionTypes>) {
     this.pipelineName = pipelineName;
@@ -106,6 +107,7 @@ export class EventSourcingService<
       globalQueue,
       globalJobRegistry,
       killSwitch,
+      parseEvent,
     });
 
     // Create ProjectionRouter (no event store needed — incremental only)
@@ -607,6 +609,7 @@ export class EventSourcingService<
    */
   registerJob<P extends Record<string, unknown>>(config: {
     name: string;
+    parse: (payload: unknown) => P;
     process: (payload: P) => Promise<void>;
     delay?: number;
     deduplication?: DeduplicationConfig<P>;

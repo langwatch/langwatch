@@ -43,6 +43,7 @@ export function createMockQueueManager(overrides?: {
   getProjectionSubscriberQueue?: QueueManager<Event>["getProjectionSubscriberQueue"];
 }): QueueManager<Event> {
   const queueManager = new QueueManager<Event>({
+    parseEvent: parseTestEvent,
     aggregateType: createTestAggregateType(),
     pipelineName: "test_pipeline",
   });
@@ -174,6 +175,16 @@ let testEventIdCounter = 0;
  * Creates a test event with predictable values.
  * IDs are auto-generated to be unique even for events with the same timestamp.
  */
+/** A standalone test job's payload read as a plain record. */
+export function parseTestJobPayload(value: unknown): Record<string, unknown> {
+  return z.record(z.string(), z.unknown()).parse(value);
+}
+
+/** The base event schema's parse, standing in for a test pipeline's declared schemas. */
+export function parseTestEvent(value: unknown): Event {
+  return EventSchema.parse(value);
+}
+
 export function createTestEvent(
   aggregateId: string,
   aggregateType: AggregateType,

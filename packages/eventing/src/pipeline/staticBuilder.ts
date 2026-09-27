@@ -38,7 +38,7 @@ import {
   sealStateProjection,
 } from "../projections/sealedProjection.ts";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
-import { ConfigurationError } from "../services/errorHandling.ts";
+import { ConfigurationError, ValidationError } from "../services/errorHandling.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type {
   SubscriberDispatchDefinition,
@@ -107,7 +107,10 @@ export class PipelineBuilder<
   constructor(
     private readonly name: string,
     private readonly aggregate: AggregateDefinition,
-    private readonly eventSchemas: ReadonlyMap<string, PipelineEventSchema>,
+    private readonly events: {
+      eventSchemas: ReadonlyMap<string, PipelineEventSchema>;
+      parseEvent: (value: unknown) => EventType;
+    },
   ) {}
 
   /**
@@ -514,7 +517,7 @@ export class PipelineBuilder<
   private declaredAggregate(): AggregateDefinition {
     return aggregateWithEvents({
       aggregate: this.aggregate,
-      eventTypes: [...this.eventSchemas.keys()],
+      eventTypes: [...this.events.eventSchemas.keys()],
     });
   }
 
@@ -554,7 +557,8 @@ export class PipelineBuilder<
 
     return {
       aggregate,
-      eventSchemas: this.eventSchemas,
+      eventSchemas: this.events.eventSchemas,
+      parseEvent: this.events.parseEvent,
       metadata,
       prepareEventForProjection: this.prepareEventForProjection,
       foldProjections: this.foldProjections,
@@ -575,12 +579,10 @@ export class PipelineBuilder<
   }
 }
 
-/** The events a pipeline's `.withEvents` schemas declare (§9); none keeps the open `Event`. */
-export type DeclaredEvents<Schemas extends readonly PipelineEventSchema[]> = [
-  Schemas[number],
-] extends [never]
-  ? Event
-  : z.output<Schemas[number]>;
+/** The events a pipeline's `.withEvents` schemas declare (§9); none declares `never`. */
+export type DeclaredEvents<Schemas extends readonly PipelineEventSchema[]> = z.output<
+  Schemas[number]
+>;
 
 /** A named pipeline before its events: `.withEvents(schemas)`, its only call, fixes the type. */
 export class PipelineDeclaration {
@@ -599,12 +601,25 @@ export class PipelineDeclaration {
     never,
     Record<never, never>
   > {
-    return new PipelineBuilder(
-      this.name,
-      this.aggregate,
-      indexEventSchemas({ pipelineName: this.name, schemas }),
-    );
+    const eventSchemas = indexEventSchemas<Schemas[number]>({ pipelineName: this.name, schemas });
+    const parseEvent = (value: unknown): DeclaredEvents<Schemas> => {
+      const schema = eventSchemas.get(eventTypeOf(value));
+      if (!schema) {
+        throw new ValidationError({
+          reason: `Pipeline "${this.name}" declares no schema for this queued event's type`,
+          field: "type",
+        });
+      }
+      return schema.parse(value);
+    };
+    return new PipelineBuilder(this.name, this.aggregate, { eventSchemas, parseEvent });
   }
+}
+
+/** The `type` a queued event claims, read before the schema for that type parses it. */
+function eventTypeOf(value: unknown): string {
+  if (typeof value !== "object" || value === null || !("type" in value)) return "";
+  return typeof value.type === "string" ? value.type : "";
 }
 
 /** Starts a pipeline; its event type comes from the `.withEvents` call that must follow. */

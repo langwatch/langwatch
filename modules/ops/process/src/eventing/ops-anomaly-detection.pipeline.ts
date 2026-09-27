@@ -4,7 +4,6 @@ import {
   definePipeline,
   type EventingSetup,
   type StaticPipelineDefinition,
-  type Event,
 } from "@langwatch/eventing";
 
 import type { OpsApp } from "../app/ops.app.ts";
@@ -27,7 +26,7 @@ export const ANOMALY_DETECTION_PIPELINE_NAME = "ops_anomaly_detection";
 export function buildAnomalyDetection({
   app,
   processStore,
-}: EventingSetup<unknown, Pick<OpsApp, "detectAnomalies">>): StaticPipelineDefinition<Event> {
+}: EventingSetup<unknown, Pick<OpsApp, "detectAnomalies">>): StaticPipelineDefinition<never> {
   return definePipeline({
     name: ANOMALY_DETECTION_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),

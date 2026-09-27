@@ -10,7 +10,7 @@ import {
 } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
+import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 /**
  * The Langy feature's application: what its doors call. It holds every service and process
@@ -445,7 +445,7 @@ export class LangyApp implements LangyApiContract {
    */
   maintenanceEventingPipeline(
     deps: Pick<LangySessionKeyReapDeps, "deleteDispatchedBefore">,
-  ): StaticPipelineDefinition<Event> {
+  ): StaticPipelineDefinition<never> {
     return LangyMaintenanceService.create({
       sessionKeyReap: {
         reap: () => this.dependencies.sessionKeyReap.reap(),

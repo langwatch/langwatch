@@ -11,6 +11,7 @@ import {
   createTestEvent,
   setupTestEnvironment,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "./testHelpers.ts";
 
 describe("EventSourcingService - Sequential Ordering Flows", () => {
@@ -32,6 +33,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       eventStore = EventStoreMemory.createForTesting<Event>();
       mapDef = createMockMapProjectionDefinition("handler");
       service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -187,6 +189,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = EventStoreMemory.createForTesting<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -226,6 +229,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = EventStoreMemory.createForTesting<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -265,6 +269,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = EventStoreMemory.createForTesting<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -311,6 +316,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const mapDef1 = createMockMapProjectionDefinition("handler1");
       const mapDef2 = createMockMapProjectionDefinition("handler2");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -353,6 +359,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = EventStoreMemory.createForTesting<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -415,6 +422,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = EventStoreMemory.createForTesting<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],

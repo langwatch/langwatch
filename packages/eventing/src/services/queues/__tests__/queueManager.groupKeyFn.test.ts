@@ -7,6 +7,7 @@ import {
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "../../__tests__/testHelpers.ts";
 import type { JobRegistryEntry } from "../queueManager.ts";
 import { QueueManager } from "../queueManager.ts";
@@ -37,6 +38,7 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -56,11 +58,11 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
 
       // The registry entry's groupKeyFn dispatches to the projection's custom groupKeyFn
       const entry = globalJobRegistry.get("test-pipeline:projection:myProjection");
-      expect(entry?.groupKeyFn).toBeDefined();
+      expect(entry?.route).toBeDefined();
 
       // Call groupKeyFn with the event
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
-      const groupKey = entry?.groupKeyFn(event);
+      const groupKey = entry?.route(event).groupKey;
       expect(groupKey).toBe(`${tenantId}/fold/myProjection/by-tenant:${tenantId}`);
     });
   });
@@ -77,6 +79,7 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -92,10 +95,10 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
       manager.initializeProjectionQueues({ projections, onEvent: vi.fn() });
 
       const entry = globalJobRegistry.get("test-pipeline:projection:myProjection");
-      expect(entry?.groupKeyFn).toBeDefined();
+      expect(entry?.route).toBeDefined();
 
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
-      const groupKey = entry?.groupKeyFn(event);
+      const groupKey = entry?.route(event).groupKey;
       expect(groupKey).toBe(
         `${tenantId}/fold/myProjection/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
@@ -114,6 +117,7 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -142,12 +146,12 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
 
       // Custom projection uses its custom groupKeyFn
       const customEntry = globalJobRegistry.get("test-pipeline:projection:customProjection");
-      const customGroupKey = customEntry?.groupKeyFn(event);
+      const customGroupKey = customEntry?.route(event).groupKey;
       expect(customGroupKey).toBe(`${tenantId}/fold/customProjection/custom:${event.id}`);
 
       // Default projection uses aggregate-based groupKey
       const defaultEntry = globalJobRegistry.get("test-pipeline:projection:defaultProjection");
-      const defaultGroupKey = defaultEntry?.groupKeyFn(event);
+      const defaultGroupKey = defaultEntry?.route(event).groupKey;
       expect(defaultGroupKey).toBe(
         `${tenantId}/fold/defaultProjection/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );

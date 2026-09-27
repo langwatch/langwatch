@@ -4,7 +4,7 @@ import {
   type ReportUsageForMonthCommandData,
   type UsageBillingContract,
 } from "@langwatch/enterprise-billing-contract";
-import type { Command, CommandHandler, Event } from "@langwatch/eventing";
+import type { Command, CommandHandler } from "@langwatch/eventing";
 import { defineCommandSchema } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, Temporal } from "@langwatch/time";
@@ -181,7 +181,7 @@ function totalWithinContractCeiling({
  */
 export class ReportUsageForMonthCommandHandler implements CommandHandler<
   Command<ReportUsageForMonthCommandData>,
-  Event
+  never
 > {
   static readonly schema = SCHEMA;
 
@@ -224,7 +224,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     };
   }
 
-  async handle(command: Command<ReportUsageForMonthCommandData>): Promise<Event[]> {
+  async handle(command: Command<ReportUsageForMonthCommandData>): Promise<never[]> {
     const { organizationId, billingMonth, tenantId } = command.data;
 
     // Assigned on every path that reaches the dispatch below: the catch

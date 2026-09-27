@@ -5,7 +5,6 @@ import {
   definePipeline,
   type EventingSetup,
   type StaticPipelineDefinition,
-  type Event,
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
@@ -25,7 +24,7 @@ export const DEMO_DATA_PIPELINE_NAME = "seed_demo";
 /** Replaces main's `/api/cron/seed_demo`: one run a day across the fleet, with no events of its own. */
 export function buildDemoDataPipeline(
   deps: Omit<DemoDataRunDeps, "now">,
-): StaticPipelineDefinition<Event> {
+): StaticPipelineDefinition<never> {
   return definePipeline({
     name: DEMO_DATA_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),

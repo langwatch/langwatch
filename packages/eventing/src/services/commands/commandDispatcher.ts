@@ -34,7 +34,8 @@ export interface ProcessCommandParams<
   EventType extends Event,
   Payload extends TenantScopedPayload,
 > {
-  payload: unknown;
+  /** Already parsed by the command's queue lane, its only dispatch-time validation (§9). */
+  payload: Payload;
   commandType: CommandType;
   commandSchema: CommandSchema<Payload, CommandType>;
   handler: CommandHandler<Command<Payload>, EventType>;
@@ -105,10 +106,10 @@ function validateHandlerEvents(events: unknown, commandType: CommandType): void 
 }
 
 /** Parses a queued payload once, at dispatch; a failure is refused non-retryably (dead-letter). */
-function parseQueuedPayload<EventType extends Event, Payload extends TenantScopedPayload>(
-  params: Omit<ProcessCommandParams<EventType, Payload>, "payload">,
-  payload: unknown,
-): Payload {
+export function parseQueuedCommandPayload<
+  EventType extends Event,
+  Payload extends TenantScopedPayload,
+>(params: Omit<ProcessCommandParams<EventType, Payload>, "payload">, payload: unknown): Payload {
   const validation = params.commandSchema.validate(payload);
   if (validation.success) return validation.data;
   const identity = {
@@ -146,7 +147,7 @@ export async function processCommand<EventType extends Event, Payload extends Te
     logger: log,
   } = params;
 
-  const validated = parseQueuedPayload(params, payload);
+  const validated = payload;
   const tenantId = createTenantId(String(validated.tenantId));
   const aggregateId = getAggregateId(validated);
 
@@ -215,7 +216,7 @@ export interface ProcessCommandBatchParams<
   Payload extends TenantScopedPayload,
 > extends Omit<ProcessCommandParams<EventType, Payload>, "payload"> {
   /** Same-command payloads to coalesce, in dispatch (occurredAt) order. */
-  payloads: unknown[];
+  payloads: Payload[];
 }
 
 /**
@@ -225,16 +226,6 @@ export interface ProcessCommandBatchParams<
  */
 interface BatchProgress {
   attempted: number;
-}
-
-/**
- * Parse every payload up front (Phase 1). A failure refuses the whole batch
- * non-retryably, like the single path; nothing is stored.
- */
-function validateBatchPayloads<EventType extends Event, Payload extends TenantScopedPayload>(
-  params: ProcessCommandBatchParams<EventType, Payload>,
-): Payload[] {
-  return params.payloads.map((payload) => parseQueuedPayload(params, payload));
 }
 
 /**
@@ -391,7 +382,7 @@ export async function processCommandBatch<
     return;
   }
 
-  const validatedPayloads = validateBatchPayloads(params);
+  const validatedPayloads = params.payloads;
   const tenantId = resolveBatchTenantId({
     validatedPayloads,
     commandType: params.commandType,

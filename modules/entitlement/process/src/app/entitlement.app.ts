@@ -23,7 +23,7 @@ import {
   type PricingModel,
   PlanLimitExceededError,
 } from "@langwatch/entitlement-contract";
-import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
+import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -267,7 +267,7 @@ export class EntitlementApp implements EntitlementApiContract {
   /** The daily warning sweep this module's worker hosts, over the warning it composed. */
   usageWarningEventingPipeline(deps: {
     deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
-  }): StaticPipelineDefinition<Event> {
+  }): StaticPipelineDefinition<never> {
     return buildUsageWarningPipeline({
       sweep: () => this.#warnings.sweep(),
       deleteDispatchedBefore: deps.deleteDispatchedBefore,
