@@ -209,6 +209,52 @@ export interface TraceApi extends TraceOtlpIngestApi {
     protections: unknown;
     withEditOverlay?: boolean;
   }): Promise<Trace | undefined>;
+  /** `GET /api/traces/:traceId` for an API key: the trace, its evaluations and its address. */
+  getTraceByIdForApiKey(input: {
+    projectId: string;
+    traceId: string;
+    format: "digest" | "json";
+    projectSlug: string;
+    apiKeyId: string | null;
+    userId: string | null;
+  }): Promise<Record<string, unknown>>;
+  /** One trace through the viewer's protections; refuses with `TraceNotFoundError`. */
+  getTraceForViewer(input: {
+    projectId: string;
+    traceId: string;
+    withEditOverlay?: boolean;
+    viewerUserId: string;
+  }): Promise<Trace>;
+  /** A tenant's `trace_updated` or `discover_updated` pushes, until `signal` aborts. */
+  streamTenantUpdates(input: {
+    projectId: string;
+    eventName: "trace_updated" | "discover_updated";
+    signal?: AbortSignal;
+  }): AsyncIterable<unknown>;
+  /** Renames a trace after trimming; a name out of bounds refuses with `ValidationError`. */
+  renameTrace(
+    input: { projectId: string; traceId: string; newName: string },
+    by: { id: string },
+  ): Promise<{ traceId: string; newName: string }>;
+  /** The Prompt Studio span through the viewer's protections; refuses with `SpanNotFoundError`. */
+  getPromptStudioSpan(input: {
+    projectId: string;
+    spanId: string;
+    viewerUserId: string;
+  }): Promise<unknown>;
+  /** The trace's edit overlay as the viewer may see it; `overlay` is null when none exists. */
+  readTraceEditOverlayForViewer(input: {
+    projectId: string;
+    traceId: string;
+    viewerUserId: string;
+  }): Promise<{ overlay: TraceEditOverlayDto | null }>;
+  /** Saves the viewer's patch, carrying over edits their protections withheld from them. */
+  saveTraceEditOverlayAsViewer(input: {
+    projectId: string;
+    traceId: string;
+    patch: TraceEditOverlayPatch;
+    viewerUserId: string;
+  }): Promise<TraceEditOverlayDto>;
   readTracesWithSpans(input: {
     projectId: string;
     traceIds: string[];

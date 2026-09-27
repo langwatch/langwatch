@@ -14,8 +14,6 @@ import { resolveRequestBound } from "@langwatch/plans";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import {
   TraceApi,
-  TraceIdAmbiguousError,
-  TraceNotFoundError,
   ProjectionValidationError,
   discoverResultSchema,
   traceFacetsQuerySchema,
@@ -50,11 +48,10 @@ import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.
  * PATCH). Route order load-bearing: register :traceId sub-resources, and the
  * literal /facets, before the bare :traceId.
  */
-import { formatTraceSummaryDigest, generateAsciiTree } from "#rules/trace-formatting.rules";
+import { formatTraceSummaryDigest } from "#rules/trace-formatting.rules";
 import { tracePath } from "#rules/trace-platform-url.rules";
 import { compileProjection } from "#rules/trace-projection-compile.rules";
 import { TraceFacetValuesService } from "#services/trace-facet-values.service";
-import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
 
 const logger = createLogger("langwatch:api:traces");
 
@@ -139,32 +136,6 @@ async function answerTraceFacets({
     total: result.totalDistinct,
     hasMore: offset + result.values.length < result.totalDistinct,
   });
-}
-
-/** The one trace a `:traceId` route names, or the two errors it maps to. */
-async function readOneTraceOrThrow(input: {
-  app: TraceApi;
-  projectId: string;
-  traceId: string;
-  protections: unknown;
-  withEditOverlay?: boolean;
-}): Promise<Trace> {
-  let trace: Trace | undefined;
-  try {
-    trace = await input.app.findTrace({
-      projectId: input.projectId,
-      traceId: input.traceId,
-      protections: input.protections,
-      ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
-    });
-  } catch (err) {
-    if (err instanceof AmbiguousTraceIdPrefixError) {
-      throw new TraceIdAmbiguousError(input.traceId, err.candidateTraceIds);
-    }
-    throw err;
-  }
-  if (!trace) throw new TraceNotFoundError(input.traceId);
-  return trace;
 }
 
 function formatTraceRow(
@@ -528,57 +499,16 @@ export function createTracesRest(): Readonly<{
         },
       },
     })
-    .handle(async ({ app, input, scope }, project, caller) => {
-      const { traceId } = input;
-      const format = resolveTraceFormat({ format: input.format, llmMode: input.llmMode });
-
-      logger.info({ projectId: scope.id, traceId }, "Getting trace by ID");
-
-      const protections = await app.resolveApiKeyProtections({
+    .handle(({ app, input, scope }, project, caller) => {
+      logger.info({ projectId: scope.id, traceId: input.traceId }, "Getting trace by ID");
+      return app.getTraceByIdForApiKey({
         projectId: scope.id,
+        traceId: input.traceId,
+        format: resolveTraceFormat({ format: input.format, llmMode: input.llmMode }),
+        projectSlug: project.projectSlug,
         apiKeyId: caller.apiKeyId,
         userId: caller.userId,
       });
-      const trace = await readOneTraceOrThrow({
-        app,
-        projectId: scope.id,
-        traceId,
-        protections,
-        withEditOverlay: true,
-      });
-
-      const resolvedTraceId = trace.trace_id;
-      const evaluationsMap = await app.readEvaluations({
-        projectId: scope.id,
-        traceIds: [resolvedTraceId],
-        protections,
-      });
-      const evaluations = evaluationsMap[resolvedTraceId] ?? [];
-      const url = app.platformUrl({
-        projectSlug: project.projectSlug,
-        path: tracePath({
-          traceId: resolvedTraceId,
-          occurredAtMs: trace.timestamps?.started_at,
-        }),
-      });
-
-      if (format === "digest") {
-        return {
-          trace_id: resolvedTraceId,
-          formatted_trace: await app.formatSpansDigest({ spans: trace.spans ?? [] }),
-          timestamps: trace.timestamps,
-          metadata: trace.metadata,
-          evaluations,
-          platformUrl: url,
-        };
-      }
-
-      return {
-        ...trace,
-        evaluations,
-        ascii_tree: generateAsciiTree(trace.spans),
-        platformUrl: url,
-      };
     });
 
   return router.build();

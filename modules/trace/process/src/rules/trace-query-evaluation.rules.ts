@@ -260,8 +260,8 @@ function evaluateFreeText(tag: TagToken, negated: boolean, trace: InMemoryTrace)
   // a trace whose non-matching side has a NULL column. Span names need rows
   // the dispatcher may not load; absent, this is deliberately NARROWER than SQL.
   const value = traceQueryValuesRepository.extractStringValue(tag).toLowerCase();
-  const inputMatch = ilikeContains(trace.summary.computedInput, value);
-  const outputMatch = ilikeContains(trace.summary.computedOutput, value);
+  const inputMatch = computeIlikeContains(trace.summary.computedInput, value);
+  const outputMatch = computeIlikeContains(trace.summary.computedOutput, value);
   // `?? ""` rather than a bare deref: the type says string, but the only place
   // that coalesce actually happens is the analytics repository's row mapping, so
   // a summary built from a fold state that predates the field would throw here
@@ -286,7 +286,10 @@ function evaluateFreeText(tag: TagToken, negated: boolean, trace: InMemoryTrace)
 }
 
 /** `column ILIKE %value%` with SQL semantics: NULL column → NULL, not false. */
-function ilikeContains(column: string | null | undefined, lowerValue: string): boolean | null {
+function computeIlikeContains(
+  column: string | null | undefined,
+  lowerValue: string,
+): boolean | null {
   if (column == null) {
     return null;
   }

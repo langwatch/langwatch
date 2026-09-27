@@ -14,6 +14,7 @@ import {
   type EvaluationRunsByTraceQuery,
 } from "@langwatch/evaluation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import { ValidationError } from "@langwatch/handled-error";
 import type {
   InstantEvalApi,
   InstantEvalEstimateWire,
@@ -142,6 +143,10 @@ import {
   traceConfig,
   TraceIdAmbiguousError,
   TraceNotFoundError,
+  SpanNotFoundError,
+  changeTraceNameInputSchema,
+  TRACE_NAME_MAX_LENGTH,
+  TRACE_NAME_MIN_LENGTH,
   type TraceMetadataUpdate,
   type TracePreconditionSampleInput,
 } from "@langwatch/trace-contract";
@@ -165,6 +170,8 @@ import {
   isCodingAgentShapedSpan,
   mapSummaryRowsToClaudeRefs,
 } from "../rules/claude-code-log-enrichment.rules.ts";
+import { redactPatchForViewer } from "../rules/trace-edit-overlay-redaction.rules.ts";
+import { restoreWithheldEdits } from "../rules/trace-edit-overlay-restore.rules.ts";
 import {
   createFacetFilterResolver,
   type FacetFilterResolver,
@@ -174,6 +181,7 @@ import {
   explorerOriginExclusion,
   findHiddenOriginConditions,
 } from "../rules/trace-filter-hidden-origins.rules.ts";
+import { generateAsciiTree } from "../rules/trace-formatting.rules.ts";
 import {
   describeTraceLegacyValidationError,
   traceLegacySearchBodySchema,
@@ -182,7 +190,7 @@ import {
   extractLlmMessagesForSpan,
   extractLlmMessagesForTrace,
 } from "../rules/trace-llm-messages.rules.ts";
-import { tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
+import { tracePath, tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
 import { IO_PREVIEW_BYTES, utf8Preview } from "../rules/trace-projection-lean.rules.ts";
 import { traceMatchesQuery } from "../rules/trace-query-evaluation.rules.ts";
 import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
@@ -1007,6 +1015,147 @@ export class TraceApp implements TraceApi, CollectorApp {
   ): Promise<Trace | undefined> {
     return this.#contentReader.findTrace(input);
   }
+  async getTraceForViewer(input: {
+    projectId: string;
+    traceId: string;
+    withEditOverlay?: boolean;
+    viewerUserId: string;
+  }): Promise<Trace> {
+    const protections = await this.resolveViewerProtections({
+      projectId: input.projectId,
+      userId: input.viewerUserId,
+    });
+    const trace = await this.findTrace({
+      projectId: input.projectId,
+      traceId: input.traceId,
+      protections,
+      withEditOverlay: input.withEditOverlay,
+    });
+    if (!trace) throw new TraceNotFoundError(input.traceId);
+    return trace;
+  }
+
+  async *streamTenantUpdates(input: {
+    projectId: string;
+    eventName: "trace_updated" | "discover_updated";
+    signal?: AbortSignal;
+  }): AsyncGenerator<unknown> {
+    const emitter = this.getTenantEmitter(input.projectId);
+    try {
+      for await (const eventArgs of on(emitter, input.eventName, { signal: input.signal })) {
+        yield eventArgs[0];
+      }
+    } finally {
+      this.cleanupTenantEmitter(input.projectId);
+    }
+  }
+
+  /** Trimmed first, so the event always carries a canonical name. */
+  async renameTrace(
+    input: { projectId: string; traceId: string; newName: string },
+    by: { id: string },
+  ): Promise<{ traceId: string; newName: string }> {
+    const trimmed = input.newName.trim();
+    const parsed = changeTraceNameInputSchema.safeParse({ newName: trimmed });
+    if (!parsed.success) {
+      throw new ValidationError(
+        `Trace name must be between ${TRACE_NAME_MIN_LENGTH} and ${TRACE_NAME_MAX_LENGTH} characters after trimming`,
+        {
+          meta: {
+            field: "newName",
+            minLength: TRACE_NAME_MIN_LENGTH,
+            maxLength: TRACE_NAME_MAX_LENGTH,
+            receivedLength: trimmed.length,
+            fieldErrors: parsed.error.flatten().fieldErrors,
+          },
+        },
+      );
+    }
+    await this.changeTraceName(
+      { projectId: input.projectId, traceId: input.traceId, newName: parsed.data.newName },
+      by,
+    );
+    return { traceId: input.traceId, newName: parsed.data.newName };
+  }
+
+  async getPromptStudioSpan(input: {
+    projectId: string;
+    spanId: string;
+    viewerUserId: string;
+  }): Promise<unknown> {
+    const protections = await this.resolveViewerProtections({
+      projectId: input.projectId,
+      userId: input.viewerUserId,
+    });
+    const span = await this.findPromptStudioSpan({
+      projectId: input.projectId,
+      spanId: input.spanId,
+      protections,
+    });
+    if (!span) throw new SpanNotFoundError(input.spanId);
+    return span;
+  }
+
+  /** The viewer's protections and whether the trace sits past their visibility window. */
+  private async viewerOverlayView(input: {
+    projectId: string;
+    traceId: string;
+    viewerUserId: string;
+  }) {
+    const protections = await this.resolveViewerProtections({
+      projectId: input.projectId,
+      userId: input.viewerUserId,
+    });
+    const isWindowRedacted = await this.isTraceWindowRedacted({
+      projectId: input.projectId,
+      traceId: input.traceId,
+      visibilityCutoffMs: protections.visibilityCutoffMs,
+    });
+    return { protections, isWindowRedacted };
+  }
+
+  async readTraceEditOverlayForViewer(input: {
+    projectId: string;
+    traceId: string;
+    viewerUserId: string;
+  }): Promise<{ overlay: TraceEditOverlayDto | null }> {
+    const overlay = await this.findTraceEditOverlay({
+      projectId: input.projectId,
+      traceId: input.traceId,
+    });
+    if (!overlay) return { overlay: null };
+    const view = await this.viewerOverlayView(input);
+    return {
+      overlay: { ...overlay, patch: redactPatchForViewer({ patch: overlay.patch, ...view }) },
+    };
+  }
+
+  /** The first correction has nothing to carry over or redact: the answer is the caller's patch. */
+  async saveTraceEditOverlayAsViewer(input: {
+    projectId: string;
+    traceId: string;
+    patch: TraceEditOverlayPatch;
+    viewerUserId: string;
+  }): Promise<TraceEditOverlayDto> {
+    const target = { projectId: input.projectId, traceId: input.traceId };
+    const stored = await this.findTraceEditOverlay(target);
+    if (!stored) {
+      return this.saveTraceEditOverlay(
+        { ...target, patch: input.patch },
+        { id: input.viewerUserId },
+      );
+    }
+    const view = await this.viewerOverlayView(input);
+    const saved = await this.saveTraceEditOverlay(
+      {
+        ...target,
+        patch: restoreWithheldEdits({ incoming: input.patch, stored: stored.patch, ...view }),
+      },
+      { id: input.viewerUserId },
+    );
+    return { ...saved, patch: redactPatchForViewer({ patch: saved.patch, ...view }) };
+  }
+
   async readTracesWithSpans(
     input: Parameters<TraceContentReadService["readTracesWithSpans"]>[0],
   ): Promise<Trace[]> {
@@ -2127,6 +2276,45 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   /** Port of main's REST transcript route: the key's protections, the trace, its transcript. */
+  /** `GET /api/traces/:traceId` for an API key: the trace, its evaluations and its address. */
+  async getTraceByIdForApiKey(input: {
+    projectId: string;
+    traceId: string;
+    format: "digest" | "json";
+    projectSlug: string;
+    apiKeyId: string | null;
+    userId: string | null;
+  }): Promise<Record<string, unknown>> {
+    const protections = await this.resolveApiKeyProtections(input);
+    const trace = await this.#getTraceByIdOrPrefix({
+      ...input,
+      protections,
+      withEditOverlay: true,
+    });
+    const resolvedTraceId = trace.trace_id;
+    const evaluationsMap = await this.readEvaluations({
+      projectId: input.projectId,
+      traceIds: [resolvedTraceId],
+      protections,
+    });
+    const evaluations = evaluationsMap[resolvedTraceId] ?? [];
+    const platformUrl = this.platformUrl({
+      projectSlug: input.projectSlug,
+      path: tracePath({ traceId: resolvedTraceId, occurredAtMs: trace.timestamps?.started_at }),
+    });
+    if (input.format === "digest") {
+      return {
+        trace_id: resolvedTraceId,
+        formatted_trace: await this.formatSpansDigest({ spans: trace.spans ?? [] }),
+        timestamps: trace.timestamps,
+        metadata: trace.metadata,
+        evaluations,
+        platformUrl,
+      };
+    }
+    return { ...trace, evaluations, ascii_tree: generateAsciiTree(trace.spans), platformUrl };
+  }
+
   async readTraceTranscript(input: {
     projectId: string;
     traceId: string;
@@ -2148,6 +2336,7 @@ export class TraceApp implements TraceApi, CollectorApp {
     projectId: string;
     traceId: string;
     protections: Protections;
+    withEditOverlay?: boolean;
   }): Promise<Trace> {
     let trace: Trace | undefined;
     try {

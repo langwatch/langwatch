@@ -50,14 +50,14 @@ function spanKind(value: number): NormalizedSpanKind {
   return isKnownKind ? value : NormalizedSpanKind.UNSPECIFIED;
 }
 
-function statusCode(value: number | null): NormalizedStatusCode | null {
+function toStatusCode(value: number | null): NormalizedStatusCode | null {
   if (value === null) return null;
   const isKnownStatus = Object.values(NormalizedStatusCode).includes(value);
 
   return isKnownStatus ? value : NormalizedStatusCode.UNSET;
 }
 
-function jsonValue(value: unknown): TraceRecordValue | null {
+function toJsonValue(value: unknown): TraceRecordValue | null {
   const isScalar =
     value === null ||
     typeof value === "string" ||
@@ -67,7 +67,7 @@ function jsonValue(value: unknown): TraceRecordValue | null {
   if (Array.isArray(value)) {
     const values: TraceRecordValue[] = [];
     for (const item of value) {
-      const parsed = jsonValue(item);
+      const parsed = toJsonValue(item);
       if (parsed === null && item !== null) return null;
       values.push(parsed);
     }
@@ -76,7 +76,7 @@ function jsonValue(value: unknown): TraceRecordValue | null {
   if (!isRecord(value)) return null;
   const result: Record<string, TraceRecordValue> = {};
   for (const [key, child] of Object.entries(value)) {
-    const parsed = jsonValue(child);
+    const parsed = toJsonValue(child);
     if (parsed === null && child !== null) return null;
     result[key] = parsed;
   }
@@ -120,35 +120,35 @@ function extractContent({
   messagesKey: string;
   toolKey: string;
 }): { type: string; value: TraceRecordValue } | null {
-  const messages = valueAsRecordValue(attributes[messagesKey]);
+  const messages = toRecordValue(attributes[messagesKey]);
   if (messages !== void 0) return content("chat_messages", messages);
   const key = `langwatch.${direction}`;
-  const direct = valueAsRecordValue(attributes[key]);
+  const direct = toRecordValue(attributes[key]);
   if (direct !== void 0) {
     if (isRecord(direct) && typeof direct.type === "string" && direct.value !== void 0) {
       return content(direct.type, direct.value);
     }
-    const annotated = annotatedType(attributes, key);
+    const annotated = extractAnnotatedType(attributes, key);
     if (annotated) return content(annotated, direct);
     return content(typeof direct === "string" ? "text" : "json", direct);
   }
-  const tool = valueAsRecordValue(attributes[toolKey]);
+  const tool = toRecordValue(attributes[toolKey]);
   if (tool === void 0) return null;
   if (typeof tool !== "string") return content("json", tool);
   try {
-    const parsed = jsonValue(JSON.parse(tool));
+    const parsed = toJsonValue(JSON.parse(tool));
     return parsed === null ? content("text", tool) : content("json", parsed);
   } catch {
     return content("text", tool);
   }
 }
 
-function valueAsRecordValue(value: unknown): TraceRecordValue | undefined {
-  const parsed = jsonValue(value);
+function toRecordValue(value: unknown): TraceRecordValue | undefined {
+  const parsed = toJsonValue(value);
   return parsed === null && value !== null ? void 0 : parsed;
 }
 
-function annotatedType(attributes: NormalizedAttributes, attribute: string): string | null {
+function extractAnnotatedType(attributes: NormalizedAttributes, attribute: string): string | null {
   const value = attributes["langwatch.reserved.value_types"];
   let array: string[] | null;
   if (typeof value === "string") {
@@ -184,12 +184,12 @@ function extractMetrics(attributes: NormalizedAttributes): Record<string, TraceR
     ["cache_creation_input_tokens", attributes["gen_ai.usage.cache_creation.input_tokens"]],
   ];
   for (const [key, value] of values) {
-    const number = valueToNumber(value);
+    const number = toNumberValue(value);
     if (number !== null) metrics[key] = number;
   }
   if (typeof attributes["langwatch.tokens.estimated"] === "boolean")
     metrics.tokens_estimated = attributes["langwatch.tokens.estimated"];
-  const cost = valueToNumber(attributes["gen_ai.usage.cost"] ?? attributes["langwatch.span.cost"]);
+  const cost = toNumberValue(attributes["gen_ai.usage.cost"] ?? attributes["langwatch.span.cost"]);
   if (cost !== null && cost > 0) metrics.cost = cost;
   return Object.keys(metrics).length > 0 ? metrics : null;
 }
@@ -227,7 +227,7 @@ function spanType(attributes: NormalizedAttributes): string {
   return typeof value === "string" ? value : "span";
 }
 
-function stringAttribute(
+function extractStringAttribute(
   attributes: NormalizedAttributes,
   first: string,
   second: string,
@@ -237,7 +237,7 @@ function stringAttribute(
 }
 
 function extractContexts(attributes: NormalizedAttributes): TraceRecordValue[] | null {
-  const value = valueAsRecordValue(attributes["langwatch.rag.contexts"]);
+  const value = toRecordValue(attributes["langwatch.rag.contexts"]);
   if (!Array.isArray(value)) return null;
   return value.map((context) => {
     if (typeof context === "string") return { content: context };
@@ -271,7 +271,7 @@ function containerForPath(
 function unflatten(attributes: NormalizedAttributes): Record<string, TraceRecordValue> {
   const result: Record<string, TraceRecordValue> = {};
   for (const [key, raw] of Object.entries(attributes)) {
-    const value = valueAsRecordValue(raw);
+    const value = toRecordValue(raw);
     if (value === void 0) continue;
     const path = key.split(".");
     const hasDangerousSegment = path.some((part) => dangerousPathKeys.has(part));
@@ -284,7 +284,7 @@ function unflatten(attributes: NormalizedAttributes): Record<string, TraceRecord
   return result;
 }
 
-function recordAtPath(
+function extractRecordAtPath(
   record: Record<string, TraceRecordValue> | null | undefined,
   path: string[],
 ): TraceRecordValue | undefined {
@@ -296,7 +296,7 @@ function recordAtPath(
   return value;
 }
 
-function valueToNumber(value: unknown): number | null {
+function toNumberValue(value: unknown): number | null {
   let number: number;
   if (typeof value === "number") {
     number = value;
@@ -319,7 +319,7 @@ function parseStringArray(value: string): string[] | null {
   }
 }
 
-function stringArray(value: string | undefined): string[] | null {
+function parseStringArrayAttribute(value: string | undefined): string[] | null {
   return value === void 0 ? null : parseStringArray(value);
 }
 
@@ -347,7 +347,7 @@ export function deserializeStoredValue(value: string): TraceRecordValue {
   const isJsonArray = trimmed.startsWith("[") && trimmed.endsWith("]");
   if (isJsonObject || isJsonArray) {
     try {
-      return jsonValue(JSON.parse(trimmed)) ?? value;
+      return toJsonValue(JSON.parse(trimmed)) ?? value;
     } catch {
       return value;
     }
@@ -396,7 +396,7 @@ export function mapStoredSpanRow(
     spanAttributes: attributes,
     events,
     links,
-    statusCode: statusCode(row.StatusCode),
+    statusCode: toStatusCode(row.StatusCode),
     statusMessage: row.StatusMessage,
     instrumentationScope: { name: row.ScopeName ?? "", version: row.ScopeVersion },
     droppedAttributesCount: 0,
@@ -432,8 +432,12 @@ export function mapNormalizedSpanToFullRecordSpan(span: NormalizedSpan): TraceFu
   if (type === "llm") {
     return {
       ...base,
-      model: stringAttribute(span.spanAttributes, "gen_ai.response.model", "gen_ai.request.model"),
-      vendor: stringAttribute(span.spanAttributes, "gen_ai.provider.name", "gen_ai.system"),
+      model: extractStringAttribute(
+        span.spanAttributes,
+        "gen_ai.response.model",
+        "gen_ai.request.model",
+      ),
+      vendor: extractStringAttribute(span.spanAttributes, "gen_ai.provider.name", "gen_ai.system"),
     };
   }
   if (type === "rag")
@@ -445,7 +449,7 @@ export function mapNormalizedSpanToFullRecordSpan(span: NormalizedSpan): TraceFu
 }
 
 /** One span's event record, or none when the span carries no typed `event`. */
-function fullRecordEventOf({
+function toFullRecordEvent({
   span,
   projectId,
   traceId,
@@ -454,14 +458,14 @@ function fullRecordEventOf({
   projectId: string;
   traceId: string;
 }): TraceFullRecordEvent | null {
-  const event = recordAtPath(span.params, ["event"]);
+  const event = extractRecordAtPath(span.params, ["event"]);
   if (!isRecord(event)) return null;
   if (typeof event.type !== "string" || event.type.length === 0) return null;
 
   const metrics: Record<string, number> = {};
   if (isRecord(event.metrics)) {
     for (const [key, value] of Object.entries(event.metrics)) {
-      const number = valueToNumber(value);
+      const number = toNumberValue(value);
       if (number !== null) metrics[key] = number;
     }
   }
@@ -499,7 +503,7 @@ export function extractFullRecordEvents({
 }): TraceFullRecordEvent[] {
   const events: TraceFullRecordEvent[] = [];
   for (const span of spans) {
-    const event = fullRecordEventOf({ span, projectId, traceId });
+    const event = toFullRecordEvent({ span, projectId, traceId });
     if (event) events.push(event);
   }
 
@@ -543,9 +547,9 @@ function addListMetadata(
 ): void {
   const labels = attributes["langwatch.labels"] ?? attributes.labels;
   if (labels !== void 0) metadata.labels = stringArrayOrSingle(labels);
-  const promptIds = stringArray(attributes["langwatch.prompt_ids"]);
+  const promptIds = parseStringArrayAttribute(attributes["langwatch.prompt_ids"]);
   if (promptIds) metadata.prompt_ids = promptIds;
-  const models = stringArray(attributes["metadata.models"]);
+  const models = parseStringArrayAttribute(attributes["metadata.models"]);
   if (models) metadata.models = models;
   const logRecordCount = attributes["langwatch.reserved.log_record_count"];
   if (logRecordCount !== void 0 && metadata.otel_log_record_count === void 0)

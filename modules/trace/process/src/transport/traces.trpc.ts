@@ -3,24 +3,18 @@
  * reads are NOT here (`sharedTrace.get`, ADR-057). `aiQuery`/`aiAction`
  * throw `service_unavailable` — see the merge-traces-v2 handoff.
  */
-import { on } from "node:events";
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { ValidationError } from "@langwatch/handled-error";
 import { nowInstant } from "@langwatch/time";
 import {
-  changeTraceNameInputSchema,
   customersAndLabelsResultSchema,
   discoverResultSchema,
   distinctFieldNamesResultSchema,
   evaluationSchema,
   facetValuesResultSchema,
   SpanNotFoundError,
-  TRACE_NAME_MAX_LENGTH,
-  TRACE_NAME_MIN_LENGTH,
   TraceAiQueryUnavailableError,
   TraceApi,
-  TraceNotFoundError,
   traceListPageSchema,
   traceSummaryDataSchema,
   tracesEvaluationRunsSchema,
@@ -76,23 +70,14 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
 
   .procedure("getById")
   .withPermission("traces:view")
-  .handle(async ({ app, input, actor }) => {
-    const protections = await app.resolveViewerProtections({
-      projectId: input.projectId,
-      userId: actor.id,
-    });
-
-    const trace = await app.findTrace({
+  .handle(({ app, input, actor }) =>
+    app.getTraceForViewer({
       projectId: input.projectId,
       traceId: input.traceId,
-      protections,
       withEditOverlay: input.withEditOverlay,
-    });
-
-    if (!trace) throw new TraceNotFoundError(input.traceId);
-
-    return trace;
-  })
+      viewerUserId: actor.id,
+    }),
+  )
 
   .procedure("getEvaluations")
   .withPermission("traces:view")
@@ -319,16 +304,11 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
   .procedure("onTraceUpdate")
   .withPermission("traces:view")
   .handle(async function* ({ app, input, signal }) {
-    const { projectId } = input;
-    const emitter = app.getTenantEmitter(projectId);
-
-    try {
-      for await (const eventArgs of on(emitter, "trace_updated", { signal })) {
-        yield eventArgs[0];
-      }
-    } finally {
-      app.cleanupTenantEmitter(projectId);
-    }
+    yield* app.streamTenantUpdates({
+      projectId: input.projectId,
+      eventName: "trace_updated",
+      signal,
+    });
   })
 
   // ---------------------------------------------------------------------
@@ -545,16 +525,11 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
   .procedure("onDiscoverUpdate")
   .withPermission("traces:view")
   .handle(async function* ({ app, input, signal }) {
-    const { projectId } = input;
-    const emitter = app.getTenantEmitter(projectId);
-
-    try {
-      for await (const eventArgs of on(emitter, "discover_updated", { signal })) {
-        yield eventArgs[0];
-      }
-    } finally {
-      app.cleanupTenantEmitter(projectId);
-    }
+    yield* app.streamTenantUpdates({
+      projectId: input.projectId,
+      eventName: "discover_updated",
+      signal,
+    });
   })
 
   .procedure("facets")
@@ -652,31 +627,12 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
    */
   .procedure("changeName")
   .withPermission("traces:update")
-  .handle(async ({ app, input, actor }) => {
-    const trimmed = input.newName.trim();
-    const parsed = changeTraceNameInputSchema.safeParse({ newName: trimmed });
-    if (!parsed.success) {
-      throw new ValidationError(
-        `Trace name must be between ${TRACE_NAME_MIN_LENGTH} and ${TRACE_NAME_MAX_LENGTH} characters after trimming`,
-        {
-          meta: {
-            field: "newName",
-            minLength: TRACE_NAME_MIN_LENGTH,
-            maxLength: TRACE_NAME_MAX_LENGTH,
-            receivedLength: trimmed.length,
-            fieldErrors: parsed.error.flatten().fieldErrors,
-          },
-        },
-      );
-    }
-
-    await app.changeTraceName(
-      { projectId: input.projectId, traceId: input.traceId, newName: parsed.data.newName },
+  .handle(({ app, input, actor }) =>
+    app.renameTrace(
+      { projectId: input.projectId, traceId: input.traceId, newName: input.newName },
       actor,
-    );
-
-    return { traceId: input.traceId, newName: parsed.data.newName };
-  })
+    ),
+  )
 
   .procedure("changeMetadata")
   .withPermission("traces:update")
