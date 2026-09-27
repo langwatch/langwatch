@@ -86,6 +86,7 @@ export interface CliDeviceFlowCollaborators {
     | "validateCliSelection"
     | "findDefaultCliSelection"
     | "revokeCliLoginKeyForLogout"
+    | "extendCliLoginKeyExpiry"
   >;
   /** Resolves or creates the caller's personal workspace. */
   ensurePersonalWorkspace: (input: {
@@ -231,19 +232,22 @@ async function exchange({
   }
 
   const personalProject = await personalProjectFieldsOf({ flow, user, organization });
+  // One instant stamps the session and anchors the login key's expiry.
+  const sessionStartedAtMs = nowInstant().epochMilliseconds;
   const minted = await mintCliKey({
     flow,
     record,
     user,
     organization,
     clientInfo: parsed.data.client_info,
+    sessionStartedAtMs,
   });
 
   // Stamp the device info so the devices inventory can show a recognisable
   // entry. `session_started_at` is preserved through later rotations so the
   // dashboard shows "logged in 5 days ago" rather than the rotation moment.
   const clientInfo: CliClientInfo | undefined = parsed.data.client_info
-    ? { ...parsed.data.client_info, session_started_at: nowInstant().epochMilliseconds }
+    ? { ...parsed.data.client_info, session_started_at: sessionStartedAtMs }
     : undefined;
   const session = await flow.sessions().mintSession({
     userId: user.id,
@@ -475,6 +479,25 @@ async function refresh({
     clientInfo: record.client_info,
     cliApiKeyId: record.cli_api_key_id,
   });
+
+  // Main `auth-cli.ts:1549-1568`: the key's expiry slides with the refresh window, best effort.
+  if (record.cli_api_key_id) {
+    try {
+      await flow.apiKeys().extendCliLoginKeyExpiry({
+        apiKeyId: record.cli_api_key_id,
+        userId: record.user_id,
+        organizationId: record.organization_id,
+        sessionStartedAtMs: sessionAnchorMs,
+        maxSessionDurationDays: maxDurationDays,
+        refreshWindowMs: flow.sessions().refreshTokenTtlSeconds * 1000,
+      });
+    } catch (error) {
+      logger.warn(
+        { error, apiKeyId: record.cli_api_key_id, userId: record.user_id },
+        "[auth-cli] could not extend the CLI login key's expiry on refresh",
+      );
+    }
+  }
 
   await flow.sessions().dropRefreshToken(refresh_token);
 
@@ -733,12 +756,14 @@ async function mintCliKey({
   user,
   organization,
   clientInfo,
+  sessionStartedAtMs,
 }: {
   flow: CliDeviceFlowCollaborators;
   record: CliDeviceCodeRecord;
   user: Readonly<{ id: string }>;
   organization: Readonly<{ id: string }>;
   clientInfo: z.output<typeof clientInfoSchema>;
+  sessionStartedAtMs: number;
 }): Promise<MintedCliKey> {
   if (!record.key_selection) return {};
 
@@ -758,6 +783,9 @@ async function mintCliKey({
       organizationId: organization.id,
       deviceLabel,
       selection: record.key_selection,
+      sessionStartedAtMs,
+      maxSessionDurationDays: await flow.directory().maxSessionDurationDays(organization.id),
+      refreshWindowMs: flow.sessions().refreshTokenTtlSeconds * 1000,
     });
   } catch (err) {
     // A ceiling refusal is permanent — the approver has since lost access — so

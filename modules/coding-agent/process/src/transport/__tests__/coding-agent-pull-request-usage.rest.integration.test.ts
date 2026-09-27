@@ -5,66 +5,28 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
-import type { CodingAgentPullRequestUsage } from "@langwatch/coding-agent-contract";
+import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { TraceApi } from "@langwatch/trace-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { CodingAgentApp } from "#app/coding-agent.app";
-import type { CodingAgentSessionService } from "#services/coding-agent.service";
 
 import {
-  TestBillingPolicy,
   TestGithubService,
   TestProjectService,
   pullRequest,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import type {
-  CodingAgentAuditSink,
-  CodingAgentViewerVisibilityReader,
-} from "../../app/coding-agent.app.ts";
-import {
-  type CodingAgentCallerScopeDirectory,
-  type CodingAgentScopePermission,
-  type CodingAgentScopePermissions,
-  type CodingAgentScopeCaller,
-} from "../../app/coding-agent.members.ts";
 import { MemoryCodingAgentRepositories } from "../../repositories/memory/memory.coding-agent.repositories.ts";
 import { codingAgentRestCaller, codingAgentRollupRest } from "../coding-agent.rest.ts";
 
 const USAGE_PATH = "/api/coding-agent/pull-request-usage?repository=acme/widgets&pullRequest=1";
-
-const USAGE: CodingAgentPullRequestUsage = {
-  pullRequest: {
-    repositoryHost: "github.com",
-    repositoryFullName: "acme/widgets",
-    prNumber: 1,
-    headBranch: "feat/linkage",
-    htmlUrl: "https://github.com/acme/widgets/pull/1",
-    state: "open",
-    isDraft: false,
-    authorLogin: "octocat",
-    prCreatedAtMs: 1,
-    prClosedAtMs: null,
-    prMergedAtMs: null,
-  },
-  rows: [],
-  totals: {
-    sessionsCount: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheCreationTokens: 0,
-    totalTokens: 0,
-    costUsd: null,
-    billedCostUsd: null,
-    nonBilledCostUsd: null,
-  },
-  modelBreakdown: [],
-};
 
 const OTHER_WORKSPACE = "project_someone_else";
 
@@ -86,9 +48,18 @@ const renderHandled: ErrorHandler = (error, c) => {
 };
 
 class GithubForRest extends TestGithubService {
+  readonly lookups: { prNumber: number }[] = [];
+
   constructor() {
     super();
     this.pullRequests = [pullRequest({ repositoryFullName: "acme/widgets" })];
+  }
+
+  override findByNumber(input: {
+    prNumber: number;
+  }): ReturnType<TestGithubService["findByNumber"]> {
+    this.lookups.push(input);
+    return super.findByNumber(input);
   }
 
   override getWebBase(): string {
@@ -97,14 +68,13 @@ class GithubForRest extends TestGithubService {
 }
 
 class ProjectForRest extends TestProjectService {
+  constructor(organizationProjects: readonly string[]) {
+    super();
+    this.projects = organizationProjects.map((id) => ({ id }));
+  }
+
   override getOrganizationId(): Promise<string> {
     return Promise.resolve("organization-1");
-  }
-}
-
-class NoVisibility implements CodingAgentViewerVisibilityReader {
-  readVisibility(): Promise<{ canReadCapturedContent: boolean; canSeeCosts: boolean }> {
-    return Promise.resolve({ canReadCapturedContent: true, canSeeCosts: true });
   }
 }
 
@@ -122,83 +92,46 @@ function mount({
   apiKeyUserId: string | null;
   reach?: { key: readonly string[]; holder: readonly string[] };
 }) {
-  const audits: Record<string, unknown>[] = [];
-  const callers: CodingAgentScopeCaller[] = [];
-  const reads: { permittedProjectIds: readonly string[] }[] = [];
-  const getPullRequestUsage = vi.fn<
-    (input: { permittedProjectIds: readonly string[] }) => Promise<CodingAgentPullRequestUsage>
-  >(async (input) => {
-    reads.push({ permittedProjectIds: input.permittedProjectIds });
-
-    return USAGE;
-  });
-
-  class ScopeDirectory implements CodingAgentCallerScopeDirectory {
-    listOrganizationProjects() {
-      return Promise.resolve(
-        [...new Set([...reach.key, ...reach.holder])].map((id) => ({
-          id,
-          name: id,
-          slug: id,
-          teamId: `team-${id}`,
-          isPersonal: false,
-        })),
-      );
-    }
-
-    listPersonalTeamOwnerNames() {
-      return Promise.resolve(new Map<string, string>());
-    }
-  }
-
-  class ScopePermissions implements CodingAgentScopePermissions {
-    projectCuts(input: {
-      caller: CodingAgentScopeCaller;
-      organizationId: string;
-      projects: readonly {
-        id: string;
-        name: string;
-        slug: string;
-        teamId: string;
-        isPersonal: boolean;
-      }[];
-      permissions: readonly CodingAgentScopePermission[];
-    }) {
-      callers.push(input.caller);
-      const allowed = new Set(input.caller.kind === "apiKey" ? reach.key : reach.holder);
-
-      return Promise.resolve(
-        new Map<CodingAgentScopePermission, ReadonlySet<string>>([
-          ["traces:view", allowed],
-          ["cost:view", allowed],
-        ]),
-      );
-    }
-  }
-
-  class RecordingAudit implements CodingAgentAuditSink {
-    async auditLog(entry: Record<string, unknown>): Promise<void> {
-      audits.push(entry);
-    }
-  }
+  const audits: RecordAuditLogCommand[] = [];
+  const principals: Parameters<AuthzApi["canBatchPermissionsByIds"]>[0]["principal"][] = [];
+  const github = new GithubForRest();
+  const repositories = MemoryCodingAgentRepositories.create();
+  const candidateReads = vi.spyOn(repositories.sessions, "findByRepositoryBranch");
 
   const app = CodingAgentApp.create({
     dependencies: {
-      github: new GithubForRest(),
-      projects: new ProjectForRest(),
+      github,
+      projects: new ProjectForRest([...new Set([...reach.key, ...reach.holder])]),
       traces: createApiFixture<TraceApi>({}),
       retention: createApiFixture<DataRetentionApi>({}),
+      authz: createApiFixture<AuthzApi>({
+        canBatchPermissionsByIds: async (args) => {
+          principals.push(args.principal);
+          const allowed = args.principal.type === "apiKey" ? reach.key : reach.holder;
+          const projects = new Map(allowed.map((id) => [id, true]));
+          return {
+            byPermission: new Map(
+              args.permissions.map((permission) => [
+                permission,
+                { projects, teams: new Map<string, boolean>() },
+              ]),
+            ),
+            organizationRole: null,
+          };
+        },
+      }),
+      organizations: createApiFixture<OrganizationApi>({}),
+      users: createApiFixture<UserApi>({}),
+      auditLog: createApiFixture<AuditLogApi>({
+        record: async (command) => {
+          audits.push(command);
+          return { id: "audit-1", occurredAt: 0 };
+        },
+      }),
     },
-    members: {
-      billing: new TestBillingPolicy(),
-      scopeDirectory: new ScopeDirectory(),
-      scopePermissions: new ScopePermissions(),
-      visibility: new NoVisibility(),
-      audit: new RecordingAudit(),
-      service: TestCodingAgentSessionService.create({ getPullRequestUsage }),
-    },
+    members: {},
     config: undefined,
-    repositories: MemoryCodingAgentRepositories.create(),
+    repositories,
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
@@ -238,93 +171,12 @@ function mount({
 
   return {
     audits,
-    callers,
-    reads,
-    getPullRequestUsage,
+    principals,
+    github,
+    reads: () =>
+      candidateReads.mock.calls.map(([input]) => ({ permittedProjectIds: input.tenantIds })),
     fetch: () => hono.fetch(new Request(`http://api.test${USAGE_PATH}`)),
   };
-}
-
-class TestCodingAgentSessionService implements CodingAgentSessionService {
-  static create({
-    getPullRequestUsage,
-  }: {
-    getPullRequestUsage: CodingAgentSessionService["getPullRequestUsage"];
-  }): TestCodingAgentSessionService {
-    return new TestCodingAgentSessionService(getPullRequestUsage);
-  }
-
-  private constructor(
-    private readonly getPullRequestUsageForTest: CodingAgentSessionService["getPullRequestUsage"],
-  ) {}
-
-  getSessionEvents(
-    input: Parameters<CodingAgentSessionService["getSessionEvents"]>[0],
-  ): ReturnType<CodingAgentSessionService["getSessionEvents"]> {
-    return this.unimplemented("getSessionEvents", input);
-  }
-  findBySessionId(
-    input: Parameters<CodingAgentSessionService["findBySessionId"]>[0],
-  ): ReturnType<CodingAgentSessionService["findBySessionId"]> {
-    return this.unimplemented("findBySessionId", input);
-  }
-  findSessionForTrace(
-    input: Parameters<CodingAgentSessionService["findSessionForTrace"]>[0],
-  ): ReturnType<CodingAgentSessionService["findSessionForTrace"]> {
-    return this.unimplemented("findSessionForTrace", input);
-  }
-  listRecent(
-    input: Parameters<CodingAgentSessionService["listRecent"]>[0],
-  ): ReturnType<CodingAgentSessionService["listRecent"]> {
-    return this.unimplemented("listRecent", input);
-  }
-  backfillPullRequestMappings(
-    input: Parameters<CodingAgentSessionService["backfillPullRequestMappings"]>[0],
-  ): ReturnType<CodingAgentSessionService["backfillPullRequestMappings"]> {
-    return this.unimplemented("backfillPullRequestMappings", input);
-  }
-  getUsageTotals(
-    input: Parameters<CodingAgentSessionService["getUsageTotals"]>[0],
-  ): ReturnType<CodingAgentSessionService["getUsageTotals"]> {
-    return this.unimplemented("getUsageTotals", input);
-  }
-  listForProject(
-    input: Parameters<CodingAgentSessionService["listForProject"]>[0],
-  ): ReturnType<CodingAgentSessionService["listForProject"]> {
-    return this.unimplemented("listForProject", input);
-  }
-  linkTraceSessionsToPullRequests(
-    input: Parameters<CodingAgentSessionService["linkTraceSessionsToPullRequests"]>[0],
-  ): ReturnType<CodingAgentSessionService["linkTraceSessionsToPullRequests"]> {
-    return this.unimplemented("linkTraceSessionsToPullRequests", input);
-  }
-  getPullRequestUsage(
-    input: Parameters<CodingAgentSessionService["getPullRequestUsage"]>[0],
-  ): ReturnType<CodingAgentSessionService["getPullRequestUsage"]> {
-    return this.getPullRequestUsageForTest(input);
-  }
-  getPullRequestDetail(
-    input: Parameters<CodingAgentSessionService["getPullRequestDetail"]>[0],
-  ): ReturnType<CodingAgentSessionService["getPullRequestDetail"]> {
-    return this.unimplemented("getPullRequestDetail", input);
-  }
-  getForPersonalProject(
-    input: Parameters<CodingAgentSessionService["getForPersonalProject"]>[0],
-  ): ReturnType<CodingAgentSessionService["getForPersonalProject"]> {
-    return this.unimplemented("getForPersonalProject", input);
-  }
-
-  countUsage(
-    input: Parameters<CodingAgentSessionService["countUsage"]>[0],
-  ): ReturnType<CodingAgentSessionService["countUsage"]> {
-    return this.unimplemented("countUsage", input);
-  }
-
-  private unimplemented(operation: string, _input: unknown): Promise<never> {
-    return Promise.reject(
-      new Error(`TestCodingAgentSessionService does not implement ${operation}`),
-    );
-  }
 }
 
 describe("given the project-scoped pull request usage read", () => {
@@ -369,7 +221,7 @@ describe("given the project-scoped pull request usage read", () => {
 
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({ error: "personal_project_key_required" });
-      expect(api.getPullRequestUsage).not.toHaveBeenCalled();
+      expect(api.github.lookups).toEqual([]);
       expect(api.audits).toEqual([]);
     });
   });
@@ -389,7 +241,7 @@ describe("given the project-scoped pull request usage read", () => {
       expect(body).toEqual({ error: "personal_usage_key_mismatch" });
       expect(JSON.stringify(body)).not.toContain(OTHER_WORKSPACE);
       expect(JSON.stringify(body)).not.toContain("user-2");
-      expect(api.getPullRequestUsage).not.toHaveBeenCalled();
+      expect(api.github.lookups).toEqual([]);
     });
   });
 });
@@ -407,8 +259,8 @@ describe("given a key bound to fewer projects than the person holding it", () =>
       const response = await api.fetch();
 
       expect(response.status).toBe(200);
-      expect(api.callers).toEqual([{ kind: "apiKey", apiKeyId: "key-1", userId: "user-1" }]);
-      expect(api.reads).toEqual([{ permittedProjectIds: [OWNER_PROJECT] }]);
+      expect(api.principals).toEqual([{ type: "apiKey", id: "key-1" }]);
+      expect(api.reads()).toEqual([{ permittedProjectIds: [OWNER_PROJECT] }]);
     });
   });
 });
@@ -428,7 +280,7 @@ describe("given a key for a personal workspace that belongs to no person", () =>
       expect(await response.json()).toEqual({
         error: "personal_usage_service_key_unsupported",
       });
-      expect(api.getPullRequestUsage).not.toHaveBeenCalled();
+      expect(api.github.lookups).toEqual([]);
       expect(api.audits).toEqual([]);
     });
   });

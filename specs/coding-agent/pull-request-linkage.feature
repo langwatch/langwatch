@@ -1179,3 +1179,31 @@ Rule: The v1 usage read needs only an organization credential
     When the v1 pull request usage is read for a pull request mapped elsewhere
     Then the caller receives the pull request not mapped failure
     And nothing says the pull request is mapped for anyone else
+
+  # The installed process answers the rollup from its peers: the organization's
+  # projects, the authorization decision and the audit trail all come from the
+  # modules that own them, so no read fails for want of a composed member.
+  @unit @regression
+  Scenario: The installed process answers the organization rollup instead of failing
+    Given coding-agent installed the way a process installs it
+    When an organization key reads a mapped pull request's usage
+    Then the caller's scope is decided by the authorization service in one ask
+    And the read reaches the pull request
+
+  @unit
+  Scenario: A pull request usage read is written to the audit log
+    Given coding-agent installed the way a process installs it
+    When a read that names people is recorded
+    Then the entry is written through the audit log service
+
+  @unit
+  Scenario: The organization's projects are read across every page
+    Given an organization with more projects than one page holds
+    When the caller's scope is resolved
+    Then every project of the organization is considered
+
+  @unit
+  Scenario: A personal workspace in the rollup is named by its owner
+    Given personal workspaces whose owners have a name, only an email, or no account
+    When the caller's scope is resolved
+    Then each is named by its owner's name, else their email, else its own name

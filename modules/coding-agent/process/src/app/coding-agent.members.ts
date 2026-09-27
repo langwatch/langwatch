@@ -42,6 +42,7 @@ export interface CodingAgentCallerScopeDirectory {
    * nothing displays, so reading them would cost a query for nothing.
    */
   listPersonalTeamOwnerNames(input: {
+    organizationId: string;
     teamIds: readonly string[];
   }): Promise<ReadonlyMap<string, string>>;
 }
@@ -63,6 +64,20 @@ export interface CodingAgentScopePermissions {
     projects: readonly CodingAgentScopeProject[];
     permissions: readonly CodingAgentScopePermission[];
   }): Promise<ReadonlyMap<CodingAgentScopePermission, ReadonlySet<string>>>;
+}
+
+/** What one viewer may see of one project: the generated titles travel under content visibility. */
+export type CodingAgentViewerVisibility = Readonly<{
+  canReadCapturedContent: boolean;
+  canSeeCosts: boolean;
+}>;
+
+/** Resolves one viewer's protections over one project; throws when unresolvable. */
+export interface CodingAgentViewerVisibilityReader {
+  readVisibility(input: {
+    userId: string;
+    projectId: string;
+  }): Promise<CodingAgentViewerVisibility>;
 }
 
 /** The package clock keeps time-dependent read and persistence rules testable. */
