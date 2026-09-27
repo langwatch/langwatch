@@ -1,7 +1,8 @@
 /**
- * Main's voice-session doors: mint and finish over tRPC, the recording over REST.
+ * Main's voice-session doors: mint and finish over tRPC and REST, the recording over REST.
  * @vitest-environment node
  */
+import { SurfaceUnverifiedError } from "@langwatch/api";
 import { createApiFixture } from "@langwatch/api-fixture";
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
@@ -9,6 +10,7 @@ import type { ScenarioApi } from "@langwatch/scenario-contract";
 import {
   VoiceRecordingKeyMissingError,
   VoiceRecordingUnavailableError,
+  VoiceSessionInvalidError,
 } from "@langwatch/scenario-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
@@ -226,6 +228,131 @@ describe("GET /api/voice/run/:scenarioRunId/audio", () => {
 
       expect(response.status).toBe(404);
       expect(await response.json()).toEqual({ code: "voice_recording_key_missing" });
+    });
+  });
+});
+
+function sessionDoor({
+  app,
+  signedIn = true,
+}: {
+  app: Partial<Pick<ScenarioApi, "mintVoiceSession" | "finishVoiceSession">>;
+  signedIn?: boolean;
+}) {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: null }),
+      identify: () => {
+        if (!signedIn) throw new SurfaceUnverifiedError("browser");
+
+        return { actor: { type: "user", id: "user_1" }, scope: null };
+      },
+      authorize: () => ({ permitted: true, organizationRole: null }),
+    },
+  });
+  const hono = runtime.mount(scenarioVoiceRest.router(), {
+    app: () => createApiFixture<ScenarioApi>(app),
+    onError: boundaryErrorHandler,
+  });
+
+  return (path: string, body: object) =>
+    hono.request(`http://api.test${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+}
+
+describe("POST /api/voice/session", () => {
+  describe("given a signed-in caller and the form's values", () => {
+    /** @scenario "The Talk to it panel mints a voice session over REST" */
+    it("mints through the app as that user and answers main's body", async () => {
+      const mintVoiceSession = vi.fn<ScenarioApi["mintVoiceSession"]>(async () => mintResult);
+      const post = sessionDoor({ app: { mintVoiceSession } });
+
+      const response = await post("/api/voice/session", {
+        projectId: "project_1",
+        transport: "elevenlabs_convai",
+        agentId: "  vendor_agent  ",
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(mintResult);
+      expect(mintVoiceSession).toHaveBeenCalledWith({
+        projectId: "project_1",
+        transport: "elevenlabs_convai",
+        agentId: "vendor_agent",
+        userId: "user_1",
+      });
+    });
+  });
+
+  describe("given a request with no logged-in user", () => {
+    /** @scenario "A Talk to it REST request with no logged-in user is refused" */
+    it("refuses it as unauthenticated and mints no session", async () => {
+      const mintVoiceSession = vi.fn<ScenarioApi["mintVoiceSession"]>(async () => mintResult);
+      const post = sessionDoor({ app: { mintVoiceSession }, signedIn: false });
+
+      const response = await post("/api/voice/session", {
+        projectId: "project_1",
+        transport: "elevenlabs_convai",
+        agentId: "vendor_agent",
+      });
+
+      expect(response.status).toBe(401);
+      expect(mintVoiceSession).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("POST /api/voice/session/:sessionId/finish", () => {
+  describe("given a finished call and its signed token", () => {
+    /** @scenario "The Talk to it panel reports a finished call over REST" */
+    it("hands the token, transcript and defaults to the app and answers main's body", async () => {
+      const finishVoiceSession = vi.fn<ScenarioApi["finishVoiceSession"]>(async () => finishResult);
+      const post = sessionDoor({ app: { finishVoiceSession } });
+
+      const response = await post("/api/voice/session/session_1/finish", {
+        projectId: "project_1",
+        sessionToken: "token",
+        startedAt: 1,
+        endedAt: 2,
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(finishResult);
+      expect(finishVoiceSession).toHaveBeenCalledWith({
+        projectId: "project_1",
+        sessionToken: "token",
+        startedAt: 1,
+        endedAt: 2,
+        transcript: [],
+        isCutAtLimit: false,
+        userId: "user_1",
+      });
+    });
+  });
+
+  describe("given a token the app does not accept", () => {
+    /** @scenario "A finish with a token that does not verify is refused by name" */
+    it("answers the app's handled refusal", async () => {
+      const post = sessionDoor({
+        app: {
+          finishVoiceSession: async () => {
+            throw new VoiceSessionInvalidError();
+          },
+        },
+      });
+
+      const response = await post("/api/voice/session/session_1/finish", {
+        projectId: "project_1",
+        sessionToken: "forged",
+        startedAt: 1,
+        endedAt: 2,
+      });
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ code: "voice_session_invalid" });
     });
   });
 });

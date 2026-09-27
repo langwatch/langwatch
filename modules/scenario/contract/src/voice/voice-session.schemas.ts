@@ -33,6 +33,8 @@ export const voiceSessionFinishInputSchema = z.object({
   scenarioId: z.string().trim().min(1).optional(),
 });
 export type VoiceSessionFinishInput = z.input<typeof voiceSessionFinishInputSchema>;
+/** Main's finish path names the session; the signed token in the body is what is trusted. */
+export const voiceSessionFinishParamsSchema = z.object({ sessionId: z.string().min(1) });
 
 /** Main's mint response: the signed URL to connect with, and the token finish carries back. */
 export const voiceSessionMintResultSchema = z.object({
