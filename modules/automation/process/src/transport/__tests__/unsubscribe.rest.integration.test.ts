@@ -97,15 +97,18 @@ describe("given the one-click unsubscribe door", () => {
     });
   });
 
-  describe("when the method is anything but POST", () => {
-    it("answers 405 with an Allow header rather than a bare 404", async () => {
-      const api = mount(async () => undefined);
+  describe.each(["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"])(
+    "when the method is %s",
+    (method) => {
+      it("answers 405 with an Allow header rather than a bare 404", async () => {
+        const api = mount(async () => undefined);
 
-      const response = await api.send("GET", "/api/unsubscribe?token=t_valid");
+        const response = await api.send(method, "/api/unsubscribe?token=t_valid");
 
-      expect(response.status).toBe(405);
-      expect(response.headers.get("allow")).toBe("POST");
-      expect(api.spent).toEqual([]);
-    });
-  });
+        expect(response.status).toBe(405);
+        expect(response.headers.get("allow")).toBe("POST");
+        expect(api.spent).toEqual([]);
+      });
+    },
+  );
 });

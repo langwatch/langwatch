@@ -8,6 +8,7 @@ import {
   type IdentityHeads,
   IdentityIdentifierAlreadyHeldError,
   IdentityIdentifierNotFoundError,
+  IdentityIdentifierNotVerifiableError,
   type MethodsLastUsed,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
@@ -148,6 +149,40 @@ export class AccountIdentifiersService {
   }): Promise<void> {
     await this.meter({ key: `identity.resendIdentifierConfirmation:${userId}` });
     await this.sendConfirmationFor({ userId, identifierId, codeChallenge });
+  }
+
+  /**
+   * The session's own address, resolved here rather than taken from the caller, through the
+   * same PKCE ceremony as an added address: the mailed link alone confirms nothing.
+   */
+  async sendOwnAddressConfirmation({
+    userId,
+    email,
+    codeChallenge,
+  }: {
+    userId: string;
+    email: string;
+    codeChallenge: string;
+  }): Promise<EmailIdentifierAdded> {
+    const normalizedValue = normalizeIdentifierValue(email);
+    const heads = await this.deps.heads.findHeads({ userId });
+    const own = Object.values(heads.identifiers).filter(
+      (head) => head.provider === "email" && head.value === normalizedValue,
+    );
+    const attached = own.find((head) => head.state === "ATTACHED");
+    if (!attached) {
+      if (own.some((head) => head.state !== "DETACHED")) {
+        throw new IdentityIdentifierNotVerifiableError(
+          `send_own_address_confirmation: ${normalizedValue} is not awaiting confirmation`,
+        );
+      }
+      throw new IdentityIdentifierNotFoundError(
+        `send_own_address_confirmation: no email identifier carries ${normalizedValue}`,
+      );
+    }
+
+    await this.sendConfirmationFor({ userId, identifierId: attached.identifierId, codeChallenge });
+    return { identifierId: attached.identifierId };
   }
 
   /** A primary demotes before it detaches (D01); with no successor the detach guard refuses. */

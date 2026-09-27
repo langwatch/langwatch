@@ -5,7 +5,8 @@ import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 /**
  * A signed-in caller's own confirmation link: refused without an address,
- * metered per caller, and mailed through sign-up's own link.
+ * metered per caller, and started as identity's session-bound ceremony.
+ * @see specs/identity/authentication-settings.feature
  */
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
@@ -39,8 +40,11 @@ function countingLimiter() {
   return { rateLimiter, windows };
 }
 
+const CHALLENGE = "c".repeat(43);
+
 async function appFor(
   limiter: ReturnType<typeof countingLimiter>["rateLimiter"],
+  identity: IdentityApi = createApiFixture<IdentityApi>(),
 ): Promise<AuthApp> {
   return AuthApp.create({
     config: {
@@ -60,7 +64,7 @@ async function appFor(
         findResolvedToken: async () => ({ project: { slug: "acme" } }),
       } as never,
       featureFlags: {} as never,
-      identity: createApiFixture<IdentityApi>(),
+      identity,
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
@@ -102,7 +106,11 @@ describe("given a signed-in caller asking for their own confirmation link", () =
       const app = await appFor(rateLimiter);
 
       await expect(
-        app.sendMyAddressConfirmation({ actorId: "user_ana", email: null }),
+        app.sendMyAddressConfirmation({
+          actorId: "user_ana",
+          email: null,
+          codeChallenge: CHALLENGE,
+        }),
       ).rejects.toMatchObject({ code: "auth_no_address_to_confirm" });
       expect(windows).toEqual([]);
     });
@@ -115,11 +123,19 @@ describe("given a signed-in caller asking for their own confirmation link", () =
 
       for (let attempt = 0; attempt < 10; attempt += 1) {
         await app
-          .sendMyAddressConfirmation({ actorId: "user_ana", email: "ana@acme.com" })
+          .sendMyAddressConfirmation({
+            actorId: "user_ana",
+            email: "ana@acme.com",
+            codeChallenge: CHALLENGE,
+          })
           .catch(() => null);
       }
       const refusal = await app
-        .sendMyAddressConfirmation({ actorId: "user_ana", email: "ana@acme.com" })
+        .sendMyAddressConfirmation({
+          actorId: "user_ana",
+          email: "ana@acme.com",
+          codeChallenge: CHALLENGE,
+        })
         .catch((error: unknown) => error);
 
       expect(refusal).toMatchObject({
@@ -132,13 +148,30 @@ describe("given a signed-in caller asking for their own confirmation link", () =
   });
 
   describe("when the caller is inside the budget", () => {
-    it("asks sign-up to mail the link, which this deployment cannot send", async () => {
+    /** @scenario "The own address confirmation only ever goes to the session's own address" */
+    it("starts the session-bound ceremony for the session's own address, never a sign-up link", async () => {
       const { rateLimiter } = countingLimiter();
-      const app = await appFor(rateLimiter);
+      const started: Parameters<IdentityApi["sendOwnAddressConfirmation"]>[0][] = [];
+      const app = await appFor(
+        rateLimiter,
+        createApiFixture<IdentityApi>({
+          sendOwnAddressConfirmation: async (input) => {
+            started.push(input);
+            return { identifierId: "idf_own" };
+          },
+        }),
+      );
 
       await expect(
-        app.sendMyAddressConfirmation({ actorId: "user_ana", email: "ana@acme.com" }),
-      ).rejects.toMatchObject({ code: "service_unavailable" });
+        app.sendMyAddressConfirmation({
+          actorId: "user_ana",
+          email: "ana@acme.com",
+          codeChallenge: CHALLENGE,
+        }),
+      ).resolves.toEqual({ identifierId: "idf_own" });
+      expect(started).toEqual([
+        { userId: "user_ana", email: "ana@acme.com", codeChallenge: CHALLENGE },
+      ]);
     });
   });
 });

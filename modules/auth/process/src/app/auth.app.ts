@@ -52,6 +52,7 @@ import {
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
+  type EmailIdentifierAdded,
   IdentityApi,
   type IdentityEmailService,
   type RoutingDecision,
@@ -180,7 +181,7 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
 type AuthAppPeers = Readonly<{
   apiKeys: ApiKeyApi;
   featureFlags: FeatureFlagApi;
-  identity: Pick<IdentityApi, "routeSignIn">;
+  identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation">;
 }>;
 
 type AuthSetup = FeatureSetup<
@@ -851,8 +852,8 @@ export class AuthApp implements AuthApiContract {
 
   /** Metered on the caller rather than the address, like the token check's own probe. */
   async sendMyAddressConfirmation(
-    input: Readonly<{ actorId: string; email: string | null }>,
-  ): Promise<void> {
+    input: Readonly<{ actorId: string; email: string | null; codeChallenge: string }>,
+  ): Promise<EmailIdentifierAdded> {
     if (!input.email) throw new NoAddressToConfirmError();
 
     const budget = await this.isWithinBudget({
@@ -866,7 +867,11 @@ export class AuthApp implements AuthApiContract {
       });
     }
 
-    await this.requestSignUpVerification({ email: input.email });
+    return this.#dependencies.identity.sendOwnAddressConfirmation({
+      userId: input.actorId,
+      email: input.email,
+      codeChallenge: input.codeChallenge,
+    });
   }
 
   getMyAddressConfirmation(

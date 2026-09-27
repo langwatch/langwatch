@@ -1,4 +1,8 @@
-import type { RoutingDecision, SignedInWith } from "@langwatch/identity-contract";
+import type {
+  EmailIdentifierAdded,
+  RoutingDecision,
+  SignedInWith,
+} from "@langwatch/identity-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type {
@@ -164,12 +168,12 @@ export interface AuthApi {
   /** Mails a sign-up confirmation link, refusing an address that already has an account. */
   requestNewAccountVerification(input: Readonly<{ email: string }>): Promise<void>;
   /**
-   * Mails the signed-in caller's own address its confirmation link, metered per
+   * Starts identity's PKCE ceremony for the signed-in caller's own address, metered per
    * caller; refuses an account the process resolved no address for.
    */
   sendMyAddressConfirmation(
-    input: Readonly<{ actorId: string; email: string | null }>,
-  ): Promise<void>;
+    input: Readonly<{ actorId: string; email: string | null; codeChallenge: string }>,
+  ): Promise<EmailIdentifierAdded>;
   /** The caller's own address and whether it is confirmed; unconfirmed where it has none. */
   getMyAddressConfirmation(input: Readonly<{ email: string | null }>): Promise<AddressConfirmation>;
   /**
