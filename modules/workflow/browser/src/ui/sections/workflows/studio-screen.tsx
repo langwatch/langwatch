@@ -2,7 +2,7 @@ import { Button } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { HandledErrorState } from "@langwatch/workflow-browser-kit";
-import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { SearchX } from "lucide-react";
 import { useEffect } from "react";
 
@@ -51,7 +51,8 @@ export default function Studio() {
   }, []);
 
   useEffect(() => {
-    const dsl = workflow.data?.currentVersion?.dsl as unknown as StudioWorkflow | undefined;
+    const savedDsl = workflow.data?.currentVersion?.dsl;
+    const dsl = savedDsl ? parseStudioWorkflow(savedDsl) : undefined;
     if (dsl) {
       // Prevent autosave from triggering after load
       setAutosavedWorkflow(undefined);

@@ -21,7 +21,6 @@ import {
   VariablesSection,
 } from "@langwatch/prompt-browser-kit";
 import { rewriteCodeSignature } from "@langwatch/workflow-browser-kit";
-import { CodeEditor } from "@langwatch/workflow-browser/surfaces/code-editor-transport";
 import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
@@ -31,6 +30,7 @@ import {
   type CodeEvaluatorField,
   validCodeEvaluatorFields,
 } from "../../blocks/code-evaluator-editor.tsx";
+import { EvaluatorCodeEditor } from "./evaluator-code-editor.tsx";
 import {
   EvaluatorGateSection,
   type EvaluatorGateConfig,
@@ -401,7 +401,7 @@ function CodeEvaluatorFormFields({ form }: { form: CodeEvaluatorFormState }) {
       onNameChange={form.setName}
       onInputsChange={form.setInputs}
       renderCodeEditor={({ code, inputs, outputs }) => (
-        <CodeEditor
+        <EvaluatorCodeEditor
           code={code}
           setCode={form.setCode}
           onClose={() => void 0}

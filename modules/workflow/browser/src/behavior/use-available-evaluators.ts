@@ -1,10 +1,12 @@
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import type { CustomEvaluator } from "@langwatch/evaluation-contract";
+import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { evaluatorCatalogueWith } from "@langwatch/evaluator-browser-kit";
 import type { EvaluatorDefinition } from "@langwatch/evaluator-contract";
 import { getInputsOutputs } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
+
+import { useOrganizationTeamProject } from "./studio-host/use-organization-team-project.ts";
+
+type CustomEvaluator = RouterOutputs["evaluations"]["availableCustomEvaluators"][number];
 
 export const useAvailableEvaluators = ():
   | Readonly<Record<string, EvaluatorDefinition>>

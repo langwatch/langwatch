@@ -11,13 +11,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { CustomEvaluator } from "@langwatch/evaluation-contract";
 import {
   evaluatorDisplayName,
   AVAILABLE_EVALUATORS,
@@ -25,7 +25,6 @@ import {
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
 import { NextLink } from "@langwatch/workflow-browser-kit";
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { AlertTriangle, Plus, Shield } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 
@@ -96,7 +95,7 @@ export function EvaluatorSelection({
         if (index2 === -1) return -999;
         return index - index2;
       }),
-    ...(availableCustomEvaluators.data ?? []).map((evaluator: CustomEvaluator) => [
+    ...(availableCustomEvaluators.data ?? []).map((evaluator) => [
       `custom/${evaluator.id}`,
       {
         name: evaluator.name,
@@ -116,6 +115,7 @@ export function EvaluatorSelection({
       (entry): entry is [string, EvaluatorDefinition] =>
         Array.isArray(entry) &&
         typeof entry[1] === "object" &&
+        entry[1] !== null &&
         "category" in entry[1] &&
         entry[1].category === category,
     );

@@ -69,7 +69,7 @@ import { TryItOut } from "./try-it-out.tsx";
 
 export interface CheckConfigFormData {
   name: string;
-  checkType: EvaluatorTypes;
+  checkType: EvaluatorTypes | undefined;
   sample: number;
   preconditions: CheckPreconditions;
   settings: Evaluators[EvaluatorTypes]["settings"];
@@ -556,7 +556,7 @@ function SaveBar({
   storeSettingsOnCode,
   loading,
 }: {
-  storeSettingsOnCode: boolean;
+  storeSettingsOnCode?: boolean;
   loading: boolean;
 }) {
   return (
@@ -610,9 +610,8 @@ function checkConfigResolver(
         .optional(),
       mappings: mappingStateSchema,
     });
-
-    // settings is selected dynamically at runtime from data.checkType, so
-    // TypeScript cannot prove the schema output matches CheckConfigFormData.
+    // settings is selected at runtime from data.checkType, so the schema output
+    // is not provably CheckConfigFormData.
     return (zodResolver(schema) as unknown as Resolver<CheckConfigFormData>)(
       { ...data, settings: data.settings || {} },
       context,

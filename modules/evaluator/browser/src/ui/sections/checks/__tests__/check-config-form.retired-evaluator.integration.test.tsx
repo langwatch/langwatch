@@ -5,7 +5,9 @@
  * Drives the real `CheckConfigForm`, since the failure mode is a runtime `TypeError`.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { DEFAULT_MAPPINGS } from "@langwatch/dataset-contract";
+import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
@@ -88,7 +90,7 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => {
   return { api: stub("") };
 });
 
-import CheckConfigForm from "../check-config-form.tsx";
+import CheckConfigForm, { type CheckConfigFormData } from "../check-config-form.tsx";
 
 afterEach(() => cleanup());
 
@@ -145,6 +147,49 @@ describe("<CheckConfigForm/>", () => {
 
         expect(screen.getByText("Ragas Faithfulness")).toBeTruthy();
         expect(screen.queryByText("This evaluator is no longer available")).toBeNull();
+      });
+    });
+  });
+});
+
+describe("<CheckConfigForm/> saving", () => {
+  describe("given a valid monitor on a catalogued evaluator", () => {
+    describe("when the user saves it", () => {
+      it("submits the parsed values, without the store-settings-on-code toggle", async () => {
+        const onSubmit = vi.fn(async (_data: CheckConfigFormData) => void 0);
+        const settings = { case_sensitive: false, trim_whitespace: true, remove_punctuation: true };
+        render(
+          <ChakraProvider value={defaultSystem}>
+            <CheckConfigForm
+              checkId="monitor-1"
+              defaultValues={{
+                name: "Exact",
+                checkType: "langevals/exact_match",
+                sample: 1,
+                preconditions: [],
+                settings,
+                executionMode: EvaluationExecutionMode.ON_MESSAGE,
+                storeSettingsOnCode: false,
+                mappings: DEFAULT_MAPPINGS,
+              }}
+              onSubmit={onSubmit}
+              loading={false}
+            />
+          </ChakraProvider>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+        expect(onSubmit.mock.calls[0]?.[0]).toStrictEqual({
+          name: "Exact",
+          checkType: "langevals/exact_match",
+          sample: 1,
+          preconditions: [],
+          settings,
+          executionMode: EvaluationExecutionMode.ON_MESSAGE,
+          mappings: DEFAULT_MAPPINGS,
+        });
       });
     });
   });
