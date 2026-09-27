@@ -43,7 +43,20 @@ type RestParity struct {
 // page is not an API, and ADR-158's amendment removes the dataset
 // direct-upload byte routes rather than refusing them.
 func RetiredRestOperation(path string) bool {
-	return path == "/" || path == "/api/dataset/direct-upload" || strings.HasPrefix(path, "/api/dataset/direct-upload/")
+	return path == "/" || path == "/api/dataset/direct-upload" || strings.HasPrefix(path, "/api/dataset/direct-upload/") ||
+		retiredServedRoutes[path]
+}
+
+// retiredServedRoutes are routes main serves that Alex ruled out of the
+// branch (2026-09-27): rpc.discover and CopilotKit were removed on purpose,
+// the two crons became scheduled process managers, and dataset generate had
+// no caller on main.
+var retiredServedRoutes = map[string]bool{
+	"/api/rpc.discover":         true,
+	"/api/copilotkit":           true,
+	"/api/cron/seed_demo":       true,
+	"/api/cron/trace_analytics": true,
+	"/api/dataset/generate":     true,
 }
 
 // DiffRest compares two served documents operation by operation, ignoring
