@@ -128,6 +128,45 @@ describe("config", () => {
     });
   });
 
+  describe("hasConfig", () => {
+    const freshModule = async () => {
+      delete (globalThis as Record<string, unknown>).__langwatch_mcp_config;
+      delete (globalThis as Record<string, unknown>).__langwatch_mcp_config_storage;
+      vi.resetModules();
+      return import("../config.js");
+    };
+
+    describe("when config has not been initialized", () => {
+      /** @scenario "Checking for a config before it exists logs nothing" */
+      it("returns false without logging", async () => {
+        const fresh = await freshModule();
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+        try {
+          expect(fresh.hasConfig()).toBe(false);
+          expect(errorSpy).not.toHaveBeenCalled();
+        } finally {
+          errorSpy.mockRestore();
+        }
+      });
+    });
+
+    describe("when config was initialized or a scoped config is active", () => {
+      /** @scenario "A config counts as present once initialized or scoped" */
+      it("returns true", async () => {
+        const fresh = await freshModule();
+        fresh.runWithConfig(
+          { apiKey: "scoped", endpoint: "https://example.com" },
+          () => {
+            expect(fresh.hasConfig()).toBe(true);
+          }
+        );
+        expect(fresh.hasConfig()).toBe(false);
+        fresh.initConfig({});
+        expect(fresh.hasConfig()).toBe(true);
+      });
+    });
+  });
+
   describe("runWithConfig()", () => {
     it("overrides global config within the callback", () => {
       initConfig({ apiKey: "global-key" });
