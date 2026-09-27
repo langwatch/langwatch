@@ -44,7 +44,7 @@ func (fake *fakeHaven) statusJSON() string {
 	var stacks []string
 	for slug, port := range fake.readySlugs {
 		stacks = append(stacks, `{"slug":"`+slug+`","apiPort":`+itoa(port)+`,"live":true,`+
-			`"lanes":[{"name":"ui","listening":true},{"name":"backend","listening":true}],`+
+			`"lanes":[{"name":"ui","listening":true},{"name":"api","listening":true}],`+
 			`"services":[{"name":"app","url":"https://app.`+slug+`.langwatch.localhost"}]}`)
 	}
 	return `{"stacks":[` + strings.Join(stacks, ",") + `]}`

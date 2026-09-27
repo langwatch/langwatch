@@ -45,7 +45,7 @@ func (fake *fakeHavenRunner) statusJSON() string {
 	var stacks []string
 	for slug, url := range fake.readyStacks {
 		stacks = append(stacks, `{"slug":"`+slug+`","live":true,`+
-			`"lanes":[{"name":"ui","listening":true},{"name":"backend","listening":true}],`+
+			`"lanes":[{"name":"ui","listening":true},{"name":"api","listening":true}],`+
 			`"services":[{"name":"app","url":"`+url+`"}]}`)
 	}
 	return `{"stacks":[` + strings.Join(stacks, ",") + `]}`
@@ -377,7 +377,7 @@ func TestReadyMeansBothLanesAreHealthy(t *testing.T) {
 		}
 		return havenrun.Status{Stacks: []havenrun.StackStatus{{
 			Slug: slug, Live: live,
-			Lanes:    []havenrun.LaneStatus{{Name: "ui", Listening: uiUp}, {Name: "backend", Listening: backendUp}},
+			Lanes:    []havenrun.LaneStatus{{Name: "ui", Listening: uiUp}, {Name: "api", Listening: backendUp}},
 			Services: services,
 		}}}
 	}
@@ -525,7 +525,7 @@ func TestVisualdiffMonolithBasesFailureTailReadsTheAppLane(t *testing.T) {
 					logCmd = spec
 				}
 			}
-			if got := haventArgv(logCmd); got != "haven logs backend --agent --stack "+stack.HavenSlug {
+			if got := haventArgv(logCmd); got != "haven logs api --agent --stack "+stack.HavenSlug {
 				t.Errorf("logs command = %q, want the backend lane", got)
 			}
 		})

@@ -99,13 +99,13 @@ func TestArgvBuilders(t *testing.T) {
 	if got := strings.Join(DestroyArgs("slug-1"), " "); got != "destroy slug-1 --agent --yes" {
 		t.Errorf("DestroyArgs = %q", got)
 	}
-	if got := strings.Join(BackendLogArgs("slug-1"), " "); got != "logs backend --agent --stack slug-1" {
+	if got := strings.Join(BackendLogArgs("slug-1"), " "); got != "logs api --agent --stack slug-1" {
 		t.Errorf("BackendLogArgs = %q", got)
 	}
 }
 
 func TestParseStatus(t *testing.T) {
-	status, err := ParseStatus([]byte(`{"stacks":[{"slug":"a","apiPort":6560,"live":true,"lanes":[{"name":"backend","listening":true}],"services":[{"name":"app","url":"https://app.a.langwatch.localhost"}]}]}`))
+	status, err := ParseStatus([]byte(`{"stacks":[{"slug":"a","apiPort":6560,"live":true,"lanes":[{"name":"api","listening":true}],"services":[{"name":"app","url":"https://app.a.langwatch.localhost"}]}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,9 +120,9 @@ func TestParseStatus(t *testing.T) {
 func TestStackReadyRequiresEveryNamedLaneListening(t *testing.T) {
 	status := Status{Stacks: []StackStatus{{
 		Slug: "s1", Live: true,
-		Lanes: []LaneStatus{{Name: "ui", Listening: true}, {Name: "backend", Listening: false}},
+		Lanes: []LaneStatus{{Name: "ui", Listening: true}, {Name: "api", Listening: false}},
 	}}}
-	if _, ready := StackReady(status, "s1", "ui", "backend"); ready {
+	if _, ready := StackReady(status, "s1", "ui", "api"); ready {
 		t.Fatal("a stack missing one required lane was reported ready")
 	}
 	if _, ready := StackReady(status, "s1", "ui"); !ready {
@@ -176,7 +176,7 @@ func TestLogArgsAndBackendLogArgs(t *testing.T) {
 	if got := strings.Join(LogArgs(AppService, "slug-1"), " "); got != "logs app --agent --stack slug-1" {
 		t.Errorf("LogArgs = %q", got)
 	}
-	if got := strings.Join(BackendLogArgs("slug-1"), " "); got != "logs backend --agent --stack slug-1" {
+	if got := strings.Join(BackendLogArgs("slug-1"), " "); got != "logs api --agent --stack slug-1" {
 		t.Errorf("BackendLogArgs = %q", got)
 	}
 }

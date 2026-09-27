@@ -21,14 +21,14 @@ import (
 // port-based or compose-based one.
 const Command = "haven"
 
-// UILane and BackendLane name the two Node lanes haven supervises (see
-// tools/thuishaven/domain/stack.go, Stack.Lanes). A caller names the lanes it
+// UILane and BackendLane name the two Node lanes haven supervises, ui and api
+// (see tools/thuishaven/app/plan.go, APILane). A caller names the lanes it
 // needs ready; apidiff only ever needs the backend lane, visualdiff needs
 // both because it drives a browser against the UI and seeds fixtures through
 // the API on the same origin.
 const (
 	UILane      = "ui"
-	BackendLane = "backend"
+	BackendLane = "api"
 )
 
 // AppService is the routed service name whose URL is the browser-facing
