@@ -75,7 +75,7 @@ const SIGN_IN_CALLBACK_PATH =
  * unrecognized sign-in error gets, with the trace id. Every other auth route
  * keeps its status, because the callers of those read it.
  */
-export function redirectFailedSignInCallback({
+export async function redirectFailedSignInCallback({
   response,
   path,
   errorPageUrl,
@@ -85,12 +85,15 @@ export function redirectFailedSignInCallback({
   path: string;
   errorPageUrl: string;
   traceId?: string | null;
-}): Response {
+}): Promise<Response> {
   if (response.status < 500) return response;
   if (!SIGN_IN_CALLBACK_PATH.test(path)) return response;
 
+  // The body better-auth answers a thrown callback with carries the error's
+  // message. It goes to the log only, never to the screen.
+  const cause = (await response.text().catch(() => "")).slice(0, 1000);
   logger.error(
-    { status: response.status, path, traceId: traceId ?? null },
+    { status: response.status, path, traceId: traceId ?? null, cause },
     "a sign-in callback failed on the server; the person was sent a generic refusal",
   );
 

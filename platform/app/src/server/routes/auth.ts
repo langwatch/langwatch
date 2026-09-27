@@ -224,7 +224,7 @@ const betterAuthCatchAll = async (c: Context) => {
   const traceId = c.get("traceId") as string | undefined;
   // The two act on different statuses (a 3xx to the error page, a 5xx on a
   // callback), so each answer passes through at most one of them.
-  return redirectFailedSignInCallback({
+  return await redirectFailedSignInCallback({
     response: withholdInternalSignInError({
       response: answered,
       errorPageUrl: SIGN_IN_ERROR_PAGE_URL,

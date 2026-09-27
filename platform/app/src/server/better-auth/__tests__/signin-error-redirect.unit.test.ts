@@ -252,9 +252,12 @@ describe("given a sign-in callback that fails on the server", () => {
       "/api/auth/oauth2/callback/okta",
       "/api/auth/sso/callback/conn_1",
       "/api/auth/sso/saml2/sp/acs/conn_1",
-    ])("redirects %s to the error screen with the generic code and trace", (path) => {
-      const answered = redirectFailedSignInCallback({
-        response: new Response(null, { status: 500 }),
+    ])("redirects %s to the error screen with the generic code and trace", async (path) => {
+      const answered = await redirectFailedSignInCallback({
+        response: new Response(
+          JSON.stringify({ message: "rekey transaction failed" }),
+          { status: 500 },
+        ),
         path,
         errorPageUrl: ERROR_PAGE,
         traceId: "trace_1",
@@ -268,7 +271,12 @@ describe("given a sign-in callback that fails on the server", () => {
       );
       expect(location.searchParams.get("trace")).toBe("trace_1");
       expect(errorLog).toHaveBeenCalledWith(
-        expect.objectContaining({ path, traceId: "trace_1", status: 500 }),
+        expect.objectContaining({
+          path,
+          traceId: "trace_1",
+          status: 500,
+          cause: expect.stringContaining("rekey transaction failed"),
+        }),
         expect.any(String),
       );
     });
@@ -282,9 +290,9 @@ describe("given an auth request that is not a sign-in callback", () => {
       "/api/auth/sign-in/email",
       "/api/auth/get-session",
       "/api/auth/sso/saml2/sp/metadata",
-    ])("answers %s with the server error itself", (path) => {
+    ])("answers %s with the server error itself", async (path) => {
       const response = new Response(null, { status: 500 });
-      const answered = redirectFailedSignInCallback({
+      const answered = await redirectFailedSignInCallback({
         response,
         path,
         errorPageUrl: ERROR_PAGE,
@@ -295,10 +303,10 @@ describe("given an auth request that is not a sign-in callback", () => {
   });
 
   describe("when a callback answers below 500", () => {
-    it("leaves the answer alone", () => {
+    it("leaves the answer alone", async () => {
       const response = new Response(null, { status: 302 });
       expect(
-        redirectFailedSignInCallback({
+        await redirectFailedSignInCallback({
           response,
           path: "/api/auth/callback/microsoft",
           errorPageUrl: ERROR_PAGE,
