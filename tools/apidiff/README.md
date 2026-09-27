@@ -597,7 +597,25 @@ no database, no stack — only the two worktrees.
    REST section of every packet open; a full run completes it from both
    served documents right after the spec fetch, pairing operations that
    differ only in path-parameter names and skipping URL version mounts.
-5. **Output.** `<work-root>/parity.json` (everything, including additive
+5. **Served routes, both sides.** REST parity reads documents, so a route
+   main serves without documenting it (a webhook, a UI door) is invisible to
+   it. `.apidiff-routes-inventory.mjs` is written, run and removed the same
+   way as the tRPC script: on main it builds `createApiRouter()` and walks its
+   Hono route table (middleware told apart the way `hono/dev` does); on the
+   branch it reads every installed server module's REST and socket
+   declarations through `@langwatch/api`'s own addressing, plus the API
+   application's lanes and the health door. Routes pair on method and
+   canonical path (`:param` and `{param}` alike, `/api/v1` folded, regex
+   constraints and a trailing slash dropped); ALL answers any method, GET
+   answers HEAD, and a branch wildcard answers everything under it. A main
+   route the branch does not serve is `servedOnly.missingOnBranch` and a row
+   in its module's packet, unless it is ruled retired (`RetiredRestOperation`),
+   documented on main (REST parity compares it), or on the ignore list in
+   `parity-served.go`: Better Auth's `/api/auth/*` catch-all, the tRPC lanes,
+   and URL version mounts. Every ignored route is kept with its reason in
+   `parity.json`. Served-only rows count in the module table; they do not
+   enter the ledger.
+6. **Output.** `<work-root>/parity.json` (everything, including additive
    changes) and `<work-root>/parity/<module>.md`, one packet per owning
    module: counts, each missing procedure with main's source file, each
    breaking field difference, the rename/move candidates, and the extras.
@@ -606,7 +624,7 @@ no database, no stack — only the two worktrees.
    `unowned.md`. The module × {missing, breaking, extra} table, largest work
    first, is printed on stdout by `-parity-only` and on stderr by a full run
    (whose stdout stays the deterministic report).
-6. **Verdict.** Parity feeds the same report, ledger and exit code as every
+7. **Verdict.** Parity feeds the same report, ledger and exit code as every
    other cause: a missing procedure is the cause `spec-trpc-missing`, a
    breaking field `spec-trpc-input-<kind>` / `spec-trpc-output-<kind>` /
    `spec-trpc-kind-changed`, keyed `TRPC <path>` in the ledger. Without a

@@ -26,6 +26,7 @@ type ParityReport struct {
 	BranchDir   string         `json:"branchDir"`
 	Trpc        TrpcParity     `json:"trpc"`
 	Rest        *RestParity    `json:"rest,omitempty"`
+	ServedOnly  *ServedParity  `json:"servedOnly,omitempty"`
 	Modules     []ModuleCounts `json:"modules"`
 	Notes       []string       `json:"notes,omitempty"`
 }
@@ -65,7 +66,11 @@ func runParityPhase(ctx context.Context, boot BootConfig, stderr io.Writer) (*pa
 		phase.cleanup()
 		return nil, err
 	}
-	phase.readMainRest()
+	document := phase.readMainRest()
+	if err := phase.inventoryRoutes(ctx, document); err != nil {
+		phase.cleanup()
+		return nil, err
+	}
 	err := phase.write()
 	return phase, err
 }
@@ -213,23 +218,50 @@ func contractModule(source string) string {
 	return ""
 }
 
-// readMainRest records main's REST count from the artifact it serves. The
-// branch generates its document from the mounted routes, so its side is only
-// known once it is serving; the full run completes REST parity then.
-func (phase *parityPhase) readMainRest() {
+// readMainRest records main's REST count from the artifact it serves and
+// answers the document, nil when there is none. The branch generates its
+// document from the mounted routes, so its side is only known once it is
+// serving; the full run completes REST parity then.
+func (phase *parityPhase) readMainRest() map[string]any {
 	data, err := os.ReadFile(filepath.Join(phase.state.mainDir, mainOpenAPIDocument)) // #nosec G304 -- a file inside this run's own worktree
 	if err != nil {
 		phase.report.Notes = append(phase.report.Notes, "main REST document not found at "+mainOpenAPIDocument)
-		return
+		return nil
 	}
 	document, err := decodeObject(data)
 	if err != nil {
 		phase.report.Notes = append(phase.report.Notes, "main REST document unreadable: "+err.Error())
-		return
+		return nil
 	}
 	phase.report.Notes = append(phase.report.Notes, fmt.Sprintf(
 		"REST: main serves %d operations; the branch document is generated from its mounted routes, so REST parity is completed once the branch serves (a full run)",
 		countOperations(document)))
+	return document
+}
+
+// inventoryRoutes compares every route each side serves, documented or not,
+// before either stack boots. mainDocument is main's served OpenAPI document:
+// a route it describes is left to REST parity rather than counted twice.
+func (phase *parityPhase) inventoryRoutes(ctx context.Context, mainDocument map[string]any) error {
+	sides := map[string]string{"main": phase.state.mainDir, "branch": phase.state.branchDir}
+	manifests := map[string]RouteManifest{}
+	for _, side := range []string{"main", "branch"} {
+		out := filepath.Join(phase.dir, "routes-"+side+".json")
+		phase.state.logf("parity: inventory %s served routes (%s)", side, sides[side])
+		inventory := routeInventory{run: phase.state.run, inherit: phase.state.environ(), log: phase.state.stderr}
+		manifest, err := inventory.collect(ctx, sides[side], out)
+		if err != nil {
+			return err
+		}
+		for _, failure := range manifest.Failures {
+			phase.report.Notes = append(phase.report.Notes, fmt.Sprintf("%s routes of %s not read: %s", side, failure.Source, failure.Error))
+		}
+		manifests[side] = manifest
+	}
+	comparison := ServedComparison{Documented: DocumentedRoutes(mainDocument), ModuleOf: phase.restModule}
+	served := DiffServedRoutes(manifests["main"].Routes, manifests["branch"].Routes, comparison)
+	phase.report.ServedOnly = &served
+	return nil
 }
 
 // completeWithRest adds REST parity from both served documents, rewrites the
