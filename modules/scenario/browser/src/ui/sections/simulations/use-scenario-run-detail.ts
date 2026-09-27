@@ -1,11 +1,11 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { useDejaViewLink } from "@langwatch/workflow-browser/surfaces/deja-view-link";
 import { useCallback, useState } from "react";
 
 import { api } from "../../../behavior/scenario-api.ts";
 import { useRunDetailFacts } from "../../../behavior/simulations/use-run-detail-facts.ts";
 import { useRunStateStream } from "../../../behavior/simulations/use-run-state-stream.ts";
+import { useDejaViewLink } from "../../../behavior/use-deja-view-link.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useRunAgainActions } from "./use-run-again-actions.ts";
 

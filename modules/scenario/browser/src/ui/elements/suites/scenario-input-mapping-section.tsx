@@ -14,6 +14,7 @@ import {
   resolveOutputField,
   toOutputFieldState,
 } from "@langwatch/suite-browser-kit";
+import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import { useMemo } from "react";
 
 /** The scenario fields shown as input mapping rows. */
@@ -215,6 +216,7 @@ export function ScenarioInputMappingSection({
           mappings={displayMappings}
           onMappingChange={handleDisplayMappingChange}
           availableSources={[agentSource]}
+          renderSourceIcon={renderSourceTypeIcon}
           showMappings={true}
           canAddRemove={false}
           readOnly={true}
@@ -257,6 +259,7 @@ export function ScenarioInputMappingSection({
             mappings={outputDisplayMappings}
             onMappingChange={handleOutputMappingChange}
             availableSources={[agentOutputSource]}
+            renderSourceIcon={renderSourceTypeIcon}
             showMappings={true}
             canAddRemove={false}
             readOnly={true}
