@@ -1,3 +1,5 @@
+import type { JsonValue } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 /** Spec: specs/lwql/access-model.feature */
 import { describe, expect, it, vi } from "vitest";
 
@@ -18,7 +20,7 @@ import {
 const BOOTED_AT = 1_700_000_000_000;
 
 function wake(state: LwqlReconvergenceState, at: number) {
-  const reconverge = vi.fn((messageKey: string, payload: { scheduledFor: number }) => ({
+  const reconverge = vi.fn((messageKey: string, payload: JsonValue) => ({
     messageKey,
     intentType: "reconverge",
     payload,
@@ -28,7 +30,7 @@ function wake(state: LwqlReconvergenceState, at: number) {
     now: at,
     key: LWQL_RECONVERGENCE_PROCESS_NAME,
     projectId: "__global__",
-    intents: { reconverge },
+    intent: intentAccessorOf({ reconverge }),
   });
   return { evolution, reconverge };
 }

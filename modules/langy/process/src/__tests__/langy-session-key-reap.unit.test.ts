@@ -1,3 +1,4 @@
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import {
   LangyMaintenanceService,
   LANGY_SESSION_KEYS_METRIC_NAME,
@@ -12,9 +13,9 @@ const wakeContext = (at: number) => ({
   now: at,
   key: LANGY_SESSION_KEY_REAP_PROCESS_NAME,
   projectId: "__global__",
-  intents: {
-    reap: (key: string, payload: unknown) => ({ type: "reap", key, payload }),
-  },
+  intent: intentAccessorOf({
+    reap: (key, payload) => ({ intentType: "reap", messageKey: key, payload }),
+  }),
 });
 
 describe("langySessionKeyReap process", () => {
@@ -28,7 +29,7 @@ describe("langySessionKeyReap process", () => {
 
         expect(evolution.state).toEqual({ lastReapAt: 1_000 });
         expect(evolution.intents).toEqual([
-          { type: "reap", key: "reap:1000", payload: { scheduledFor: 1_000 } },
+          { intentType: "reap", messageKey: "reap:1000", payload: { scheduledFor: 1_000 } },
         ]);
       });
 

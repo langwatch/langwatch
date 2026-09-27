@@ -6,6 +6,8 @@ import type { EventType } from "../../domain/eventType.ts";
 import type { TenantId } from "../../domain/tenantId.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
 import { type Event, EventSchema, type Projection } from "../../domain/types.ts";
+import { ensureJsonSafe, type JsonValue } from "../../process-manager/json.ts";
+import type { ProcessIntent } from "../../process-manager/processManager.types.ts";
 import type {
   FoldProjectionDefinition,
   FoldProjectionStore,
@@ -175,6 +177,17 @@ let testEventIdCounter = 0;
  * Creates a test event with predictable values.
  * IDs are auto-generated to be unique even for events with the same timestamp.
  */
+/** A handler context's `intent` double: each declared name answers from its test factory. */
+export function intentAccessorOf(
+  factories: Readonly<Record<string, (key: string, payload: JsonValue) => ProcessIntent>>,
+): (name: string, key: string, payload: unknown) => ProcessIntent {
+  return (name, key, payload) => {
+    const factory = factories[name];
+    if (!factory) throw new Error(`The test declares no intent "${name}"`);
+    return factory(key, ensureJsonSafe(payload));
+  };
+}
+
 /** A standalone test job's payload read as a plain record. */
 export function parseTestJobPayload(value: unknown): Record<string, unknown> {
   return z.record(z.string(), z.unknown()).parse(value);

@@ -134,7 +134,7 @@ export const handleRunQueued: EventHandler<
     state: base,
     nextWakeAt: refMs + STALL_THRESHOLD_MS,
     intents: [
-      ctx.intents.execute(executeKey(ctx.key), {
+      ctx.intent("execute", executeKey(ctx.key), {
         scenarioRunId: ctx.key,
         projectId: ctx.projectId,
         scenarioId: view.scenarioId,
@@ -190,7 +190,7 @@ export const handleCancelRequested: EventHandler<
         nextWakeAt: null,
         intents: wasSubmitted
           ? [
-              ctx.intents.cancel(cancelKey(ctx.key), {
+              ctx.intent("cancel", cancelKey(ctx.key), {
                 scenarioRunId: ctx.key,
                 projectId: ctx.projectId,
               }),
@@ -211,7 +211,7 @@ export const handleCancelRequested: EventHandler<
         },
         nextWakeAt: ctx.now + CANCEL_GRACE_MS,
         intents: [
-          ctx.intents.cancel(cancelKey(ctx.key), {
+          ctx.intent("cancel", cancelKey(ctx.key), {
             scenarioRunId: ctx.key,
             projectId: ctx.projectId,
           }),
@@ -342,7 +342,7 @@ export const simulationRunExecutionWake: WakeHandler<
       state: { ...state, phase: "terminal" },
       nextWakeAt: null,
       intents: [
-        ctx.intents.finish(finishStalledKey(ctx.key), {
+        ctx.intent("finish", finishStalledKey(ctx.key), {
           scenarioRunId: ctx.key,
           projectId: ctx.projectId,
           status: ScenarioRunStatus.ERROR,
@@ -375,7 +375,7 @@ function computeWake(state: SimulationRunExecutionProcessState): number | null {
 }
 
 function finishCancelledIntent(ctx: Ctx): ProcessIntent {
-  return ctx.intents.finish(finishCancelledKey(ctx.key), {
+  return ctx.intent("finish", finishCancelledKey(ctx.key), {
     scenarioRunId: ctx.key,
     projectId: ctx.projectId,
     status: ScenarioRunStatus.CANCELLED,
@@ -416,7 +416,7 @@ function finishUnexecutable({
     state: { ...base, phase: "terminal" as const },
     nextWakeAt: null,
     intents: [
-      ctx.intents.finish(finishUnexecutableKey(ctx.key), {
+      ctx.intent("finish", finishUnexecutableKey(ctx.key), {
         scenarioRunId: ctx.key,
         projectId: ctx.projectId,
         status: ScenarioRunStatus.ERROR,
@@ -445,7 +445,7 @@ function wakeEvaluating(
     state: { ...state, phase: "terminal" as const, pendingEvaluators: null },
     nextWakeAt: null,
     intents: [
-      ctx.intents.record_evaluations(recordEvaluationsLostKey(ctx.key), {
+      ctx.intent("record_evaluations", recordEvaluationsLostKey(ctx.key), {
         scenarioRunId: ctx.key,
         projectId: ctx.projectId,
         evaluators: state.pendingEvaluators ?? [],

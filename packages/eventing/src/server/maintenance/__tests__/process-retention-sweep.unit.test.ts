@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { JsonValue } from "../../../process-manager/json.ts";
+import type { ProcessIntent } from "../../../process-manager/processManager.types.ts";
+import { intentAccessorOf } from "../../../services/__tests__/testHelpers.ts";
 import {
   type ProcessRetentionSweepDeps,
   runProcessRetentionSweep,
@@ -72,17 +75,18 @@ function payload(maxBatchesPerFamily = RETENTION_SWEEP_MAX_BATCHES_PER_WAKE) {
   return { scheduledFor: NOW, maxBatchesPerFamily };
 }
 
+function sweepIntent(messageKey: string, payload: JsonValue): ProcessIntent {
+  return { messageKey, intentType: "sweep", payload };
+}
+
 describe("processRetentionSweep", () => {
   describe("given a scheduled sweep process", () => {
     describe("when the schedule wakes it", () => {
       it("emits one sweep intent keyed on the tick it woke at", () => {
-        const sweep = vi.fn((key: string, intentPayload: unknown) => ({
-          key,
-          payload: intentPayload,
-        }));
+        const sweep = vi.fn(sweepIntent);
         const result = processRetentionSweepWake({ lastSweepAt: null, sweepsScheduled: 0 }, {
           at: NOW,
-          intents: { sweep },
+          intent: intentAccessorOf({ sweep }),
         } as never);
 
         expect(result.state).toEqual({ lastSweepAt: NOW, sweepsScheduled: 1 });
@@ -103,10 +107,10 @@ describe("processRetentionSweep", () => {
       });
 
       it("counts the wakes it has scheduled so the ramp survives a restart", () => {
-        const sweep = vi.fn(() => ({}));
+        const sweep = vi.fn(sweepIntent);
         const result = processRetentionSweepWake({ lastSweepAt: NOW - 1, sweepsScheduled: 3 }, {
           at: NOW,
-          intents: { sweep },
+          intent: intentAccessorOf({ sweep }),
         } as never);
 
         expect(result.state).toEqual({ lastSweepAt: NOW, sweepsScheduled: 4 });

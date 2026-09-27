@@ -1,6 +1,5 @@
 import {
   RECORD_TRIGGER_MATCH_COMMAND_TYPE,
-  REPORT_SCHEDULE_EVENT_TYPES,
   TRIGGER_MATCH_COALESCE_MAX_BATCH,
   TRIGGER_MATCH_RECORDED_EVENT_TYPE,
   triggerMatchRecordedEventDataSchema,
@@ -34,7 +33,15 @@ import {
   ResumeReportScheduleCommand,
   SettleReportRunCommand,
 } from "./report-schedule.commands.ts";
-import { reportScheduleEventSchemas, type ReportScheduleEvent } from "./report-schedule.events.ts";
+import {
+  reportScheduleEventSchemas,
+  type ReportScheduleEvent,
+  reportScheduleConfiguredEventSchema,
+  reportSchedulePausedEventSchema,
+  reportScheduleResumedEventSchema,
+  reportRunRequestedEventSchema,
+  reportRunSettledEventSchema,
+} from "./report-schedule.events.ts";
 import {
   REPORT_DISPATCH_MAX_ATTEMPTS,
   REPORT_SCHEDULE_INTENT_TYPES,
@@ -148,7 +155,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
           logOverflowIntentSchema,
           (payload, context) => deps.settlement.logOverflow(payload, context),
         )
-        .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
+        .on(triggerMatchRecordedEventSchema, (state, data, ctx) => {
           const { state: nextState, flushed, nextBoundary } = addPending(state, data, ctx.at);
           const flushedPersist = flushed.filter(({ match }) => match.actionClass === "persist");
           const flushedNotify = flushed.filter(({ match }) => match.actionClass !== "persist");
@@ -165,13 +172,14 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
                         settleWindowBucket: match.settleWindowBucket,
                       })),
                     }).map((page) =>
-                      ctx.intents.persistMatch(`persist:${page.pageKey}`, {
+                      ctx.intent("persistMatch", `persist:${page.pageKey}`, {
                         triggerId: ctx.key,
                         traceIds: page.traceIds,
                       }),
                     ),
                     ...flushedNotify.map(({ traceId, match }) =>
-                      ctx.intents.notifyDigest(
+                      ctx.intent(
+                        "notifyDigest",
                         `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
                         {
                           triggerId: ctx.key,
@@ -182,11 +190,15 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
                     ),
                     // Message key for outbox deduplication; keyed on trigger +
                     // minute to coalesce storms to one row per trigger per minute.
-                    ctx.intents.logOverflow(`overflow:${ctx.key}:${Math.floor(ctx.at / 60_000)}`, {
-                      triggerId: ctx.key,
-                      flushed: flushed.length,
-                      totalFlushed: nextState.overflowFlushed,
-                    }),
+                    ctx.intent(
+                      "logOverflow",
+                      `overflow:${ctx.key}:${Math.floor(ctx.at / 60_000)}`,
+                      {
+                        triggerId: ctx.key,
+                        flushed: flushed.length,
+                        totalFlushed: nextState.overflowFlushed,
+                      },
+                    ),
                   ]
                 : undefined,
             nextWakeAt: nextBoundary,
@@ -198,7 +210,8 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
             state: due.state,
             intents: [
               ...due.boundaries.map((boundary) =>
-                ctx.intents.notifyDigest(
+                ctx.intent(
+                  "notifyDigest",
                   `digest:${boundary.key}:${digestBatchKey(boundary.traceIds)}`,
                   {
                     triggerId: ctx.key,
@@ -208,7 +221,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
                 ),
               ),
               ...due.persistPages.map((page) =>
-                ctx.intents.persistMatch(`persist:${page.pageKey}`, {
+                ctx.intent("persistMatch", `persist:${page.pageKey}`, {
                   triggerId: ctx.key,
                   traceIds: page.traceIds,
                 }),
@@ -230,11 +243,11 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
           reportDispatchIntentSchema,
           runReportDispatch({ dispatcher: deps.reports, runs: deps.reportRuns }),
         )
-        .on(REPORT_SCHEDULE_EVENT_TYPES.CONFIGURED, reportScheduleConfigured)
-        .on(REPORT_SCHEDULE_EVENT_TYPES.PAUSED, reportSchedulePaused)
-        .on(REPORT_SCHEDULE_EVENT_TYPES.RESUMED, reportScheduleResumed)
-        .on(REPORT_SCHEDULE_EVENT_TYPES.RUN_REQUESTED, reportRunRequested)
-        .on(REPORT_SCHEDULE_EVENT_TYPES.RUN_SETTLED, reportRunSettled)
+        .on(reportScheduleConfiguredEventSchema, reportScheduleConfigured)
+        .on(reportSchedulePausedEventSchema, reportSchedulePaused)
+        .on(reportScheduleResumedEventSchema, reportScheduleResumed)
+        .on(reportRunRequestedEventSchema, reportRunRequested)
+        .on(reportRunSettledEventSchema, reportRunSettled)
         .onWake(reportScheduleWake)
         .outbox({ maxAttempts: REPORT_DISPATCH_MAX_ATTEMPTS, leaseDurationMs: 300_000 }),
     )

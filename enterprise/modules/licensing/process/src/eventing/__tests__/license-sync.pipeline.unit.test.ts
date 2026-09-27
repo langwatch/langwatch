@@ -1,5 +1,7 @@
 /** Spec: specs/self-hosting/connected-services/license-sync.feature */
 import { InMemoryProcessStore } from "@langwatch/eventing";
+import type { JsonValue } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import { licensingServer } from "../../licensing.server.ts";
@@ -19,14 +21,20 @@ const BOOTED_AT = 1_700_000_000_000;
 const MINUTE_MS = 60 * 1000;
 
 function wakeAt({ at, lastSyncAt }: { at: number; lastSyncAt: number | null }) {
-  const sync = vi.fn((messageKey: string, payload: { scheduledFor: number }) => ({
+  const sync = vi.fn((messageKey: string, payload: JsonValue) => ({
     messageKey,
     intentType: "sync",
     payload,
   }));
   const evolution = licenseSyncWake({ bootedAt: BOOTED_AT })(
     { lastSyncAt },
-    { at, now: at, key: LICENSE_SYNC_PROCESS_NAME, projectId: "__global__", intents: { sync } },
+    {
+      at,
+      now: at,
+      key: LICENSE_SYNC_PROCESS_NAME,
+      projectId: "__global__",
+      intent: intentAccessorOf({ sync }),
+    },
   );
   return { evolution, sync };
 }

@@ -1,6 +1,7 @@
 /** @vitest-environment node */
 
 import type { ProcessHandlerContext } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import { runCompleteTeardown } from "../connection-teardown.intent.ts";
@@ -24,13 +25,13 @@ function context(at: number): ProcessHandlerContext<ConnectionTeardownIntents> {
     now: at,
     key: CONNECTION,
     projectId: ORG,
-    intents: {
+    intent: intentAccessorOf({
       completeTeardown: (key, payload) => ({
         messageKey: key,
         intentType: "completeTeardown",
         payload,
       }),
-    },
+    }),
   };
 }
 

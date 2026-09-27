@@ -1,3 +1,4 @@
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 /**
  * The daily report's schedule: hourly wakes, one report after each 12:00 UTC.
  * Spec: specs/self-hosting/connected-services/usage-report.feature
@@ -17,9 +18,9 @@ function wake(state: UsageReportScheduleState, iso: string) {
     now: moment,
     key: USAGE_REPORT_PROCESS_NAME,
     projectId: "__global__",
-    intents: {
+    intent: intentAccessorOf({
       send: (messageKey, payload) => ({ messageKey, intentType: "send", payload }),
-    },
+    }),
   });
 }
 

@@ -122,7 +122,7 @@ function notificationIntent({
   ctx: LifecycleContext;
 }) {
   const joinRequestId = state.joinRequestId ?? ctx.key;
-  return ctx.intents.prepareNotification(`join-notification:${joinRequestId}:${kind}`, {
+  return ctx.intent("prepareNotification", `join-notification:${joinRequestId}:${kind}`, {
     kind,
     notificationId: `join:${joinRequestId}:${kind}`,
     joinRequestId,
@@ -250,7 +250,7 @@ export const joinRequestLifecycleWake: WakeHandler<
       state,
       nextWakeAt: null,
       intents: [
-        ctx.intents.expireRequest(`join-expire:${expiresAtMs}`, {
+        ctx.intent("expireRequest", `join-expire:${expiresAtMs}`, {
           joinRequestId: ctx.key,
           organizationId: ctx.projectId,
           scheduledFor: expiresAtMs,
@@ -267,7 +267,7 @@ export const joinRequestLifecycleWake: WakeHandler<
     state: { ...state, remindedAt: ctx.at },
     nextWakeAt: expiresAtMs,
     intents: [
-      ctx.intents.remindAdmins(`join-remind:${state.remindAtMs ?? ctx.at}`, {
+      ctx.intent("remindAdmins", `join-remind:${state.remindAtMs ?? ctx.at}`, {
         joinRequestId: ctx.key,
         organizationId: ctx.projectId,
         ...(state.requesterUserId ? { requesterUserId: state.requesterUserId } : {}),

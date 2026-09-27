@@ -3,9 +3,9 @@ import {
   backoffDelayMs,
   isSimulationRunFinishedEvent,
   SCENARIO_EVALUATIONS_JOB,
-  SIMULATION_RUN_EVENT_TYPES,
   UNGRADED_RUN_STATUSES,
   type SimulationProcessingEvent,
+  SimulationRunFinishedEventSchema,
 } from "@langwatch/scenario-contract";
 import { extractSuiteId } from "@langwatch/suite-contract";
 import { z } from "zod";
@@ -80,7 +80,7 @@ export const handleRunFinishedForGrading: EventHandler<
   return {
     state: { gradingQueued: true },
     intents: [
-      ctx.intents.grade("grade", {
+      ctx.intent("grade", "grade", {
         tenantId: ctx.projectId,
         scenarioRunId: ctx.key,
         scenarioId: view.scenarioId,
@@ -102,8 +102,8 @@ export function scenarioEvaluationsPM(
     pm
       .state(scenarioEvaluationsProcessStateSchema, INITIAL_SCENARIO_EVALUATIONS_STATE)
       .intent("grade", gradeRunIntentSchema, createGradeRunHandler(deps))
-      .on(SIMULATION_RUN_EVENT_TYPES.FINISHED, handleRunFinishedForGrading)
-      .toPayload(finishedRunViewOf)
+      .toPayload(finishedRunViewSchema, finishedRunViewOf)
+      .on(SimulationRunFinishedEventSchema, handleRunFinishedForGrading)
       .outbox({
         maxAttempts: SCENARIO_EVALUATIONS_JOB.MAX_ATTEMPTS,
         retryDelayMs: ({ attempt }) => backoffDelayMs(attempt),

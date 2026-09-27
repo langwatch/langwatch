@@ -33,5 +33,5 @@ export const gatewayRealtimeSessionReconcileWake: WakeHandler<
   GatewayRealtimeSessionReconcileIntents
 > = (_state, ctx) => ({
   state: { lastReconcileAt: ctx.at },
-  intents: [ctx.intents.reconcile(`reconcile:${ctx.at}`, { scheduledFor: ctx.at })],
+  intents: [ctx.intent("reconcile", `reconcile:${ctx.at}`, { scheduledFor: ctx.at })],
 });

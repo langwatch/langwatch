@@ -44,7 +44,7 @@ export const spendSettlementWake: WakeHandler<SpendSettlementState, SpendSettlem
   ctx,
 ) => ({
   state: { ...state, lastSweepAt: ctx.at },
-  intents: [ctx.intents.sweep(`sweep:${ctx.at}`, { scheduledFor: ctx.at })],
+  intents: [ctx.intent("sweep", `sweep:${ctx.at}`, { scheduledFor: ctx.at })],
 });
 
 /**

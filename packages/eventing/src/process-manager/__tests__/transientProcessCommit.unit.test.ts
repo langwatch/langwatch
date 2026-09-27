@@ -3,8 +3,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import type { Event } from "../../domain/types.ts";
 import { buildProcessManager } from "../../pipeline/processBuilder.ts";
+import type {
+  IntentSpec,
+  ProcessEvolution,
+  ProcessHandlerContext,
+} from "../../pipeline/processManagerDefinition.ts";
+import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 import type { ProcessDefinition, ProcessEventEnvelope } from "../processManager.types.ts";
 import { ProcessManagerService } from "../processManagerService.ts";
 import { buildProcessDefinition } from "../processRuntime.ts";
@@ -16,12 +21,19 @@ const PROJECT = "project-1";
  *  rather than declaring event types the pipeline schema does not know. */
 const PROBE_EVENT = "test.integration.event";
 
+const probeEventSchema = testEventSchema(
+  PROBE_EVENT,
+  z.object({ id: z.string(), mode: z.enum(["note", "remember"]) }),
+);
 type ProbeMode = "note" | "remember";
 
 const probeStateSchema = z.object({ remembered: z.string().nullable() });
 type ProbeState = z.infer<typeof probeStateSchema>;
 
 const INITIAL: ProbeState = { remembered: null };
+
+const actIntentSchema = z.object({ id: z.string() });
+type ProbeIntents = { act: IntentSpec<typeof actIntentSchema> };
 
 /**
  * A process with both shapes on purpose: `note` emits an intent and keeps
@@ -32,19 +44,17 @@ function buildProbe(
   handle: (
     state: ProbeState,
     data: { id: string; mode: ProbeMode },
-    ctx: {
-      intents: { act: (key: string, payload: { id: string }) => unknown };
-    },
-  ) => { state: ProbeState; intents?: unknown[] } = probeHandler,
+    ctx: ProcessHandlerContext<ProbeIntents>,
+  ) => ProcessEvolution<ProbeState> = probeHandler,
 ): ProcessDefinition<ProbeState> {
   return buildProcessDefinition(
-    buildProcessManager<Event>({
+    buildProcessManager<z.infer<typeof probeEventSchema>>({
       name: PROCESS_NAME,
       applier: (pm) =>
         pm
           .state(probeStateSchema, INITIAL)
-          .intent("act", z.object({ id: z.string() }), async () => undefined)
-          .on(PROBE_EVENT, handle as never)
+          .intent("act", actIntentSchema, async () => undefined)
+          .on(probeEventSchema, handle)
           .transient(),
     }).config,
   ) as ProcessDefinition<ProbeState>;
@@ -53,10 +63,10 @@ function buildProbe(
 function probeHandler(
   state: ProbeState,
   data: { id: string; mode: ProbeMode },
-  ctx: { intents: { act: (key: string, payload: { id: string }) => unknown } },
-): { state: ProbeState; intents?: unknown[] } {
+  ctx: ProcessHandlerContext<ProbeIntents>,
+): ProcessEvolution<ProbeState> {
   if (data.mode === "remember") return { state: { remembered: data.id } };
-  return { state, intents: [ctx.intents.act("act:noted", { id: data.id })] };
+  return { state, intents: [ctx.intent("act", "act:noted", { id: data.id })] };
 }
 
 let store: InMemoryProcessStore;
@@ -188,7 +198,7 @@ describe("transient process commits", () => {
         definition: buildProbe((state, data, ctx) => ({
           state,
           intents: state.remembered
-            ? [ctx.intents.act(`act:${state.remembered}`, { id: data.id })]
+            ? [ctx.intent("act", `act:${state.remembered}`, { id: data.id })]
             : [],
         })),
       });
@@ -215,15 +225,15 @@ describe("transient process commits", () => {
     /** @scenario A transient process cannot be scheduled */
     it("refuses to build", () => {
       expect(() =>
-        buildProcessManager<Event>({
+        buildProcessManager<z.infer<typeof probeEventSchema>>({
           name: PROCESS_NAME,
           applier: (pm) =>
             pm
               .state(probeStateSchema, INITIAL)
               .intent("act", z.object({ id: z.string() }), async () => undefined)
-              .on(PROBE_EVENT, (state) => ({ state }))
+              .on(probeEventSchema, (state) => ({ state }))
               .transient()
-              .schedule({ everyMs: 1_000 }) as never,
+              .schedule({ everyMs: 1_000 }),
         }),
       ).toThrow(/transient and scheduled/);
     });

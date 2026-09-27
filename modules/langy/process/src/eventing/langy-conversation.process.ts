@@ -18,6 +18,24 @@ import {
 } from "./langy-conversation-process.schemas.ts";
 import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
 import {
+  LangyAgentTurnAcceptedEventSchema,
+  LangyAgentRespondedEventSchema,
+  LangyAgentResponseFailedEventSchema,
+  LangyConversationArchivedEventSchema,
+  LangyConversationMetadataUpdatedEventSchema,
+  LangyConversationTitleGeneratedEventSchema,
+  LangyConversationHandoffPendingEventSchema,
+  LangyConversationHandoffConsumedEventSchema,
+  LangyConversationStartedEventSchema,
+  LangyConversationForkedEventSchema,
+  LangyMessageRecordedEventSchema,
+  LangyMessageImportedEventSchema,
+  LangyToolCallInitiatedEventSchema,
+  LangyToolCallSucceededEventSchema,
+  LangyToolCallFailedEventSchema,
+  LangyPlanUpdatedEventSchema,
+} from "./langy-conversation-state.projection.ts";
+import {
   createLangyGenerateTitleIntent,
   createLangyWorkerDispatchIntent,
 } from "./langy-conversation.intent.ts";
@@ -88,7 +106,7 @@ export const handleAgentTurnAccepted: LangyHandler = (state, payload, ctx) => {
   return {
     state: { ...state, currentTurnId: view.turnId, turnStatus: "running" },
     intents: [
-      ctx.intents[LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH](`dispatch:${view.turnId}`, {
+      ctx.intent(LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH, `dispatch:${view.turnId}`, {
         conversationId: ctx.key,
         turnId: view.turnId,
         resumeFromTurnId: state.pendingHandoffTurnId,
@@ -113,7 +131,7 @@ export const handleAgentResponded: LangyHandler = (state, payload, ctx) => {
     },
     intents: generateTitle
       ? [
-          ctx.intents[LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE](`title:${view.turnId}`, {
+          ctx.intent(LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE, `title:${view.turnId}`, {
             conversationId: ctx.key,
             turnId: view.turnId,
           }),
@@ -199,23 +217,23 @@ export function langyConversationProcess(
         langyGenerateTitleIntentSchema,
         createLangyGenerateTitleIntent(ports),
       )
-      .toPayload(buildLangyProcessEventView)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED, handleAgentTurnAccepted)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED, handleAgentResponded)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED, handleAgentResponseFailed)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED, handleArchived)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED, handleMetadataUpdated)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED, handleTitleGenerated)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING, handleHandoffPending)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED, handleHandoffConsumed)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED, handleConversationStarted)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_IMPORTED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED, handleNoDecision)
+      .toPayload(langyProcessEventViewSchema, buildLangyProcessEventView)
+      .on(LangyAgentTurnAcceptedEventSchema, handleAgentTurnAccepted)
+      .on(LangyAgentRespondedEventSchema, handleAgentResponded)
+      .on(LangyAgentResponseFailedEventSchema, handleAgentResponseFailed)
+      .on(LangyConversationArchivedEventSchema, handleArchived)
+      .on(LangyConversationMetadataUpdatedEventSchema, handleMetadataUpdated)
+      .on(LangyConversationTitleGeneratedEventSchema, handleTitleGenerated)
+      .on(LangyConversationHandoffPendingEventSchema, handleHandoffPending)
+      .on(LangyConversationHandoffConsumedEventSchema, handleHandoffConsumed)
+      .on(LangyConversationStartedEventSchema, handleConversationStarted)
+      .on(LangyConversationForkedEventSchema, handleNoDecision)
+      .on(LangyMessageRecordedEventSchema, handleNoDecision)
+      .on(LangyMessageImportedEventSchema, handleNoDecision)
+      .on(LangyToolCallInitiatedEventSchema, handleNoDecision)
+      .on(LangyToolCallSucceededEventSchema, handleNoDecision)
+      .on(LangyToolCallFailedEventSchema, handleNoDecision)
+      .on(LangyPlanUpdatedEventSchema, handleNoDecision)
       // The lease MUST outlive the slowest accepted dispatch, or a healthy
       // long-running turn loses its lease mid-flight and a second instance
       // re-delivers it concurrently (the completing handler is then fenced out

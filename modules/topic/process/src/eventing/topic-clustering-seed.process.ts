@@ -31,7 +31,7 @@ export const topicClusteringSeedWake: WakeHandler<
 > = (_state, ctx) => ({
   state: { lastSeededAt: ctx.at },
   intents: [
-    ctx.intents.seedTopicModels(`topics:${ctx.at}`, { scheduledFor: ctx.at }),
-    ctx.intents.seedSchedules(`schedules:${ctx.at}`, { scheduledFor: ctx.at }),
+    ctx.intent("seedTopicModels", `topics:${ctx.at}`, { scheduledFor: ctx.at }),
+    ctx.intent("seedSchedules", `schedules:${ctx.at}`, { scheduledFor: ctx.at }),
   ],
 });

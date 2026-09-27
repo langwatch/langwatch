@@ -1,6 +1,6 @@
 import {
-  GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE,
-  GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
+  governanceVkLifecycleEventSchema,
+  governanceBudgetCrossingEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import type { ProcessManagerApplier } from "@langwatch/eventing";
 import { Temporal } from "@langwatch/time";
@@ -100,12 +100,12 @@ export class GovernanceEventDeliveryProcess {
         .intent("sendBatch", governanceSendBatchSchema, (payload, context) =>
           this.intent.sendBatch(payload, context),
         )
-        .on(GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE, (state, data, context) => {
+        .on(governanceVkLifecycleEventSchema, (state, data, context) => {
           const envelope = GovernanceEventDeliveryProcess.vkLifecycleEnvelope(data);
           return {
             state,
             intents: [
-              context.intents.deliverGovernance(`deliver:${envelope.id}`, {
+              context.intent("deliverGovernance", `deliver:${envelope.id}`, {
                 organization_id: data.organization_id,
                 project_id: context.projectId,
                 event_type: envelope.type,
@@ -114,12 +114,12 @@ export class GovernanceEventDeliveryProcess {
             ],
           };
         })
-        .on(GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE, (state, data, context) => {
+        .on(governanceBudgetCrossingEventSchema, (state, data, context) => {
           const envelope = GovernanceEventDeliveryProcess.budgetCrossingEnvelope(data);
           return {
             state,
             intents: [
-              context.intents.deliverGovernance(`deliver:${envelope.id}`, {
+              context.intent("deliverGovernance", `deliver:${envelope.id}`, {
                 organization_id: data.organization_id,
                 project_id: context.projectId,
                 event_type: envelope.type,

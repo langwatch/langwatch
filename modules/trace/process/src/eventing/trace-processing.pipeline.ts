@@ -14,6 +14,8 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
   type TraceProcessingEvent,
   type TraceSummaryData,
+  spanReceivedEventSchema,
+  originResolvedEventSchema,
 } from "@langwatch/trace-contract";
 
 import type { TraceApp } from "../app/trace.app.ts";
@@ -99,8 +101,8 @@ export function buildTraceProcessingConsumer(
         .intent("resolveDeferredOrigin", resolveDeferredOriginIntentSchema, (payload) =>
           reactions.resolveDeferredOrigin(payload),
         )
-        .on(SPAN_RECEIVED_EVENT_TYPE, onSpanReceivedArmOrigin)
-        .on(ORIGIN_RESOLVED_EVENT_TYPE, onOriginResolvedDisarm)
+        .on(spanReceivedEventSchema, onSpanReceivedArmOrigin)
+        .on(originResolvedEventSchema, onOriginResolvedDisarm)
         .onWake(deferredOriginWake),
     )
     .withProjectionSubscriber(reactions.evaluationTrigger.name, reactions.evaluationTrigger.spec)

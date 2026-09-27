@@ -3,15 +3,19 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { createTenantId } from "../../domain/tenantId.ts";
-import type { Event } from "../../domain/types.ts";
 import { buildProcessManager } from "../../pipeline/processBuilder.ts";
+import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 import { ProcessRuntime, SCHEDULED_SINGLETON_PROJECT_ID } from "../processRuntime.ts";
 import { InMemoryProcessStore } from "../stores/inMemoryProcessStore.ts";
 import type { ProcessStore } from "../stores/processStore.types.ts";
 
 const tenantId = createTenantId("project-1");
 const TEST_PROCESS_EVENT_TYPE = "test.process.triggered";
-type ProcessTestEvent = Event<{ traceId: string }>;
+const testProcessEventSchema = testEventSchema(
+  TEST_PROCESS_EVENT_TYPE,
+  z.object({ traceId: z.string() }),
+);
+type ProcessTestEvent = z.infer<typeof testProcessEventSchema>;
 
 /** A store stub that never has a persisted instance and always reports the
  * given commit outcome — used to force outcomes InMemoryProcessStore cannot
@@ -80,7 +84,7 @@ describe("ProcessRuntime", () => {
             .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
             .keyBy((event) => event.data.traceId)
-            .on(TEST_PROCESS_EVENT_TYPE, (state) => ({
+            .on(testProcessEventSchema, (state) => ({
               state: { count: state.count + 1 },
             })),
       });
@@ -127,7 +131,7 @@ describe("ProcessRuntime", () => {
             .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
             .keyBy((event) => `trace:${event.data.traceId}`)
-            .on(TEST_PROCESS_EVENT_TYPE, (state) => ({
+            .on(testProcessEventSchema, (state) => ({
               state: { count: state.count + 1 },
             })),
       });
@@ -170,7 +174,7 @@ describe("ProcessRuntime", () => {
           pm
             .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
-            .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state })),
+            .on(testProcessEventSchema, (state) => ({ state })),
       });
 
       const [subscriber] = runtime.registerPipeline<ProcessTestEvent>({
@@ -192,7 +196,7 @@ describe("ProcessRuntime", () => {
           pm
             .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
-            .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state }))
+            .on(testProcessEventSchema, (state) => ({ state }))
             .onSignal(
               "increment",
               z.object({ by: z.number().int().positive() }),
@@ -266,7 +270,7 @@ describe("ProcessRuntime", () => {
           pm
             .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
-            .on(TEST_PROCESS_EVENT_TYPE, (state) => ({
+            .on(testProcessEventSchema, (state) => ({
               state: { count: state.count + 1 },
             })),
       });
@@ -310,7 +314,7 @@ describe("ProcessRuntime", () => {
           pm
             .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
-            .on(TEST_PROCESS_EVENT_TYPE, (state) => ({
+            .on(testProcessEventSchema, (state) => ({
               state: { count: state.count + 1 },
             })),
       });
@@ -342,7 +346,7 @@ describe("ProcessRuntime", () => {
           pm
             .state(z.object({ count: z.number() }), { count: 0 })
             .intent("noop", z.object({}), async () => {})
-            .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state })),
+            .on(testProcessEventSchema, (state) => ({ state })),
       });
 
       runtime.registerPipeline<ProcessTestEvent>({

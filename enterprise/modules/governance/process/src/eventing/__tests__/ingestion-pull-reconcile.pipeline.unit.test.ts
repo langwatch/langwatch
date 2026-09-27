@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { JsonValue } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -15,7 +17,7 @@ import { ingestionPullReconcileWake } from "../ingestion-pull-reconcile.process.
 const BOOTED_AT = 1_700_000_000_000;
 
 function wakeAt({ at, lastReconciledAt }: { at: number; lastReconciledAt: number | null }) {
-  const reconcile = vi.fn((messageKey: string, payload: { scheduledFor: number }) => ({
+  const reconcile = vi.fn((messageKey: string, payload: JsonValue) => ({
     messageKey,
     intentType: "reconcile",
     payload,
@@ -27,7 +29,7 @@ function wakeAt({ at, lastReconciledAt }: { at: number; lastReconciledAt: number
       now: at,
       key: INGESTION_PULL_RECONCILE_PROCESS_NAME,
       projectId: "__global__",
-      intents: { reconcile },
+      intent: intentAccessorOf({ reconcile }),
     },
   );
   return { evolution, reconcile };

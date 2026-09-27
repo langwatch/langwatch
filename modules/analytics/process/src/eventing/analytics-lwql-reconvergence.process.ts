@@ -65,7 +65,7 @@ export function lwqlReconvergenceWake({
     return {
       state: { bootedAt, nextAt: at + delayMs, delayMs, elapsedMs, gaveUp },
       intents: [
-        ctx.intents.reconverge(`reconverge:${bootedAt}:${elapsedMs}`, {
+        ctx.intent("reconverge", `reconverge:${bootedAt}:${elapsedMs}`, {
           scheduledFor: at,
           final: gaveUp,
         }),

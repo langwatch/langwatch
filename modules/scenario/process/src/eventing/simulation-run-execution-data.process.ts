@@ -6,7 +6,7 @@ export const SIMULATION_RUN_EXECUTION_PROCESS_NAME = "simulation_run_execution" 
 
 /**
  * The intents this process may emit. Property-style like the other
- * builder-mounted domains (`ctx.intents.execute(...)`); outbox rows scope
+ * builder-mounted domains (`ctx.intent("execute", ...)`); outbox rows scope
  * intentType by processName, so the short names stay unambiguous.
  */
 export const SIMULATION_RUN_EXECUTION_INTENT_TYPES = {

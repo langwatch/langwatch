@@ -132,7 +132,7 @@ export const reportRunRequested: Handler<ReportRunRequestedEventData> = (state, 
     },
     after,
     intents: [
-      context.intents.dispatchReport(`run:${data.requestId}`, {
+      context.intent("dispatchReport", `run:${data.requestId}`, {
         triggerId: data.triggerId,
         slot: context.at,
         requestId: data.requestId,
@@ -166,7 +166,7 @@ export const reportScheduleWake: WakeHandler<ReportScheduleState, ReportSchedule
     },
     after,
     intents: [
-      context.intents.dispatchReport(`report:${context.at}`, {
+      context.intent("dispatchReport", `report:${context.at}`, {
         triggerId: state.triggerId,
         slot: context.at,
         requestId,

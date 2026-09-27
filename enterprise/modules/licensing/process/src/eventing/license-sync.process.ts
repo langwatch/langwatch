@@ -43,7 +43,7 @@ export function licenseSyncWake({
     if (!settled || (syncedSinceBoot && !dayElapsed)) return { state };
     return {
       state: { lastSyncAt: at },
-      intents: [ctx.intents.sync(`sync:${at}`, { scheduledFor: at })],
+      intents: [ctx.intent("sync", `sync:${at}`, { scheduledFor: at })],
     };
   };
 }

@@ -118,7 +118,7 @@ export const processRetentionSweepWake: WakeHandler<
   return {
     state: { lastSweepAt: ctx.at, sweepsScheduled: priorWakes + 1 },
     intents: [
-      ctx.intents.sweep(`sweep:${ctx.at}`, {
+      ctx.intent("sweep", `sweep:${ctx.at}`, {
         scheduledFor: ctx.at,
         maxBatchesPerFamily: retentionSweepBatchBudget(priorWakes),
       }),

@@ -1,5 +1,6 @@
 /** Spec: modules/ops/specs/event-queue-anomaly-detection.feature */
 import { InMemoryProcessStore } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import type { Anomaly } from "@langwatch/ops-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -72,9 +73,9 @@ function wake(at: number) {
       now: at,
       key: ANOMALY_DETECTION_PROCESS_NAME,
       projectId: "__global__",
-      intents: {
+      intent: intentAccessorOf({
         detect: (messageKey, payload) => ({ messageKey, intentType: "detect", payload }),
-      },
+      }),
     },
   );
 }

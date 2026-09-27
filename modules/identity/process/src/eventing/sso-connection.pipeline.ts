@@ -3,7 +3,7 @@ import {
   definePipeline,
   type EventSourcing,
   type IntentSpec,
-  type ProcessManagerHandledStage,
+  type ProcessManagerStage,
   type ProcessManagerInitialStage,
   type Projection,
   type RegisteredCommand,
@@ -13,11 +13,7 @@ import {
   type EventingSetup,
 } from "@langwatch/eventing";
 import {
-  CONNECTION_TORN_DOWN_EVENT_TYPE,
-  DOMAIN_PROOF_LAPSED_EVENT_TYPE,
-  DOMAIN_PROOF_WAVERED_EVENT_TYPE,
   MIGRATION_FINALIZED_EVENT_TYPE,
-  TEARDOWN_REQUESTED_EVENT_TYPE,
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
@@ -366,7 +362,7 @@ export function defineSsoConnectionPipeline(
 function mountTeardownGrace(
   pm: ProcessManagerInitialStage<SsoConnectionEvent>,
   teardown: ConnectionTeardown,
-): ProcessManagerHandledStage<
+): ProcessManagerStage<
   SsoConnectionEvent,
   ConnectionTeardownState,
   Record<string, IntentSpec<ZodType>>
@@ -378,8 +374,8 @@ function mountTeardownGrace(
       completeTeardownIntentSchema,
       runCompleteTeardown({ port: teardown }),
     )
-    .on(TEARDOWN_REQUESTED_EVENT_TYPE, onTeardownRequested)
-    .on(CONNECTION_TORN_DOWN_EVENT_TYPE, onTornDown)
+    .on(teardownRequestedEventSchema, onTeardownRequested)
+    .on(connectionTornDownEventSchema, onTornDown)
     .onWake(connectionTeardownWake);
 }
 
@@ -391,7 +387,7 @@ function mountTeardownGrace(
 function mountDomainProofNotification(
   pm: ProcessManagerInitialStage<SsoConnectionEvent>,
   notifications: SsoDomainProofNotifications,
-): ProcessManagerHandledStage<
+): ProcessManagerStage<
   SsoConnectionEvent,
   SsoDomainProofNotificationState,
   Record<string, IntentSpec<ZodType>>
@@ -404,8 +400,8 @@ function mountDomainProofNotification(
       runNotifyProofWavering({ notifications }),
     )
     .intent("notifyLapsed", notifyProofLapsedIntentSchema, runNotifyProofLapsed({ notifications }))
-    .on(DOMAIN_PROOF_WAVERED_EVENT_TYPE, onDomainProofWavered)
-    .on(DOMAIN_PROOF_LAPSED_EVENT_TYPE, onDomainProofLapsed)
+    .on(domainProofWaveredEventSchema, onDomainProofWavered)
+    .on(domainProofLapsedEventSchema, onDomainProofLapsed)
     .transient();
 }
 

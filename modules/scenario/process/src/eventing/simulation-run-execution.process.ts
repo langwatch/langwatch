@@ -1,9 +1,17 @@
 import type { ProcessManagerApplier } from "@langwatch/eventing";
 import {
   type ScenarioExecutionService,
-  SIMULATION_RUN_EVENT_TYPES,
   type SimulationService,
   type SimulationProcessingEvent,
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationMessageSnapshotEventSchema,
+  SimulationTextMessageStartEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationRunCancelRequestedEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunEvaluatedEventSchema,
+  SimulationRunDeletedEventSchema,
 } from "@langwatch/scenario-contract";
 
 import {
@@ -14,6 +22,7 @@ import {
   simulationRunExecutionProcessStateSchema,
   recordEvaluationsIntentSchema,
   SIMULATION_RUN_EXECUTION_INTENT_TYPES,
+  simulationRunProcessEventViewSchema,
 } from "./simulation-run-execution-data.process.ts";
 import {
   handleCancelRequested,
@@ -104,17 +113,19 @@ export function simulationRunExecutionPM(
         recordEvaluationsIntentSchema,
         createRecordEvaluationsHandler(simulations, resolveEvaluatorNames),
       )
-      .on(SIMULATION_RUN_EVENT_TYPES.QUEUED, handleRunQueued)
-      .on(SIMULATION_RUN_EVENT_TYPES.STARTED, handleRunActivity)
-      .on(SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT, handleRunActivity)
-      .on(SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_START, handleRunActivity)
-      .on(SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END, handleRunActivity)
-      .on(SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED, handleCancelRequested)
-      .on(SIMULATION_RUN_EVENT_TYPES.FINISHED, handleRunFinished)
-      .on(SIMULATION_RUN_EVENT_TYPES.EVALUATED, handleRunEvaluated)
-      .on(SIMULATION_RUN_EVENT_TYPES.DELETED, handleTerminal)
+      .toPayload(simulationRunProcessEventViewSchema, (...args) =>
+        buildSimulationRunEventView(...args),
+      )
+      .on(SimulationRunQueuedEventSchema, handleRunQueued)
+      .on(SimulationRunStartedEventSchema, handleRunActivity)
+      .on(SimulationMessageSnapshotEventSchema, handleRunActivity)
+      .on(SimulationTextMessageStartEventSchema, handleRunActivity)
+      .on(SimulationTextMessageEndEventSchema, handleRunActivity)
+      .on(SimulationRunCancelRequestedEventSchema, handleCancelRequested)
+      .on(SimulationRunFinishedEventSchema, handleRunFinished)
+      .on(SimulationRunEvaluatedEventSchema, handleRunEvaluated)
+      .on(SimulationRunDeletedEventSchema, handleTerminal)
       .onWake(simulationRunExecutionWake)
-      .toPayload((...args) => buildSimulationRunEventView(...args))
       .outbox({
         // The execute intent is the run's only dispatch path: give it more
         // attempts than the generic default so a pod without a pool (or a

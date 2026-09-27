@@ -44,7 +44,7 @@ function createProcessPipelineDefinition() {
       process
         .state(z.object({ handled: z.number() }), { handled: 0 })
         .keyBy(() => "test-process")
-        .on("test.event", (state) => ({
+        .on(pipelineEventSchema, (state) => ({
           state: { handled: state.handled + 1 },
         })),
     )

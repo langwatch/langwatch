@@ -1156,6 +1156,8 @@ eventing `ScheduledJob` scheduler is retired, its table dropped a release after 
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
+A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
+registers with `.on(eventSchema, handler)` (or reads its `.toPayload(schema, map)` view); no cast (Alex, 2026-09-27).
 repositories. The process builds, registers and connects them one at a time in
 the order declared, so a later pipeline's `build` may read senders an earlier
 one's `connect` handed the app. Each still follows the role table below — the

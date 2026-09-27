@@ -1,5 +1,5 @@
 import {
-  buildIntentFactories,
+  buildIntentAccessor,
   InMemoryProcessStore,
   type ProcessEvolution,
 } from "@langwatch/eventing";
@@ -39,7 +39,7 @@ type Handler<Data> = (
 /** Each sender runs its event's real handler and commits the result, as the worker would. */
 function processBackedSchedules(triggers: MemoryTriggerRepository) {
   const store = InMemoryProcessStore.createForTesting();
-  const intents = buildIntentFactories({
+  const intent = buildIntentAccessor({
     dispatchReport: { schema: reportDispatchIntentSchema, run: async () => {} },
   });
   const sent: string[] = [];
@@ -57,7 +57,7 @@ function processBackedSchedules(triggers: MemoryTriggerRepository) {
         now: payload.occurredAt,
         key: payload.triggerId,
         projectId: payload.tenantId,
-        intents,
+        intent,
       });
       await store.commit({
         ref,

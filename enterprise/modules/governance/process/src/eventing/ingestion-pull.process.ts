@@ -1,9 +1,18 @@
 import {
-  INGESTION_PULL_EVENT_TYPES,
   isValidPullSchedule,
   type IngestionPullConfiguredEventData,
   type IngestionPullProcessingEvent,
   type IngestionPullRunFailedEventData,
+  ingestionPullConfiguredEventSchema,
+  ingestionPullDisabledEventSchema,
+  ingestionPullRunCompletedEventSchema,
+  ingestionPullRunFailedEventSchema,
+  ingestionPullAgentsListingRequestedEventSchema,
+  ingestionPullAgentsListedEventSchema,
+  ingestionPullAgentsListingRefusedEventSchema,
+  ingestionPullPeopleListingRequestedEventSchema,
+  ingestionPullPeopleListedEventSchema,
+  ingestionPullPeopleListingRefusedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import type {
   Event,
@@ -122,10 +131,10 @@ export class IngestionPullProcess {
           ingestionPullListingIntentSchema,
           (payload, context) => this.listing.listPeople(payload, context),
         )
-        .on(INGESTION_PULL_EVENT_TYPES.CONFIGURED, (state, data, context) =>
+        .on(ingestionPullConfiguredEventSchema, (state, data, context) =>
           this.configured({ state, data, context }),
         )
-        .on(INGESTION_PULL_EVENT_TYPES.DISABLED, (state, data) => ({
+        .on(ingestionPullDisabledEventSchema, (state, data) => ({
           state: {
             ...state,
             sourceId: data.sourceId,
@@ -138,7 +147,7 @@ export class IngestionPullProcess {
           nextWakeAt: null,
           intents: [],
         }))
-        .on(INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED, (state, data, context) => {
+        .on(ingestionPullRunCompletedEventSchema, (state, data, context) => {
           const current = state.currentRun?.runId === data.runId;
           return this.settle({
             state: {
@@ -149,20 +158,20 @@ export class IngestionPullProcess {
             after: this.schedulingReference(context),
           });
         })
-        .on(INGESTION_PULL_EVENT_TYPES.RUN_FAILED, (state, data, context) =>
+        .on(ingestionPullRunFailedEventSchema, (state, data, context) =>
           this.runFailed({ state, data, context }),
         )
-        .on(INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED, (state, data, context) =>
+        .on(ingestionPullAgentsListingRequestedEventSchema, (state, data, context) =>
           this.listingRequested({
             state,
             request: data,
             context,
             slot: "currentAgentsListing",
             dispatch: (listing) =>
-              context.intents.listAgents(`agents:${listing.requestId}`, listing),
+              context.intent("listAgents", `agents:${listing.requestId}`, listing),
           }),
         )
-        .on(INGESTION_PULL_EVENT_TYPES.AGENTS_LISTED, (state, data, context) =>
+        .on(ingestionPullAgentsListedEventSchema, (state, data, context) =>
           this.listingSettled({
             state,
             requestId: data.requestId,
@@ -170,7 +179,7 @@ export class IngestionPullProcess {
             context,
           }),
         )
-        .on(INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REFUSED, (state, data, context) =>
+        .on(ingestionPullAgentsListingRefusedEventSchema, (state, data, context) =>
           this.listingSettled({
             state,
             requestId: data.requestId,
@@ -178,17 +187,17 @@ export class IngestionPullProcess {
             context,
           }),
         )
-        .on(INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REQUESTED, (state, data, context) =>
+        .on(ingestionPullPeopleListingRequestedEventSchema, (state, data, context) =>
           this.listingRequested({
             state,
             request: data,
             context,
             slot: "currentPeopleListing",
             dispatch: (listing) =>
-              context.intents.listPeople(`people:${listing.requestId}`, listing),
+              context.intent("listPeople", `people:${listing.requestId}`, listing),
           }),
         )
-        .on(INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTED, (state, data, context) =>
+        .on(ingestionPullPeopleListedEventSchema, (state, data, context) =>
           this.listingSettled({
             state,
             requestId: data.requestId,
@@ -196,7 +205,7 @@ export class IngestionPullProcess {
             context,
           }),
         )
-        .on(INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REFUSED, (state, data, context) =>
+        .on(ingestionPullPeopleListingRefusedEventSchema, (state, data, context) =>
           this.listingSettled({
             state,
             requestId: data.requestId,
@@ -366,7 +375,7 @@ export class IngestionPullProcess {
       },
       after: context.now,
       intents: [
-        context.intents.run(`pull:${runId}`, {
+        context.intent("run", `pull:${runId}`, {
           sourceId: state.sourceId,
           runId,
           scheduledFor: context.at,

@@ -2,10 +2,10 @@ import type { ProcessManagerApplier } from "@langwatch/eventing";
 import { z } from "zod";
 
 import {
-  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
-  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
-  GATEWAY_SPEND_FAILED_EVENT_TYPE,
   type GatewayBudgetLedger,
+  gatewaySpendAdmittedEventSchema,
+  gatewaySpendConfirmedEventSchema,
+  gatewaySpendFailedEventSchema,
   type GatewaySpendAdmittedData,
   type GatewaySpendAttribution,
   type GatewaySpendFailedData,
@@ -37,9 +37,7 @@ type SpendOutcome =
 
 type OutcomeContext<Intent> = {
   projectId: string;
-  intents: {
-    writeDebits: (key: string, payload: WriteGatewayDebitsPayload) => Intent;
-  };
+  intent: (name: "writeDebits", key: string, payload: WriteGatewayDebitsPayload) => Intent;
 };
 
 const INITIAL_STATE: GatewayDebitsState = {
@@ -64,13 +62,13 @@ export class GatewayDebitProcess {
       process
         .state(gatewayDebitsStateSchema, INITIAL_STATE)
         .intent("writeDebits", writeGatewayDebitsSchema, (payload) => this.intent.execute(payload))
-        .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, context) =>
+        .on(gatewaySpendAdmittedEventSchema, (state, data, context) =>
           this.onAdmission(state, context, data),
         )
-        .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, context) =>
+        .on(gatewaySpendConfirmedEventSchema, (state, data, context) =>
           this.onOutcome(state, context, { status: "confirmed", data }),
         )
-        .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, context) =>
+        .on(gatewaySpendFailedEventSchema, (state, data, context) =>
           this.onOutcome(state, context, { status: "failed", data }),
         )
         .transient()
@@ -144,7 +142,7 @@ export class GatewayDebitProcess {
     };
     const release = stashed
       ? [
-          context.intents.writeDebits("debits:late", {
+          context.intent("writeDebits", "debits:late", {
             ...stashed,
             ...attributed,
           }),
@@ -177,7 +175,8 @@ export class GatewayDebitProcess {
       return {
         state,
         intents: [
-          context.intents.writeDebits(
+          context.intent(
+            "writeDebits",
             `debits:${outcome.status}`,
             this.payload(stated, context.projectId, outcome),
           ),
@@ -188,7 +187,7 @@ export class GatewayDebitProcess {
     return state.admitted
       ? {
           state,
-          intents: [context.intents.writeDebits(`debits:${outcome.status}`, payload)],
+          intents: [context.intent("writeDebits", `debits:${outcome.status}`, payload)],
         }
       : { state: { ...state, pendingOutcome: payload } };
   }

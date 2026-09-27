@@ -22,5 +22,5 @@ export const graphAlertSweepWake: WakeHandler<GraphAlertSweepState, SweepIntents
   ctx,
 ) => ({
   state: { lastSweepAt: ctx.at },
-  intents: [ctx.intents.evaluateGraph(`sweep:${ctx.at}`, { scheduledFor: ctx.at })],
+  intents: [ctx.intent("evaluateGraph", `sweep:${ctx.at}`, { scheduledFor: ctx.at })],
 });

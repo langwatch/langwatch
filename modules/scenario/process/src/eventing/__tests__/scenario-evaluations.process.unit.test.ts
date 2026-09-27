@@ -1,5 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import { buildIntentFactories, createTenantId, type IntentContext } from "@langwatch/eventing";
+import { buildIntentAccessor, createTenantId, type IntentContext } from "@langwatch/eventing";
 import {
   SCENARIO_EVALUATIONS_JOB,
   SIMULATION_EVENT_VERSIONS,
@@ -91,7 +91,7 @@ const context = {
   now: 5_000,
   key: "run-1",
   projectId,
-  intents: buildIntentFactories({
+  intent: buildIntentAccessor({
     grade: { schema: gradeRunIntentSchema, run: async () => {} },
   }),
 };

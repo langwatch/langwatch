@@ -1,9 +1,9 @@
 import {
   PULLED_USAGE_DEFAULT_CURRENCY_CODE,
-  PULLED_USAGE_EVENT_TYPES,
   type PulledUsageObservedEventData,
   type PulledUsageObservedEvent,
   type PulledUsageRetractedEvent,
+  pulledUsageObservedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import type { Event, ProcessManagerApplier } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -89,7 +89,7 @@ export class PulledUsageLedgerProcess {
         .intent("retractPulledUsage", retractPulledUsageSchema, (payload) =>
           this.retract.execute(payload),
         )
-        .on(PULLED_USAGE_EVENT_TYPES.OBSERVED, (state, record, context) => {
+        .on(pulledUsageObservedEventSchema, (state, record, context) => {
           // Detection precedes the unpriced return: a bill re-denominated into a currency
           // the ledger holds no dollar figure for is the headline reissue. `?? null` reads
           // a `{}` stored by the build that kept no state as a first observation.
@@ -97,7 +97,7 @@ export class PulledUsageLedgerProcess {
           const intents =
             filed !== null && isReissuedElsewhere(filed, record)
               ? [
-                  context.intents.retractPulledUsage(`retract:${record.observedAtMs}`, {
+                  context.intent("retractPulledUsage", `retract:${record.observedAtMs}`, {
                     restatement_key: record.restatementKey,
                     tenant_id: context.projectId,
                     organization_id: record.organizationId,
@@ -134,7 +134,7 @@ export class PulledUsageLedgerProcess {
             state: nextState,
             intents: [
               ...intents,
-              context.intents.writePulledUsage(`pulled:${record.observedAtMs}`, {
+              context.intent("writePulledUsage", `pulled:${record.observedAtMs}`, {
                 restatement_key: record.restatementKey,
                 tenant_id: context.projectId,
                 scope_id: PulledUsageLedgerProcess.scopeId(record),

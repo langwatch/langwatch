@@ -1,4 +1,5 @@
 import type { ProcessHandlerContext } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import type { DeferredOriginPayload } from "../../app/trace.members.ts";
@@ -17,13 +18,13 @@ function context(at: number): ProcessHandlerContext<DeferredOriginIntents> {
     now: NOW,
     key: "trace-1",
     projectId: "tenant-1",
-    intents: {
+    intent: intentAccessorOf({
       resolveDeferredOrigin: (key, payload) => ({
         messageKey: key,
         intentType: "resolveDeferredOrigin",
         payload,
       }),
-    },
+    }),
   };
 }
 

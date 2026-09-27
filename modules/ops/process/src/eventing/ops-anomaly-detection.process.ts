@@ -27,5 +27,5 @@ export const anomalyDetectionWake: WakeHandler<AnomalyDetectionState, AnomalyDet
   ctx,
 ) => ({
   state: { lastDetectionAt: ctx.at },
-  intents: [ctx.intents.detect(`detect:${ctx.at}`, { scheduledFor: ctx.at })],
+  intents: [ctx.intent("detect", `detect:${ctx.at}`, { scheduledFor: ctx.at })],
 });

@@ -1,5 +1,5 @@
 import { REPORT_SCHEDULE_EVENT_TYPES } from "@langwatch/automation-contract";
-import { buildIntentFactories, type ProcessEvolution } from "@langwatch/eventing";
+import { buildIntentAccessor, type ProcessEvolution } from "@langwatch/eventing";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -31,7 +31,7 @@ function context(now: number) {
     now,
     key: "trigger-1",
     projectId: "project-1",
-    intents: buildIntentFactories({
+    intent: buildIntentAccessor({
       dispatchReport: { schema: reportDispatchIntentSchema, run: async () => {} },
     }),
   };

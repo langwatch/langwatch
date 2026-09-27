@@ -53,8 +53,8 @@ export const githubBranchRecheckWake: WakeHandler<
       lastPruneAt: prunable ? ctx.at : state.lastPruneAt,
     },
     intents: [
-      ctx.intents.recheck(`recheck:${ctx.at}`, { scheduledFor: ctx.at }),
-      ...(prunable ? [ctx.intents.prune(`prune:${ctx.at}`, { scheduledFor: ctx.at })] : []),
+      ctx.intent("recheck", `recheck:${ctx.at}`, { scheduledFor: ctx.at }),
+      ...(prunable ? [ctx.intent("prune", `prune:${ctx.at}`, { scheduledFor: ctx.at })] : []),
     ],
   };
 };

@@ -126,7 +126,7 @@ export const handleInstantEvalRequested: EventHandler<
     state: { ...state, phase: "planning" },
     refMs: instantEvalSchedulingRef(ctx),
     intents: [
-      ctx.intents.plan(instantEvalPlanKey(data.runId), {
+      ctx.intent("plan", instantEvalPlanKey(data.runId), {
         runId: data.runId,
         projectId: ctx.projectId,
       }),
@@ -150,7 +150,7 @@ export const handleInstantEvalPlanned: EventHandler<
       state: { ...state, phase: "terminal" },
       refMs,
       intents: [
-        ctx.intents.finish(instantEvalFinishKey({ runId: data.runId, reason: "empty" }), {
+        ctx.intent("finish", instantEvalFinishKey({ runId: data.runId, reason: "empty" }), {
           runId: data.runId,
           projectId: ctx.projectId,
           outcome: "finished",
@@ -179,7 +179,7 @@ export const handleInstantEvalPlanned: EventHandler<
       state: { ...planned, phase: "terminal" },
       refMs,
       intents: [
-        ctx.intents.finish(instantEvalFinishKey({ runId: data.runId, reason: "cancelled" }), {
+        ctx.intent("finish", instantEvalFinishKey({ runId: data.runId, reason: "cancelled" }), {
           runId: data.runId,
           projectId: ctx.projectId,
           outcome: "cancelled",
@@ -195,7 +195,7 @@ export const handleInstantEvalPlanned: EventHandler<
     state: planned,
     refMs,
     intents: [
-      ctx.intents.judgePage(instantEvalPageIntentKey({ runId: data.runId, page: 1 }), {
+      ctx.intent("judgePage", instantEvalPageIntentKey({ runId: data.runId, page: 1 }), {
         runId: data.runId,
         projectId: ctx.projectId,
         page: 1,
@@ -239,7 +239,8 @@ export const handleInstantEvalPageJudged: EventHandler<
       state: { ...advanced, phase: "terminal" },
       refMs,
       intents: [
-        ctx.intents.finish(
+        ctx.intent(
+          "finish",
           instantEvalFinishKey({
             runId: data.runId,
             reason: isCancelling ? "cancelled" : "done",
@@ -263,7 +264,7 @@ export const handleInstantEvalPageJudged: EventHandler<
     state: advanced,
     refMs,
     intents: [
-      ctx.intents.judgePage(instantEvalPageIntentKey({ runId: data.runId, page: nextPage }), {
+      ctx.intent("judgePage", instantEvalPageIntentKey({ runId: data.runId, page: nextPage }), {
         runId: data.runId,
         projectId: ctx.projectId,
         page: nextPage,
@@ -326,7 +327,7 @@ export const instantEvalWake: WakeHandler<InstantEvalProcessState, InstantEvalIn
       state: { ...state, phase: "terminal" },
       nextWakeAt: null,
       intents: [
-        ctx.intents.finish(instantEvalFinishKey({ runId, reason: "cancelled" }), {
+        ctx.intent("finish", instantEvalFinishKey({ runId, reason: "cancelled" }), {
           runId,
           projectId: ctx.projectId,
           outcome: "cancelled",
@@ -348,7 +349,7 @@ export const instantEvalWake: WakeHandler<InstantEvalProcessState, InstantEvalIn
     state: { ...state, phase: "terminal" },
     nextWakeAt: null,
     intents: [
-      ctx.intents.finish(instantEvalFinishKey({ runId, reason: "stalled" }), {
+      ctx.intent("finish", instantEvalFinishKey({ runId, reason: "stalled" }), {
         runId,
         projectId: ctx.projectId,
         outcome: "failed",
