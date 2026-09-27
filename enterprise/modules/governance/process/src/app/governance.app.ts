@@ -145,6 +145,7 @@ import {
   type PeopleScreenPerson,
   type PeopleScreenSuggestion,
   type SessionCeilingApplied,
+  type GovernanceMcpSessionTools,
 } from "@langwatch/enterprise-governance-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import {
@@ -237,6 +238,7 @@ import {
   type GovernanceIngestTraceCollection,
 } from "../services/governance-ingest-receiver.service.ts";
 import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
+import { GovernanceMcpToolsService } from "../services/governance-mcp-tools.service.ts";
 import { GovernancePeopleScreenService } from "../services/governance-people-screen.service.ts";
 import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
@@ -341,6 +343,7 @@ export interface GovernanceAppDependencies {
   projects: Pick<
     ProjectApi,
     | "getOrganizationId"
+    | "findIdByLegacyApiKey"
     | "findInternal"
     | "countWithTraces"
     | "findSharedProjectSlugs"
@@ -697,6 +700,14 @@ export class GovernanceApp implements GovernanceRestApi {
       organizations: dependencies.organizations,
       templates: repositories.ingestionTemplates,
     });
+    this.mcpTools = GovernanceMcpToolsService.create({
+      projects: dependencies.projects,
+      governance: this,
+      permissions: {
+        holdsOrganizationPermission: ({ userId, organizationId, permission }) =>
+          this.permittedOn("organization", organizationId, { userId, permission }),
+      },
+    });
     this.setupState = DefaultGovernanceSetupStateService.create({
       repository: repositories.setupState,
       keys: dependencies.gateway,
@@ -895,6 +906,7 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly personListing: PersonListingService;
   private readonly templates: IngestionTemplateService;
   private readonly ingestionKeys: PersonalIngestionKeyService;
+  private readonly mcpTools: GovernanceMcpToolsService;
   private readonly setupState: DefaultGovernanceSetupStateService;
   private readonly workspaceViews: DefaultGovernanceAdminWorkspaceViewAuditService;
   private readonly pullLifecycle: IngestionPullLifecycleService;
@@ -1421,6 +1433,10 @@ export class GovernanceApp implements GovernanceRestApi {
     input: RecordWorkspaceViewInput,
   ): Promise<RecordWorkspaceViewResult> {
     return this.workspaceViews.recordView(input);
+  }
+
+  registerMcpTools(input: GovernanceMcpSessionTools): void {
+    this.mcpTools.register(input);
   }
 
   // ── Personal ingestion keys: the caller's own /me trace-ingest keys ──

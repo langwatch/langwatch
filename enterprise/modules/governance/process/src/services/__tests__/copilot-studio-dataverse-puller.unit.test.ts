@@ -14,7 +14,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ZodError } from "zod";
+import { ZodError, z } from "zod";
 
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 
@@ -293,6 +293,38 @@ async function newAdapter() {
   const { HttpCopilotStudioDataverseChannel } =
     await import("../../channels/http/http.copilot-studio-dataverse.channel.ts");
   return HttpCopilotStudioDataverseChannel.create(new StubHttp());
+}
+
+const storedCostPositionSchema = z.object({ costHeldSinceMs: z.number().nullish() });
+
+/**
+ * One run over a subscription with a billing identity: the billing sign-in is
+ * answered first, then whatever the test queued. What the run did after the
+ * bill (its conversation read) is not this helper's business.
+ */
+async function readTheBillThroughARun(options: { signal?: AbortSignal; deadlineMs?: number } = {}) {
+  responseQueue.unshift({ status: 200, body: { access_token: "token-xyz" } });
+  const adapter = await newAdapter();
+  const result = await adapter.runOnce(
+    {
+      ...options,
+      cursor: null,
+      credentials: {
+        ...CREDENTIALS,
+        billingClientId: "billing-client-id",
+        billingClientSecret: "billing-client-secret",
+      },
+    },
+    adapter.validateConfig({
+      ...CONFIG,
+      azureSubscriptionId: "bbbbbbbb-0000-4000-8000-000000000002",
+    }),
+  );
+  const position = storedCostPositionSchema.parse(JSON.parse(result.cursor ?? "{}"));
+  return {
+    held: position.costHeldSinceMs != null,
+    events: result.events.filter((event) => event.source_event_id.startsWith("azure_cost:")),
+  };
 }
 
 class StubHttp implements GovernanceHttpClient {
@@ -1202,29 +1234,15 @@ describe("given the pull goes wrong", () => {
  * and stopped would pass every mapper test and still hand back a bill missing
  * most of its days.
  *
- * The page walk is reached directly. Driving it through a whole run would need
- * a subscription, a cursor and a write path, none of which this is about, and
- * all of which would hide the property being asserted behind their own
- * failures.
+ * Read through a whole run: the bill's days come back as cost events, and a
+ * held window shows as the hold the run's cursor records.
  */
 describe("given an Azure bill that does not fit in one reply", () => {
-  interface PageWalk {
-    fetchAzureCostPages(params: {
-      subscriptionId: string;
-      token: string;
-      window: { fromDay: string; toDay: string };
-      options: { signal?: AbortSignal; deadlineMs?: number };
-    }): Promise<{ day: string; costMinor: string }[] | null>;
-  }
-
+  /** The billed days the run recorded, or null when it held the window instead. */
   async function readTheBill(options: { signal?: AbortSignal; deadlineMs?: number } = {}) {
-    const adapter = await newAdapter();
-    return (adapter as unknown as PageWalk).fetchAzureCostPages({
-      subscriptionId: "sub-1",
-      token: "token-xyz",
-      window: { fromDay: "2026-08-01", toDay: "2026-08-02" },
-      options,
-    });
+    const read = await readTheBillThroughARun(options);
+    if (read.held) return null;
+    return read.events.map((event) => ({ day: event.event_timestamp.slice(0, 10) }));
   }
 
   function costPage({
@@ -1244,7 +1262,7 @@ describe("given an Azure bill that does not fit in one reply", () => {
           { name: "MeterCategory" },
           { name: "Currency" },
         ],
-        rows: [[day, cost, "Power Platform", "EUR"]],
+        rows: [[day, cost, "Copilot Studio", "EUR"]],
         nextLink,
       },
     };
@@ -1470,25 +1488,9 @@ describe("given a source reading a period of conversations", () => {
  * reply named; a category filter inside either would falsify a stated
  * contract, and inside the parser it would turn a reader into a policy engine.
  *
- * The recording step is reached directly, the same way the page walk above is.
- * Driving a whole run would need a cursor and a write path, neither of which
- * this is about, and both of which would hide the property behind their own
- * failures.
+ * Read through a whole run, the same way the page walk above is.
  */
 describe("given a subscription billing both AI services and unrelated infrastructure", () => {
-  interface CostRead {
-    readAzureCost(params: {
-      config: unknown;
-      options: unknown;
-      previous: {
-        pricedThroughDay: string | null;
-        heldSinceMs: number | null;
-        readAtMs: number | null;
-        deepReadDay: string | null;
-      };
-    }): Promise<{ events: { target: string }[] }>;
-  }
-
   /** A bill naming one AI line and one that is plainly not. */
   function mixedBill() {
     return {
@@ -1512,31 +1514,10 @@ describe("given a subscription billing both AI services and unrelated infrastruc
   describe("when the bill is read", () => {
     /** @scenario "The cloud bill is asked only for the lines that carry AI spend" */
     it("does not record an unrelated infrastructure line as AI cost", async () => {
-      const adapter = await newAdapter();
-      // The billing sign-in, then the bill itself.
-      responseQueue.push({ status: 200, body: { access_token: "token-xyz" } });
       responseQueue.push({ status: 200, body: mixedBill() });
 
-      const read = await (adapter as unknown as CostRead).readAzureCost({
-        config: { ...CONFIG, azureSubscriptionId: "sub-1" },
-        options: {
-          cursor: null,
-          credentials: {
-            ...CREDENTIALS,
-            billingClientId: "billing-client-id",
-            billingClientSecret: "billing-client-secret",
-          },
-        },
-        // Never read before, so this run is due to ask — and no deep read has
-        // finished either, which is a state production reaches and the omitted
-        // fourth one (a caller that does no deep reads at all) is not.
-        previous: {
-          pricedThroughDay: null,
-          heldSinceMs: null,
-          readAtMs: null,
-          deepReadDay: null,
-        },
-      });
+      // Never read before, so this run is due to ask the bill.
+      const read = await readTheBillThroughARun();
 
       // Belt and braces on top of the request filter: Azure answered with a
       // category outside the list, and it becomes no recorded cost at all.

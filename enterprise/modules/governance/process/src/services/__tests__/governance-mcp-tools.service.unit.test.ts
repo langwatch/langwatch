@@ -1,5 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -31,7 +31,7 @@ function registered({ callerUserId, allowed }: { callerUserId?: string; allowed:
       findIdByLegacyApiKey: async () => "project_1",
       getOrganizationId: async () => "org_1",
     }),
-    governance: createApiFixture<GovernanceApi>({
+    governance: createApiFixture<GovernanceRestApi>({
       templateListForUser: async ({ organizationId }) => {
         asked.push(`list:${organizationId}`);
         return [];

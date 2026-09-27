@@ -1,72 +1,78 @@
-import { describe, expect, it, vi } from "vitest";
+import {
+  buildProcessDefinition,
+  buildProcessManager,
+  InMemoryProcessStore,
+  type JsonValue,
+  ProcessManagerService,
+} from "@langwatch/eventing";
+import { describe, expect, it } from "vitest";
 
 import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   type GatewayBudgetLedger,
 } from "../../app/governance.members.ts";
-import { GatewayDebitProcess } from "../gateway-debit.process.ts";
+import { GATEWAY_DEBITS_PROCESS_NAME, GatewayDebitProcess } from "../gateway-debit.process.ts";
 
 /**
  * Transient commits rely on outbox uniqueness (no inbox marker), which only works
  * if keys are pure functions of the event. Clock/random keys can't be re-derived.
  */
 
-type Handler = (
-  state: unknown,
-  data: unknown,
-  context: unknown,
-) => { state: unknown; intents?: unknown[] };
-
-/** Captures the handlers an applier registers, without a real pipeline. */
-function capture(applier: (process: unknown) => unknown) {
-  const handlers = new Map<string, Handler>();
-  let initial: unknown;
-  const builder = {
-    state(value: unknown) {
-      initial = value;
-      return builder;
-    },
-    intent() {
-      return builder;
-    },
-    on(type: string, fn: Handler) {
-      handlers.set(type, fn);
-      return builder;
-    },
-    onWake() {
-      return builder;
-    },
-    schedule() {
-      return builder;
-    },
-    toPayload() {
-      return builder;
-    },
-    outbox() {
-      return builder;
-    },
-    transient() {
-      return builder;
-    },
-  };
-  applier(builder);
-  return { handlers, initial: () => initial };
+/** The handlers under test mint intents and return; only the outbox worker would reach this. */
+class UnreachedLedger implements GatewayBudgetLedger {
+  resolve(): never {
+    throw new Error("the ledger is never reached while minting intents");
+  }
+  insert(): Promise<void> {
+    return Promise.reject(new Error("the ledger is never reached while minting intents"));
+  }
+  detectCrossings(): Promise<void> {
+    return Promise.reject(new Error("the ledger is never reached while minting intents"));
+  }
+  shouldEmitBudgetUpdated = (): Promise<boolean> =>
+    Promise.reject(new Error("the ledger is never reached while minting intents"));
+  emitBudgetUpdated(): Promise<void> {
+    return Promise.reject(new Error("the ledger is never reached while minting intents"));
+  }
 }
 
-/** A context whose intent factories record the keys they were handed. */
-function recordingContext(now: number) {
-  return {
-    context: {
-      projectId: "proj_1",
-      key: "req_1",
-      at: now,
-      now,
-      intents: {
-        writeDebits: vi.fn((key: string, payload: unknown) => ({ key, payload })),
-      },
+const REF = { processName: GATEWAY_DEBITS_PROCESS_NAME, projectId: "proj_1", processKey: "req_1" };
+
+/** Handles one event on a fresh store at `now`, and answers the outbox keys it minted. */
+async function keysMintedAt({
+  eventType,
+  data,
+  now,
+}: {
+  eventType: string;
+  data: JsonValue;
+  now: number;
+}): Promise<string[]> {
+  const store = InMemoryProcessStore.createForTesting();
+  const manager = new ProcessManagerService({
+    definition: buildProcessDefinition(
+      buildProcessManager({
+        name: REF.processName,
+        applier: GatewayDebitProcess.create(new UnreachedLedger()).processManager(),
+      }).config,
+    ),
+    store,
+  });
+  await manager.handleEvent({
+    envelope: {
+      eventId: `${eventType}:req_1`,
+      eventType,
+      occurredAt: 2_000,
+      tenantId: REF.projectId,
+      projectId: REF.projectId,
+      processKey: REF.processKey,
+      payload: data,
     },
-  };
+    now,
+  });
+  const messages = await store.findMessagesByRef({ ref: REF });
+  return messages.map((message) => message.messageKey);
 }
 
 const attribution = {
@@ -113,43 +119,22 @@ const failed = {
   error: { type: "provider_timeout", http_status: 504 },
 };
 
-/** Runs one handler at two different wall clocks and answers both key sets. */
-function keysAtTwoClocks(handler: Handler, data: unknown, initial: unknown) {
-  const first = recordingContext(10_000);
-  handler(initial, data, first.context);
-  const second = recordingContext(999_999_999);
-  handler(initial, data, second.context);
-  return {
-    first: first.context.intents.writeDebits.mock.calls.map(([key]) => key),
-    second: second.context.intents.writeDebits.mock.calls.map(([key]) => key),
-  };
-}
-
 describe("transient process message keys", () => {
   describe("given the gateway debits process", () => {
     describe("when the same event is handled at two different wall clocks", () => {
       /** @scenario A transient process mints message keys that a redelivery re-derives exactly */
-      it("mints the same keys regardless of wall clock", () => {
-        // The handlers under test never reach the port: they mint intents and
-        // return, and only the outbox worker would execute one.
-        const port = {} as GatewayBudgetLedger;
-        const { handlers, initial } = capture(
-          GatewayDebitProcess.create(port).processManager() as unknown as (
-            process: unknown,
-          ) => unknown,
-        );
-
-        for (const [type, data] of [
-          [GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, confirmed],
-          [GATEWAY_SPEND_FAILED_EVENT_TYPE, failed],
-        ] as const) {
-          const handler = handlers.get(type);
-          expect(handler, `no handler for ${type}`).toBeDefined();
-          const { first, second } = keysAtTwoClocks(handler!, data, initial());
+      it.each([
+        [GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, confirmed],
+        [GATEWAY_SPEND_FAILED_EVENT_TYPE, failed],
+      ] as const)(
+        "mints the same keys for %s regardless of wall clock",
+        async (eventType, data) => {
+          const first = await keysMintedAt({ eventType, data, now: 10_000 });
+          const second = await keysMintedAt({ eventType, data, now: 999_999_999 });
           expect(first.length).toBeGreaterThan(0);
           expect(first).toEqual(second);
-        }
-      });
+        },
+      );
     });
   });
 });

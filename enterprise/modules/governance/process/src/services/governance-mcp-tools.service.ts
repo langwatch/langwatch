@@ -3,7 +3,10 @@
 // RBAC at the tool layer; OAuth for writes, a project apiKey is enough for reads.
 
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
+import {
+  type GovernanceRestApi,
+  TemplateNotFoundError,
+} from "@langwatch/enterprise-governance-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type ZodRawShape, z } from "zod";
 
@@ -42,11 +45,24 @@ function json(value: unknown) {
   return text(JSON.stringify(value, null, 2));
 }
 
+type GovernanceMcpOperations = Pick<
+  GovernanceRestApi,
+  | "templateListForUser"
+  | "templateListForOrgAdmin"
+  | "templateGetByIdForOrg"
+  | "templateCreateOrg"
+  | "templateUpdateOttlRules"
+  | "templateCloneFromPlatform"
+  | "templateArchiveOrg"
+  | "ingestionKeyList"
+  | "ingestionKeyInstall"
+>;
+
 /** Registers the governance MCP tools on one session-scoped McpServer. */
 export class GovernanceMcpToolsService {
   private constructor(
     private readonly projects: Pick<ProjectApi, "findIdByLegacyApiKey" | "getOrganizationId">,
-    private readonly governance: GovernanceApi,
+    private readonly governance: GovernanceMcpOperations,
     private readonly permissions: GovernanceMcpPermissionProbe,
   ) {}
 
@@ -56,7 +72,7 @@ export class GovernanceMcpToolsService {
     permissions,
   }: {
     projects: Pick<ProjectApi, "findIdByLegacyApiKey" | "getOrganizationId">;
-    governance: GovernanceApi;
+    governance: GovernanceMcpOperations;
     permissions: GovernanceMcpPermissionProbe;
   }): GovernanceMcpToolsService {
     return new GovernanceMcpToolsService(projects, governance, permissions);
@@ -80,6 +96,16 @@ export class GovernanceMcpToolsService {
     this.registerTemplateReads(server, session);
     this.registerTemplateWrites(server, session);
     this.registerIngestionKeys(server, session);
+  }
+
+  /** A cross-organization probe answers null, as on main, rather than naming the template. */
+  private async templateOrNull(input: { id: string; organizationId: string }) {
+    try {
+      return await this.governance.templateGetByIdForOrg(input);
+    } catch (error) {
+      if (error instanceof TemplateNotFoundError) return null;
+      throw error;
+    }
   }
 
   private async resolveSession({
@@ -179,7 +205,7 @@ export class GovernanceMcpToolsService {
       { id: z.string().describe("IngestionTemplate id") },
       ({ id }) =>
         this.read(session, "aiTools:view", (organizationId) =>
-          this.governance.findTemplateByIdForOrg({ id, organizationId }),
+          this.templateOrNull({ id, organizationId }),
         ),
     );
   }
@@ -282,7 +308,7 @@ export class GovernanceMcpToolsService {
         const denied = await this.deniedRead(current, "organization:view");
         if (denied) return text(denied);
         return json(
-          await this.governance.ingestionKeyListForPersonalProject({
+          await this.governance.ingestionKeyList({
             userId: callerUserId,
             organizationId: current.organizationId,
           }),
@@ -301,7 +327,7 @@ export class GovernanceMcpToolsService {
       },
       ({ source_type, template_id }) =>
         this.write(session, "organization:view", ({ organizationId, callerUserId }) =>
-          this.governance.ingestionKeyIssueForPersonalProject({
+          this.governance.ingestionKeyInstall({
             userId: callerUserId,
             organizationId,
             sourceType: source_type,

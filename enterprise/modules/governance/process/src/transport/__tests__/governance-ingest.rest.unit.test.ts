@@ -90,6 +90,9 @@ function mountIngest(world: World = {}) {
     ingestWebhook: (input) => ingest.receiveWebhook(input),
     ingestOtlpLogs: (input) => ingest.receiveOtlpLogs(input),
     ingestOtlpMetrics: (input) => ingest.receiveOtlpMetrics(input),
+    registerMcpTools: () => {
+      throw new Error("not reachable through the ingest door");
+    },
     cliBudgetStatus: unsupportedRestOperation,
     cliBootstrapRead: unsupportedRestOperation,
     cliBudgetOverview: unsupportedRestOperation,

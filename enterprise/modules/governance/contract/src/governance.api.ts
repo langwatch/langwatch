@@ -386,8 +386,23 @@ export interface GovernanceCaller {
   readonly displayEmail?: string | null;
 }
 
+/** A hosted MCP session's server, as the governance tools register on it. */
+export type GovernanceMcpToolServer = {
+  tool(name: string, description: string, inputSchema: unknown, callback: unknown): unknown;
+};
+
+/** One hosted MCP session the governance tools install on. */
+export type GovernanceMcpSessionTools = {
+  server: GovernanceMcpToolServer;
+  apiKey: string;
+  /** Captured at /api/mcp/authorize; absent for project-apiKey-only sessions. */
+  callerUserId: string | undefined;
+};
+
 /** The ingestion-template operations the governance REST family calls. */
 export interface GovernanceRestApi {
+  /** Installs the governance MCP tools on one hosted MCP session (Alex, 2026-09-27). */
+  registerMcpTools(input: GovernanceMcpSessionTools): void;
   cliBudgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliBudgetStatusAnswer>;
   cliBootstrapRead(input: GovernanceCliRequest): Promise<GovernanceCliBootstrapAnswer>;
   cliBudgetOverview(input: GovernanceCliRequest): Promise<GovernanceCliBudgetOverviewAnswer>;
