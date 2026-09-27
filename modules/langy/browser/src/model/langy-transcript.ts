@@ -71,15 +71,19 @@ export function langyTranscriptRuns(parts: readonly unknown[]): LangyTranscriptR
 }
 
 /** The roles the transcript draws. */
-const TRANSCRIPT_ROLES = new Set<string>(["user", "assistant", "system"]);
+const TRANSCRIPT_ROLES = ["user", "assistant", "system"] as const;
+
+type LangyTranscriptRole = (typeof TRANSCRIPT_ROLES)[number];
 
 /**
  * Does the panel draw this message? `user`/`assistant` are the conversation; `system` is a
  * durable platform notice, drawn but neither question nor answer. A `tool` result belongs to
  * the activity cards instead. Shared by the engine's hydration and the panel's message count.
  */
-export function isLangyTranscriptMessage(message: { role: string }): boolean {
-  return TRANSCRIPT_ROLES.has(message.role);
+export function isLangyTranscriptMessage<TMessage extends { role: string }>(
+  message: TMessage,
+): message is TMessage & { role: LangyTranscriptRole } {
+  return TRANSCRIPT_ROLES.some((role) => role === message.role);
 }
 
 /** The prose of an answer run: its text parts, one paragraph break apart. */

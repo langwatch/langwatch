@@ -51,6 +51,7 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   };
 });
 
+import { toEngineMessage } from "../../../model/langy-engine-parts.ts";
 import { StreamingAnswerWithCards } from "../derived-cards/streaming-answer-with-cards.tsx";
 import { MessageContent } from "../message-content.tsx";
 
@@ -65,14 +66,7 @@ function assistantMessage({
   parts: unknown[];
   metadata?: Record<string, unknown>;
 }): UIMessage {
-  return {
-    id: "m-assistant",
-    role: "assistant",
-    parts,
-    metadata,
-    // Fixture boundary: stamped parts aren't members of the SDK's part
-    // union — the same honest cast the history rehydration path documents.
-  } as unknown as UIMessage;
+  return toEngineMessage({ id: "m-assistant", role: "assistant", parts, metadata });
 }
 
 /** As the durable fold hands it to the engine — the relay has ruled on it. */
