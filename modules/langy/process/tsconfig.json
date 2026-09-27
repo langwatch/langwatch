@@ -82,6 +82,9 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/redis-client/tsconfig.build.json"
+    },
+    {
       "path": "../../secret/contract/tsconfig.build.json"
     },
     {
@@ -101,9 +104,6 @@
     },
     {
       "path": "../../feature-flag/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

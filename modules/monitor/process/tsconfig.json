@@ -63,6 +63,9 @@
       "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
     },
     {
+      "path": "../../evaluation/process/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {

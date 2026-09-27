@@ -9866,6 +9866,9 @@ importers:
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-migrations
+      '@langwatch/evaluation-process':
+        specifier: workspace:*
+        version: link:../../evaluation/process
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness

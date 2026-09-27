@@ -49,6 +49,7 @@
     "@langwatch/api-fixture": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
+    "@langwatch/evaluation-process": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@trpc/server": "catalog:",
