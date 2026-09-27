@@ -91,17 +91,17 @@ func TestFindingsStreamWhileTheRunIsStillGoing(t *testing.T) {
 
 			t.Run("then one JSON line is appended straight away, per screen, not batched to the end", func(t *testing.T) {
 				if len(writer.lines) != 2 {
-					t.Fatalf("expected 2 findings written before finalize (settings' capture-failed fires on the candidate capture alone; analytics' changed fires on the diff), got %d: %+v", len(writer.lines), writer.lines)
+					t.Fatalf("expected 2 findings written before finalize (settings' regression fires once both captures are in; analytics' changed fires on the diff), got %d: %+v", len(writer.lines), writer.lines)
 				}
 				settingsFailure, ok := writer.lines[0].(Finding)
-				if !ok || settingsFailure.Kind != FindingCaptureFailed || settingsFailure.Route != "/{slug}/settings" {
-					t.Fatalf("first finding = %+v, want the settings capture-failed", writer.lines[0])
+				if !ok || settingsFailure.Kind != ClassRegression || settingsFailure.Route != "/{slug}/settings" {
+					t.Fatalf("first finding = %+v, want the settings regression", writer.lines[0])
 				}
-				if settingsFailure.Message != "candidate: net::ERR_CONNECTION_REFUSED" {
-					t.Errorf("capture-failed message = %q", settingsFailure.Message)
+				if settingsFailure.Message != "candidate failed where the base did not: net::ERR_CONNECTION_REFUSED" || !settingsFailure.Finding {
+					t.Errorf("regression message = %q", settingsFailure.Message)
 				}
 				analyticsChanged, ok := writer.lines[1].(Finding)
-				if !ok || analyticsChanged.Kind != FindingChanged || analyticsChanged.Route != "/{slug}/analytics" {
+				if !ok || analyticsChanged.Kind != ClassChanged || analyticsChanged.Route != "/{slug}/analytics" {
 					t.Fatalf("second finding = %+v, want the analytics changed", writer.lines[1])
 				}
 				if analyticsChanged.Module != "analytics" {
@@ -126,18 +126,18 @@ func TestFindingsStreamWhileTheRunIsStillGoing(t *testing.T) {
 				}
 			})
 
-			t.Run("and once the capture stream ends, a base-only screen is missing-on-candidate and a run-complete line closes the file", func(t *testing.T) {
+			t.Run("and once the capture stream ends, a base-only screen is missing-candidate and a run-complete line closes the file", func(t *testing.T) {
 				tracker.onCapture(Capture{Kind: "route", Key: "/{slug}/traces", Side: "base", Screenshot: "/run/base/routes/traces.png"})
 
 				if err := tracker.finalize(); err != nil {
 					t.Fatalf("finalize: %v", err)
 				}
 				if len(writer.lines) != 4 {
-					t.Fatalf("expected 2 more lines (missing-on-candidate, run-complete), got %d total: %+v", len(writer.lines), writer.lines)
+					t.Fatalf("expected 2 more lines (missing-candidate, run-complete), got %d total: %+v", len(writer.lines), writer.lines)
 				}
 				missing, ok := writer.lines[2].(Finding)
-				if !ok || missing.Kind != FindingMissingOnCandidate || missing.Route != "/{slug}/traces" {
-					t.Fatalf("third finding = %+v, want traces missing-on-candidate", writer.lines[2])
+				if !ok || missing.Kind != ClassMissingCandidate || missing.Route != "/{slug}/traces" {
+					t.Fatalf("third finding = %+v, want traces missing-candidate", writer.lines[2])
 				}
 				complete, ok := writer.lines[3].(RunComplete)
 				if !ok || complete.Kind != "run-complete" {
@@ -146,7 +146,7 @@ func TestFindingsStreamWhileTheRunIsStillGoing(t *testing.T) {
 				if complete.Total != 3 {
 					t.Errorf("run-complete total = %d, want 3", complete.Total)
 				}
-				if complete.Counts[FindingCaptureFailed] != 1 || complete.Counts[FindingChanged] != 1 || complete.Counts[FindingMissingOnCandidate] != 1 {
+				if complete.Counts[string(ClassRegression)] != 1 || complete.Counts[string(ClassChanged)] != 1 || complete.Counts[string(ClassMissingCandidate)] != 1 {
 					t.Errorf("run-complete counts = %+v", complete.Counts)
 				}
 			})
@@ -187,7 +187,7 @@ func TestRunWithFindingsWritesOneJSONLLinePerFindingToDisk(t *testing.T) {
 	if err := json.Unmarshal([]byte(lines[0]), &finding); err != nil {
 		t.Fatalf("unmarshal finding line: %v", err)
 	}
-	if finding.Kind != FindingIdentical || finding.Module != "analytics" {
+	if finding.Kind != ClassNoise || finding.Module != "analytics" {
 		t.Errorf("finding = %+v", finding)
 	}
 	var complete RunComplete
@@ -208,7 +208,7 @@ func TestFileFindingsWriterFlushesEachLineWithoutClosing(t *testing.T) {
 	}
 	defer writer.Close()
 
-	if err := writer.WriteLine(Finding{Kind: FindingChanged, Route: "/a"}); err != nil {
+	if err := writer.WriteLine(Finding{Kind: ClassChanged, Route: "/a"}); err != nil {
 		t.Fatalf("WriteLine: %v", err)
 	}
 	// Read the file back WITHOUT closing the writer - a `tail -f` reader
@@ -222,7 +222,7 @@ func TestFileFindingsWriterFlushesEachLineWithoutClosing(t *testing.T) {
 		t.Fatalf("expected the first line to be visible before the writer closes, got:\n%s", firstRead)
 	}
 
-	if err := writer.WriteLine(Finding{Kind: FindingIdentical, Route: "/b"}); err != nil {
+	if err := writer.WriteLine(Finding{Kind: ClassNoise, Route: "/b"}); err != nil {
 		t.Fatalf("WriteLine: %v", err)
 	}
 	secondRead, err := os.ReadFile(path)

@@ -8,6 +8,7 @@ package visualdiff
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,8 +25,8 @@ const ConfigFile = "tools/visualdiff/visualdiff.yaml"
 // Viewport is one browser viewport, given on the command line or in the
 // configuration as WIDTHxHEIGHT.
 type Viewport struct {
-	Width  int
-	Height int
+	Width  int `json:"width"`
+	Height int `json:"height"`
 }
 
 func (viewport Viewport) String() string {
@@ -66,8 +67,8 @@ type Flow struct {
 // the in-flight request count to sit at zero for QuietMillis, and gives up at
 // DeadlineMillis rather than hanging on a page that never goes quiet.
 type Settle struct {
-	QuietMillis    int `yaml:"quietMillis"`
-	DeadlineMillis int `yaml:"deadlineMillis"`
+	QuietMillis    int `json:"quietMillis"    yaml:"quietMillis"`
+	DeadlineMillis int `json:"deadlineMillis" yaml:"deadlineMillis"`
 }
 
 // Config is visualdiff.yaml.
@@ -76,6 +77,10 @@ type Config struct {
 	Settle   Settle   `yaml:"settle"`
 	Routes   []string `yaml:"routes"`
 	Flows    []Flow   `yaml:"flows"`
+	// Fixtures fill a route's {name} placeholders with the ids the run seeds
+	// deterministically, so a dynamic screen renders a real entity.
+	Fixtures map[string]string `yaml:"fixtures"`
+	Coverage CoverageConfig    `yaml:"coverage"`
 }
 
 // RunnerActions are the actions tools/visualdiff/runner implements. A flow
@@ -127,6 +132,14 @@ func (config *Config) Validate() error {
 			return err
 		}
 	}
+	if err := config.validateRoutes(); err != nil {
+		return err
+	}
+	return config.validateFlows()
+}
+
+// validateFlows refuses a flow declared twice or one the runner could not carry out.
+func (config *Config) validateFlows() error {
 	seen := map[string]bool{}
 	for _, flow := range config.Flows {
 		if seen[flow.ID] {
@@ -135,6 +148,26 @@ func (config *Config) Validate() error {
 		seen[flow.ID] = true
 		if err := validateFlow(flow); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+var placeholder = regexp.MustCompile(`\{([^}]+)\}`)
+
+// validateRoutes refuses a placeholder no fixture fills and an exclusion
+// with no reason: an unexplained gap is the thing coverage exists to stop.
+func (config *Config) validateRoutes() error {
+	for _, route := range config.Routes {
+		for _, match := range placeholder.FindAllStringSubmatch(route, -1) {
+			if _, ok := config.Fixtures[match[1]]; !ok && match[1] != "slug" {
+				return fmt.Errorf("route %s: no fixture fills {%s}", route, match[1])
+			}
+		}
+	}
+	for _, exclusion := range config.Coverage.Excluded {
+		if strings.TrimSpace(exclusion.Reason) == "" {
+			return fmt.Errorf("coverage exclusion %s: give a reason", exclusion.Route)
 		}
 	}
 	return nil

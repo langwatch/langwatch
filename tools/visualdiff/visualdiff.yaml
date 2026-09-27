@@ -14,6 +14,20 @@ settle:
   quietMillis: 500
   deadlineMillis: 20000
 
+# Ids the run seeds deterministically (seed.go), filling a route's {name}.
+fixtures:
+  trace: trace_visualdiff_0
+  openTab: spans
+  span: trace_visualdiff_0_llm
+
+# Every route either ref declares is rendered above or excluded here with a
+# reason; anything else is an `uncovered` finding (coverage.go).
+coverage:
+  basePages: platform/app/src/pages
+  excluded:
+    - route: /dev/error-test
+      reason: a development page that throws on purpose to exercise the error boundary
+
 routes:
   - /{slug}
   - /{slug}/agents
@@ -140,6 +154,41 @@ routes:
   - /auth/error
   - /auth/verify-email
   - /auth/reset-password
+
+  # Added with coverage (coverage.go): the pages main and the branch declare
+  # that the list above did not render. Token- and callback-driven pages
+  # render their no-token state, which is still one screen to compare.
+  - /admin
+  - /not-found
+  - /settings/not-found
+  - /{slug}/not-found
+  - /@project/traces
+  - /{slug}/traces/{trace}
+  - /{slug}/messages/{trace}
+  - /{slug}/messages/{trace}/{openTab}
+  - /{slug}/messages/{trace}/{openTab}/{span}
+  - /onboarding
+  - /onboarding/product
+  - /onboarding/welcome
+  - /settings/access
+  - /settings/authentication/connectors
+  - /settings/authentication/provider
+  - /settings/checkup
+  - /settings/connect
+  - /settings/directory
+  - /settings/profile
+  - /settings/security
+  - /ops/backoffice/directory-sync
+  - /ops/backoffice/identity-lookup
+  - /ops/backoffice/licenses
+  - /ops/backoffice/self-hosted-instances
+  - /auth/join
+  - /auth/sso-test-complete
+  - /authorize
+  - /mcp/authorize
+  - /cli/auth
+  - /invite/accept
+  - /unsubscribe
 
 flows:
   - id: automation-create

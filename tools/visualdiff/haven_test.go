@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -525,7 +527,7 @@ func TestVisualdiffMonolithBasesFailureTailReadsTheAppLane(t *testing.T) {
 					logCmd = spec
 				}
 			}
-			if got := haventArgv(logCmd); got != "haven logs backend --agent --stack "+stack.HavenSlug {
+			if got := haventArgv(logCmd); got != "haven logs api --agent --stack "+stack.HavenSlug {
 				t.Errorf("logs command = %q, want the backend lane", got)
 			}
 		})
@@ -571,4 +573,50 @@ func TestHavenWaitReadyRespectsTheTimeoutOnACommandError(t *testing.T) {
 		t.Fatal("a status command that always errors must still fail within the boot timeout")
 	}
 	mustContain(t, err.Error(), stack.HavenSlug)
+}
+
+// @scenario "A stack haven gave up on fails the run at once"
+func TestAStackHavenGaveUpOnFailsTheRunAtOnce(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("LANGWATCH_PORTLESS_HOME", home)
+	slug := HavenSlug(testRunID, "base")
+	if err := os.MkdirAll(filepath.Join(home, "logs"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	log := "Falling back to port 1355.\n\x1b[?25h\x1b[0mhaven: could not start the portless proxy: exit status 1\nClear the root-owned leftovers\n"
+	if err := os.WriteFile(filepath.Join(home, "logs", slug+".log"), []byte(log), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("given the stack is not live and its log ends in haven's own fatal line", func(t *testing.T) {
+		fatal, tail := havenGaveUp(havenrun.Status{}, slug, 0)
+		if fatal != "haven: could not start the portless proxy: exit status 1" || !strings.Contains(tail, "1355") {
+			t.Fatalf("fatal = %q, tail = %q", fatal, tail)
+		}
+	})
+
+	t.Run("given the same stack reported live, it is still booting", func(t *testing.T) {
+		live := havenrun.Status{Stacks: []havenrun.StackStatus{{Slug: slug, Live: true}}}
+		if fatal, _ := havenGaveUp(live, slug, 0); fatal != "" {
+			t.Fatalf("a live stack read as given up: %q", fatal)
+		}
+	})
+
+	t.Run("given the fatal line was written by an earlier up of the same slug, it is not this one's", func(t *testing.T) {
+		if fatal, _ := havenGaveUp(havenrun.Status{}, slug, int64(len(log))); fatal != "" {
+			t.Fatalf("an earlier up's fatal line read as this one's: %q", fatal)
+		}
+	})
+
+	t.Run("when the run waits for it, it fails long before the boot timeout", func(t *testing.T) {
+		run := havenTestSession(&fakeHavenRunner{readyStacks: map[string]string{}}, time.Hour)
+		started := time.Now()
+		err := run.havenWaitReady(context.Background(), &run.plan.Base)
+		if err == nil || !strings.Contains(err.Error(), "portless proxy") {
+			t.Fatalf("err = %v, want haven's own fatal line", err)
+		}
+		if time.Since(started) > 5*time.Second {
+			t.Fatalf("waited %s for a stack haven had already given up on", time.Since(started))
+		}
+	})
 }

@@ -99,10 +99,10 @@ Feature: Visual diff between two refs
     Then it is classified as an intended restore
 
   @unit
-  Scenario: A candidate console 404 on an API call is a restore gap
-    Given the candidate records a 404 on an /api/ request the base does not
+  Scenario: A candidate 4xx or 5xx on an API call is an api error
+    Given the candidate records a failing /api/ or tRPC request the base does not
     When the row is classified
-    Then it is classified as a restore gap
+    Then it is classified as an api error
 
   @unit
   Scenario: A candidate page error is a regression

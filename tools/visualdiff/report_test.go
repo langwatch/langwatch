@@ -23,7 +23,7 @@ func TestClassifyIntendedRestore(t *testing.T) {
 	}
 }
 
-// @scenario A candidate console 404 on an API call is a restore gap
+// @scenario A candidate 4xx or 5xx on an API call is an api error
 func TestClassifyRestoreGap(t *testing.T) {
 	row := Row{
 		Base:      &Capture{Side: "base"},
@@ -33,13 +33,13 @@ func TestClassifyRestoreGap(t *testing.T) {
 
 	class, why := Classify(row)
 
-	if class != ClassRestoreGap {
+	if class != ClassAPIError || !class.IsFinding() {
 		t.Fatalf("got %s (%s)", class, why)
 	}
 	mustContain(t, why, "/api/governance/catalog")
 }
 
-// @scenario A candidate console 404 on an API call is a restore gap
+// @scenario A candidate 4xx or 5xx on an API call is an api error
 func TestAFailedRequestBothSidesShareIsNotARestoreGap(t *testing.T) {
 	shared := []string{"404 GET /api/governance/catalog"}
 	row := Row{
@@ -50,7 +50,7 @@ func TestAFailedRequestBothSidesShareIsNotARestoreGap(t *testing.T) {
 
 	class, _ := Classify(row)
 
-	if class == ClassRestoreGap {
+	if class == ClassAPIError {
 		t.Fatal("a 404 both refs already had is not a gap this branch opened")
 	}
 }
@@ -89,8 +89,8 @@ func TestARegressionOutranksARestoredScreen(t *testing.T) {
 
 // @scenario A small diff with no errors is noise
 func TestClassifyNoise(t *testing.T) {
-	quiet := Row{Base: &Capture{Side: "base"}, Candidate: &Capture{Side: "candidate"}, Ratio: 0.011}
-	loud := Row{Base: &Capture{Side: "base"}, Candidate: &Capture{Side: "candidate"}, Ratio: 0.31}
+	quiet := Row{Base: &Capture{Side: "base"}, Candidate: &Capture{Side: "candidate"}, Ratio: 0.011, Diffed: true}
+	loud := Row{Base: &Capture{Side: "base"}, Candidate: &Capture{Side: "candidate"}, Ratio: 0.31, Diffed: true}
 
 	if class, why := Classify(quiet); class != ClassNoise {
 		t.Fatalf("got %s (%s)", class, why)

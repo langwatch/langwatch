@@ -23,6 +23,8 @@ type Capture struct {
 	ConsoleErrors  []string `json:"consoleErrors"`
 	FailedRequests []string `json:"failedRequests"`
 	NotFound       bool     `json:"notFound"`
+	Blank          bool     `json:"blank"`
+	AriaSnapshot   string   `json:"ariaSnapshot,omitempty"`
 	Error          string   `json:"error"`
 	DurationMS     int      `json:"durationMs"`
 }
@@ -37,130 +39,22 @@ type Diff struct {
 	File  string  `json:"file"`
 }
 
-// Classification is the verdict on one row.
-type Classification string
-
-const (
-	// ClassRegression is the candidate throwing, or failing a step, where the base does not.
-	ClassRegression Classification = "regression"
-	// ClassRestoreGap is the candidate calling an endpoint that answers 404 — a
-	// screen that came back without the route behind it.
-	ClassRestoreGap Classification = "restore-gap"
-	// ClassIntendedRestore is the base having no such screen where the candidate renders one.
-	ClassIntendedRestore Classification = "intended-restore"
-	// ClassNoise is a small difference with nothing wrong on either side.
-	ClassNoise Classification = "noise"
-	// ClassChanged is a real visual difference that none of the rules explain.
-	ClassChanged Classification = "changed"
-)
-
-// NoiseRatio is the diff ratio below which an error-free difference is noise.
-const NoiseRatio = 0.02
-
-// Row pairs one screen's two captures.
-type Row struct {
-	Kind      string         `json:"kind"`
-	Key       string         `json:"key"`
-	Index     int            `json:"index"`
-	Label     string         `json:"label"`
-	Base      *Capture       `json:"base"`
-	Candidate *Capture       `json:"candidate"`
-	Ratio     float64        `json:"ratio"`
-	DiffFile  string         `json:"diffFile"`
-	Class     Classification `json:"class"`
-	Why       string         `json:"why"`
-}
-
-// Finding reports whether a row is something to look at. Noise is not.
-func (row Row) Finding() bool {
-	return row.Class == ClassRegression || row.Class == ClassRestoreGap
-}
-
-// apiNotFound reports whether any recorded failed request is a 404 on an API
-// path — the signature of a screen restored without its endpoint.
-func apiNotFound(entries []string) []string {
-	var hits []string
-	for _, entry := range entries {
-		if strings.Contains(entry, "404") && strings.Contains(entry, "/api/") {
-			hits = append(hits, entry)
-		}
-	}
-	return hits
-}
-
-// onlyIn returns the entries present in candidate and absent from base,
-// compared on their first 80 characters so a trailing id never reads as a new
-// error.
-func onlyIn(candidate, base []string) []string {
-	seen := map[string]bool{}
-	for _, entry := range base {
-		seen[head(entry)] = true
-	}
-	var out []string
-	for _, entry := range candidate {
-		if !seen[head(entry)] {
-			out = append(out, entry)
-		}
-	}
-	return out
-}
-
-func head(value string) string {
-	if len(value) > 80 {
-		return value[:80]
-	}
-	return value
-}
-
-// Classify is the rule-based first pass. It is deliberately a first pass:
-// every row keeps both screenshots so a person can overrule it, and anything
-// the rules cannot explain lands in "changed" rather than being waved through
-// as noise.
-//
-// The order matters. A candidate that throws is a regression even where the
-// base had no screen at all, so the failure rules run before the
-// restore rules, and the noise rule runs last so it can never swallow one.
-func Classify(row Row) (Classification, string) {
-	base, candidate := row.Base, row.Candidate
-	if candidate == nil {
-		return ClassRegression, "no capture on the candidate"
-	}
-	if base == nil {
-		return ClassIntendedRestore, "no capture on the base"
-	}
-	if candidate.Error != "" && base.Error == "" {
-		return ClassRegression, "candidate failed where the base did not: " + head(candidate.Error)
-	}
-	newErrors := onlyIn(candidate.ConsoleErrors, base.ConsoleErrors)
-	if len(newErrors) > 0 {
-		return ClassRegression, "candidate console error the base does not have: " + head(newErrors[0])
-	}
-	if hits := apiNotFound(onlyIn(candidate.FailedRequests, base.FailedRequests)); len(hits) > 0 {
-		return ClassRestoreGap, "candidate calls an endpoint that answers 404: " + head(hits[0])
-	}
-	if base.NotFound && !candidate.NotFound {
-		return ClassIntendedRestore, "the base has no such screen and the candidate renders one"
-	}
-	if row.Ratio < NoiseRatio {
-		return ClassNoise, fmt.Sprintf("differs by %.2f%% with no errors on either side", row.Ratio*100)
-	}
-	return ClassChanged, fmt.Sprintf("differs by %.2f%%", row.Ratio*100)
-}
-
 // BuildRows pairs the captures by screen, attaches the runner's diffs and
 // classifies every row. Rows sort worst-first: findings, then by diff ratio.
 func BuildRows(captures []Capture, diffs []Diff) []Row {
 	rows, order := pairCaptures(captures)
 	for _, diff := range diffs {
 		if row, ok := rows[rowKey{diff.Kind, diff.Key, diff.Index}]; ok {
-			row.Ratio = diff.Ratio
-			row.DiffFile = diff.File
+			row.Ratio, row.Diffed, row.DiffFile = diff.Ratio, true, diff.File
 		}
 	}
 	out := make([]Row, 0, len(order))
 	for _, identity := range order {
 		row := rows[identity]
 		row.Class, row.Why = Classify(*row)
+		if row.Base != nil && row.Candidate != nil {
+			row.Text = CompareText(row.Base.AriaSnapshot, row.Candidate.AriaSnapshot)
+		}
 		out = append(out, *row)
 	}
 	sort.SliceStable(out, func(a, b int) bool {
@@ -256,20 +150,49 @@ func rowTitle(row Row) string {
 	return fmt.Sprintf("%s · %d %s", row.Key, row.Index, row.Label)
 }
 
+// renderMarkdown lists the findings only, one line each with its text
+// evidence; every other row is in findings.json and report.html.
 func renderMarkdown(rows []Row, meta ReportMeta) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "# Visual diff — %s vs %s\n\n", meta.BaseRef, meta.CandidateRef)
 	fmt.Fprintf(&out, "%d rows, %d findings, viewport %s.\n\n", len(rows), CountFindings(rows), meta.Viewport)
-	fmt.Fprintf(&out, "| Class | Screen | Diff | Why |\n| --- | --- | --- | --- |\n")
+	if CountFindings(rows) == 0 {
+		return out.String()
+	}
+	fmt.Fprintf(&out, "| Class | Screen | Why | Evidence |\n| --- | --- | --- | --- |\n")
 	for index := range rows {
 		row := &rows[index]
-		if row.Class == ClassNoise {
+		if !row.Finding() {
 			continue
 		}
-		fmt.Fprintf(&out, "| %s | %s | %.2f%% | %s |\n",
-			row.Class, rowTitle(*row), row.Ratio*100, strings.ReplaceAll(row.Why, "|", "/"))
+		fmt.Fprintf(&out, "| %s | %s | %s | %s |\n",
+			row.Class, rowTitle(*row), markdownCell(row.Why), markdownCell(RowEvidence(*row)))
 	}
 	return out.String()
+}
+
+func markdownCell(value string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(value, "|", "/"), "\n", " ")
+}
+
+// RowEvidence is a row's text evidence on one line: where the candidate
+// ended, its new failed API calls and its role diff.
+func RowEvidence(row Row) string {
+	if row.Candidate == nil {
+		return ""
+	}
+	parts := []string{"url " + finalPath(row.Candidate.URL)}
+	var baseFailures []string
+	if row.Base != nil {
+		baseFailures = row.Base.FailedRequests
+	}
+	for _, request := range NewAPIFailures(baseFailures, row.Candidate.FailedRequests) {
+		parts = append(parts, "req "+head(request))
+	}
+	if summary := row.Text.Summary(); summary != "" {
+		parts = append(parts, "controls "+summary)
+	}
+	return strings.Join(parts, " · ")
 }
 
 const reportStyle = `body{font:14px/1.5 -apple-system,system-ui,sans-serif;margin:0;padding:24px;color:#101828;background:#fff}
@@ -286,9 +209,9 @@ img{width:100%;border:1px solid #eaecf0;border-radius:4px}
 
 func classColour(class Classification) string {
 	switch class {
-	case ClassRegression:
+	case ClassRegression, ClassMissingCandidate, ClassBrokenBoth, ClassBlank, ClassNotFound:
 		return "#b42318"
-	case ClassRestoreGap:
+	case ClassAPIError, ClassRedirect, ClassControls, ClassMissingBase:
 		return "#b54708"
 	case ClassIntendedRestore:
 		return "#175cd3"
@@ -315,6 +238,9 @@ func renderHTML(rows []Row, meta ReportMeta) string {
 		}
 		fmt.Fprintf(&out, "<div class=\"row%s\"><b>%s</b> <span class=\"pill\" style=\"background:%s\">%s</span> <span class=\"mono\">%.2f%% — %s</span>\n",
 			class, html.EscapeString(rowTitle(*row)), classColour(row.Class), row.Class, row.Ratio*100, html.EscapeString(row.Why))
+		if evidence := RowEvidence(*row); evidence != "" {
+			fmt.Fprintf(&out, "<div class=\"mono\">%s</div>", html.EscapeString(evidence))
+		}
 		writeSideDetail(&out, "base", row.Base)
 		writeSideDetail(&out, "candidate", row.Candidate)
 		fmt.Fprint(&out, "<div class=\"shots\">")

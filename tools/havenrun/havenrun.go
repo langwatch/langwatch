@@ -26,9 +26,12 @@ const Command = "haven"
 // needs ready; apidiff only ever needs the backend lane, visualdiff needs
 // both because it drives a browser against the UI and seeds fixtures through
 // the API on the same origin.
+// BackendLane is "api" since haven named the lane for what it serves;
+// LegacyBackendLane is what a stack started before that still reports.
 const (
-	UILane      = "ui"
-	BackendLane = "backend"
+	UILane            = "ui"
+	BackendLane       = "api"
+	LegacyBackendLane = "backend"
 )
 
 // AppService is the routed service name whose URL is the browser-facing
@@ -253,11 +256,16 @@ func resolveRequiredLanes(monolith bool, requiredLanes []string) []string {
 	return resolved
 }
 
+// laneAnswers reports whether a reported lane name satisfies a required one.
+func laneAnswers(reported, required string) bool {
+	return reported == required || (required == BackendLane && reported == LegacyBackendLane)
+}
+
 func lanesListening(lanes []LaneStatus, required []string) bool {
 	for _, name := range required {
 		found := false
 		for _, lane := range lanes {
-			if lane.Name == name && lane.Listening {
+			if laneAnswers(lane.Name, name) && lane.Listening {
 				found = true
 				break
 			}

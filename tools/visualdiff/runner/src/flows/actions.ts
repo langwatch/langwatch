@@ -9,6 +9,12 @@ const optionalClick = async (context: Parameters<Action>[0], text: string): Prom
 export const signIn: Action = async (context) => {
   const { credential } = context;
   await goTo({ context, path: "/auth/signin" });
+  await context.side.page
+    .locator("input")
+    .locator("visible=true")
+    .first()
+    .waitFor({ timeout: 15_000 })
+    .catch(() => undefined);
   await context.snapshot("sign in");
   const filled = await fillField({ context, target: "email", value: credential.email }).then(
     () => true,

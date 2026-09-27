@@ -113,8 +113,9 @@ type runner func(ctx context.Context, spec commandSpec, log io.Writer) error
 // allowedCommands are the only executables this tool runs. Every commandSpec
 // in the package is built from these constants, so a subprocess name is never
 // tainted input. haven joined the list when the stacks moved onto it; env
-// joined it for the haven prepare step's `env -u CI pnpm install ...`.
-var allowedCommands = map[string]bool{"git": true, "pnpm": true, "bash": true, "node": true, "haven": true, "env": true}
+// joined it for the haven prepare step's `env -u CI pnpm install ...`, psql
+// for the edition switch (edition.go).
+var allowedCommands = map[string]bool{"git": true, "pnpm": true, "bash": true, "node": true, "haven": true, "env": true, "psql": true}
 
 // execRunner runs one command, streaming its output to log.
 func execRunner(ctx context.Context, spec commandSpec, log io.Writer) error {

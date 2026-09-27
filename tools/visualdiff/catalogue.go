@@ -7,20 +7,18 @@ import (
 	"strings"
 )
 
-// CatalogueFile is where apps/ui/src/features/catalogue.json lives, relative
-// to the repository root. A finding's module is a guess derived from it, not
-// the authoritative feature map: the match is a route-segment heuristic, so
-// an unmatched route or flow reports an empty module rather than a wrong one.
-const CatalogueFile = "apps/ui/src/features/catalogue.json"
+// CatalogueFile is the module catalog, relative to the repository root. A
+// finding's module is a guess derived from it, not the authoritative feature
+// map: the match is a route-segment heuristic, so an unmatched route or flow
+// reports an empty module rather than a wrong one.
+const CatalogueFile = "modules/catalogue.json"
 
-// ModuleIndex maps a catalog feature's route segment ("root") to the
-// module owning its screens.
+// ModuleIndex maps a route segment - a module's id or one of the subjects it
+// owns - to that module.
 type ModuleIndex map[string]string
 
-// LoadModuleIndex reads catalogue.json under root and derives, for each
-// feature, the module owning its first listed screen
-// ("@langwatch/analytics-browser/screens/analytics" -> "analytics"), indexed by
-// the feature's own route segment.
+// LoadModuleIndex reads the catalog under root and indexes every module by
+// its own id and by each subject it owns.
 func LoadModuleIndex(root string) (ModuleIndex, error) {
 	data, err := os.ReadFile(filepath.Join(root, CatalogueFile)) // #nosec G304 -- root is the tool's own -root flag; the joined path is a fixed repository file.
 	if err != nil {
@@ -28,10 +26,8 @@ func LoadModuleIndex(root string) (ModuleIndex, error) {
 	}
 	var document struct {
 		Features []struct {
-			Root string `json:"root"`
-			Uses struct {
-				Screens []string `json:"screens"`
-			} `json:"uses"`
+			ID       string   `json:"id"`
+			Subjects []string `json:"subjects"`
 		} `json:"features"`
 	}
 	if err := json.Unmarshal(data, &document); err != nil {
@@ -39,33 +35,22 @@ func LoadModuleIndex(root string) (ModuleIndex, error) {
 	}
 	index := ModuleIndex{}
 	for _, feature := range document.Features {
-		module := screenModule(feature.Uses.Screens)
-		if feature.Root == "" || module == "" {
+		if feature.ID == "" {
 			continue
 		}
-		index[feature.Root] = module
+		for _, subject := range feature.Subjects {
+			if _, taken := index[subject]; !taken {
+				index[subject] = feature.ID
+			}
+		}
+		index[feature.ID] = feature.ID
 	}
 	return index, nil
 }
 
-// screenModule derives the owning module from a screen package reference
-// like "@langwatch/analytics-browser/screens/analytics" -> "analytics", matching
-// modules/analytics/browser's own directory name.
-func screenModule(screens []string) string {
-	if len(screens) == 0 {
-		return ""
-	}
-	parts := strings.SplitN(screens[0], "/", 3)
-	if len(parts) < 2 {
-		return ""
-	}
-	return strings.TrimSuffix(parts[1], "-web")
-}
-
 // lookup finds the module owning a route's or flow's first path segment,
-// trying the plural too: the catalogue's own "root" values are not
-// consistently singular or plural ("annotation" for the "annotations"
-// route). Empty when no feature claims the segment.
+// trying the singular too: module ids are singular ("annotation") where
+// routes are often plural ("annotations"). Empty when no feature claims the segment.
 func (index ModuleIndex) lookup(segment string) string {
 	if segment == "" {
 		return ""

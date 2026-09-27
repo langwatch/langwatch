@@ -14,24 +14,15 @@ import (
 // findings.json/findings.md/report.html.
 const FindingsFile = "findings.jsonl"
 
-// Finding kinds. Deliberately narrower than report.go's Classification: the
-// stream is a live triage feed, not the rule-based report classifier, so
-// every Classification collapses onto one of these five.
-const (
-	FindingMissingOnCandidate = "missing-on-candidate"
-	FindingChanged            = "changed"
-	FindingConsoleError       = "console-error"
-	FindingCaptureFailed      = "capture-failed"
-	FindingIdentical          = "identical"
-)
-
 // Finding is one line of a run's findings.jsonl - one screen's comparison,
 // written the instant enough is known to classify it.
 type Finding struct {
+	Edition    Edition         `json:"edition,omitempty"`
 	Route      string          `json:"route,omitempty"`
 	Flow       string          `json:"flow,omitempty"`
 	Index      int             `json:"index,omitempty"`
-	Kind       string          `json:"kind"`
+	Kind       Classification  `json:"kind"`
+	Finding    bool            `json:"finding"`
 	Module     string          `json:"module"`
 	Evidence   FindingEvidence `json:"evidence"`
 	Message    string          `json:"message"`
@@ -44,12 +35,18 @@ type FindingEvidence struct {
 	Base      string `json:"base,omitempty"`
 	Candidate string `json:"candidate,omitempty"`
 	Diff      string `json:"diff,omitempty"`
+	// URL is where the candidate ended; Requests its new failed API calls;
+	// Controls the role diff - the text an agent triages from without the images.
+	URL      string   `json:"url,omitempty"`
+	Requests []string `json:"requests,omitempty"`
+	Controls string   `json:"controls,omitempty"`
 }
 
 // RunComplete is the findings stream's last line: how many of each kind, so
 // a reader tailing the file knows the run finished and what it added up to.
 type RunComplete struct {
 	Kind       string         `json:"kind"`
+	Edition    Edition        `json:"edition,omitempty"`
 	Total      int            `json:"total"`
 	Counts     map[string]int `json:"counts"`
 	CapturedAt string         `json:"capturedAt"`
@@ -112,6 +109,9 @@ type findingsRunInputs struct {
 	// - always the developer's own checkout, never a worktree, since the
 	// module guess is the same regardless of which ref is being compared.
 	CatalogueRoot string
+	// Edition tags every line this pass writes, so one findings.jsonl carries
+	// every edition's pass side by side.
+	Edition Edition
 }
 
 // runWithFindings drives inputs.Deps.Capture, writing one Finding to
@@ -130,6 +130,7 @@ func runWithFindings(ctx context.Context, inputs findingsRunInputs) (RunnerStrea
 	}
 	tracker := newFindingsTracker(trackerInputs{
 		Writer: writer, Modules: modules, RunRoot: filepath.Dir(inputs.FindingsPath), Now: inputs.Deps.Now,
+		Edition: inputs.Edition,
 	})
 	options := inputs.Options
 	options.OnCapture = tracker.onCapture
@@ -144,6 +145,7 @@ func runWithFindings(ctx context.Context, inputs findingsRunInputs) (RunnerStrea
 // findingsTracker classifies capture/diff events into Findings as they
 // stream in, and writes each one the instant it is decided.
 type findingsTracker struct {
+	edition Edition
 	writer  FindingsWriter
 	modules ModuleIndex
 	runRoot string
@@ -171,11 +173,13 @@ type trackerInputs struct {
 	Modules ModuleIndex
 	RunRoot string
 	Now     func() time.Time
+	Edition Edition
 }
 
 func newFindingsTracker(inputs trackerInputs) *findingsTracker {
 	return &findingsTracker{
-		writer: inputs.Writer, modules: inputs.Modules, runRoot: inputs.RunRoot, now: inputs.Now,
+		edition: inputs.Edition,
+		writer:  inputs.Writer, modules: inputs.Modules, runRoot: inputs.RunRoot, now: inputs.Now,
 		rows: map[rowKey]*trackedRow{}, counts: map[string]int{},
 	}
 }
@@ -209,48 +213,40 @@ func (tracker *findingsTracker) onDiff(diff Diff) {
 	tracker.tryEmit(row)
 }
 
-// tryEmit writes a Finding for row the instant enough of it is known, and
-// never twice. capture-failed and console-error need only one or both
-// captures; changed/identical need the diff too. missing-on-candidate is not
-// decided here at all - see finalize - because a capture event that never
-// arrives cannot be told apart, mid-run, from one still coming.
+// tryEmit writes a Finding for row the instant Classify can decide it, and
+// never twice: once both captures are in, and also the pixel diff when the
+// verdict turns on it. A capture that never arrives is decided in finalize,
+// since mid-run it cannot be told apart from one still coming.
 func (tracker *findingsTracker) tryEmit(row *trackedRow) {
-	if row.written {
+	if row.written || row.base == nil || row.candidate == nil {
 		return
 	}
-	if row.candidate != nil && row.candidate.Error != "" {
-		tracker.emit(row, FindingCaptureFailed, "candidate: "+row.candidate.Error)
+	verdict := row.toRow()
+	class, why := Classify(verdict)
+	if NeedsPixels(class) && row.diff == nil {
 		return
 	}
-	if row.base != nil && row.base.Error != "" {
-		tracker.emit(row, FindingCaptureFailed, "base: "+row.base.Error)
-		return
-	}
-	if row.base == nil || row.candidate == nil {
-		return
-	}
-	if newErrors := onlyIn(row.candidate.ConsoleErrors, row.base.ConsoleErrors); len(newErrors) > 0 {
-		tracker.emit(row, FindingConsoleError, newErrors[0])
-		return
-	}
-	if row.diff == nil {
-		return
-	}
-	if row.diff.Ratio < NoiseRatio {
-		tracker.emit(row, FindingIdentical, fmt.Sprintf("differs by %.2f%%, under the noise threshold", row.diff.Ratio*100))
-		return
-	}
-	tracker.emit(row, FindingChanged, fmt.Sprintf("differs by %.2f%%", row.diff.Ratio*100))
+	tracker.emit(row, class, why)
 }
 
-func (tracker *findingsTracker) emit(row *trackedRow, kind, message string) {
+// toRow is the tracked screen in the shape Classify reads.
+func (row *trackedRow) toRow() Row {
+	verdict := Row{Kind: row.kind, Key: row.key, Index: row.index, Base: row.base, Candidate: row.candidate}
+	if row.diff != nil {
+		verdict.Ratio, verdict.Diffed, verdict.DiffFile = row.diff.Ratio, true, row.diff.File
+	}
+	return verdict
+}
+
+func (tracker *findingsTracker) emit(row *trackedRow, kind Classification, message string) {
 	row.written = true
-	tracker.counts[kind]++
+	tracker.counts[string(kind)]++
 	tracker.write(tracker.toFinding(row, kind, message))
 }
 
-func (tracker *findingsTracker) toFinding(row *trackedRow, kind, message string) Finding {
+func (tracker *findingsTracker) toFinding(row *trackedRow, kind Classification, message string) Finding {
 	finding := Finding{
+		Edition: tracker.edition, Finding: kind.IsFinding(),
 		Kind: kind, Module: tracker.modules.lookup(moduleKey(row.key)),
 		Message: message, CapturedAt: tracker.now().Format(time.RFC3339),
 		Evidence: FindingEvidence{
@@ -258,6 +254,11 @@ func (tracker *findingsTracker) toFinding(row *trackedRow, kind, message string)
 			Candidate: tracker.relative(captureScreenshot(row.candidate)),
 			Diff:      tracker.relative(diffFile(row.diff)),
 		},
+	}
+	if row.candidate != nil {
+		finding.Evidence.URL = row.candidate.URL
+		finding.Evidence.Requests = NewAPIFailures(baseRequests(row.base), row.candidate.FailedRequests)
+		finding.Evidence.Controls = CompareText(baseSnapshot(row.base), row.candidate.AriaSnapshot).Summary()
 	}
 	if row.kind == "flow" {
 		finding.Flow = row.key
@@ -285,23 +286,17 @@ func (tracker *findingsTracker) write(finding Finding) {
 	}
 }
 
-// finalize runs once the capture stream ends. Any row with a base capture
-// and no candidate one really is missing on the candidate - provable only
-// now. The rarer opposite (a candidate screen with no base one at all, which
-// the runner's own two-full-passes order means only a side-wide failure
-// produces) has no dedicated kind in this vocabulary, so it reports as
-// changed. Then it writes the run-complete summary line.
+// finalize runs once the capture stream ends and decides every screen still
+// open: a side that never arrived, or a diff that never came. Then it writes
+// the run-complete summary line.
 func (tracker *findingsTracker) finalize() error {
 	for _, identity := range tracker.order {
 		row := tracker.rows[identity]
 		if row.written {
 			continue
 		}
-		if row.candidate == nil {
-			tracker.emit(row, FindingMissingOnCandidate, "no capture on the candidate")
-			continue
-		}
-		tracker.emit(row, FindingChanged, "no capture on the base")
+		class, why := Classify(row.toRow())
+		tracker.emit(row, class, why)
 	}
 	total := 0
 	counts := map[string]int{}
@@ -309,10 +304,24 @@ func (tracker *findingsTracker) finalize() error {
 		counts[kind] = count
 		total += count
 	}
-	if err := tracker.writer.WriteLine(RunComplete{Kind: "run-complete", Total: total, Counts: counts, CapturedAt: tracker.now().Format(time.RFC3339)}); err != nil && tracker.err == nil {
+	if err := tracker.writer.WriteLine(RunComplete{Kind: "run-complete", Edition: tracker.edition, Total: total, Counts: counts, CapturedAt: tracker.now().Format(time.RFC3339)}); err != nil && tracker.err == nil {
 		tracker.err = err
 	}
 	return tracker.err
+}
+
+func baseRequests(capture *Capture) []string {
+	if capture == nil {
+		return nil
+	}
+	return capture.FailedRequests
+}
+
+func baseSnapshot(capture *Capture) string {
+	if capture == nil {
+		return ""
+	}
+	return capture.AriaSnapshot
 }
 
 func captureScreenshot(capture *Capture) string {

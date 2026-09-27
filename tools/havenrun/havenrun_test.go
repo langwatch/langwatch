@@ -99,7 +99,7 @@ func TestArgvBuilders(t *testing.T) {
 	if got := strings.Join(DestroyArgs("slug-1"), " "); got != "destroy slug-1 --agent --yes" {
 		t.Errorf("DestroyArgs = %q", got)
 	}
-	if got := strings.Join(BackendLogArgs("slug-1"), " "); got != "logs backend --agent --stack slug-1" {
+	if got := strings.Join(BackendLogArgs("slug-1"), " "); got != "logs api --agent --stack slug-1" {
 		t.Errorf("BackendLogArgs = %q", got)
 	}
 }
@@ -176,7 +176,7 @@ func TestLogArgsAndBackendLogArgs(t *testing.T) {
 	if got := strings.Join(LogArgs(AppService, "slug-1"), " "); got != "logs app --agent --stack slug-1" {
 		t.Errorf("LogArgs = %q", got)
 	}
-	if got := strings.Join(BackendLogArgs("slug-1"), " "); got != "logs backend --agent --stack slug-1" {
+	if got := strings.Join(BackendLogArgs("slug-1"), " "); got != "logs api --agent --stack slug-1" {
 		t.Errorf("BackendLogArgs = %q", got)
 	}
 }
@@ -211,5 +211,27 @@ func TestLastLinesKeepsOnlyTheTail(t *testing.T) {
 	}
 	if got := LastLines("solo line", 40); got != "solo line" {
 		t.Errorf("LastLines = %q", got)
+	}
+}
+
+func TestTheAPILaneAnswersForTheBackend(t *testing.T) {
+	status := Status{Stacks: []StackStatus{{
+		Slug: "s1", Live: true,
+		Lanes: []LaneStatus{{Name: "ui", Listening: true}, {Name: "api", Listening: true}},
+	}}}
+	if _, ready := StackReady(status, "s1", UILane, BackendLane); !ready {
+		t.Fatal("a stack whose api lane listens is not ready")
+	}
+}
+
+func TestACopiedDotenvNeverDecidesWhereAStacksDataLives(t *testing.T) {
+	copied := NeutraliseStackOwnedKeys("DATABASE_URL=\"postgresql://postgres@localhost:5432/langwatch_db\"\nexport BASE_HOST=http://localhost:5560\nOPENAI_API_KEY=sk-user\n# DATABASE_URL=old\n")
+	for _, owned := range []string{"# owned by haven for this stack: DATABASE_URL=", "# owned by haven for this stack: export BASE_HOST="} {
+		if !strings.Contains(copied, owned) {
+			t.Errorf("want %q in:\n%s", owned, copied)
+		}
+	}
+	if !strings.Contains(copied, "\nOPENAI_API_KEY=sk-user\n") || !strings.Contains(copied, "\n# DATABASE_URL=old\n") {
+		t.Errorf("unrelated lines must survive untouched:\n%s", copied)
 	}
 }

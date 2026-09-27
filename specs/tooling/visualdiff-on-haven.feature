@@ -208,3 +208,65 @@ Feature: visualdiff boots its stacks through haven
       And it captures only the named routes, against those same two stacks
       And it never checks out a worktree, never runs haven up, and never tears anything down
       And its findings are appended to the same run's findings.jsonl, after whatever the run itself already wrote
+
+  Rule: The base is rendered once per commit and replayed after that
+
+    # Booting main is most of a run's cost, and main does not change between
+    # two runs a developer makes while fixing their branch. Its captures are
+    # kept per base commit, edition, configuration, runner source and UTC day
+    # (seeded dates render as text), so a matching run never boots the base.
+
+    @unit
+    Scenario: A run against a base it has already rendered never boots the base
+      Given an earlier run rendered the base at the same commit, edition, configuration and day
+      When visualdiff run runs again
+      Then the base's captures are replayed from .visualdiff/baselines
+      And the base is never checked out, prepared or started
+      And a changed route list, viewport or runner source renders the base live and caches it anew
+
+    @unit
+    Scenario: A recapture replays only the routes it names from the baseline
+      Given a baseline recorded for every route
+      When the runner is asked for three routes
+      Then it replays exactly those three from the baseline
+
+  Rule: Every screen is compared in both editions
+
+    # Both refs seed the same signed local-dev enterprise licence onto the
+    # organization, and a null licence is the open-source plan on both, so
+    # one pair of stacks serves both editions by flipping that column.
+
+    @unit
+    Scenario: Every screen is captured once per edition
+      Given a haven run with -editions enterprise,free (the default is enterprise alone)
+      When it captures
+      Then it captures an enterprise pass on the seeded licence, then a free pass with the licence cleared on every live stack
+      And each pass writes its own screenshots, report and edition-tagged findings lines
+
+    @unit
+    Scenario: The free edition is refused where the database is the developer's own
+      Given a -no-haven run, whose stacks share the developer's own database
+      When the free edition is asked for
+      Then the run refuses before anything boots, naming -editions enterprise
+      And -no-haven defaults to the enterprise edition alone
+
+  Rule: A broken candidate costs seconds, not a whole run
+
+    @unit
+    Scenario: A candidate whose shell does not render stops the run within its first routes
+      Given the candidate is captured before the base
+      When each of its first three routes throws, raises a page error or renders blank
+      Then the run stops with every one of those routes and its reason
+      And -no-fail-fast carries on regardless
+
+    @unit
+    Scenario: Each screen is diffed the moment both sides of it exist
+      Given one side of a screen has been captured or replayed
+      When the other side of it is captured
+      Then its pixel diff is computed and reported straight away, not at the end of the run
+
+    @unit
+    Scenario: A stack haven gave up on fails the run at once
+      Given haven has written its own fatal line to a stack's log and does not report the stack live
+      When the run waits for that stack
+      Then it fails on that line straight away, with the log tail, instead of waiting out the boot timeout

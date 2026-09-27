@@ -41,9 +41,20 @@ export const asRegExp = (value: string): RegExp =>
     ? new RegExp(value.slice(1, value.lastIndexOf("/")), value.slice(value.lastIndexOf("/") + 1))
     : new RegExp(escapeRegExp(value), "i");
 
-/** fillPath substitutes the run's project slug into a configured path. */
-export const fillPath = ({ path, slug }: { path: string; slug: string }): string =>
-  path.replaceAll("{slug}", slug);
+/** fillPath substitutes the project slug and any seeded fixture ids into a configured path. */
+export const fillPath = ({
+  path,
+  slug,
+  fixtures = {},
+}: {
+  path: string;
+  slug: string;
+  fixtures?: Record<string, string>;
+}): string =>
+  Object.entries(fixtures).reduce(
+    (filled, [name, value]) => filled.replaceAll(`{${name}}`, value),
+    path.replaceAll("{slug}", slug),
+  );
 
 export const argument = ({
   context,

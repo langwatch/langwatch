@@ -3,9 +3,19 @@ import { join } from "node:path";
 
 import { openSide, captureMessage, type Side } from "./capture";
 import { diffScreenshots } from "./diff";
+import { signIn } from "./flows/actions";
 import { fillPath } from "./flows/context";
 import { resolveAction } from "./flows/registry";
-import { emit, note, type CaptureMessage, type Plan, type PlanFlow } from "./protocol";
+import { Pairing, readReplay, safeName } from "./pairing";
+import {
+  emit,
+  note,
+  type CaptureMessage,
+  type Plan,
+  type PlanFlow,
+  type PlanSide,
+} from "./protocol";
+import { shellBroken, type ShellProbe } from "./shell";
 
 const out = process.stdout;
 const err = process.stderr;
@@ -18,8 +28,7 @@ const readPlan = (argv: string[]): Plan => {
   return JSON.parse(readFileSync(argv[index + 1] as string, "utf8")) as Plan;
 };
 
-const safeName = (value: string): string =>
-  value === "/" ? "_root" : value.replace(/^\//, "").replace(/[/?=&{}]/g, "_");
+type Collect = (message: CaptureMessage) => void;
 
 /** SNAPSHOT_STRIDE keeps one step's mid-action snapshots inside its own index range,
  * so a step that fails on one side cannot shift every capture after it out of line. */
@@ -28,14 +37,16 @@ const SNAPSHOT_STRIDE = 100;
 const captureRoutes = async ({
   plan,
   side,
-  collected,
+  collect,
 }: {
   plan: Plan;
   side: Side;
-  collected: CaptureMessage[];
+  collect: Collect;
 }): Promise<void> => {
+  const probes: ShellProbe[] = [];
+  const probing = plan.failFast === true && side.name === "candidate";
   for (const route of plan.routes) {
-    const path = fillPath({ path: route, slug: plan.slug });
+    const path = fillPath({ path: route, slug: plan.slug, fixtures: plan.fixtures });
     const file = join(plan.outDir, side.name, "routes", `${safeName(path)}.png`);
     const startedAt = Date.now();
     let error = "";
@@ -56,9 +67,14 @@ const captureRoutes = async ({
       error,
       durationMs: Date.now() - startedAt,
       notFound: await side.notFound().catch(() => false),
+      blank: await side.blank(),
+      ariaSnapshot: await side.ariaSnapshot(),
     });
-    collected.push(message);
-    emit({ message, out });
+    collect(message);
+    if (!probing) continue;
+    probes.push({ capture: message, blank: message.blank });
+    const broken = shellBroken({ probes });
+    if (broken !== "") throw new Error(`the candidate's shell does not render: ${broken}`);
   }
 };
 
@@ -66,12 +82,12 @@ const captureFlow = async ({
   plan,
   flow,
   side,
-  collected,
+  collect,
 }: {
   plan: Plan;
   flow: PlanFlow;
   side: Side;
-  collected: CaptureMessage[];
+  collect: Collect;
 }): Promise<void> => {
   await side.page
     .goto(`${side.baseUrl}/${plan.slug}`, { waitUntil: "commit" })
@@ -103,9 +119,10 @@ const captureFlow = async ({
         error,
         durationMs: 0,
         notFound: false,
+        blank: await side.blank(),
+        ariaSnapshot: await side.ariaSnapshot(),
       });
-      collected.push(message);
-      emit({ message, out });
+      collect(message);
     };
 
     const startedAt = Date.now();
@@ -131,73 +148,79 @@ const captureFlow = async ({
   }
 };
 
+/** signInSide signs in before any route, so routes photograph the product, not the sign-in page. */
+const signInSide = async ({ plan, side }: { plan: Plan; side: Side }): Promise<void> => {
+  if (plan.credential.email === "") return;
+  const emails = [plan.credential.email, ...(plan.credential.fallbackEmails ?? [])];
+  for (const email of emails) {
+    await signIn({
+      side,
+      slug: plan.slug,
+      credential: { ...plan.credential, email },
+      args: {},
+      snapshot: async () => undefined,
+    });
+    await side.waitUntilQuiet();
+    if (!new URL(side.page.url()).pathname.startsWith("/auth/")) {
+      side.drain();
+      return;
+    }
+  }
+  throw new Error(
+    `${side.name} could not sign in as ${emails.join(" or ")}: still on ${side.page.url()}`,
+  );
+};
+
 const captureSide = async ({
   plan,
-  sideIndex,
+  definition,
+  collect,
 }: {
   plan: Plan;
-  sideIndex: number;
-}): Promise<CaptureMessage[]> => {
-  const definition = plan.sides[sideIndex];
-  if (definition === undefined) throw new Error(`no side ${sideIndex} in the plan`);
-  const side = await openSide({ side: definition, viewport: plan.viewport, settle: plan.settle });
-  const collected: CaptureMessage[] = [];
+  definition: PlanSide;
+  collect: Collect;
+}): Promise<void> => {
+  if (definition.replay !== undefined) {
+    for (const message of readReplay({ file: definition.replay, plan, side: definition.name })) {
+      collect(message);
+    }
+    return;
+  }
+  const side = await openSide({
+    side: definition,
+    viewport: plan.viewport,
+    settle: plan.settle,
+    frozenTime: plan.frozenTime,
+  });
   try {
-    await captureRoutes({ plan, side, collected });
+    await signInSide({ plan, side });
+    await captureRoutes({ plan, side, collect });
     for (const flow of plan.flows) {
-      await captureFlow({ plan, flow, side, collected });
+      await captureFlow({ plan, flow, side, collect });
     }
   } finally {
     await side.browser.close().catch(() => undefined);
   }
-  return collected;
 };
 
-/** emitDiffs pairs the two sides' captures and diffs each pair's screenshots. */
-const emitDiffs = ({
-  plan,
-  base,
-  candidate,
-}: {
-  plan: Plan;
-  base: CaptureMessage[];
-  candidate: CaptureMessage[];
-}): void => {
-  const identity = (capture: CaptureMessage): string =>
-    `${capture.kind}|${capture.key}|${capture.index}`;
-  const byIdentity = new Map(base.map((capture) => [identity(capture), capture]));
-  for (const right of candidate) {
-    const left = byIdentity.get(identity(right));
-    if (left === undefined) continue;
-    const file = join(
-      plan.outDir,
-      "diff",
-      `${safeName(right.kind)}_${safeName(right.key)}_${right.index}.png`,
-    );
-    const diff = diffScreenshots({ base: left.screenshot, candidate: right.screenshot, out: file });
-    if (diff === null) continue;
-    emit({
-      message: {
-        type: "diff",
-        kind: right.kind,
-        key: right.key,
-        index: right.index,
-        ratio: diff.ratio,
-        file,
-      },
-      out,
-    });
-  }
+/** Replayed sides go first (they are free), then the candidate, so its breakage costs seconds. */
+const captureOrder = (side: PlanSide): number => {
+  if (side.replay !== undefined) return 0;
+  return side.name === "candidate" ? 1 : 2;
 };
 
 const main = async (): Promise<void> => {
   const plan = readPlan(process.argv.slice(2));
   emit({ message: { type: "ready" }, out });
-  const captured: CaptureMessage[][] = [];
-  for (const sideIndex of plan.sides.keys()) {
-    captured.push(await captureSide({ plan, sideIndex }));
+  const pairing = new Pairing(plan, diffScreenshots);
+  const collect: Collect = (message) => {
+    emit({ message, out });
+    const diff = pairing.add(message);
+    if (diff !== null) emit({ message: diff, out });
+  };
+  for (const definition of plan.sides.toSorted((a, b) => captureOrder(a) - captureOrder(b))) {
+    await captureSide({ plan, definition, collect });
   }
-  emitDiffs({ plan, base: captured[0] ?? [], candidate: captured[1] ?? [] });
   emit({ message: { type: "done" }, out });
 };
 

@@ -1,6 +1,7 @@
 package visualdiff
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -38,5 +39,21 @@ func TestParseRunnerStreamRefusesWhatItCannotRead(t *testing.T) {
 	_, err := ParseRunnerStream(strings.NewReader(`{"type":"error","message":"chromium is not installed"}`))
 	if err == nil || !strings.Contains(err.Error(), "chromium") {
 		t.Fatalf("the runner's own error should surface: %v", err)
+	}
+}
+
+func TestRunnerPlanSpellsSettleAndViewportAsTheRunnerReadsThem(t *testing.T) {
+	encoded, err := json.Marshal(RunnerPlan{
+		Viewport: Viewport{Width: 1440, Height: 900},
+		Settle:   Settle{QuietMillis: 500, DeadlineMillis: 20000},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, key := range []string{`"width":1440`, `"height":900`, `"quietMillis":500`, `"deadlineMillis":20000`} {
+		if !strings.Contains(string(encoded), key) {
+			t.Fatalf("plan lacks %s, so the runner reads undefined and never settles: %s", key, encoded)
+		}
 	}
 }
