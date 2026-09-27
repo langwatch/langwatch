@@ -161,8 +161,8 @@ function patchObjectInspectBrowserStub(): Plugin {
 
 /**
  * Production receives public configuration from the process that serves the
- * HTML shell. In development Vite owns the shell, so it performs the same
- * explicit boot mapping during its own executable config phase.
+ * HTML shell. In development and `vite preview` (the build job's boot smoke)
+ * Vite owns the shell, so it performs the same explicit boot mapping itself.
  */
 function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
   return {
@@ -170,6 +170,17 @@ function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
     apply: "serve",
     transformIndexHtml(html) {
       return injectPublicAppConfigIntoHtml({ html, config });
+    },
+    configurePreviewServer(server) {
+      const shellPath = path.resolve(server.config.root, server.config.build.outDir, "index.html");
+      server.middlewares.use((request, response, next) => {
+        const pathname = (request.url ?? "/").split("?")[0] ?? "/";
+        const isShell = pathname.endsWith(".html") || !path.extname(pathname);
+        if (request.method !== "GET" || !isShell || !existsSync(shellPath)) return next();
+        const html = readFileSync(shellPath, "utf8");
+        response.setHeader("Content-Type", "text/html");
+        response.end(injectPublicAppConfigIntoHtml({ html, config }));
+      });
     },
   };
 }
