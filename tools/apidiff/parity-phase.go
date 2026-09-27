@@ -270,7 +270,7 @@ func (phase *parityPhase) inventoryRoutes(ctx context.Context, mainDocument map[
 // routeInventoryBuilds are the built entries the route inventory loads: served
 // routes are read from the composed application, whose packages import these
 // packages' dist, and the parity prepare deliberately skips the build.
-var routeInventoryBuilds = []string{"langwatch", "@langwatch/mail", "@langwatch/mcp-server"}
+var routeInventoryBuilds = []string{"langwatch", "@langwatch/ksuid", "@langwatch/mail", "@langwatch/mcp-server"}
 
 // buildSdkForRoutes builds each package the route inventory imports built.
 func (phase *parityPhase) buildSdkForRoutes(ctx context.Context, dir string) error {
