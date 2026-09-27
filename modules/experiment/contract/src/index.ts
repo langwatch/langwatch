@@ -32,6 +32,7 @@ export * from "./workbench/compute-aggregates.ts";
 export * from "./workbench/actions/manifest.ts";
 export * from "./workbench/actions/narration.ts";
 export * from "./workbench/actions/live-workbench-read.ts";
+export * from "./workbench/actions/saved-workbench-read.ts";
 export * from "./workbench/actions/projection.ts";
 export * from "./workbench/actions/run-scope.ts";
 export * from "./workbench/actions/schemas.ts";

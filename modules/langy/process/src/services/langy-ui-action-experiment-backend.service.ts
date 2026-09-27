@@ -1,6 +1,5 @@
-import type { ExperimentApi } from "@langwatch/experiment-contract";
+import { type ExperimentApi, getStatePayloadSchema } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { LangyUiHandlerFailedError } from "@langwatch/langy-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type {
@@ -13,7 +12,7 @@ import type {
 
 type Experiments = Pick<
   ExperimentApi,
-  "getWorkbenchState" | "saveWorkbenchState" | "startSavedRun"
+  "getWorkbenchState" | "projectSavedWorkbench" | "saveWorkbenchState" | "startSavedRun"
 >;
 
 /** Whether a save lost to a concurrent writer: the stale code, read off the handled payload. */
@@ -41,14 +40,23 @@ export class LangyUiActionExperimentBackendService implements LangyUiActionBacke
     },
   ) {}
 
-  /**
-   * The saved board as an agent reads it. Refused by name until experiment owns projecting its
-   * persisted state (the persisted and live workbench types differ; see the lint-w9 handoff).
-   */
-  project(_input: { projectId: string; target: string; payload: unknown }): Promise<never> {
-    return Promise.reject(
-      new LangyUiHandlerFailedError("workbench.getState", "saved_read_unavailable"),
-    );
+  /** The saved board as an agent reads it, projected by experiment at the version it read. */
+  async project({
+    projectId,
+    target,
+    payload,
+  }: {
+    projectId: string;
+    target: string;
+    payload: unknown;
+  }): Promise<{ version: number; projection: Record<string, unknown> }> {
+    const { includeResults } = getStatePayloadSchema.parse(payload);
+    const { version, ...projection } = await this.peers.experiments.projectSavedWorkbench({
+      projectId,
+      slug: target,
+      includeResults,
+    });
+    return { version, projection };
   }
 
   async readState({

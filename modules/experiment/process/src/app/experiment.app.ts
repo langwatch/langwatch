@@ -45,6 +45,7 @@ import {
   type RunsPageAnswer,
   type RunsPageRequest,
   type SavedRunAnswer,
+  type SavedWorkbenchRead,
   type SavedRunRequest,
   type WorkbenchRunAnswer,
   type ExperimentSlugLookup,
@@ -318,6 +319,7 @@ export class ExperimentApp implements ExperimentApi {
     });
     this.#workbenchVersions = ExperimentWorkbenchVersionService.create({
       experiments: dependencies.experiments,
+      workbenchTargetNames: (input) => dependencies.workbenchTargetNames(input),
     });
     this.#workflowLinks = ExperimentWorkflowLinkService.create({
       experiments: dependencies.experiments,
@@ -903,6 +905,14 @@ export class ExperimentApp implements ExperimentApi {
 
   startSavedRun(input: SavedRunRequest): Promise<SavedRunAnswer> {
     return this.#workbenchRuns.startSavedRun(input);
+  }
+
+  projectSavedWorkbench(input: {
+    projectId: string;
+    slug: string;
+    includeResults?: boolean;
+  }): Promise<SavedWorkbenchRead> {
+    return this.#workbenchVersions.projectSavedBySlug(input);
   }
 
   executeWorkbenchRun(

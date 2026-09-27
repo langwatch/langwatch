@@ -66,6 +66,7 @@ import type {
   FindOrCreateWorkflowExperimentInput,
   SaveExperimentInput,
 } from "./experiment.ts";
+import type { SavedWorkbenchRead } from "./workbench/actions/saved-workbench-read.ts";
 
 /**
  * The credential a workbench write arrived on, as the attribution rule reads
@@ -196,6 +197,12 @@ export interface ExperimentApi {
   }): Promise<Record<string, string>>;
   /** Starts a run over the saved workbench, as the CLI's `experiment run` does. */
   startSavedRun(input: SavedRunRequest): Promise<SavedRunAnswer>;
+  /** The saved workbench as an agent reads it when no page is open. */
+  projectSavedWorkbench(input: {
+    projectId: string;
+    slug: string;
+    includeResults?: boolean;
+  }): Promise<SavedWorkbenchRead>;
 
   // ── Workbench writes, attributed to the caller who asked for them ──
   // Each takes the caller as a separate argument rather than an `actor` field,

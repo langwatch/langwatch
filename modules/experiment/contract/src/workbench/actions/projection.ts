@@ -1,14 +1,17 @@
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 
-import type {
-  ComparisonEvaluatorConfig,
-  DatasetReference,
-  EvaluationResults,
-} from "../../experiment-workbench.ts";
+import type { PersistedEvaluationsV3State } from "../../experiment-workbench-persistence.ts";
+import type { ComparisonEvaluatorConfig, EvaluationResults } from "../../experiment-workbench.ts";
 import { computeTargetAggregates } from "../compute-aggregates.ts";
 import { toComparisonConfig } from "../normalize-comparison.ts";
 import { disambiguateNames } from "../variant-disambiguation.ts";
-import type { WorkbenchState } from "./transforms/index.ts";
+
+/** The board slice a projection reads: the saved shape, which the live board also satisfies. */
+type ProjectableWorkbench = Pick<
+  PersistedEvaluationsV3State,
+  "name" | "datasets" | "activeDatasetId" | "evaluators" | "targets"
+>;
+type ProjectableDataset = ProjectableWorkbench["datasets"][number];
 
 /**
  * A compact, serializable view of the workbench, for an agent reading the board before
@@ -150,7 +153,7 @@ export type ProjectedWorkbenchState = {
   omittedEvaluators?: number;
 };
 
-const datasetRowCount = (dataset: DatasetReference): number => {
+const datasetRowCount = (dataset: ProjectableDataset): number => {
   if (dataset.type === "inline" && dataset.inline) {
     const columnValues = Object.values(dataset.inline.records);
     if (columnValues.length === 0) return 0;
@@ -168,7 +171,7 @@ const clipCell = (text: string): string => {
   return text.length > SAMPLE_CELL_MAX_CHARS ? `${text.slice(0, SAMPLE_CELL_MAX_CHARS)}…` : text;
 };
 
-const sampleRowsOf = (dataset: DatasetReference): Record<string, string>[] => {
+const sampleRowsOf = (dataset: ProjectableDataset): Record<string, string>[] => {
   const rowCount = Math.min(datasetRowCount(dataset), SAMPLE_ROWS);
   const rows: Record<string, string>[] = [];
   for (let index = 0; index < rowCount; index++) {
@@ -206,7 +209,7 @@ const serializedSize = (projection: ProjectedWorkbenchState): number =>
 const isWithinBudget = (projection: ProjectedWorkbenchState): boolean =>
   serializedSize(projection) <= PROJECTION_BUDGET_BYTES;
 
-const projectDataset = (dataset: DatasetReference): ProjectedDataset => ({
+const projectDataset = (dataset: ProjectableDataset): ProjectedDataset => ({
   id: dataset.id,
   name: dataset.name,
   type: dataset.type,
@@ -226,7 +229,7 @@ const nameTargets = ({
   targets,
   targetNames,
 }: {
-  targets: WorkbenchState["targets"];
+  targets: ProjectableWorkbench["targets"];
   targetNames?: TargetNames;
 }): Map<string, string> => {
   const raw = targets.map(
@@ -240,7 +243,7 @@ const nameTargets = ({
 };
 
 /** What an evaluator is called: its own name, then the catalog's. */
-const evaluatorName = (evaluator: WorkbenchState["evaluators"][number]): string =>
+const evaluatorName = (evaluator: ProjectableWorkbench["evaluators"][number]): string =>
   evaluator.localEvaluatorConfig?.name ??
   // A project's own evaluators carry a `custom/<id>` type the catalog has no
   // entry for, and fall through to the type itself.
@@ -264,7 +267,7 @@ const projectTarget = ({
   target,
   names,
 }: {
-  target: WorkbenchState["targets"][number];
+  target: ProjectableWorkbench["targets"][number];
   names: Map<string, string>;
 }): ProjectedTarget => {
   const comparison = toComparisonConfig(target);
@@ -288,7 +291,7 @@ const projectEvaluator = ({
   evaluator,
   names,
 }: {
-  evaluator: WorkbenchState["evaluators"][number];
+  evaluator: ProjectableWorkbench["evaluators"][number];
   names: Map<string, string>;
 }): ProjectedEvaluator => {
   const comparison = toComparisonConfig(evaluator);
@@ -363,7 +366,7 @@ const projectResults = ({
   activeRowCount,
   names,
 }: {
-  state: WorkbenchState;
+  state: ProjectableWorkbench;
   results: EvaluationResults;
   activeRowCount: number;
   names: Map<string, string>;
@@ -412,7 +415,7 @@ const projectResults = ({
   }),
 });
 
-const evaluatorNameById = (state: WorkbenchState, evaluatorId: string): string => {
+const evaluatorNameById = (state: ProjectableWorkbench, evaluatorId: string): string => {
   const evaluator = state.evaluators.find((entry) => entry.id === evaluatorId);
   return evaluator ? evaluatorName(evaluator) : evaluatorId;
 };
@@ -545,7 +548,7 @@ export const projectWorkbenchState = ({
   results,
   targetNames,
 }: {
-  state: WorkbenchState;
+  state: ProjectableWorkbench;
   results?: EvaluationResults;
   targetNames?: TargetNames;
 }): ProjectedWorkbenchState => {
