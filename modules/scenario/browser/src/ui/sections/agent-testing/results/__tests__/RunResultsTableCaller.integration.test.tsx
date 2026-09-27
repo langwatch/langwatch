@@ -38,7 +38,7 @@ function run({
           },
         }
       : { langwatch: { targetReferenceId: "agent-1", targetType: "http" } },
-  } as unknown as ScenarioRunData;
+  };
 }
 
 function renderTable(runs: ScenarioRunData[]) {

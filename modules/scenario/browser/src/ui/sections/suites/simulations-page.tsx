@@ -68,37 +68,10 @@ function SimulationsBoard() {
   const utils = api.useUtils();
   const { selectedSuiteSlug, navigateToSuite, highlightBatchId } = useSuiteRouting();
 
-  // Auto-open run detail drawer when redirected from old individual run URL
   const router = useRouter();
-  useEffect(() => {
-    if (!router.isReady) return;
-    const openRunId = router.query.openRun;
-    if (typeof openRunId === "string" && openRunId) {
-      openDrawer("scenarioRunDetail", {
-        urlParams: { scenarioRunId: openRunId },
-      });
-      // Remove the query param to avoid re-opening on navigation
-      const { openRun: _, ...restQuery } = router.query;
-      void router.replace({ pathname: router.pathname, query: restQuery }, undefined, {
-        shallow: true,
-      });
-    }
-  }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  useOpenRunFromUrl({ router, openDrawer });
 
-  // Read pending batch from URL query param (set by "Save and Run" redirect)
-  const [urlPendingBatchId, setUrlPendingBatchId] = useState<string | null>(null);
-  useEffect(() => {
-    if (!router.isReady) return;
-    const pendingBatch = router.query.pendingBatch;
-    if (typeof pendingBatch === "string" && pendingBatch) {
-      setUrlPendingBatchId(pendingBatch);
-      // Remove the query param to keep URL clean
-      const { pendingBatch: _, ...restQuery } = router.query;
-      void router.replace({ pathname: router.pathname, query: restQuery }, undefined, {
-        shallow: true,
-      });
-    }
-  }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  const urlPendingBatchId = useUrlPendingBatch(router);
 
   const { period, mode, setPeriod, setRelativePeriod } = usePeriodSelector(30);
 
@@ -142,26 +115,7 @@ function SimulationsBoard() {
   // When the SDK opened this tab, later runs from the same machine are steered
   // here instead of spawning yet another browser tab.
   const scenarioTab = useScenarioTabFollow();
-  const lastFollowedRef = useRef<string | null>(null);
-
-  const followRun = useCallback(
-    (payload: ScenarioTabNavigatePayload) => {
-      const target = new URL(payload.url);
-      if (target.origin !== window.location.origin) return;
-      if (target.pathname === window.location.pathname) return;
-      // A handoff is parked as well as broadcast, so a tab that took the live
-      // one and then re-subscribed is offered the same run again. Without this
-      // it would be yanked back to a run the user had already moved on from.
-      if (lastFollowedRef.current === payload.url) return;
-      lastFollowedRef.current = payload.url;
-
-      // Silently: the user started the run themselves, the page moving to it
-      // is the expected outcome, not news. The connected badge in the set
-      // header is the only marker that this tab behaves this way.
-      void router.push(target.pathname + target.search);
-    },
-    [router],
-  );
+  const followRun = useFollowRun(router);
 
   useSimulationUpdateListener({
     projectId: project?.id ?? "",
@@ -181,46 +135,26 @@ function SimulationsBoard() {
     return new Map<string, SuiteRunSummary>(Object.entries(suiteSummariesData));
   }, [suiteSummariesData]);
 
-  // Build suiteId -> suite name map for AllRuns view
-  const suiteNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (suites) {
-      for (const suite of suites) {
-        map.set(suite.id, suite.name);
-      }
-    }
-    return map;
-  }, [suites]);
+  const suiteNameMap = useMemo(() => suiteNamesById(suites), [suites]);
 
-  const selectedSuite = useMemo(() => {
-    if (!selectedSuiteSlug || selectedSuiteSlug === ALL_RUNS_ID) return null;
-    if (isExternalSetSelection(selectedSuiteSlug)) return null;
-    return suites?.find((s) => s.slug === selectedSuiteSlug) ?? null;
-  }, [selectedSuiteSlug, suites]);
+  const selectedSuite = useMemo(
+    () => selectedSuiteOf({ slug: selectedSuiteSlug, suites }),
+    [selectedSuiteSlug, suites],
+  );
 
-  const selectedExternalSetId = useMemo(() => {
-    if (!selectedSuiteSlug || !isExternalSetSelection(selectedSuiteSlug)) return null;
-    return extractExternalSetId(selectedSuiteSlug);
-  }, [selectedSuiteSlug]);
+  const selectedExternalSetId = useMemo(
+    () => selectedExternalSetIdOf(selectedSuiteSlug),
+    [selectedSuiteSlug],
+  );
 
-  // Auto-expand period when selected item's last run is outside current range
-  useEffect(() => {
-    if (!selectedSuiteSlug || selectedSuiteSlug === ALL_RUNS_ID) return;
-
-    let lastRunTs: number | null = null;
-    if (isExternalSetSelection(selectedSuiteSlug) && externalSets) {
-      const setId = extractExternalSetId(selectedSuiteSlug);
-      lastRunTs = externalSets.find((s) => s.scenarioSetId === setId)?.lastRunTimestamp ?? null;
-    } else if (selectedSuite && runSummaries) {
-      lastRunTs = runSummaries.get(selectedSuite.id)?.lastRunTimestamp ?? null;
-    }
-
-    if (lastRunTs && lastRunTs < period.startDate.epochMilliseconds) {
-      const now = nowInstant();
-      const daysAgo = Math.ceil((now.epochMilliseconds - lastRunTs) / 86400000);
-      setPeriod(fromDate(subDays(now.epochMilliseconds, expandedPeriodDays(daysAgo))), now);
-    }
-  }, [selectedSuiteSlug]); // eslint-disable-line react-hooks/exhaustive-deps
+  useExpandPeriodToSelection({
+    selectedSuiteSlug,
+    selectedSuite,
+    externalSets,
+    runSummaries,
+    periodStartMs: period.startDate.epochMilliseconds,
+    setPeriod,
+  });
 
   const archiveTargetSuite = archiveConfirmId
     ? suites?.find((s) => s.id === archiveConfirmId)
@@ -541,4 +475,130 @@ function MainPanel({
   }
 
   return <SuiteEmptyState onNewSuite={onNewSuite} />;
+}
+
+type BoardRouter = ReturnType<typeof useRouter>;
+
+/** Opens a run's detail when redirected here from the old individual run URL. */
+function useOpenRunFromUrl({
+  router,
+  openDrawer,
+}: {
+  router: BoardRouter;
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+}) {
+  useEffect(() => {
+    if (!router.isReady) return;
+    const openRunId = router.query.openRun;
+    if (typeof openRunId === "string" && openRunId) {
+      openDrawer("scenarioRunDetail", {
+        urlParams: { scenarioRunId: openRunId },
+      });
+      // Remove the query param to avoid re-opening on navigation
+      const { openRun: _, ...restQuery } = router.query;
+      void router.replace({ pathname: router.pathname, query: restQuery }, undefined, {
+        shallow: true,
+      });
+    }
+  }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+/** The batch a "Save and Run" redirect asked this page to show as pending. */
+function useUrlPendingBatch(router: BoardRouter): string | null {
+  const [urlPendingBatchId, setUrlPendingBatchId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!router.isReady) return;
+    const pendingBatch = router.query.pendingBatch;
+    if (typeof pendingBatch === "string" && pendingBatch) {
+      setUrlPendingBatchId(pendingBatch);
+      // Remove the query param to keep URL clean
+      const { pendingBatch: _, ...restQuery } = router.query;
+      void router.replace({ pathname: router.pathname, query: restQuery }, undefined, {
+        shallow: true,
+      });
+    }
+  }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return urlPendingBatchId;
+}
+
+/** Steers this tab to a run the SDK started from the same machine, once per run. */
+function useFollowRun(router: BoardRouter) {
+  const lastFollowedRef = useRef<string | null>(null);
+
+  return useCallback(
+    (payload: ScenarioTabNavigatePayload) => {
+      const target = new URL(payload.url);
+      if (target.origin !== window.location.origin) return;
+      if (target.pathname === window.location.pathname) return;
+      // A handoff is parked as well as broadcast, so a tab that took the live
+      // one and then re-subscribed is offered the same run again. Without this
+      // it would be yanked back to a run the user had already moved on from.
+      if (lastFollowedRef.current === payload.url) return;
+      lastFollowedRef.current = payload.url;
+
+      // Silently: the user started the run themselves, the page moving to it
+      // is the expected outcome, not news. The connected badge in the set
+      // header is the only marker that this tab behaves this way.
+      void router.push(target.pathname + target.search);
+    },
+    [router],
+  );
+}
+
+/** Widens the period when the selected plan or set last ran before its start. */
+function useExpandPeriodToSelection({
+  selectedSuiteSlug,
+  selectedSuite,
+  externalSets,
+  runSummaries,
+  periodStartMs,
+  setPeriod,
+}: {
+  selectedSuiteSlug: string | null | undefined;
+  selectedSuite: SimulationSuite | null | undefined;
+  externalSets: { scenarioSetId: string; lastRunTimestamp?: number | null }[] | undefined;
+  runSummaries: Map<string, SuiteRunSummary> | undefined;
+  periodStartMs: number;
+  setPeriod: ReturnType<typeof usePeriodSelector>["setPeriod"];
+}) {
+  useEffect(() => {
+    if (!selectedSuiteSlug || selectedSuiteSlug === ALL_RUNS_ID) return;
+
+    let lastRunTs: number | null = null;
+    if (isExternalSetSelection(selectedSuiteSlug) && externalSets) {
+      const setId = extractExternalSetId(selectedSuiteSlug);
+      lastRunTs = externalSets.find((s) => s.scenarioSetId === setId)?.lastRunTimestamp ?? null;
+    } else if (selectedSuite && runSummaries) {
+      lastRunTs = runSummaries.get(selectedSuite.id)?.lastRunTimestamp ?? null;
+    }
+
+    if (lastRunTs && lastRunTs < periodStartMs) {
+      const now = nowInstant();
+      const daysAgo = Math.ceil((now.epochMilliseconds - lastRunTs) / 86400000);
+      setPeriod(fromDate(subDays(now.epochMilliseconds, expandedPeriodDays(daysAgo))), now);
+    }
+  }, [selectedSuiteSlug]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+function suiteNamesById(suites: { id: string; name: string }[] | undefined): Map<string, string> {
+  return new Map((suites ?? []).map((suite) => [suite.id, suite.name]));
+}
+
+/** The run plan the route names; none for "all runs" or an external set. */
+function selectedSuiteOf({
+  slug,
+  suites,
+}: {
+  slug: string | null | undefined;
+  suites: SimulationSuite[] | undefined;
+}): SimulationSuite | null {
+  if (!slug || slug === ALL_RUNS_ID) return null;
+  if (isExternalSetSelection(slug)) return null;
+  return suites?.find((s) => s.slug === slug) ?? null;
+}
+
+function selectedExternalSetIdOf(slug: string | null | undefined): string | null {
+  if (!slug || !isExternalSetSelection(slug)) return null;
+  return extractExternalSetId(slug);
 }
