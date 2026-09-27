@@ -1,34 +1,34 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { CommandEnvelope } from "@langwatch/eventing";
-import type {
-  LangyAgentRespondedEventData,
-  LangyAgentResponseFailedEventData,
-  LangyAgentTurnAcceptedEventData,
-  LangyConversationArchivedEventData,
-  LangyConversationForkedEventData,
-  LangyConversationHandoffConsumedEventData,
-  LangyConversationHandoffPendingEventData,
-  LangyConversationMetadataUpdatedEventData,
-  LangyConversationStartedEventData,
-  LangyConversationTitleGeneratedEventData,
-  LangyCredentialSession,
-  LangyLocalControlRequestedEventData,
-  LangyLocalPolicyChangedEventData,
-  LangyLocalWorkspaceConnectedEventData,
-  LangyLocalWorkspaceDisconnectedEventData,
-  LangyMessageImportedEventData,
-  LangyMessageRecordedEventData,
-  LangyPlanUpdatedEventData,
-  LangyTitleSource,
-  LangyToolCallFailedEventData,
-  LangyToolCallInitiatedEventData,
-  LangyToolCallSucceededEventData,
-  LangyUserWaitEndedEventData,
-  LangyUserWaitStartedEventData,
+import {
+  type LangyAgentRespondedEventData,
+  type LangyAgentResponseFailedEventData,
+  type LangyAgentTurnAcceptedEventData,
+  type LangyConversationArchivedEventData,
+  type LangyConversationForkedEventData,
+  type LangyConversationHandoffConsumedEventData,
+  type LangyConversationHandoffPendingEventData,
+  type LangyConversationMetadataUpdatedEventData,
+  type LangyConversationStartedEventData,
+  type LangyConversationTitleGeneratedEventData,
+  type LangyCredentialSession,
+  type LangyLocalControlRequestedEventData,
+  type LangyLocalPolicyChangedEventData,
+  type LangyLocalWorkspaceConnectedEventData,
+  type LangyLocalWorkspaceDisconnectedEventData,
+  type LangyMessageImportedEventData,
+  type LangyMessageRecordedEventData,
+  type LangyPlanUpdatedEventData,
+  type LangyToolCallFailedEventData,
+  type LangyToolCallInitiatedEventData,
+  type LangyToolCallSucceededEventData,
+  type LangyUserWaitEndedEventData,
+  type LangyUserWaitStartedEventData,
+  LANGY_TITLE_SOURCE,
 } from "@langwatch/langy-contract";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import type { LanguageModel } from "ai";
-import type { z } from "zod";
+import { z } from "zod";
 
 import type {
   LANGY_ID_RESOURCES,
@@ -46,20 +46,21 @@ import type { UserWaitService } from "../services/langy-local-user-wait.service.
 export type LangyProcessIntentType =
   (typeof LANGY_PROCESS_INTENT_TYPES)[keyof typeof LANGY_PROCESS_INTENT_TYPES];
 
-export interface LangyConversationProcessState {
-  currentTurnId: string | null;
-  turnStatus: "idle" | "running" | "completed" | "failed";
-  titleSource: LangyTitleSource;
+export const langyConversationProcessStateSchema = z.object({
+  currentTurnId: z.string().nullable(),
+  turnStatus: z.enum(["idle", "running", "completed", "failed"]),
+  titleSource: z.enum(LANGY_TITLE_SOURCE),
   /**
    * One-shot latch: automatic title intent already recorded. Only generated
    * at the first successful agent_responded boundary while the title is
    * still derived, never again once set or titleSource leaves "derived".
    */
-  autoTitleRequested: boolean;
-  archived: boolean;
+  autoTitleRequested: z.boolean(),
+  archived: z.boolean(),
   /** ADR-048: id of the turn whose resume handoff is pending — identity only. */
-  pendingHandoffTurnId: string | null;
-}
+  pendingHandoffTurnId: z.string().nullable(),
+});
+export type LangyConversationProcessState = z.infer<typeof langyConversationProcessStateSchema>;
 
 export type LangyWorkerDispatchIntent = z.infer<typeof langyWorkerDispatchIntentSchema>;
 

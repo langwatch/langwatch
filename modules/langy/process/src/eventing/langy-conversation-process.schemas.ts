@@ -1,11 +1,13 @@
 import { z } from "zod";
 
+import { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "../channels/langy-worker.channel.ts";
+
 /** Typed contracts for the Langy conversation process manager (ADR-049 §4). State holds
  * identities, statuses, and flags only; sensitive data stays in domain tables or Redis. */
 export const LANGY_CONVERSATION_PROCESS_NAME = "langyConversation";
 
 /** Worker dispatch budget used by both the worker adapter and process lease. */
-export const LANGY_AGENT_DISPATCH_TIMEOUT_MS = 60_000;
+export { LANGY_AGENT_DISPATCH_TIMEOUT_MS };
 
 /** Margin kept between a worker dispatch timeout and its process lease. */
 export const LANGY_OUTBOX_LEASE_MARGIN_MS = 30_000;

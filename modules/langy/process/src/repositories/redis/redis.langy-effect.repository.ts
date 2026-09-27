@@ -63,148 +63,145 @@ function assertHandoffIdentity(params: {
   }
 }
 
+type TurnRef = { projectId: string; conversationId: string; turnId: string };
+type DispatchIntent = "create" | "revive" | "continue";
+
 /**
- * Live effect adapters for process-outbox delivery. The dispatcher owns the
- * consumer span and retry attempt; the worker and title generator own their
- * downstream spans.
+ * One turn's worker dispatch from the process outbox. It peeks rather than consumes the handoff,
+ * so an outbox failure can retry the same short-lived handoff until its normal TTL expires.
+ */
+class LangyTurnDispatchEffect {
+  constructor(private readonly deps: CreateLangyEffectRepositoryOptions) {}
+
+  readonly dispatchTurn = async (turn: TurnRef): Promise<void> => {
+    const handoff = await this.liveHandoff(turn);
+    if (!handoff) return;
+    let current = handoff;
+    let intent = dispatchIntentOf({
+      resumable: Boolean(handoff.resumeToken),
+      hasApiKey: Boolean(handoff.credentials.langwatchApiKey),
+    });
+    let outcome = await this.dispatch({ turn, handoff: current, intent });
+
+    // A probe hit is only a latency hint: the worker may die before this durable effect reaches
+    // it. The key is recovered once from the actor and persisted into the retryable handoff.
+    if (outcome === "credentialsRequired" && !current.credentials.langwatchApiKey) {
+      current = await this.recoverCredentials({ turn, handoff: current });
+      intent = current.resumeToken ? "revive" : "create";
+      outcome = await this.dispatch({ turn, handoff: current, intent });
+    }
+    if (outcome === "accepted") return;
+    if (outcome === "rejected") return this.terminalize(turn);
+    throw new LangyTurnDispatchRetry(
+      `langy dispatch not accepted (${outcome}) for turn ${turn.turnId}`,
+    );
+  };
+
+  /**
+   * The handoff to dispatch, or none. Missing/expired is not recoverable by retrying this intent
+   * (the heartbeat-aware liveness subscriber terminalizes an abandoned turn), and a turn the user
+   * stopped already has its terminal on the record — dispatching would spend a worker for nothing.
+   */
+  private async liveHandoff(turn: TurnRef): Promise<LangyTurnHandoff | undefined> {
+    const { projectId, conversationId, turnId } = turn;
+    const lookup = await this.deps.handoffStore.read({ conversationId, turnId });
+    if (lookup.kind === "miss") {
+      logger.warn(turn, "No Langy turn handoff found; leaving recovery to liveness");
+      return undefined;
+    }
+    assertHandoffIdentity({ handoff: lookup.handoff, projectId, conversationId, turnId });
+    if (await this.deps.handoffStore.isStopped({ conversationId, turnId })) {
+      logger.info(turn, "langy turn was stopped before dispatch; not starting the work");
+      return undefined;
+    }
+    return lookup.handoff;
+  }
+
+  /** The seed rides a re-drive too: a fresh session must still get the conversation so far. */
+  private dispatch({
+    turn,
+    handoff,
+    intent,
+  }: {
+    turn: TurnRef;
+    handoff: LangyTurnHandoff;
+    intent: DispatchIntent;
+  }) {
+    return this.deps.worker.dispatch({
+      intent,
+      ...turn,
+      userId: handoff.actorUserId,
+      runToken: handoff.runToken,
+      prompt: handoff.prompt,
+      system: handoff.system,
+      ...(handoff.historySeed ? { historySeed: handoff.historySeed } : {}),
+      credentials: handoff.credentials,
+      ...(handoff.modelOverride ? { modelOverride: handoff.modelOverride } : {}),
+      ...(handoff.resumeToken ? { resumeToken: handoff.resumeToken } : {}),
+    });
+  }
+
+  /**
+   * Mints a key for the actor and stashes it into the handoff, so later outbox or liveness
+   * deliveries reuse it rather than minting on every retry; a key it cannot stash is revoked.
+   */
+  private async recoverCredentials({
+    turn,
+    handoff,
+  }: {
+    turn: TurnRef;
+    handoff: LangyTurnHandoff;
+  }): Promise<LangyTurnHandoff> {
+    const minted = await this.deps.mintSessionKey({
+      userId: handoff.actorUserId,
+      projectId: turn.projectId,
+      organizationId: handoff.credentials.organizationId,
+    });
+    const recovered = {
+      ...handoff,
+      credentials: {
+        ...handoff.credentials,
+        langwatchApiKey: minted.token,
+        langwatchApiKeyId: minted.apiKeyId,
+      },
+    };
+    try {
+      await this.deps.handoffStore.stash(recovered);
+    } catch (error) {
+      await this.deps
+        .revokeSessionKey({ apiKeyId: minted.apiKeyId, projectId: turn.projectId })
+        .catch((revokeError: unknown) =>
+          logger.warn({ revokeError, ...turn }, "failed to revoke unstashed Langy recovery key"),
+        );
+      throw error;
+    }
+    return recovered;
+  }
+
+  /**
+   * A permanent rejection poisons the outbox if it may retry — the agent answers the same 4xx
+   * forever and every later turn queues behind it — so the turn is durably failed instead.
+   */
+  private async terminalize(turn: TurnRef): Promise<void> {
+    logger.warn(turn, "langy dispatch permanently rejected; terminalizing the turn");
+    const error = LangyTurnErrors.serialize(new LangyDispatchRejectedError());
+    const { conversationId, turnId } = turn;
+    await this.deps.markError({ conversationId, turnId, error }).catch(() => undefined);
+    await this.deps.failTurn.failTurn({ ...turn, error });
+  }
+}
+
+/**
+ * Live effect adapters for process-outbox delivery. The dispatcher owns the consumer span and
+ * retry attempt; the worker and title generator own their downstream spans.
  */
 export class RedisLangyEffectRepository {
   static create(deps: CreateLangyEffectRepositoryOptions): LangyEffectMembers {
     return {
-      workerDispatch: {
-        async dispatchTurn({ projectId, conversationId, turnId }): Promise<void> {
-          // Peek rather than consume: an outbox failure must be able to retry the
-          // same short-lived handoff until its normal TTL expires.
-          const lookup = await deps.handoffStore.read({
-            conversationId,
-            turnId,
-          });
-          if (lookup.kind === "miss") {
-            // Missing/expired is not recoverable by retrying this intent. The
-            // heartbeat-aware liveness subscriber owns terminalizing an
-            // abandoned turn.
-            logger.warn(
-              { projectId, conversationId, turnId },
-              "No Langy turn handoff found; leaving recovery to liveness",
-            );
-            return;
-          }
-          const { handoff } = lookup;
-          assertHandoffIdentity({
-            handoff,
-            projectId,
-            conversationId,
-            turnId,
-          });
-
-          // The user stopped this turn. Its terminal is already on the record, so dispatching
-          // now would spend a worker on an answer that has nowhere to land — and on a turn
-          // admitted just before the stop, this intent is the only thing left that could still
-          // start the work.
-          if (await deps.handoffStore.isStopped({ conversationId, turnId })) {
-            logger.info(
-              { projectId, conversationId, turnId },
-              "langy turn was stopped before dispatch; not starting the work",
-            );
-            return;
-          }
-
-          let dispatchHandoff = handoff;
-          let intent: "create" | "revive" | "continue" = dispatchIntentOf({
-            resumable: Boolean(handoff.resumeToken),
-            hasApiKey: Boolean(handoff.credentials.langwatchApiKey),
-          });
-          const dispatch = (candidate: LangyTurnHandoff) =>
-            deps.worker.dispatch({
-              intent,
-              projectId,
-              conversationId,
-              turnId,
-              userId: candidate.actorUserId,
-              runToken: candidate.runToken,
-              prompt: candidate.prompt,
-              system: candidate.system,
-              // The seed rides the re-drive too: this is exactly the path where
-              // a probe-hit turn lands on a worker that has since died, and the
-              // fresh session it spawns must still get the conversation so far.
-              ...(candidate.historySeed ? { historySeed: candidate.historySeed } : {}),
-              credentials: candidate.credentials,
-              ...(candidate.modelOverride ? { modelOverride: candidate.modelOverride } : {}),
-              ...(candidate.resumeToken ? { resumeToken: candidate.resumeToken } : {}),
-            });
-
-          let outcome = await dispatch(dispatchHandoff);
-
-          // A probe hit is only a latency hint: the worker may die before this
-          // durable effect reaches it. Recover the key from the actor identity in
-          // Postgres, persist it into the retryable handoff, then redrive once.
-          // Subsequent outbox/liveness deliveries reuse the same key rather than
-          // minting on every retry.
-          if (outcome === "credentialsRequired" && !dispatchHandoff.credentials.langwatchApiKey) {
-            const minted = await deps.mintSessionKey({
-              userId: dispatchHandoff.actorUserId,
-              projectId,
-              organizationId: dispatchHandoff.credentials.organizationId,
-            });
-            dispatchHandoff = {
-              ...dispatchHandoff,
-              credentials: {
-                ...dispatchHandoff.credentials,
-                langwatchApiKey: minted.token,
-                langwatchApiKeyId: minted.apiKeyId,
-              },
-            };
-            try {
-              await deps.handoffStore.stash(dispatchHandoff);
-            } catch (error) {
-              await deps
-                .revokeSessionKey({ apiKeyId: minted.apiKeyId, projectId })
-                .catch((revokeError) => {
-                  logger.warn(
-                    { revokeError, projectId, conversationId, turnId },
-                    "failed to revoke unstashed Langy recovery key",
-                  );
-                });
-              throw error;
-            }
-            intent = dispatchHandoff.resumeToken ? "revive" : "create";
-            outcome = await dispatch(dispatchHandoff);
-          }
-
-          if (outcome === "accepted") return;
-
-          // A permanent rejection poisons the outbox if it is allowed to retry:
-          // the agent will answer the same 4xx forever, every ~minute, and every
-          // later turn queues behind it. Terminalize instead — durably fail the
-          // turn (the same path liveness uses for an abandoned one) and consume
-          // the intent.
-          if (outcome === "rejected") {
-            logger.warn(
-              { projectId, conversationId, turnId },
-              "langy dispatch permanently rejected; terminalizing the turn",
-            );
-            const error = LangyTurnErrors.serialize(new LangyDispatchRejectedError());
-            await deps.markError({ conversationId, turnId, error }).catch(() => undefined);
-            await deps.failTurn.failTurn({
-              projectId,
-              conversationId,
-              turnId,
-              error,
-            });
-            return;
-          }
-
-          throw new LangyTurnDispatchRetry(
-            `langy dispatch not accepted (${outcome}) for turn ${turnId}`,
-          );
-        },
-      },
+      workerDispatch: new LangyTurnDispatchEffect(deps),
       titleGeneration: {
         async generateTitle({ projectId, conversationId, turnId }): Promise<void> {
-          const generated = await deps.titleGenerator({
-            projectId,
-            conversationId,
-          });
+          const generated = await deps.titleGenerator({ projectId, conversationId });
           if (generated.outcome === "unchanged") return;
           await deps.saveTitle({
             projectId,
@@ -225,7 +222,7 @@ function dispatchIntentOf({
 }: {
   resumable: boolean;
   hasApiKey: boolean;
-}): "create" | "revive" | "continue" {
+}): DispatchIntent {
   if (resumable) return "revive";
   return hasApiKey ? "create" : "continue";
 }

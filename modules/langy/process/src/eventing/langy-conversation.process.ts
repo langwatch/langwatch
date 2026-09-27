@@ -1,12 +1,13 @@
 import type { EventHandler, IntentExecutor, ProcessManagerApplier } from "@langwatch/eventing";
 import { LANGY_CONVERSATION_EVENT_TYPES, LANGY_TITLE_SOURCE } from "@langwatch/langy-contract";
 
-import type {
-  LangyConversationProcessState,
-  LangyEffectMembers,
-  LangyGenerateTitleIntent,
-  LangyProcessEventView,
-  LangyWorkerDispatchIntent,
+import {
+  type LangyConversationProcessState,
+  langyConversationProcessStateSchema,
+  type LangyEffectMembers,
+  type LangyGenerateTitleIntent,
+  type LangyProcessEventView,
+  type LangyWorkerDispatchIntent,
 } from "../app/langy.members.ts";
 import {
   LANGY_OUTBOX_LEASE_DURATION_MS,
@@ -187,7 +188,7 @@ export function langyConversationProcess(
 ): ProcessManagerApplier<LangyConversationProcessingEvent> {
   return (pm) =>
     pm
-      .state<LangyConversationProcessState>(INITIAL_LANGY_PROCESS_STATE)
+      .state(langyConversationProcessStateSchema, INITIAL_LANGY_PROCESS_STATE)
       .intent(
         LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH,
         langyWorkerDispatchIntentSchema,

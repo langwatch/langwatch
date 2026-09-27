@@ -157,99 +157,156 @@ export function createAgentTurnLivenessSubscriber(
       },
     },
     async handle(event): Promise<void> {
-      const projectId = event.tenantId;
-      const conversationId = String(event.aggregateId);
-      const eventTurnId = extractTurnId(event);
-      if (!eventTurnId) return;
-      const conversation = await getFoldedConversation({
-        reader: deps.conversations,
-        projectId,
-        conversationId,
-        event,
-      });
-      if (
-        conversation.status !== LANGY_CONVERSATION_STATUS.RUNNING ||
-        conversation.currentTurnId === null ||
-        conversation.currentTurnId !== eventTurnId
-      )
-        return;
-      const turnId = conversation.currentTurnId;
+      const [turn] = await findRunningTurn({ deps, event });
+      if (!turn) return;
       const now = clock();
       const liveness = await deps.buffer.liveness({
-        conversationId,
-        turnId,
+        conversationId: turn.conversationId,
+        turnId: turn.turnId,
         now,
         graceMs: LANGY_HEARTBEAT_GRACE_MS,
       });
       if (!liveness.stale) {
         throw new DispatchError({
-          message: `langy turn ${turnId} still live; re-checking liveness`,
+          message: `langy turn ${turn.turnId} still live; re-checking liveness`,
           retryable: true,
           retryAfterMs: LANGY_HEARTBEAT_GRACE_MS,
         });
       }
       const stalledMs =
-        conversation.lastActivityAtMs === null
-          ? MAX_STALL_MS + 1
-          : now - conversation.lastActivityAtMs;
-      const lookup = await deps.handoffStore.read({ conversationId, turnId });
-      const candidateHandoff = lookup.kind === "hit" ? lookup.handoff : undefined;
-      const handoff =
-        candidateHandoff?.projectId === projectId &&
-        candidateHandoff.conversationId === conversationId &&
-        candidateHandoff.turnId === turnId
-          ? candidateHandoff
-          : null;
+        turn.lastActivityAtMs === null ? MAX_STALL_MS + 1 : now - turn.lastActivityAtMs;
+      const [handoff] = await findMatchingHandoff({ deps, turn });
       if (stalledMs > MAX_STALL_MS) {
-        livenessLogger.warn(
-          {
-            projectId,
-            conversationId,
-            turnId,
-            stalledMs,
-            reason: "stall_expired",
-            hasHandoff: handoff !== null,
-          },
-          "failing a stalled langy turn",
-        );
-        const error = LangyTurnErrors.serialize(new LangyWorkerStoppedError());
-        await deps.buffer.markError({ conversationId, turnId, error }).catch(() => undefined);
-        await deps.failTurn.failTurn({ projectId, conversationId, turnId, error });
+        await failStalledTurn({ deps, turn, stalledMs, hasHandoff: handoff !== undefined });
         return;
       }
       if (!handoff) {
         throw new DispatchError({
-          message: `langy turn ${turnId} has no handoff but is still active (${stalledMs}ms); re-checking liveness`,
+          message: `langy turn ${turn.turnId} has no handoff but is still active (${stalledMs}ms); re-checking liveness`,
           retryable: true,
           retryAfterMs: LANGY_HEARTBEAT_GRACE_MS,
         });
       }
-      await deps.buffer
-        .appendStatus({ conversationId, turnId, status: "Reconnecting to the agent…" })
-        .catch(() => undefined);
-      await deps.worker.dispatch({
-        intent: dispatchIntentOf({
-          resumable: Boolean(handoff.resumeToken),
-          hasApiKey: Boolean(handoff.credentials.langwatchApiKey),
-        }),
-        conversationId,
-        turnId,
-        projectId,
-        userId: handoff.actorUserId,
-        runToken: handoff.runToken,
-        prompt: handoff.prompt,
-        system: handoff.system,
-        ...(handoff.historySeed ? { historySeed: handoff.historySeed } : {}),
-        credentials: handoff.credentials,
-        ...(handoff.modelOverride ? { modelOverride: handoff.modelOverride } : {}),
-        ...(handoff.resumeToken ? { resumeToken: handoff.resumeToken } : {}),
-      });
+      await redriveTurn({ deps, turn, handoff });
       throw new DispatchError({
-        message: `langy turn ${turnId} stalled (${stalledMs}ms); re-driven, awaiting liveness`,
+        message: `langy turn ${turn.turnId} stalled (${stalledMs}ms); re-driven, awaiting liveness`,
         retryable: true,
       });
     },
   };
+}
+
+type LivenessTurn = {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  lastActivityAtMs: number | null;
+};
+
+/** The turn the event names, when the folded conversation is still running exactly that turn. */
+async function findRunningTurn({
+  deps,
+  event,
+}: {
+  deps: AgentTurnLivenessSubscriberDeps;
+  event: LangyConversationProcessingEvent;
+}): Promise<LivenessTurn[]> {
+  const eventTurnId = extractTurnId(event);
+  if (!eventTurnId) return [];
+  const projectId = event.tenantId;
+  const conversationId = String(event.aggregateId);
+  const conversation = await getFoldedConversation({
+    reader: deps.conversations,
+    projectId,
+    conversationId,
+    event,
+  });
+  const running = conversation.status === LANGY_CONVERSATION_STATUS.RUNNING;
+  if (!running || conversation.currentTurnId !== eventTurnId) return [];
+  return [
+    {
+      projectId,
+      conversationId,
+      turnId: eventTurnId,
+      lastActivityAtMs: conversation.lastActivityAtMs,
+    },
+  ];
+}
+
+/** The turn's parked handoff, only when it really is this turn's. */
+async function findMatchingHandoff({
+  deps,
+  turn,
+}: {
+  deps: AgentTurnLivenessSubscriberDeps;
+  turn: LivenessTurn;
+}): Promise<LangyTurnHandoffRecord[]> {
+  const lookup = await deps.handoffStore.read({
+    conversationId: turn.conversationId,
+    turnId: turn.turnId,
+  });
+  if (lookup.kind !== "hit") return [];
+  const { handoff } = lookup;
+  const same =
+    handoff.projectId === turn.projectId &&
+    handoff.conversationId === turn.conversationId &&
+    handoff.turnId === turn.turnId;
+  return same ? [handoff] : [];
+}
+
+/** A turn silent past the stall window is durably failed as a stopped worker. */
+async function failStalledTurn({
+  deps,
+  turn,
+  stalledMs,
+  hasHandoff,
+}: {
+  deps: AgentTurnLivenessSubscriberDeps;
+  turn: LivenessTurn;
+  stalledMs: number;
+  hasHandoff: boolean;
+}): Promise<void> {
+  const { projectId, conversationId, turnId } = turn;
+  livenessLogger.warn(
+    { projectId, conversationId, turnId, stalledMs, reason: "stall_expired", hasHandoff },
+    "failing a stalled langy turn",
+  );
+  const error = LangyTurnErrors.serialize(new LangyWorkerStoppedError());
+  await deps.buffer.markError({ conversationId, turnId, error }).catch(() => undefined);
+  await deps.failTurn.failTurn({ projectId, conversationId, turnId, error });
+}
+
+/** Says it is reconnecting, then dispatches the parked handoff again. */
+async function redriveTurn({
+  deps,
+  turn,
+  handoff,
+}: {
+  deps: AgentTurnLivenessSubscriberDeps;
+  turn: LivenessTurn;
+  handoff: LangyTurnHandoffRecord;
+}): Promise<void> {
+  const { projectId, conversationId, turnId } = turn;
+  await deps.buffer
+    .appendStatus({ conversationId, turnId, status: "Reconnecting to the agent…" })
+    .catch(() => undefined);
+  await deps.worker.dispatch({
+    intent: dispatchIntentOf({
+      resumable: Boolean(handoff.resumeToken),
+      hasApiKey: Boolean(handoff.credentials.langwatchApiKey),
+    }),
+    conversationId,
+    turnId,
+    projectId,
+    userId: handoff.actorUserId,
+    runToken: handoff.runToken,
+    prompt: handoff.prompt,
+    system: handoff.system,
+    ...(handoff.historySeed ? { historySeed: handoff.historySeed } : {}),
+    credentials: handoff.credentials,
+    ...(handoff.modelOverride ? { modelOverride: handoff.modelOverride } : {}),
+    ...(handoff.resumeToken ? { resumeToken: handoff.resumeToken } : {}),
+  });
 }
 
 export function createLangyConversationUpdateBroadcastSubscriber(

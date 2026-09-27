@@ -3,11 +3,15 @@ import { context, propagation, trace } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
-import { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "../../eventing/langy-conversation-process.schemas.ts";
-import type {
-  LangyDispatchOutcome,
-  LangyWorkerMetrics,
+import {
+  LANGY_AGENT_DISPATCH_TIMEOUT_MS,
   LangyWorker,
+  type LangyDispatchOutcome,
+  type LangyWorkerCancelInput,
+  type LangyWorkerDispatchInput,
+  type LangyWorkerProbeInput,
+  type LangyWorkerWarmInput,
+  type LangyWorkerMetrics,
 } from "../langy-worker.channel.ts";
 
 export type { LangyDispatchOutcome } from "../langy-worker.channel.ts";
@@ -60,186 +64,197 @@ function dispatchOutcome(response: Response): LangyDispatchOutcome {
   return "unavailable";
 }
 
-function buildLangyWorker(config: LangyWorkerChannelConfig): LangyWorker {
-  const { agentUrl, internalSecret, metrics } = config;
-  const logger = createLogger("langwatch:langy:worker");
-  const tracer = getLangWatchTracer("langwatch.langy.chat");
+/** HTTP adapter for the process-owned Langy worker manager. */
+export class HttpLangyWorkerChannel extends LangyWorker {
+  static create(config: LangyWorkerChannelConfig): LangyWorker {
+    return new HttpLangyWorkerChannel(config);
+  }
 
-  return {
-    async probe({
-      projectId,
-      actorUserId,
-      conversationId,
-      model,
-      hasGithubAuth,
-      githubRepoScopeKey,
-      egressAllowlist,
-      mirrorTier,
-      harness,
-    }) {
-      try {
-        const response = await fetch(`${agentUrl}/worker/probe`, {
-          method: "POST",
-          headers: headers(internalSecret),
-          body: JSON.stringify({
-            projectId,
-            actorUserId,
-            conversationId,
-            ...(model ? { model } : {}),
-            hasGithubAuth,
-            ...(githubRepoScopeKey ? { githubRepoScopeKey } : {}),
-            ...(egressAllowlist?.length ? { egressAllowlist } : {}),
-            ...(mirrorTier ? { mirrorTier } : {}),
-            ...(harness ? { harness } : {}),
-          }),
-          signal: AbortSignal.timeout(AGENT_PROBE_TIMEOUT_MS),
-        });
-        if (!response.ok) {
-          return false;
-        }
+  private readonly agentUrl: string;
+  private readonly internalSecret: string;
+  private readonly metrics: LangyWorkerMetrics;
+  private readonly logger = createLogger("langwatch:langy:worker");
+  private readonly tracer = getLangWatchTracer("langwatch.langy.chat");
 
-        const body = probeResponseSchema.parse(await response.json());
-        const alive = body.alive === true;
-        trace.getActiveSpan()?.setAttribute("langy.probe.hit", alive);
-        return alive;
-      } catch (error) {
-        logger.debug(
-          { error, conversationId },
-          "langy worker probe failed — minting a session key as if cold",
-        );
+  private constructor(config: LangyWorkerChannelConfig) {
+    super();
+    this.agentUrl = config.agentUrl;
+    this.internalSecret = config.internalSecret;
+    this.metrics = config.metrics;
+  }
+
+  async probe({
+    projectId,
+    actorUserId,
+    conversationId,
+    model,
+    hasGithubAuth,
+    githubRepoScopeKey,
+    egressAllowlist,
+    mirrorTier,
+    harness,
+  }: LangyWorkerProbeInput): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.agentUrl}/worker/probe`, {
+        method: "POST",
+        headers: headers(this.internalSecret),
+        body: JSON.stringify({
+          projectId,
+          actorUserId,
+          conversationId,
+          ...(model ? { model } : {}),
+          hasGithubAuth,
+          ...(githubRepoScopeKey ? { githubRepoScopeKey } : {}),
+          ...(egressAllowlist?.length ? { egressAllowlist } : {}),
+          ...(mirrorTier ? { mirrorTier } : {}),
+          ...(harness ? { harness } : {}),
+        }),
+        signal: AbortSignal.timeout(AGENT_PROBE_TIMEOUT_MS),
+      });
+      if (!response.ok) {
         return false;
       }
-    },
 
-    async warm({ projectId, actorUserId, conversationId, credentials, modelOverride }) {
-      await tracer.withActiveSpan(
-        "langy.chat.warm_worker",
-        {
-          attributes: {
-            "tenant.id": projectId,
-            "user.id": actorUserId,
-            "langy.conversation.id": conversationId,
-          },
-        },
-        async () => {
-          try {
-            const response = await fetch(`${agentUrl}/warm`, {
-              method: "POST",
-              headers: headers(internalSecret),
-              body: JSON.stringify({
-                projectId,
-                actorUserId,
-                conversationId,
-                credentials,
-                ...(modelOverride ? { modelOverride } : {}),
-              }),
-              signal: AbortSignal.timeout(AGENT_WARM_TIMEOUT_MS),
-            });
-            void response.body?.cancel();
-          } catch (error) {
-            logger.debug({ error, conversationId }, "langy worker warm failed — cold-starting");
-          }
-        },
+      const body = probeResponseSchema.parse(await response.json());
+      const alive = body.alive === true;
+      trace.getActiveSpan()?.setAttribute("langy.probe.hit", alive);
+      return alive;
+    } catch (error) {
+      this.logger.debug(
+        { error, conversationId },
+        "langy worker probe failed — minting a session key as if cold",
       );
-    },
+      return false;
+    }
+  }
 
-    async dispatch({
-      intent,
-      conversationId,
-      turnId,
-      projectId,
-      userId,
-      runToken,
-      prompt,
-      system,
-      historySeed,
-      credentials,
-      modelOverride,
-      resumeToken,
-    }) {
-      return tracer.withActiveSpan(
-        "langy.chat.dispatch_turn",
-        {
-          attributes: {
-            "tenant.id": projectId,
-            "user.id": userId,
-            "langy.conversation.id": conversationId,
-            "langy.turn.id": turnId,
-            "langy.worker.intent": intent,
-          },
+  async warm({
+    projectId,
+    actorUserId,
+    conversationId,
+    credentials,
+    modelOverride,
+  }: LangyWorkerWarmInput): Promise<void> {
+    await this.tracer.withActiveSpan(
+      "langy.chat.warm_worker",
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "user.id": actorUserId,
+          "langy.conversation.id": conversationId,
         },
-        async (span): Promise<LangyDispatchOutcome> => {
-          try {
-            const response = await fetch(`${agentUrl}/worker/${intent}`, {
-              method: "POST",
-              headers: headers(internalSecret),
-              body: JSON.stringify({
-                conversationId,
-                turnId,
-                projectId,
-                userId,
-                runToken,
-                prompt,
-                system,
-                ...(historySeed ? { historySeed } : {}),
-                credentials,
-                ...(modelOverride ? { modelOverride } : {}),
-                ...(resumeToken ? { resumeToken } : {}),
-              }),
-              signal: AbortSignal.timeout(AGENT_DISPATCH_TIMEOUT_MS),
-            });
-            void response.body?.cancel();
-            const outcome = dispatchOutcome(response);
-            span.setAttribute("langy.dispatch.outcome", outcome);
-            metrics.recordDispatch({ outcome });
-            return outcome;
-          } catch (error) {
-            logger.warn(
-              { error, conversationId, turnId },
-              "langy worker dispatch failed — leaving the turn to the liveness subscriber",
-            );
-            span.setAttribute("langy.dispatch.outcome", "error");
-            metrics.recordDispatch({ outcome: "error" });
-            return "unavailable";
-          }
-        },
-      );
-    },
+      },
+      async () => {
+        try {
+          const response = await fetch(`${this.agentUrl}/warm`, {
+            method: "POST",
+            headers: headers(this.internalSecret),
+            body: JSON.stringify({
+              projectId,
+              actorUserId,
+              conversationId,
+              credentials,
+              ...(modelOverride ? { modelOverride } : {}),
+            }),
+            signal: AbortSignal.timeout(AGENT_WARM_TIMEOUT_MS),
+          });
+          void response.body?.cancel();
+        } catch (error) {
+          this.logger.debug({ error, conversationId }, "langy worker warm failed — cold-starting");
+        }
+      },
+    );
+  }
 
-    async cancel({ conversationId, turnId, projectId }) {
-      await tracer.withActiveSpan(
-        "langy.chat.cancel_turn",
-        {
-          attributes: {
-            "tenant.id": projectId,
-            "langy.conversation.id": conversationId,
-            "langy.turn.id": turnId,
-          },
+  async dispatch({
+    intent,
+    conversationId,
+    turnId,
+    projectId,
+    userId,
+    runToken,
+    prompt,
+    system,
+    historySeed,
+    credentials,
+    modelOverride,
+    resumeToken,
+  }: LangyWorkerDispatchInput): Promise<LangyDispatchOutcome> {
+    return this.tracer.withActiveSpan(
+      "langy.chat.dispatch_turn",
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "user.id": userId,
+          "langy.conversation.id": conversationId,
+          "langy.turn.id": turnId,
+          "langy.worker.intent": intent,
         },
-        async () => {
-          try {
-            const response = await fetch(`${agentUrl}/worker/cancel`, {
-              method: "POST",
-              headers: headers(internalSecret),
-              body: JSON.stringify({ conversationId, turnId, projectId }),
-              signal: AbortSignal.timeout(AGENT_CANCEL_TIMEOUT_MS),
-            });
-            void response.body?.cancel();
-          } catch (error) {
-            logger.debug(
-              { error, conversationId, turnId },
-              "langy worker cancel failed — the turn is already stopped on record",
-            );
-          }
-        },
-      );
-    },
-  };
-}
+      },
+      async (span): Promise<LangyDispatchOutcome> => {
+        try {
+          const response = await fetch(`${this.agentUrl}/worker/${intent}`, {
+            method: "POST",
+            headers: headers(this.internalSecret),
+            body: JSON.stringify({
+              conversationId,
+              turnId,
+              projectId,
+              userId,
+              runToken,
+              prompt,
+              system,
+              ...(historySeed ? { historySeed } : {}),
+              credentials,
+              ...(modelOverride ? { modelOverride } : {}),
+              ...(resumeToken ? { resumeToken } : {}),
+            }),
+            signal: AbortSignal.timeout(AGENT_DISPATCH_TIMEOUT_MS),
+          });
+          void response.body?.cancel();
+          const outcome = dispatchOutcome(response);
+          span.setAttribute("langy.dispatch.outcome", outcome);
+          this.metrics.recordDispatch({ outcome });
+          return outcome;
+        } catch (error) {
+          this.logger.warn(
+            { error, conversationId, turnId },
+            "langy worker dispatch failed — leaving the turn to the liveness subscriber",
+          );
+          span.setAttribute("langy.dispatch.outcome", "error");
+          this.metrics.recordDispatch({ outcome: "error" });
+          return "unavailable";
+        }
+      },
+    );
+  }
 
-/** HTTP adapter for the process-owned Langy worker manager. */
-export class HttpLangyWorkerChannel {
-  static create(config: LangyWorkerChannelConfig): LangyWorker {
-    return buildLangyWorker(config);
+  async cancel({ conversationId, turnId, projectId }: LangyWorkerCancelInput): Promise<void> {
+    await this.tracer.withActiveSpan(
+      "langy.chat.cancel_turn",
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "langy.conversation.id": conversationId,
+          "langy.turn.id": turnId,
+        },
+      },
+      async () => {
+        try {
+          const response = await fetch(`${this.agentUrl}/worker/cancel`, {
+            method: "POST",
+            headers: headers(this.internalSecret),
+            body: JSON.stringify({ conversationId, turnId, projectId }),
+            signal: AbortSignal.timeout(AGENT_CANCEL_TIMEOUT_MS),
+          });
+          void response.body?.cancel();
+        } catch (error) {
+          this.logger.debug(
+            { error, conversationId, turnId },
+            "langy worker cancel failed — the turn is already stopped on record",
+          );
+        }
+      },
+    );
   }
 }
