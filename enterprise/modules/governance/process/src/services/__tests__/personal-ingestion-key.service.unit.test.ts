@@ -6,7 +6,10 @@ import {
   type ApiKeyApi,
   ApiKeyAlreadyRevokedError,
 } from "@langwatch/api-key-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import {
+  findPersonalWorkspaceInputSchema,
+  type OrganizationService,
+} from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
@@ -66,10 +69,13 @@ async function setup(
   const service = PersonalIngestionKeyService.create({
     templates,
     organizations: createApiFixture<OrganizationService>({
-      getPersonalWorkspace: async () => ({
-        team: { id: "team_p", name: "Personal", slug: "personal", createdAtMs: 0 },
-        project: { id: "project_p", name: "Personal", slug: "p", apiKey: "k", createdAtMs: 0 },
-      }),
+      getPersonalWorkspace: async (input) => {
+        findPersonalWorkspaceInputSchema.parse(input);
+        return {
+          team: { id: "team_p", name: "Personal", slug: "personal", createdAtMs: 0 },
+          project: { id: "project_p", name: "Personal", slug: "p", apiKey: "k", createdAtMs: 0 },
+        };
+      },
     }),
     apiKeys: createApiFixture<ApiKeyApi>({
       findIngestionKeysForUser: async () => live,
@@ -192,6 +198,23 @@ describe("PersonalIngestionKeyService", () => {
           createdByDeviceLabel: "mbp",
           name: "Ingestion key (claude_code, mbp)",
         },
+      ]);
+    });
+
+    /** @regression the workspace lookup refused the session's fields and the mint answered 500 */
+    it("mints on the personal project with every session field present", async () => {
+      const { service, created } = await setup([login]);
+
+      const issued = await service.mint({
+        ...session,
+        fromCliSession: true,
+        parentApiKeyId: "login_1",
+        createdByDeviceLabel: "mbp",
+      });
+
+      expect(issued.token).toBe("ik-lw-0123456789ab");
+      expect(created).toMatchObject([
+        { bindings: [{ scopeType: "PROJECT", scopeId: "project_p" }], parentApiKeyId: "login_1" },
       ]);
     });
 
