@@ -248,6 +248,9 @@ func (phase *parityPhase) inventoryRoutes(ctx context.Context, mainDocument map[
 	for _, side := range []string{"main", "branch"} {
 		out := filepath.Join(phase.dir, "routes-"+side+".json")
 		phase.state.logf("parity: inventory %s served routes (%s)", side, sides[side])
+		if err := phase.buildSdkForRoutes(ctx, sides[side]); err != nil {
+			return err
+		}
 		inventory := routeInventory{run: phase.state.run, inherit: phase.state.environ(), log: phase.state.stderr}
 		manifest, err := inventory.collect(ctx, sides[side], out)
 		if err != nil {
@@ -261,6 +264,18 @@ func (phase *parityPhase) inventoryRoutes(ctx context.Context, mainDocument map[
 	comparison := ServedComparison{Documented: DocumentedRoutes(mainDocument), ModuleOf: phase.restModule}
 	served := DiffServedRoutes(manifests["main"].Routes, manifests["branch"].Routes, comparison)
 	phase.report.ServedOnly = &served
+	return nil
+}
+
+// buildSdkForRoutes builds the TypeScript SDK the route inventory loads:
+// served routes are read from the composed application, whose packages import
+// the SDK's built entry, and the parity prepare deliberately skips the build.
+func (phase *parityPhase) buildSdkForRoutes(ctx context.Context, dir string) error {
+	phase.state.logf("parity prepare %s: pnpm --filter langwatch build", dir)
+	build := commandSpec{name: "pnpm", args: []string{"--filter", "langwatch", "build"}, dir: dir}
+	if err := phase.state.run(ctx, build, phase.state.stderr); err != nil {
+		return fmt.Errorf("parity prepare %s (pnpm --filter langwatch build): %w", dir, err)
+	}
 	return nil
 }
 
