@@ -17,7 +17,7 @@ import {
 } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
 import { TraceIOAccumulationService } from "../trace-io-accumulation.service.ts";
-import { TraceMediaReferenceAdapter } from "../trace-media-reference.service.ts";
+import { TraceMediaReferenceService } from "../trace-media-reference.service.ts";
 
 type Rich = { raw: unknown; text: string; source: "gen_ai" | "langwatch" };
 
@@ -36,7 +36,7 @@ function accumulator(sides: { input?: Rich; output?: Rich }): TraceIOAccumulatio
   return TraceIOAccumulationService.create(
     new StubExtraction(sides),
     TraceCanonicalisationService.create(),
-    TraceMediaReferenceAdapter.create(),
+    TraceMediaReferenceService.create(),
   );
 }
 

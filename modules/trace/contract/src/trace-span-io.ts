@@ -1,4 +1,4 @@
-import type { Span, SpanInputOutput } from "./trace-format.schemas.ts";
+import type { Span, LegacySpanInputOutput } from "./trace-format.schemas.ts";
 
 /**
  * The text one system-instruction entry contributes: the entry itself when it
@@ -83,7 +83,7 @@ export function buildDisplayInput(span: Pick<Span, "input" | "params">): string 
  * and edits. Pure and dependency-free so the client applies a correction with
  * exactly the same rendering the server used for the original.
  */
-export function stringifySpanIO(io: SpanInputOutput | null | undefined): string | null {
+export function stringifySpanIO(io: LegacySpanInputOutput | null | undefined): string | null {
   if (!io) return null;
   switch (io.type) {
     case "text":

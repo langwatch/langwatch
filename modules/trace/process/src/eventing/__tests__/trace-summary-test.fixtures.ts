@@ -11,12 +11,12 @@ import type {
   TraceSummaryData,
 } from "@langwatch/trace-contract";
 
-import { ModelCatalogTraceModelCostAdapter } from "../../services/model-catalog.trace-model-cost.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { TraceIoExtractionAdapter } from "../../services/trace-io-extraction-adapter.service.ts";
-import { TraceMediaReferenceAdapter } from "../../services/trace-media-reference.service.ts";
+import { TraceIoExtractionAdapterService } from "../../services/trace-io-extraction-adapter.service.ts";
+import { TraceMediaReferenceService } from "../../services/trace-media-reference.service.ts";
+import { TraceModelCostService } from "../../services/trace-model-cost.service.ts";
 import { TraceProjectionRuntimeService } from "../../services/trace-projection-runtime.service.ts";
-import { TraceSpanNormalizationAdapter } from "../../services/trace-span-normalization-adapter.service.ts";
+import { TraceSpanNormalizationAdapterService } from "../../services/trace-span-normalization-adapter.service.ts";
 
 /**
  * The deterministic, no-I/O runtime the trace-summary fold projection folds
@@ -27,10 +27,10 @@ export function createTestRuntime(): TraceProjectionRuntimeService {
   const canonicalisation = TraceCanonicalisationService.create();
   return TraceProjectionRuntimeService.create({
     canonicalisation,
-    ioExtraction: TraceIoExtractionAdapter.create(canonicalisation),
-    mediaReferences: TraceMediaReferenceAdapter.create(),
-    modelCosts: ModelCatalogTraceModelCostAdapter.create(),
-    spanNormalization: TraceSpanNormalizationAdapter.create(canonicalisation),
+    ioExtraction: TraceIoExtractionAdapterService.create(canonicalisation),
+    mediaReferences: TraceMediaReferenceService.create(),
+    modelCosts: TraceModelCostService.create(),
+    spanNormalization: TraceSpanNormalizationAdapterService.create(canonicalisation),
   });
 }
 

@@ -352,14 +352,31 @@ export const spanTypesSchema = z.union([
 
 export type SpanTypes = z.infer<typeof spanTypesSchema>;
 
+/**
+ * A verdict as legacy SDKs sent it, before `status` was required. Main's legacy span mapper
+ * carried it through as-is, so the legacy span shape accepts any JSON value in its place.
+ */
+export const typedValueLegacyVerdictSchema = z.object({
+  type: z.union([z.literal("evaluation_result"), z.literal("guardrail_result")]),
+  value: jSONSerializableSchema,
+});
+
+/** What a legacy span's input or output carries: the shared shape, or a legacy verdict. */
+export const legacySpanInputOutputSchema = z.union([
+  spanInputOutputSchema,
+  typedValueLegacyVerdictSchema,
+]);
+
+export type LegacySpanInputOutput = z.infer<typeof legacySpanInputOutputSchema>;
+
 export const baseSpanSchema = z.object({
   span_id: z.string(),
   parent_id: z.string().optional().nullable(),
   trace_id: z.string(),
   type: spanTypesSchema,
   name: z.string().optional().nullable(),
-  input: spanInputOutputSchema.optional().nullable(),
-  output: spanInputOutputSchema.optional().nullable(),
+  input: legacySpanInputOutputSchema.optional().nullable(),
+  output: legacySpanInputOutputSchema.optional().nullable(),
   error: errorCaptureSchema.optional().nullable(),
   timestamps: spanTimestampsSchema,
   metrics: spanMetricsSchema.optional().nullable(),

@@ -16,9 +16,9 @@ export const EVALUATOR_LOOP_BLOCKED_METRIC_DESCRIPTION =
 export const EVALUATOR_LOOP_BLOCKED_REASON_LABEL = "reason";
 
 /** Loop-guard refusals, pushed over OTLP. */
-export class OtelTraceEvaluationLoopMetricsAdapter implements TraceEvaluationLoopMetrics {
-  static create(): OtelTraceEvaluationLoopMetricsAdapter {
-    return new OtelTraceEvaluationLoopMetricsAdapter(
+export class TraceEvaluationLoopMetricsService implements TraceEvaluationLoopMetrics {
+  static create(): TraceEvaluationLoopMetricsService {
+    return new TraceEvaluationLoopMetricsService(
       counter({
         name: EVALUATOR_LOOP_BLOCKED_METRIC_NAME,
         description: EVALUATOR_LOOP_BLOCKED_METRIC_DESCRIPTION,

@@ -11,9 +11,9 @@ export const TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME =
 /**
  * Metrics for edge media extraction; optional in the extraction service.
  */
-export class OtelTraceEdgeMediaTelemetryAdapter implements TraceEdgeMediaTelemetry {
-  static create(): OtelTraceEdgeMediaTelemetryAdapter {
-    return new OtelTraceEdgeMediaTelemetryAdapter(
+export class TraceEdgeMediaTelemetryService implements TraceEdgeMediaTelemetry {
+  static create(): TraceEdgeMediaTelemetryService {
+    return new TraceEdgeMediaTelemetryService(
       counter({
         name: TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME,
         description: "Count of edge media-extraction fail-open events by failing stage",

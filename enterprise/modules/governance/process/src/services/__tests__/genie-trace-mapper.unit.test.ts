@@ -17,7 +17,7 @@
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { spanSchema } from "@langwatch/trace-contract";
-import { TraceSpanCostMatchingService } from "@langwatch/trace-process/testing";
+import { computeSpanCost } from "@langwatch/trace-process/testing";
 import { describe, expect, it } from "vitest";
 
 import { KNOWN_AGENT_IDENTITIES } from "../../rules/conversation-trace-assembly-service.rules.ts";
@@ -431,7 +431,7 @@ describe("given two ingestion sources routing into one destination project", () 
 
 describe("given the pricing table (Decision 14(d) pin)", () => {
   it("the Genie agent label resolves to no price — cost enrichment yields zero", () => {
-    const cost = TraceSpanCostMatchingService.computeSpanCost({
+    const cost = computeSpanCost({
       attrs: {},
       model: GENIE_AGENT_MODEL,
       promptTokens: 100_000,
@@ -449,7 +449,7 @@ describe("given the pricing table (Decision 14(d) pin)", () => {
    */
   /** @scenario "A source cannot name a real model as its agent" */
   it.each([...KNOWN_AGENT_IDENTITIES])("%s resolves to no price either", (agent) => {
-    const cost = TraceSpanCostMatchingService.computeSpanCost({
+    const cost = computeSpanCost({
       attrs: {},
       model: agent,
       promptTokens: 100_000,

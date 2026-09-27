@@ -34,6 +34,7 @@ import {
   isCollectorRejection,
   parseCollectorMetadata,
   resolveTraceId,
+  type CollectorBody,
   type CollectorErrorReport,
   type CollectorMetadata,
   type CollectorRejection,
@@ -132,10 +133,7 @@ const payloadTooLarge = (): Error =>
   new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 /** The request body as a JSON object, or the refusal reading it earned. */
-function readCollectorBody(
-  request: Request,
-  raw: string,
-): Record<string, any> | CollectorRejection {
+function readCollectorBody(request: Request, raw: string): CollectorBody | CollectorRejection {
   // warn, not error: a malformed body is the caller's mistake and we answer
   // it with a 400. These three sites return rather than throw, so they never
   // reach the boundary that would classify them as customer fault, and at
@@ -166,12 +164,12 @@ function readCollectorBody(
     return { rejected: true, body: { message: "Invalid body, expecting json" }, status: 400 };
   }
 
-  return body as Record<string, any>;
+  return Object.fromEntries(Object.entries(body));
 }
 
 /** The legacy rewrites, the evaluation refusals, and the schema the whole body must satisfy. */
 function parseCollectorParams(
-  body: Record<string, any>,
+  body: CollectorBody,
   input: Readonly<{ projectId: string; reportError?: CollectorErrorReport | undefined }>,
 ): CollectorRESTParamsValidator | CollectorRejection {
   applyLegacyMetadataFields(body);
@@ -206,7 +204,7 @@ type PreparedCollectorBody = Readonly<{
 }>;
 
 function prepareCollectorBody(
-  body: Record<string, any>,
+  body: CollectorBody,
   params: CollectorRESTParamsValidator,
   input: Readonly<{ projectId: string; reportError?: CollectorErrorReport | undefined }>,
 ): PreparedCollectorBody | CollectorRejection {

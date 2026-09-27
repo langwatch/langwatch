@@ -5,6 +5,7 @@ import type {
   Span,
   SpanInputOutput,
   TypedValueJson,
+  LegacySpanInputOutput,
 } from "./trace-format.schemas.ts";
 import { typedValueJsonSchema } from "./trace-format.schemas.ts";
 
@@ -391,7 +392,7 @@ const listToText = (value: unknown, last: boolean, preferRole: string | undefine
 };
 
 export const typedValueToText = (
-  typed: SpanInputOutput,
+  typed: LegacySpanInputOutput,
   last = false,
   preferRole?: string,
 ): string => {

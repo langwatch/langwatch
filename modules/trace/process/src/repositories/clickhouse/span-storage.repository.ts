@@ -21,7 +21,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
-import { TraceSpanCostMatchingService } from "../../services/trace-span-cost-matching.service.ts";
+import { computeSpanCost } from "../../rules/trace-span-cost-matching.rules.ts";
 import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
 /**
  * The insert shape of a row whose epoch-millisecond fields are written as
@@ -452,7 +452,7 @@ function computeSummaryRowCost({
   inputTokens: number | null;
   outputTokens: number | null;
 }): number {
-  return TraceSpanCostMatchingService.computeSpanCost({
+  return computeSpanCost({
     attrs: {
       [ATTR_KEYS.GEN_AI_RESPONSE_MODEL]: toReportedValue(row.ResponseModel),
       [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: toReportedValue(row.Model),

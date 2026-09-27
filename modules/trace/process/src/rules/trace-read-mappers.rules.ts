@@ -16,7 +16,7 @@ import type {
   DerivedTraceEvent,
   Span,
   SpanDetail,
-  SpanInputOutput,
+  LegacySpanInputOutput,
   SpanTreeNode,
   SpanSummaryRow,
   TraceHeader,
@@ -41,7 +41,7 @@ import { TraceAttributeRedactionService } from "../services/trace-attribute-reda
 /** How a span's captured input/output becomes the text the drawer renders. */
 export type TraceSpanDisplay = Readonly<{
   buildDisplayInput(span: Pick<Span, "input" | "params">): string | null;
-  stringifySpanIO(io: SpanInputOutput | null | undefined): string | null;
+  stringifySpanIO(io: LegacySpanInputOutput | null | undefined): string | null;
 }>;
 
 /**

@@ -13,7 +13,7 @@ import { TraceSummaryReaderRepository } from "./repositories/trace-summary-reade
 export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service.ts";
 export { SpanNormalizationPipelineService } from "./services/span-normalization.service.ts";
 export { storedSpanReadBack } from "./repositories/clickhouse/__tests__/stored-span-row.test-fakes.ts";
-export { TraceSpanCostMatchingService } from "./services/trace-span-cost-matching.service.ts";
+export { computeSpanCost } from "./rules/trace-span-cost-matching.rules.ts";
 export { ClickHouseTraceQuerySubqueryRepository } from "./repositories/clickhouse/clickhouse.trace-query-subquery.repository.ts";
 
 export class MissingTraceRecordRepository extends TraceRecordRepository {

@@ -1,4 +1,4 @@
-import type { Span, SpanInputOutput, Trace } from "@langwatch/trace-contract";
+import type { Span, LegacySpanInputOutput, Trace } from "@langwatch/trace-contract";
 import {
   type ChatMessage,
   coerceToChatMessages,
@@ -82,7 +82,9 @@ export function extractLlmMessagesForTrace({
  * A `text`/`raw` payload is a JSON string often enough to be worth parsing
  * first, which is what the I/O panel does with the same value.
  */
-function coerceSpanIOToChatMessages(io: SpanInputOutput | null | undefined): ChatMessage[] | null {
+function coerceSpanIOToChatMessages(
+  io: LegacySpanInputOutput | null | undefined,
+): ChatMessage[] | null {
   if (!io) return null;
   const value: unknown = io.value;
   if (value === undefined || value === null) return null;
@@ -91,7 +93,7 @@ function coerceSpanIOToChatMessages(io: SpanInputOutput | null | undefined): Cha
 }
 
 /** A typed span payload as plain text, for the non-chat fallback. */
-function spanIOToText(io: SpanInputOutput | null | undefined): string {
+function spanIOToText(io: LegacySpanInputOutput | null | undefined): string {
   if (!io) return "";
   const value: unknown = io.value;
   if (value === undefined || value === null) return "";

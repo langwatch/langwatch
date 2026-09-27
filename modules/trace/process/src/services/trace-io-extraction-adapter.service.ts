@@ -10,15 +10,15 @@ import { TraceIOExtractionService } from "./trace-io-extraction.service.ts";
 /**
  * The projection's input/output extraction, over this package's own service.
  */
-export class TraceIoExtractionAdapter implements TraceIoExtraction {
+export class TraceIoExtractionAdapterService implements TraceIoExtraction {
   private constructor(private readonly service: TraceIOExtractionService) {}
 
-  static create(canonicalisation: TraceCanonicalisationService): TraceIoExtractionAdapter {
-    return new TraceIoExtractionAdapter(TraceIOExtractionService.create(canonicalisation));
+  static create(canonicalisation: TraceCanonicalisationService): TraceIoExtractionAdapterService {
+    return new TraceIoExtractionAdapterService(TraceIOExtractionService.create(canonicalisation));
   }
 
-  static fromService(service: TraceIOExtractionService): TraceIoExtractionAdapter {
-    return new TraceIoExtractionAdapter(service);
+  static fromService(service: TraceIOExtractionService): TraceIoExtractionAdapterService {
+    return new TraceIoExtractionAdapterService(service);
   }
 
   extractRichIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {

@@ -1,7 +1,7 @@
 import { getStaticModelCostRates, findMatchingModelCost } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
+import { computeSpanCost } from "../../rules/trace-span-cost-matching.rules.ts";
 
 /** Long-context [1m] suffix is absorbed by prefix-anchored regexes, so base
  * model rates apply (no [1m] premium). */
@@ -24,7 +24,7 @@ describe("long-context [1m] model cost matching", () => {
 
   /** @scenario "A Claude Code span on claude-opus-5[1m] with cache traffic gets a nonzero cost" */
   it("computes a nonzero cost for the literal claude-opus-5[1m] with cache tokens", () => {
-    const result = TraceSpanCostMatchingService.computeSpanCost({
+    const result = computeSpanCost({
       attrs: {
         "gen_ai.request.model": "claude-opus-5[1m]",
         "gen_ai.usage.cache_read.input_tokens": 20540,
@@ -40,7 +40,7 @@ describe("long-context [1m] model cost matching", () => {
 
   /** @scenario "A Claude Code span on claude-opus-5[1m] with cache traffic gets a nonzero cost" */
   it("adds fresh input and output tokens at the standard Opus 5 rates", () => {
-    const result = TraceSpanCostMatchingService.computeSpanCost({
+    const result = computeSpanCost({
       attrs: {
         "gen_ai.request.model": "claude-opus-5[1m]",
         "gen_ai.usage.cache_read.input_tokens": 20540,

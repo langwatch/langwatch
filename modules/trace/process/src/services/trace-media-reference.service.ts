@@ -13,9 +13,9 @@ import {
 
 /** Media reference serialization: shared format between write and read paths
  * prevents parsing failures that hide thumbnails. */
-export class TraceMediaReferenceAdapter implements TraceMediaReferenceResolver {
-  static create(): TraceMediaReferenceAdapter {
-    return new TraceMediaReferenceAdapter();
+export class TraceMediaReferenceService implements TraceMediaReferenceResolver {
+  static create(): TraceMediaReferenceService {
+    return new TraceMediaReferenceService();
   }
 
   private constructor() {}

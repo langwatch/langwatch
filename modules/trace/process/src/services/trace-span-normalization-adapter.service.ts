@@ -14,15 +14,17 @@ import { SpanNormalizationPipelineService } from "./span-normalization.service.t
  * of the application's `AppTraceSpanNormalizationAdapter`
  * (`platform/app/src/runtime/app/trace-record-span.adapter.ts`).
  */
-export class TraceSpanNormalizationAdapter implements TraceSpanNormalization {
+export class TraceSpanNormalizationAdapterService implements TraceSpanNormalization {
   private readonly service: SpanNormalizationPipelineService;
 
   private constructor(canonicalisation: TraceCanonicalisationService) {
     this.service = SpanNormalizationPipelineService.create(canonicalisation);
   }
 
-  static create(canonicalisation: TraceCanonicalisationService): TraceSpanNormalizationAdapter {
-    return new TraceSpanNormalizationAdapter(canonicalisation);
+  static create(
+    canonicalisation: TraceCanonicalisationService,
+  ): TraceSpanNormalizationAdapterService {
+    return new TraceSpanNormalizationAdapterService(canonicalisation);
   }
 
   normalizeSpanReceived({

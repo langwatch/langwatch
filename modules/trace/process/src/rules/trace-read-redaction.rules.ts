@@ -4,7 +4,7 @@ import type {
   DerivedTraceEvent,
   Event,
   Span,
-  SpanInputOutput,
+  LegacySpanInputOutput,
   SpanMetrics,
   Trace,
 } from "@langwatch/trace-contract";
@@ -182,8 +182,8 @@ export const applySpanProtections = (
   protections: Protections,
   redactions: Set<string>,
 ): Span => {
-  let transformedInput: SpanInputOutput | null | undefined = span.input;
-  let transformedOutput: SpanInputOutput | null | undefined = span.output;
+  let transformedInput: LegacySpanInputOutput | null | undefined = span.input;
+  let transformedOutput: LegacySpanInputOutput | null | undefined = span.output;
   let transformedMetrics: SpanMetrics | null | undefined = span.metrics;
 
   // Redact input if not allowed to see
@@ -196,7 +196,7 @@ export const applySpanProtections = (
       transformedInput = {
         ...span.input,
         value: redactedValue,
-      } as SpanInputOutput;
+      } as LegacySpanInputOutput;
     }
   }
 
@@ -210,7 +210,7 @@ export const applySpanProtections = (
       transformedOutput = {
         ...span.output,
         value: redactedValue,
-      } as SpanInputOutput;
+      } as LegacySpanInputOutput;
     }
   }
 
