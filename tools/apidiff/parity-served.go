@@ -55,6 +55,21 @@ var servedIgnores = []struct {
 	{ignoreBetterAuth, func(path string) bool { return path == "/api/auth/*" }},
 	{ignoreTrpcLanes, func(path string) bool { return path == "/api/trpc/*" || path == "/api/sse/*" }},
 	{ignoreVersionMount, versionMountRoute},
+	{ignoreServedLiterally, func(path string) bool { return servedLiterally[path] }},
+}
+
+// ignoreServedLiterally names main routes whose wildcard or parameter the
+// branch answers route by route instead.
+const ignoreServedLiterally = "main's wildcard or parameter route is served one route per operation on the branch"
+
+// servedLiterally: main's /api/evaluations/v3/* only forwarded to its v3 app,
+// which experiment-v3-legacy.rest.ts serves route for route; main's gateway
+// connect dispatch table has exactly instant-evals-classify, usage and budget,
+// which licensing's connect-hosted.rest.ts serves as literal routes.
+var servedLiterally = map[string]bool{
+	"/api/evaluations/v3/*":                     true,
+	"/api/internal/gateway/connect/:operation":  true,
+	"/api/internal/gateway/connect/{operation}": true,
 }
 
 func ignoreReason(path string) string {

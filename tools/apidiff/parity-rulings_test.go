@@ -219,3 +219,14 @@ func TestRuledOutServedRoutesAreRetired(t *testing.T) {
 		t.Error("hotel_bot is being ported, not retired")
 	}
 }
+
+func TestLiterallyServedMainRoutesAreIgnored(t *testing.T) {
+	for _, path := range []string{"/api/evaluations/v3/*", "/api/internal/gateway/connect/:operation"} {
+		if ignoreReason(path) != ignoreServedLiterally {
+			t.Errorf("%s: reason %q", path, ignoreReason(path))
+		}
+	}
+	if ignoreReason("/api/unsubscribe") != "" {
+		t.Error("unsubscribe is a real gap, not ignored")
+	}
+}
