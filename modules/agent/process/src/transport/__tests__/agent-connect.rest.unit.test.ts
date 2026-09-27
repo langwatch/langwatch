@@ -11,7 +11,6 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import type * as observabilityModule from "@langwatch/observability";
 import { Hono } from "hono";
 /**
  * @vitest-environment node
@@ -21,20 +20,6 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
-
-const outputLog = vi.hoisted(() => ({ error: vi.fn() }));
-vi.mock("@langwatch/observability", async (original) => {
-  const actual = await original<typeof observabilityModule>();
-  return {
-    ...actual,
-    createLogger: (name: string) => {
-      const logger = actual.createLogger(name);
-      if (name.startsWith("langwatch:api"))
-        vi.spyOn(logger, "error").mockImplementation(outputLog.error);
-      return logger;
-    },
-  };
-});
 
 const renderRefusal: RestErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {

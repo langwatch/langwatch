@@ -45,6 +45,10 @@ class TestCodingAgentApi {
     return Promise.resolve(this.tracePullRequestLinks);
   }
 
+  readSessionEventsPage(): never {
+    throw new Error("Not used by session group tests: readSessionEventsPage.");
+  }
+
   logContentKeys(): never {
     throw new Error("Not used by session group tests: logContentKeys.");
   }

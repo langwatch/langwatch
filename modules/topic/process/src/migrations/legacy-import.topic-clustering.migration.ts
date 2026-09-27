@@ -152,35 +152,10 @@ export class LegacyImportTopicClusteringMigration {
       }
       cursor = page[page.length - 1]!.id;
 
-      // One ownership query per page instead of one per project: projects that
-      // signed up after the cutover always carry a cursor row (the projection
-      // writes it with their first topics), so they cost nothing here.
-      const owned = new Set(
-        await this.repository.findOwnedTopicModelProjectIds(page.map((project) => project.id)),
-      );
-
-      for (const { id: projectId } of page) {
-        if (owned.has(projectId)) {
-          skipped++;
-          continue;
-        }
-        try {
-          const result = await this.seedProjectTopicModel(projectId);
-          if (result === "seeded") seeded++;
-          else skipped++;
-        } catch (error) {
-          failed++;
-          // Per-project isolation: one bad project must not truncate the
-          // fleet. The next wake retries it (its cursor row never appeared).
-          logger.warn(
-            {
-              projectId,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Seeding this project's topics failed; the next wake retries it",
-          );
-        }
-      }
+      const tally = await this.seedTopicModelPage(page);
+      seeded += tally.seeded;
+      skipped += tally.skipped;
+      failed += tally.failed;
     }
 
     // Nothing seeded and nothing failed means every legacy project is owned
@@ -193,6 +168,44 @@ export class LegacyImportTopicClusteringMigration {
 
     logger.info({ seeded, skipped, failed }, "Topic model seed pass finished");
     return { seeded, skipped };
+  }
+
+  private async seedTopicModelPage(
+    page: readonly { id: string }[],
+  ): Promise<{ seeded: number; skipped: number; failed: number }> {
+    const tally = { seeded: 0, skipped: 0, failed: 0 };
+    // One ownership query per page instead of one per project: projects that
+    // signed up after the cutover always carry a cursor row (the projection
+    // writes it with their first topics), so they cost nothing here.
+    const owned = new Set(
+      await this.repository.findOwnedTopicModelProjectIds(page.map((project) => project.id)),
+    );
+
+    for (const { id: projectId } of page) {
+      const outcome = owned.has(projectId)
+        ? "skipped"
+        : await this.seedProjectTopicModelIsolated(projectId);
+      tally[outcome]++;
+    }
+    return tally;
+  }
+
+  /** Per-project isolation: one bad project must not truncate the fleet; the next wake retries. */
+  private async seedProjectTopicModelIsolated(
+    projectId: string,
+  ): Promise<"seeded" | "skipped" | "failed"> {
+    try {
+      return (await this.seedProjectTopicModel(projectId)) === "seeded" ? "seeded" : "skipped";
+    } catch (error) {
+      logger.warn(
+        {
+          projectId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Seeding this project's topics failed; the next wake retries it",
+      );
+      return "failed";
+    }
   }
 
   /**

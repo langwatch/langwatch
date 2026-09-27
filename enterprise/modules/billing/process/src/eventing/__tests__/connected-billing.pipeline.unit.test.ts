@@ -1,3 +1,5 @@
+import type { JsonValue } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 /** @see specs/self-hosting/connected-services/connected-billing.feature */
 import { describe, expect, it, vi } from "vitest";
 
@@ -17,7 +19,7 @@ const BOOTED_AT = 1_700_000_000_000;
 const MINUTE_MS = 60 * 1000;
 
 function wakeAt({ at, lastTickAt }: { at: number; lastTickAt: number | null }) {
-  const tick = vi.fn((messageKey: string, payload: { scheduledFor: number }) => ({
+  const tick = vi.fn((messageKey: string, payload: JsonValue) => ({
     messageKey,
     intentType: "tick",
     payload,
@@ -29,7 +31,7 @@ function wakeAt({ at, lastTickAt }: { at: number; lastTickAt: number | null }) {
       now: at,
       key: CONNECTED_BILLING_PROCESS_NAME,
       projectId: "__global__",
-      intents: { tick },
+      intent: intentAccessorOf({ tick }),
     },
   );
   return tick;

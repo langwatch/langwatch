@@ -102,7 +102,7 @@ export function buildLangyInfrastructure(input: {
   const credentials: LangyCredentialComposition = {
     sessionKeys,
     virtualKeys,
-    github: { enabled: false, mintTurnToken: () => Promise.resolve(null) },
+    github: { enabled: false, findTurnTokens: () => Promise.resolve([]) },
     runtime: langyWorkerRuntimeOf({ config: input.config, publicBaseUrl: input.publicBaseUrl }),
   };
 

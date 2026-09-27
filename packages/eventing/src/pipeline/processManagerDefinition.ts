@@ -62,12 +62,12 @@ export type SchemaOf<Spec> = Spec extends { schema: infer Schema extends ZodType
 /** Intents whose every `run` takes what its own `schema` parses to (ARCHITECTURE §9). */
 export type IntentSpecs<Intents> = { [K in keyof Intents]: IntentSpec<SchemaOf<Intents[K]>> };
 
-export type IntentFactories<Intents> = {
-  [K in keyof Intents & string]: (
-    key: string,
-    payload: z.input<SchemaOf<Intents[K]>>,
-  ) => ProcessIntent;
-};
+/** Emits one declared intent: its name picks the schema its payload is checked against (§9). */
+export type IntentAccessor<Intents> = <Name extends keyof Intents & string>(
+  name: Name,
+  key: string,
+  payload: z.input<SchemaOf<Intents[Name]>>,
+) => ProcessIntent;
 
 export interface IntentContext {
   processName: string;
@@ -108,7 +108,7 @@ export interface ProcessHandlerContext<Intents> {
   now: number;
   key: string;
   projectId: string;
-  intents: IntentFactories<Intents>;
+  intent: IntentAccessor<Intents>;
 }
 
 export type EventHandler<State, Data, Intents> = (
@@ -216,14 +216,17 @@ export function defineProcessManager<
   return { config };
 }
 
-export function buildIntentFactories<Intents extends IntentSpecs<Intents>>(
-  intents: Intents &
-    Readonly<Record<string, { readonly schema: ZodTypeAny; readonly run: unknown }>>,
+/** The runtime's accessor over a process's declared intents; an undeclared name refuses. */
+export function buildIntentAccessor(
+  intents: Readonly<Record<string, IntentSpec>>,
   options?: { processKey?: string },
-): IntentFactories<Intents> {
-  const factories: Record<string, unknown> = {};
-  for (const [intentType, spec] of Object.entries(intents)) {
-    factories[intentType] = (key: string, payload: unknown) => ({
+): (name: string, key: string, payload: unknown) => ProcessIntent {
+  return (intentType, key, payload) => {
+    const spec = intents[intentType];
+    if (!spec) {
+      throw new Error(`Process intent "${intentType}" is not declared by this process manager`);
+    }
+    return {
       // ProcessManagerOutbox message keys are unique within
       // (processName, projectId). Builder-authored keys are local to one
       // process instance, so qualify them without burdening every domain.
@@ -232,7 +235,6 @@ export function buildIntentFactories<Intents extends IntentSpecs<Intents>>(
         : key,
       intentType,
       payload: ensureJsonSafe(spec.schema.parse(payload)),
-    });
-  }
-  return factories as IntentFactories<Intents>;
+    };
+  };
 }

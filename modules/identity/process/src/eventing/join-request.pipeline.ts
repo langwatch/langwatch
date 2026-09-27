@@ -3,7 +3,7 @@ import {
   type EventSourcing,
   definePipeline,
   type IntentSpec,
-  type ProcessManagerHandledStage,
+  type ProcessManagerStage,
   type ProcessManagerInitialStage,
   type Projection,
   type RegisteredCommand,
@@ -13,11 +13,6 @@ import {
   type EventingSetup,
 } from "@langwatch/eventing";
 import {
-  JOIN_APPROVED_EVENT_TYPE,
-  JOIN_EXPIRED_EVENT_TYPE,
-  JOIN_REJECTED_EVENT_TYPE,
-  JOIN_REQUESTED_EVENT_TYPE,
-  JOIN_WITHDRAWN_EVENT_TYPE,
   JOIN_REQUEST_AGGREGATE_TYPE,
   JOIN_REQUEST_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
@@ -152,7 +147,7 @@ export function defineJoinRequestPipeline(deps: JoinRequestPipelineDeps): JoinRe
 function mountRequestLifecycle(
   pm: ProcessManagerInitialStage<JoinRequestEvent>,
   lifecycle: JoinRequestLifecycle,
-): ProcessManagerHandledStage<
+): ProcessManagerStage<
   JoinRequestEvent,
   JoinRequestLifecycleState,
   Record<string, IntentSpec<ZodType>>
@@ -166,11 +161,11 @@ function mountRequestLifecycle(
       joinRequestNotificationIntentSchema,
       runPrepareNotification({ port: lifecycle }),
     )
-    .on(JOIN_REQUESTED_EVENT_TYPE, onJoinRequested)
-    .on(JOIN_APPROVED_EVENT_TYPE, onJoinApproved)
-    .on(JOIN_REJECTED_EVENT_TYPE, onJoinRejected)
-    .on(JOIN_WITHDRAWN_EVENT_TYPE, onJoinResolved)
-    .on(JOIN_EXPIRED_EVENT_TYPE, onJoinExpired)
+    .on(joinRequestedEventSchema, onJoinRequested)
+    .on(joinApprovedEventSchema, onJoinApproved)
+    .on(joinRejectedEventSchema, onJoinRejected)
+    .on(joinWithdrawnEventSchema, onJoinResolved)
+    .on(joinExpiredEventSchema, onJoinExpired)
     .onWake(joinRequestLifecycleWake);
 }
 

@@ -1,6 +1,7 @@
 /** @vitest-environment node */
 
 import type { ProcessHandlerContext } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -27,7 +28,7 @@ function context(at: number): ProcessHandlerContext<SsoDomainProofNotificationIn
     now: at,
     key: CONNECTION,
     projectId: ORG,
-    intents: {
+    intent: intentAccessorOf({
       notifyWavering: (messageKey, payload) => ({
         messageKey,
         intentType: "notifyWavering",
@@ -38,7 +39,7 @@ function context(at: number): ProcessHandlerContext<SsoDomainProofNotificationIn
         intentType: "notifyLapsed",
         payload,
       }),
-    },
+    }),
   };
 }
 

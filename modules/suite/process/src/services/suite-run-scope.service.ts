@@ -18,8 +18,8 @@ import {
   SuiteNotFoundError,
 } from "@langwatch/suite-contract";
 
-import { isAgentTarget } from "../rules/suite-target.rules.ts";
-import { ConnectedTargetService, type ConnectedTargetAgent } from "./connected-target.service.ts";
+import { isAgentTarget, isAgentUnseen } from "../rules/suite-target.rules.ts";
+import type { ConnectedTargetAgent } from "./connected-target.service.ts";
 import type { SuiteServiceOptions } from "./suite.service.ts";
 
 export class SuiteRunScopeService {
@@ -285,7 +285,7 @@ export class SuiteRunScopeService {
       const agent = agentById.get(target.referenceId);
       if (!agent) {
         missing.push(target);
-      } else if (agent.archivedAt || ConnectedTargetService.isAgentUnseen(agent)) {
+      } else if (agent.archivedAt || isAgentUnseen(agent)) {
         archived.push(target);
       } else {
         active.push(target);

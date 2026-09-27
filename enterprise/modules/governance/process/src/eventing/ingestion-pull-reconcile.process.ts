@@ -33,7 +33,7 @@ export function ingestionPullReconcileWake({
     if (state.lastReconciledAt !== null && state.lastReconciledAt >= bootedAt) return { state };
     return {
       state: { lastReconciledAt: at },
-      intents: [ctx.intents.reconcile(`reconcile:${at}`, { scheduledFor: at })],
+      intents: [ctx.intent("reconcile", `reconcile:${at}`, { scheduledFor: at })],
     };
   };
 }

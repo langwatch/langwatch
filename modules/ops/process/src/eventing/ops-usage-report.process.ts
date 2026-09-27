@@ -35,7 +35,7 @@ export const usageReportWake: WakeHandler<UsageReportScheduleState, UsageReportI
   if (!isUsageReportDue({ at, lastReportAt: state.lastReportAt })) return { state };
   return {
     state: { lastReportAt: at },
-    intents: [ctx.intents.send(`send:${Math.floor(at / DAY_MS)}`, { scheduledFor: at })],
+    intents: [ctx.intent("send", `send:${Math.floor(at / DAY_MS)}`, { scheduledFor: at })],
   };
 };
 

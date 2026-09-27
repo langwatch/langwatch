@@ -87,7 +87,7 @@ export class MemoryShareGrantRepository implements ShareGrantRepository {
     projectId: string;
     maxViews: number | null;
   }): void {
-    const link = this.#database.link(grantId, projectId);
+    const [link] = this.#database.findLinks({ id: grantId, projectId });
     if (!link) return;
     if (maxViews != null && link.viewCount >= maxViews) return;
 

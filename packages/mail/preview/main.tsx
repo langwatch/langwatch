@@ -37,8 +37,6 @@ const Studio = (): JSX.Element => {
   const { resolvedTheme, setTheme } = useTheme();
   const previewDark = resolvedTheme === "dark";
 
-  const [galleryEntries, setGalleryEntries] = useState<GalleryEntry[] | null>(null);
-  const [galleryFailure, setGalleryFailure] = useState<string | null>(null);
   const [everyFixture, setEveryFixture] = useState(initialUrl.everyFixture);
   const [width, setWidth] = useState<keyof typeof WIDTHS>(initialUrl.width);
   const [density, setDensity] = useState<Density>(initialUrl.density);
@@ -56,42 +54,20 @@ const Studio = (): JSX.Element => {
           return;
         }
         setTemplates(body);
-        const wanted = initialUrl.templateId
-          ? (body.find((entry) => entry.id === initialUrl.templateId) ?? body[0])
-          : body[0];
-        const fixture = initialUrl.fixtureName
-          ? (wanted?.fixtures.find((entry) => entry.name === initialUrl.fixtureName) ??
-            wanted?.fixtures[0])
-          : wanted?.fixtures[0];
-        if (wanted && fixture) {
-          setSelected({ id: wanted.id, fixture: fixture.name });
+        const picked = pickFixture({
+          templates: body,
+          templateId: initialUrl.templateId,
+          fixtureName: initialUrl.fixtureName,
+        });
+        if (picked) {
+          setSelected({ id: picked.template.id, fixture: picked.fixture.name });
           setCurrentProps(
-            initialPropsOverride !== undefined ? initialPropsOverride : fixture.props,
+            initialPropsOverride !== undefined ? initialPropsOverride : picked.fixture.props,
           );
         }
       })
       .catch((error: unknown) => setFailure(String(error)));
   }, []);
-
-  useEffect(() => {
-    if (view !== "gallery") return;
-    setGalleryEntries(null);
-    setGalleryFailure(null);
-    const controller = new AbortController();
-    fetch(`/__gallery${everyFixture ? "?fixtures=all" : ""}`, { signal: controller.signal })
-      .then((response) => response.json())
-      .then((body: GalleryEntry[] | { error: string }) => {
-        if ("error" in body) {
-          setGalleryFailure(body.error);
-          return;
-        }
-        setGalleryEntries(body);
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) setGalleryFailure(String(error));
-      });
-    return () => controller.abort();
-  }, [view, everyFixture]);
 
   const choose = useCallback(
     (templateId: string, fixtureName: string) => {
@@ -114,11 +90,172 @@ const Studio = (): JSX.Element => {
 
   const inspectTemplates = useMemo(() => templates ?? [], [templates]);
 
-  // Address-bar sync: template/fixture/view changes are places worth a back
-  // button entry; width, density, theme and prop edits are preferences that
-  // replace the current entry instead of piling up a new one per keystroke.
-  const historyReady = useRef(false);
   const suppressNextPush = useRef(false);
+  useAddressBarSync({
+    view,
+    selected,
+    width,
+    density,
+    previewScheme,
+    everyFixture,
+    currentProps,
+    suppressNextPush,
+  });
+  const { galleryEntries, galleryFailure } = useGalleryEntries({ view, everyFixture });
+
+  useEffect(() => {
+    const onPopState = () => {
+      const state = parseUrlState(window.location.search);
+      const props = decodePropsFragment(window.location.hash);
+      suppressNextPush.current = true;
+      setView(state.view);
+      setWidth(state.width);
+      setDensity(state.density);
+      setPreviewScheme(state.theme);
+      setEveryFixture(state.everyFixture);
+      const picked = pickFixture({
+        templates: templatesRef.current ?? [],
+        templateId: state.templateId,
+        fixtureName: state.fixtureName,
+      });
+      if (picked) {
+        setSelected({ id: picked.template.id, fixture: picked.fixture.name });
+        setCurrentProps(props !== undefined ? props : picked.fixture.props);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  if (failure) {
+    return (
+      <Box padding={6} color="red.700">
+        The studio could not load the templates: {failure}
+      </Box>
+    );
+  }
+  if (!templates) {
+    return (
+      <Box padding={6} color="fg.muted">
+        Loading templates…
+      </Box>
+    );
+  }
+
+  return (
+    <Flex direction="column" height="100vh" bg="bg">
+      <StudioHeader
+        view={view}
+        onViewChange={setView}
+        previewScheme={previewScheme}
+        onPreviewSchemeChange={setPreviewScheme}
+      />
+
+      <Box flex="1" minHeight={0}>
+        {view === "inspect" ? (
+          <InspectView
+            templates={inspectTemplates}
+            selected={selected}
+            currentProps={currentProps}
+            onPropsChange={setCurrentProps}
+            onSelect={choose}
+            previewDark={previewDark}
+            width={width}
+            onWidthChange={setWidth}
+          />
+        ) : (
+          <GalleryView
+            entries={galleryEntries}
+            failure={galleryFailure}
+            everyFixture={everyFixture}
+            onEveryFixtureChange={setEveryFixture}
+            width={width}
+            onWidthChange={setWidth}
+            density={density}
+            onDensityChange={setDensity}
+            previewDark={previewDark}
+            onOpen={openInInspect}
+          />
+        )}
+      </Box>
+    </Flex>
+  );
+};
+
+type Picked = { template: TemplateSummary; fixture: TemplateSummary["fixtures"][number] };
+
+/** The named template and fixture, falling back to the first of each when a name misses. */
+function pickFixture({
+  templates,
+  templateId,
+  fixtureName,
+}: {
+  templates: readonly TemplateSummary[];
+  templateId: string | null | undefined;
+  fixtureName: string | null | undefined;
+}): Picked | undefined {
+  const template = templates.find((entry) => entry.id === templateId) ?? templates[0];
+  const fixture =
+    template?.fixtures.find((entry) => entry.name === fixtureName) ?? template?.fixtures[0];
+  return template && fixture ? { template, fixture } : undefined;
+}
+
+/** Every template's rendered fixtures while the gallery is open, refetched when the set changes. */
+function useGalleryEntries({ view, everyFixture }: { view: View; everyFixture: boolean }): {
+  galleryEntries: GalleryEntry[] | null;
+  galleryFailure: string | null;
+} {
+  const [galleryEntries, setGalleryEntries] = useState<GalleryEntry[] | null>(null);
+  const [galleryFailure, setGalleryFailure] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (view !== "gallery") return;
+    setGalleryEntries(null);
+    setGalleryFailure(null);
+    const controller = new AbortController();
+    fetch(`/__gallery${everyFixture ? "?fixtures=all" : ""}`, { signal: controller.signal })
+      .then((response) => response.json())
+      .then((body: GalleryEntry[] | { error: string }) => {
+        if ("error" in body) {
+          setGalleryFailure(body.error);
+          return;
+        }
+        setGalleryEntries(body);
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setGalleryFailure(String(error));
+      });
+    return () => controller.abort();
+  }, [view, everyFixture]);
+
+  return { galleryEntries, galleryFailure };
+}
+
+/**
+ * Address-bar sync: template/fixture/view changes are places worth a back button entry; width,
+ * density, theme and prop edits are preferences that replace the current entry instead.
+ */
+function useAddressBarSync({
+  view,
+  selected,
+  width,
+  density,
+  previewScheme,
+  everyFixture,
+  currentProps,
+  suppressNextPush,
+}: {
+  view: View;
+  selected: { id: string; fixture: string } | null;
+  width: keyof typeof WIDTHS;
+  density: Density;
+  previewScheme: PreviewScheme;
+  everyFixture: boolean;
+  currentProps: unknown;
+  /** Set by the back button, so the entry it lands on is replaced rather than pushed. */
+  suppressNextPush: { current: boolean };
+}): void {
+  const historyReady = useRef(false);
 
   useEffect(() => {
     if (!selected) return;
@@ -161,115 +298,57 @@ const Studio = (): JSX.Element => {
     window.history.replaceState(null, "", `${search}${hash}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, density, previewScheme, everyFixture, currentProps]);
+}
 
-  useEffect(() => {
-    const onPopState = () => {
-      const state = parseUrlState(window.location.search);
-      const props = decodePropsFragment(window.location.hash);
-      suppressNextPush.current = true;
-      setView(state.view);
-      setWidth(state.width);
-      setDensity(state.density);
-      setPreviewScheme(state.theme);
-      setEveryFixture(state.everyFixture);
-      const current = templatesRef.current;
-      const template = current?.find((entry) => entry.id === state.templateId) ?? current?.[0];
-      const fixture = state.fixtureName
-        ? (template?.fixtures.find((entry) => entry.name === state.fixtureName) ??
-          template?.fixtures[0])
-        : template?.fixtures[0];
-      if (template && fixture) {
-        setSelected({ id: template.id, fixture: fixture.name });
-        setCurrentProps(props !== undefined ? props : fixture.props);
-      }
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
-
-  if (failure) {
-    return (
-      <Box padding={6} color="red.700">
-        The studio could not load the templates: {failure}
-      </Box>
-    );
-  }
-  if (!templates) {
-    return (
-      <Box padding={6} color="fg.muted">
-        Loading templates…
-      </Box>
-    );
-  }
-
+function StudioHeader({
+  view,
+  onViewChange,
+  previewScheme,
+  onPreviewSchemeChange,
+}: {
+  view: View;
+  onViewChange: (view: View) => void;
+  previewScheme: PreviewScheme;
+  onPreviewSchemeChange: (scheme: PreviewScheme) => void;
+}): JSX.Element {
   return (
-    <Flex direction="column" height="100vh" bg="bg">
-      <Flex
-        as="header"
-        align="center"
-        justify="space-between"
-        gap={4}
-        paddingX={4}
-        paddingY={2}
-        borderBottomWidth="1px"
-        borderColor="border"
-        bg="bg.panel"
-        flexWrap="wrap"
-      >
-        <Heading size="sm">LangWatch mail</Heading>
-        <Flex gap={4} align="center" flexWrap="wrap">
-          <SegmentedControl
-            size="xs"
-            items={[
-              { value: "inspect", label: "Inspect" },
-              { value: "gallery", label: "Gallery" },
-            ]}
-            value={view}
-            onValueChange={(details) => setView(details.value as View)}
-          />
-          <SegmentedControl
-            size="xs"
-            items={[
-              { value: "light", label: "Light" },
-              { value: "system", label: "System" },
-              { value: "dark", label: "Dark" },
-            ]}
-            value={previewScheme}
-            onValueChange={(details) => setPreviewScheme(details.value as PreviewScheme)}
-          />
-        </Flex>
+    <Flex
+      as="header"
+      align="center"
+      justify="space-between"
+      gap={4}
+      paddingX={4}
+      paddingY={2}
+      borderBottomWidth="1px"
+      borderColor="border"
+      bg="bg.panel"
+      flexWrap="wrap"
+    >
+      <Heading size="sm">LangWatch mail</Heading>
+      <Flex gap={4} align="center" flexWrap="wrap">
+        <SegmentedControl
+          size="xs"
+          items={[
+            { value: "inspect", label: "Inspect" },
+            { value: "gallery", label: "Gallery" },
+          ]}
+          value={view}
+          onValueChange={(details) => onViewChange(details.value as View)}
+        />
+        <SegmentedControl
+          size="xs"
+          items={[
+            { value: "light", label: "Light" },
+            { value: "system", label: "System" },
+            { value: "dark", label: "Dark" },
+          ]}
+          value={previewScheme}
+          onValueChange={(details) => onPreviewSchemeChange(details.value as PreviewScheme)}
+        />
       </Flex>
-
-      <Box flex="1" minHeight={0}>
-        {view === "inspect" ? (
-          <InspectView
-            templates={inspectTemplates}
-            selected={selected}
-            currentProps={currentProps}
-            onPropsChange={setCurrentProps}
-            onSelect={choose}
-            previewDark={previewDark}
-            width={width}
-            onWidthChange={setWidth}
-          />
-        ) : (
-          <GalleryView
-            entries={galleryEntries}
-            failure={galleryFailure}
-            everyFixture={everyFixture}
-            onEveryFixtureChange={setEveryFixture}
-            width={width}
-            onWidthChange={setWidth}
-            density={density}
-            onDensityChange={setDensity}
-            previewDark={previewDark}
-            onOpen={openInInspect}
-          />
-        )}
-      </Box>
     </Flex>
   );
-};
+}
 
 const mount = document.getElementById("studio");
 if (mount) {

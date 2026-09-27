@@ -4,17 +4,16 @@
  * nothing here constructs a transport error. Spec: modules/project/specs/project-service.feature.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import {
-  CannotArchiveCurrentProjectError,
   ProjectCreateDeniedError,
   ProjectCreateTargetMissingError,
-  ProjectNotFoundError,
   TraceSharingDeniedError,
   projectTrpc,
+  type Project,
   type ProjectApi,
+  type TopicClusteringRequest,
 } from "@langwatch/project-contract";
 
 /** A scope a probe is asked at, when the declaration resolved a different one. */
@@ -75,8 +74,19 @@ export interface ProjectBrowserApi {
    * failure must not stop the new key reaching the caller who rotated it.
    */
   recordApiKeyRegenerated(entry: { userId: string; projectId: string }): Promise<void>;
-  /** The deployment's error reporter for a clustering request that did not land. */
-  reportTopicClusteringFailure(error: unknown, context: { projectId: string }): void;
+  /** The project, or `ProjectNotFoundError`. */
+  getProject(input: { projectId: string }): Promise<Project>;
+  /** Archives a project other than the one the caller is in, after probing it on its own. */
+  archiveOtherProject(input: {
+    projectId: string;
+    projectToArchiveId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<{ alreadyArchived: boolean }>;
+  /** Requests a clustering run, reporting a request that did not land. */
+  triggerTopicClustering(input: {
+    projectId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<TopicClusteringRequest>;
 }
 
 export const ProjectBrowserApi = moduleApi<ProjectBrowserApi>()("project");
@@ -136,13 +146,7 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
    */
   .procedure("getProjectAPIKey")
   .withPermission("project:manage")
-  .handle(async ({ app, input }) => {
-    const project = await app.projects().findById(input.projectId);
-
-    if (!project) throw new ProjectNotFoundError();
-
-    return project;
-  })
+  .handle(({ app, input }) => app.getProject({ projectId: input.projectId }))
 
   .procedure("getHasFirstMessage")
   .withPermission("project:view")
@@ -218,23 +222,10 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
   .procedure("archiveById")
   .withPermission("project:delete")
   .handle(async ({ app, input, actor }) => {
-    if (input.projectToArchiveId === input.projectId) {
-      throw new CannotArchiveCurrentProjectError();
-    }
-
-    // The declared check covered `projectId`, the project the caller is in.
-    // The project actually archived is the other one, so it is probed on its
-    // own before anything is read or written.
-    const canDeleteTarget = await app.probePermission({
-      permission: "project:delete",
-      scope: { tier: "project", id: input.projectToArchiveId },
+    const { alreadyArchived } = await app.archiveOtherProject({
+      projectId: input.projectId,
+      projectToArchiveId: input.projectToArchiveId,
       by: actor,
-    });
-
-    if (!canDeleteTarget) throw new ProjectPermissionDeniedError("project:delete");
-
-    const { alreadyArchived } = await app.projects().archive({
-      projectId: input.projectToArchiveId,
     });
 
     return { success: true as const, alreadyArchived };
@@ -242,24 +233,9 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
 
   .procedure("triggerTopicClustering")
   .withPermission("project:update")
-  .handle(async ({ app, input, actor }) => {
-    try {
-      return await app.projects().requestTopicClustering(input, actor);
-    } catch (error) {
-      app.reportTopicClusteringFailure(error, { projectId: input.projectId });
-      // A refusal the deployment already named — one that composes no
-      // clustering scheduler is what reaches here — is re-raised untouched.
-      // Its cause is known and its caller can act on it, so wrapping it would
-      // spend a name the boundary would then report as a trace id.
-      if (HandledError.isHandled(error)) throw error;
-      // Everything else behind this is event-store and projection internals,
-      // which is a cause we cannot name and the caller cannot act on. It stays
-      // an ordinary error so the boundary degrades it to an unknown failure
-      // carrying a trace id rather than dressing an members fault up as
-      // handled.
-      throw new Error("Failed to trigger topic clustering", { cause: error });
-    }
-  })
+  .handle(({ app, input, actor }) =>
+    app.triggerTopicClustering({ projectId: input.projectId, by: actor }),
+  )
   .build();
 
 /**

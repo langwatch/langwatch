@@ -73,7 +73,7 @@ function composition(turns: LangyTurnTechnicalMembers) {
     credentials: {
       sessionKeys: { mint: vi.fn(), revokeManaged: vi.fn() },
       virtualKeys: { provision: vi.fn() },
-      github: { enabled: false, mintTurnToken: vi.fn() },
+      github: { enabled: false, findTurnTokens: vi.fn() },
       runtime: {
         workerCallbackUrl: "https://langwatch.test/callback",
         workerGatewayBaseUrl: "https://langwatch.test/gateway",

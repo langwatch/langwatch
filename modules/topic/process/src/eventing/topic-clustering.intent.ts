@@ -151,7 +151,7 @@ export const RecordTopicsCommand = defineCommand({
 export const TOPIC_CLUSTERING_PROCESS_INTENT_TYPES = {
   /**
    * Run one clustering page for the project. Property-style like the other
-   * builder-mounted domains (`ctx.intents.run(...)`); outbox rows scope
+   * builder-mounted domains (`ctx.intent("run", ...)`); outbox rows scope
    * intentType by processName, so the short name stays unambiguous.
    */
   RUN: "run",

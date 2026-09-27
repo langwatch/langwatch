@@ -24,6 +24,69 @@ interface TraceBroadcastPayload {
   traceId?: string;
 }
 
+type Timer = ReturnType<typeof setTimeout>;
+
+/**
+ * Trace ids batched behind a trailing debounce, with an optional max wait so a
+ * steady stream of events still flushes; each event would otherwise reset the timer.
+ */
+function useBatchedTraceIds({
+  onFlush,
+  debounceMs,
+  maxWaitMs,
+}: {
+  onFlush: ((traceIds: string[]) => void | Promise<void>) | undefined;
+  debounceMs: number;
+  maxWaitMs: number | undefined;
+}) {
+  // The latest callback, read when a timer fires rather than when it was set.
+  const onFlushRef = useRef(onFlush);
+  onFlushRef.current = onFlush;
+  const debounceRef = useRef<Timer | null>(null);
+  const maxWaitRef = useRef<Timer | null>(null);
+  const idsRef = useRef<Set<string>>(new Set());
+
+  const clearTimers = useCallback(() => {
+    for (const timer of [debounceRef, maxWaitRef]) {
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
+    }
+  }, []);
+
+  const flush = useCallback(() => {
+    clearTimers();
+    const ids = [...idsRef.current];
+    idsRef.current = new Set();
+    if (ids.length > 0) void onFlushRef.current?.(ids);
+  }, [clearTimers]);
+
+  const schedule = useCallback(
+    (eventTraceId: string | undefined) => {
+      if (eventTraceId) idsRef.current.add(eventTraceId);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(flush, debounceMs);
+      if (maxWaitMs != null && !maxWaitRef.current) {
+        maxWaitRef.current = setTimeout(flush, maxWaitMs);
+      }
+    },
+    [debounceMs, maxWaitMs, flush],
+  );
+
+  useEffect(() => clearTimers, [clearTimers]);
+  return schedule;
+}
+
+/** The broadcast an SSE event carries; a non-JSON payload carries none. */
+function broadcastsIn(event: unknown): TraceBroadcastPayload[] {
+  try {
+    const parsed: TraceBroadcastPayload | null =
+      typeof event === "string" ? JSON.parse(event) : event;
+    return parsed && typeof parsed === "object" ? [parsed] : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Hook for subscribing to real-time trace updates via tRPC subscriptions.
  * Differentiates between span storage events and trace summary updates so callers can
@@ -38,104 +101,16 @@ export function useTraceUpdateListener({
   debounceMs = 5000,
   maxWaitMs,
 }: UseTraceUpdateListenerOptions) {
-  // Stable refs for callbacks to avoid stale closures in timers
-  const onSpanStoredRef = useRef(onSpanStored);
-  onSpanStoredRef.current = onSpanStored;
-
-  const onTraceSummaryUpdatedRef = useRef(onTraceSummaryUpdated);
-  onTraceSummaryUpdatedRef.current = onTraceSummaryUpdated;
-
-  // Debounce/throttle state for span events
-  const spanDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const spanMaxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const spanTraceIdsRef = useRef<Set<string>>(new Set());
-
-  // Debounce/throttle state for summary events
-  const summaryDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const summaryMaxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const summaryTraceIdsRef = useRef<Set<string>>(new Set());
-
-  const flushSpanUpdate = useCallback(() => {
-    if (spanDebounceTimerRef.current) {
-      clearTimeout(spanDebounceTimerRef.current);
-      spanDebounceTimerRef.current = null;
-    }
-    if (spanMaxWaitTimerRef.current) {
-      clearTimeout(spanMaxWaitTimerRef.current);
-      spanMaxWaitTimerRef.current = null;
-    }
-    const ids = [...spanTraceIdsRef.current];
-    spanTraceIdsRef.current = new Set();
-    if (ids.length > 0) {
-      void onSpanStoredRef.current?.(ids);
-    }
-  }, []);
-
-  const flushSummaryUpdate = useCallback(() => {
-    if (summaryDebounceTimerRef.current) {
-      clearTimeout(summaryDebounceTimerRef.current);
-      summaryDebounceTimerRef.current = null;
-    }
-    if (summaryMaxWaitTimerRef.current) {
-      clearTimeout(summaryMaxWaitTimerRef.current);
-      summaryMaxWaitTimerRef.current = null;
-    }
-    const ids = [...summaryTraceIdsRef.current];
-    summaryTraceIdsRef.current = new Set();
-    if (ids.length > 0) {
-      void onTraceSummaryUpdatedRef.current?.(ids);
-    }
-  }, []);
-
-  const scheduleSpanUpdate = useCallback(
-    (eventTraceId: string | undefined) => {
-      if (eventTraceId) {
-        spanTraceIdsRef.current.add(eventTraceId);
-      }
-
-      // Reset trailing-edge debounce timer
-      if (spanDebounceTimerRef.current) {
-        clearTimeout(spanDebounceTimerRef.current);
-      }
-      spanDebounceTimerRef.current = setTimeout(flushSpanUpdate, debounceMs);
-
-      // Start maxWait timer on first event in this cycle (if maxWaitMs is set)
-      if (maxWaitMs != null && !spanMaxWaitTimerRef.current) {
-        spanMaxWaitTimerRef.current = setTimeout(flushSpanUpdate, maxWaitMs);
-      }
-    },
-    [debounceMs, maxWaitMs, flushSpanUpdate],
-  );
-
-  const scheduleSummaryUpdate = useCallback(
-    (eventTraceId: string | undefined) => {
-      if (eventTraceId) {
-        summaryTraceIdsRef.current.add(eventTraceId);
-      }
-
-      // Reset trailing-edge debounce timer
-      if (summaryDebounceTimerRef.current) {
-        clearTimeout(summaryDebounceTimerRef.current);
-      }
-      summaryDebounceTimerRef.current = setTimeout(flushSummaryUpdate, debounceMs);
-
-      // Start maxWait timer on first event in this cycle (if maxWaitMs is set)
-      if (maxWaitMs != null && !summaryMaxWaitTimerRef.current) {
-        summaryMaxWaitTimerRef.current = setTimeout(flushSummaryUpdate, maxWaitMs);
-      }
-    },
-    [debounceMs, maxWaitMs, flushSummaryUpdate],
-  );
-
-  // Cleanup timers on unmount
-  useEffect(() => {
-    return () => {
-      if (spanDebounceTimerRef.current) clearTimeout(spanDebounceTimerRef.current);
-      if (spanMaxWaitTimerRef.current) clearTimeout(spanMaxWaitTimerRef.current);
-      if (summaryDebounceTimerRef.current) clearTimeout(summaryDebounceTimerRef.current);
-      if (summaryMaxWaitTimerRef.current) clearTimeout(summaryMaxWaitTimerRef.current);
-    };
-  }, []);
+  const scheduleSpanUpdate = useBatchedTraceIds({ onFlush: onSpanStored, debounceMs, maxWaitMs });
+  const scheduleSummaryUpdate = useBatchedTraceIds({
+    onFlush: onTraceSummaryUpdated,
+    debounceMs,
+    maxWaitMs,
+  });
+  const scheduleByEvent: Record<string, (traceId: string | undefined) => void> = {
+    span_stored: scheduleSpanUpdate,
+    trace_summary_updated: scheduleSummaryUpdate,
+  };
 
   const [lastEventAt, setLastEventAt] = useState<number>(0);
 
@@ -147,23 +122,10 @@ export function useTraceUpdateListener({
       enabled: Boolean(enabled && projectId),
       onData: (data) => {
         if (!data.event) return;
-
-        try {
-          const payload: TraceBroadcastPayload =
-            typeof data.event === "string" ? JSON.parse(data.event) : data.event;
-
-          if (traceId && payload.traceId !== traceId) return;
-
+        for (const payload of broadcastsIn(data.event)) {
+          if (traceId && payload.traceId !== traceId) continue;
           setLastEventAt(nowInstant().epochMilliseconds);
-
-          if (payload.event === "span_stored") {
-            scheduleSpanUpdate(payload.traceId);
-          } else if (payload.event === "trace_summary_updated") {
-            scheduleSummaryUpdate(payload.traceId);
-          }
-        } catch {
-          // Non-JSON payload — ignore
-          return;
+          scheduleByEvent[payload.event]?.(payload.traceId);
         }
       },
     },

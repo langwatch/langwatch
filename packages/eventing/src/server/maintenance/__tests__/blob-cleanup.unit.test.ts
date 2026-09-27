@@ -1,6 +1,7 @@
 import type { BlobSweepReport } from "@langwatch/group-queue/operational";
 import { describe, expect, it, vi } from "vitest";
 
+import { intentAccessorOf } from "../../../services/__tests__/testHelpers.ts";
 import { runBlobCleanup } from "../blob-cleanup.intent.ts";
 import { BLOB_CLEANUP_PROCESS_NAME, blobCleanupWake } from "../blob-cleanup.process.ts";
 import { createBlobMaintenancePipeline } from "../blob-maintenance.pipeline.ts";
@@ -26,13 +27,9 @@ const wakeContext = (at: number) => ({
   now: at,
   key: BLOB_CLEANUP_PROCESS_NAME,
   projectId: "__global__",
-  intents: {
-    sweep: (key: string, payload: unknown) => ({
-      type: "sweep",
-      key,
-      payload,
-    }),
-  },
+  intent: intentAccessorOf({
+    sweep: (key, payload) => ({ messageKey: key, intentType: "sweep", payload }),
+  }),
 });
 
 describe("blobCleanup process", () => {
@@ -44,8 +41,8 @@ describe("blobCleanup process", () => {
         expect(evolution.state.lastSweepAt).toBe(1_700);
         expect(evolution.intents).toHaveLength(1);
         expect(evolution.intents?.[0]).toMatchObject({
-          type: "sweep",
-          key: "sweep:1700",
+          intentType: "sweep",
+          messageKey: "sweep:1700",
         });
       });
 

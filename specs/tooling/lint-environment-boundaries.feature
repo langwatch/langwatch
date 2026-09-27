@@ -41,3 +41,10 @@ Feature: The environment-boundaries lint rule
     Given a strict feature service test module that reads process.env directly
     When the environment-boundaries rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: The test process's boot seam in packages/vitest-config may read process.env
+    Given a source file in packages/vitest-config that reads process.env
+    When the environment-boundaries rule runs over it
+    Then it reports nothing, because it is the test process's boot seam
+    And another package, or a file named like it elsewhere, still reports environment

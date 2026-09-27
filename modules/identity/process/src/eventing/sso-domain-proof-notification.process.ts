@@ -75,7 +75,7 @@ export const onDomainProofWavered: EventHandler<
 > = (state, data, ctx) => ({
   state,
   intents: [
-    ctx.intents.notifyWavering(notificationKey("wavering", data), {
+    ctx.intent("notifyWavering", notificationKey("wavering", data), {
       connectionId: data.connectionId,
       organizationId: ctx.projectId,
       domain: data.domain,
@@ -93,7 +93,7 @@ export const onDomainProofLapsed: EventHandler<
 > = (state, data, ctx) => ({
   state,
   intents: [
-    ctx.intents.notifyLapsed(notificationKey("lapsed", data), {
+    ctx.intent("notifyLapsed", notificationKey("lapsed", data), {
       connectionId: data.connectionId,
       organizationId: ctx.projectId,
       domain: data.domain,

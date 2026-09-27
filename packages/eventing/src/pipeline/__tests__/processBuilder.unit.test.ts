@@ -1,24 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import type { Event } from "../../domain/types.ts";
+import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 import type { ProcessManagerInitialStage } from "../processBuilder.ts";
 import { buildProcessManager } from "../processBuilder.ts";
 import type { IntentSpec, WakeHandler } from "../processManagerDefinition.ts";
 
 const payloadSchema = z.object({ traceId: z.string() });
 const TEST_PROCESS_EVENT_TYPE = "test.process.triggered";
-type ProcessTestEvent = Event<{ traceId: string }> & {
-  type: typeof TEST_PROCESS_EVENT_TYPE;
-};
+const testProcessEventSchema = testEventSchema(TEST_PROCESS_EVENT_TYPE, payloadSchema);
+type ProcessTestEvent = z.infer<typeof testProcessEventSchema>;
 
 function typeCheckStaging(pm: ProcessManagerInitialStage<ProcessTestEvent>) {
   // @ts-expect-error state must be declared before event handlers
-  pm.on(TEST_PROCESS_EVENT_TYPE, () => ({ state: {} }));
+  pm.on(testProcessEventSchema, () => ({ state: {} }));
 
   const state = pm.state(z.object({ count: z.number() }), { count: 0 });
   // @ts-expect-error intents must be declared before event handlers
-  state.on(TEST_PROCESS_EVENT_TYPE, () => ({ state: { count: 1 } }));
+  state.on(testProcessEventSchema, () => ({ state: { count: 1 } }));
   // @ts-expect-error intents must be declared before signal handlers
   state.onSignal("increment", z.object({ by: z.number() }), () => ({
     state: { count: 1 },
@@ -38,12 +37,12 @@ describe("ProcessManagerBuilder", () => {
             pm
               .state(z.object({ traceIds: z.array(z.string()) }), { traceIds: [] })
               .intent("persistMatch", payloadSchema, async () => {})
-              .on(TEST_PROCESS_EVENT_TYPE, (state, data, ctx) => ({
+              .on(testProcessEventSchema, (state, data, ctx) => ({
                 state: {
                   traceIds: [...state.traceIds, data.traceId],
                 },
                 intents: [
-                  ctx.intents.persistMatch(`persist:${data.traceId}`, {
+                  ctx.intent("persistMatch", `persist:${data.traceId}`, {
                     traceId: data.traceId,
                   }),
                 ],
@@ -61,7 +60,7 @@ describe("ProcessManagerBuilder", () => {
             pm
               .state(z.object({ traceIds: z.array(z.string()) }), { traceIds: [] })
               .intent("persistMatch", payloadSchema, async () => {})
-              .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state }))
+              .on(testProcessEventSchema, (state) => ({ state }))
               .outbox({ maxAttempts: 8, leaseDurationMs: 120_000 }),
         });
 
@@ -79,7 +78,7 @@ describe("ProcessManagerBuilder", () => {
               .state(z.object({ count: z.number() }), { count: 0 })
               .intent("noop", z.object({}), async () => {})
               .keyBy((event) => event.data.traceId)
-              .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state })),
+              .on(testProcessEventSchema, (state) => ({ state })),
         });
         const event = {
           type: TEST_PROCESS_EVENT_TYPE,
@@ -98,7 +97,7 @@ describe("ProcessManagerBuilder", () => {
         const sweep: WakeHandler<{ lastWakeAt: number | null }, SweepIntents> = (state, ctx) => ({
           state: { lastWakeAt: ctx.at },
           intents: [
-            ctx.intents.evaluateGraph(`sweep:${ctx.at}`, {
+            ctx.intent("evaluateGraph", `sweep:${ctx.at}`, {
               traceId: "sweep",
             }),
           ],
@@ -163,7 +162,7 @@ describe("ProcessManagerBuilder", () => {
             .onSignal("increment", z.object({ by: z.number().int() }), (state, data, ctx) => ({
               state: { count: state.count + data.by },
               intents: [
-                ctx.intents.recordCount(`count:${state.count + data.by}`, {
+                ctx.intent("recordCount", `count:${state.count + data.by}`, {
                   count: state.count + data.by,
                 }),
               ],
@@ -204,7 +203,7 @@ describe("ProcessManagerBuilder", () => {
                 .state(z.object({ count: z.number() }), { count: 0 })
                 .intent("persistMatch", payloadSchema, async () => {})
                 .intent("persistMatch", payloadSchema, async () => {})
-                .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state })),
+                .on(testProcessEventSchema, (state) => ({ state })),
           }),
         ).toThrow(/already declares intent/);
       });

@@ -4,6 +4,7 @@
  * Fleet-wide pull-request maintenance: one sweep per tick with retention pruning.
  */
 import { InMemoryProcessStore, type ProcessHandlerContext } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestGithubService } from "../../app/__tests__/github.fixture.ts";
@@ -25,7 +26,7 @@ const wakeContext = (at: number): ProcessHandlerContext<GithubBranchRecheckInten
   now: at,
   key: GITHUB_BRANCH_RECHECK_PROCESS_NAME,
   projectId: "__global__",
-  intents: {
+  intent: intentAccessorOf({
     recheck: (key, payload) => ({
       intentType: "recheck",
       messageKey: key,
@@ -36,7 +37,7 @@ const wakeContext = (at: number): ProcessHandlerContext<GithubBranchRecheckInten
       messageKey: key,
       payload,
     }),
-  },
+  }),
 });
 
 function createDeps() {

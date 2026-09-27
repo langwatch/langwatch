@@ -489,7 +489,12 @@ export class ApplicationBuilder<
       if (role === "api") {
         // Now: all Apps exist, nothing serves yet. Only moment doors can be built.
         const hosts = this.openDoors((token) => provided.get(token));
-        if (hosts.rest !== void 0 || hosts.trpc !== void 0 || hosts.websocket !== void 0) {
+        if (
+          hosts.rest !== void 0 ||
+          hosts.trpc !== void 0 ||
+          hosts.websocket !== void 0 ||
+          hosts.rawhttp !== void 0
+        ) {
           transports = mountDeclaredTransports({
             declared: declaredForRole(declared, "api"),
             hosts,

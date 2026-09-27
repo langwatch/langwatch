@@ -102,6 +102,94 @@ async function exportRequestError(response: Response): Promise<Error> {
   );
 }
 
+const NO_PROGRESS: ExportProgress = { exported: 0, total: 0 };
+
+/** Progress after a streamed event: its counts, and everything exported once done. */
+function progressAfter(previous: ExportProgress, event: ExportProgressEvent): ExportProgress {
+  const counted =
+    event.exported === undefined
+      ? previous
+      : { exported: event.exported, total: event.total ?? previous.total };
+  return event.type === "done" ? { ...counted, exported: counted.total } : counted;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+/** Says why an export produced an empty file: nothing matched, or the server failed. */
+function toastEmptyExport(totalTraces: number) {
+  const isNoMatches = totalTraces === 0;
+  toaster.create({
+    title: isNoMatches ? "Export produced no data" : "Export failed",
+    description: isNoMatches
+      ? "No traces matched the current filters. Try adjusting the time range or search query."
+      : "The server returned an empty response. Please try again.",
+    type: isNoMatches ? "warning" : "error",
+  });
+}
+
+/**
+ * Streams the export file and saves it. The total arrives in a header at once,
+ * and the export id opens the progress subscription. Resolves whether a file
+ * was saved; a cancel resolves false quietly, any other failure toasts.
+ */
+async function downloadExport({
+  requestBody,
+  fallbackFilename,
+  signal,
+  onTotal,
+  onExportId,
+}: {
+  requestBody: Record<string, unknown>;
+  fallbackFilename: string;
+  signal: AbortSignal;
+  onTotal: (total: number) => void;
+  onExportId: (exportId: string) => void;
+}): Promise<boolean> {
+  try {
+    const response = await fetch("/api/export/traces/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+      signal,
+    });
+    if (!response.ok) throw await exportRequestError(response);
+    const totalTraces = parseInt(response.headers.get("X-Total-Traces") ?? "0", 10);
+    onTotal(totalTraces);
+    const exportId = response.headers.get("X-Export-Id");
+    if (exportId) onExportId(exportId);
+    const blob = await response.blob();
+    if (blob.size === 0) {
+      toastEmptyExport(totalTraces);
+      return false;
+    }
+    const filename = extractFilename({
+      contentDisposition: response.headers.get("Content-Disposition"),
+      fallbackName: fallbackFilename,
+    });
+    triggerBlobDownload({ blob, filename });
+    return true;
+  } catch (error) {
+    if (!isAbortError(error)) {
+      showErrorToast({ error, fallbackTitle: "Couldn't export your traces" });
+    }
+    return false;
+  }
+}
+
+function fallbackExportFilename({
+  projectId,
+  config,
+}: {
+  projectId: string;
+  config: ExportConfig;
+}) {
+  const fileExtension = config.format === "json" ? "jsonl" : "csv";
+  const today = nowInstant().toString().split("T")[0];
+  return `${projectId} - Traces - ${today} - ${config.mode}.${fileExtension}`;
+}
+
 /**
  * Hook that orchestrates the trace export flow: dialog state, file download streaming,
  * tRPC subscription progress updates, and cancellation.
@@ -116,35 +204,19 @@ export function useExportTraces({
 }: UseExportTracesOptions): UseExportTracesReturn {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [progress, setProgress] = useState<ExportProgress>({
-    exported: 0,
-    total: 0,
-  });
+  const [progress, setProgress] = useState<ExportProgress>(NO_PROGRESS);
   const [selectedTraceIds, setSelectedTraceIds] = useState<string[] | undefined>();
   const [currentExportId, setCurrentExportId] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // tRPC subscription for export progress via BroadcastService (Redis pub/sub)
+  // Progress streams over a tRPC subscription fed by the BroadcastService.
   api.export.onExportProgress.useSubscription(
-    { projectId: projectId!, exportId: currentExportId! },
+    { projectId: projectId ?? "", exportId: currentExportId ?? "" },
     {
       enabled: isExporting && !!currentExportId && !!projectId,
-      onData: (event: ExportProgressEvent) => {
-        if (event.exported !== undefined) {
-          setProgress({
-            exported: event.exported,
-            total: event.total ?? progress.total,
-          });
-        }
-        if (event.type === "done") {
-          setProgress((prev) => ({
-            ...prev,
-            exported: prev.total,
-          }));
-        }
-      },
+      onData: (event: ExportProgressEvent) => setProgress((prev) => progressAfter(prev, event)),
     },
   );
 
@@ -158,20 +230,25 @@ export function useExportTraces({
     setSelectedTraceIds(undefined);
   }, []);
 
-  const cancelExport = useCallback(() => {
-    if (completionTimeoutRef.current) {
-      clearTimeout(completionTimeoutRef.current);
-      completionTimeoutRef.current = null;
-    }
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
+  const clearCompletionTimer = useCallback(() => {
+    if (completionTimeoutRef.current) clearTimeout(completionTimeoutRef.current);
+    completionTimeoutRef.current = null;
+  }, []);
+
+  const resetExport = useCallback(() => {
     setIsExporting(false);
-    setProgress({ exported: 0, total: 0 });
+    setProgress(NO_PROGRESS);
     setCurrentExportId(null);
   }, []);
 
+  const cancelExport = useCallback(() => {
+    clearCompletionTimer();
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    resetExport();
+  }, [clearCompletionTimer, resetExport]);
+
   const startExport = useCallback(
-    // biome-ignore lint/complexity/noExcessiveLinesPerFunction: relocated, not rewritten
     (config: ExportConfig) => {
       if (!projectId) {
         showErrorToast({
@@ -180,125 +257,52 @@ export function useExportTraces({
         });
         return;
       }
-
-      // Cancel any stale completion timeout from a previous export
-      if (completionTimeoutRef.current) {
-        clearTimeout(completionTimeoutRef.current);
-        completionTimeoutRef.current = null;
-      }
-
-      // Abort any in-flight export
+      clearCompletionTimer();
       abortControllerRef.current?.abort();
-
-      // Close the dialog when export starts
       setIsDialogOpen(false);
       setIsExporting(true);
-      setProgress({ exported: 0, total: 0 });
+      setProgress(NO_PROGRESS);
 
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
+      // A newer export replaces the ref, which is how a stale one knows to stay quiet.
+      const thisController = new AbortController();
+      abortControllerRef.current = thisController;
 
-      const requestBody = {
-        projectId,
-        mode: config.mode,
-        format: config.format,
-        filters,
-        startDate,
-        endDate,
-        ...(query ? { query } : {}),
-        ...(selectedTraceIds ? { traceIds: selectedTraceIds } : {}),
-      };
-
-      const fileExtension = config.format === "json" ? "jsonl" : "csv";
-      const today = nowInstant().toString().split("T")[0];
-      const fallbackFilename = `${projectId} - Traces - ${today} - ${config.mode}.${fileExtension}`;
-
-      // Capture this controller to detect staleness in async handlers.
-      // If a new export starts, abortControllerRef.current will change,
-      // so comparing against thisController tells us this export is stale.
-      const thisController = abortController;
-
-      // Start the file download stream and track progress from both:
-      // 1. X-Total-Traces header (immediate total count)
-      // 2. tRPC subscription via BroadcastService (real-time exported count)
-      const exportPromise = fetch("/api/export/traces/download", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-        signal: abortController.signal,
-      })
-        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: relocated, not rewritten
-        .then(async (response) => {
-          if (!response.ok) {
-            throw await exportRequestError(response);
-          }
-
-          // Read total from header immediately
-          const totalTraces = parseInt(response.headers.get("X-Total-Traces") ?? "0", 10);
-          setProgress((prev) => ({ ...prev, total: totalTraces }));
-
-          // Activate tRPC subscription for real-time progress
-          const exportId = response.headers.get("X-Export-Id");
-          if (exportId) {
-            setCurrentExportId(exportId);
-          }
-
-          const blob = await response.blob();
-
-          if (blob.size === 0) {
-            const isNoMatches = totalTraces === 0;
-            toaster.create({
-              title: isNoMatches ? "Export produced no data" : "Export failed",
-              description: isNoMatches
-                ? "No traces matched the current filters. Try adjusting the time range or search query."
-                : "The server returned an empty response. Please try again.",
-              type: isNoMatches ? "warning" : "error",
-            });
-            return false;
-          }
-
-          const filename = extractFilename({
-            contentDisposition: response.headers.get("Content-Disposition"),
-            fallbackName: fallbackFilename,
-          });
-
-          triggerBlobDownload({ blob, filename });
-
-          return true;
-        })
-        .catch((error: unknown) => {
-          if (error instanceof Error && error.name === "AbortError") {
-            return false; // User cancelled, not an error
-          }
-          showErrorToast({
-            error,
-            fallbackTitle: "Couldn't export your traces",
-          });
-          return false;
-        });
-
-      // When download completes, show "done" state briefly then hide.
-      // Only update state if this export is still the active one —
-      // a newer export will have replaced abortControllerRef.current.
-      void exportPromise.then((completed) => {
+      void downloadExport({
+        requestBody: {
+          projectId,
+          mode: config.mode,
+          format: config.format,
+          filters,
+          startDate,
+          endDate,
+          ...(query ? { query } : {}),
+          ...(selectedTraceIds ? { traceIds: selectedTraceIds } : {}),
+        },
+        fallbackFilename: fallbackExportFilename({ projectId, config }),
+        signal: thisController.signal,
+        onTotal: (total) => setProgress((prev) => ({ ...prev, total })),
+        onExportId: setCurrentExportId,
+      }).then((completed) => {
         if (abortControllerRef.current !== thisController) return;
-
         if (!completed) {
-          setIsExporting(false);
-          setProgress({ exported: 0, total: 0 });
-          setCurrentExportId(null);
+          resetExport();
           return;
         }
+        // A brief "complete" state before the progress hides.
         setProgress((prev) => ({ ...prev, exported: prev.total }));
-        // Brief flash of "complete" state before hiding
-        completionTimeoutRef.current = setTimeout(() => {
-          setIsExporting(false);
-          setProgress({ exported: 0, total: 0 });
-          setCurrentExportId(null);
-        }, 1500);
+        completionTimeoutRef.current = setTimeout(resetExport, 1500);
       });
     },
-    [projectId, filters, startDate, endDate, query, selectedTraceIds],
+    [
+      projectId,
+      filters,
+      startDate,
+      endDate,
+      query,
+      selectedTraceIds,
+      clearCompletionTimer,
+      resetExport,
+    ],
   );
 
   return {

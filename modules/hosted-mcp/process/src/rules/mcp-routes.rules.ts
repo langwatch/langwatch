@@ -98,7 +98,8 @@ export function hostedMcpRoutePolicies(): readonly {
   );
 }
 
-const MCP_ROUTES = new Set([
+/** Main's exact MCP root paths (mcp/handler.ts MCP_ROUTES), answered ahead of every route. */
+export const MCP_ROOT_PATHS: readonly string[] = [
   "/mcp",
   "/mcp/health",
   "/sse",
@@ -111,16 +112,20 @@ const MCP_ROUTES = new Set([
   "/.well-known/openid-configuration",
   "/oauth/token",
   "/oauth/register",
-]);
+];
 
 /**
  * RFC 9728 §3.1 lets a client that only knows the resource URL ask for metadata at the
  * resource's path under the well-known prefix; modern MCP clients try that form first.
  */
-const OAUTH_METADATA_PREFIXES = [
-  `${PROTECTED_RESOURCE_METADATA_PATH}/`,
-  `${AUTHORIZATION_SERVER_METADATA_PATH}/`,
+export const MCP_METADATA_SUBTREES: readonly string[] = [
+  PROTECTED_RESOURCE_METADATA_PATH,
+  AUTHORIZATION_SERVER_METADATA_PATH,
 ];
+
+const MCP_ROUTES = new Set(MCP_ROOT_PATHS);
+
+const OAUTH_METADATA_PREFIXES = MCP_METADATA_SUBTREES.map((subtree) => `${subtree}/`);
 
 /** The resource paths whose metadata this server publishes. */
 const METADATA_RESOURCE_SUFFIXES = new Set(["/mcp", "/sse"]);

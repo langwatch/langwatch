@@ -55,12 +55,18 @@ export interface FeatureRawSocketHost {
   mount(declaration: MountableTransport, app: () => unknown): void;
 }
 
+/** The api process's doors answered ahead of its routes, as the installer calls them. */
+export interface FeatureRawHttpHost {
+  mount(declaration: MountableTransport, app: () => unknown): void;
+}
+
 /** The doors one process opens, named by protocol. */
 export type FeatureTransportHosts<Rest, Trpc> = Readonly<{
   rest?: FeatureRestHost<Rest> | undefined;
   trpc?: FeatureTrpcHost<Trpc> | undefined;
   websocket?: FeatureWebSocketHost | undefined;
   rawsocket?: FeatureRawSocketHost | undefined;
+  rawhttp?: FeatureRawHttpHost | undefined;
 }>;
 
 /** Whatever the process's doors made of one feature's declared transports. */
@@ -127,14 +133,7 @@ export function mountDeclaredTransports<Rest, Trpc>({
 
   for (const entry of declared) {
     for (const descriptor of entry.transports) {
-      if (descriptor.protocol === "websocket") {
-        mountSocket(entry, descriptor, hosts.websocket);
-        continue;
-      }
-      if (descriptor.protocol === "rawsocket") {
-        mountRawSocket(entry, descriptor, hosts.rawsocket);
-        continue;
-      }
+      if (mountedAsDoor(entry, descriptor, hosts)) continue;
       if (descriptor.protocol === "rest") {
         rest.push(mountRest(entry, descriptor, hosts.rest));
         continue;
@@ -155,6 +154,19 @@ export function mountDeclaredTransports<Rest, Trpc>({
   return { rest, trpc };
 }
 
+/** Mounts a socket or raw door, whose host keeps no record; false for REST and tRPC. */
+function mountedAsDoor<Rest, Trpc>(
+  entry: DeclaredTransports,
+  descriptor: FeatureTransportDescriptor,
+  hosts: FeatureTransportHosts<Rest, Trpc>,
+): boolean {
+  if (descriptor.protocol === "websocket") mountSocket(entry, descriptor, hosts.websocket);
+  else if (descriptor.protocol === "rawsocket") mountRawSocket(entry, descriptor, hosts.rawsocket);
+  else if (descriptor.protocol === "rawhttp") mountRawHttp(entry, descriptor, hosts.rawhttp);
+  else return false;
+  return true;
+}
+
 /** One socket on the process's upgrade router, bound to the feature's app. */
 function mountSocket(
   entry: DeclaredTransports,
@@ -172,6 +184,16 @@ function mountRawSocket(
   host: FeatureRawSocketHost | undefined,
 ): void {
   if (!host) throw new MissingTransportHostError(entry.feature, "raw socket");
+  host.mount(descriptor.router(), entry.provided);
+}
+
+/** One raw HTTP door on the api process's own listener, bound to the feature's app. */
+function mountRawHttp(
+  entry: DeclaredTransports,
+  descriptor: FeatureTransportDescriptor,
+  host: FeatureRawHttpHost | undefined,
+): void {
+  if (!host) throw new MissingTransportHostError(entry.feature, "raw HTTP");
   host.mount(descriptor.router(), entry.provided);
 }
 

@@ -75,6 +75,131 @@ function EvaluatorInputsTooltip({
   );
 }
 
+/** The custom prompt an evaluator's settings carry, if any. */
+function promptSettingOf(config: unknown): string | undefined {
+  if (!config || typeof config !== "object" || !("settings" in config)) return undefined;
+  const settings = config.settings;
+  if (!settings || typeof settings !== "object" || !("prompt" in settings)) return undefined;
+  return typeof settings.prompt === "string" ? settings.prompt : undefined;
+}
+
+function Badge({
+  bg,
+  color,
+  mono = false,
+  children,
+}: {
+  bg: string;
+  color?: string;
+  mono?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box
+      bg={bg}
+      color={color}
+      paddingX={2}
+      paddingY={0.5}
+      borderRadius="md"
+      fontSize={mono ? "sm" : "xs"}
+      fontWeight="semibold"
+      fontFamily={mono ? "mono" : undefined}
+    >
+      {children}
+    </Box>
+  );
+}
+
+/** Score, pass/fail and label once processed; otherwise the state the run is in. */
+function ResultBadges({
+  check,
+  isGuardrail,
+  passed,
+}: {
+  check: ElasticSearchEvaluation;
+  isGuardrail: boolean;
+  passed: boolean | undefined;
+}) {
+  const isPending = check.status === "in_progress" || check.status === "scheduled";
+  return (
+    <HStack gap={2} flexShrink={0}>
+      {check.status === "processed" && (
+        <>
+          {!isGuardrail && check.score != null && (
+            <Badge bg="bg.muted" mono>
+              {formatEvaluationScore(check.score)}
+            </Badge>
+          )}
+          {passed !== undefined && (
+            <Badge
+              bg={passed ? "green.subtle" : "red.subtle"}
+              color={passed ? "green.fg" : "red.fg"}
+            >
+              {passed ? "Pass" : "Fail"}
+            </Badge>
+          )}
+          {check.label && (
+            <Badge bg="blue.subtle" color="blue.fg">
+              {check.label}
+            </Badge>
+          )}
+        </>
+      )}
+      {check.status === "error" && (
+        <Badge bg="red.subtle" color="red.fg">
+          Error
+        </Badge>
+      )}
+      {check.status === "skipped" && (
+        <Badge bg="yellow.subtle" color="yellow.fg">
+          Skipped
+        </Badge>
+      )}
+      {isPending && (
+        <Text fontSize="xs" color="fg.subtle">
+          {check.status === "in_progress" ? "Processing..." : "Scheduled"}
+        </Text>
+      )}
+    </HStack>
+  );
+}
+
+/** A note under the header, ruled off and indented to the name. */
+function DetailNote({
+  color,
+  preWrap = false,
+  children,
+}: {
+  color: string;
+  preWrap?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box paddingLeft="22px" marginTop={2}>
+      <Box
+        borderTopWidth="1px"
+        borderTopStyle="dashed"
+        borderTopColor="border.subtle"
+        paddingTop={2}
+      >
+        <Text fontSize="sm" color={color} whiteSpace={preWrap ? "pre-wrap" : undefined}>
+          {children}
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
+function ExpandableText({ text }: { text: string }) {
+  return (
+    <HoverableBigText expandedVersion={text} lineClamp={3}>
+      <Box as="span" whiteSpace="pre-wrap" wordBreak="break-word">
+        {text}
+      </Box>
+    </HoverableBigText>
+  );
+}
+
 export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation }) {
   const router = useRouter();
   const projectSlug = router.query.project as string | undefined;
@@ -105,19 +230,13 @@ export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation
   const color = evaluationStatusColor(check);
   const passed = evaluationPassed(check);
 
-  const customPrompt = useMemo(() => {
-    if (isEvaluatorTable && evaluatorQuery.data) {
-      const config = evaluatorQuery.data.config as { settings?: { prompt?: string } } | undefined;
-      return config?.settings?.prompt;
-    }
-    if (!isEvaluatorTable && monitorQuery.data) {
-      const config = monitorQuery.data.evaluator?.config as
-        | { settings?: { prompt?: string } }
-        | undefined;
-      return config?.settings?.prompt;
-    }
-    return undefined;
-  }, [isEvaluatorTable, evaluatorQuery.data, monitorQuery.data]);
+  const customPrompt = useMemo(
+    () =>
+      promptSettingOf(
+        isEvaluatorTable ? evaluatorQuery.data?.config : monitorQuery.data?.evaluator?.config,
+      ),
+    [isEvaluatorTable, evaluatorQuery.data, monitorQuery.data],
+  );
 
   const hasEvaluatorData = isEvaluatorTable ? !!evaluatorQuery.data : !!monitorQuery.data;
 
@@ -179,94 +298,7 @@ export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation
 
         <Spacer />
 
-        {/* Result badges */}
-        <HStack gap={2} flexShrink={0}>
-          {check.status === "processed" && (
-            <>
-              {/* Score badge */}
-              {!evaluator?.isGuardrail && check.score !== undefined && check.score !== null && (
-                <Box
-                  bg="bg.muted"
-                  paddingX={2}
-                  paddingY={0.5}
-                  borderRadius="md"
-                  fontSize="sm"
-                  fontWeight="semibold"
-                  fontFamily="mono"
-                >
-                  {formatEvaluationScore(check.score)}
-                </Box>
-              )}
-
-              {/* Pass/Fail badge */}
-              {passed !== undefined && (
-                <Box
-                  bg={passed ? "green.subtle" : "red.subtle"}
-                  color={passed ? "green.fg" : "red.fg"}
-                  paddingX={2}
-                  paddingY={0.5}
-                  borderRadius="md"
-                  fontSize="xs"
-                  fontWeight="semibold"
-                >
-                  {passed ? "Pass" : "Fail"}
-                </Box>
-              )}
-
-              {/* Label badge */}
-              {check.label && (
-                <Box
-                  bg="blue.subtle"
-                  color="blue.fg"
-                  paddingX={2}
-                  paddingY={0.5}
-                  borderRadius="md"
-                  fontSize="xs"
-                  fontWeight="semibold"
-                >
-                  {check.label}
-                </Box>
-              )}
-            </>
-          )}
-
-          {/* Error badge */}
-          {check.status === "error" && (
-            <Box
-              bg="red.subtle"
-              color="red.fg"
-              paddingX={2}
-              paddingY={0.5}
-              borderRadius="md"
-              fontSize="xs"
-              fontWeight="semibold"
-            >
-              Error
-            </Box>
-          )}
-
-          {/* Skipped badge */}
-          {check.status === "skipped" && (
-            <Box
-              bg="yellow.subtle"
-              color="yellow.fg"
-              paddingX={2}
-              paddingY={0.5}
-              borderRadius="md"
-              fontSize="xs"
-              fontWeight="semibold"
-            >
-              Skipped
-            </Box>
-          )}
-
-          {/* Processing/Scheduled badge */}
-          {(check.status === "in_progress" || check.status === "scheduled") && (
-            <Text fontSize="xs" color="fg.subtle">
-              {check.status === "in_progress" ? "Processing..." : "Scheduled"}
-            </Text>
-          )}
-        </HStack>
+        <ResultBadges check={check} isGuardrail={!!evaluator?.isGuardrail} passed={passed} />
 
         {/* Timestamp */}
         {check.timestamps.finished_at && (
@@ -306,60 +338,20 @@ export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation
         )}
       </HStack>
 
-      {/* Details/reasoning section */}
-      {hasDetails && (
-        <Box paddingLeft="22px" marginTop={2}>
-          <Box
-            borderTopWidth="1px"
-            borderTopStyle="dashed"
-            borderTopColor="border.subtle"
-            paddingTop={2}
-          >
-            <Text fontSize="sm" color="fg.subtle">
-              <HoverableBigText expandedVersion={check.details!} lineClamp={3}>
-                <Box as="span" whiteSpace="pre-wrap" wordBreak="break-word">
-                  {check.details}
-                </Box>
-              </HoverableBigText>
-            </Text>
-          </Box>
-        </Box>
+      {hasDetails && check.details && (
+        <DetailNote color="fg.subtle">
+          <ExpandableText text={check.details} />
+        </DetailNote>
       )}
-
-      {/* Error message */}
       {errorMessage && (
-        <Box paddingLeft="22px" marginTop={2}>
-          <Box
-            borderTopWidth="1px"
-            borderTopStyle="dashed"
-            borderTopColor="border.subtle"
-            paddingTop={2}
-          >
-            <Text fontSize="sm" color="red.fg">
-              <HoverableBigText expandedVersion={errorMessage} lineClamp={3}>
-                <Box as="span" whiteSpace="pre-wrap" wordBreak="break-word">
-                  {errorMessage}
-                </Box>
-              </HoverableBigText>
-            </Text>
-          </Box>
-        </Box>
+        <DetailNote color="red.fg">
+          <ExpandableText text={errorMessage} />
+        </DetailNote>
       )}
-
-      {/* Skipped details */}
       {check.status === "skipped" && check.details && (
-        <Box paddingLeft="22px" marginTop={2}>
-          <Box
-            borderTopWidth="1px"
-            borderTopStyle="dashed"
-            borderTopColor="border.subtle"
-            paddingTop={2}
-          >
-            <Text fontSize="sm" color="fg.subtle" whiteSpace="pre-wrap">
-              {check.details}
-            </Text>
-          </Box>
-        </Box>
+        <DetailNote color="fg.subtle" preWrap>
+          {check.details}
+        </DetailNote>
       )}
     </Box>
   );

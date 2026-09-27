@@ -190,8 +190,9 @@ function mount(options: Parameters<typeof application>[0] = {}) {
     projects: () => app.projects(),
     encryptProjectSecret: (value) => app.encryptProjectSecret(value),
     probePermission: (input) => app.probePermission(input),
-    reportTopicClusteringFailure: (error, context) =>
-      app.reportTopicClusteringFailure(error, context),
+    getProject: (input) => app.getProject(input),
+    archiveOtherProject: (input) => app.archiveOtherProject(input),
+    triggerTopicClustering: (input) => app.triggerTopicClustering(input),
     getFieldProtections,
     provisionLangyVirtualKey,
     recordApiKeyRegenerated,

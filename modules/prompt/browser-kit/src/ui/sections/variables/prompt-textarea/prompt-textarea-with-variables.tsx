@@ -1,10 +1,12 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { extractLiquidVariables, tokenizeLiquidTemplate } from "@langwatch/prompt-contract";
+import { Box, HStack } from "@chakra-ui/react";
+import { extractLiquidVariables } from "@langwatch/prompt-contract";
 import {
   type ChangeEvent,
+  type CSSProperties,
+  type FocusEvent,
   type KeyboardEvent,
+  type RefObject,
   useCallback,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -14,10 +16,14 @@ import { type CaretPosition, RichTextarea, type RichTextareaHandle } from "rich-
 import { useLayoutMode } from "../../../../model/layout-mode.ts";
 import { VariableInsertMenu } from "../variable-insert-menu.tsx";
 import type { AvailableSource } from "../variable-mapping-input.tsx";
+import type { Variable } from "../variables-section.tsx";
 import { AddLogicButton } from "./components/add-logic-button.tsx";
 import { AddVariableButton } from "./components/add-variable-button.tsx";
+import { renderLiquidText } from "./components/liquid-highlight.tsx";
 import { GripHandles, LineHighlights } from "./components/paragraph-overlay.tsx";
 import { TemplateLogicMenu } from "./components/template-logic-menu.tsx";
+import { UndefinedVariablesBanner } from "./components/undefined-variables-banner.tsx";
+import { useBannerReservation } from "./hooks/use-banner-reservation.ts";
 import { useDebouncedTextarea } from "./hooks/use-debounced-textarea.ts";
 import { useParagraphDragDrop } from "./hooks/use-paragraph-drag-drop.ts";
 import { useTemplateLogicMenu } from "./hooks/use-template-logic-menu.ts";
@@ -29,6 +35,323 @@ import {
   findUnclosedBraces,
   findUnclosedPercentBraces,
 } from "./prompt-textarea.utils.ts";
+
+type VariableMenu = ReturnType<typeof useVariableMenu>;
+type LogicMenu = ReturnType<typeof useTemplateLogicMenu>;
+
+/** What keyboard steering needs from whichever menu is open. */
+type SteerableMenu = Pick<
+  VariableMenu | LogicMenu,
+  | "setIsKeyboardNav"
+  | "setHighlightedIndex"
+  | "optionCount"
+  | "selectHighlightedOption"
+  | "closeMenu"
+>;
+
+/** What a typed trigger needs from the menu it opens. */
+type TriggeredMenu = Pick<VariableMenu | LogicMenu, "menuOpen" | "openMenu" | "setMenuQuery">;
+
+/** Existing variables as a "Variables" source, when there are any. */
+function variablesSource(variables: Variable[]): AvailableSource[] {
+  if (variables.length === 0) return [];
+  return [
+    {
+      id: "__variables__",
+      name: "Variables",
+      type: "signature",
+      fields: variables.map((v) => ({ name: v.identifier, type: v.type })),
+    },
+  ];
+}
+
+/** External sources, narrowed to the fields `otherNodesFields` lists for them. */
+function narrowedExternalSources({
+  externalSources,
+  otherNodesFields,
+}: {
+  externalSources: AvailableSource[];
+  otherNodesFields: Record<string, string[]>;
+}): AvailableSource[] {
+  return externalSources.flatMap((source) => {
+    const availableFields = otherNodesFields[source.id];
+    if (availableFields === undefined) return [source];
+    const fields = source.fields.filter((f) => availableFields.includes(f.name));
+    return fields.length > 0 ? [{ ...source, fields }] : [];
+  });
+}
+
+/** Nodes from `otherNodesFields` that no external source already added. */
+function orphanNodeSources({
+  otherNodesFields,
+  addedNodeIds,
+}: {
+  otherNodesFields: Record<string, string[]>;
+  addedNodeIds: Set<string>;
+}): AvailableSource[] {
+  return Object.entries(otherNodesFields)
+    .filter(([nodeId, fields]) => !addedNodeIds.has(nodeId) && fields.length > 0)
+    .map(([nodeId, fields]) => ({
+      id: nodeId,
+      name: nodeId,
+      type: "signature",
+      fields: fields.map((f) => ({ name: f, type: "str" })),
+    }));
+}
+
+/** Merge variables, otherNodesFields into availableSources */
+function mergeAvailableSources({
+  variables,
+  externalSources,
+  otherNodesFields,
+}: {
+  variables: Variable[];
+  externalSources: AvailableSource[];
+  otherNodesFields: Record<string, string[]>;
+}): AvailableSource[] {
+  const external = narrowedExternalSources({ externalSources, otherNodesFields });
+  const addedNodeIds = new Set(external.map((source) => source.id));
+  return [
+    ...variablesSource(variables),
+    ...external,
+    ...orphanNodeSources({ otherNodesFields, addedNodeIds }),
+  ];
+}
+
+/**
+ * Updates the shared caret refs. A typed-trigger menu follows the cursor: once
+ * the caret leaves both the in-progress `{{…` and a just-completed `{{name}}`,
+ * it closes. The button-opened menu manages its own lifecycle.
+ */
+function followSelection({
+  pos,
+  containerRef,
+  caretPositionRef,
+  lastUserCursorPosRef,
+  variableMenu,
+  localValue,
+}: {
+  pos: CaretPosition;
+  containerRef: RefObject<HTMLDivElement | null>;
+  caretPositionRef: RefObject<CaretPosition | null>;
+  lastUserCursorPosRef: RefObject<number>;
+  variableMenu: VariableMenu;
+  localValue: string;
+}) {
+  caretPositionRef.current = pos;
+  if (!pos.focused) return;
+  const nativeTextarea = containerRef.current?.querySelector("textarea");
+  if (nativeTextarea?.selectionStart === undefined) return;
+  const cursor = nativeTextarea.selectionStart;
+  lastUserCursorPosRef.current = cursor;
+  if (!variableMenu.menuOpen || variableMenu.buttonMenuMode) return;
+  const stillTyping = findUnclosedBraces(localValue, cursor);
+  const stillOnCompleted = findJustCompletedVariable(localValue, cursor);
+  if (!stillTyping && !stillOnCompleted) variableMenu.closeMenu();
+}
+
+function steerMenu({
+  event,
+  menu,
+}: {
+  event: KeyboardEvent<HTMLTextAreaElement>;
+  menu: SteerableMenu;
+}) {
+  switch (event.key) {
+    case "ArrowDown":
+      event.preventDefault();
+      menu.setIsKeyboardNav(true);
+      menu.setHighlightedIndex((prev: number) => Math.min(prev + 1, menu.optionCount - 1));
+      break;
+    case "ArrowUp":
+      event.preventDefault();
+      menu.setIsKeyboardNav(true);
+      menu.setHighlightedIndex((prev: number) => Math.max(prev - 1, 0));
+      break;
+    case "Enter":
+    case "Tab":
+      event.preventDefault();
+      menu.selectHighlightedOption();
+      break;
+    case "Escape":
+      event.preventDefault();
+      menu.closeMenu();
+      break;
+  }
+}
+
+/** The open menu takes the key; the variable menu wins when both are open. */
+function dispatchMenuKey({
+  event,
+  variableMenu,
+  logicMenu,
+}: {
+  event: KeyboardEvent<HTMLTextAreaElement>;
+  variableMenu: VariableMenu;
+  logicMenu: LogicMenu;
+}) {
+  if (variableMenu.menuOpen) steerMenu({ event, menu: variableMenu });
+  else if (logicMenu.menuOpen) steerMenu({ event, menu: logicMenu });
+}
+
+function openOrRequery({
+  menu,
+  start,
+  query,
+}: {
+  menu: TriggeredMenu;
+  start: number;
+  query: string;
+}) {
+  if (menu.menuOpen) {
+    menu.setMenuQuery(query);
+    return;
+  }
+  setTimeout(() => menu.openMenu(start, query), 0);
+}
+
+/**
+ * `{%` is checked first (more specific than `{{`) and the menus are mutually
+ * exclusive. A just-completed `{{name}}` that resolves to nothing keeps the
+ * variable menu open, so "Create variable" stays one click away.
+ */
+function followTriggers({
+  text,
+  cursor,
+  variableMenu,
+  logicMenu,
+  offersCreate,
+}: {
+  text: string;
+  cursor: number;
+  variableMenu: VariableMenu;
+  logicMenu: LogicMenu;
+  offersCreate: (name: string) => boolean;
+}) {
+  const unclosedPercent = findUnclosedPercentBraces(text, cursor);
+  if (unclosedPercent) {
+    if (variableMenu.menuOpen) variableMenu.closeMenu();
+    openOrRequery({ menu: logicMenu, ...unclosedPercent });
+    return;
+  }
+  if (logicMenu.menuOpen) logicMenu.closeMenu();
+
+  const unclosedBraces = findUnclosedBraces(text, cursor);
+  if (unclosedBraces) {
+    openOrRequery({ menu: variableMenu, ...unclosedBraces });
+    return;
+  }
+
+  const completed = findJustCompletedVariable(text, cursor);
+  if (completed && offersCreate(completed.name)) {
+    openOrRequery({ menu: variableMenu, start: completed.start, query: completed.name });
+  } else if (variableMenu.menuOpen) {
+    variableMenu.closeMenu();
+  }
+}
+
+function textareaStyle({
+  borderless,
+  fillHeight,
+  hasError,
+  minHeight,
+  maxHeight,
+  height,
+  reservedBottomPadding,
+}: {
+  borderless: boolean;
+  fillHeight: boolean;
+  hasError: boolean;
+  minHeight: string;
+  maxHeight: string | undefined;
+  height: string | undefined;
+  reservedBottomPadding: number | null;
+}): CSSProperties {
+  const borderColor = hasError ? "var(--chakra-colors-red-500)" : "var(--chakra-colors-border)";
+  return {
+    width: "100%",
+    minHeight: fillHeight ? "100%" : minHeight,
+    maxHeight: fillHeight ? undefined : maxHeight,
+    height,
+    fontFamily: borderless
+      ? undefined
+      : 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+    fontSize: borderless ? "14px" : "13px",
+    lineHeight: borderless ? "28px" : "1.5",
+    padding: borderless ? "0 0 0 24px" : "8px 10px",
+    ...(reservedBottomPadding !== null ? { paddingBottom: `${reservedBottomPadding}px` } : {}),
+    border: borderless ? "none" : `1px solid ${borderColor}`,
+    borderRadius: borderless ? "0" : "12px",
+    outline: "none",
+    resize: borderless ? "none" : "vertical",
+    background: borderless ? "transparent" : undefined,
+  };
+}
+
+/**
+ * The bordered frame thickens on focus. The padding shorthand wipes the
+ * banner reservation, so it is re-applied or focusing hides the last line.
+ */
+function paintFrame({
+  element,
+  focused,
+  hasError,
+  reservedBottomPadding,
+}: {
+  element: HTMLTextAreaElement;
+  focused: boolean;
+  hasError: boolean;
+  reservedBottomPadding: number | null;
+}) {
+  const idleColor = focused ? "var(--chakra-colors-blue-500)" : "var(--chakra-colors-border)";
+  element.style.borderColor = hasError ? "var(--chakra-colors-red-500)" : idleColor;
+  element.style.borderWidth = focused ? "2px" : "1px";
+  element.style.padding = focused ? "7px 9px" : "8px 10px";
+  if (reservedBottomPadding !== null) {
+    element.style.paddingBottom = `${reservedBottomPadding}px`;
+  }
+}
+
+function addContextBottomOf({
+  reservedBottomPadding,
+  borderless,
+}: {
+  reservedBottomPadding: number | null;
+  borderless: boolean;
+}): string {
+  if (reservedBottomPadding === null) return borderless ? "2px" : "10px";
+  return `${reservedBottomPadding + (borderless ? 0 : 8)}px`;
+}
+
+/** Existing variable ids and the locally defined ones (loop iterators, assign). */
+function useVariableUsage({
+  variables,
+  localValue,
+}: {
+  variables: Variable[];
+  localValue: string;
+}) {
+  const existingVariableIds = useMemo(
+    () => new Set(variables.map((v) => v.identifier)),
+    [variables],
+  );
+  // Variables used in text - Liquid-aware extraction
+  const liquidVariables = useMemo(() => extractLiquidVariables(localValue), [localValue]);
+  const locallyDefinedVariables = useMemo(
+    () => new Set([...liquidVariables.loopVariables, ...liquidVariables.assignedVariables]),
+    [liquidVariables],
+  );
+  const usedVariables = liquidVariables.inputVariables;
+  const invalidVariables = useMemo(
+    () => usedVariables.filter((v) => !existingVariableIds.has(v)),
+    [usedVariables, existingVariableIds],
+  );
+  const isKnownVariable = useCallback(
+    (name: string) => existingVariableIds.has(name) || locallyDefinedVariables.has(name),
+    [existingVariableIds, locallyDefinedVariables],
+  );
+  return { existingVariableIds, invalidVariables, isKnownVariable };
+}
 
 export const PromptTextAreaWithVariables = ({
   value,
@@ -55,50 +378,10 @@ export const PromptTextAreaWithVariables = ({
   const layoutMode = useLayoutMode();
   const maxHeight = layoutMode === "horizontal" ? undefined : maxHeightProp;
 
-  // Merge variables, otherNodesFields into availableSources
-  const availableSources = useMemo(() => {
-    const sources: AvailableSource[] = [];
-
-    // Add existing variables as a "Variables" source
-    if (variables.length > 0) {
-      sources.push({
-        id: "__variables__",
-        name: "Variables",
-        type: "signature",
-        fields: variables.map((v) => ({ name: v.identifier, type: v.type })),
-      });
-    }
-
-    const addedNodeIds = new Set<string>();
-
-    for (const source of externalSources) {
-      const availableFields = otherNodesFields[source.id];
-      if (availableFields !== undefined) {
-        const filteredFields = source.fields.filter((f) => availableFields.includes(f.name));
-        if (filteredFields.length > 0) {
-          sources.push({ ...source, fields: filteredFields });
-          addedNodeIds.add(source.id);
-        }
-      } else {
-        sources.push(source);
-        addedNodeIds.add(source.id);
-      }
-    }
-
-    // Add any nodes from otherNodesFields not in externalSources
-    for (const [nodeId, fields] of Object.entries(otherNodesFields)) {
-      if (!addedNodeIds.has(nodeId) && fields.length > 0) {
-        sources.push({
-          id: nodeId,
-          name: nodeId,
-          type: "signature",
-          fields: fields.map((f) => ({ name: f, type: "str" })),
-        });
-      }
-    }
-
-    return sources;
-  }, [externalSources, otherNodesFields, variables]);
+  const availableSources = useMemo(
+    () => mergeAvailableSources({ variables, externalSources, otherNodesFields }),
+    [externalSources, otherNodesFields, variables],
+  );
 
   const textareaRef = useRef<RichTextareaHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -107,22 +390,18 @@ export const PromptTextAreaWithVariables = ({
   const caretPositionRef = useRef<CaretPosition | null>(null);
   const lastUserCursorPosRef = useRef(-1);
 
-  // Hover state
   const [isHovered, setIsHovered] = useState(false);
 
-  // Debounced textarea value management
   const { localValue, handleValueChange, setValueImmediate } = useDebouncedTextarea({
     value,
     onChange,
   });
 
-  // Existing variable identifiers
-  const existingVariableIds = useMemo(
-    () => new Set(variables.map((v) => v.identifier)),
-    [variables],
-  );
+  const { existingVariableIds, invalidVariables, isKnownVariable } = useVariableUsage({
+    variables,
+    localValue,
+  });
 
-  // Variable menu logic
   const variableMenu = useVariableMenu({
     localValue,
     setValueImmediate,
@@ -137,7 +416,6 @@ export const PromptTextAreaWithVariables = ({
     lastUserCursorPosRef,
   });
 
-  // Template logic menu
   const logicMenu = useTemplateLogicMenu({
     localValue,
     setValueImmediate,
@@ -146,290 +424,63 @@ export const PromptTextAreaWithVariables = ({
     lastUserCursorPosRef,
   });
 
-  // Shared selection change handler that updates caret refs for both menus
   const handleSelectionChange = useCallback(
-    (pos: CaretPosition) => {
-      caretPositionRef.current = pos;
-      if (pos.focused) {
-        const nativeTextarea = containerRef.current?.querySelector("textarea");
-        if (nativeTextarea?.selectionStart !== undefined) {
-          lastUserCursorPosRef.current = nativeTextarea.selectionStart;
-
-          // A typed-trigger menu follows the cursor: once the caret
-          // leaves both the in-progress `{{…` and a just-completed
-          // `{{name}}`, the menu no longer applies - close it. The
-          // button-opened menu manages its own lifecycle.
-          if (variableMenu.menuOpen && !variableMenu.buttonMenuMode) {
-            const cursor = nativeTextarea.selectionStart;
-            const stillTyping = findUnclosedBraces(localValue, cursor);
-            const stillOnCompleted = findJustCompletedVariable(localValue, cursor);
-            if (!stillTyping && !stillOnCompleted) {
-              variableMenu.closeMenu();
-            }
-          }
-        }
-      }
-    },
+    (pos: CaretPosition) =>
+      followSelection({
+        pos,
+        containerRef,
+        caretPositionRef,
+        lastUserCursorPosRef,
+        variableMenu,
+        localValue,
+      }),
     [containerRef, caretPositionRef, lastUserCursorPosRef, variableMenu, localValue],
   );
 
-  // Textarea resize detection
-  const minHeightPx = parseInt(minHeight ?? "120", 10);
   const { userResizedHeight, useAutoHeight } = useTextareaResize({
     containerRef,
-    minHeightPx,
+    minHeightPx: parseInt(minHeight, 10),
   });
 
-  // Paragraph drag-drop
-  const {
-    hoveredParagraph,
-    gripHoveredParagraph,
-    draggedParagraph,
-    dropTargetParagraph,
-    setGripHoveredParagraph,
-    handleParagraphDragStart,
-    handleParagraphDrop,
-    handleParagraphDragEnd,
-    handleMouseMove,
-    handleDragOverContainer,
-    handleMouseLeave,
-    getVisibleParagraphPositions,
-  } = useParagraphDragDrop({
-    localValue,
-    onChange,
-    containerRef,
-    borderless,
-  });
+  const paragraphs = useParagraphDragDrop({ localValue, onChange, containerRef, borderless });
 
-  // Variables used in text - Liquid-aware extraction
-  const liquidVariables = useMemo(() => extractLiquidVariables(localValue), [localValue]);
+  const { bannerRef, reservedBottomPadding } = useBannerReservation(invalidVariables);
 
-  const usedVariables = liquidVariables.inputVariables;
-
-  // Variables that are defined locally (loop iterators, assign) - not "undefined"
-  const locallyDefinedVariables = useMemo(
-    () => new Set([...liquidVariables.loopVariables, ...liquidVariables.assignedVariables]),
-    [liquidVariables],
-  );
-
-  const invalidVariables = useMemo(
-    () => usedVariables.filter((v) => !existingVariableIds.has(v)),
-    [usedVariables, existingVariableIds],
-  );
-
-  // The undefined-variables banner overlays the textarea's bottom edge, so
-  // the textarea reserves matching padding. Height is measured (grows with
-  // wrapped names); 28px is the single-line floor, also what jsdom
-  // (offsetHeight always 0) falls back to.
-  const bannerRef = useRef<HTMLDivElement>(null);
-  const [bannerHeight, setBannerHeight] = useState(0);
-  // Padding stays in sync with the banner's real height via a ResizeObserver
-  // (layout-only reflows change it too, not just content). Keyed on a
-  // primitive signature of the names, not `invalidVariables` array identity:
-  // that array is rebuilt every render, so an identity dependency re-ran this
-  // effect every render and hit React's nested-update limit.
-  const invalidVariablesKey = invalidVariables.join("\n");
-  useLayoutEffect(() => {
-    const node = bannerRef.current;
-    if (!node) {
-      setBannerHeight((prev) => (prev === 0 ? prev : 0));
-      return;
-    }
-    const measure = () => {
-      const measured = node.offsetHeight;
-      setBannerHeight((prev) => (prev === measured ? prev : measured));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [invalidVariablesKey]);
-  const reservedBottomPadding = invalidVariables.length > 0 ? Math.max(bannerHeight + 8, 28) : null;
-
-  // Handle keyboard input - dispatches to whichever menu is active
   const handleKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      // Determine which menu is active
-      const openLogicMenu = logicMenu.menuOpen ? logicMenu : null;
-      const activeMenu = variableMenu.menuOpen ? variableMenu : openLogicMenu;
-
-      if (!activeMenu) {
-        if (e.key === "Escape") return;
-        return;
-      }
-
-      switch (e.key) {
-        case "ArrowDown":
-          e.preventDefault();
-          activeMenu.setIsKeyboardNav(true);
-          activeMenu.setHighlightedIndex((prev: number) =>
-            Math.min(prev + 1, activeMenu.optionCount - 1),
-          );
-          break;
-        case "ArrowUp":
-          e.preventDefault();
-          activeMenu.setIsKeyboardNav(true);
-          activeMenu.setHighlightedIndex((prev: number) => Math.max(prev - 1, 0));
-          break;
-        case "Enter":
-        case "Tab":
-          e.preventDefault();
-          activeMenu.selectHighlightedOption();
-          break;
-        case "Escape":
-          e.preventDefault();
-          activeMenu.closeMenu();
-          break;
-      }
-    },
+    (event: KeyboardEvent<HTMLTextAreaElement>) =>
+      dispatchMenuKey({ event, variableMenu, logicMenu }),
     [variableMenu, logicMenu],
   );
 
-  // Handle text change - checks for both {%  and {{ triggers with mutual exclusion
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
-      const newValue = e.target.value;
-      const cursorPos = e.target.selectionStart;
-
-      handleValueChange(newValue);
-
-      // Check {%  first since it's more specific than {{
-      const unclosedPercent = findUnclosedPercentBraces(newValue, cursorPos);
-
-      if (unclosedPercent) {
-        // Close variable menu if open (mutual exclusion)
-        if (variableMenu.menuOpen) {
-          variableMenu.closeMenu();
-        }
-
-        if (!logicMenu.menuOpen) {
-          setTimeout(() => logicMenu.openMenu(unclosedPercent.start, unclosedPercent.query), 0);
-        } else {
-          logicMenu.setMenuQuery(unclosedPercent.query);
-        }
-        return;
-      }
-
-      // If no {% trigger, close logic menu if open
-      if (logicMenu.menuOpen) {
-        logicMenu.closeMenu();
-      }
-
-      // Check for unclosed {{ before cursor
-      const unclosedBraces = findUnclosedBraces(newValue, cursorPos);
-
-      if (unclosedBraces) {
-        if (!variableMenu.menuOpen) {
-          setTimeout(() => variableMenu.openMenu(unclosedBraces.start, unclosedBraces.query), 0);
-        } else {
-          variableMenu.setMenuQuery(unclosedBraces.query);
-        }
-        return;
-      }
-
-      // Typing the final `}` completes the reference and would normally
-      // dismiss the menu - exactly when the user finished typing the
-      // name they want to create. Keep the menu open for a completed
-      // {{name}} that doesn't resolve, so "Create variable" stays one
-      // click away.
-      const completed = findJustCompletedVariable(newValue, cursorPos);
-      const completedIsUnknown =
-        completed &&
-        onCreateVariable &&
-        !existingVariableIds.has(completed.name) &&
-        !locallyDefinedVariables.has(completed.name);
-
-      if (completedIsUnknown) {
-        if (!variableMenu.menuOpen) {
-          setTimeout(() => variableMenu.openMenu(completed.start, completed.name), 0);
-        } else {
-          variableMenu.setMenuQuery(completed.name);
-        }
-      } else if (variableMenu.menuOpen) {
-        variableMenu.closeMenu();
-      }
-    },
-    [
-      handleValueChange,
-      variableMenu,
-      logicMenu,
-      onCreateVariable,
-      existingVariableIds,
-      locallyDefinedVariables,
-    ],
-  );
-
-  // Render function for rich-textarea - highlights Liquid tags and variables
-  const renderText = useCallback(
-    (text: string) => {
-      if (!text) return null;
-
-      const tokens = tokenizeLiquidTemplate(text);
-      if (tokens.length === 0) return null;
-
-      return tokens.map((token, index) => {
-        if (token.type === "plain-text") {
-          return token.value;
-        }
-
-        if (token.type === "variable") {
-          // Extract the variable name (before any filter pipe)
-          const inner = token.value.slice(2, -2).trim();
-          const varName = inner.split("|")[0]!.trim().split(".")[0]!.trim();
-          // Valid if it's an existing external variable OR a locally-defined one (loop/assign)
-          const isInvalid = varName
-            ? !existingVariableIds.has(varName) && !locallyDefinedVariables.has(varName)
-            : true;
-
-          const variableColor = isInvalid
-            ? "var(--chakra-colors-red-500)"
-            : "var(--chakra-colors-blue-500)";
-
-          return (
-            <span
-              key={`var-${index}`}
-              style={{
-                color: variableColor,
-                // In borderless mode with variable-width fonts (Inter), real fontWeight
-                // changes character width and breaks caret positioning. Use text-shadow
-                // for a "faux bold" effect that doesn't affect text metrics.
-                fontWeight: borderless ? undefined : 600,
-                textShadow: borderless ? `0px 0px 1px ${variableColor}` : undefined,
-              }}
-            >
-              {token.value}
-            </span>
-          );
-        }
-
-        // liquid-tag: highlight with a distinct color
-        const tagColor = "var(--chakra-colors-purple-500)";
-        return (
-          <span
-            key={`tag-${index}`}
-            style={{
-              color: tagColor,
-              fontWeight: borderless ? undefined : 600,
-              textShadow: borderless ? `0px 0px 1px ${tagColor}` : undefined,
-            }}
-          >
-            {token.value}
-          </span>
-        );
+      const text = e.target.value;
+      const cursor = e.target.selectionStart;
+      handleValueChange(text);
+      followTriggers({
+        text,
+        cursor,
+        variableMenu,
+        logicMenu,
+        offersCreate: (name) => Boolean(onCreateVariable) && !isKnownVariable(name),
       });
     },
-    [existingVariableIds, locallyDefinedVariables, borderless],
+    [handleValueChange, variableMenu, logicMenu, onCreateVariable, isKnownVariable],
   );
 
-  const visibleParagraphPositions = getVisibleParagraphPositions(isHovered);
+  const renderText = useCallback(
+    (text: string) => renderLiquidText({ text, isKnownVariable, borderless }),
+    [isKnownVariable, borderless],
+  );
 
+  const paintOnFocusChange = (focused: boolean) => (e: FocusEvent<HTMLTextAreaElement>) => {
+    if (borderless) return;
+    paintFrame({ element: e.currentTarget, focused, hasError, reservedBottomPadding });
+  };
+
+  const visibleParagraphPositions = paragraphs.getVisibleParagraphPositions(isHovered);
+  const showParagraphHandles = borderless && visibleParagraphPositions.length > 1;
   const resizedHeight = userResizedHeight ? `${userResizedHeight}px` : undefined;
-  const textareaHeight = fillHeight ? "100%" : resizedHeight;
-  const defaultContextBottom = borderless ? "2px" : "10px";
-  const addContextBottom =
-    reservedBottomPadding !== null
-      ? `${reservedBottomPadding + (borderless ? 0 : 8)}px`
-      : defaultContextBottom;
 
   return (
     <>
@@ -439,28 +490,27 @@ export const PromptTextAreaWithVariables = ({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => {
           setIsHovered(false);
-          handleMouseLeave();
+          paragraphs.handleMouseLeave();
         }}
         onMouseMove={(e) => {
           setIsHovered(true);
-          handleMouseMove(e);
+          paragraphs.handleMouseMove(e);
         }}
-        onDragOver={handleDragOverContainer}
+        onDragOver={paragraphs.handleDragOverContainer}
         onDrop={(event) => {
-          if (dropTargetParagraph !== null) {
-            handleParagraphDrop(event, dropTargetParagraph);
-          }
+          if (paragraphs.dropTargetParagraph === null) return;
+          paragraphs.handleParagraphDrop(event, paragraphs.dropTargetParagraph);
         }}
         minHeight={fillHeight ? undefined : "120px"}
         height={fillHeight ? "100%" : undefined}
         {...boxProps}
       >
         {/* Line highlights - rendered BEFORE textarea so they appear behind text */}
-        {borderless && visibleParagraphPositions.length > 1 && (
+        {showParagraphHandles && (
           <LineHighlights
             positions={visibleParagraphPositions}
-            gripHoveredParagraph={gripHoveredParagraph}
-            draggedParagraph={draggedParagraph}
+            gripHoveredParagraph={paragraphs.gripHoveredParagraph}
+            draggedParagraph={paragraphs.draggedParagraph}
           />
         )}
 
@@ -475,125 +525,53 @@ export const PromptTextAreaWithVariables = ({
           autoHeight={useAutoHeight}
           data-role={role}
           className="rich-textarea-position-relative"
-          style={{
-            width: "100%",
-            minHeight: fillHeight ? "100%" : minHeight,
-            maxHeight: fillHeight ? undefined : maxHeight,
-            height: textareaHeight,
-            fontFamily: borderless
-              ? undefined
-              : 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-            fontSize: borderless ? "14px" : "13px",
-            lineHeight: borderless ? "28px" : "1.5",
-            padding: borderless ? "0 0 0 24px" : "8px 10px",
-            ...(reservedBottomPadding !== null
-              ? { paddingBottom: `${reservedBottomPadding}px` }
-              : {}),
-            border: borderless
-              ? "none"
-              : `1px solid ${
-                  hasError ? "var(--chakra-colors-red-500)" : "var(--chakra-colors-border)"
-                }`,
-            borderRadius: borderless ? "0" : "12px",
-            outline: "none",
-            resize: borderless ? "none" : "vertical",
-            background: borderless ? "transparent" : undefined,
-          }}
-          onFocus={(e) => {
-            if (borderless) return;
-            e.currentTarget.style.borderColor = hasError
-              ? "var(--chakra-colors-red-500)"
-              : "var(--chakra-colors-blue-500)";
-            e.currentTarget.style.borderWidth = "2px";
-            e.currentTarget.style.padding = "7px 9px";
-            // The padding shorthand above wipes the banner reservation -
-            // re-apply it or focusing hides the last line again.
-            if (reservedBottomPadding !== null) {
-              e.currentTarget.style.paddingBottom = `${reservedBottomPadding}px`;
-            }
-          }}
-          onBlur={(e) => {
-            if (borderless) return;
-            e.currentTarget.style.borderColor = hasError
-              ? "var(--chakra-colors-red-500)"
-              : "var(--chakra-colors-border)";
-            e.currentTarget.style.borderWidth = "1px";
-            e.currentTarget.style.padding = "8px 10px";
-            if (reservedBottomPadding !== null) {
-              e.currentTarget.style.paddingBottom = `${reservedBottomPadding}px`;
-            }
-          }}
+          style={textareaStyle({
+            borderless,
+            fillHeight,
+            hasError,
+            minHeight,
+            maxHeight,
+            height: fillHeight ? "100%" : resizedHeight,
+            reservedBottomPadding,
+          })}
+          onFocus={paintOnFocusChange(true)}
+          onBlur={paintOnFocusChange(false)}
         >
           {renderText}
         </RichTextarea>
 
         {/* Grip handles - rendered AFTER textarea so they're clickable on top */}
-        {borderless && visibleParagraphPositions.length > 1 && (
+        {showParagraphHandles && (
           <GripHandles
             positions={visibleParagraphPositions}
-            hoveredParagraph={hoveredParagraph}
-            draggedParagraph={draggedParagraph}
-            dropTargetParagraph={dropTargetParagraph}
-            onGripHover={setGripHoveredParagraph}
-            onDragStart={handleParagraphDragStart}
-            onDragEnd={handleParagraphDragEnd}
+            hoveredParagraph={paragraphs.hoveredParagraph}
+            draggedParagraph={paragraphs.draggedParagraph}
+            dropTargetParagraph={paragraphs.dropTargetParagraph}
+            onGripHover={paragraphs.setGripHoveredParagraph}
+            onDragStart={paragraphs.handleParagraphDragStart}
+            onDragEnd={paragraphs.handleParagraphDragEnd}
           />
         )}
 
         <Box position="sticky" bottom={0} width="full">
-          {/* Invalid variables warning */}
-          {invalidVariables.length > 0 && (
-            <HStack
-              ref={bannerRef}
-              backgroundColor="red.subtle"
-              borderRadius="lg"
-              padding={1}
-              marginBottom={1}
-              paddingLeft={2}
-              position="absolute"
-              bottom={borderless ? -2 : 0}
-              marginLeft={1}
-              width="calc(100% - 8px)"
-              justifyContent="space-between"
-              gap={2}
-              data-testid="undefined-variables-banner"
-            >
-              <Text fontSize="xs" color="red.fg">
-                Undefined variables: {invalidVariables.join(", ")}
-              </Text>
-              {onCreateVariable && (
-                <Button
-                  size="xs"
-                  height="20px"
-                  variant="surface"
-                  colorPalette="red"
-                  flexShrink={0}
-                  data-testid="create-missing-variable-button"
-                  onClick={() =>
-                    onCreateVariable({
-                      identifier: invalidVariables[0]!,
-                      type: "str",
-                    })
-                  }
-                >
-                  Create {`"${invalidVariables[0]}"`}
-                </Button>
-              )}
-            </HStack>
-          )}
+          <UndefinedVariablesBanner
+            bannerRef={bannerRef}
+            invalidVariables={invalidVariables}
+            borderless={borderless}
+            onCreateVariable={onCreateVariable}
+          />
 
           {/* Add variable and Add logic buttons */}
           {showAddContextButton && isHovered && !disabled && (
             <HStack
               position="absolute"
-              bottom={addContextBottom}
+              bottom={addContextBottomOf({ reservedBottomPadding, borderless })}
               right={2}
               gap={1.5}
               data-testid="add-context-buttons"
             >
-              {/* Two separate normal buttons; each carries its own solid
-                  background so message text behind never bleeds through the
-                  labels (see AddLogicButton / AddVariableButton). */}
+              {/* Two separate buttons, each with its own solid background so
+                  message text behind never bleeds through the labels. */}
               <AddLogicButton
                 ref={logicMenu.addButtonRef}
                 onClick={logicMenu.handleAddLogicClick}
@@ -606,7 +584,6 @@ export const PromptTextAreaWithVariables = ({
           )}
         </Box>
 
-        {/* Variable Insert Menu */}
         <VariableInsertMenu
           isOpen={variableMenu.menuOpen}
           position={variableMenu.menuPosition}
@@ -624,7 +601,6 @@ export const PromptTextAreaWithVariables = ({
           renderSourceIcon={renderSourceIcon}
         />
 
-        {/* Template Logic Menu */}
         <TemplateLogicMenu
           isOpen={logicMenu.menuOpen}
           position={logicMenu.menuPosition}

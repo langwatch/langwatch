@@ -22,6 +22,7 @@ import {
   SuiteNotFoundError,
   SuiteScopeEmptyError,
   SuiteTargetsRequiredError,
+  suiteRunInputSchema,
 } from "@langwatch/suite-contract";
 import { fromDate, nowInstant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -1071,7 +1072,7 @@ describe("SuiteService", () => {
           expect.objectContaining({
             id: "suite_abc123",
             projectId: "project_1",
-            archivedAt: new Date("2026-02-01T00:00:00.000Z"),
+            archivedAt: fromDate(new Date("2026-02-01T00:00:00.000Z")),
             archivedSlug: "critical-path--archived-abc123",
           }),
         );
@@ -1390,19 +1391,17 @@ describe("SuiteService", () => {
      * schema itself carries the "stored configuration only" rule.
      */
     /** @scenario "A run plan run through the test suite path refuses stored execution settings" */
-    it("refuses a request carrying execution settings it has no field for", async () => {
-      const service = SuiteService.create(serviceOptions(repository()));
-
-      await expect(
-        service.run({
+    it("refuses a request carrying execution settings it has no field for", () => {
+      expect(() =>
+        suiteRunInputSchema.parse({
           id: "suite_original",
           projectId: "project_1",
           organizationId: "org_1",
           idempotencyKey: "request_1",
           targets: [{ type: "http", referenceId: "agent_9" }],
           repeatCount: 2,
-        } as unknown as Parameters<typeof service.run>[0]),
-      ).rejects.toBeInstanceOf(z.ZodError);
+        }),
+      ).toThrow(z.ZodError);
     });
   });
 

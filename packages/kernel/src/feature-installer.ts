@@ -145,7 +145,7 @@ export type ModuleTaskBinder<Dependencies extends TokenMap, Members, Repositorie
 
 /** An inert API descriptor retained for the process root to mount later. */
 export type FeatureTransportDescriptor = Readonly<{
-  readonly protocol: "rest" | "trpc" | "websocket" | "rawsocket";
+  readonly protocol: "rest" | "trpc" | "websocket" | "rawsocket" | "rawhttp";
   /** The family's path segment, or the tRPC namespace the record keys it by. */
   readonly namespace?: string;
   readonly router: (...args: never[]) => object;

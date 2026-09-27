@@ -33,5 +33,5 @@ export const langySessionKeyReapWake: WakeHandler<
   LangySessionKeyReapIntents
 > = (_state, ctx) => ({
   state: { lastReapAt: ctx.at },
-  intents: [ctx.intents.reap(`reap:${ctx.at}`, { scheduledFor: ctx.at })],
+  intents: [ctx.intent("reap", `reap:${ctx.at}`, { scheduledFor: ctx.at })],
 });

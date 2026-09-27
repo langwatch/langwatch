@@ -4,15 +4,10 @@ import {
 } from "@langwatch/data-retention-contract";
 import type { Cluster, Redis } from "ioredis";
 
-/** A cache read: the retention held under the key, or a miss the caller resolves. */
-export type CachedRetentionLookup = { kind: "hit"; value: ResolvedRetention } | { kind: "miss" };
-
-/** Internal cache port; cache implementation and wiring stay server-owned. */
-export abstract class DataRetentionCacheStore {
-  abstract get(key: string): Promise<CachedRetentionLookup>;
-  abstract set(key: string, value: ResolvedRetention): Promise<void>;
-  abstract delete(key: string): Promise<void>;
-}
+import {
+  type CachedRetentionLookup,
+  DataRetentionCacheRepository,
+} from "../data-retention-cache.repository.ts";
 
 /** Only what this cache calls. */
 export type DataRetentionRedis = Pick<Redis | Cluster, "get" | "setex" | "del">;
@@ -26,14 +21,14 @@ type MemoryEntry = {
  * The one retention-policy cache. Redis is shared across processes; the
  * in-memory shadow keeps reads available when Redis is absent or unhealthy.
  */
-export class RedisDataRetentionCacheStore extends DataRetentionCacheStore {
+export class RedisDataRetentionCacheRepository extends DataRetentionCacheRepository {
   static create(options: {
     redis?: DataRetentionRedis | null;
     ttlMs: number;
     prefix?: string;
     now?: () => number;
-  }): RedisDataRetentionCacheStore {
-    return new RedisDataRetentionCacheStore({
+  }): RedisDataRetentionCacheRepository {
+    return new RedisDataRetentionCacheRepository({
       redis: options.redis ?? null,
       ttlMs: options.ttlMs,
       prefix: options.prefix ?? "retention-policy:",

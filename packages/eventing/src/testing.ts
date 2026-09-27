@@ -9,6 +9,7 @@ export {
   createTestEventStoreReadContext,
   createTestProjection,
   createTestTenantId,
+  intentAccessorOf,
   TEST_CONSTANTS,
 } from "./services/__tests__/testHelpers.ts";
 export { processCommand, processCommandBatch } from "./services/commands/commandDispatcher.ts";

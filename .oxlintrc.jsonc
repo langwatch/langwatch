@@ -113,6 +113,11 @@
       "rules": { "typescript/no-explicit-any": "error" },
     },
     {
+      // A type test's spread is the assertion itself (Alex, 2026-09-27); scoped to type-tests only.
+      "files": ["packages/*/type-tests/**"],
+      "rules": { "typescript/no-misused-spread": "off" },
+    },
+    {
       // Published SDK surface keeps its public `any`s (Alex, 2026-09-27); internal SDK code stays strict.
       "files": [
         "sdks/typescript/src/client-sdk/services/prompts/errors/prompt-compilation.error.ts",

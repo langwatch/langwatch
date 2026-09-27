@@ -27,5 +27,5 @@ export const storageStatsWake: WakeHandler<StorageStatsState, StorageStatsIntent
   ctx,
 ) => ({
   state: { lastMeasuredAt: ctx.at },
-  intents: [ctx.intents.measure(`measure:${ctx.at}`, { scheduledFor: ctx.at })],
+  intents: [ctx.intent("measure", `measure:${ctx.at}`, { scheduledFor: ctx.at })],
 });

@@ -36,6 +36,127 @@ export function OpenAIToolCallCard({
   return <ToolPairCard name={call.function.name} input={parsedInput} id={call.id} result={null} />;
 }
 
+const IDENTIFYING_ARGS = ["file_path", "command", "path", "url", "query", "pattern"];
+
+/**
+ * The most identifying scalar argument, shown as the collapsed row's subtitle
+ * ("Read · /path/to/x"): a well-known key, else the first argument.
+ */
+function argSummaryOf(argEntries: [string, unknown][]): string | null {
+  const primary = argEntries.find(([k]) => IDENTIFYING_ARGS.includes(k)) ?? argEntries[0];
+  const value = primary?.[1];
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return null;
+}
+
+/** The input as JSON text, for when it has no named arguments to list. */
+function fallbackJsonOf(input: unknown): string {
+  if (input == null) return "";
+  if (typeof input === "string") return asPrettyJson(input);
+  try {
+    return JSON.stringify(input, null, 2);
+  } catch {
+    return "[unserializable value]";
+  }
+}
+
+function ToolPairHeader({
+  title,
+  summary,
+  isSkill,
+  isError,
+  hasResult,
+  open,
+  glyphColor,
+  onToggle,
+}: {
+  title: string;
+  summary: string | null;
+  isSkill: boolean;
+  isError: boolean;
+  hasResult: boolean;
+  open: boolean;
+  glyphColor: string;
+  onToggle: () => void;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      display="flex"
+      alignItems="center"
+      gap={2}
+      paddingX={2.5}
+      paddingY={1.5}
+      cursor="pointer"
+      onClick={onToggle}
+      width="full"
+      _hover={{ bg: isSkill ? "purple.subtle/60" : "bg.muted" }}
+      transition="background 0.12s ease"
+      textAlign="left"
+    >
+      <Icon as={isSkill ? LuSparkles : LuWrench} boxSize={3} color={glyphColor} flexShrink={0} />
+      <Text
+        textStyle="xs"
+        fontFamily="mono"
+        color={isSkill ? "purple.fg" : "fg"}
+        fontWeight="medium"
+        flexShrink={0}
+      >
+        {title}
+      </Text>
+      {summary ? (
+        <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" truncate flex={1} minWidth={0}>
+          {summary}
+        </Text>
+      ) : (
+        <Box flex={1} />
+      )}
+      {isError && (
+        <Text
+          textStyle="2xs"
+          fontWeight="600"
+          color="red.fg"
+          textTransform="uppercase"
+          letterSpacing="0.06em"
+          flexShrink={0}
+        >
+          error
+        </Text>
+      )}
+      {!hasResult && (
+        <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" flexShrink={0}>
+          no result
+        </Text>
+      )}
+      <Icon
+        as={open ? LuChevronDown : LuChevronRight}
+        boxSize={3}
+        color="fg.subtle"
+        flexShrink={0}
+      />
+    </chakra.button>
+  );
+}
+
+function ResultPre({ text }: { text: string }) {
+  return (
+    <Box
+      as="pre"
+      textStyle="2xs"
+      fontFamily="mono"
+      color="fg"
+      whiteSpace="pre-wrap"
+      wordBreak="break-word"
+      margin={0}
+      maxHeight="600px"
+      overflow="auto"
+    >
+      {text || "—"}
+    </Box>
+  );
+}
+
 /**
  * Unified tool call card — pairs an Anthropic-style `tool_use` with its `tool_result`
  * (when one is available) into a single, compact, neutral card.
@@ -60,43 +181,9 @@ export function ToolPairCard({
   const skill = useMemo(() => skillInvocationFromToolUse({ name, input }), [name, input]);
   const isSkill = skill !== null;
 
-  const argEntries = useMemo<[string, unknown][] | null>(() => {
-    if (isRecord(input)) {
-      return Object.entries(input);
-    }
-    return null;
-  }, [input]);
-
-  const fallbackJson = useMemo(() => {
-    if (input == null) return "";
-    if (typeof input === "string") return asPrettyJson(input);
-    try {
-      return JSON.stringify(input, null, 2);
-    } catch {
-      return "[unserializable value]";
-    }
-  }, [input]);
-
-  const argSummary = useMemo(() => {
-    if (!argEntries || argEntries.length === 0) return null;
-    // Pull the most identifying single-arg out as a header subtitle —
-    // makes the row scannable while collapsed (e.g. "Read · /path/to/x").
-    const primary =
-      argEntries.find(
-        ([k]) =>
-          k === "file_path" ||
-          k === "command" ||
-          k === "path" ||
-          k === "url" ||
-          k === "query" ||
-          k === "pattern",
-      ) ?? argEntries[0];
-    if (!primary) return null;
-    const [, val] = primary;
-    if (typeof val === "string") return val;
-    if (typeof val === "number" || typeof val === "boolean") return String(val);
-    return null;
-  }, [argEntries]);
+  const argEntries = useMemo(() => (isRecord(input) ? Object.entries(input) : null), [input]);
+  const fallbackJson = useMemo(() => fallbackJsonOf(input), [input]);
+  const argSummary = useMemo(() => argSummaryOf(argEntries ?? []), [argEntries]);
 
   const resultBody = useMemo(
     () => (result ? toolResultBodyToString(result.content) : ""),
@@ -122,61 +209,16 @@ export function ToolPairCard({
       bg={isSkill ? "purple.subtle/40" : "bg.subtle"}
       overflow="hidden"
     >
-      <chakra.button
-        type="button"
-        display="flex"
-        alignItems="center"
-        gap={2}
-        paddingX={2.5}
-        paddingY={1.5}
-        cursor="pointer"
-        onClick={() => setOpen((v) => !v)}
-        width="full"
-        _hover={{ bg: isSkill ? "purple.subtle/60" : "bg.muted" }}
-        transition="background 0.12s ease"
-        textAlign="left"
-      >
-        <Icon as={isSkill ? LuSparkles : LuWrench} boxSize={3} color={glyphColor} flexShrink={0} />
-        <Text
-          textStyle="xs"
-          fontFamily="mono"
-          color={isSkill ? "purple.fg" : "fg"}
-          fontWeight="medium"
-          flexShrink={0}
-        >
-          {isSkill && skill?.slug ? `Skill · ${skill.slug}` : name}
-        </Text>
-        {!isSkill && argSummary ? (
-          <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" truncate flex={1} minWidth={0}>
-            {argSummary}
-          </Text>
-        ) : (
-          <Box flex={1} />
-        )}
-        {isError && (
-          <Text
-            textStyle="2xs"
-            fontWeight="600"
-            color="red.fg"
-            textTransform="uppercase"
-            letterSpacing="0.06em"
-            flexShrink={0}
-          >
-            error
-          </Text>
-        )}
-        {!result && (
-          <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" flexShrink={0}>
-            no result
-          </Text>
-        )}
-        <Icon
-          as={open ? LuChevronDown : LuChevronRight}
-          boxSize={3}
-          color="fg.subtle"
-          flexShrink={0}
-        />
-      </chakra.button>
+      <ToolPairHeader
+        title={isSkill && skill?.slug ? `Skill · ${skill.slug}` : name}
+        summary={isSkill ? null : argSummary}
+        isSkill={isSkill}
+        isError={isError}
+        hasResult={!!result}
+        open={open}
+        glyphColor={glyphColor}
+        onToggle={() => setOpen((v) => !v)}
+      />
       {open && (
         <VStack align="stretch" gap={0} borderTopWidth="1px" borderTopColor="border.muted">
           <ToolPairSection label={id ? `Args · ${id}` : "Args"}>
@@ -190,19 +232,7 @@ export function ToolPairCard({
               {resultHasAnsi && renderTerminalOutput ? (
                 renderTerminalOutput(resultBody, isError)
               ) : (
-                <Box
-                  as="pre"
-                  textStyle="2xs"
-                  fontFamily="mono"
-                  color="fg"
-                  whiteSpace="pre-wrap"
-                  wordBreak="break-word"
-                  margin={0}
-                  maxHeight="600px"
-                  overflow="auto"
-                >
-                  {prettyResult || "—"}
-                </Box>
+                <ResultPre text={prettyResult} />
               )}
             </ToolPairSection>
           )}

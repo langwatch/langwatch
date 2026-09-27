@@ -21,12 +21,12 @@ import type {
 
 /**
  * Accumulator used by the record-shaped redaction paths (logs, metrics). Tracks parallel arrays
- * of texts and back-references plus a cumulative length budget enforced by `tryPush`.
+ * of texts and their write-backs plus a cumulative length budget enforced by `tryPush`.
  */
 type RedactionBatch = {
   texts: string[];
-  refs: { obj: Record<string, string>; key: string }[];
-  tryPush: (obj: Record<string, string>, key: string, value: string) => void;
+  writes: ((redacted: string) => void)[];
+  tryPush: (entry: { key: string; value: string; write: (redacted: string) => void }) => void;
 };
 
 export class OtlpRecordPiiRedactionService {
@@ -185,7 +185,13 @@ export class OtlpRecordPiiRedactionService {
     // an identifier written in a sentence sits next to content that may well
     // hold personal data.
     if (log.body) {
-      batch.tryPush(log as unknown as Record<string, string>, "body", log.body);
+      batch.tryPush({
+        key: "body",
+        value: log.body,
+        write: (redacted) => {
+          log.body = redacted;
+        },
+      });
     }
 
     this.collectRecordEntries(batch, log.attributes, log.attributeNames);
@@ -273,15 +279,15 @@ export class OtlpRecordPiiRedactionService {
 
   private createRedactionBatch(): RedactionBatch {
     const texts: string[] = [];
-    const refs: { obj: Record<string, string>; key: string }[] = [];
+    const writes: ((redacted: string) => void)[] = [];
     const maxLen = this.deps.piiRedactionMaxAttributeLength;
     const logger = this.logger;
     const state = { totalLength: 0 };
 
     return {
       texts,
-      refs,
-      tryPush(obj, key, value) {
+      writes,
+      tryPush({ key, value, write }) {
         if (state.totalLength + value.length > maxLen) {
           logger.warn(
             {
@@ -297,7 +303,7 @@ export class OtlpRecordPiiRedactionService {
         }
 
         texts.push(value);
-        refs.push({ obj, key });
+        writes.push(write);
         state.totalLength += value.length;
       },
     };
@@ -319,7 +325,13 @@ export class OtlpRecordPiiRedactionService {
       if (isHeldOutIdentifierAttribute({ key: attributeNames?.[key] ?? key, value })) {
         continue;
       }
-      batch.tryPush(record, key, value);
+      batch.tryPush({
+        key,
+        value,
+        write: (redacted) => {
+          record[key] = redacted;
+        },
+      });
     }
   }
 
@@ -333,17 +345,15 @@ export class OtlpRecordPiiRedactionService {
 
     const results = await this.policy.clearBatch(batch.texts, options);
 
-    if (results.length !== batch.refs.length) {
+    if (results.length !== batch.writes.length) {
       throw new Error(
-        `Incomplete PII batch: got ${results.length} results for ${batch.refs.length} inputs`,
+        `Incomplete PII batch: got ${results.length} results for ${batch.writes.length} inputs`,
       );
     }
 
-    for (let i = 0; i < batch.refs.length; i++) {
-      const redacted = results[i];
-      if (redacted != null) {
-        batch.refs[i]!.obj[batch.refs[i]!.key] = redacted;
-      }
-    }
+    batch.writes.forEach((write, index) => {
+      const redacted = results[index];
+      if (redacted != null) write(redacted);
+    });
   }
 }

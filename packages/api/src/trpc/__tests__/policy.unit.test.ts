@@ -386,10 +386,9 @@ describe("createDeclaredAuthzMiddlewares", () => {
       const checks = createDeclaredAuthzMiddlewares(makePorts());
       const middleware = checks.noPermission({ reason: "nothing scoped" });
 
-      // tRPC hands an undeclared procedure's real, unvalidated input through
-      // untouched: `undefined`, not `{}`. `ScopeInput` promises an object, so
-      // this is only reachable by casting the call itself, the way a
-      // procedure with no `.input()` reaches it at runtime.
+      // wrong-typed input: tRPC hands an undeclared procedure's input through
+      // untouched, `undefined` not `{}`, though `ScopeInput` promises an object;
+      // only casting the call reaches that, as a procedure with no `.input()` does.
       const callWithNoDeclaredInput = middleware as unknown as (params: {
         ctx: ReturnType<typeof ctxFor>;
         input: undefined;

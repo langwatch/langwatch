@@ -1,4 +1,4 @@
-import { buildIntentFactories } from "@langwatch/eventing";
+import { buildIntentAccessor } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -51,7 +51,7 @@ describe("webhook delivery prune process", () => {
             now: 10_000,
             key: "webhookDeliveryPrune",
             projectId: "__global__",
-            intents: buildIntentFactories(definition.config.intents),
+            intent: buildIntentAccessor(definition.config.intents),
           },
         );
         expect(wake).toEqual({

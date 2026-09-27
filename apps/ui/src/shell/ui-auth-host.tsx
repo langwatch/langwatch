@@ -1,23 +1,22 @@
 /**
- * The shell's answer to auth's declared host port. The front door reads the
- * deployment's public shape, its own address, and somewhere to report a
- * failure — none of which auth may reach for itself.
+ * The shell's answer to auth's host port: the deployment's public shape, its
+ * own address, and somewhere to report a failure, over auth's loaded host
+ * capability. Auth may reach none of these for itself.
  */
 
-import {
-  AuthHostApi,
-  AuthHostProvider,
-  type AuthFailureNotice,
-  type AuthPublicEnvironment,
-  type AuthRouteReading,
+import type {
+  AuthFailureNotice,
+  AuthPublicEnvironment,
+  AuthRouteReading,
 } from "@langwatch/auth-browser/auth";
 import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
 import { readPublicAppConfig } from "@langwatch/ui-kernel/public-config";
 import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
-import { useMemo } from "react";
+import { useMemo, type ComponentType } from "react";
 import { useLocation, useParams, useSearchParams } from "react-router";
 
 import { parseUiFeatureConfig, type UiFeatureConfig } from "../ui-feature-config";
+import type { UiRootCapabilities } from "./ui-root-capabilities";
 
 /** Auth restates the public shape to break a cycle, so the projection lives here. */
 function authPublicEnvironment(config: UiFeatureConfig): AuthPublicEnvironment {
@@ -41,47 +40,52 @@ function authPublicEnvironment(config: UiFeatureConfig): AuthPublicEnvironment {
   };
 }
 
-class ShellAuthHost extends AuthHostApi {
-  constructor(
-    private readonly config: UiFeatureConfig,
-    private readonly reading: AuthRouteReading,
-    private readonly report: (failure: AuthFailureNotice) => void,
-  ) {
-    super();
+/** The auth layout: auth's host port answered from the shell's own readings. */
+export function uiAuthHost(auth: UiRootCapabilities["authHost"]): ComponentType {
+  class ShellAuthHost extends auth.AuthHostApi {
+    constructor(
+      private readonly config: UiFeatureConfig,
+      private readonly reading: AuthRouteReading,
+      private readonly report: (failure: AuthFailureNotice) => void,
+    ) {
+      super();
+    }
+
+    publicEnvironment(): AuthPublicEnvironment {
+      return authPublicEnvironment(this.config);
+    }
+
+    route(): AuthRouteReading {
+      return this.reading;
+    }
+
+    failed(failure: AuthFailureNotice): void {
+      this.report(failure);
+    }
   }
 
-  publicEnvironment(): AuthPublicEnvironment {
-    return authPublicEnvironment(this.config);
-  }
+  return function UiAuthHost() {
+    const capabilities = useOptionalUiCapabilities();
+    const location = useLocation();
+    const params = useParams();
+    const [search] = useSearchParams();
+    const [config] = useMemo(() => [parseUiFeatureConfig(readPublicAppConfig(document))], []);
 
-  route(): AuthRouteReading {
-    return this.reading;
-  }
+    const host = useMemo(() => {
+      const reading: AuthRouteReading = {
+        pathname: location.pathname,
+        params,
+        query: Object.fromEntries(search.entries()),
+      };
+      return new ShellAuthHost(config, reading, (failure) =>
+        capabilities?.feedback?.failed(failure),
+      );
+    }, [config, location.pathname, params, search, capabilities]);
 
-  failed(failure: AuthFailureNotice): void {
-    this.report(failure);
-  }
-}
-
-export default function UiAuthHost() {
-  const capabilities = useOptionalUiCapabilities();
-  const location = useLocation();
-  const params = useParams();
-  const [search] = useSearchParams();
-  const [config] = useMemo(() => [parseUiFeatureConfig(readPublicAppConfig(document))], []);
-
-  const host = useMemo(() => {
-    const reading: AuthRouteReading = {
-      pathname: location.pathname,
-      params,
-      query: Object.fromEntries(search.entries()),
-    };
-    return new ShellAuthHost(config, reading, (failure) => capabilities?.feedback?.failed(failure));
-  }, [config, location.pathname, params, search, capabilities]);
-
-  return (
-    <AuthHostProvider value={host}>
-      <UiRouteOutlet />
-    </AuthHostProvider>
-  );
+    return (
+      <auth.AuthHostProvider value={host}>
+        <UiRouteOutlet />
+      </auth.AuthHostProvider>
+    );
+  };
 }

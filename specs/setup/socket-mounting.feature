@@ -92,6 +92,42 @@ Feature: Sockets are declared like routes and mounted by the process
       When a client upgrades "/elsewhere" and requests "/healthz"
       Then the upgrade is refused 404 and the liveness path answers 200
 
+  Rule: A request answered over the raw Node request is a raw HTTP door the api answers first
+
+    @unit
+    Scenario: A declared raw HTTP door mounts on the api process, bound to its module's application
+      Given a module declares a raw HTTP door among its transports
+      When the api process boots with a raw HTTP host
+      Then the door is mounted on it, bound to the module's own application
+
+    @unit
+    Scenario: An api process without a raw HTTP host refuses a declared door by name
+      When the api process boots with REST doors but no raw HTTP host
+      Then boot is refused naming the module and the raw HTTP protocol
+
+    @unit
+    Scenario: The worker never mounts a raw HTTP door
+      When the worker boots the same module
+      Then no raw HTTP door is mounted
+
+    @integration
+    Scenario: A request on a claimed path is answered by the door ahead of the routes
+      Given a raw HTTP door claiming "/mcp" and everything beneath "/.well-known/oauth-protected-resource"
+      When clients request those paths and others
+      Then the claimed ones are answered by the door and every other one reaches the routes
+
+    @integration
+    Scenario: Shutdown closes what every raw HTTP door holds open
+      Given a mounted raw HTTP door
+      When the process shuts down
+      Then the door's close runs once
+
+    @unit
+    Scenario: Main's fourteen MCP root paths reach the API through the raw HTTP door
+      Given the api surface with a door claiming main's MCP paths and metadata subtrees
+      When a client requests each of main's fourteen MCP root paths
+      Then every one is answered by the door, none by the browser application
+
   Rule: The two sockets main served are declared by their modules
 
     @unit

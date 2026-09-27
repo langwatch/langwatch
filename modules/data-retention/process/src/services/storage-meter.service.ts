@@ -10,15 +10,10 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import {
-  RedisStorageMeterCacheStore,
-  type StorageMeterRedis,
-  type StorageMeterCacheStore,
-} from "../stores/storage-meter-cache.store.ts";
+import type { StorageMeterCacheRepository } from "../repositories/storage-meter-cache.repository.ts";
 
 const logger = createLogger("langwatch:data-retention:metering");
 const STORAGE_FRESH_MS = 5 * 60 * 1_000;
-const STORAGE_HARD_TTL_MS = 30 * 60 * 1_000;
 const METERING_MAX_EXECUTION_SECONDS = 45;
 const METERING_CLICKHOUSE_SETTINGS = {
   max_threads: 2,
@@ -56,25 +51,15 @@ export class StorageMeterService {
   static create(options: {
     /** The process's one ClickHouse client, which routes each read itself. */
     clickhouse: ClickHouseQueryClient;
-    redis?: StorageMeterRedis | null;
+    cache: StorageMeterCacheRepository;
     now?: () => number;
-    cache?: StorageMeterCacheStore;
   }): StorageMeterService {
-    return new StorageMeterService(
-      options.clickhouse,
-      options.cache ??
-        RedisStorageMeterCacheStore.create({
-          redis: options.redis,
-          ttlMs: STORAGE_HARD_TTL_MS,
-          now: options.now,
-        }),
-      options.now ?? Date.now,
-    );
+    return new StorageMeterService(options.clickhouse, options.cache, options.now ?? Date.now);
   }
 
   private constructor(
     private readonly clickhouse: ClickHouseQueryClient,
-    private readonly cache: StorageMeterCacheStore,
+    private readonly cache: StorageMeterCacheRepository,
     private readonly now: () => number,
   ) {}
 

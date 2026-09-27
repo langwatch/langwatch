@@ -85,48 +85,9 @@ export const InspectView = ({
             {templates.length} messages
           </Text>
         </Box>
-        {templates.map((entry) => {
-          const isCurrent = entry.id === selected?.id;
-          const firstFixture = entry.fixtures[0];
-          return (
-            <Box key={entry.id}>
-              <HtmlButton
-                type="button"
-                width="full"
-                textAlign="left"
-                cursor="pointer"
-                borderRadius="sm"
-                paddingY={0.5}
-                onClick={() => firstFixture && onSelect(entry.id, firstFixture.name)}
-              >
-                <Heading size="xs" color={isCurrent ? "orange.500" : "fg"}>
-                  {entry.title}
-                </Heading>
-                <Text fontSize="2xs" color="fg.muted">
-                  {entry.sentWhen}
-                </Text>
-              </HtmlButton>
-              <HStack gap={1} flexWrap="wrap" marginTop={1.5}>
-                {entry.fixtures.map((fixture) => {
-                  const isFixtureCurrent = isCurrent && fixture.name === selected.fixture;
-                  return (
-                    <Button
-                      key={fixture.name}
-                      type="button"
-                      size="2xs"
-                      variant={isFixtureCurrent ? "solid" : "outline"}
-                      colorPalette={isFixtureCurrent ? "orange" : "gray"}
-                      borderRadius="full"
-                      onClick={() => onSelect(entry.id, fixture.name)}
-                    >
-                      {fixture.name}
-                    </Button>
-                  );
-                })}
-              </HStack>
-            </Box>
-          );
-        })}
+        {templates.map((entry) => (
+          <TemplateNavEntry key={entry.id} entry={entry} selected={selected} onSelect={onSelect} />
+        ))}
       </Stack>
 
       <Stack flex="1" minWidth={0} gap={0}>
@@ -250,3 +211,55 @@ export const InspectView = ({
     </Flex>
   );
 };
+
+/** One template in the navigation: its title, when it is sent, and a chip per fixture. */
+function TemplateNavEntry({
+  entry,
+  selected,
+  onSelect,
+}: {
+  entry: InspectViewProps["templates"][number];
+  selected: InspectViewProps["selected"];
+  onSelect: InspectViewProps["onSelect"];
+}): JSX.Element {
+  const isCurrent = entry.id === selected?.id;
+  const firstFixture = entry.fixtures[0];
+  return (
+    <Box>
+      <HtmlButton
+        type="button"
+        width="full"
+        textAlign="left"
+        cursor="pointer"
+        borderRadius="sm"
+        paddingY={0.5}
+        onClick={() => firstFixture && onSelect(entry.id, firstFixture.name)}
+      >
+        <Heading size="xs" color={isCurrent ? "orange.500" : "fg"}>
+          {entry.title}
+        </Heading>
+        <Text fontSize="2xs" color="fg.muted">
+          {entry.sentWhen}
+        </Text>
+      </HtmlButton>
+      <HStack gap={1} flexWrap="wrap" marginTop={1.5}>
+        {entry.fixtures.map((fixture) => {
+          const isFixtureCurrent = isCurrent && fixture.name === selected.fixture;
+          return (
+            <Button
+              key={fixture.name}
+              type="button"
+              size="2xs"
+              variant={isFixtureCurrent ? "solid" : "outline"}
+              colorPalette={isFixtureCurrent ? "orange" : "gray"}
+              borderRadius="full"
+              onClick={() => onSelect(entry.id, fixture.name)}
+            >
+              {fixture.name}
+            </Button>
+          );
+        })}
+      </HStack>
+    </Box>
+  );
+}

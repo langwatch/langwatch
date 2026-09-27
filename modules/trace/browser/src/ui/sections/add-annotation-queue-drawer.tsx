@@ -11,6 +11,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import type { AnnotationQueueDetail } from "@langwatch/annotation-contract";
 import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useEffect, useState } from "react";
@@ -23,9 +24,145 @@ import { useOrganizationTeamProject } from "../../behavior/use-organization-team
 import { slugify } from "../../model/slugify.ts";
 import { RandomColorAvatar } from "../blocks/random-color-avatar.tsx";
 import { FullWidthFormControl } from "../elements/full-width-form-control.tsx";
-import { AddOrEditAnnotationScore } from "./annotations/add-or-edit-annotation-score.tsx";
 import { Drawer } from "./drawer.tsx";
 import { applyHandledErrorToForm, FormServerError, showErrorToast } from "./errors/index.ts";
+
+type Picked = { id: string; name: string | null };
+type QueueData =
+  | Pick<AnnotationQueueDetail, "members" | "AnnotationQueueScores">
+  | null
+  | undefined;
+
+function participantsOf(queue: QueueData): Picked[] {
+  return (queue?.members ?? []).map((m) => ({ id: m.user.id, name: m.user.name }));
+}
+
+function scoreTypesOf(queue: QueueData): Picked[] {
+  return (queue?.AnnotationQueueScores ?? []).map((s) => ({
+    id: s.annotationScore.id,
+    name: s.annotationScore.name,
+  }));
+}
+
+function queueSlug(name: string | undefined): string {
+  return slugify((name || "").replace("_", "-"), { lower: true, strict: true });
+}
+
+function toastQueueSaved({ isUpdate, name }: { isUpdate: boolean; name: string }) {
+  toaster.create({
+    title: `Annotation Queue ${isUpdate ? "Updated" : "Created"}`,
+    description: `Successfully ${isUpdate ? "updated" : "created"} ${name} annotation queue`,
+    type: "success",
+  });
+}
+
+function toggled(list: Picked[], item: Picked): Picked[] {
+  return list.some((p) => p.id === item.id)
+    ? list.filter((p) => p.id !== item.id)
+    : [...list, item];
+}
+
+/**
+ * Everything that lists queues or counts their work: the listing, the queue
+ * page, the pickers, the sidebar and its badges. Membership decides whose work
+ * an item is, so a walk already open reads the wrong set once it changes.
+ */
+function invalidateQueueReads(utils: ReturnType<typeof api.useUtils>) {
+  void utils.annotation.getOptimizedAnnotationQueues.invalidate();
+  void utils.annotation.getQueueBySlugOrId.invalidate();
+  void utils.annotation.getQueues.invalidate();
+  void utils.annotation.getQueueItemsCounts.invalidate();
+  void utils.annotation.getPendingItemsCount.invalidate();
+  void utils.annotation.getAssignedItemsCount.invalidate();
+}
+
+/** A button listing the picked items as tags, opening a list to toggle them. */
+function MultiPick({
+  disclosure,
+  placeholder,
+  selected,
+  options,
+  withAvatar = false,
+  onToggle,
+  footer,
+}: {
+  disclosure: ReturnType<typeof useDisclosure>;
+  placeholder: string;
+  selected: Picked[];
+  options: Picked[];
+  withAvatar?: boolean;
+  onToggle: (item: Picked) => void;
+  footer?: React.ReactNode;
+}) {
+  return (
+    <Popover.Root
+      open={disclosure.open}
+      onOpenChange={({ open }) => disclosure.setOpen(open)}
+      positioning={{ placement: "bottom-start" }}
+    >
+      <Popover.Trigger asChild>
+        <Button
+          variant="outline"
+          width="full"
+          justifyContent="space-between"
+          fontWeight="normal"
+          color={selected.length === 0 ? "fg.subtle" : "fg"}
+          paddingX={3}
+        >
+          {selected.length === 0 ? (
+            placeholder
+          ) : (
+            <HStack gap={1} flexWrap="wrap" flex={1}>
+              {selected.map((p) => (
+                <Tag.Root key={p.id} size="sm">
+                  <Tag.Label>{p.name}</Tag.Label>
+                </Tag.Root>
+              ))}
+            </HStack>
+          )}
+          <ChevronDown size={16} />
+        </Button>
+      </Popover.Trigger>
+      <Popover.Content width="300px">
+        <Popover.Body padding={footer ? 0 : undefined}>
+          <Box
+            maxH={footer ? "250px" : undefined}
+            overflowY={footer ? "auto" : undefined}
+            padding={footer ? 2 : 0}
+          >
+            <VStack align="start" gap={1}>
+              {options.map((option) => {
+                const isSelected = selected.some((p) => p.id === option.id);
+                return (
+                  <Button
+                    key={option.id}
+                    variant="ghost"
+                    width="full"
+                    justifyContent="flex-start"
+                    padding={1}
+                    height="auto"
+                    fontWeight="normal"
+                    aria-pressed={isSelected}
+                    onClick={() => onToggle(option)}
+                  >
+                    <Check size={16} color={isSelected ? "green" : "transparent"} />
+                    {withAvatar && <RandomColorAvatar size="2xs" name={option.name ?? ""} />}
+                    <Text fontSize="sm">{option.name}</Text>
+                  </Button>
+                );
+              })}
+            </VStack>
+          </Box>
+          {footer && (
+            <Box padding={2} borderTop="1px solid" borderColor="border.muted">
+              {footer}
+            </Box>
+          )}
+        </Popover.Body>
+      </Popover.Content>
+    </Popover.Root>
+  );
+}
 
 export const AddAnnotationQueueDrawer = ({
   open = true,
@@ -71,7 +208,7 @@ export const AddAnnotationQueueDrawer = ({
     },
   );
 
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
 
   const closeAll = () => {
     closeDrawer();
@@ -109,30 +246,14 @@ export const AddAnnotationQueueDrawer = ({
     description?: string | null;
   };
 
-  const [participants, setParticipants] = useState<{ id: string; name: string | null }[]>(
-    queue.data?.members.map((member) => ({
-      id: member.user.id,
-      name: member.user.name,
-    })) ?? [],
-  );
-
-  const [scoreTypes, setScoreTypes] = useState<{ id: string; name: string | null }[]>(
-    queue.data?.AnnotationQueueScores.map((score) => ({
-      id: score.annotationScore.id,
-      name: score.annotationScore.name,
-    })) ?? [],
-  );
+  const [participants, setParticipants] = useState<Picked[]>(() => participantsOf(queue.data));
+  const [scoreTypes, setScoreTypes] = useState<Picked[]>(() => scoreTypesOf(queue.data));
 
   // Sync local state when queue data loads (edit mode hydration)
   useEffect(() => {
     if (!queue.data) return;
-    setParticipants(queue.data.members.map((m) => ({ id: m.user.id, name: m.user.name })));
-    setScoreTypes(
-      queue.data.AnnotationQueueScores.map((s) => ({
-        id: s.annotationScore.id,
-        name: s.annotationScore.name,
-      })),
-    );
+    setParticipants(participantsOf(queue.data));
+    setScoreTypes(scoreTypesOf(queue.data));
     reset({
       name: queue.data.name,
       description: queue.data.description ?? "",
@@ -158,24 +279,8 @@ export const AddAnnotationQueueDrawer = ({
       },
       {
         onSuccess: (data) => {
-          // Everything that lists queues or counts their work: the listing, the
-          // queue page itself, the participants picker, the sidebar entries and
-          // its badges. A queue nobody can see yet is a queue nobody can use.
-          void queryClient.annotation.getOptimizedAnnotationQueues.invalidate();
-          // Membership decides whose work an item is, so a walk already open
-          // is reading the wrong set the moment it changes.
-          void queryClient.annotation.getQueueBySlugOrId.invalidate();
-          void queryClient.annotation.getQueues.invalidate();
-          void queryClient.annotation.getQueueItemsCounts.invalidate();
-          void queryClient.annotation.getPendingItemsCount.invalidate();
-          void queryClient.annotation.getAssignedItemsCount.invalidate();
-          toaster.create({
-            title: `Annotation Queue ${queueId ? "Updated" : "Created"}`,
-            description: `Successfully ${queueId ? "updated" : "created"} ${
-              data.name
-            } annotation queue`,
-            type: "success",
-          });
+          invalidateQueueReads(queryClient);
+          toastQueueSaved({ isUpdate: !!queueId, name: data.name });
           handleClose();
           reset();
         },
@@ -183,263 +288,127 @@ export const AddAnnotationQueueDrawer = ({
           if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
           showErrorToast({
             error,
-            fallbackTitle: queueId
-              ? "Couldn't update annotation queue"
-              : "Couldn't create annotation queue",
+            fallbackTitle: `Couldn't ${queueId ? "update" : "create"} annotation queue`,
           });
         },
       },
     );
   };
 
-  const scoreTypeDrawerOpen = useDisclosure();
   const participantsPopoverOpen = useDisclosure();
   const scoreTypesPopoverOpen = useDisclosure();
 
   const name = watch("name");
-  const slug = slugify((name || "").replace("_", "-"), {
-    lower: true,
-    strict: true,
-  });
-
-  const toggleParticipant = (id: string, memberName: string | null) => {
-    setParticipants((prev) =>
-      prev.some((p) => p.id === id)
-        ? prev.filter((p) => p.id !== id)
-        : [...prev, { id, name: memberName }],
-    );
-  };
-
-  const toggleScoreType = (id: string, scoreName: string) => {
-    setScoreTypes((prev) =>
-      prev.some((s) => s.id === id)
-        ? prev.filter((s) => s.id !== id)
-        : [...prev, { id, name: scoreName }],
-    );
-  };
+  const slug = queueSlug(name);
 
   return (
-    <>
-      <Drawer.Root
-        open={!!open}
-        placement="end"
-        size="lg"
-        onOpenChange={({ open }) => {
-          if (!open) {
-            closeAll();
-          }
-        }}
-      >
-        <Drawer.Content bg="bg">
-          <Drawer.Header>
-            <HStack>
-              <Drawer.CloseTrigger onClick={() => closeAll()} />
-            </HStack>
-            <HStack>
-              <Text paddingTop={5} fontSize="2xl">
-                {queueId ? "Edit Annotation Queue" : "Create Annotation Queue"}
-              </Text>
-            </HStack>
-          </Drawer.Header>
-          <Drawer.Body>
-            <form onSubmit={handleSubmit(onSubmit)}>
-              <VStack align="start">
-                <FormServerError form={form} />
+    <Drawer.Root
+      open={!!open}
+      placement="end"
+      size="lg"
+      onOpenChange={({ open }) => {
+        if (!open) {
+          closeAll();
+        }
+      }}
+    >
+      <Drawer.Content bg="bg">
+        <Drawer.Header>
+          <HStack>
+            <Drawer.CloseTrigger onClick={() => closeAll()} />
+          </HStack>
+          <HStack>
+            <Text paddingTop={5} fontSize="2xl">
+              {queueId ? "Edit Annotation Queue" : "Create Annotation Queue"}
+            </Text>
+          </HStack>
+        </Drawer.Header>
+        <Drawer.Body>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <VStack align="start">
+              <FormServerError form={form} />
 
-                <FullWidthFormControl
-                  label="Participants"
-                  helper="Select the participants for this annotation queue"
+              <FullWidthFormControl
+                label="Participants"
+                helper="Select the participants for this annotation queue"
+              >
+                <MultiPick
+                  disclosure={participantsPopoverOpen}
+                  placeholder="Add Participants"
+                  selected={participants}
+                  options={(users.data?.members ?? []).map((member) => ({
+                    id: member.user.id,
+                    name: member.user.name,
+                  }))}
+                  withAvatar
+                  onToggle={(item) => setParticipants((prev) => toggled(prev, item))}
+                />
+              </FullWidthFormControl>
+
+              <FullWidthFormControl
+                label="Name Annotation Queue"
+                helper="Give it a name to identify this annotation queue"
+                invalid={!!errors.name}
+              >
+                <Input {...register("name")} required />
+                {slug && <Field.HelperText>slug: {slug}</Field.HelperText>}
+                <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+              </FullWidthFormControl>
+
+              <FullWidthFormControl
+                label="Description"
+                helper="Provide a description of the annotation"
+                invalid={!!errors.description}
+              >
+                <Textarea {...register("description")} required />
+                <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
+              </FullWidthFormControl>
+
+              <FullWidthFormControl
+                label="Score Type"
+                helper="Select the score type for this annotation queue"
+              >
+                <MultiPick
+                  disclosure={scoreTypesPopoverOpen}
+                  placeholder="Add Score Type"
+                  selected={scoreTypes}
+                  options={(annotationScores.data ?? []).map((score) => ({
+                    id: score.id,
+                    name: score.name,
+                  }))}
+                  onToggle={(item) => setScoreTypes((prev) => toggled(prev, item))}
+                  footer={
+                    <Button
+                      width="100%"
+                      colorPalette="blue"
+                      onClick={() => {
+                        scoreTypesPopoverOpen.onClose();
+                        openDrawer("addOrEditAnnotationScore");
+                      }}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Plus /> Add New
+                    </Button>
+                  }
+                />
+              </FullWidthFormControl>
+
+              <HStack width="full">
+                <Spacer />
+                <Button
+                  colorPalette="orange"
+                  type="submit"
+                  minWidth="fit-content"
+                  loading={createOrUpdateQueue.isPending}
                 >
-                  <Popover.Root
-                    open={participantsPopoverOpen.open}
-                    onOpenChange={({ open }) => participantsPopoverOpen.setOpen(open)}
-                    positioning={{ placement: "bottom-start" }}
-                  >
-                    <Popover.Trigger asChild>
-                      <Button
-                        variant="outline"
-                        width="full"
-                        justifyContent="space-between"
-                        fontWeight="normal"
-                        color={participants.length === 0 ? "fg.subtle" : "fg"}
-                        paddingX={3}
-                      >
-                        {participants.length === 0 ? (
-                          "Add Participants"
-                        ) : (
-                          <HStack gap={1} flexWrap="wrap" flex={1}>
-                            {participants.map((p) => (
-                              <Tag.Root key={p.id} size="sm">
-                                <Tag.Label>{p.name}</Tag.Label>
-                              </Tag.Root>
-                            ))}
-                          </HStack>
-                        )}
-                        <ChevronDown size={16} />
-                      </Button>
-                    </Popover.Trigger>
-                    <Popover.Content width="300px">
-                      <Popover.Body>
-                        <VStack align="start" gap={1}>
-                          {users.data?.members.map((member) => {
-                            const isSelected = participants.some((p) => p.id === member.user.id);
-                            return (
-                              <Button
-                                key={member.user.id}
-                                variant="ghost"
-                                width="full"
-                                justifyContent="flex-start"
-                                padding={1}
-                                height="auto"
-                                fontWeight="normal"
-                                aria-pressed={isSelected}
-                                onClick={() => toggleParticipant(member.user.id, member.user.name)}
-                              >
-                                <Check size={16} color={isSelected ? "green" : "transparent"} />
-                                <RandomColorAvatar size="2xs" name={member.user.name ?? ""} />
-                                <Text fontSize="sm">{member.user.name}</Text>
-                              </Button>
-                            );
-                          })}
-                        </VStack>
-                      </Popover.Body>
-                    </Popover.Content>
-                  </Popover.Root>
-                </FullWidthFormControl>
-
-                <FullWidthFormControl
-                  label="Name Annotation Queue"
-                  helper="Give it a name to identify this annotation queue"
-                  invalid={!!errors.name}
-                >
-                  <Input {...register("name")} required />
-                  {slug && <Field.HelperText>slug: {slug}</Field.HelperText>}
-                  <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
-                </FullWidthFormControl>
-
-                <FullWidthFormControl
-                  label="Description"
-                  helper="Provide a description of the annotation"
-                  invalid={!!errors.description}
-                >
-                  <Textarea {...register("description")} required />
-                  <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
-                </FullWidthFormControl>
-
-                <FullWidthFormControl
-                  label="Score Type"
-                  helper="Select the score type for this annotation queue"
-                >
-                  <Popover.Root
-                    open={scoreTypesPopoverOpen.open}
-                    onOpenChange={({ open }) => scoreTypesPopoverOpen.setOpen(open)}
-                    positioning={{ placement: "bottom-start" }}
-                  >
-                    <Popover.Trigger asChild>
-                      <Button
-                        variant="outline"
-                        width="full"
-                        justifyContent="space-between"
-                        fontWeight="normal"
-                        color={scoreTypes.length === 0 ? "fg.subtle" : "fg"}
-                        paddingX={3}
-                      >
-                        {scoreTypes.length === 0 ? (
-                          "Add Score Type"
-                        ) : (
-                          <HStack gap={1} flexWrap="wrap" flex={1}>
-                            {scoreTypes.map((s) => (
-                              <Tag.Root key={s.id} size="sm">
-                                <Tag.Label>{s.name}</Tag.Label>
-                              </Tag.Root>
-                            ))}
-                          </HStack>
-                        )}
-                        <ChevronDown size={16} />
-                      </Button>
-                    </Popover.Trigger>
-                    <Popover.Content width="300px">
-                      <Popover.Body padding={0}>
-                        <Box maxH="250px" overflowY="auto" padding={2}>
-                          <VStack align="start" gap={1}>
-                            {annotationScores.data?.map((score) => {
-                              const isSelected = scoreTypes.some((s) => s.id === score.id);
-                              return (
-                                <Button
-                                  key={score.id}
-                                  variant="ghost"
-                                  width="full"
-                                  justifyContent="flex-start"
-                                  padding={1}
-                                  height="auto"
-                                  fontWeight="normal"
-                                  aria-pressed={isSelected}
-                                  onClick={() => toggleScoreType(score.id, score.name)}
-                                >
-                                  <Check size={16} color={isSelected ? "green" : "transparent"} />
-                                  <Text fontSize="sm">{score.name}</Text>
-                                </Button>
-                              );
-                            })}
-                          </VStack>
-                        </Box>
-                        <Box padding={2} borderTop="1px solid" borderColor="border.muted">
-                          <Button
-                            width="100%"
-                            colorPalette="blue"
-                            onClick={() => {
-                              scoreTypesPopoverOpen.onClose();
-                              scoreTypeDrawerOpen.onOpen();
-                            }}
-                            variant="outline"
-                            size="sm"
-                          >
-                            <Plus /> Add New
-                          </Button>
-                        </Box>
-                      </Popover.Body>
-                    </Popover.Content>
-                  </Popover.Root>
-                </FullWidthFormControl>
-
-                <HStack width="full">
-                  <Spacer />
-                  <Button
-                    colorPalette="orange"
-                    type="submit"
-                    minWidth="fit-content"
-                    loading={createOrUpdateQueue.isPending}
-                  >
-                    Save
-                  </Button>
-                </HStack>
-              </VStack>
-            </form>
-          </Drawer.Body>
-        </Drawer.Content>
-      </Drawer.Root>
-      <Drawer.Root
-        open={scoreTypeDrawerOpen.open}
-        placement="end"
-        size="lg"
-        onOpenChange={({ open }) => scoreTypeDrawerOpen.setOpen(open)}
-      >
-        <Drawer.Content bg="bg">
-          <Drawer.Header>
-            <HStack>
-              <Drawer.CloseTrigger />
-            </HStack>
-            <HStack>
-              <Text paddingTop={5} fontSize="2xl">
-                Add Score Metric
-              </Text>
-            </HStack>
-          </Drawer.Header>
-          <Drawer.Body>
-            <AddOrEditAnnotationScore onClose={scoreTypeDrawerOpen.onClose} />
-          </Drawer.Body>
-        </Drawer.Content>
-      </Drawer.Root>
-    </>
+                  Save
+                </Button>
+              </HStack>
+            </VStack>
+          </form>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 };

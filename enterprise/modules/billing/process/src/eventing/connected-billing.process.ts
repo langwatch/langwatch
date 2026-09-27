@@ -41,7 +41,7 @@ export function connectedBillingWake({
     if (!settled || (tickedSinceBoot && !dayElapsed)) return { state };
     return {
       state: { lastTickAt: at },
-      intents: [ctx.intents.tick(`tick:${at}`, { scheduledFor: at })],
+      intents: [ctx.intent("tick", `tick:${at}`, { scheduledFor: at })],
     };
   };
 }

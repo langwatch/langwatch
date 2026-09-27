@@ -1,8 +1,6 @@
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import type { TenantDirectory } from "@langwatch/clickhouse-client";
 
 import type { PersonalTeamScopeReader } from "../services/personal-team-scope.service.ts";
-import type { TenantOwnershipReader } from "../services/tenant-directory.service.ts";
 import type { GroupRepository } from "./group.repository.ts";
 import type { OrganizationMembershipRepository } from "./organization-membership.repository.ts";
 import type { OrganizationRepository } from "./organization.repository.ts";
@@ -24,5 +22,4 @@ export interface OrganizationRepositories {
    */
   readonly membership: (grants: AuthzGrantsService) => OrganizationMembershipRepository;
   readonly personalTeamScope: PersonalTeamScopeReader;
-  readonly tenantDirectory: TenantDirectory & TenantOwnershipReader;
 }

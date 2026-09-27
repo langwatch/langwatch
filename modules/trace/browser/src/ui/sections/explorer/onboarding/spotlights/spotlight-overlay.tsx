@@ -437,6 +437,136 @@ export function HighlightRing({ anchorRect }: { anchorRect: AnchorRect }): React
 // ---------------------------------------------------------------------------
 
 /**
+ * What gates each spotlight's isApplicable. `hasEvaluators` defaults to true so
+ * the evaluator spotlight shows unless something says otherwise.
+ */
+const TOUR_CONTEXT: SpotlightContext = { hasEvaluators: true, hasFlameViz: true };
+
+/** The anchor's rect, or its fallback's; none when neither is in the DOM. */
+function measureSpotlight(spotlight: Spotlight): AnchorRect | null {
+  const rect = measureAnchor(spotlight.anchor);
+  if (rect || !spotlight.fallbackAnchor) return rect;
+  return measureAnchor(spotlight.fallbackAnchor);
+}
+
+/**
+ * The spotlight's anchor rect, measured after paint (a rAF keeps it client-only)
+ * and again on scroll or resize so the ring tracks a reflowing page. An anchor
+ * missing from the DOM is reported, so the tour can move past it.
+ */
+function useAnchorRect({
+  spotlight,
+  active,
+  onMissing,
+}: {
+  spotlight: Spotlight | null;
+  active: boolean;
+  onMissing: (spotlight: Spotlight) => void;
+}) {
+  const [anchorRect, setAnchorRect] = useState<AnchorRect | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const onMissingRef = useRef(onMissing);
+  onMissingRef.current = onMissing;
+  const spotlightRef = useRef(spotlight);
+  spotlightRef.current = spotlight;
+
+  const remeasure = useCallback(() => {
+    const current = spotlightRef.current;
+    if (!current) {
+      setAnchorRect(null);
+      return;
+    }
+    const rect = measureSpotlight(current);
+    if (rect) setAnchorRect(rect);
+    else onMissingRef.current(current);
+  }, []);
+
+  const schedule = useCallback(() => {
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(remeasure);
+  }, [remeasure]);
+
+  useEffect(() => {
+    if (!spotlight) {
+      setAnchorRect(null);
+      return;
+    }
+    schedule();
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [spotlight, schedule]);
+
+  useEffect(() => {
+    if (!active) return;
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, [active, schedule]);
+
+  return anchorRect;
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+  );
+}
+
+/**
+ * Escape ends the tour. The tour is non-modal, so an Escape meant to clear or
+ * blur a field the reader is typing in leaves it alone.
+ */
+function useEscapeToDismiss({ active, onDismiss }: { active: boolean; onDismiss: () => void }) {
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+  useEffect(() => {
+    if (!active) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isTypingTarget(e.target)) onDismissRef.current();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [active]);
+}
+
+export function TourMotion({
+  motionKey,
+  style,
+  children,
+}: {
+  motionKey: string;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={motionKey}
+        initial={{ opacity: 0, scale: 0.95, y: 6 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: -4 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        style={style}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+export const RING_LAYER_STYLE: React.CSSProperties = {
+  pointerEvents: "none",
+  position: "fixed",
+  inset: 0,
+  zIndex: 1498,
+};
+
+/**
  * Drop-in at the TracesPage root. Subscribes to `spotlightsActive` +
  * `currentSpotlightId`. When active, renders a floating popover next to the current
  * spotlight's anchor element.
@@ -448,170 +578,75 @@ export function SpotlightOverlay(): React.ReactElement | null {
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
   const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
 
-  // URL sync on mount
   useSpotlightURLSync();
 
-  const [anchorRect, setAnchorRect] = useState<AnchorRect | null>(null);
+  const resolved = spotlightsActive
+    ? resolveSpotlight({ id: currentSpotlightId, ctx: TOUR_CONTEXT })
+    : null;
 
-  // Context used to gate isApplicable. We leave `hasEvaluators` as a
-  // reasonable default (true) so the evaluator spotlight shows unless
-  // there's a positive signal it's not there. In the future this could
-  // read the discover response.
-  const ctx: SpotlightContext = { hasEvaluators: true, hasFlameViz: true };
-
-  const resolved = spotlightsActive ? resolveSpotlight({ id: currentSpotlightId, ctx }) : null;
-
-  // Measure the anchor on every spotlight change (and on scroll/resize
-  // so the popover tracks if the page reflows).
-  const rafRef = useRef<number | null>(null);
-
-  const remeasure = useCallback(() => {
-    if (!resolved) {
-      setAnchorRect(null);
-      return;
-    }
-    const rect =
-      measureAnchor(resolved.anchor) ??
-      (resolved.fallbackAnchor ? measureAnchor(resolved.fallbackAnchor) : null);
-    if (!rect) {
-      // Anchor not in the DOM — skip to the next applicable spotlight.
-      const nxt = nextSpotlight({ currentId: resolved.id, ctx });
-      if (nxt) {
-        setCurrentSpotlightId(nxt.id);
-        writeSpotlightFragment(nxt.id);
-      } else {
-        // Nothing further — dismiss.
-        setSpotlightsActive(false);
-        setCurrentSpotlightId(null);
-        writeSpotlightFragment(null);
-      }
-    } else {
-      setAnchorRect(rect);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolved?.anchor, resolved?.fallbackAnchor, resolved?.id]);
-
-  // Measure immediately after DOM paint so absolutely-positioned elements
-  // have finished laying out. `useLayoutEffect` would fire synchronously
-  // but SSR-unsafe; the rAF keeps the call client-only.
-  useEffect(() => {
-    if (!resolved) {
-      setAnchorRect(null);
-      return;
-    }
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(remeasure);
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    };
-  }, [resolved, remeasure]);
-
-  // Re-measure on scroll or resize so the ring tracks the anchor.
-  useEffect(() => {
-    if (!spotlightsActive) return;
-    const onScrollOrResize = () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(remeasure);
-    };
-    window.addEventListener("scroll", onScrollOrResize, { passive: true });
-    window.addEventListener("resize", onScrollOrResize);
-    return () => {
-      window.removeEventListener("scroll", onScrollOrResize);
-      window.removeEventListener("resize", onScrollOrResize);
-    };
-  }, [spotlightsActive, remeasure]);
-
-  // Esc dismisses.
-  useEffect(() => {
-    if (!spotlightsActive) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      // The tour is non-modal and interactable, so users type while it's up
-      // (search bar, facet value inputs). Don't let an Escape meant to
-      // clear/blur a field also tear the tour down.
-      const target = e.target;
-      const isTypingTarget =
-        target instanceof HTMLElement &&
-        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-      if (isTypingTarget) {
-        return;
-      }
-      handleDismiss();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spotlightsActive]);
-
-  const handleNext = useCallback(() => {
-    const nxt = nextSpotlight({ currentId: resolved?.id ?? null, ctx });
-    if (nxt) {
-      setCurrentSpotlightId(nxt.id);
-      writeSpotlightFragment(nxt.id);
-    } else {
-      handleDismiss();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolved?.id]);
-
-  const handleBack = useCallback(() => {
-    const prev = prevSpotlight({ currentId: resolved?.id ?? null, ctx });
-    if (prev) {
-      setCurrentSpotlightId(prev.id);
-      writeSpotlightFragment(prev.id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolved?.id]);
-
-  const handleDismiss = useCallback(() => {
-    persistDismissal();
+  const endTour = useCallback(() => {
     setSpotlightsActive(false);
     setCurrentSpotlightId(null);
     writeSpotlightFragment(null);
-  }, [persistDismissal, setCurrentSpotlightId, setSpotlightsActive]);
+  }, [setCurrentSpotlightId, setSpotlightsActive]);
+
+  const goTo = useCallback(
+    (id: string) => {
+      setCurrentSpotlightId(id);
+      writeSpotlightFragment(id);
+    },
+    [setCurrentSpotlightId],
+  );
+
+  const handleDismiss = useCallback(() => {
+    persistDismissal();
+    endTour();
+  }, [persistDismissal, endTour]);
+
+  // A step whose anchor is not on the page is skipped; past the last, the tour ends.
+  const anchorRect = useAnchorRect({
+    spotlight: resolved,
+    active: spotlightsActive,
+    onMissing: (missing) => {
+      const next = nextSpotlight({ currentId: missing.id, ctx: TOUR_CONTEXT });
+      if (next) goTo(next.id);
+      else endTour();
+    },
+  });
+  useEscapeToDismiss({ active: spotlightsActive, onDismiss: handleDismiss });
+
+  const resolvedId = resolved?.id ?? null;
+  const handleNext = useCallback(() => {
+    const next = nextSpotlight({ currentId: resolvedId, ctx: TOUR_CONTEXT });
+    if (next) goTo(next.id);
+    else handleDismiss();
+  }, [resolvedId, goTo, handleDismiss]);
+
+  const handleBack = useCallback(() => {
+    const prev = prevSpotlight({ currentId: resolvedId, ctx: TOUR_CONTEXT });
+    if (prev) goTo(prev.id);
+  }, [resolvedId, goTo]);
 
   if (!spotlightsActive || !resolved || !anchorRect) return null;
 
-  const pageStep = spotlightIndex({ currentId: resolved.id, ctx });
+  const pageStep = spotlightIndex({ currentId: resolved.id, ctx: TOUR_CONTEXT });
 
   return (
     <Portal>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={resolved.id}
-          initial={{ opacity: 0, scale: 0.95, y: 6 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: -4 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          style={{
-            pointerEvents: "none",
-            position: "fixed",
-            inset: 0,
-            zIndex: 1498,
-          }}
-        >
-          <HighlightRing anchorRect={anchorRect} />
-        </motion.div>
-      </AnimatePresence>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={resolved.id}
-          initial={{ opacity: 0, scale: 0.95, y: 6 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: -4 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <SpotlightPopover
-            spotlight={resolved}
-            anchorRect={anchorRect}
-            stepIndex={pageStep.index}
-            stepTotal={pageStep.total}
-            onNext={handleNext}
-            onBack={handleBack}
-            onDismiss={handleDismiss}
-          />
-        </motion.div>
-      </AnimatePresence>
+      <TourMotion motionKey={resolved.id} style={RING_LAYER_STYLE}>
+        <HighlightRing anchorRect={anchorRect} />
+      </TourMotion>
+      <TourMotion motionKey={resolved.id}>
+        <SpotlightPopover
+          spotlight={resolved}
+          anchorRect={anchorRect}
+          stepIndex={pageStep.index}
+          stepTotal={pageStep.total}
+          onNext={handleNext}
+          onBack={handleBack}
+          onDismiss={handleDismiss}
+        />
+      </TourMotion>
     </Portal>
   );
 }

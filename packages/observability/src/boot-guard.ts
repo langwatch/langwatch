@@ -8,40 +8,46 @@ import { nowInstant } from "@langwatch/time";
 import { processFailureLine } from "./run-script.ts";
 
 /** Fatal handlers a process must have before its real entry point loads. */
-export function installBootGuard(service: string): { dispose(): void } {
-  const uncaughtException = (error: unknown) => {
-    writeFatal(service, "uncaught exception", error);
-    process.exit(1);
+export function installBootGuard(
+  service: string,
+  { onFatal }: { onFatal?: () => void } = {},
+): { dispose(): void; disposeWarnings(): void } {
+  const fatal = (event: string, error: unknown) => {
+    writeFatal(service, event, error);
+    if (onFatal) onFatal();
+    else process.exit(1);
   };
-  const unhandledRejection = (reason: unknown) => {
-    writeFatal(service, "unhandled rejection", reason);
-    process.exit(1);
-  };
+  const uncaughtException = (error: unknown) => fatal("uncaught exception", error);
+  const unhandledRejection = (reason: unknown) => fatal("unhandled rejection", reason);
   const warning = (warning: unknown) => {
     writeFatal(service, "warning", warning);
   };
   process.on("uncaughtException", uncaughtException);
   process.on("unhandledRejection", unhandledRejection);
   process.on("warning", warning);
+  const disposeWarnings = () => {
+    process.off("warning", warning);
+  };
   return {
     dispose: () => {
       process.off("uncaughtException", uncaughtException);
       process.off("unhandledRejection", unhandledRejection);
-      process.off("warning", warning);
+      disposeWarnings();
     },
+    disposeWarnings,
   };
 }
 
 /**
- * Installs the guard, then loads the real entry via the one sanctioned
- * inline `import()` — a boot seam, not lazy loading, so a failure rejects
- * rather than crashing pre-handler; dispose() then hands off to the entry's own handlers.
+ * Loads the entry under the guard. With `onFatal`, a long-running process keeps the crash
+ * handlers after boot and a crash calls `onFatal` (its drain) instead of exiting on the spot.
  */
 export async function bootNodeExecutable(
   service: string,
   load: () => Promise<unknown>,
+  { onFatal }: { onFatal?: () => void } = {},
 ): Promise<void> {
-  const guard = installBootGuard(service);
+  const guard = installBootGuard(service, { onFatal });
   try {
     await load();
   } catch (error) {
@@ -50,7 +56,8 @@ export async function bootNodeExecutable(
     // otherwise hold the event loop open forever, spinning on closed clients.
     process.exit(1);
   } finally {
-    guard.dispose();
+    if (onFatal) guard.disposeWarnings();
+    else guard.dispose();
   }
 }
 

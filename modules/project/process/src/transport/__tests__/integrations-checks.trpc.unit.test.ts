@@ -59,11 +59,10 @@ describe("the integrationsChecks tRPC namespace", () => {
     it("refuses on the parser and never reaches the rollup", async () => {
       const { caller, reader } = mount();
 
-      await expect(
-        (caller as unknown as { getCheckStatus(input: unknown): Promise<unknown> }).getCheckStatus(
-          {},
-        ),
-      ).rejects.toBeInstanceOf(TRPCError);
+      // wrong-typed input: the parser, not the type system, must refuse a missing project id
+      const untyped = caller as unknown as { getCheckStatus(input: unknown): Promise<unknown> };
+
+      await expect(untyped.getCheckStatus({})).rejects.toBeInstanceOf(TRPCError);
       expect(reader).not.toHaveBeenCalled();
     });
   });

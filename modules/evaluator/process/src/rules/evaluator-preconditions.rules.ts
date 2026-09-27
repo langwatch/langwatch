@@ -111,12 +111,12 @@ export function evaluatePreconditions({
     evaluateRule({
       rule: precondition.rule,
       fieldValue: isMatchableField(precondition.field)
-        ? PRECONDITION_FIELD_MATCHERS[precondition.field]?.(
-            normalizedData,
-            precondition.value,
-            precondition.key,
-            precondition.subkey,
-          )
+        ? PRECONDITION_FIELD_MATCHERS[precondition.field]?.({
+            data: normalizedData,
+            value: precondition.value,
+            key: precondition.key,
+            subkey: precondition.subkey,
+          })
         : undefined,
       conditionValue: precondition.value,
     }),

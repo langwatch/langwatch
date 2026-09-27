@@ -10,7 +10,6 @@ import type { SessionStateStore } from "@langwatch/redis-client/session-state";
  * is on screen, the answer shape the panel polls for, and the error a second answer gets. No
  * store and no command dispatch is reachable from here.
  */
-import { nanoid } from "nanoid";
 import { z } from "zod";
 
 import type { LangyTokenBufferRepository } from "../repositories/langy-token-buffer.repository.ts";
@@ -146,6 +145,7 @@ export function toPollResponse(wait: StoredUserWait): PollWaitResponse {
 
 /** A card as it starts: pending, with only the fields the caller gave. */
 export function blankUserWait({
+  waitId,
   now,
   projectId,
   conversationId,
@@ -164,6 +164,7 @@ export function blankUserWait({
   hostname,
   questions,
 }: {
+  waitId: string;
   now: number;
   projectId: string;
   conversationId: string;
@@ -185,7 +186,7 @@ export function blankUserWait({
   const createdAt = now;
 
   return {
-    waitId: `lwait_${nanoid()}`,
+    waitId,
     projectId,
     conversationId,
     turnId,

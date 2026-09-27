@@ -1,6 +1,6 @@
 import {
-  CONTENT_CATEGORIES,
   PLATFORM_DEFAULT_DATA_PRIVACY,
+  type ContentCategory,
   type DataPrivacyConfig,
   type DataPrivacyRow,
   type DataPrivacyScopeFacts,
@@ -48,76 +48,83 @@ export function buildDataPrivacyChain(facts: DataPrivacyScopeFacts): Candidate[]
   return chain;
 }
 
-export function resolveDataPrivacy(input: {
+type ResolvedCategory = ResolvedDataPrivacy["categories"][ContentCategory];
+type ResolvedAttributeRule = ResolvedDataPrivacy["customAttributes"][number];
+
+/** The configs that apply, nearest scope first. */
+function configsNearestFirst(input: {
   rows: DataPrivacyRow[];
   facts: DataPrivacyScopeFacts;
-}): ResolvedDataPrivacy {
-  const resolved: ResolvedDataPrivacy = {
-    categories: {
-      input: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.input },
-      output: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.output },
-      system: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.system },
-      tools: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.tools },
-    },
-    pii: { ...PLATFORM_DEFAULT_DATA_PRIVACY.pii },
-    secrets: {
-      enabled: PLATFORM_DEFAULT_DATA_PRIVACY.secrets.enabled,
-      customPatterns: [],
-    },
-    customAttributes: [],
-  };
-  const setCategory: Partial<Record<(typeof CONTENT_CATEGORIES)[number], boolean>> = {};
-  let setPii = false;
-  let setSecretsEnabled = false;
-  const piiExceptPatterns = new Set<string>();
-  const attributeRules = new Map<string, ResolvedDataPrivacy["customAttributes"][number]>();
-  const customPatterns = new Set<string>();
-
-  for (const candidate of buildDataPrivacyChain(input.facts)) {
+}): DataPrivacyConfig[] {
+  return buildDataPrivacyChain(input.facts).flatMap((candidate) => {
     const row = input.rows.find(
       (item) =>
         item.scopeType === candidate.scopeType &&
         item.scopeId === candidate.scopeId &&
         item.personalOnly === candidate.personalOnly,
     );
-    if (!row) continue;
-    const config: DataPrivacyConfig = row.config;
-    for (const category of CONTENT_CATEGORIES) {
-      const setting = config.categories?.[category];
-      if (setting && !setCategory[category]) {
-        resolved.categories[category] = {
-          disposition: setting.disposition,
-          audience: resolveAudience(setting.audience),
-        };
-        setCategory[category] = true;
-      }
-    }
-    if (config.pii && !setPii) {
-      resolved.pii = {
-        level: config.pii.level,
-        entities: config.pii.entities ?? [],
-        exceptPatterns: [],
-      };
-      setPii = true;
-    }
-    for (const pattern of config.pii?.exceptPatterns ?? []) piiExceptPatterns.add(pattern);
-    if (config.secrets && !setSecretsEnabled) {
-      resolved.secrets.enabled = config.secrets.enabled;
-      setSecretsEnabled = true;
-    }
-    for (const rule of config.customAttributes ?? []) {
-      if (!attributeRules.has(rule.pattern)) {
-        attributeRules.set(rule.pattern, {
-          pattern: rule.pattern,
-          disposition: rule.disposition,
-          audience: resolveAudience(rule.audience),
-        });
-      }
-    }
-    for (const pattern of config.secrets?.customPatterns ?? []) customPatterns.add(pattern);
+    return row ? [row.config] : [];
+  });
+}
+
+/** The nearest scope that sets this category wins; otherwise the platform default. */
+function resolveCategory(
+  configs: DataPrivacyConfig[],
+  category: ContentCategory,
+): ResolvedCategory {
+  const setting = configs.find((config) => config.categories?.[category])?.categories?.[category];
+  if (!setting) return { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories[category] };
+
+  return { disposition: setting.disposition, audience: resolveAudience(setting.audience) };
+}
+
+function resolvePii(configs: DataPrivacyConfig[]): ResolvedDataPrivacy["pii"] {
+  const exceptPatterns = [
+    ...new Set(configs.flatMap((config) => config.pii?.exceptPatterns ?? [])),
+  ];
+  const nearest = configs.find((config) => config.pii)?.pii;
+  if (!nearest) return { ...PLATFORM_DEFAULT_DATA_PRIVACY.pii, exceptPatterns };
+
+  return { level: nearest.level, entities: nearest.entities ?? [], exceptPatterns };
+}
+
+/** Per pattern, the nearest scope's rule wins. */
+function resolveCustomAttributes(configs: DataPrivacyConfig[]): ResolvedAttributeRule[] {
+  const rules = new Map<string, ResolvedAttributeRule>();
+  for (const rule of configs.flatMap((config) => config.customAttributes ?? [])) {
+    if (rules.has(rule.pattern)) continue;
+    rules.set(rule.pattern, {
+      pattern: rule.pattern,
+      disposition: rule.disposition,
+      audience: resolveAudience(rule.audience),
+    });
   }
-  resolved.customAttributes = [...attributeRules.values()];
-  resolved.secrets.customPatterns = [...customPatterns];
-  resolved.pii.exceptPatterns = [...piiExceptPatterns];
-  return resolved;
+  return [...rules.values()];
+}
+
+export function resolveDataPrivacy(input: {
+  rows: DataPrivacyRow[];
+  facts: DataPrivacyScopeFacts;
+}): ResolvedDataPrivacy {
+  const configs = configsNearestFirst(input);
+  const nearestSecrets = configs.find((config) => config.secrets)?.secrets;
+
+  return {
+    categories: {
+      input: resolveCategory(configs, "input"),
+      output: resolveCategory(configs, "output"),
+      system: resolveCategory(configs, "system"),
+      tools: resolveCategory(configs, "tools"),
+    },
+    pii: resolvePii(configs),
+    secrets: {
+      enabled: nearestSecrets
+        ? nearestSecrets.enabled
+        : PLATFORM_DEFAULT_DATA_PRIVACY.secrets.enabled,
+      customPatterns: [
+        ...new Set(configs.flatMap((config) => config.secrets?.customPatterns ?? [])),
+      ],
+    },
+    customAttributes: resolveCustomAttributes(configs),
+  };
 }

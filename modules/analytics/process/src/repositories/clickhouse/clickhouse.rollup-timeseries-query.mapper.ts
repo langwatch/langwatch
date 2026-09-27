@@ -4,12 +4,9 @@
  * so none of legacy's JOINs, dedup or fan-out apply. Unsupported shapes throw as routing bugs.
  */
 
-import type {
-  AnalyticsAggregation,
-  AnalyticsTimeseriesBuilderInput,
-  BuiltAnalyticsQuery,
-} from "@langwatch/analytics-contract";
+import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
 
+import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import {
   isRollupAvgMetricKey,
   isRollupRollableTraceMetricKey,
@@ -125,9 +122,7 @@ function rollupAggExpression({
  * one aggregate per series, ungrouped only.
  * @see assertRollupUngrouped
  */
-export function buildRollupTimeseriesQuery(
-  input: AnalyticsTimeseriesBuilderInput,
-): BuiltAnalyticsQuery {
+export function buildRollupTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnalyticsQuery {
   const timeZone = input.timeZone ?? "UTC";
 
   const selectExprs: string[] = [];

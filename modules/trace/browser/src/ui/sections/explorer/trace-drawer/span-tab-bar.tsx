@@ -102,6 +102,147 @@ function resolvePinnedSpans(pinnedSpanIds: string[], spanTree: SpanTreeNode[]): 
     .filter((s): s is SpanTreeNode => s != null);
 }
 
+type TabDescriptor = {
+  id: string;
+  activeId?: string;
+  label: string;
+  onSelect: () => void;
+  render: () => React.ReactNode;
+  /** Dropdown-row contents when this tab is folded into the menu. */
+  menuContent: React.ReactNode;
+};
+
+function TabMenuLabel({ span }: { span: SpanTreeNode }) {
+  return (
+    <HStack gap={1.5}>
+      <Text truncate maxWidth="200px">
+        {spanTabLabel(span)}
+      </Text>
+    </HStack>
+  );
+}
+
+function presenceFor({ traceId, spanId }: { traceId: string | null | undefined; spanId: string }) {
+  return traceId ? <SpanFocusPresenceDot traceId={traceId} spanId={spanId} /> : null;
+}
+
+function pinnedTabDescriptor({
+  span,
+  traceId,
+  isActive,
+  onSelect,
+  onHover,
+  onUnpin,
+}: {
+  span: SpanTreeNode;
+  traceId: string | null | undefined;
+  isActive: boolean;
+  onSelect: () => void;
+  onHover: () => void;
+  onUnpin: () => void;
+}): TabDescriptor {
+  const id = `span:${span.spanId}`;
+  return {
+    id,
+    activeId: isActive ? id : undefined,
+    label: spanTabLabel(span),
+    onSelect,
+    render: () => (
+      <SpanTab
+        overflowId={id}
+        span={span}
+        isActive={isActive}
+        onClick={onSelect}
+        onHover={onHover}
+        actionIcon={<Icon as={LuPinOff} boxSize={3} />}
+        actionLabel="Unpin span tab"
+        onAction={onUnpin}
+        presence={presenceFor({ traceId, spanId: span.spanId })}
+      />
+    ),
+    menuContent: <TabMenuLabel span={span} />,
+  };
+}
+
+/** The selected span's tab while it is not pinned: pin it, or close it. */
+function ephemeralTabDescriptor({
+  span,
+  traceId,
+  onSelect,
+  onPin,
+  onClose,
+}: {
+  span: SpanTreeNode;
+  traceId: string | null | undefined;
+  onSelect: () => void;
+  onPin: () => void;
+  onClose: () => void;
+}): TabDescriptor {
+  const id = "span:ephemeral";
+  return {
+    id,
+    activeId: id,
+    label: spanTabLabel(span),
+    onSelect,
+    render: () => (
+      <SpanTab
+        overflowId={id}
+        span={span}
+        isActive
+        onClick={onSelect}
+        actionIcon={<Icon as={LuPin} boxSize={3} />}
+        actionLabel="Pin span tab"
+        onAction={onPin}
+        secondaryActionIcon={<Icon as={LuX} boxSize={3} />}
+        secondaryActionLabel="Close span tab"
+        onSecondaryAction={onClose}
+        presence={presenceFor({ traceId, spanId: span.spanId })}
+      />
+    ),
+    menuContent: <TabMenuLabel span={span} />,
+  };
+}
+
+/**
+ * Shows or hides the details pane from the tab row's edge. The icon follows the
+ * pane's edge: right for a side-by-side split, bottom for a stacked one.
+ */
+function DetailCollapseToggle({
+  collapsed,
+  position,
+  onToggle,
+}: {
+  collapsed: boolean;
+  position: "leading" | "trailing";
+  onToggle: () => void;
+}) {
+  const rightEdgeIcon = collapsed ? LuPanelRightOpen : LuPanelRightClose;
+  const bottomEdgeIcon = collapsed ? LuPanelBottomOpen : LuPanelBottomClose;
+  const label = collapsed ? "Show details" : "Hide details";
+  return (
+    <Tooltip
+      content={label}
+      positioning={{ placement: position === "leading" ? "right" : "left" }}
+      openDelay={400}
+    >
+      <Flex
+        as="button"
+        align="center"
+        justify="center"
+        paddingX={1.5}
+        color="fg.muted"
+        cursor="pointer"
+        _hover={{ color: "fg" }}
+        aria-label={label}
+        onClick={onToggle}
+        flexShrink={0}
+      >
+        <Icon as={position === "leading" ? rightEdgeIcon : bottomEdgeIcon} boxSize={3.5} />
+      </Flex>
+    </Tooltip>
+  );
+}
+
 export const SpanTabBar = memo(function SpanTabBar({
   spanTree,
   rightSlot,
@@ -120,36 +261,12 @@ export const SpanTabBar = memo(function SpanTabBar({
   // Chrome DevTools' "Headers / Cookies / Request / Response" row).
   const detailCollapsed = useDrawerStore((s) => s.paneState.spanDetail.collapsed);
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
-  // Icon orientation tracks the pane's edge: horizontal layout docks the detail pane right
-  // (LuPanelRight*), vertical docks it at the bottom (LuPanelBottom*).
-  const isHorizontalSplit = collapsePosition === "leading";
-  const rightEdgeIcon = detailCollapsed ? LuPanelRightOpen : LuPanelRightClose;
-  const bottomEdgeIcon = detailCollapsed ? LuPanelBottomOpen : LuPanelBottomClose;
-  const CollapseToggleIcon = isHorizontalSplit ? rightEdgeIcon : bottomEdgeIcon;
-
   const collapseToggle = (
-    <Tooltip
-      content={detailCollapsed ? "Show details" : "Hide details"}
-      positioning={{
-        placement: collapsePosition === "leading" ? "right" : "left",
-      }}
-      openDelay={400}
-    >
-      <Flex
-        as="button"
-        align="center"
-        justify="center"
-        paddingX={1.5}
-        color="fg.muted"
-        cursor="pointer"
-        _hover={{ color: "fg" }}
-        aria-label={detailCollapsed ? "Show details" : "Hide details"}
-        onClick={() => togglePaneCollapsed("spanDetail")}
-        flexShrink={0}
-      >
-        <Icon as={CollapseToggleIcon} boxSize={3.5} />
-      </Flex>
-    </Tooltip>
+    <DetailCollapseToggle
+      collapsed={detailCollapsed}
+      position={collapsePosition}
+      onToggle={() => togglePaneCollapsed("spanDetail")}
+    />
   );
 
   const selectedSpan = useMemo(
@@ -177,91 +294,30 @@ export const SpanTabBar = memo(function SpanTabBar({
     [pinnedSpans, inlineCount, overflowing],
   );
 
-  // Build a unified descriptor list (static tabs + dynamic span tabs) so
-  // `useOverflowVisibility` can collapse anything that doesn't fit on the strip into a
-  // single kebab menu — same pattern the viz tab row uses.
-  type TabDescriptor = {
-    id: string;
-    activeId?: string;
-    label: string;
-    onSelect: () => void;
-    render: () => React.ReactNode;
-    /** Dropdown-row contents when this tab is folded into the menu. */
-    menuContent: React.ReactNode;
-  };
-  // After the trace-view redesign the SpanTabBar carries only span-scope tabs: pinned
-  // spans (rendered first, in pin order) and the currently-selected ephemeral span
-  // (rendered at the trailing edge if it isn't already pinned).
-  const tabDescriptors: TabDescriptor[] = useMemo(() => {
-    const list: TabDescriptor[] = [];
-    inlinePinned.forEach((span) => {
-      const id = `span:${span.spanId}`;
-      const isActive = selectedSpan?.spanId === span.spanId;
-      list.push({
-        id,
-        activeId: isActive ? id : undefined,
-        label: spanTabLabel(span),
+  // One descriptor list, so useOverflowVisibility can fold whatever does not fit into
+  // the kebab menu: pinned spans in pin order, then the selected span unless pinned.
+  const tabDescriptors = useMemo(() => {
+    const pinned = inlinePinned.map((span) =>
+      pinnedTabDescriptor({
+        span,
+        traceId,
+        isActive: selectedSpan?.spanId === span.spanId,
         onSelect: () => selectSpan(span.spanId),
-        render: () => (
-          <SpanTab
-            overflowId={id}
-            span={span}
-            isActive={isActive}
-            onClick={() => selectSpan(span.spanId)}
-            onHover={() => prefetchSpan(span.spanId)}
-            actionIcon={<Icon as={LuPinOff} boxSize={3} />}
-            actionLabel="Unpin span tab"
-            onAction={() => unpinSpan(span.spanId)}
-            presence={
-              traceId ? <SpanFocusPresenceDot traceId={traceId} spanId={span.spanId} /> : null
-            }
-          />
-        ),
-        menuContent: (
-          <HStack gap={1.5}>
-            <Text truncate maxWidth="200px">
-              {spanTabLabel(span)}
-            </Text>
-          </HStack>
-        ),
-      });
-    });
-    if (selectedSpan && !isSelectedPinned) {
-      const id = "span:ephemeral";
-      list.push({
-        id,
-        activeId: id,
-        label: spanTabLabel(selectedSpan),
+        onHover: () => prefetchSpan(span.spanId),
+        onUnpin: () => unpinSpan(span.spanId),
+      }),
+    );
+    if (!selectedSpan || isSelectedPinned) return pinned;
+    return [
+      ...pinned,
+      ephemeralTabDescriptor({
+        span: selectedSpan,
+        traceId,
         onSelect: () => selectSpan(selectedSpan.spanId),
-        render: () => (
-          <SpanTab
-            overflowId={id}
-            span={selectedSpan}
-            isActive
-            onClick={() => selectSpan(selectedSpan.spanId)}
-            actionIcon={<Icon as={LuPin} boxSize={3} />}
-            actionLabel="Pin span tab"
-            onAction={() => pinSpan(selectedSpan.spanId)}
-            secondaryActionIcon={<Icon as={LuX} boxSize={3} />}
-            secondaryActionLabel="Close span tab"
-            onSecondaryAction={clearSpan}
-            presence={
-              traceId ? (
-                <SpanFocusPresenceDot traceId={traceId} spanId={selectedSpan.spanId} />
-              ) : null
-            }
-          />
-        ),
-        menuContent: (
-          <HStack gap={1.5}>
-            <Text truncate maxWidth="200px">
-              {spanTabLabel(selectedSpan)}
-            </Text>
-          </HStack>
-        ),
-      });
-    }
-    return list;
+        onPin: () => pinSpan(selectedSpan.spanId),
+        onClose: clearSpan,
+      }),
+    ];
   }, [
     traceId,
     inlinePinned,

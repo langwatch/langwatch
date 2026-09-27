@@ -1,6 +1,6 @@
 import { TriggerAction, TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "@langwatch/automation-contract";
 import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contract";
-import { buildIntentFactories } from "@langwatch/eventing";
+import { buildIntentAccessor } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { automationProcessDefinition } from "../../__tests__/fixtures/pipeline-test-harness.ts";
@@ -150,11 +150,11 @@ describe("trigger settlement process", () => {
           name: "triggerSettlement",
         });
         const evolve = definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
-        const intents = buildIntentFactories(definition.config.intents);
+        const intent = buildIntentAccessor(definition.config.intents);
         const context = {
           key: "trigger-1",
           projectId: "project-1",
-          intents,
+          intent,
         };
 
         const firstRound = evolve(
@@ -212,7 +212,7 @@ describe("trigger settlement process", () => {
           const context = {
             key: triggerId,
             projectId: "project-1",
-            intents: buildIntentFactories(definition.config.intents, {
+            intent: buildIntentAccessor(definition.config.intents, {
               processKey: triggerId,
             }),
           };
@@ -303,7 +303,7 @@ describe("trigger settlement process", () => {
             now: MAX_PENDING_MATCHES + 1,
             key: "trigger-1",
             projectId: "project-1",
-            intents: buildIntentFactories(definition.config.intents),
+            intent: buildIntentAccessor(definition.config.intents),
           },
         );
 
@@ -363,7 +363,7 @@ describe("trigger settlement process", () => {
               now: at,
               key: triggerId,
               projectId: "project-1",
-              intents: buildIntentFactories(definition.config.intents),
+              intent: buildIntentAccessor(definition.config.intents),
             },
           ).intents?.find((intent) => intent.intentType === "logOverflow")?.messageKey;
 

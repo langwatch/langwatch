@@ -60,13 +60,10 @@ async function resolve({
   actor?: RunActor;
 }): Promise<string> {
   const target: SuiteTarget = { type: "connected", referenceId } as SuiteTarget;
-  const [resolved] = await ConnectedTargetService.resolveConnectedReferences({
-    targets: [target],
-    projectId: PROJECT_ID,
-    actor,
+  const [resolved] = await ConnectedTargetService.create({
     agents: agentsOver(rows),
     presence: presenceOver(rows),
-  });
+  }).resolveConnectedReferences({ targets: [target], projectId: PROJECT_ID, actor });
   return (resolved as { referenceId: string }).referenceId;
 }
 

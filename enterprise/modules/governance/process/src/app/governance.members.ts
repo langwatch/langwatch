@@ -26,7 +26,13 @@ import type {
   SpendOverTimeGroupBy,
   SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
-import type { Event, IntentContext, ProcessStore, TriggerContext } from "@langwatch/eventing";
+import {
+  type Event,
+  EventSchema,
+  type IntentContext,
+  type ProcessStore,
+  type TriggerContext,
+} from "@langwatch/eventing";
 import type {
   InternalProject,
   InternalProjectQuery,
@@ -35,6 +41,7 @@ import type {
 import type { Instant } from "@langwatch/time";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import { z } from "zod";
 export type AnomalyAlertHttpResponse = {
   status: number;
   ok: boolean;
@@ -79,76 +86,101 @@ export interface CliAdminContactReader {
   findAdminEmail(organizationId: string): Promise<string | null>;
 }
 
-export type GatewaySpendUsage = {
-  input_tokens: number;
-  output_tokens: number;
-  cache_read_input_tokens: number;
-  cache_creation_input_tokens: number;
-  cache_creation_1h_tokens: number;
-  reasoning_tokens: number;
-  input_audio_tokens: number;
-  output_audio_tokens: number;
-  input_chars: number;
-  audio_ms: number;
-  input_image_tokens: number;
-  output_image_tokens: number;
-  image_count: number;
-};
+/** Mirrors the gateway's spend usage: every quantity an older event lacks reads as zero. */
+const gatewaySpendUsageSchema = z.object({
+  input_tokens: z.number().default(0),
+  output_tokens: z.number().default(0),
+  cache_read_input_tokens: z.number().default(0),
+  cache_creation_input_tokens: z.number().default(0),
+  cache_creation_1h_tokens: z.number().default(0),
+  reasoning_tokens: z.number().default(0),
+  input_audio_tokens: z.number().default(0),
+  output_audio_tokens: z.number().default(0),
+  input_chars: z.number().default(0),
+  audio_ms: z.number().default(0),
+  input_image_tokens: z.number().default(0),
+  output_image_tokens: z.number().default(0),
+  image_count: z.number().default(0),
+});
+export type GatewaySpendUsage = z.infer<typeof gatewaySpendUsageSchema>;
 
-export type GatewaySpendAttribution = {
-  organization_id: string;
-  team_id: string;
-  virtual_key_id: string;
-  principal_user_id: string;
-  end_user_id: string;
-};
+const gatewaySpendAttributionSchema = z.object({
+  organization_id: z.string(),
+  team_id: z.string(),
+  virtual_key_id: z.string(),
+  principal_user_id: z.string(),
+  end_user_id: z.string(),
+});
+export type GatewaySpendAttribution = z.infer<typeof gatewaySpendAttributionSchema>;
 
-export type GatewaySpendAdmittedData = GatewaySpendAttribution & {
-  gateway_request_id: string;
-  outcome_carries_attribution: boolean;
-};
+const gatewaySpendAdmittedDataSchema = z.object({
+  ...gatewaySpendAttributionSchema.shape,
+  gateway_request_id: z.string(),
+  outcome_carries_attribution: z.boolean(),
+});
+export type GatewaySpendAdmittedData = z.infer<typeof gatewaySpendAdmittedDataSchema>;
 
-export type GatewaySpendOutcomeData = GatewaySpendAttribution & {
-  gateway_request_id: string;
-  model: string;
-  model_provider_id: string;
-  usage: GatewaySpendUsage | null;
-  cost_nano_usd: number;
-  rate_version: string;
-  duration_ms: number;
-  occurred_at: number;
-};
+const gatewaySpendOutcomeDataSchema = z.object({
+  ...gatewaySpendAttributionSchema.shape,
+  gateway_request_id: z.string(),
+  model: z.string(),
+  model_provider_id: z.string(),
+  usage: gatewaySpendUsageSchema.nullable(),
+  cost_nano_usd: z.number(),
+  rate_version: z.string(),
+  duration_ms: z.number(),
+  occurred_at: z.number(),
+});
+export type GatewaySpendOutcomeData = z.infer<typeof gatewaySpendOutcomeDataSchema>;
 
-export type GatewaySpendFailedData = GatewaySpendOutcomeData & {
-  error: { type: string; http_status: number };
-};
+const gatewaySpendFailedDataSchema = z.object({
+  ...gatewaySpendOutcomeDataSchema.shape,
+  error: z.object({ type: z.string(), http_status: z.number() }),
+});
+export type GatewaySpendFailedData = z.infer<typeof gatewaySpendFailedDataSchema>;
 
-export type GatewaySpendSettledData = GatewaySpendAttribution & {
-  gateway_request_id: string;
-  occurred_at: number;
-  reason: string;
-  model: string;
-  model_provider_id: string;
-};
+const gatewaySpendSettledDataSchema = z.object({
+  ...gatewaySpendAttributionSchema.shape,
+  gateway_request_id: z.string(),
+  occurred_at: z.number(),
+  reason: z.string(),
+  model: z.string(),
+  model_provider_id: z.string(),
+});
+export type GatewaySpendSettledData = z.infer<typeof gatewaySpendSettledDataSchema>;
 
 export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as const;
 export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE = "lw.gateway.spend.confirmed" as const;
 export const GATEWAY_SPEND_FAILED_EVENT_TYPE = "lw.gateway.spend.failed" as const;
 export const GATEWAY_SPEND_SETTLED_EVENT_TYPE = "lw.gateway.spend.settled" as const;
 
+/** The gateway spend events governance reads, as the gateway's pipeline stores them. */
+export const gatewaySpendAdmittedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(GATEWAY_SPEND_ADMITTED_EVENT_TYPE),
+  data: gatewaySpendAdmittedDataSchema,
+});
+export const gatewaySpendConfirmedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE),
+  data: gatewaySpendOutcomeDataSchema,
+});
+export const gatewaySpendFailedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(GATEWAY_SPEND_FAILED_EVENT_TYPE),
+  data: gatewaySpendFailedDataSchema,
+});
+export const gatewaySpendSettledEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(GATEWAY_SPEND_SETTLED_EVENT_TYPE),
+  data: gatewaySpendSettledDataSchema,
+});
+
 export type GatewaySpendProcessingEvent =
-  | (Event<GatewaySpendAdmittedData> & {
-      type: typeof GATEWAY_SPEND_ADMITTED_EVENT_TYPE;
-    })
-  | (Event<GatewaySpendOutcomeData> & {
-      type: typeof GATEWAY_SPEND_CONFIRMED_EVENT_TYPE;
-    })
-  | (Event<GatewaySpendFailedData> & {
-      type: typeof GATEWAY_SPEND_FAILED_EVENT_TYPE;
-    })
-  | (Event<GatewaySpendSettledData> & {
-      type: typeof GATEWAY_SPEND_SETTLED_EVENT_TYPE;
-    });
+  | z.infer<typeof gatewaySpendAdmittedEventSchema>
+  | z.infer<typeof gatewaySpendConfirmedEventSchema>
+  | z.infer<typeof gatewaySpendFailedEventSchema>
+  | z.infer<typeof gatewaySpendSettledEventSchema>;
 
 export type GatewayBudgetScope =
   | "ORGANIZATION"

@@ -99,7 +99,7 @@ export const deferredOriginWake: WakeHandler<DeferredOriginState, DeferredOrigin
     state: DEFERRED_ORIGIN_INITIAL_STATE,
     nextWakeAt: null,
     intents: [
-      ctx.intents.resolveDeferredOrigin(`deferred-origin:${ctx.projectId}:${ctx.key}`, {
+      ctx.intent("resolveDeferredOrigin", `deferred-origin:${ctx.projectId}:${ctx.key}`, {
         tenantId: ctx.projectId,
         traceId: ctx.key,
         scheduledFor: state.resolveAfterMs,

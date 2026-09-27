@@ -32,7 +32,7 @@ import type {
   FeatureFlagExperimentRepository,
 } from "../repositories/feature-flag-experiment-setting.repository.ts";
 import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
-import type { FeatureFlagRowStore } from "../stores/feature-flag-row.store.ts";
+import type { FeatureFlagRowStore } from "./cached-feature-flag-row.service.ts";
 import type { OrganizationCreatedAtCacheService } from "./organization-created-at-cache.service.ts";
 
 /** Resolution, experiments and the operator store, over this feature's own repositories. */

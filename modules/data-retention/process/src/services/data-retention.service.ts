@@ -26,10 +26,10 @@ import {
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
+import type { DataRetentionCacheRepository } from "../repositories/data-retention-cache.repository.ts";
 import type { DataRetentionRepository } from "../repositories/data-retention.repository.ts";
 import type { PinnedTraceRepository } from "../repositories/pinned-trace.repository.ts";
 import type { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository.ts";
-import type { DataRetentionCacheStore } from "../stores/data-retention-cache.store.ts";
 import type { StorageMeterService } from "./storage-meter.service.ts";
 
 export type DataRetentionServiceOptions = Readonly<{
@@ -44,7 +44,7 @@ export type DataRetentionServiceOptions = Readonly<{
    * answering `[]` for "no backend" let an in-flight rewrite read as finished.
    */
   retroactive: RetroactiveRetentionRepository;
-  cache: DataRetentionCacheStore;
+  cache: DataRetentionCacheRepository;
   storageMeter: StorageMeterService;
 }>;
 

@@ -58,16 +58,10 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
   });
 }
 
-process.on("uncaughtException", (error) => {
-  write(processFailureLine({ service: BACKEND_SERVICE, event: "uncaught exception", error }));
+/** The boot guard's crash hook: drain both halves, then exit non-zero. */
+export function drainAfterCrash(): void {
   void stop(1);
-});
-process.on("unhandledRejection", (reason) => {
-  write(
-    processFailureLine({ service: BACKEND_SERVICE, event: "unhandled rejection", error: reason }),
-  );
-  void stop(1);
-});
+}
 
 /** Boots both applications and reports whether they came up. Never re-throws. */
 export function bootBackendEntry(): Promise<void> {

@@ -19,7 +19,7 @@ import {
 /**
  * URL fragment synchronization for traces-v2 bar state.
  */
-import { useCallback, useEffect, useRef } from "react";
+import { type RefObject, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router";
 
 import { getPresetById } from "../../../../behavior/time-range-presets.ts";
@@ -252,6 +252,175 @@ function resolveTarget({
   };
 }
 
+/** The live bar state, as the stores hold it. */
+type LiveBarState = {
+  activeLensId: string;
+  allLenses: LensConfig[];
+  draftState: Map<string, { filter?: string }>;
+  queryText: string;
+  timeRange: TimeRange;
+  evalRuns?: Record<string, string>;
+};
+
+/** A fragment lens the list does not hold yet, kept so the apply can replay once it does. */
+type PendingLens = {
+  lensId: string;
+  /** The list it was judged against; the replay waits for a different one. */
+  lenses: LensConfig[];
+  /** The bar state that apply installed; anything else by then is the user's own choice. */
+  applied: BarState;
+};
+
+/**
+ * The bar state an apply leaves behind, in full, which the guards compare
+ * against. An absent `q` means the target lens's own filter, which only a
+ * hydrated lens supplies; a run rides with the query it was written for.
+ */
+function appliedStateFor({
+  target,
+  targetTimeRange,
+  live,
+}: {
+  target: FragmentTarget;
+  targetTimeRange: TimeRange | null;
+  live: LiveBarState;
+}): { targetLens: LensConfig | undefined; applied: BarState } {
+  const targetLens = live.allLenses.find((l) => l.id === target.lensId);
+  const lensQuery = targetLens
+    ? (live.draftState.get(target.lensId)?.filter ?? targetLens.filterText)
+    : live.queryText;
+  const query = target.overrides.query ?? lensQuery;
+  // Null only on the first apply, where the URL states no window and the store's is the answer.
+  const timeRange = targetTimeRange ?? live.timeRange;
+  const named = target.overrides.query !== undefined ? (target.overrides.runs ?? NO_RUNS) : NO_RUNS;
+  return {
+    targetLens,
+    applied: {
+      lensId: target.lensId,
+      query,
+      timeRange,
+      evalRuns: runsForRestoredQuery({
+        named,
+        held: live.evalRuns ?? NO_RUNS,
+        query,
+        lensId: target.lensId,
+        timeRange,
+      }),
+    },
+  };
+}
+
+/**
+ * React Router sees same-route fragment pushes but not the store's raw history
+ * writes, so every router navigation re-reads the fragment and lets the apply
+ * decide. The mount run is skipped; the mount effect already applied it.
+ */
+function useReapplyOnNavigation({
+  hasAppliedFragment,
+  applyFromFragment,
+}: {
+  hasAppliedFragment: RefObject<boolean>;
+  applyFromFragment: () => void;
+}) {
+  const location = useLocation();
+  const hasSeenInitialLocation = useRef(false);
+  // A ref keeps unstable store actions out of the navigation-only dependency.
+  const applyFromFragmentRef = useRef(applyFromFragment);
+  useEffect(() => {
+    applyFromFragmentRef.current = applyFromFragment;
+  });
+  useEffect(() => {
+    if (!hasAppliedFragment.current) return;
+    if (!hasSeenInitialLocation.current) {
+      hasSeenInitialLocation.current = true;
+      return;
+    }
+    applyFromFragmentRef.current();
+  }, [location.key, hasAppliedFragment]);
+}
+
+/**
+ * Writes the bar state to the fragment on a 150ms timer, since encoding costs
+ * per character. It never names a lens the list lacks, and leaves a pending
+ * deep link alone until its lens hydrates.
+ */
+function useFragmentWriter({
+  hasAppliedFragment,
+  pendingLens,
+  allLenses,
+  state,
+}: {
+  hasAppliedFragment: RefObject<boolean>;
+  pendingLens: RefObject<PendingLens | null>;
+  allLenses: LensConfig[];
+  state: Omit<LiveBarState, "allLenses" | "draftState">;
+}) {
+  const lastSearchBody = useRef<string | null>(null);
+  const { activeLensId, queryText, timeRange, evalRuns } = state;
+  useEffect(() => {
+    if (!hasAppliedFragment.current) return;
+    const handle = window.setTimeout(() => {
+      // The popstate guard's own encoder, so this entry reads back as nothing to apply.
+      const body = liveBody({ activeLensId, queryText, timeRange, evalRuns });
+      const searchBody = liveBody({ activeLensId, queryText, timeRange, evalRuns: NO_RUNS });
+      const pending = pendingLens.current;
+      if (pending && body === canonicalBody(pending.applied)) return;
+      if (!allLenses.some((l) => l.id === activeLensId)) return;
+      // A state Back or Forward just restored is already the address; only bookkeeping moves.
+      const asNewEntry = isNewSearchEntry({
+        previousSearch: lastSearchBody.current,
+        nextSearch: searchBody,
+      });
+      lastSearchBody.current = searchBody;
+      writeFragment(body, { asNewEntry });
+    }, 150);
+    return () => window.clearTimeout(handle);
+  }, [hasAppliedFragment, pendingLens, activeLensId, allLenses, queryText, timeRange, evalRuns]);
+}
+
+/**
+ * The live bar state behind a ref, so the apply (and the popstate listener it
+ * feeds) keeps one identity across keystrokes; plus the snapshot one render
+ * older, which is the only one that can tell a hydration restore from the user.
+ */
+function useLiveBarState(state: LiveBarState) {
+  const liveState = useRef(state);
+  const previousState = useRef(liveState.current);
+  useEffect(() => {
+    previousState.current = liveState.current;
+    liveState.current = state;
+  });
+  return { liveState, previousState };
+}
+
+/**
+ * Replays the fragment once the lens list moves under it, which is how a shared
+ * `#custom-…` link opens: its lens cannot be loaded at mount. One chance only;
+ * a lens, query or window the user chose meanwhile outranks the link.
+ */
+function usePendingLensReplay({
+  pendingLens,
+  allLenses,
+  previousState,
+  applyFromFragment,
+}: {
+  pendingLens: RefObject<PendingLens | null>;
+  allLenses: LensConfig[];
+  previousState: RefObject<LiveBarState>;
+  applyFromFragment: () => void;
+}) {
+  useEffect(() => {
+    const pending = pendingLens.current;
+    if (!pending || pending.lenses === allLenses) return;
+    pendingLens.current = null;
+    if (!allLenses.some((l) => l.id === pending.lensId)) return;
+    // Compared with the render before this one: the last-used-lens restore
+    // lands in the same write as the list, and is a fallback, not a choice.
+    if (liveBody(previousState.current) !== canonicalBody(pending.applied)) return;
+    applyFromFragment();
+  }, [allLenses, applyFromFragment, pendingLens, previousState]);
+}
+
 /**
  * Hook that synchronizes bar state with the URL fragment.
  * Call once at the page level (TracesPage).
@@ -273,11 +442,7 @@ export function useURLSync(): void {
   const draftState = useViewStore((s) => s.draftState);
   const selectLens = useViewStore((s) => s.selectLens);
 
-  // Live bar state behind a ref so `applyFromFragment` — and therefore the
-  // `popstate` listener it feeds — keeps one identity instead of being torn
-  // down and re-registered on every keystroke. Declared before the effects
-  // that call it, so React has already written it by the time they run.
-  const liveState = useRef({
+  const { liveState, previousState } = useLiveBarState({
     activeLensId,
     allLenses,
     draftState,
@@ -285,39 +450,7 @@ export function useURLSync(): void {
     timeRange,
     evalRuns,
   });
-  // The same snapshot, one render older. `setUserLenses` restores the
-  // last-used lens in the very store write that hydrates the list, so by the
-  // first render that sees the new list the active lens may already have moved
-  // without the user touching anything. "Had the user gone somewhere else?"
-  // is therefore only answerable from the render BEFORE that one.
-  const previousState = useRef(liveState.current);
-  useEffect(() => {
-    previousState.current = liveState.current;
-    liveState.current = {
-      activeLensId,
-      allLenses,
-      draftState,
-      queryText,
-      timeRange,
-      evalRuns,
-    };
-  });
-
-  /**
-   * A fragment naming a lens the list doesn't hold yet, kept so the apply can be
-   * replayed once it does.
-   */
-  const pendingLens = useRef<{
-    lensId: string;
-    /** The list it was judged against; the replay waits for a different one. */
-    lenses: LensConfig[];
-    /**
-     * The bar state that apply installed. Anything else in the store by the
-     * time the list moves means the user chose for themselves while we waited,
-     * and their choice outranks the link.
-     */
-    applied: BarState;
-  } | null>(null);
+  const pendingLens = useRef<PendingLens | null>(null);
 
   const applyFromFragment = useCallback(() => {
     const isFirstApply = !hasAppliedFragment.current;
@@ -331,36 +464,7 @@ export function useURLSync(): void {
       persistedLensId: getPersistedActiveLensId(),
     });
     const targetTimeRange = resolveTimeRange({ parsed, isFirstApply });
-    const targetLens = live.allLenses.find((l) => l.id === target.lensId);
-    // An absent `q` denotes the target lens's own filter — the value
-    // `selectLens` installs below — not "keep the current query". Only a lens
-    // that has actually hydrated can supply it, which is why the guard below
-    // waits for one.
-    const lensQuery = targetLens
-      ? (live.draftState.get(target.lensId)?.filter ?? targetLens.filterText)
-      : live.queryText;
-
-    /**
-     * The bar state this apply leaves behind, in full: what the guard below
-     * compares the store against, and what the replay effect later compares
-     * the store against to tell "nobody touched it" from "the user moved on".
-     */
-    const applied: BarState = {
-      lensId: target.lensId,
-      query: target.overrides.query ?? lensQuery,
-      // Null only on the first apply, where the URL carries no time-range
-      // statement at all and the window the store holds is the answer.
-      timeRange: targetTimeRange ?? live.timeRange,
-      // A run rides with the query it was written for; what the fragment does
-      // not name is recovered by key from the runs the page already holds.
-      evalRuns: runsForRestoredQuery({
-        named: target.overrides.query !== undefined ? (target.overrides.runs ?? NO_RUNS) : NO_RUNS,
-        held: live.evalRuns ?? NO_RUNS,
-        query: target.overrides.query ?? lensQuery,
-        lensId: target.lensId,
-        timeRange: targetTimeRange ?? live.timeRange,
-      }),
-    };
+    const { targetLens, applied } = appliedStateFor({ target, targetTimeRange, live });
 
     // `popstate` fires for every history entry this page owns, and the trace drawer
     // pushes one of its own — its state lives in the query string, which this hook
@@ -383,7 +487,7 @@ export function useURLSync(): void {
     pendingLens.current = target.pendingLensId
       ? { lensId: target.pendingLensId, lenses: live.allLenses, applied }
       : null;
-  }, [selectLens, applyQueryText, setEvalRuns, setTimeRange, resetPagination]);
+  }, [liveState, selectLens, applyQueryText, setEvalRuns, setTimeRange, resetPagination]);
 
   // Initialize from fragment on mount
   useEffect(() => {
@@ -391,102 +495,21 @@ export function useURLSync(): void {
     applyFromFragment();
   }, [applyFromFragment]);
 
-  // Replay the fragment once the lens list moves under it — the other half of
-  // honouring a shared `#custom-…` link, whose lens cannot possibly be loaded
-  // at mount. Nothing else revisits the fragment: `applyFromFragment` doesn't
-  // depend on the lens list, and the mount effect above is one-shot.
-  useEffect(() => {
-    const pending = pendingLens.current;
-    // Still the list the apply was judged against: nothing has hydrated, so
-    // there is nothing new to say about the lens it named.
-    if (!pending || pending.lenses === allLenses) return;
-    // Whatever happens next, this was the one chance. Either the lens has
-    // arrived, or it never existed here at all — deleted by a teammate, or
-    // another project's id — and the writer below takes the URL back.
-    pendingLens.current = null;
-    if (!allLenses.some((l) => l.id === pending.lensId)) return;
-    // A lens the user picked, a query they typed or a window they moved while
-    // the list loaded outranks the link. The comparison is against the render
-    // BEFORE this one because `setUserLenses` restores the last-used lens in
-    // the same write that hydrates the list, and that restore is a fallback
-    // preference, not the user choosing anything — the URL outranks it.
-    const bodyMoved = liveBody(previousState.current) !== canonicalBody(pending.applied);
-    if (bodyMoved) {
-      return;
-    }
-    applyFromFragment();
-  }, [allLenses, applyFromFragment]);
+  usePendingLensReplay({ pendingLens, allLenses, previousState, applyFromFragment });
 
-  // Restore state on browser back/forward navigation within the page.
+  // Back and forward within the page restore the state their entry carries.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const onPopState = () => applyFromFragment();
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+    window.addEventListener("popstate", applyFromFragment);
+    return () => window.removeEventListener("popstate", applyFromFragment);
   }, [applyFromFragment]);
 
-  // React Router observes same-route fragment pushes but not the raw history
-  // writes used by the store. Re-read the live fragment for every router
-  // navigation and let `applyFromFragment` decide whether it is already in
-  // sync. Skip the mount run because the mount effect has already applied it.
-  const location = useLocation();
-  const hasSeenInitialLocation = useRef(false);
-  // A ref keeps unstable store actions out of the navigation-only dependency.
-  const applyFromFragmentRef = useRef(applyFromFragment);
-  useEffect(() => {
-    applyFromFragmentRef.current = applyFromFragment;
+  useReapplyOnNavigation({ hasAppliedFragment, applyFromFragment });
+
+  useFragmentWriter({
+    hasAppliedFragment,
+    pendingLens,
+    allLenses,
+    state: { activeLensId, queryText, timeRange, evalRuns },
   });
-  useEffect(() => {
-    if (!hasAppliedFragment.current) return;
-    if (!hasSeenInitialLocation.current) {
-      hasSeenInitialLocation.current = true;
-      return;
-    }
-    applyFromFragmentRef.current();
-  }, [location.key]);
-
-  // Coalesce URL writes on a 150ms timer. `replaceState` itself is cheap,
-  // but `computeOverrides`/`buildFragment` allocate per char, and effect
-  // re-runs on every keystroke add up. 150ms is below human perception of
-  // URL trailing the editor.
-  const lastSearchBody = useRef<string | null>(null);
-  useEffect(() => {
-    if (!hasAppliedFragment.current) return;
-
-    const handle = window.setTimeout(() => {
-      // Same encoder the popstate guard compares against, so the entry this
-      // writes now reads back as "nothing left to apply" — and only this
-      // entry: older ones keep whatever body they were written with.
-      const body = liveBody({ activeLensId, queryText, timeRange, evalRuns });
-      const searchBody = liveBody({
-        activeLensId,
-        queryText,
-        timeRange,
-        evalRuns: NO_RUNS,
-      });
-
-      // A fragment naming a lens that hasn't hydrated is a live deep link, not stale state.
-      // Collapsing it to the default fallback's empty body made a shared `#custom-…` link
-      // unopenable, gone before the lens it named arrived.
-      const pending = pendingLens.current;
-      if (pending && body === canonicalBody(pending.applied)) return;
-
-      // Never name a lens the list doesn't hold. The fragment is the shareable
-      // address of the view, and an id nothing resolves to just makes the next
-      // read fall back to the default — better to leave the previous, still
-      // valid, body in place until the lens hydrates.
-      if (!allLenses.some((l) => l.id === activeLensId)) return;
-
-      // A state Back or Forward just restored already is the address, so the
-      // write below is a no-op for it and only the bookkeeping moves.
-      const asNewEntry = isNewSearchEntry({
-        previousSearch: lastSearchBody.current,
-        nextSearch: searchBody,
-      });
-      lastSearchBody.current = searchBody;
-      writeFragment(body, { asNewEntry });
-    }, 150);
-
-    return () => window.clearTimeout(handle);
-  }, [activeLensId, allLenses, queryText, timeRange, evalRuns]);
 }

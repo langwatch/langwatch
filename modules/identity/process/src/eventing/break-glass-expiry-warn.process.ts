@@ -29,5 +29,5 @@ export const breakGlassExpiryWarnWake: WakeHandler<
   BreakGlassExpiryWarnIntents
 > = (_state, ctx) => ({
   state: { lastWarnAt: ctx.at },
-  intents: [ctx.intents.warn(`warn:${ctx.at}`, { scheduledFor: ctx.at })],
+  intents: [ctx.intent("warn", `warn:${ctx.at}`, { scheduledFor: ctx.at })],
 });

@@ -176,8 +176,8 @@ describe("given two routers that declare the same procedure", () => {
 
 describe("given a router declared under another namespace", () => {
   it("refuses the composition, naming the namespace it came from", () => {
-    // The type refuses it too; the cast is what lets the test prove the
-    // runtime refusal a `namespace` read off a value would still need.
+    // wrong-typed input: the type refuses a router from another namespace, and
+    // this proves the runtime refuses it too, as a `namespace` read off a value must.
     const foreign = otherNamespace as unknown as ComposableTrpcRouter<"review">;
 
     expect(() => composeTrpcRouters("review", [reads, foreign])).toThrow(

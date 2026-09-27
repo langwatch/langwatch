@@ -1,7 +1,7 @@
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
-import { RedisDataRetentionCacheStore } from "../data-retention-cache.store.ts";
+import { RedisDataRetentionCacheRepository } from "../redis.data-retention-cache.repository.ts";
 
 const retention = {
   traces: 49,
@@ -9,14 +9,17 @@ const retention = {
   experiments: 91,
 };
 
-describe("RedisDataRetentionCacheStore", () => {
+describe("RedisDataRetentionCacheRepository", () => {
   it("uses the injected Redis connection and keeps a warm memory fallback", async () => {
     const redis = {
       get: vi.fn().mockRejectedValue(new Error("redis unavailable")),
       setex: vi.fn().mockResolvedValue("OK"),
       del: vi.fn().mockResolvedValue(1),
     };
-    const cache = RedisDataRetentionCacheStore.create({ redis: redisDouble(redis), ttlMs: 60_000 });
+    const cache = RedisDataRetentionCacheRepository.create({
+      redis: redisDouble(redis),
+      ttlMs: 60_000,
+    });
 
     await cache.set("project", retention);
 
@@ -34,7 +37,7 @@ describe("RedisDataRetentionCacheStore", () => {
 
   it("expires the process-local fallback without a global app lookup", async () => {
     let now = 1_000;
-    const cache = RedisDataRetentionCacheStore.create({
+    const cache = RedisDataRetentionCacheRepository.create({
       ttlMs: 50,
       now: () => now,
     });

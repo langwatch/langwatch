@@ -282,7 +282,7 @@ Messages:
 
 - `environment`
   - what: Do not read `process.env` here.
-  - fix: Declare the key in the module's config schema and take the parsed value as an argument; only an app's `src/main.ts` or `src/config.ts` reads the environment.
+  - fix: Declare the key in the module's config schema and take the parsed value as an argument; only an app's `src/main.ts` or `src/config.ts`, or the test process's `packages/vitest-config`, reads the environment.
 
 ## `langwatch/eventing-role-purity`
 
@@ -1021,8 +1021,8 @@ Messages:
   - why: A cast through `unknown` or `any` removes the only check that stood between the two types.
 - `doubleCastInTest`
   - what: `as {{through}} as {{target}}` forces this test value to {{target}} without checking it.
-  - fix: Build the stub to {{target}}'s real shape instead of casting: give each mocked member its real signature so the object type-checks without the cast.
-  - why: A test value never crossed a trust boundary, so there is nothing to parse — the fix is a typed stub, not a schema.
+  - fix: Build the stub to {{target}}'s real shape instead of casting: give each mocked member its real signature so the object type-checks without the cast. Only when the test proves how the code handles a wrong-typed input, write `// wrong-typed input: <why>` on the line above the cast.
+  - why: A test value never crossed a trust boundary, so there is nothing to parse; the marker excuses one reviewed cast, where a test name would excuse every cast in the test.
 
 ## `langwatch/store-containment`
 

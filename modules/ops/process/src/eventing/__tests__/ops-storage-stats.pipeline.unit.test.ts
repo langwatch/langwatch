@@ -1,5 +1,6 @@
 /** Spec: modules/ops/specs/storage-stats.feature */
 import { InMemoryProcessStore } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
 
@@ -55,9 +56,9 @@ function wake(at: number) {
       now: at,
       key: STORAGE_STATS_PROCESS_NAME,
       projectId: "__global__",
-      intents: {
+      intent: intentAccessorOf({
         measure: (messageKey, payload) => ({ messageKey, intentType: "measure", payload }),
-      },
+      }),
     },
   );
 }

@@ -1,3 +1,5 @@
+import type { JsonValue } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import { LegacyImportTopicClusteringMigration } from "../../migrations/legacy-import.topic-clustering.migration.ts";
@@ -39,18 +41,20 @@ function makeMigration(repository: TopicClusteringRepository) {
 }
 
 function wakeIntents(at: number) {
-  const intent =
-    (intentType: string) => (messageKey: string, payload: { scheduledFor: number }) => ({
-      intentType,
-      messageKey,
-      payload,
-    });
+  const intent = (intentType: string) => (messageKey: string, payload: JsonValue) => ({
+    intentType,
+    messageKey,
+    payload,
+  });
   return topicClusteringSeedWake(TOPIC_CLUSTERING_SEED_INITIAL_STATE, {
     at,
     now: at,
     key: "topicClusteringSeed",
     projectId: "",
-    intents: { seedTopicModels: intent("seedTopicModels"), seedSchedules: intent("seedSchedules") },
+    intent: intentAccessorOf({
+      seedTopicModels: intent("seedTopicModels"),
+      seedSchedules: intent("seedSchedules"),
+    }),
   });
 }
 

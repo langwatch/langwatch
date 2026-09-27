@@ -4,16 +4,29 @@
  * tier). A wrong route is a data-leak bug, not a slow query, so refuse.
  */
 import { PLATFORM_TENANT, type TenantDirectory } from "@langwatch/clickhouse-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 export type { TenantDirectory };
+
+type RowById<Select, Row> = {
+  findUnique(args: { where: { id: string }; select: Select }): PromiseLike<Row | null>;
+};
+
+/** The three reads the directory makes, which a `PrismaClient` answers as it is. */
+export type TenantDirectoryRows = {
+  project: RowById<
+    { team: { select: { organizationId: true } } },
+    { team: { organizationId: string } | null }
+  >;
+  organization: RowById<{ id: true }, { id: string }>;
+  user: RowById<{ id: true }, { id: string }>;
+};
 
 /**
  * The three reads that place a tenant: a project by its team's organization,
  * an organization by itself, and a user nowhere in particular - they can be
  * in several organizations, and picking one would misplace their history.
  */
-export function prismaTenantDirectory(prisma: PrismaClient): TenantDirectory {
+export function prismaTenantDirectory(prisma: TenantDirectoryRows): TenantDirectory {
   return {
     async organizationForTenant(tenantId: string): Promise<string | null> {
       if (tenantId === "") return null;

@@ -18,6 +18,7 @@ import {
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { ProjectRequestService } from "../../services/project-request.service.ts";
 import { projectTrpcTransport, type ProjectBrowserApi } from "../project.trpc.ts";
 import { projectTrpcTestMembers, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
@@ -71,6 +72,11 @@ function mount({
   const encryptProjectSecret = vi.fn((value: string) => `encrypted(${value})`);
   const probe = vi.fn(probePermission);
   const application = new TestProjectApi(projects);
+  const requests = ProjectRequestService.create({
+    projects: application,
+    probePermission: probe,
+    reportTopicClusteringFailure,
+  });
 
   const browser: ProjectBrowserApi = {
     projects: () => application,
@@ -79,7 +85,9 @@ function mount({
     getFieldProtections: async () => fieldProtections,
     provisionLangyVirtualKey,
     recordApiKeyRegenerated,
-    reportTopicClusteringFailure,
+    getProject: (input) => requests.getProject(input),
+    archiveOtherProject: (input) => requests.archiveOtherProject(input),
+    triggerTopicClustering: (input) => requests.triggerTopicClustering(input),
   };
 
   const trpc = initTRPC.context<ProjectTrpcTestContext>().create();

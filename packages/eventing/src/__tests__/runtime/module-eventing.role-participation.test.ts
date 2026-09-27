@@ -120,7 +120,7 @@ function traceEventing(seen: InstalledAs[]) {
           process
             .state(z.object({ handled: z.number() }), { handled: 0 })
             .keyBy(() => AGGREGATE_ID)
-            .on("producer.recorded", (state) => ({ state: { handled: state.handled + 1 } })),
+            .on(recordedEventSchema, (state) => ({ state: { handled: state.handled + 1 } })),
         )
         .withCommand("record", RecordCommand)
         .build();

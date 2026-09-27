@@ -122,3 +122,17 @@ Feature: The package-boundaries lint rule
     Given a service that imports its own module's contract package
     When the package-boundaries rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: A type-only import of a browser package is let through, a value import is not
+    Given a file that imports another module's browser package with import type, inline type specifiers or export type
+    When the package-boundaries rule runs over it
+    Then it reports nothing, because types are erased
+    And a value import, a mixed import carrying one value, and a type-only import of a process package are still reported
+
+  @unit
+  Scenario: apps/tasks' migration runner may name a process package, nothing else in an app may
+    Given apps/tasks' migration-runner files import a module's process package for their hand-run migrations
+    When the package-boundaries rule runs over them
+    Then it reports nothing, because migrations run before any module boots
+    And apps/tasks' main.ts, its other tasks, another app's migrate file and a nested file still report compositionRoot

@@ -1,4 +1,5 @@
-import type { IntentFactories, ProcessHandlerContext } from "@langwatch/eventing";
+import type { ProcessHandlerContext, ProcessIntent } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -35,7 +36,7 @@ const requestData = (expiresAtMs: number, notifyAdmins = true) => ({
   notifyAdmins,
 });
 
-type Intent = ReturnType<IntentFactories<JoinRequestLifecycleIntents>["remindAdmins"]>;
+type Intent = ProcessIntent;
 
 const intentFactory = (intentType: string) =>
   vi.fn((messageKey: string, payload: Intent["payload"]): Intent => ({
@@ -44,17 +45,23 @@ const intentFactory = (intentType: string) =>
     payload,
   }));
 
-const ctx = (at: number): ProcessHandlerContext<JoinRequestLifecycleIntents> => ({
-  at,
-  now: at,
-  key: "jreq_1",
-  projectId: "org_acme",
-  intents: {
+const ctx = (at: number) => {
+  const intents = {
     remindAdmins: intentFactory("remindAdmins"),
     expireRequest: intentFactory("expireRequest"),
     prepareNotification: intentFactory("prepareNotification"),
-  },
-});
+  };
+  const context: ProcessHandlerContext<JoinRequestLifecycleIntents> & { intents: typeof intents } =
+    {
+      at,
+      now: at,
+      key: "jreq_1",
+      projectId: "org_acme",
+      intent: intentAccessorOf(intents),
+      intents,
+    };
+  return context;
+};
 
 const armed = (): JoinRequestLifecycleState =>
   onJoinRequested(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE, requestData(EXPIRES_AT), ctx(REQUESTED_AT))

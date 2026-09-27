@@ -243,9 +243,9 @@ describe("EventingRecordSpanAdapter", () => {
       const input = commandData({ resource: { attributes: [] } });
       const request = { resourceSpans: [{ resource: input.resource }] };
       applyOtlpReceiverPolicy({
-        request,
+        request: request,
         signal: "traces",
-        apiKeyId,
+        apiKeyId: apiKeyId,
         policy: {
           resourceAttributeKeysToRemove: [],
           resourceAttributes: [

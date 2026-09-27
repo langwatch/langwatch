@@ -32,5 +32,5 @@ export const ssoDomainReproofSweepWake: WakeHandler<
   SsoDomainReproofSweepIntents
 > = (_state, ctx) => ({
   state: { lastSweepAt: ctx.at },
-  intents: [ctx.intents.sweep(`sweep:${ctx.at}`, { scheduledFor: ctx.at })],
+  intents: [ctx.intent("sweep", `sweep:${ctx.at}`, { scheduledFor: ctx.at })],
 });

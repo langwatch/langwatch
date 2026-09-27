@@ -75,6 +75,15 @@ export const annotationWeb = defineWebModule("annotation")
     "annotation-chips": { load: () => import("./annotation-chips.ts") },
     "annotation-scores": { load: () => import("./annotation-scores.ts") },
   })
+  /** The score editor, opened by address from the annotation queue drawer. */
+  .withDrawers({
+    addOrEditAnnotationScore: {
+      load: async () => ({
+        default: (await import("./ui/sections/routed-annotation-score-drawer.tsx"))
+          .RoutedAnnotationScoreDrawer,
+      }),
+    },
+  })
   /** The annotation form's pieces, lent to the trace explorer (§3.4 rule 7). */
   .withCapabilities({
     annotateBody: {
@@ -85,11 +94,6 @@ export const annotationWeb = defineWebModule("annotation")
     },
     annotationFormFooter: {
       load: async () => ({ default: (await import("./annotation-form.ts")).FormFooter }),
-    },
-    annotationScoreEditor: {
-      load: async () => ({
-        default: (await import("./annotation-form.ts")).AnnotationScoreEditor,
-      }),
     },
   })
   /**

@@ -6,7 +6,7 @@
 
 import { createServer } from "node:http";
 
-import { WebSocketHost } from "@langwatch/api";
+import { RawHttpHost, WebSocketHost } from "@langwatch/api";
 import { type NodeHandler, TransportSelection } from "@langwatch/api/hosting";
 import { defineRestRouter } from "@langwatch/api/rest";
 import { moduleApi, transportPeersOf } from "@langwatch/kernel";
@@ -56,6 +56,7 @@ const surface = apiSurface({
   production: false,
   selection: TransportSelection.create().rest().browserBundle(false),
   sockets: WebSocketHost.create(),
+  doors: RawHttpHost.create(),
 })(transportPeersOf(() => ({})));
 const rest = surface.hosts.rest;
 if (!rest) throw new Error("the surface selected REST");

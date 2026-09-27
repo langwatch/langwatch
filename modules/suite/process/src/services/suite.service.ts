@@ -37,7 +37,7 @@ import {
   type SuiteRunPlanResult,
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { SuiteExecution } from "../app/suite.app.ts";
 import type { SuiteRepository } from "../repositories/suite.repository.ts";
@@ -303,7 +303,7 @@ export class SuiteService {
 
     return this.options.repository.archive({
       ...input,
-      archivedAt: toDate((this.options.now ?? nowInstant)()),
+      archivedAt: (this.options.now ?? nowInstant)(),
       archivedSlug,
     });
   }

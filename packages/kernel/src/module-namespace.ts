@@ -18,6 +18,7 @@ const NAMESPACE_EXCEPTIONS = {
   "enterprise-gateway": "enterprise-gateway",
   "enterprise-ops": "enterprise-ops",
   presence: "presence",
+  rum: "rum",
   saas: "saas",
   "sample-agents": "sample-agents",
   scim: "scim",

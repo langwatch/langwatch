@@ -33,7 +33,7 @@ import {
 /** What an outcome handler needs from the process context. */
 export interface DeliverOutcomeContext<Intent> {
   projectId: string;
-  intents: { deliver: (key: string, payload: DeliverPayload) => Intent };
+  intent: (name: "deliver", key: string, payload: DeliverPayload) => Intent;
 }
 
 /** The delay before the attempt after the 1-based `attempt` that just failed. */
@@ -138,7 +138,7 @@ export function onSpendOutcome<
 
   return {
     state,
-    intents: [ctx.intents.deliver(`deliver:${status}`, payload)],
+    intents: [ctx.intent("deliver", `deliver:${status}`, payload)],
   };
 }
 
@@ -166,7 +166,7 @@ export function onAdmission<Intent>({
   const attribution = attributionFrom(admit);
   const stashed = state.pendingOutcome;
   const release = stashed
-    ? [ctx.intents.deliver("deliver:late", { ...stashed, attribution })]
+    ? [ctx.intent("deliver", "deliver:late", { ...stashed, attribution })]
     : void 0;
 
   // Every outcome states the attribution itself, so there is nothing worth

@@ -9,17 +9,11 @@ import {
   AgentOwnerOnlyError,
   connectedAgentSelectability,
   DEVELOPMENT_ENVIRONMENT,
-  isConnectedAgentStale,
   parseConnectedReference,
 } from "@langwatch/agent-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
-import {
-  type RunActor,
-  parseScenarioParameterDefinitions,
-  type ScenarioParameterDefinition,
-} from "@langwatch/scenario-contract";
+import type { RunActor } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
-import type { TimeInput } from "@langwatch/time";
 
 /** What this module reads about an agent, and nothing more. */
 export type ConnectedTargetAgent = {
@@ -66,26 +60,37 @@ export interface AgentOwnerNameReader {
  * The reads and refusals a run settles about its connected agent targets.
  */
 export class ConnectedTargetService {
-  static create(): ConnectedTargetService {
-    return new ConnectedTargetService();
+  /** Over an `AgentApi`, which answers both the references and the owner names. */
+  static create({
+    agents,
+    presence = NO_PRESENCE_READER,
+    owners,
+  }: {
+    agents: ConnectedTargetReferenceReader;
+    presence?: ConnectedPresenceReader;
+    /** Absent when the caller has no user store; a refusal then names no name. */
+    owners?: AgentOwnerNameReader;
+  }): ConnectedTargetService {
+    return new ConnectedTargetService(agents, presence, owners);
   }
 
-  private constructor() {}
+  private constructor(
+    private readonly agents: ConnectedTargetReferenceReader,
+    private readonly presence: ConnectedPresenceReader,
+    private readonly owners: AgentOwnerNameReader | undefined,
+  ) {}
 
   /**
    * Refuses the run when an agent is someone else's personal dev agent — the
    * same predicate the listings mark rows with, so a row the client was told
    * it could choose is never refused, and one it couldn't is never accepted.
    */
-  static async assertConnectedAgentsRunnable({
+  async assertConnectedAgentsRunnable({
     agents,
     actor,
-    owners,
   }: {
     agents: readonly ConnectedTargetAgent[];
     actor: RunActor | undefined;
-    /** Absent when the caller has no user store; the refusal then names no name. */
-    owners?: AgentOwnerNameReader;
   }): Promise<void> {
     const foreign = agents.find(
       (agent) =>
@@ -100,7 +105,7 @@ export class ConnectedTargetService {
       return;
     }
 
-    const names = await owners?.findNamesByIds([ownerUserId]);
+    const names = await this.owners?.findNamesByIds([ownerUserId]);
 
     throw new AgentOwnerOnlyError({
       agentId: foreign.id,
@@ -111,71 +116,28 @@ export class ConnectedTargetService {
   }
 
   /**
-   * Bridges `AgentService.ownersOf` (agent-server's own read of the owner
-   * names) to the `AgentOwnerNameReader` port above, so a caller that already
-   * holds an `AgentApi` need not read a user store itself.
-   */
-  static agentOwnerNameReader(agents: Pick<AgentApi, "ownersOf">): AgentOwnerNameReader {
-    return {
-      async findNamesByIds(ids) {
-        const owners = await agents.ownersOf(ids.map((ownerUserId) => ({ ownerUserId })));
-
-        return new Map([...owners].map(([id, owner]) => [id, owner.name]));
-      },
-    };
-  }
-
-  /**
    * The targets with every `<name>@<environment>` and every bare `<name>`
    * reference replaced by the connected agent's id. No environment means
    * development; if none is connected there, the one other connected environment is used.
    */
-  static async resolveConnectedReferences({
+  resolveConnectedReferences({
     targets,
     projectId,
     actor,
-    agents,
-    presence = NO_PRESENCE_READER,
   }: {
     targets: readonly SuiteTarget[];
     projectId: string;
     actor: RunActor | undefined;
-    agents: ConnectedTargetReferenceReader;
-    presence?: ConnectedPresenceReader;
   }): Promise<SuiteTarget[]> {
+    const { agents, presence } = this;
     return Promise.all(
       targets.map((target) =>
         resolveConnectedReference({ target, projectId, actor, agents, presence }),
       ),
     );
   }
-
-  /**
-   * Whether a target's agent is a connected agent whose process has not been seen for too
-   * long.
-   */
-  static isAgentUnseen(agent: { type?: string; lastSeenAt?: TimeInput | null }): boolean {
-    return agent.type === "connected" && isConnectedAgentStale({ lastSeenAt: agent.lastSeenAt });
-  }
-
-  /**
-   * The parameters the agent of a target declares; none for other targets.
-   */
-  static agentParameterDefinitionsOf(
-    agent: { type?: string; config?: unknown } | undefined,
-  ): ScenarioParameterDefinition[] {
-    if (agent?.type !== "connected") {
-      return [];
-    }
-
-    const config = agent.config;
-    if (typeof config !== "object" || config === null || Array.isArray(config)) {
-      return [];
-    }
-
-    return parseScenarioParameterDefinitions((config as { parameters?: unknown }).parameters);
-  }
 }
+
 
 /**
  * One target with its `<name>@<environment>` reference replaced by an agent

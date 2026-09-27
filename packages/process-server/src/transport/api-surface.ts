@@ -6,6 +6,7 @@ import {
   SurfaceUnconfiguredError,
   SurfaceUnverifiedError,
   type RateLimiter,
+  type RawHttpHost,
   type WebSocketHost,
 } from "@langwatch/api";
 import { ApiKeyApi, type ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
@@ -82,6 +83,8 @@ export type ApiSurfaceComposition = Readonly<{
   selection: TransportSelection;
   /** The process's one upgrade router, where every declared socket protocol mounts. */
   sockets: WebSocketHost;
+  /** The raw HTTP doors, answered ahead of every route as main answered MCP. */
+  doors: RawHttpHost;
 }>;
 
 export function apiSurface(
@@ -218,8 +221,10 @@ class ApiSurface {
     rest: RestHost | undefined;
     trpc: TrpcHost | undefined;
     websocket: WebSocketHost;
+    rawhttp: RawHttpHost;
   } {
-    return { rest: this.#rest, trpc: this.#trpc, websocket: this.composition.sockets };
+    const { sockets, doors } = this.composition;
+    return { rest: this.#rest, trpc: this.#trpc, websocket: sockets, rawhttp: doors };
   }
 
   serve(): NodeHandler {
@@ -244,7 +249,7 @@ class ApiSurface {
       mux.route(path, api, { onFailure: answerApiFailure, exact: true });
     for (const document of selected.documents)
       mux.route(document.path, FramedDocument.create(document));
-    return mux.route("/", page).handler;
+    return composition.doors.ahead(mux.route("/", page).handler);
   }
 
   #projectDoor(): RestIdentity {

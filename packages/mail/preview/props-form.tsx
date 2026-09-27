@@ -74,6 +74,24 @@ export const PropsForm = ({
   );
 };
 
+type FieldProps = {
+  node: Node;
+  root: Node;
+  path: readonly string[];
+  label: string;
+  required: boolean;
+  props: unknown;
+  onChange: (next: unknown) => void;
+};
+
+/** What every kind of field reads: the resolved node, its current value and its setter. */
+type FieldContext = FieldProps & {
+  value: unknown;
+  set: (next: unknown) => void;
+  id: string;
+  description: string | undefined;
+};
+
 const Field = ({
   node: raw,
   root,
@@ -82,128 +100,204 @@ const Field = ({
   required,
   props,
   onChange,
-}: {
-  node: Node;
-  root: Node;
-  path: readonly string[];
-  label: string;
-  required: boolean;
-  props: unknown;
-  onChange: (next: unknown) => void;
-}): JSX.Element => {
+}: FieldProps): JSX.Element => {
   const node = unwrapNullable(deref(raw, root));
-  const value = path.length === 0 ? props : getIn(props, path);
-  const set = (next: unknown) => onChange(setIn(props, path, next));
-  const id = path.join(".") || "root";
-  const description = typeof node.description === "string" ? node.description : undefined;
+  const context: FieldContext = {
+    node,
+    root,
+    path,
+    label,
+    required,
+    props,
+    onChange,
+    value: path.length === 0 ? props : getIn(props, path),
+    set: (next: unknown) => onChange(setIn(props, path, next)),
+    id: path.join(".") || "root",
+    description: typeof node.description === "string" ? node.description : undefined,
+  };
 
-  if (Array.isArray(node.enum)) {
+  if (Array.isArray(node.enum)) return <EnumField {...context} />;
+  if (node.type === "object" && isObject(node.properties)) return <ObjectField {...context} />;
+  if (node.type === "array") return <ArrayField {...context} />;
+  if (node.type === "boolean") return <BooleanField {...context} />;
+  if (node.type === "number" || node.type === "integer") return <NumberField {...context} />;
+  if (node.type === "string") return <StringField {...context} />;
+  return <JsonBox value={context.value} onChange={context.set} label={label} />;
+};
+
+const EnumField = ({
+  node,
+  label,
+  required,
+  value,
+  set,
+  id,
+  description,
+}: FieldContext): JSX.Element => {
+  return (
+    <Labelled id={id} label={label} required={required} description={description}>
+      <HtmlSelect
+        id={id}
+        value={typeof value === "string" ? value : ""}
+        onChange={(event: React.ChangeEvent<HTMLSelectElement>) => set(event.target.value)}
+        width="full"
+        fontSize="xs"
+        padding="1"
+        borderWidth="1px"
+        borderColor="border"
+        borderRadius="sm"
+        bg="bg.panel"
+        color="fg"
+      >
+        {!required && <option value="">(not set)</option>}
+        {(Array.isArray(node.enum) ? node.enum : []).map((option: unknown) => (
+          <option key={String(option)} value={String(option)}>
+            {String(option)}
+          </option>
+        ))}
+      </HtmlSelect>
+    </Labelled>
+  );
+};
+
+const ObjectField = ({
+  node,
+  root,
+  path,
+  label,
+  required,
+  props,
+  onChange,
+}: FieldContext): JSX.Element => {
+  const requiredKeys = new Set(
+    Array.isArray(node.required) ? node.required.map((key) => String(key)) : [],
+  );
+  const properties = isObject(node.properties) ? node.properties : {};
+  const body = Object.entries(properties).map(([key, child]) =>
+    isObject(child) ? (
+      <Field
+        key={key}
+        node={child}
+        root={root}
+        path={[...path, key]}
+        label={key}
+        required={requiredKeys.has(key)}
+        props={props}
+        onChange={onChange}
+      />
+    ) : null,
+  );
+  if (path.length === 0) return <>{body}</>;
+  return (
+    <Fieldset.Root borderWidth="1px" borderColor="border" borderRadius="md" padding={2.5}>
+      <Fieldset.Legend fontSize="xs" fontWeight="semibold">
+        {label}
+        {!required && (
+          <Text as="span" fontWeight="normal" color="fg.muted" marginLeft={1.5}>
+            optional
+          </Text>
+        )}
+      </Fieldset.Legend>
+      <Stack gap={3}>{body}</Stack>
+    </Fieldset.Root>
+  );
+};
+
+const ArrayField = ({ node, root, label, required, value, set, id }: FieldContext): JSX.Element => {
+  const items = unwrapNullable(deref(isObject(node.items) ? node.items : {}, root));
+  if (items.type === "string") {
+    const lines = Array.isArray(value) ? value.map((entry) => String(entry)) : [];
     return (
-      <Labelled id={id} label={label} required={required} description={description}>
-        <HtmlSelect
+      <Labelled id={id} label={label} required={required} description="One per line">
+        <Textarea
           id={id}
-          value={typeof value === "string" ? value : ""}
-          onChange={(event: React.ChangeEvent<HTMLSelectElement>) => set(event.target.value)}
-          width="full"
+          size="sm"
           fontSize="xs"
-          padding="1"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="sm"
-          bg="bg.panel"
-          color="fg"
-        >
-          {!required && <option value="">(not set)</option>}
-          {node.enum.map((option) => (
-            <option key={String(option)} value={String(option)}>
-              {String(option)}
-            </option>
-          ))}
-        </HtmlSelect>
+          rows={Math.max(3, lines.length + 1)}
+          value={lines.join("\n")}
+          onChange={(event) =>
+            set(event.target.value.split("\n").filter((line) => line.trim() !== ""))
+          }
+        />
       </Labelled>
     );
   }
+  return <JsonBox value={value} onChange={set} label={label} />;
+};
 
-  if (node.type === "object" && isObject(node.properties)) {
-    const requiredKeys = new Set(
-      Array.isArray(node.required) ? node.required.map((key) => String(key)) : [],
-    );
-    const body = Object.entries(node.properties).map(([key, child]) =>
-      isObject(child) ? (
-        <Field
-          key={key}
-          node={child}
-          root={root}
-          path={[...path, key]}
-          label={key}
-          required={requiredKeys.has(key)}
-          props={props}
-          onChange={onChange}
+const BooleanField = ({ label, value, set, id }: FieldContext): JSX.Element => {
+  return (
+    <Checkbox.Root
+      checked={value === true}
+      onCheckedChange={(details) => set(details.checked === true)}
+    >
+      <Checkbox.HiddenInput id={id} />
+      <Checkbox.Control>
+        <Checkbox.Indicator />
+      </Checkbox.Control>
+      <Checkbox.Label fontSize="xs">{label}</Checkbox.Label>
+    </Checkbox.Root>
+  );
+};
+
+const NumberField = ({
+  label,
+  required,
+  value,
+  set,
+  id,
+  description,
+}: FieldContext): JSX.Element => {
+  return (
+    <Labelled id={id} label={label} required={required} description={description}>
+      <HtmlInput
+        id={id}
+        type="number"
+        value={typeof value === "number" ? value : ""}
+        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+          set(event.target.value === "" ? undefined : Number(event.target.value))
+        }
+        width="full"
+        fontSize="xs"
+        padding="1.5"
+        borderWidth="1px"
+        borderColor="border"
+        borderRadius="sm"
+        bg="bg.panel"
+        color="fg"
+      />
+    </Labelled>
+  );
+};
+
+const StringField = ({
+  label,
+  required,
+  value,
+  set,
+  id,
+  description,
+}: FieldContext): JSX.Element => {
+  const text = typeof value === "string" ? value : "";
+  const multiline = text.includes("\n") || text.length > 70;
+  return (
+    <Labelled id={id} label={label} required={required} description={description}>
+      {multiline ? (
+        <Textarea
+          id={id}
+          size="sm"
+          fontSize="xs"
+          rows={4}
+          value={text}
+          onChange={(event) => set(event.target.value)}
         />
-      ) : null,
-    );
-    if (path.length === 0) return <>{body}</>;
-    return (
-      <Fieldset.Root borderWidth="1px" borderColor="border" borderRadius="md" padding={2.5}>
-        <Fieldset.Legend fontSize="xs" fontWeight="semibold">
-          {label}
-          {!required && (
-            <Text as="span" fontWeight="normal" color="fg.muted" marginLeft={1.5}>
-              optional
-            </Text>
-          )}
-        </Fieldset.Legend>
-        <Stack gap={3}>{body}</Stack>
-      </Fieldset.Root>
-    );
-  }
-
-  if (node.type === "array") {
-    const items = unwrapNullable(deref(isObject(node.items) ? node.items : {}, root));
-    if (items.type === "string") {
-      const lines = Array.isArray(value) ? value.map((entry) => String(entry)) : [];
-      return (
-        <Labelled id={id} label={label} required={required} description="One per line">
-          <Textarea
-            id={id}
-            size="sm"
-            fontSize="xs"
-            rows={Math.max(3, lines.length + 1)}
-            value={lines.join("\n")}
-            onChange={(event) =>
-              set(event.target.value.split("\n").filter((line) => line.trim() !== ""))
-            }
-          />
-        </Labelled>
-      );
-    }
-    return <JsonBox value={value} onChange={set} label={label} />;
-  }
-
-  if (node.type === "boolean") {
-    return (
-      <Checkbox.Root
-        checked={value === true}
-        onCheckedChange={(details) => set(details.checked === true)}
-      >
-        <Checkbox.HiddenInput id={id} />
-        <Checkbox.Control>
-          <Checkbox.Indicator />
-        </Checkbox.Control>
-        <Checkbox.Label fontSize="xs">{label}</Checkbox.Label>
-      </Checkbox.Root>
-    );
-  }
-
-  if (node.type === "number" || node.type === "integer") {
-    return (
-      <Labelled id={id} label={label} required={required} description={description}>
+      ) : (
         <HtmlInput
           id={id}
-          type="number"
-          value={typeof value === "number" ? value : ""}
+          type="text"
+          value={text}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-            set(event.target.value === "" ? undefined : Number(event.target.value))
+            set(event.target.value === "" && !required ? undefined : event.target.value)
           }
           width="full"
           fontSize="xs"
@@ -214,47 +308,9 @@ const Field = ({
           bg="bg.panel"
           color="fg"
         />
-      </Labelled>
-    );
-  }
-
-  if (node.type === "string") {
-    const text = typeof value === "string" ? value : "";
-    const multiline = text.includes("\n") || text.length > 70;
-    return (
-      <Labelled id={id} label={label} required={required} description={description}>
-        {multiline ? (
-          <Textarea
-            id={id}
-            size="sm"
-            fontSize="xs"
-            rows={4}
-            value={text}
-            onChange={(event) => set(event.target.value)}
-          />
-        ) : (
-          <HtmlInput
-            id={id}
-            type="text"
-            value={text}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-              set(event.target.value === "" && !required ? undefined : event.target.value)
-            }
-            width="full"
-            fontSize="xs"
-            padding="1.5"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="sm"
-            bg="bg.panel"
-            color="fg"
-          />
-        )}
-      </Labelled>
-    );
-  }
-
-  return <JsonBox value={value} onChange={set} label={label} />;
+      )}
+    </Labelled>
+  );
 };
 
 const Labelled = ({

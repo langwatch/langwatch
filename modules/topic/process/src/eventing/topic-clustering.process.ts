@@ -9,13 +9,17 @@ import type {
 } from "@langwatch/eventing";
 import { Temporal, toDate } from "@langwatch/time";
 import {
-  TOPIC_CLUSTERING_EVENT_TYPES,
   TOPIC_CLUSTERING_STALE_RUN_MS,
   topicClusteringSearchAfterSchema,
 } from "@langwatch/topic-contract";
 import { z } from "zod";
 
 import type { TopicClusteringProcessingEvent } from "../services/topic-events.service.ts";
+import {
+  TopicClusteringRequestedEventSchema,
+  TopicClusteringRunCompletedEventSchema,
+  TopicClusteringRunFailedEventSchema,
+} from "../services/topic-events.service.ts";
 import {
   createTopicClusteringRunHandler,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,
@@ -197,20 +201,16 @@ export class TopicClusteringProcess {
           topicClusteringRunIntentSchema,
           createTopicClusteringRunHandler(dispatch),
         )
-        .on(
-          TOPIC_CLUSTERING_EVENT_TYPES.REQUESTED,
-          TopicClusteringProcess.handleClusteringRequested,
+        .toPayload(topicClusteringProcessEventViewSchema, (...args) =>
+          TopicClusteringProcess.buildProcessEventView(...args),
         )
+        .on(TopicClusteringRequestedEventSchema, TopicClusteringProcess.handleClusteringRequested)
         .on(
-          TOPIC_CLUSTERING_EVENT_TYPES.RUN_COMPLETED,
+          TopicClusteringRunCompletedEventSchema,
           TopicClusteringProcess.handleClusteringRunCompleted,
         )
-        .on(
-          TOPIC_CLUSTERING_EVENT_TYPES.RUN_FAILED,
-          TopicClusteringProcess.handleClusteringRunFailed,
-        )
+        .on(TopicClusteringRunFailedEventSchema, TopicClusteringProcess.handleClusteringRunFailed)
         .onWake(TopicClusteringProcess.topicClusteringWake)
-        .toPayload((...args) => TopicClusteringProcess.buildProcessEventView(...args))
         .outbox({
           // 3 attempts, then the failure is recorded durably (the executor
           // owns the final-attempt record; the cap here is the backstop for
@@ -255,7 +255,7 @@ export class TopicClusteringProcess {
       },
       refMs,
       [
-        ctx.intents.run(`run:${runId}:page-1`, {
+        ctx.intent("run", `run:${runId}:page-1`, {
           runId,
           page: 1,
           searchAfter: null,
@@ -302,7 +302,7 @@ export class TopicClusteringProcess {
       },
       refMs,
       [
-        ctx.intents.run(`run:${view.runId}:page-${nextPage}`, {
+        ctx.intent("run", `run:${view.runId}:page-${nextPage}`, {
           runId: view.runId,
           page: nextPage,
           searchAfter: view.nextSearchAfter,
@@ -359,7 +359,7 @@ export class TopicClusteringProcess {
       },
       refMs,
       [
-        ctx.intents.run(`run:${runId}:page-1`, {
+        ctx.intent("run", `run:${runId}:page-1`, {
           runId,
           page: 1,
           searchAfter: null,

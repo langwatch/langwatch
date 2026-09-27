@@ -4,6 +4,7 @@ import {
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
 import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import type { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
 
@@ -12,7 +13,7 @@ import type { RetroactiveRetentionRepository } from "../retroactive-retention.re
  * refuse concurrent rewrites like the live store does.
  */
 export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentionRepository {
-  static create(now: () => Date = () => new Date()): MemoryRetroactiveRetentionRepository {
+  static create(now: () => Instant = nowInstant): MemoryRetroactiveRetentionRepository {
     return new MemoryRetroactiveRetentionRepository(now);
   }
 
@@ -20,7 +21,7 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
   readonly #mutations = new Map<string, RetroactiveMutationProgress[]>();
   #nextId = 1;
 
-  private constructor(private readonly now: () => Date) {}
+  private constructor(private readonly now: () => Instant) {}
 
   async triggerUpdate(input: {
     projectId: string;
@@ -43,7 +44,7 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
         table,
         isDone: false,
         partsToDo: 1,
-        createTime: this.now().toISOString().slice(0, 19),
+        createTime: toDate(this.now()).toISOString().slice(0, 19),
         category: input.category,
       })),
     );

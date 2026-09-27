@@ -85,7 +85,7 @@ export const connectionTeardownWake: WakeHandler<
     state: CONNECTION_TEARDOWN_INITIAL_STATE,
     nextWakeAt: null,
     intents: [
-      ctx.intents.completeTeardown(`teardown:${state.tearDownAfterMs}`, {
+      ctx.intent("completeTeardown", `teardown:${state.tearDownAfterMs}`, {
         connectionId: ctx.key,
         organizationId: ctx.projectId,
         scheduledFor: state.tearDownAfterMs,

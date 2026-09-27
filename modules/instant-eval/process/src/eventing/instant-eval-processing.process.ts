@@ -6,12 +6,17 @@
 
 import type { ProcessManagerApplier } from "@langwatch/eventing";
 import {
-  INSTANT_EVAL_EVENT_TYPES,
   type InstantEvalProcessingEvent,
+  instantEvalRequestedEventSchema,
+  instantEvalPlannedEventSchema,
+  instantEvalPageJudgedEventSchema,
+  instantEvalCancelRequestedEventSchema,
+  instantEvalFinishedEventSchema,
 } from "@langwatch/instant-eval-contract";
 
 import {
   INITIAL_INSTANT_EVAL_STATE,
+  instantEvalProcessEventViewSchema,
   instantEvalProcessStateSchema,
   INSTANT_EVAL_PROCESS_INTENT_TYPES,
   instantEvalFinishIntentSchema,
@@ -58,13 +63,13 @@ export function instantEvalProcessManager(
         instantEvalFinishIntentSchema,
         createInstantEvalFinishHandler(dispatch),
       )
-      .on(INSTANT_EVAL_EVENT_TYPES.REQUESTED, handleInstantEvalRequested)
-      .on(INSTANT_EVAL_EVENT_TYPES.PLANNED, handleInstantEvalPlanned)
-      .on(INSTANT_EVAL_EVENT_TYPES.PAGE_JUDGED, handleInstantEvalPageJudged)
-      .on(INSTANT_EVAL_EVENT_TYPES.CANCEL_REQUESTED, handleInstantEvalCancelRequested)
-      .on(INSTANT_EVAL_EVENT_TYPES.FINISHED, handleInstantEvalFinished)
+      .toPayload(instantEvalProcessEventViewSchema, buildInstantEvalProcessEventView)
+      .on(instantEvalRequestedEventSchema, handleInstantEvalRequested)
+      .on(instantEvalPlannedEventSchema, handleInstantEvalPlanned)
+      .on(instantEvalPageJudgedEventSchema, handleInstantEvalPageJudged)
+      .on(instantEvalCancelRequestedEventSchema, handleInstantEvalCancelRequested)
+      .on(instantEvalFinishedEventSchema, handleInstantEvalFinished)
       .onWake(instantEvalWake)
-      .toPayload(buildInstantEvalProcessEventView)
       .outbox({
         maxAttempts: INSTANT_EVAL_MAX_ATTEMPTS,
         // Far longer than a healthy page, because a lease that expires

@@ -40,13 +40,13 @@ export class MemoryShareRepository implements ShareRepository {
   }
 
   async findById({ id, projectId }: ShareLinkScope): Promise<ShareWithProject | null> {
-    const link = this.#database.link(id, projectId);
+    const [link] = this.#database.findLinks({ id, projectId });
 
     return link ? shareWithProjectSchema.parse(this.#database.withProject(link)) : null;
   }
 
   async existsById({ id, projectId }: ShareLinkScope): Promise<boolean> {
-    return this.#database.link(id, projectId) !== void 0;
+    return this.#database.findLinks({ id, projectId }).length > 0;
   }
 
   async findAllByResource(scope: ShareResourceScope): Promise<ShareLink[]> {
@@ -85,7 +85,7 @@ export class MemoryShareRepository implements ShareRepository {
   }
 
   async consumeView({ id, projectId, maxViews }: ConsumeShareViewParams): Promise<boolean> {
-    const link = this.#database.link(id, projectId);
+    const [link] = this.#database.findLinks({ id, projectId });
     if (!link) return false;
     if (maxViews != null && link.viewCount >= maxViews) return false;
 

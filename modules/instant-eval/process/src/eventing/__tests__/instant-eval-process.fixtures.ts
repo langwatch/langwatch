@@ -6,6 +6,7 @@
  */
 
 import type { ProcessHandlerContext, ProcessIntent } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 
 import {
   INITIAL_INSTANT_EVAL_STATE,
@@ -46,11 +47,11 @@ export function context(now = NOW): {
       projectId: PROJECT_ID,
       // Keyed by the intent names the process declares, so a renamed intent
       // fails to typecheck here rather than silently recording nothing.
-      intents: {
+      intent: intentAccessorOf({
         plan: factory("plan"),
         judgePage: factory("judgePage"),
         finish: factory("finish"),
-      },
+      }),
     },
   };
 }

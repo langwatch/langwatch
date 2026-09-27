@@ -10,13 +10,13 @@ import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 import {
   eventMatches,
-  WEBHOOK_SPEND_DELIVERY_REQUESTED_EVENT_TYPE,
   type WebhookEndpointView,
   type WebhookSpendEventRow,
 } from "@langwatch/webhook-contract";
 
 import type { WebhookDispatchChannel } from "../channels/webhook-dispatch.channel.ts";
 import type { WebhookSpendDeliveryRequestedEvent } from "../eventing/webhook-spend-delivery.intent.ts";
+import { webhookSpendDeliveryRequestedEventSchema } from "../eventing/webhook-spend-delivery.intent.ts";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
@@ -157,7 +157,7 @@ export class WebhookDeliveryService {
         .intent("deliver", deliverSchema, this.runDeliver())
         .intent("flushEndpoint", flushEndpointSchema, this.runFlushEndpoint())
         .intent("sendBatch", sendBatchSchema, this.runWebhookSendBatch())
-        .on(WEBHOOK_SPEND_DELIVERY_REQUESTED_EVENT_TYPE, (state, { spend }, context) => {
+        .on(webhookSpendDeliveryRequestedEventSchema, (state, { spend }, context) => {
           switch (spend.type) {
             case GATEWAY_SPEND_ADMITTED_EVENT_TYPE:
               return onAdmission({ state, ctx: context, admit: spend.data });
@@ -196,7 +196,7 @@ export class WebhookDeliveryService {
           return {
             state,
             intents: [
-              context.intents.flushEndpoint(`flush:${context.at}`, {
+              context.intent("flushEndpoint", `flush:${context.at}`, {
                 ...target,
                 scheduledFor: context.at,
               }),

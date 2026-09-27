@@ -66,6 +66,149 @@ interface RegistryRowProps<TRow> {
   "data-index"?: number;
 }
 
+type RowStyle = (typeof ROW_STYLES)[keyof typeof ROW_STYLES];
+type AddonDef<TRow> = NonNullable<Registry<TRow>["addons"][string]>;
+
+/**
+ * The evals cell grows tall when many evaluators ran, so it spans down into
+ * the IO preview's empty corner. A rowSpan reaches only the next row, so this
+ * holds only when io-preview renders first. -1 when it does not span.
+ */
+function evalsRowSpanIndex<TRow>({
+  visibleCells,
+  renderedAddons,
+  isLoading,
+}: {
+  visibleCells: { column: { id: string } }[];
+  renderedAddons: AddonDef<TRow>[];
+  isLoading: boolean;
+}): number {
+  if (isLoading || renderedAddons[0]?.id !== "io-preview") return -1;
+  return visibleCells.findIndex((c) => c.column.id === "evaluations");
+}
+
+/** The registered addons this row renders now, in the order they were enabled. */
+function renderableAddons<TRow>({
+  addons,
+  registry,
+  row,
+  isExpanded,
+  densityMode,
+}: {
+  addons: string[];
+  registry: Registry<TRow>;
+  row: TRow;
+  isExpanded: boolean;
+  densityMode: ReturnType<typeof useDensityStore.getState>["density"];
+}): AddonDef<TRow>[] {
+  return addons.flatMap((id) => {
+    const def = registry.addons[id];
+    return def?.shouldRender({ row, isExpanded, densityMode }) ? [def] : [];
+  });
+}
+
+/**
+ * One main-row cell. Borders sit on each cell because the table runs under
+ * `border-collapse: separate`, where row borders never render; a cell that
+ * spans into the IO preview below paints the border that row would have.
+ */
+function RowCell<TRow>({
+  cell,
+  index,
+  style,
+  unifiedBg,
+  firstCellBg,
+  spansIntoAddon,
+  ownsBottomBorder,
+  isFirstOfErrorRun,
+  isSelectCell,
+  contentPadding,
+  children,
+}: {
+  cell: ReturnType<Row<TRow>["getVisibleCells"]>[number];
+  index: number;
+  style: RowStyle;
+  unifiedBg: boolean;
+  firstCellBg: string | undefined;
+  spansIntoAddon: boolean;
+  ownsBottomBorder: boolean;
+  isFirstOfErrorRun: boolean;
+  isSelectCell: boolean;
+  contentPadding: string;
+  children: React.ReactNode;
+}) {
+  const hasBottomBorder = spansIntoAddon || ownsBottomBorder;
+  return (
+    <Td
+      bg={unifiedBg ? style.bg : undefined}
+      // The sticky first column's background is forced by a shell rule no token
+      // prop beats, so the expanded surface goes on inline.
+      style={firstCellBg ? { backgroundColor: firstCellBg } : undefined}
+      rowSpan={spansIntoAddon ? 2 : undefined}
+      verticalAlign={spansIntoAddon ? "top" : undefined}
+      borderBottomWidth={hasBottomBorder ? "1px" : undefined}
+      borderBottomColor={hasBottomBorder ? style.bottomSeparatorColor : undefined}
+      borderTopWidth={isFirstOfErrorRun ? "1px" : undefined}
+      borderTopColor={isFirstOfErrorRun ? style.bottomSeparatorColor : undefined}
+      // Select cells own their padding, so a click anywhere in them hits the checkbox.
+      padding={isSelectCell ? 0 : contentPadding}
+      cursor={isSelectCell ? "pointer" : undefined}
+      // Long unbreakable strings would otherwise bleed into the next column.
+      overflow="hidden"
+      {...cellPropsFor({ cell, leftBorderColor: style.borderColor, index })}
+    >
+      {children}
+    </Td>
+  );
+}
+
+function LoadingCell({
+  isSelectCell,
+  meta,
+  rowIdx,
+  colIdx,
+}: {
+  isSelectCell: boolean;
+  meta: ColumnMeta | undefined;
+  rowIdx: number;
+  colIdx: number;
+}) {
+  if (isSelectCell) return <SkeletonSelectCell />;
+  return <SkeletonCellContent meta={meta} rowIdx={rowIdx} colIdx={colIdx} />;
+}
+
+/**
+ * The placeholder addon row. Its padding is trimmed by the 2px the skeleton
+ * main row gains, so row plus addon matches the real height once data lands.
+ */
+function SkeletonAddon({
+  colCount,
+  style,
+  tokens,
+  rowIdx,
+}: {
+  colCount: number;
+  style: RowStyle;
+  tokens: ReturnType<typeof useDensityTokens>;
+  rowIdx: number;
+}) {
+  return (
+    <Tr>
+      <Td
+        colSpan={colCount}
+        bg={style.bg}
+        padding={`calc(${tokens.ioPaddingTop} - 2px) 8px calc(${tokens.ioPaddingBottom} - 2px) 76px`}
+        borderLeftWidth="2px"
+        borderLeftColor={style.borderColor}
+        borderBottomWidth="1px"
+        borderBottomColor={style.bottomSeparatorColor}
+      >
+        <SkeletonAddonRow rowIdx={rowIdx} />
+      </Td>
+    </Tr>
+  );
+}
+
 function RegistryRowComponent<TRow>({
   tanstackRow,
   registry,
@@ -104,17 +247,7 @@ function RegistryRowComponent<TRow>({
 
   const renderedAddons = useMemo(
     () =>
-      addons
-        .map((id) => registry.addons[id])
-        .filter(
-          (def): def is NonNullable<typeof def> =>
-            Boolean(def) &&
-            def!.shouldRender({
-              row: tanstackRow.original,
-              isExpanded,
-              densityMode,
-            }),
-        ),
+      renderableAddons({ addons, registry, row: tanstackRow.original, isExpanded, densityMode }),
     [addons, registry, tanstackRow.original, isExpanded, densityMode],
   );
   // While loading, always render one placeholder addon row so the row's
@@ -122,34 +255,17 @@ function RegistryRowComponent<TRow>({
   // is the common-case addon and dominates the row's height).
   const hasAddons = isLoading || renderedAddons.length > 0;
 
-  // The evals column tends to grow tall when many evaluators ran (chips wrap to
-  // multiple lines), while the IO preview addon directly below wastes the bottom-right
-  // corner with empty space under the same column.
   const evalsCellIdx = useMemo(
-    () => visibleCells.findIndex((c) => c.column.id === "evaluations"),
-    [visibleCells],
+    () => evalsRowSpanIndex({ visibleCells, renderedAddons, isLoading }),
+    [visibleCells, renderedAddons, isLoading],
   );
-  // `rowSpan=2` spans the immediately-following row only. If another addon (e.g.
-  // error-detail) is registered before io-preview, the claim would land on that row
-  // instead and the eval cell would punch through the wrong section of the table.
-  const ioPreviewWillRender = useMemo(
-    () => renderedAddons[0]?.id === "io-preview",
-    [renderedAddons],
-  );
-  const evalsRowSpansIntoIOPreview = !isLoading && evalsCellIdx >= 0 && ioPreviewWillRender;
   const rowSpanClaimedIndices = useMemo(
-    () => (evalsRowSpansIntoIOPreview ? [evalsCellIdx] : []),
-    [evalsRowSpansIntoIOPreview, evalsCellIdx],
+    () => (evalsCellIdx >= 0 ? [evalsCellIdx] : []),
+    [evalsCellIdx],
   );
   const skeletonRowIdx = dataIndex ?? 0;
 
-  const handleRowClick = () => {
-    if (onSelect) {
-      onSelect();
-    } else if (onToggleExpand) {
-      onToggleExpand();
-    }
-  };
+  const handleRowClick = () => (onSelect ?? onToggleExpand)?.();
 
   // Expanded split-scope rows (conversation / group) paint a recessed
   // surface so the header row reads as part of the same block as its
@@ -162,7 +278,7 @@ function RegistryRowComponent<TRow>({
   const contentPadding = isLoading
     ? `calc(${tokens.rowPaddingY} + 2px) 8px`
     : `${tokens.rowPaddingY} 8px`;
-  const splitRowBg = showExpandedBg ? expandedBg!.surface : style.bg;
+  const splitRowBg = showExpandedBg ? expandedBg.surface : style.bg;
   const splitRowHoverBg = showExpandedBg ? undefined : { bg: style.hoverBg };
 
   const mainRow = (
@@ -181,49 +297,28 @@ function RegistryRowComponent<TRow>({
     >
       {visibleCells.map((cell, i) => {
         const isSelectCell = cell.column.id === SELECT_COLUMN_ID;
-        const isEvalsRowSpanCell = evalsRowSpansIntoIOPreview && i === evalsCellIdx;
-        const meta = cell.column.columnDef.meta as ColumnMeta | undefined;
         return (
-          <Td
+          <RowCell
             key={cell.id}
-            bg={hoverScope === "unified" ? style.bg : undefined}
-            // The sticky first column's background is forced by a high-
-            // specificity shell rule that a token prop can't beat, so the
-            // expanded recessed surface goes on inline to keep that cell in
-            // step with the rest of the header row.
-            style={
-              i === 0 && showExpandedBg ? { backgroundColor: expandedBg!.firstCell } : undefined
-            }
-            // When this cell rowSpans into the IO preview row below, it
-            // needs to paint the bottom border that the IO preview row
-            // would otherwise own on this column slot — the addon row
-            // never gets a chance to render a TD here.
-            rowSpan={isEvalsRowSpanCell ? 2 : undefined}
-            verticalAlign={isEvalsRowSpanCell ? "top" : undefined}
-            // Borders go on each TD instead of the Tr because the table runs under
-            // `border-collapse: separate` — under that mode browsers ignore TR-level
-            // borders, only TD borders render.
-            borderBottomWidth={isEvalsRowSpanCell || !hasAddons ? "1px" : undefined}
-            borderBottomColor={
-              isEvalsRowSpanCell || !hasAddons ? style.bottomSeparatorColor : undefined
-            }
-            borderTopWidth={isFirstOfErrorRun ? "1px" : undefined}
-            borderTopColor={isFirstOfErrorRun ? style.bottomSeparatorColor : undefined}
-            // Select cells own their full padding so clicks anywhere inside the cell
-            // (including the edge padding) hit the checkbox Box, not the Td.
-            padding={isSelectCell ? 0 : contentPadding}
-            cursor={isSelectCell ? "pointer" : undefined}
-            // Clip whatever the cell renders at the column boundary — long unbreakable
-            // strings (trace IDs, model slugs, error messages) will otherwise visually
-            // bleed across the right border and overlap the next cell's content.
-            overflow="hidden"
-            {...cellPropsFor({ cell, leftBorderColor: style.borderColor, index: i })}
+            cell={cell}
+            index={i}
+            style={style}
+            unifiedBg={hoverScope === "unified"}
+            firstCellBg={i === 0 && showExpandedBg ? expandedBg?.firstCell : undefined}
+            spansIntoAddon={i === evalsCellIdx}
+            ownsBottomBorder={!hasAddons}
+            isFirstOfErrorRun={isFirstOfErrorRun}
+            isSelectCell={isSelectCell}
+            contentPadding={contentPadding}
           >
-            {isLoading && isSelectCell && <SkeletonSelectCell />}
-            {isLoading && !isSelectCell && (
-              <SkeletonCellContent meta={meta} rowIdx={skeletonRowIdx} colIdx={i} />
-            )}
-            {!isLoading &&
+            {isLoading ? (
+              <LoadingCell
+                isSelectCell={isSelectCell}
+                meta={cell.column.columnDef.meta as ColumnMeta | undefined}
+                rowIdx={skeletonRowIdx}
+                colIdx={i}
+              />
+            ) : (
               pickCell({
                 registry,
                 id: cell.column.id,
@@ -238,31 +333,16 @@ function RegistryRowComponent<TRow>({
                   actions,
                   enabledAddonIds: addons,
                 },
-              })}
-          </Td>
+              })
+            )}
+          </RowCell>
         );
       })}
     </Tr>
   );
 
   const addonRows = isLoading ? (
-    <Tr>
-      <Td
-        colSpan={colCount}
-        bg={style.bg}
-        // Mirror image of the main-row bump: trim 2px off the
-        // skeleton addon's vertical padding so the combined
-        // skeleton (row + addon) height matches the real
-        // (row + IO preview) height once data lands.
-        padding={`calc(${tokens.ioPaddingTop} - 2px) 8px calc(${tokens.ioPaddingBottom} - 2px) 76px`}
-        borderLeftWidth="2px"
-        borderLeftColor={style.borderColor}
-        borderBottomWidth="1px"
-        borderBottomColor={style.bottomSeparatorColor}
-      >
-        <SkeletonAddonRow rowIdx={skeletonRowIdx} />
-      </Td>
-    </Tr>
+    <SkeletonAddon colCount={colCount} style={style} tokens={tokens} rowIdx={skeletonRowIdx} />
   ) : (
     renderedAddons.map((addon) => (
       <React.Fragment key={addon.id}>

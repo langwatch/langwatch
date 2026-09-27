@@ -5,6 +5,7 @@
  * @see specs/instant-evals/instant-eval-billing.feature
  */
 
+import type { Instant } from "@langwatch/time";
 import {
   INSTANT_EVAL_REQUEST_TYPE,
   type InstantEvalPricing,
@@ -46,7 +47,7 @@ export interface InstantEvalSpendRecord {
   readonly costUsd: number;
   /** What the customer is charged, in USD: the cost at the published markup. */
   readonly priceUsd: number;
-  readonly occurredAt: Date;
+  readonly occurredAt: Instant;
 }
 
 /** Who a project's spend is billed against. */
@@ -135,6 +136,6 @@ export function instantEvalPricedSpend({
     // ledger charges, caps and reports.
     costNanoUsd: usdToNanoUsd(record.priceUsd),
     metadata: instantEvalSpendMetadata(record),
-    occurredAt: record.occurredAt.getTime(),
+    occurredAt: record.occurredAt.epochMilliseconds,
   };
 }

@@ -8,10 +8,14 @@ import type {
   NavigationOrganization,
   NavigationTeam,
 } from "@langwatch/navigation-browser/navigation";
-import {
-  selectAmbientTeam,
-  userCanOpenTeam,
-} from "@langwatch/organization-browser/surfaces/scope-capability";
+
+import type { UiRootCapabilities } from "./ui-root-capabilities";
+
+/** Organization's team rules, handed in from its loaded scope capability. */
+export type NavigationTeamRules = Pick<
+  UiRootCapabilities["scope"],
+  "selectAmbientTeam" | "userCanOpenTeam"
+>;
 
 /** `organization.getAll` as it arrives, including what only presence reads. */
 export type NavigationGraphRead = readonly {
@@ -92,15 +96,17 @@ export function openableTeamsOf({
   organization,
   userId,
   organizationRole,
+  teamRules,
 }: {
   organization: NavigationOrganization | undefined;
   userId: string | undefined;
   organizationRole: string | undefined;
+  teamRules: NavigationTeamRules;
 }): readonly NavigationTeam[] {
   const reachable = (organization?.teams ?? []).filter((team) =>
-    userCanOpenTeam({ team, userId, organizationRole }),
+    teamRules.userCanOpenTeam({ team, userId, organizationRole }),
   );
-  const ambient = selectAmbientTeam({ teams: reachable, userId });
+  const ambient = teamRules.selectAmbientTeam({ teams: reachable, userId });
   if (!ambient) return reachable;
   return [ambient, ...reachable.filter((team) => team.id !== ambient.id)];
 }

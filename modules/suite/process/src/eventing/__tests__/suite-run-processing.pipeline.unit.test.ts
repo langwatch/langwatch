@@ -1,4 +1,4 @@
-import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -63,19 +63,18 @@ function compose(
     suiteRunStateFoldStore,
   });
 
-  return { pipeline, insert, clickhouse, redis, set };
+  return { pipeline, suiteRunStateFoldStore, insert, clickhouse, redis, set };
 }
 
-function runStateStore(
-  pipeline: SuiteRunProcessingPipeline,
-): FoldProjectionStore<SuiteRunStateData> {
+/** Stores a folded state through the store the pipeline registered for its suiteRunState fold. */
+async function storeThrough({
+  pipeline,
+  suiteRunStateFoldStore,
+}: ReturnType<typeof compose>): Promise<void> {
   const fold = pipeline.foldProjections.get("suiteRunState");
   expect(fold, "the pipeline registered no suiteRunState fold").toBeDefined();
-  return (fold!.definition as unknown as { store: FoldProjectionStore<SuiteRunStateData> }).store;
-}
-
-async function storeThrough(pipeline: SuiteRunProcessingPipeline): Promise<void> {
-  await runStateStore(pipeline).store(foldedState(), {
+  fold!.open((definition) => expect(definition.store).toBe(suiteRunStateFoldStore));
+  await suiteRunStateFoldStore.store(foldedState(), {
     aggregateId: "batch_1",
     tenantId: createTenantId("project_alpha"),
   });
@@ -110,9 +109,10 @@ describe("ClickHouseSuiteRunProcessingAdapter", () => {
   describe("when a suite run's folded state is stored", () => {
     /** @scenario "Suite-run state is written through the client this graph resolved" */
     it("names the tenant the state names, and the table it belongs in", async () => {
-      const { pipeline, insert } = compose();
+      const composed = compose();
+      const { insert } = composed;
 
-      await storeThrough(pipeline);
+      await storeThrough(composed);
 
       // The batch names its tenant, and the process's one client routes it
       // there. A pipeline that wrote without naming one registers the
@@ -123,9 +123,10 @@ describe("ClickHouseSuiteRunProcessingAdapter", () => {
 
     /** @scenario "Suite-run state is written through the client this graph resolved" */
     it("stamps the row with the retention the substrate already carries", async () => {
-      const { pipeline, insert } = compose();
+      const composed = compose();
+      const { insert } = composed;
 
-      await storeThrough(pipeline);
+      await storeThrough(composed);
 
       // 49 is the `defaultRetentionDays` this adapter was composed with, not a
       // number configured a second time. Two graphs stamping different
@@ -139,9 +140,10 @@ describe("ClickHouseSuiteRunProcessingAdapter", () => {
 
     /** @scenario "Both graphs cache the run-state fold under one keyspace" */
     it("writes the cache entry under the keyspace the App also reads", async () => {
-      const { pipeline, set } = compose();
+      const composed = compose();
+      const { set } = composed;
 
-      await storeThrough(pipeline);
+      await storeThrough(composed);
 
       // Frozen twin: `PipelineRegistry.registerSuiteRunPipeline` caches under
       // `suite_runs` too, and the two graphs share one Redis. A prefix that
@@ -153,18 +155,20 @@ describe("ClickHouseSuiteRunProcessingAdapter", () => {
   describe("given a fold cache TTL named by the process", () => {
     /** @scenario "Producer and consumer honour one fold cache TTL" */
     it("writes cache entries with that TTL", async () => {
-      const { pipeline, set } = compose({ foldCacheTtlSeconds: 900 });
+      const composed = compose({ foldCacheTtlSeconds: 900 });
+      const { set } = composed;
 
-      await storeThrough(pipeline);
+      await storeThrough(composed);
 
       expect(set.mock.calls[0]!.slice(2)).toEqual(["EX", 900]);
     });
 
     /** @scenario "Producer and consumer honour one fold cache TTL" */
     it("falls back to the replication-lag floor when the process names none", async () => {
-      const { pipeline, set } = compose();
+      const composed = compose();
+      const { set } = composed;
 
-      await storeThrough(pipeline);
+      await storeThrough(composed);
 
       expect(set.mock.calls[0]!.slice(2)).toEqual(["EX", FOLD_CACHE_FLOOR_SECONDS]);
     });

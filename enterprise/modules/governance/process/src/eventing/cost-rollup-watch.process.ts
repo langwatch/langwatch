@@ -1,7 +1,8 @@
 import {
-  PULLED_USAGE_EVENT_TYPES,
   type PulledUsageObservedEvent,
   type PulledUsageRetractedEvent,
+  pulledUsageObservedEventSchema,
+  pulledUsageRetractedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import type { Event, ProcessManagerApplier } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -14,6 +15,11 @@ import {
   CostRollupWatchIntent,
   compareCostRollupDaySchema,
 } from "./cost-rollup-watch.intent.ts";
+
+/** What a watched charge leaves the process: its moment, which the handler checks is finite. */
+const costRollupWatchPayloadSchema = z.object({
+  occurredAtMs: z.custom<number>((value) => typeof value === "number").nullable(),
+});
 
 const logger = createLogger("langwatch:governance:cost-rollup:watch");
 
@@ -148,13 +154,22 @@ export class CostRollupWatchProcess {
         .intent("compareDay", compareCostRollupDaySchema, (payload, context) =>
           this.intent.execute(payload, { attempt: context.attempt }),
         )
-        .on(PULLED_USAGE_EVENT_TYPES.OBSERVED, (state, data, context) =>
+        .toPayload(costRollupWatchPayloadSchema, (event) => {
+          const occurredAtMs = (event.data as { occurredAtMs?: unknown } | null)?.occurredAtMs;
+          return {
+            occurredAtMs:
+              typeof occurredAtMs === "number" && Number.isFinite(occurredAtMs)
+                ? occurredAtMs
+                : null,
+          };
+        })
+        .on(pulledUsageObservedEventSchema, (state, data, context) =>
           mark(state, data, context.now),
         )
         // A retraction dates the day it CORRECTS, and may arrive before the
         // observation it answers — separate streams. Marking handles that
         // without noticing, because a day is a day either way.
-        .on(PULLED_USAGE_EVENT_TYPES.RETRACTED, (state, data, context) =>
+        .on(pulledUsageRetractedEventSchema, (state, data, context) =>
           mark(state, data, context.now),
         )
         .onWake((state, context) => ({
@@ -171,7 +186,7 @@ export class CostRollupWatchProcess {
           // week is a new question, the counter so a re-mark inside one slot
           // does not collide with the request made here.
           intents: (state.pendingDays ?? []).map((day) =>
-            context.intents.compareDay(`compare:${day}:${context.at}:${state.marks ?? 0}`, {
+            context.intent("compareDay", `compare:${day}:${context.at}:${state.marks ?? 0}`, {
               tenantId: context.projectId,
               day,
               costSource: this.comparer.costSource,
@@ -182,15 +197,6 @@ export class CostRollupWatchProcess {
         // The content boundary: the process needs the moment and nothing else,
         // and a value that is not a finite number is narrowed to null here
         // rather than written into state and read back as garbage.
-        .toPayload((event) => {
-          const occurredAtMs = (event.data as { occurredAtMs?: unknown } | null)?.occurredAtMs;
-          return {
-            occurredAtMs:
-              typeof occurredAtMs === "number" && Number.isFinite(occurredAtMs)
-                ? occurredAtMs
-                : null,
-          };
-        })
         .outbox({
           maxAttempts: COST_ROLLUP_WATCH_MAX_ATTEMPTS,
           // ~30s, 1m, 2m, 4m: long enough to ride out a ClickHouse restart,

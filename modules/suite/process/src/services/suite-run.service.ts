@@ -47,6 +47,7 @@ import {
   TARGET_SECRET_REFUSAL,
   targetsOverrideASecret,
 } from "../rules/suite-target.rules.ts";
+import { AgentOwnerNamesService } from "./agent-owner-names.service.ts";
 import { ConnectedTargetService } from "./connected-target.service.ts";
 import { SuiteRunScopeService } from "./suite-run-scope.service.ts";
 import type { SuiteServiceOptions } from "./suite.service.ts";
@@ -454,13 +455,12 @@ export class SuiteRunService {
 
     // A connected target may be named `<name>@<environment>`; from here on
     // every target names an id, so two spellings of one agent fold together.
-    const namedTargets = await ConnectedTargetService.resolveConnectedReferences({
-      targets,
-      projectId,
-      actor,
+    const connected = ConnectedTargetService.create({
       agents,
+      owners: AgentOwnerNamesService.create(agents),
       ...(this.options.connectedPresence ? { presence: this.options.connectedPresence } : {}),
     });
+    const namedTargets = await connected.resolveConnectedReferences({ targets, projectId, actor });
     const targetResolution = await this.scope.resolveTargetReferences({
       targets: sortTargets ? sortSuiteTargets(namedTargets) : namedTargets,
       projectId,
@@ -478,10 +478,9 @@ export class SuiteRunService {
       throw new AllTargetsArchivedError();
     }
 
-    await ConnectedTargetService.assertConnectedAgentsRunnable({
+    await connected.assertConnectedAgentsRunnable({
       agents: targetResolution.connectedAgents,
       actor,
-      owners: ConnectedTargetService.agentOwnerNameReader(agents),
     });
 
     return { scenarioResolution, targetResolution, namedTargets };

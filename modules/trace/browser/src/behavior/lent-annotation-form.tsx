@@ -4,7 +4,6 @@ import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
 import type {
   UiAnnotateBodyProps,
   UiAnnotationFormFooterProps,
-  UiAnnotationScoreEditorProps,
   UiSuggestBodyProps,
 } from "@langwatch/browser-host/declarations";
 import { lazy, Suspense, useMemo } from "react";
@@ -50,23 +49,6 @@ export function FormFooter(props: UiAnnotationFormFooterProps) {
     () =>
       declarations
         .declared("annotationFormFooter")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
-}
-
-/** Annotation's score editor, rendered as annotation lends it. */
-export function AnnotationScoreEditor(props: UiAnnotationScoreEditorProps) {
-  const declarations = useUiDeclarations();
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("annotationScoreEditor")
         .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
     [declarations],
   );

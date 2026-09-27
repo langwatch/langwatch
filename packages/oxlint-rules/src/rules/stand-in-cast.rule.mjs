@@ -3,6 +3,8 @@ import { defineRule } from "../define-rule.mjs";
 // `x as unknown as T` is a type hole: in production fix the type or parse at
 // the seam; in a test build a typed stub. A lone `as any` is left to
 // `typescript/no-explicit-any`, and `x as const as T` only widens a literal.
+// A test may mark a cast that feeds the code under test a wrong-typed input on
+// purpose; the marker, not the test's name, is honoured (Alex, 2026-09-27).
 
 const GOVERNED = /^(?:enterprise\/modules|modules|apps|packages)\//;
 
@@ -11,6 +13,28 @@ function isGovernedSource(file) {
 }
 
 const WHITESPACE = /\s+/g;
+const LINE_COMMENT = /^\s*\/\//;
+const WRONG_TYPED_INPUT_MARKER = /^\s*\/\/\s*wrong-typed input:\s*\S/;
+const STATEMENT_CONTAINERS = new Set(["Program", "BlockStatement", "StaticBlock", "SwitchCase"]);
+
+/** The statement a node sits in, as its own line of code reads it. */
+function statementOf(node) {
+  let current = node;
+  while (current.parent && !STATEMENT_CONTAINERS.has(current.parent.type)) current = current.parent;
+
+  return current;
+}
+
+/** Whether the `//` block directly above this cast's statement marks it a wrong-typed input. */
+function isMarkedWrongTypedInput(source, node) {
+  const lines = source.slice(0, statementOf(node).start).split("\n");
+  lines.pop();
+  for (let index = lines.length - 1; index >= 0 && LINE_COMMENT.test(lines[index]); index -= 1) {
+    if (WRONG_TYPED_INPUT_MARKER.test(lines[index])) return true;
+  }
+
+  return false;
+}
 const NAME_BUDGET = 40;
 
 /** The type as the reader sees it written, so the message quotes the source. */
@@ -41,8 +65,8 @@ export const standInCastRule = defineRule({
     },
     doubleCastInTest: {
       what: "`as {{through}} as {{target}}` forces this test value to {{target}} without checking it.",
-      fix: "Build the stub to {{target}}'s real shape instead of casting: give each mocked member its real signature so the object type-checks without the cast.",
-      why: "A test value never crossed a trust boundary, so there is nothing to parse — the fix is a typed stub, not a schema.",
+      fix: "Build the stub to {{target}}'s real shape instead of casting: give each mocked member its real signature so the object type-checks without the cast. Only when the test proves how the code handles a wrong-typed input, write `// wrong-typed input: <why>` on the line above the cast.",
+      why: "A test value never crossed a trust boundary, so there is nothing to parse; the marker excuses one reviewed cast, where a test name would excuse every cast in the test.",
     },
   },
   create(context, file) {
@@ -59,6 +83,7 @@ export const standInCastRule = defineRule({
           return;
 
         covered.add(inner);
+        if (file.isTest && isMarkedWrongTypedInput(source, node)) return;
         context.report({
           node,
           messageId: doubleCastId,

@@ -3,6 +3,8 @@ import { PRODUCTION_STORAGE_METER_TABLES } from "@langwatch/data-retention-contr
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
+import { RedisStorageMeterCacheRepository } from "../../repositories/redis/redis.storage-meter-cache.repository.ts";
+import { STORAGE_METER_CACHE_TTL_MS } from "../../repositories/storage-meter-cache.repository.ts";
 import { StorageMeterService } from "../storage-meter.service.ts";
 
 /** The process's one ClickHouse client, stood in for by its `query`. */
@@ -13,7 +15,10 @@ function clientOf(query: (request: QueryRequest) => unknown) {
 describe("StorageMeterService memory guard", () => {
   function makeService() {
     const query = vi.fn().mockResolvedValue({ rows: [{ total: "42" }] });
-    const service = StorageMeterService.create({ clickhouse: clientOf(query) });
+    const service = StorageMeterService.create({
+      clickhouse: clientOf(query),
+      cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
+    });
     return { service, query };
   }
 
@@ -44,7 +49,10 @@ describe("StorageMeterService memory guard", () => {
       const query = vi.fn(async ({ sql }: QueryRequest) => ({
         rows: [{ total: sql.includes("FROM langy_analytics_events") ? "17" : "0" }],
       }));
-      const service = StorageMeterService.create({ clickhouse: clientOf(query) });
+      const service = StorageMeterService.create({
+        clickhouse: clientOf(query),
+        cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
+      });
 
       const breakdown = await service.getStorageBreakdown({
         tenantId: "project-langy",
@@ -78,7 +86,13 @@ describe("StorageMeterService memory guard", () => {
         if (failing.has(request.tenantId)) throw new Error("cluster unreachable");
         return { rows: [{ total: String(totals[request.tenantId] ?? 0) }] };
       });
-      return { service: StorageMeterService.create({ clickhouse: clientOf(query) }), query };
+      return {
+        service: StorageMeterService.create({
+          clickhouse: clientOf(query),
+          cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
+        }),
+        query,
+      };
     }
 
     /** Which tenants this client was actually asked about, in order, once each. */
@@ -142,6 +156,10 @@ describe("StorageMeterService memory guard", () => {
       const service = StorageMeterService.create({
         clickhouse: clientOf(query),
         now: () => t,
+        cache: RedisStorageMeterCacheRepository.create({
+          ttlMs: STORAGE_METER_CACHE_TTL_MS,
+          now: () => t,
+        }),
       });
       return {
         service,
@@ -217,6 +235,10 @@ describe("StorageMeterService memory guard", () => {
         const service = StorageMeterService.create({
           clickhouse: clientOf(query),
           now: () => t,
+          cache: RedisStorageMeterCacheRepository.create({
+            ttlMs: STORAGE_METER_CACHE_TTL_MS,
+            now: () => t,
+          }),
         });
 
         expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(42);
@@ -242,6 +264,10 @@ describe("StorageMeterService memory guard", () => {
         const service = StorageMeterService.create({
           clickhouse: clientOf(query),
           now: () => t,
+          cache: RedisStorageMeterCacheRepository.create({
+            ttlMs: STORAGE_METER_CACHE_TTL_MS,
+            now: () => t,
+          }),
         });
 
         // First ever read fails -> degraded 0, cached already-stale.
@@ -271,7 +297,10 @@ describe("StorageMeterService memory guard", () => {
           }
           return { rows: [{ total: "10" }] };
         });
-        const service = StorageMeterService.create({ clickhouse: clientOf(query) });
+        const service = StorageMeterService.create({
+          clickhouse: clientOf(query),
+          cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
+        });
 
         const total = await service.getTotalStorageBytes({
           tenantId: "p-heavy",

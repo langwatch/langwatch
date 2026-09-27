@@ -7,11 +7,11 @@
 import type {
   AnalyticsAggregation,
   AnalyticsFilterValue,
-  AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,
 } from "@langwatch/analytics-contract";
 
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../rules/trace-signal.rules.ts";
+import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import {
   isSlimEligibleTraceMetricKey,
   type SlimTraceMetricKey,
@@ -204,7 +204,7 @@ const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTim
  * WHERE fragment + params, throwing on an unhandled field as a guardrail
  * (anything else must have been rejected by `pickAnalyticsTable` already).
  */
-function buildSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["filters"]): {
+function buildSlimFilterClauses(filters: TimeseriesQueryInput["filters"]): {
   whereClause: string;
   params: Record<string, unknown>;
 } {
@@ -344,9 +344,7 @@ function appendSlimFilterClause({
  * [group_key], aggregated columns FROM the deduped table, filtered on
  * TenantId + OccurredAt range [+ slim filters], grouped/ordered by the same.
  */
-export function buildSlimTimeseriesQuery(
-  input: AnalyticsTimeseriesBuilderInput,
-): BuiltAnalyticsQuery {
+export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnalyticsQuery {
   const timeZone = input.timeZone ?? "UTC";
 
   const selectExprs: string[] = [];
@@ -441,9 +439,10 @@ export function buildSlimTimeseriesQuery(
  * The caller's own origin exclusion, ANDed after the user's filters. It is not
  * one of them: a negated filter selection never inverts it.
  */
-function buildSlimOriginExclusion(
-  excludeOrigins: AnalyticsTimeseriesBuilderInput["excludeOrigins"],
-): { whereClause: string; params: Record<string, unknown> } {
+function buildSlimOriginExclusion(excludeOrigins: TimeseriesQueryInput["excludeOrigins"]): {
+  whereClause: string;
+  params: Record<string, unknown>;
+} {
   if (!excludeOrigins || excludeOrigins.length === 0) {
     return { whereClause: "", params: {} };
   }

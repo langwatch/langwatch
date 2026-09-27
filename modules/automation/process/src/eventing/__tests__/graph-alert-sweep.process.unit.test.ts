@@ -1,4 +1,4 @@
-import { buildIntentFactories } from "@langwatch/eventing";
+import { buildIntentAccessor } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -58,7 +58,7 @@ describe("graph alert sweep process", () => {
             now: 10_000,
             key: "graphAlertSweep",
             projectId: "__global__",
-            intents: buildIntentFactories(definition.config.intents),
+            intent: buildIntentAccessor(definition.config.intents),
           },
         );
         expect(wake).toEqual({

@@ -56,4 +56,10 @@ export const langyProcessEventViewSchema = z.object({
 export const LANGY_ID_RESOURCES = {
   conversation: "langyconv",
   message: "langymsg",
+  turn: "langyturn",
+  call: "langycall",
+  wait: "langywait",
+  controlRequest: "langyctlreq",
+  instance: "langyinst",
+  uiAction: "langyaction",
 } as const;

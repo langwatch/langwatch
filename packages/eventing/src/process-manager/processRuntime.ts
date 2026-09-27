@@ -3,7 +3,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { Event } from "../domain/types.ts";
 import {
-  buildIntentFactories,
+  buildIntentAccessor,
   type ProcessManagerDefinition,
 } from "../pipeline/processManagerDefinition.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
@@ -108,7 +108,7 @@ function evolveProcessInstance(
   config: ProcessManagerDefinition["config"],
   { previousState, input, ref }: Parameters<ProcessDefinition<unknown>["evolve"]>[0],
 ): ReturnType<ProcessDefinition<unknown>["evolve"]> {
-  const factories = buildIntentFactories(config.intents, {
+  const intent = buildIntentAccessor(config.intents, {
     processKey: ref.processKey,
   });
   const state = readStoredState({ config, previousState, processKey: ref.processKey });
@@ -121,7 +121,7 @@ function evolveProcessInstance(
       now: input.now,
       key: ref.processKey,
       projectId: ref.projectId,
-      intents: factories,
+      intent,
     });
     return {
       state: evolution.state,
@@ -155,7 +155,7 @@ function evolveProcessInstance(
     now: input.now,
     key: envelope.processKey,
     projectId: envelope.projectId,
-    intents: factories,
+    intent,
   });
   return {
     state: evolution.state,
@@ -184,7 +184,7 @@ function evolveProcessSignal(
       `Process manager "${config.name}" received undeclared signal "${signal.signalType}"`,
     );
   }
-  const factories = buildIntentFactories(config.intents, {
+  const intent = buildIntentAccessor(config.intents, {
     processKey: ref.processKey,
   });
   const evolution = spec.handle(
@@ -195,7 +195,7 @@ function evolveProcessSignal(
       now,
       key: signal.processKey,
       projectId: signal.projectId,
-      intents: factories,
+      intent,
     },
   );
   return {

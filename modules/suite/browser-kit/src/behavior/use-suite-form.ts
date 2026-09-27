@@ -92,7 +92,7 @@ export function useSuiteForm({
   );
 
   const archivedTargets = useMemo(
-    () => getArchivedTargets(selectedTargets, availableTargets, agents, prompts),
+    () => getArchivedTargets({ selectedTargets, availableTargets, agents, prompts }),
     [selectedTargets, availableTargets, agents, prompts],
   );
 

@@ -1,6 +1,6 @@
 import type { PresenceEvent, PresenceLocation } from "@langwatch/presence-contract";
 import { useSSESubscription } from "@langwatch/trace-browser-kit";
-import { useEffect, useRef } from "react";
+import { type RefObject, useEffect, useMemo, useRef } from "react";
 
 import { usePresencePreferencesStore } from "../../../../behavior/presence/presence-preferences-store.ts";
 import { usePresenceStore } from "../../../../behavior/presence/presence-store.ts";
@@ -16,45 +16,137 @@ interface UsePresenceOptions {
   enabled?: boolean;
 }
 
+type PresenceUpdate = (input: {
+  projectId: string;
+  sessionId: string;
+  location: PresenceLocation;
+}) => Promise<unknown>;
+type PresenceLeave = (input: { projectId: string; sessionId: string }) => Promise<unknown>;
+
+/** What the tab last announced and the announce still pending, shared by the effects below. */
+type Announcement = {
+  lastLocation: RefObject<PresenceLocation | null>;
+  debounceTimer: RefObject<ReturnType<typeof setTimeout> | null>;
+  update: RefObject<PresenceUpdate>;
+  leave: RefObject<PresenceLeave>;
+};
+
+/**
+ * Leaves presence: drops the pending announce so a stale location is not sent
+ * after, and the cached one so re-activating announces afresh. A failure is
+ * ignored; the server's TTL reclaims the session anyway.
+ */
+function leavePresence({
+  announcement,
+  projectId,
+  sessionId,
+}: {
+  announcement: Announcement;
+  projectId: string;
+  sessionId: string;
+}) {
+  if (announcement.debounceTimer.current) clearTimeout(announcement.debounceTimer.current);
+  announcement.lastLocation.current = null;
+  void announcement.leave.current({ projectId, sessionId }).catch(() => undefined);
+}
+
+/**
+ * Heartbeat and location updates ride the persistent tRPC WebSocket: at many
+ * tabs, one HTTP call per update was noticeable traffic.
+ */
+function useAnnouncement(): Announcement {
+  const updateMutation = api.presence.update.useMutation({ trpc: { context: { useWS: true } } });
+  const leaveMutation = api.presence.leave.useMutation({ trpc: { context: { useWS: true } } });
+  const update = useRef<PresenceUpdate>(updateMutation.mutateAsync);
+  update.current = updateMutation.mutateAsync;
+  const leave = useRef<PresenceLeave>(leaveMutation.mutateAsync);
+  leave.current = leaveMutation.mutateAsync;
+  const lastLocation = useRef<PresenceLocation | null>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // One stable object: the refs never change, so neither may what holds them.
+  return useMemo(() => ({ lastLocation, debounceTimer, update, leave }), []);
+}
+
+/** Pushes a changed location, debounced; an unchanged one is not re-sent. */
+function useLocationPush({
+  announcement,
+  target,
+  location,
+}: {
+  announcement: Announcement;
+  target: { projectId: string; sessionId: string } | undefined;
+  location: PresenceLocation | null;
+}) {
+  const projectId = target?.projectId;
+  const sessionId = target?.sessionId;
+  useEffect(() => {
+    if (!projectId || !sessionId || !location) return;
+    const last = announcement.lastLocation.current;
+    if (last && JSON.stringify(last) === JSON.stringify(location)) return;
+    const timer = announcement.debounceTimer;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      announcement.lastLocation.current = location;
+      void announcement.update.current({ projectId, sessionId, location });
+    }, LOCATION_DEBOUNCE_MS);
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [announcement, projectId, sessionId, location]);
+}
+
+/**
+ * Re-sends the last location on a heartbeat so the TTL never lapses, and at
+ * once when the tab becomes visible again, so peers see it before the next tick.
+ */
+function useHeartbeat({
+  announcement,
+  target,
+}: {
+  announcement: Announcement;
+  target: { projectId: string; sessionId: string } | undefined;
+}) {
+  const projectId = target?.projectId;
+  const sessionId = target?.sessionId;
+  useEffect(() => {
+    if (!projectId || !sessionId) return;
+    const resend = () => {
+      const last = announcement.lastLocation.current;
+      if (document.visibilityState !== "visible" || !last) return;
+      void announcement.update.current({ projectId, sessionId, location: last });
+    };
+    const interval = setInterval(resend, HEARTBEAT_INTERVAL_MS);
+    document.addEventListener("visibilitychange", resend);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", resend);
+    };
+  }, [announcement, projectId, sessionId]);
+}
+
 /**
  * Wires the current browser tab into the project's multiplayer presence.
  */
 export function usePresence({ projectId, location, enabled = true }: UsePresenceOptions): void {
   const sessionId = useTabSessionId();
-
   const setSelfSessionId = usePresenceStore((s) => s.setSelfSessionId);
   const applyEvent = usePresenceStore((s) => s.applyEvent);
   const reset = usePresenceStore((s) => s.reset);
-
-  // Heartbeat + location updates ride the persistent tRPC WebSocket. The
-  // heartbeat alone fires every 15s per tab; location updates fire on
-  // every span/tab/section change — at multiple-tab scale, the cumulative
-  // HTTP traffic was noticeable. Same opt-in pattern as `presence.cursor`.
-  const updateMutation = api.presence.update.useMutation({
-    trpc: { context: { useWS: true } },
-  });
-  const leaveMutation = api.presence.leave.useMutation({
-    trpc: { context: { useWS: true } },
-  });
-
-  const updateRef = useRef(updateMutation.mutateAsync);
-  updateRef.current = updateMutation.mutateAsync;
-  const leaveRef = useRef(leaveMutation.mutateAsync);
-  leaveRef.current = leaveMutation.mutateAsync;
-
-  const lastLocationRef = useRef<PresenceLocation | null>(null);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const hidden = usePresencePreferencesStore((s) => s.hidden);
+  const announcement = useAnnouncement();
 
   const active = Boolean(enabled && projectId && sessionId && location && !hidden);
+  const target = useMemo(
+    () => (active && projectId && sessionId ? { projectId, sessionId } : undefined),
+    [active, projectId, sessionId],
+  );
 
   useEffect(() => {
-    if (active && sessionId) setSelfSessionId(sessionId);
+    if (target) setSelfSessionId(target.sessionId);
     return () => setSelfSessionId(null);
-  }, [active, sessionId, setSelfSessionId]);
+  }, [target, setSelfSessionId]);
 
-  // SSE subscription: feed every delta into the local store.
+  // Every delta from the SSE feed goes into the local store.
   useSSESubscription<PresenceEvent, { projectId: string }>(
     api.presence.onPresenceUpdate,
     { projectId: projectId ?? "" },
@@ -66,94 +158,27 @@ export function usePresence({ projectId, location, enabled = true }: UsePresence
     },
   );
 
-  // Push location updates: immediate on first send, debounced thereafter.
-  useEffect(() => {
-    if (!active || !projectId || !location) return;
+  useLocationPush({ announcement, target, location });
+  useHeartbeat({ announcement, target });
 
-    const same =
-      lastLocationRef.current &&
-      JSON.stringify(lastLocationRef.current) === JSON.stringify(location);
-    if (same) return;
-
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(() => {
-      lastLocationRef.current = location;
-      void updateRef.current({
-        projectId,
-        sessionId,
-        location,
-      });
-    }, LOCATION_DEBOUNCE_MS);
-
-    return () => {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    };
-  }, [active, projectId, sessionId, location]);
-
-  // Heartbeat: re-send the last known location so TTL never expires.
-  useEffect(() => {
-    if (!active || !projectId) return;
-
-    const interval = setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      const last = lastLocationRef.current;
-      if (!last) return;
-      void updateRef.current({ projectId, sessionId, location: last });
-    }, HEARTBEAT_INTERVAL_MS);
-
-    // Re-announce immediately when the tab becomes visible — otherwise peers
-    // won't see us again until the next heartbeat tick (and may have already
-    // TTL-evicted us if we were hidden for >30s).
-    const onVisibility = () => {
-      if (document.visibilityState !== "visible") return;
-      const last = lastLocationRef.current;
-      if (!last) return;
-      void updateRef.current({ projectId, sessionId, location: last });
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [active, projectId, sessionId]);
-
-  // Hide-toggle: fire `leave` the moment the user goes invisible, instead of
-  // waiting for peers to TTL-evict us. The unmount cleanup below would also
-  // do this when `active` flips false, but going through a dedicated effect
-  // makes the intent legible and isolates it from effect-cleanup ordering.
+  // Hiding leaves at once rather than waiting for peers to TTL-evict the tab;
+  // only the visible-to-hidden transition does.
   const previouslyHiddenRef = useRef(hidden);
   useEffect(() => {
     const wasHidden = previouslyHiddenRef.current;
     previouslyHiddenRef.current = hidden;
-    if (!hidden || wasHidden) return; // only on false → true transition
-    if (!projectId || !sessionId) return;
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    lastLocationRef.current = null;
-    void leaveRef.current({ projectId, sessionId }).catch(() => {
-      // Ignore — server-side TTL reclaims the session anyway.
-    });
-  }, [hidden, projectId, sessionId]);
+    if (!hidden || wasHidden || !projectId || !sessionId) return;
+    leavePresence({ announcement, projectId, sessionId });
+  }, [announcement, hidden, projectId, sessionId]);
 
-  // Best-effort leave on tab close / unmount.
+  // Best-effort leave on tab close and unmount.
   useEffect(() => {
-    if (!active || !projectId) return;
-
-    const leave = () => {
-      // Clear debounced update so a stale location doesn't get sent after leave.
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      // Drop the cached location so re-activating (e.g. after un-hiding)
-      // forces a fresh announce instead of dedup-skipping.
-      lastLocationRef.current = null;
-      void leaveRef.current({ projectId, sessionId }).catch(() => {
-        // Ignore — server-side TTL will reclaim the session anyway.
-      });
-    };
-
+    if (!target) return;
+    const leave = () => leavePresence({ announcement, ...target });
     window.addEventListener("pagehide", leave);
     return () => {
       window.removeEventListener("pagehide", leave);
       leave();
     };
-  }, [active, projectId, sessionId]);
+  }, [announcement, target]);
 }

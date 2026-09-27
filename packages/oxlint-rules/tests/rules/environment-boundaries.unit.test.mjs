@@ -81,4 +81,25 @@ describe("given a reusable package", () => {
       ).toEqual([]);
     });
   });
+
+  describe("when the file is the test process's boot seam in packages/vitest-config", () => {
+    /** @scenario "The test process's boot seam in packages/vitest-config may read process.env" */
+    it.each([
+      "packages/vitest-config/src/vitest-config.ts",
+      "packages/vitest-config/src/console-guard.ts",
+    ])("reports nothing for %s", (file) => {
+      expect(report("export const workers = process.env.VITEST_MAX_WORKERS;", file)).toEqual([]);
+    });
+
+    /** @scenario "The test process's boot seam in packages/vitest-config may read process.env" */
+    it.each([
+      "packages/observability/src/logger.ts",
+      "packages/api/src/vitest-config/config.ts",
+      "modules/agent/process/src/vitest-config.ts",
+    ])("still reports %s, which is not that package", (file) => {
+      expect(report("export const workers = process.env.VITEST_MAX_WORKERS;", file)).toHaveLength(
+        1,
+      );
+    });
+  });
 });

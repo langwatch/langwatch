@@ -24,7 +24,7 @@ type DemoDataIntents = {
 /** Pure and synchronous: the seeding itself is an intent, run behind the outbox lease. */
 export const demoDataWake: WakeHandler<DemoDataRunState, DemoDataIntents> = (_state, ctx) => ({
   state: { lastRunAt: ctx.at },
-  intents: [ctx.intents.run(`run:${ctx.at}`, { scheduledFor: ctx.at })],
+  intents: [ctx.intent("run", `run:${ctx.at}`, { scheduledFor: ctx.at })],
 });
 
 export interface DemoDataRunDeps {
