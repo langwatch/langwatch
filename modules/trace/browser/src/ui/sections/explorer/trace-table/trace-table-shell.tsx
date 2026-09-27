@@ -274,6 +274,127 @@ interface HeaderCellProps<T> {
   suppressSortClickRef?: React.RefObject<boolean>;
 }
 
+/**
+ * A flex column declares a sentinel size to absorb leftover space and renders
+ * without a width, until the reader resizes it.
+ */
+function hasFixedWidth({
+  isFlex,
+  declaredSize,
+  size,
+}: {
+  isFlex: boolean;
+  declaredSize: number | undefined;
+  size: number;
+}): boolean {
+  return !isFlex || (declaredSize !== undefined && size !== declaredSize);
+}
+
+/** The sort state for assistive tech: `none` only for a sortable, unsorted column. */
+function sortAriaOf({
+  canSort,
+  sortDirection,
+}: {
+  canSort: boolean;
+  sortDirection: false | "asc" | "desc";
+}): "ascending" | "descending" | "none" | undefined {
+  if (sortDirection === "asc") return "ascending";
+  if (sortDirection === "desc") return "descending";
+  return canSort ? "none" : undefined;
+}
+
+/**
+ * A drag or double-click on a reorderable header opens the education dialog
+ * pointing at the Columns menu, rather than silently doing nothing. Drags from
+ * the resize or reorder grip are real gestures and are left alone.
+ */
+function useColumnEducationGestures(reorderable: boolean) {
+  const openEducation = useColumnEducationStore((s) => s.open);
+  const educationDismissed = useColumnEducationStore((s) => s.hasDismissed);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => dragCleanupRef.current?.(), []);
+  const offersEducation = reorderable && !educationDismissed;
+
+  const onHeaderMouseDown = (e: React.MouseEvent<HTMLElement>) => {
+    if (!offersEducation) return;
+    const target = e.target;
+    if (target instanceof Element && target.closest("[data-column-resize-grip]")) return;
+    if (target instanceof Element && target.closest("[data-column-drag-handle]")) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const cleanup = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", cleanup);
+      dragCleanupRef.current = null;
+    };
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (dx * dx + dy * dy < COLUMN_DRAG_THRESHOLD_PX ** 2) return;
+      openEducation();
+      cleanup();
+    };
+    dragCleanupRef.current = cleanup;
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", cleanup);
+  };
+  const onHeaderDoubleClick = () => {
+    if (offersEducation) openEducation();
+  };
+  return { onHeaderMouseDown, onHeaderDoubleClick };
+}
+
+/**
+ * The header's title. A sortable one is the sort button; otherwise the label is
+ * the drag zone when the column reorders, and plain text when it does not.
+ */
+function HeaderLabel({
+  canSort,
+  reorderable,
+  align,
+  sortDirection,
+  onToggle,
+  dragHandleProps,
+  suppressSortClickRef,
+  children,
+}: {
+  canSort: boolean;
+  reorderable: boolean;
+  align: "left" | "center";
+  sortDirection: false | "asc" | "desc";
+  onToggle: ((event: unknown) => void) | undefined;
+  dragHandleProps: React.HTMLAttributes<HTMLElement>;
+  suppressSortClickRef?: React.RefObject<boolean>;
+  children: React.ReactNode;
+}) {
+  if (canSort) {
+    return (
+      <SortableHeaderButton
+        align={align}
+        sortDirection={sortDirection}
+        onToggle={onToggle}
+        dragZoneProps={reorderable ? dragHandleProps : undefined}
+        suppressSortClickRef={suppressSortClickRef}
+      >
+        {children}
+      </SortableHeaderButton>
+    );
+  }
+  if (!reorderable) return <>{children}</>;
+  return (
+    <Box
+      data-column-drag-handle="true"
+      cursor="grab"
+      _active={{ cursor: "grabbing" }}
+      truncate
+      title="Drag to reorder column"
+      {...dragHandleProps}
+    >
+      {children}
+    </Box>
+  );
+}
+
 function HeaderCell<T>({
   header,
   isStickyFirst,
@@ -297,75 +418,19 @@ function HeaderCell<T>({
     reorderable ? { ...listeners } : {}
   ) as React.HTMLAttributes<HTMLElement>;
   const meta = header.column.columnDef.meta as ColumnMeta | undefined;
-  // v2 doesn't support native drag-reorder yet, so without this dialog the drag attempt silently
-  // does nothing; it points operators at the Columns dropdown / floating Configure CTA instead.
-  const openEducation = useColumnEducationStore((s) => s.open);
-  const educationDismissed = useColumnEducationStore((s) => s.hasDismissed);
-  // Pinned headers (the row-select column) have no drag handle and no
-  // reorder path, so the education dialog is meaningless there — the
-  // checkbox would also open it on every click. Both handlers bail
-  // when `reorderable` is false.
-  const dragCleanupRef = useRef<(() => void) | null>(null);
-  useEffect(
-    () => () => {
-      dragCleanupRef.current?.();
-    },
-    [],
-  );
-  const onHeaderMouseDown = (e: React.MouseEvent<HTMLElement>) => {
-    if (!reorderable || educationDismissed) return;
-    // Skip drags that originate on the resize grip (legitimate sizing
-    // gesture) OR on the drag-reorder grip (legitimate reorder
-    // gesture) — surfacing the education dialog from either of those
-    // would be infuriating now that both paths work.
-    const target = e.target as HTMLElement | null;
-    if (target?.closest("[data-column-resize-grip]")) return;
-    if (target?.closest("[data-column-drag-handle]")) return;
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const onMove = (ev: MouseEvent) => {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
-      if (dx * dx + dy * dy >= COLUMN_DRAG_THRESHOLD_PX ** 2) {
-        openEducation();
-        cleanup();
-      }
-    };
-    const onUp = () => cleanup();
-    const cleanup = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      dragCleanupRef.current = null;
-    };
-    dragCleanupRef.current = cleanup;
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  };
-  const onHeaderDoubleClick = () => {
-    // Double-click is the other common "I'm trying to do something to
-    // this header" gesture — treat it the same as a drag attempt for
-    // the education path so users who instinctively double-tap also
-    // see the dialog.
-    if (!reorderable || educationDismissed) return;
-    openEducation();
-  };
+  const { onHeaderMouseDown, onHeaderDoubleClick } = useColumnEducationGestures(reorderable);
   const size = header.column.getSize();
-  const declaredSize = header.column.columnDef.size;
-  // Flex columns declare a sentinel `size` (9999) to absorb leftover space — those
-  // normally render with `width: undefined` so the browser flexes them to fill the
-  // table.
-  const isFlex = meta?.flex;
-  const wasResized = isFlex && declaredSize !== undefined && size !== declaredSize;
-  const useFixedWidth = !isFlex || wasResized;
-  // Every column *title* is left-aligned for a consistent header row — the previous mix
-  // (numeric columns right-aligned their headers via `meta.align`) read as ragged.
+  const useFixedWidth = hasFixedWidth({
+    isFlex: !!meta?.flex,
+    declaredSize: header.column.columnDef.size,
+    size,
+  });
+  // Every title is left-aligned for a consistent header row; numeric right-alignment read ragged.
   const align: "left" | "center" = header.column.id === SELECT_COLUMN_ID ? "center" : "left";
   const canSort = header.column.getCanSort();
   const sortDirection = header.column.getIsSorted();
   const isActiveSort = sortDirection !== false;
-  const unsortedAria = canSort ? "none" : undefined;
-  const descendingAria = sortDirection === "desc" ? "descending" : unsortedAria;
-  const ariaSort = sortDirection === "asc" ? "ascending" : descendingAria;
+  const ariaSort = sortAriaOf({ canSort, sortDirection });
   const draggingZIndex = isDragging ? 4 : undefined;
   const stickyBg = isStickyFirst ? { base: "bg.subtle", _dark: "bg.surface" } : undefined;
   const headerBg = isActiveSort ? { base: "bg.muted", _dark: "bg.muted" } : stickyBg;
@@ -430,32 +495,17 @@ function HeaderCell<T>({
           own the cell's full width again, so narrow columns ("TIME")
           aren't squeezed by handle chrome. */}
       <Box flex={1} minWidth={0}>
-        {canSort && (
-          <SortableHeaderButton
-            align={align}
-            sortDirection={sortDirection}
-            onToggle={header.column.getToggleSortingHandler()}
-            dragZoneProps={reorderable ? dragHandleProps : undefined}
-            suppressSortClickRef={suppressSortClickRef}
-          >
-            {flexRender(header.column.columnDef.header, header.getContext())}
-          </SortableHeaderButton>
-        )}
-        {!canSort && reorderable && (
-          <Box
-            data-column-drag-handle="true"
-            cursor="grab"
-            _active={{ cursor: "grabbing" }}
-            truncate
-            title="Drag to reorder column"
-            {...dragHandleProps}
-          >
-            {flexRender(header.column.columnDef.header, header.getContext())}
-          </Box>
-        )}
-        {!canSort &&
-          !reorderable &&
-          flexRender(header.column.columnDef.header, header.getContext())}
+        <HeaderLabel
+          canSort={canSort}
+          reorderable={reorderable}
+          align={align}
+          sortDirection={sortDirection}
+          onToggle={header.column.getToggleSortingHandler()}
+          dragHandleProps={dragHandleProps}
+          suppressSortClickRef={suppressSortClickRef}
+        >
+          {flexRender(header.column.columnDef.header, header.getContext())}
+        </HeaderLabel>
       </Box>
       <ColumnResizeGrip header={header} />
     </Th>

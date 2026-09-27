@@ -2,7 +2,6 @@
  * DrawerSpotlights — condition-gated, show-once spotlights inside the trace drawer.
  */
 import { Portal } from "@chakra-ui/react";
-import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -18,89 +17,60 @@ import {
   isAnchorParkedOffscreen,
   isAnchorSettled,
   measureAnchor,
+  RING_LAYER_STYLE,
   SpotlightPopover,
+  TourMotion,
 } from "./spotlight-overlay.tsx";
 
-export function DrawerSpotlights({ traceId }: { traceId: string }): React.ReactElement | null {
-  const pageTourActive = useOnboardingStore((s) => s.spotlightsActive);
-  const seenDrawerSpotlights = useOnboardingStore((s) => s.seenDrawerSpotlights);
-  const markDrawerSpotlightSeen = useOnboardingStore((s) => s.markDrawerSpotlightSeen);
-  const { dismiss: persistDismissal, isDismissed } = useTraceExplorerTourPreference();
+const MAX_SETTLE_FRAMES = 90; // ~1.5s, so a perpetual animation still resolves
 
-  // The queue is computed once per trace (after a rAF so the drawer's
-  // content has painted). Freeze the seen-map behind a ref so marking
-  // the currently-displayed spotlight seen doesn't recompute the queue
-  // out from under itself.
-  const seenRef = useRef(seenDrawerSpotlights);
-  seenRef.current = seenDrawerSpotlights;
+/**
+ * Whether measuring can stop: the anchor settled, or the frame budget ran out.
+ * A rect parked off-screen (the drawer waiting on Langy's entrance) never
+ * counts as the previous frame.
+ */
+function settleStep({
+  next,
+  previous,
+  frames,
+}: {
+  next: AnchorRect | null;
+  previous: AnchorRect | null;
+  frames: number;
+}): { done: boolean; previous: AnchorRect | null } {
+  const viewport = { viewportWidth: window.innerWidth, scrollX: window.scrollX };
+  if (frames >= MAX_SETTLE_FRAMES || isAnchorSettled({ next, previous, ...viewport })) {
+    return { done: true, previous };
+  }
+  const parked =
+    next !== null && isAnchorParkedOffscreen(next, viewport.viewportWidth, viewport.scrollX);
+  return { done: false, previous: parked ? null : next };
+}
 
-  const [queue, setQueue] = useState<Spotlight[]>([]);
-  const [pos, setPos] = useState(0);
-  const [closed, setClosed] = useState(false);
+/**
+ * The spotlight's anchor rect, placed only once the anchor has settled (the
+ * drawer slides in, and may be parked off-screen first), then re-measured on
+ * scroll and resize so the ring follows drawer scrolls.
+ */
+function useSettledAnchorRect(spotlight: Spotlight | null) {
   const [anchorRect, setAnchorRect] = useState<AnchorRect | null>(null);
-
   const rafRef = useRef<number | null>(null);
 
-  // Compute the queue on mount / trace change. The rAF lets the drawer's
-  // accordion sections land in the DOM before we probe for anchors.
   useEffect(() => {
-    setQueue([]);
-    setPos(0);
-    setClosed(false);
-    setAnchorRect(null);
-    if (pageTourActive || isDismissed) return;
-    const raf = requestAnimationFrame(() => {
-      const next = DRAWER_SPOTLIGHTS.filter(
-        (s) => !seenRef.current[s.id] && measureAnchor(s.anchor) !== null,
-      );
-      setQueue(next);
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [traceId, pageTourActive, isDismissed]);
-
-  const current: Spotlight | null =
-    !closed && !pageTourActive && !isDismissed ? (queue[pos] ?? null) : null;
-
-  // Mark the spotlight seen the moment it is displayed — show-once even
-  // when the queue is dismissed straight after.
-  useEffect(() => {
-    if (current) markDrawerSpotlightSeen(current.id);
-  }, [current, markDrawerSpotlightSeen]);
-
-  // Measure the current anchor; remeasure on scroll/resize so the ring
-  // tracks the anchor through drawer scrolls and window resizes.
-  const remeasure = useCallback(() => {
-    setAnchorRect(current ? measureAnchor(current.anchor) : null);
-  }, [current]);
-
-  // Place the ring only once the anchor has SETTLED. On open the drawer slides in, and
-  // when Langy rides alongside as the companion the drawer is parked fully off-screen
-  // during the ride's entrance delay.
-  useEffect(() => {
-    if (!current) {
+    if (!spotlight) {
       setAnchorRect(null);
       return;
     }
     let previous: AnchorRect | null = null;
     let frames = 0;
-    const MAX_FRAMES = 90; // ~1.5s ceiling so a perpetual animation still resolves
     const settle = () => {
-      const next = measureAnchor(current.anchor);
-      const parked =
-        next !== null && isAnchorParkedOffscreen(next, window.innerWidth, window.scrollX);
-      if (
-        isAnchorSettled({
-          next,
-          previous,
-          viewportWidth: window.innerWidth,
-          scrollX: window.scrollX,
-        }) ||
-        frames >= MAX_FRAMES
-      ) {
+      const next = measureAnchor(spotlight.anchor);
+      const step = settleStep({ next, previous, frames });
+      if (step.done) {
         setAnchorRect(next);
         return;
       }
-      previous = parked ? null : next;
+      previous = step.previous;
       frames += 1;
       rafRef.current = requestAnimationFrame(settle);
     };
@@ -108,106 +78,122 @@ export function DrawerSpotlights({ traceId }: { traceId: string }): React.ReactE
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [current]);
+  }, [spotlight]);
 
   useEffect(() => {
-    if (!current) return;
+    if (!spotlight) return;
     const onScrollOrResize = () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(remeasure);
+      rafRef.current = requestAnimationFrame(() => setAnchorRect(measureAnchor(spotlight.anchor)));
     };
-    window.addEventListener("scroll", onScrollOrResize, {
-      passive: true,
-      capture: true,
-    });
+    window.addEventListener("scroll", onScrollOrResize, { passive: true, capture: true });
     window.addEventListener("resize", onScrollOrResize);
     return () => {
-      window.removeEventListener("scroll", onScrollOrResize, {
-        capture: true,
-      });
+      window.removeEventListener("scroll", onScrollOrResize, { capture: true });
       window.removeEventListener("resize", onScrollOrResize);
     };
-  }, [current, remeasure]);
+  }, [spotlight]);
+
+  return anchorRect;
+}
+
+/**
+ * Escape closes the spotlight queue without closing the drawer: captured and
+ * stopped only while a spotlight shows, so the drawer's own Escape works otherwise.
+ */
+function useEscapeCapture({ active, onDismiss }: { active: boolean; onDismiss: () => void }) {
+  useEffect(() => {
+    if (!active) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      e.preventDefault();
+      onDismiss();
+    };
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [active, onDismiss]);
+}
+
+/**
+ * The unseen show-once spotlights for this trace, found a frame after open so
+ * the drawer's sections exist. Seen is read by ref, so marking the one on
+ * screen does not recompute the queue under it.
+ */
+function useDrawerSpotlightQueue({ traceId, enabled }: { traceId: string; enabled: boolean }) {
+  const seenDrawerSpotlights = useOnboardingStore((s) => s.seenDrawerSpotlights);
+  const seenRef = useRef(seenDrawerSpotlights);
+  seenRef.current = seenDrawerSpotlights;
+  const [queue, setQueue] = useState<Spotlight[]>([]);
+
+  useEffect(() => {
+    setQueue([]);
+    if (!enabled) return;
+    const raf = requestAnimationFrame(() => {
+      setQueue(
+        DRAWER_SPOTLIGHTS.filter((s) => !seenRef.current[s.id] && measureAnchor(s.anchor) !== null),
+      );
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [traceId, enabled]);
+
+  return queue;
+}
+
+export function DrawerSpotlights({ traceId }: { traceId: string }): React.ReactElement | null {
+  const pageTourActive = useOnboardingStore((s) => s.spotlightsActive);
+  const markDrawerSpotlightSeen = useOnboardingStore((s) => s.markDrawerSpotlightSeen);
+  const { dismiss: persistDismissal, isDismissed } = useTraceExplorerTourPreference();
+  const enabled = !pageTourActive && !isDismissed;
+
+  const queue = useDrawerSpotlightQueue({ traceId, enabled });
+  const [pos, setPos] = useState(0);
+  const [closed, setClosed] = useState(false);
+  useEffect(() => {
+    setPos(0);
+    setClosed(false);
+  }, [traceId, pageTourActive, isDismissed]);
+
+  const current: Spotlight | null = !closed && enabled ? (queue[pos] ?? null) : null;
+
+  // Seen the moment it shows: show-once even when the queue is dismissed straight after.
+  useEffect(() => {
+    if (current) markDrawerSpotlightSeen(current.id);
+  }, [current, markDrawerSpotlightSeen]);
+
+  const anchorRect = useSettledAnchorRect(current);
 
   const handleDismiss = useCallback(() => {
     persistDismissal();
     setClosed(true);
   }, [persistDismissal]);
+  useEscapeCapture({ active: !!current, onDismiss: handleDismiss });
 
   const handleNext = useCallback(() => {
-    setPos((p) => {
-      if (p + 1 >= queue.length) {
-        setClosed(true);
-        return p;
-      }
-      return p + 1;
-    });
-  }, [queue.length]);
-
-  const handleBack = useCallback(() => {
-    setPos((p) => Math.max(0, p - 1));
-  }, []);
-
-  // Esc closes the spotlight queue without closing the drawer. Capture
-  // phase + stopPropagation only while a spotlight is visible, so the
-  // drawer's own Esc-to-close never sees the event mid-spotlight but
-  // works normally otherwise.
-  useEffect(() => {
-    if (!current) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        e.preventDefault();
-        handleDismiss();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown, { capture: true });
-    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
-  }, [current, handleDismiss]);
+    if (pos + 1 >= queue.length) setClosed(true);
+    else setPos(pos + 1);
+  }, [pos, queue.length]);
+  const handleBack = useCallback(() => setPos((p) => Math.max(0, p - 1)), []);
 
   if (!current || !anchorRect) return null;
 
-  // zIndex band 1498–1500 (ring 1499, popover 1500 inside the shared
-  // SpotlightPopover/HighlightRing internals) sits above the Chakra
-  // Drawer, whose `modal` z-index token is 1400.
+  // Ring 1499 and popover 1500 sit above the Chakra Drawer's modal z-index (1400).
   return (
     <Portal>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`ring-${current.id}`}
-          initial={{ opacity: 0, scale: 0.95, y: 6 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: -4 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          style={{
-            pointerEvents: "none",
-            position: "fixed",
-            inset: 0,
-            zIndex: 1498,
-          }}
-        >
-          <HighlightRing anchorRect={anchorRect} />
-        </motion.div>
-      </AnimatePresence>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`popover-${current.id}`}
-          initial={{ opacity: 0, scale: 0.95, y: 6 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: -4 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <SpotlightPopover
-            spotlight={current}
-            anchorRect={anchorRect}
-            stepIndex={pos}
-            stepTotal={queue.length}
-            onNext={handleNext}
-            onBack={handleBack}
-            onDismiss={handleDismiss}
-          />
-        </motion.div>
-      </AnimatePresence>
+      <TourMotion motionKey={`ring-${current.id}`} style={RING_LAYER_STYLE}>
+        <HighlightRing anchorRect={anchorRect} />
+      </TourMotion>
+      <TourMotion motionKey={`popover-${current.id}`}>
+        <SpotlightPopover
+          spotlight={current}
+          anchorRect={anchorRect}
+          stepIndex={pos}
+          stepTotal={queue.length}
+          onNext={handleNext}
+          onBack={handleBack}
+          onDismiss={handleDismiss}
+        />
+      </TourMotion>
     </Portal>
   );
 }

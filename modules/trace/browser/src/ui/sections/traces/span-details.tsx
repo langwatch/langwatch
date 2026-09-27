@@ -27,6 +27,146 @@ import { OverflownTextWithTooltip } from "../../elements/overflown-text.tsx";
 import { RedactedField } from "../redacted-field.tsx";
 import { RenderInputOutput } from "./render-input-output.tsx";
 
+/** A prompt reference, `handle:version` or `handle:tag`, from the span or its relatives. */
+function promptRefFor({ span, allSpans }: { span: Span; allSpans?: Span[] }): string | null {
+  const ownAttrs = flattenParamsToPromptAttributes(span.params as Record<string, unknown> | null);
+  const promptId = ownAttrs["langwatch.prompt.id"];
+  if (typeof promptId === "string" && promptId.includes(":")) return promptId;
+  if (!allSpans) return null;
+  const ref = findPromptReferenceInAncestors({
+    targetSpanId: span.span_id,
+    spans: allSpans.map((s): PromptLookupSpan => ({
+      spanId: s.span_id,
+      parentSpanId: s.parent_id ?? null,
+      startTime: s.timestamps.started_at,
+      attributes: flattenParamsToPromptAttributes(s.params as Record<string, unknown> | null),
+    })),
+  });
+  if (!ref?.promptHandle || (ref.promptVersionNumber == null && !ref.promptTag)) return null;
+  return `${ref.promptHandle}:${ref.promptTag ?? String(ref.promptVersionNumber)}`;
+}
+
+/** A context whose string content is JSON reads as the parsed value. */
+function withParsedContent<C extends { content: unknown }>(context: C): C {
+  if (typeof context.content !== "string") return context;
+  try {
+    return { ...context, content: JSON.parse(context.content) };
+  } catch {
+    return context;
+  }
+}
+
+/** Tokens per second from the first token (or the start) to the finish. */
+function tokensPerSecond(span: Span): number {
+  const completion = span.metrics?.completion_tokens ?? 0;
+  const from = span.timestamps.first_token_at ?? span.timestamps.started_at;
+  return Math.round(completion / ((span.timestamps.finished_at - from) / 1000));
+}
+
+function positiveNote(count: number | null | undefined, label: string): string {
+  return count != null && count > 0 ? ` (${count} ${label})` : "";
+}
+
+function TokensLine({ span, estimatedCost }: { span: Span; estimatedCost: React.ReactNode }) {
+  const metrics = span.metrics;
+  return (
+    <Text>
+      <b>Tokens:</b>{" "}
+      {`${metrics?.prompt_tokens ?? 0} prompt + ${metrics?.completion_tokens ?? 0} completion`}
+      {positiveNote(metrics?.reasoning_tokens, "reasoning")}
+      {positiveNote(metrics?.cache_read_input_tokens, "cache read")}
+      {positiveNote(metrics?.cache_creation_input_tokens, "cache write")}
+      {!!metrics?.completion_tokens && ` (${tokensPerSecond(span)} tokens/s)`}
+      {metrics?.tokens_estimated && estimatedCost}
+    </Text>
+  );
+}
+
+function SpanSection({
+  label,
+  color = "fg.subtle",
+  children,
+}: {
+  label: string;
+  color?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
+      <Box fontSize="13px" color={color} textTransform="uppercase" fontWeight="bold">
+        {label}
+      </Box>
+      {children}
+    </VStack>
+  );
+}
+
+function PreBox({ background, children }: { background?: string; children: React.ReactNode }) {
+  return (
+    <Box
+      as="pre"
+      borderRadius="6px"
+      padding={4}
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      width="full"
+      whiteSpace="pre-wrap"
+      background={background}
+    >
+      {children}
+    </Box>
+  );
+}
+
+function SpanException({ error }: { error: ErrorCapture }) {
+  const hasStacktrace = !!error.stacktrace?.length;
+  return (
+    <SpanSection label="Exception" color="red.fg">
+      <Box
+        as="pre"
+        borderRadius="6px"
+        padding={4}
+        borderWidth="1px"
+        borderColor="red.emphasized"
+        backgroundColor="red.subtle"
+        width="full"
+        whiteSpace="pre-wrap"
+        color="fg"
+      >
+        {error.message ||
+          (!hasStacktrace && (
+            <Text color="red.fg/60" fontStyle="italic">
+              An error occurred (no exception message captured)
+            </Text>
+          ))}
+        {hasStacktrace && (
+          <Box>
+            <Text as="code" fontSize="12px">
+              {error.stacktrace.join("\n")}
+            </Text>
+          </Box>
+        )}
+      </Box>
+    </SpanSection>
+  );
+}
+
+function SpanOutput({ span }: { span: Span }) {
+  if (span.output === undefined || span.output === null) return null;
+  return (
+    <SpanSection label={span.type === "llm" ? "Generated" : "Output"}>
+      {!span.output && <Text>{"<empty>"}</Text>}
+      {span.output && (
+        <PreBox>
+          <RedactedField field="output">
+            <RenderInputOutput value={span.output.value} showTools />
+          </RedactedField>
+        </PreBox>
+      )}
+    </SpanSection>
+  );
+}
+
 /**
  * @param props - Component props
  * @param props.span - The span object containing trace data
@@ -55,37 +195,7 @@ export function SpanDetails({
     return span.type === "llm" && !!span.span_id;
   }, [span]);
 
-  /** Extract prompt reference from span params, searching siblings and ancestors */
-  const promptRef = useMemo(() => {
-    // Check the span's own params first
-    const ownAttrs = flattenParamsToPromptAttributes(span.params as Record<string, unknown> | null);
-    const promptId = ownAttrs["langwatch.prompt.id"];
-    if (typeof promptId === "string" && promptId.includes(":")) {
-      return promptId;
-    }
-
-    // Search ancestors, siblings, and cousins using the shared function
-    if (allSpans) {
-      const lookupSpans: PromptLookupSpan[] = allSpans.map((s) => ({
-        spanId: s.span_id,
-        parentSpanId: s.parent_id ?? null,
-        startTime: s.timestamps.started_at,
-        attributes: flattenParamsToPromptAttributes(s.params as Record<string, unknown> | null),
-      }));
-
-      const ref = findPromptReferenceInAncestors({
-        targetSpanId: span.span_id,
-        spans: lookupSpans,
-      });
-
-      if (ref?.promptHandle && (ref.promptVersionNumber != null || ref.promptTag)) {
-        const suffix = ref.promptTag ?? String(ref.promptVersionNumber);
-        return `${ref.promptHandle}:${suffix}`;
-      }
-    }
-
-    return null;
-  }, [span.params, span.span_id, allSpans]);
+  const promptRef = useMemo(() => promptRefFor({ span, allSpans }), [span, allSpans]);
 
   return (
     <VStack flexGrow={1} gap={3} align="start">
@@ -139,33 +249,7 @@ export function SpanDetails({
         </HStack>
         {(span.metrics?.prompt_tokens !== undefined ||
           span.metrics?.completion_tokens !== undefined) && (
-          <Text>
-            <b>Tokens:</b>{" "}
-            {(span.metrics?.prompt_tokens ?? 0) +
-              " prompt + " +
-              (span.metrics?.completion_tokens ?? 0) +
-              " completion"}
-            {span.metrics?.reasoning_tokens != null &&
-              span.metrics.reasoning_tokens > 0 &&
-              ` (${span.metrics.reasoning_tokens} reasoning)`}
-            {span.metrics?.cache_read_input_tokens != null &&
-              span.metrics.cache_read_input_tokens > 0 &&
-              ` (${span.metrics.cache_read_input_tokens} cache read)`}
-            {span.metrics?.cache_creation_input_tokens != null &&
-              span.metrics.cache_creation_input_tokens > 0 &&
-              ` (${span.metrics.cache_creation_input_tokens} cache write)`}
-            {span.metrics.completion_tokens &&
-              span.metrics.completion_tokens > 0 &&
-              (() => {
-                const durationFromFirstToken =
-                  span.timestamps.finished_at -
-                  (span.timestamps.first_token_at ?? span.timestamps.started_at);
-                return ` (${Math.round(
-                  span.metrics.completion_tokens / (durationFromFirstToken / 1000),
-                )} tokens/s)`;
-              })()}
-            {span.metrics?.tokens_estimated && estimatedCost}
-          </Text>
+          <TokensLine span={span} estimatedCost={estimatedCost} />
         )}
         {("vendor" in span || "model" in span) && (
           <Text>
@@ -187,20 +271,8 @@ export function SpanDetails({
         )}
       </VStack>
       {span.params && (
-        <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
-          <Box fontSize="13px" color="fg.subtle" textTransform="uppercase" fontWeight="bold">
-            Params
-          </Box>
-          <Box
-            as="pre"
-            borderRadius="6px"
-            padding={4}
-            borderWidth="1px"
-            borderColor="border.emphasized"
-            width="full"
-            whiteSpace="pre-wrap"
-            background="bg.panel/75"
-          >
+        <SpanSection label="Params">
+          <PreBox background="bg.panel/75">
             <RenderInputOutput
               value={JSON.stringify(
                 Object.fromEntries(Object.entries(span.params).filter(([key]) => key !== "_keys")),
@@ -210,121 +282,29 @@ export function SpanDetails({
               }
               showTools
             />
-          </Box>
-        </VStack>
+          </PreBox>
+        </SpanSection>
       )}
       {span.input && (
-        <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
-          <Box fontSize="13px" color="fg.subtle" textTransform="uppercase" fontWeight="bold">
-            Input
-          </Box>
-          <Box
-            as="pre"
-            borderRadius="6px"
-            padding={4}
-            borderWidth="1px"
-            borderColor="border.emphasized"
-            width="full"
-            whiteSpace="pre-wrap"
-          >
+        <SpanSection label="Input">
+          <PreBox>
             <RedactedField field="input">
-              <RenderInputOutput value={span.input?.value} showTools />
+              <RenderInputOutput value={span.input.value} showTools />
             </RedactedField>
-          </Box>
-        </VStack>
+          </PreBox>
+        </SpanSection>
       )}
       {"contexts" in span && span.contexts && (
-        <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
-          <Box fontSize="13px" color="fg.subtle" textTransform="uppercase" fontWeight="bold">
-            Contexts
-          </Box>
-          <Box
-            as="pre"
-            borderRadius="6px"
-            padding={4}
-            borderWidth="1px"
-            borderColor="border.emphasized"
-            width="full"
-            whiteSpace="pre-wrap"
-          >
+        <SpanSection label="Contexts">
+          <PreBox>
             <RenderInputOutput
-              value={JSON.stringify(
-                span.contexts.map((context) => {
-                  if (typeof context.content === "string") {
-                    try {
-                      return {
-                        ...context,
-                        content: JSON.parse(context.content),
-                      };
-                    } catch {
-                      return context;
-                    }
-                  }
-                  return context;
-                }),
-              )}
+              value={JSON.stringify(span.contexts.map(withParsedContent))}
               showTools
             />
-          </Box>
-        </VStack>
+          </PreBox>
+        </SpanSection>
       )}
-      {span.error ? (
-        <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
-          <Box fontSize="13px" color="red.fg" textTransform="uppercase" fontWeight="bold">
-            Exception
-          </Box>
-          <Box
-            as="pre"
-            borderRadius="6px"
-            padding={4}
-            borderWidth="1px"
-            borderColor="red.emphasized"
-            backgroundColor="red.subtle"
-            width="full"
-            whiteSpace="pre-wrap"
-            color="fg"
-          >
-            {span.error.message ||
-              (!span.error.stacktrace?.length && (
-                <Text color="red.fg/60" fontStyle="italic">
-                  An error occurred (no exception message captured)
-                </Text>
-              ))}
-            {span.error.stacktrace?.length ? (
-              <Box>
-                <Text as="code" fontSize="12px">
-                  {span.error.stacktrace.join("\n")}
-                </Text>
-              </Box>
-            ) : null}
-          </Box>
-        </VStack>
-      ) : (
-        span.output !== undefined &&
-        span.output !== null && (
-          <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
-            <Box fontSize="13px" color="fg.subtle" textTransform="uppercase" fontWeight="bold">
-              {span.type === "llm" ? "Generated" : "Output"}
-            </Box>
-            {!span.output && <Text>{"<empty>"}</Text>}
-            {span.output && (
-              <Box
-                as="pre"
-                borderRadius="6px"
-                padding={4}
-                borderWidth="1px"
-                borderColor="border.emphasized"
-                width="full"
-                whiteSpace="pre-wrap"
-              >
-                <RedactedField field="output">
-                  <RenderInputOutput value={span.output.value} showTools />
-                </RedactedField>
-              </Box>
-            )}
-          </VStack>
-        )
-      )}
+      {span.error ? <SpanException error={span.error} /> : <SpanOutput span={span} />}
     </VStack>
   );
 }

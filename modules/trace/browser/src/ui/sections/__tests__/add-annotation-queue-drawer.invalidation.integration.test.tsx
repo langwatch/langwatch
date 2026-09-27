@@ -87,9 +87,6 @@ vi.mock("../errors/index.ts", () => ({
   FormServerError: () => null,
   showErrorToast: vi.fn(),
 }));
-vi.mock("../annotations/add-or-edit-annotation-score.tsx", () => ({
-  AddOrEditAnnotationScore: () => null,
-}));
 
 import { AddAnnotationQueueDrawer } from "../add-annotation-queue-drawer.tsx";
 

@@ -398,34 +398,11 @@ export type UiSuggestBodyProps = { state: AnnotationFormState; originalOutput: s
 /** Annotation's form footer: save, delete and cancel over the same state. */
 export type UiAnnotationFormFooterProps = { state: AnnotationFormState; padding: number };
 
-/** Annotation's controlled score-metric editor; the host owns the form and its errors. */
-export type UiAnnotationScoreEditorProps = {
-  formError: ReactNode;
-  nameField: ReactNode;
-  nameError?: ReactNode;
-  descriptionField: ReactNode;
-  descriptionError?: ReactNode;
-  dataType: string;
-  dataTypeError?: ReactNode;
-  onDataTypeChange: (value: string) => void;
-  options: string[];
-  onOptionChange: (index: number, value: string) => void;
-  onOptionRemove: (index: number) => void;
-  onOptionAdd: () => void;
-  defaultRadioOption: string;
-  onDefaultRadioOptionChange: (value: string) => void;
-  defaultCheckboxOptions: string[];
-  onDefaultCheckboxOptionsChange: (value: string[]) => void;
-  isSaving: boolean;
-  submitLabel: string;
-};
-
 export type UiDeclaredCapabilities = {
   addOrEditDatasetDrawer: UiDeclaredComponent<UiAddOrEditDatasetDrawerProps>;
   annotateBody: UiDeclaredComponent<UiAnnotateBodyProps>;
   annotationFormFooter: UiDeclaredComponent<UiAnnotationFormFooterProps>;
   annotationQueueConversation: UiDeclaredComponent<UiAnnotationQueueConversationProps>;
-  annotationScoreEditor: UiDeclaredComponent<UiAnnotationScoreEditorProps>;
   /** A card on the Authentication overview; `section` places it, sign-in first. */
   authenticationOverviewCard: UiDeclaredComponent<UiAuthenticationOverviewCardProps> & {
     readonly section?: "sign-in" | "provisioning";
