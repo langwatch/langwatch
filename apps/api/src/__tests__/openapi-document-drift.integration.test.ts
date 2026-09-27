@@ -153,7 +153,7 @@ async function composedRoutes() {
       const mountNothing = { mount: () => {} };
 
       return {
-        hosts: { rest, trpc: mountNothing, websocket: mountNothing },
+        hosts: { rest, trpc: mountNothing, websocket: mountNothing, rawhttp: mountNothing },
         serve: () => void 0,
       } as never;
     },
