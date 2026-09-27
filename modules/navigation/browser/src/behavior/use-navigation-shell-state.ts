@@ -5,6 +5,7 @@
 
 import { useBreakpointValue } from "@chakra-ui/react";
 
+import { belongsToNoOrganization } from "../model/belongs-to-no-organization.ts";
 import {
   showsDevelopmentIndicator,
   useNavigationHost,
@@ -49,6 +50,8 @@ export interface NavigationShellReadyState {
 export type NavigationShellState =
   | { status: "not-found" }
   | { status: "loading" }
+  /** "/" for a reader in no organization: the page draws bare and sends them on. */
+  | { status: "without-chrome" }
   | NavigationShellReadyState;
 
 export function useNavigationShellState({
@@ -79,9 +82,9 @@ export function useNavigationShellState({
     isOnOwnPersonalProject: !!team?.isPersonal && team.ownerUserId === user?.id,
   });
 
-  if (!user || isShellDataPending({ host, route })) {
-    return { status: "loading" };
-  }
+  if (!user) return { status: "loading" };
+  if (route.isResolverRoute && isOrgless(host)) return { status: "without-chrome" };
+  if (isShellDataPending({ host, route })) return { status: "loading" };
 
   const isCompactSidebar = isSmallScreen === true;
 
@@ -97,6 +100,15 @@ export function useNavigationShellState({
     isMobile,
     menuWidth: isCompactSidebar ? SHELL_SIDEBAR_WIDTH_COMPACT : SHELL_SIDEBAR_WIDTH_EXPANDED,
   };
+}
+
+/** The chrome needs an organization to draw, and an orgless reader will never have one. */
+function isOrgless(host: ReturnType<typeof useNavigationHost>): boolean {
+  return belongsToNoOrganization({
+    isWorkspaceResolving: host.isLoading(),
+    organization: host.organization(),
+    organizations: host.organizations(),
+  });
 }
 
 /**

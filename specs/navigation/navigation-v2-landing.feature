@@ -36,6 +36,16 @@ Feature: Landing
     When the chrome draws the front door
     Then it draws the resolver rather than refusing them for want of a team
 
+  # The chrome also waits for an organization, which a reader who belongs to
+  # none will never have. "/" is where they are sent on from, so the page draws
+  # without the chrome once their organization list has answered empty.
+  @integration
+  Scenario: A signed-in reader in no organization is sent from / to create or join one
+    Given a signed-in reader whose organization list answered empty
+    When they open "/"
+    Then they are sent to the screen that creates or joins an organization
+    And while that list has not answered they wait rather than being sent on
+
   @unit
   Scenario: An explicit pin outranks everything
     Given I pinned my home to "/governance"
