@@ -25,11 +25,12 @@ export class TracesService {
    * @param operation Description of the operation being performed.
    * @param error The error object returned from the API client.
    */
-  private handleApiError(operation: string, error: any): never {
-    const errorMessage =
+  private handleApiError(operation: string, error: unknown): never {
+    const errorMessage = displayOf(
       typeof error === "string"
         ? error
-        : (error?.error ?? error?.message ?? "Unknown error occurred");
+        : (propertyOf(error, "error") ?? propertyOf(error, "message") ?? "Unknown error occurred"),
+    );
     const message = `Failed to ${operation}: ${errorMessage}`;
 
     throw new TracesError(message, operation, error);
@@ -56,4 +57,16 @@ export class TracesService {
 
     return data as GetTraceResponse;
   }
+}
+
+function propertyOf(value: unknown, key: string): unknown {
+  if (value === null || value === undefined) return undefined;
+  return Reflect.get(Object(value), key);
+}
+
+function displayOf(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint")
+    return String(value);
+  return JSON.stringify(value) ?? String(value);
 }

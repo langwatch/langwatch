@@ -1,6 +1,7 @@
 // @vitest-environment node
 // @vitest-config ./vitest.e2e.config.mts
 
+import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -8,7 +9,7 @@ import { config } from "dotenv";
 import { describe, expect, it, afterEach, beforeEach, afterAll, beforeAll } from "vitest";
 
 import { LangWatch } from "../../../dist";
-import { expectations, CliRunner, PROMPT_NAME_PREFIX, PromptFileManager } from "./helpers";
+import { expectations, CliRunner, PromptFileManager } from "./helpers";
 import { ApiHelpers } from "./helpers/api-helpers";
 
 config({ path: ".env.test", override: true });
@@ -20,8 +21,15 @@ interface Tag {
   name: string;
 }
 
+// Not the shared PROMPT_NAME_PREFIX: sibling files and concurrent CI runs sweep that
+// prefix in their afterAll, deleting this file's prompts mid-test (#3129, #3240).
+const TAG_PROMPT_PREFIX = "cli-tag-e2e-test-prompt-";
+const createdHandles = new Set<string>();
+
 const createUniquePromptName = () => {
-  return `${PROMPT_NAME_PREFIX}-${Date.now()}`;
+  const handle = `${TAG_PROMPT_PREFIX}${randomUUID()}`;
+  createdHandles.add(handle);
+  return handle;
 };
 
 const createdTagNames = new Set<string>();
@@ -62,7 +70,7 @@ describe("CLI E2E", () => {
 
   afterAll(async () => {
     const apiHelpers = new ApiHelpers(langwatch);
-    await apiHelpers.cleanUpTestPrompts();
+    await apiHelpers.cleanUpTestPrompts(Array.from(createdHandles));
     // Only delete tags created by this test run to avoid interference with parallel runs
     await Promise.all(
       [...createdTagNames].map((name) =>
@@ -167,8 +175,7 @@ describe("CLI E2E", () => {
       });
 
       describe("when assigning a tag to a specific version", () => {
-        // Skip: flaky when two sdk-javascript-ci runs share the same e2e backend — see #3129
-        it.skip("assigns the tag to that version", async () => {
+        it("assigns the tag to that version", async () => {
           const handle = createUniquePromptName();
           const tagName = createUniqueTagName();
 

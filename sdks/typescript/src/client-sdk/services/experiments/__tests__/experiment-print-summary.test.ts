@@ -1,11 +1,10 @@
 /**
- * Unit tests for Experiment.printSummary(), parity with
- * ExperimentRunResult.printSummary. Private constructor, so a subclass-
- * bridge + `Object.assign` populates state without touching the network.
+ * Unit tests for Experiment.printSummary(), which delegates to
+ * printExperimentSummary — parity with ExperimentRunResult.printSummary.
  */
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 
-import { Experiment } from "../experiment";
+import { printExperimentSummary } from "../experiment-summary";
 import type { BatchEntry, ExperimentEvaluationResult } from "../types";
 
 function buildExperimentFixture(init: {
@@ -13,21 +12,18 @@ function buildExperimentFixture(init: {
   entries?: BatchEntry[];
   runUrl?: string;
   runId?: string;
-}): Experiment {
-  // Bypass the private constructor: an instance built off the real prototype,
-  // with its private fields assigned directly, so printSummary() runs against
-  // real instance methods rather than a duck-typed stand-in.
-  const exp = Object.create(Experiment.prototype) as Experiment;
-  Object.assign(exp, {
-    name: "ci-quality-check",
-    runId: init.runId ?? "run_abc",
-    experimentSlug: "ci-quality-check",
-    createdAtMs: Date.now(),
-    cumulativeEvaluations: init.evaluations ?? [],
-    cumulativeEntries: init.entries ?? [],
-    runUrl: init.runUrl ?? "https://app.langwatch.ai/runs/xyz",
-  });
-  return exp;
+}): { printSummary: (exitOnFailure?: boolean) => void } {
+  return {
+    printSummary: (exitOnFailure = true) =>
+      printExperimentSummary({
+        runId: init.runId ?? "run_abc",
+        runUrl: init.runUrl ?? "https://app.langwatch.ai/runs/xyz",
+        createdAtMs: Date.now(),
+        evaluations: init.evaluations ?? [],
+        entries: init.entries ?? [],
+        exitOnFailure,
+      }),
+  };
 }
 
 function evaluation(overrides: Partial<ExperimentEvaluationResult>): ExperimentEvaluationResult {

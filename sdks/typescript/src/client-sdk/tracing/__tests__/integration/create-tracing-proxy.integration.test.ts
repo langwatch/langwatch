@@ -116,6 +116,10 @@ describe("createTracingProxy Integration Tests", () => {
         publicMethod() {
           return "public result";
         }
+
+        toString() {
+          return "TestClass";
+        }
       }
 
       const target = new TestClass();

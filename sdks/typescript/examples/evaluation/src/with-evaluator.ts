@@ -76,7 +76,7 @@ const main = async () => {
           },
         });
       } catch (error) {
-        console.log(`  ⚠️ Evaluator error: ${error}`);
+        console.log("  ⚠️ Evaluator error:", error);
       }
 
       // Also log response length as a custom metric

@@ -11,7 +11,6 @@ import {
   type SpanOptions,
   type Context,
   SpanKind,
-  type SpanStatusCode,
 } from "@opentelemetry/api";
 import { vi, expect } from "vitest";
 
@@ -154,44 +153,6 @@ export class MockSpan implements Span {
 
   get links(): Link[] {
     return [...this._links];
-  }
-
-  // Better assertion helpers
-  public expectAttribute(key: string, value?: AttributeValue): void {
-    const actualValue = this._attributes[key];
-    if (value !== undefined) {
-      expect(actualValue).toBe(value);
-    } else {
-      expect(actualValue).toBeDefined();
-    }
-  }
-
-  public expectEvent(name: string, attributes?: Partial<Attributes>): void {
-    const event = this._events.find((e) => e.name === name);
-    expect(event).toBeDefined();
-
-    if (attributes && event) {
-      Object.entries(attributes).forEach(([key, expectedValue]) => {
-        expect(event.attributes?.[key]).toBe(expectedValue);
-      });
-    }
-  }
-
-  public expectStatus(code: SpanStatusCode, message?: string): void {
-    expect(this._status?.code).toBe(code);
-    if (message !== undefined) {
-      expect(this._status?.message).toBe(message);
-    }
-  }
-
-  public expectEnded(): void {
-    expect(this._ended).toBe(true);
-    expect(this._endTime).toBeDefined();
-  }
-
-  public expectRecording(): void {
-    expect(this._ended).toBe(false);
-    expect(this._endTime).toBeUndefined();
   }
 
   // Helper methods for assertions
@@ -586,13 +547,13 @@ export const testScenarios = {
 
     if (shouldHaveAttributes) {
       Object.entries(shouldHaveAttributes).forEach(([key, value]) => {
-        span.expectAttribute(key, value);
+        expect(span.getAttributeValue(key)).toBe(value);
       });
     }
 
     if (shouldHaveEvents) {
       shouldHaveEvents.forEach((eventName) => {
-        span.expectEvent(eventName);
+        expect(span.events.find((e) => e.name === eventName)).toBeDefined();
       });
     }
   },

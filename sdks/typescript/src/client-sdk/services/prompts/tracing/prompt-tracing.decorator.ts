@@ -2,6 +2,7 @@ import { shouldCaptureInput, shouldCaptureOutput } from "@/observability-sdk";
 import type { LangWatchSpan } from "@/observability-sdk";
 
 import { type Prompt, type TemplateVariables, type CompiledPrompt } from "../prompt";
+import { promptDataOf } from "../prompt-data";
 
 /**
  * Class that decorates the target prompt,
@@ -39,10 +40,7 @@ export class PromptTracingDecorator {
     }
 
     if (shouldCaptureOutput()) {
-      span.setOutput({
-        ...result,
-        raw: void 0, // TODO(afr): Figure out a better way to do this.
-      });
+      span.setOutput({ ...promptDataOf(result), original: promptDataOf(result.original) });
     }
 
     return result;

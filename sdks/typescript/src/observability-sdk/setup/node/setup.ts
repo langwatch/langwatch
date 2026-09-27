@@ -519,9 +519,9 @@ function applyNextJsProviderWorkaround(logger: Logger): void {
         );
 
         // Access the real provider from the delegate
-        const realProvider = (globalProvider as any)._delegate;
+        const realProvider: unknown = Reflect.get(globalProvider, "_delegate");
 
-        if (realProvider?.constructor.name === "NodeTracerProvider") {
+        if (isNodeTracerProvider(realProvider)) {
           // Explicitly register the real provider globally
           trace.setGlobalTracerProvider(realProvider);
           logger.info("Successfully registered NodeTracerProvider globally for Next.js 15");
@@ -691,3 +691,9 @@ export const ensureSetup = (): ObservabilityHandle => {
   // Set up observability with defaults
   return setupObservability();
 };
+
+function isNodeTracerProvider(value: unknown): value is apiModule.TracerProvider {
+  return (
+    typeof value === "object" && value !== null && value.constructor.name === "NodeTracerProvider"
+  );
+}

@@ -6,7 +6,8 @@
     "target": "ES2022",
     "module": "ESNext",
     "esModuleInterop": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "rootDir": "src"
   },
   "include": ["src/**/*"]
 }

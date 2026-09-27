@@ -374,14 +374,15 @@ describe("daemon over a unix socket", () => {
         expect(fs.statSync(socketPath).isSocket()).toBe(true);
 
         const nameAtClose: boolean[] = [];
-        // Captured only to delegate back to; the .call below supplies `this`.
-        const realClose = net.Server.prototype.close;
-        vi.spyOn(net.Server.prototype, "close").mockImplementation(function (
+        // Records the name at the first close, then hands back to the real close.
+        const closeSpy = vi.spyOn(net.Server.prototype, "close");
+        closeSpy.mockImplementation(function (
           this: net.Server,
           callback?: (error?: Error) => void,
         ) {
           nameAtClose.push(fs.existsSync(socketPath));
-          return realClose.call(this, callback);
+          closeSpy.mockRestore();
+          return this.close(callback);
         });
 
         await running.stop("stop-requested");

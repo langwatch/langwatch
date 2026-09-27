@@ -6,6 +6,7 @@ import { type BaseMessage } from "@langchain/core/messages";
 import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
 import type { ChainValues } from "@langchain/core/utils/types";
 import { context, trace, SpanStatusCode, type Attributes } from "@opentelemetry/api";
+import { isAttributeValue } from "@opentelemetry/core";
 
 import {
   chatMessageSchema,
@@ -510,6 +511,13 @@ function className(serialized?: Serialized): string {
   return "";
 }
 
+function displayOf(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint")
+    return String(value);
+  return JSON.stringify(value) ?? String(value);
+}
+
 function shorten(str: string, max = 120): string {
   return typeof str === "string" && str.length > max ? str.slice(0, max - 1) + "…" : str;
 }
@@ -611,18 +619,28 @@ function applyGenAIAttrs(
   metadata?: Record<string, unknown>,
   extraParams?: Record<string, unknown>,
 ) {
-  const md = (metadata ?? {}) as any;
-  const ex = (extraParams ?? {}) as any;
+  const md = metadata ?? {};
 
-  const provider = md.ls_provider as string | undefined;
-  const requestModel = md.ls_model_name ?? md.kwargs?.model ?? ex.kwargs?.model;
-  const temperature = md.ls_temperature ?? md.kwargs?.temperature ?? ex.kwargs?.temperature;
-  const responseModel = md.response_metadata?.model_name as string | undefined;
+  const provider = md.ls_provider;
+  const requestModel =
+    md.ls_model_name ?? propertyOf(md.kwargs, "model") ?? propertyOf(extraParams?.kwargs, "model");
+  const temperature =
+    md.ls_temperature ??
+    propertyOf(md.kwargs, "temperature") ??
+    propertyOf(extraParams?.kwargs, "temperature");
+  const responseModel = propertyOf(md.response_metadata, "model_name");
 
-  if (provider) span.setAttribute("gen_ai.system", provider);
-  if (requestModel) span.setAttribute("gen_ai.request.model", requestModel);
+  if (provider && isAttributeValue(provider)) span.setAttribute("gen_ai.system", provider);
+  if (requestModel && isAttributeValue(requestModel))
+    span.setAttribute("gen_ai.request.model", requestModel);
   if (typeof temperature === "number") span.setAttribute("gen_ai.request.temperature", temperature);
-  if (responseModel) span.setAttribute("gen_ai.response.model", responseModel);
+  if (responseModel && isAttributeValue(responseModel))
+    span.setAttribute("gen_ai.response.model", responseModel);
+}
+
+function propertyOf(value: unknown, key: string): unknown {
+  if (value === null || value === undefined) return undefined;
+  return Reflect.get(Object(value), key);
 }
 
 function getResolvedParentContext(
@@ -690,7 +708,7 @@ function toolRunName({
   inputs?: unknown;
   serialized?: Serialized;
 }): string {
-  const tool = (metadata as any)?.name ?? (cls || "tool");
+  const tool = displayOf(metadata?.name ?? (cls || "tool"));
   const prev =
     previewInput(inputs) ??
     previewInput(serialized && "input" in serialized ? serialized.input : undefined);
@@ -717,7 +735,7 @@ function deriveNameAndType(opts: {
   }
 
   const cls = className(serialized);
-  const md = (metadata ?? {}) as any;
+  const md = metadata ?? {};
 
   // LangGraph node / router - prioritize routers over nodes
   const hasNode = md?.langgraph_node != null;
@@ -737,7 +755,7 @@ function deriveNameAndType(opts: {
 
   if (hasNode) {
     const step = md?.langgraph_step;
-    const nm = `Node: ${md.langgraph_node}${step != null ? ` (step ${String(step)})` : ""}`;
+    const nm = `Node: ${displayOf(md.langgraph_node)}${step != null ? ` (step ${displayOf(step)})` : ""}`;
     return { name: nm, type: "component" };
   }
   if (isGraphRunner && runType === "chain") {
