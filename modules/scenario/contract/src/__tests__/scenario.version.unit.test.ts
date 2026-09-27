@@ -127,6 +127,11 @@ describe("the snapshot envelope", () => {
     );
   });
 
+  /** @scenario "A scenario version is written at the snapshot shape that carries fields" */
+  it("writes schema version 2, the shape that added fields", () => {
+    expect(buildSnapshotEnvelope(fields(), []).schemaVersion).toBe(2);
+  });
+
   it("round-trips through build and parse", () => {
     const envelope = buildSnapshotEnvelope(fields({ parameters: [{ name: "tier" }] }), [
       "parameters",

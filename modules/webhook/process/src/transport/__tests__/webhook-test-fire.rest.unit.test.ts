@@ -3,11 +3,13 @@
  * dispatch, refused 429 past the caller tier's ceiling, never reached on a refusal.
  * @vitest-environment node
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { describe, expect, it, vi } from "vitest";
 
 import type { WebhookDispatchResult } from "../../app/webhook.app.ts";
+import type { WebhookEndpointRepository } from "../../repositories/webhook-endpoint.repository.ts";
 import { WebhookTestBoundsService } from "../../services/webhook-test-bounds.service.ts";
 import { mountWebhookRest } from "./webhook-rest.harness.ts";
 
@@ -101,6 +103,42 @@ describe("POST /api/webhooks/v1/endpoints/:id/test", () => {
       const response = await fire();
 
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe("given a receiver that answers the test fire with a refusal", () => {
+    /** @scenario "A test fire the receiver refuses answers with the receiver's status and body" */
+    it("answers the receiver's status and its answer as response_body", async () => {
+      const { request } = mountWebhookRest({
+        endpoints: createApiFixture<WebhookEndpointRepository>({
+          findSigningSecrets: async () => ["whsec_1"],
+          getDestinationConfig: async () => ({ kind: "http", url: "https://example.test/hook" }),
+          recordDeliveryAttempt: async () => {},
+        }),
+        dispatch: async () => ({
+          verdict: "terminal",
+          status: 405,
+          body: "",
+          dispatchId: "dispatch-1",
+          error: "HTTP 405",
+        }),
+        testFireBounds: { assertTestFireWithinBounds: async () => {} },
+      });
+
+      const response = await request(`/api/webhooks/v1/endpoints/endpoint-1/test`, {
+        method: "POST",
+        body: "{}",
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        data: {
+          delivered: false,
+          response_status: 405,
+          response_body: "HTTP 405",
+          error: "HTTP 405",
+        },
+      });
     });
   });
 });

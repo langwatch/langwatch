@@ -25,10 +25,10 @@ Feature: The API's Enterprise application slot, member by member
     And one endpoint's delivery health can be read
 
   @unit
-  Scenario: A test fire refuses because this process delivers nothing
+  Scenario: A test fire is sent from the API process
     Given the process composed the webhook application
     When a test fire is dispatched to an endpoint
-    Then the refusal names the delivery process manager the API does not run
+    Then it goes through the same delivery egress the worker delivers through
 
   @unit
   Scenario: The operator's connection back office is composed

@@ -90,7 +90,8 @@ export interface WebhookDeliveryProcessDeps {
     body: string;
     batchId: string;
     attempt: number;
-    signingSecrets: string[];
+    signingSecrets: readonly string[];
+    isTestFire?: boolean;
   }) => Promise<WebhookDispatchResult>;
   /** Resolves the org's active plan for the enterprise gate. */
   getPlan: (organizationId: string) => Promise<{ webhookEndpointsEnabled?: boolean }>;
@@ -239,6 +240,7 @@ export class WebhookDeliveryService {
         batchId: request.batchId,
         attempt: request.attempt,
         signingSecrets: request.signingSecrets,
+        ...(request.isTestFire ? { isTestFire: true } : {}),
       });
     };
   }

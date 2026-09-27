@@ -48,7 +48,8 @@ export const scenarioSnapshotFieldsSchema = z
   .strict();
 export type ScenarioSnapshotFields = z.infer<typeof scenarioSnapshotFieldsSchema>;
 
-export const scenarioSnapshotSchemaVersion = 1;
+/** Version 2 added `fields`; a version 1 snapshot has no such key and reads as null (main). */
+export const scenarioSnapshotSchemaVersion = 2;
 
 const scenarioSnapshotEnvelopeSchema = z
   .object({

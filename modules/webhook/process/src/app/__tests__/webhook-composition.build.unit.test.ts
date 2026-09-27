@@ -4,10 +4,7 @@
  * @vitest-environment node
  */
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import {
-  WebhookDispatchUnavailableError,
-  WebhookEndpointsNotEntitledError,
-} from "@langwatch/webhook-contract";
+import { WebhookEndpointsNotEntitledError } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
 import { buildWebhookComposition } from "../webhook-composition.build.ts";
@@ -51,28 +48,6 @@ describe("buildWebhookComposition", () => {
       await expect(built.assertEndpointsEntitled("org-1")).rejects.toBeInstanceOf(
         WebhookEndpointsNotEntitledError,
       );
-    });
-  });
-
-  describe("when a test fire asks this process to dispatch", () => {
-    /** @scenario "A test fire from the interactive process refuses by name" */
-    it("refuses by name instead of crashing on an unsupplied function", async () => {
-      const built = buildWebhookComposition({
-        entitlement: new FixedEntitlement(plan(true)),
-      });
-
-      await expect(
-        built.dispatch({
-          destination: { kind: "http", url: "https://example.com" },
-          organizationId: "org-1",
-          endpointId: "whep_1",
-          body: "{}",
-          batchId: "batch-1",
-          attempt: 1,
-          signingSecrets: ["whsec_1"],
-          isTestFire: true,
-        }),
-      ).rejects.toBeInstanceOf(WebhookDispatchUnavailableError);
     });
   });
 });

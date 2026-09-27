@@ -26,6 +26,7 @@ import {
 } from "../eventing/webhook-delivery.pipeline.ts";
 import type { WebhookEndpointRepository } from "../repositories/webhook-endpoint.repository.ts";
 import type { WebhookRepositories } from "../repositories/webhook.repositories.ts";
+import type { WebhookDispatchResult as DeliveryDispatchResult } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
 import {
   WebhookDeliveryService,
@@ -93,7 +94,7 @@ export type WebhookTestDispatchInput = {
 
 export type WebhookTestDispatch = (
   input: WebhookTestDispatchInput,
-) => Promise<WebhookDispatchResult>;
+) => Promise<DeliveryDispatchResult>;
 
 /** What the process composes this feature's application from. */
 export interface WebhookAppDependencies {
@@ -160,6 +161,13 @@ export class WebhookApp implements WebhookApiContract {
       entitlement: input.dependencies.entitlement,
     });
     const { entitlement } = input.dependencies;
+    const deliver = WebhookDeliveryService.dispatchThrough({
+      channel: HttpWebhookDispatchChannel.create({
+        redis: input.members.redis,
+        rejectUnauthorized: input.members.isSaas,
+      }),
+      allowInsecureLocal: input.config.allowInsecureLocalUrls,
+    });
 
     const app = new WebhookApp({
       endpoints: input.repositories.endpoints,
@@ -173,7 +181,7 @@ export class WebhookApp implements WebhookApiContract {
         processStore: input.repositories.processStore,
       }),
       assertEndpointsEntitled: built.assertEndpointsEntitled.bind(built),
-      dispatch: built.dispatch,
+      dispatch: deliver,
       testFireBounds: WebhookTestBoundsService.create({
         entitlement: input.dependencies.entitlement,
         rateLimiter: input.members.rateLimiter,
@@ -187,14 +195,7 @@ export class WebhookApp implements WebhookApiContract {
       endpoints: input.repositories.endpoints,
       retention: input.repositories.retention,
       getPlan: (organizationId) => entitlement.getActivePlan({ organizationId }),
-      dispatch: () =>
-        WebhookDeliveryService.dispatchThrough({
-          channel: HttpWebhookDispatchChannel.create({
-            redis: input.members.redis,
-            rejectUnauthorized: input.members.isSaas,
-          }),
-          allowInsecureLocal: input.config.allowInsecureLocalUrls,
-        }),
+      dispatch: () => deliver,
     };
     return app;
   }
@@ -316,12 +317,13 @@ export class WebhookApp implements WebhookApiContract {
         ? {
             delivered: true,
             responseStatus: result.status,
-            responseBody: String(result.body ?? "").slice(0, 500),
+            responseBody: (typeof result.body === "string" ? result.body : "").slice(0, 500),
           }
         : {
             delivered: false,
             responseStatus: result.status,
-            error: String(result.error ?? "").slice(0, 500),
+            responseBody: (result.error ?? "").slice(0, 500),
+            error: (result.error ?? "").slice(0, 500),
           };
     } catch (error) {
       // The full message goes to the delivery log for the operator; the
@@ -429,7 +431,7 @@ export class WebhookApp implements WebhookApiContract {
   }
 
   /** One endpoint's last delivery hop, for a test fire. */
-  dispatch(input: WebhookTestDispatchInput): Promise<WebhookDispatchResult> {
+  dispatch(input: WebhookTestDispatchInput): Promise<DeliveryDispatchResult> {
     return this.#dependencies.dispatch(input);
   }
 }

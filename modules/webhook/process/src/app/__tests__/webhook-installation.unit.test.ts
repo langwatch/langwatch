@@ -53,6 +53,7 @@ function process(role: "api" | "worker") {
     .provide({
       entitlement: createApiFixture<EntitlementApi>({
         getActivePlan: async () => entitledPlan,
+        requestBound: async () => 10,
       }),
     });
 }
@@ -78,6 +79,39 @@ describe("webhook app installation", () => {
           { id: endpoint.id },
         ]);
         await expect(app.getAll({ organizationId: "other-organization" })).resolves.toEqual([]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("when the API process is asked for a test fire", () => {
+    /** @scenario "A test fire from the API process dispatches through the delivery egress" */
+    it("dispatches it through the delivery egress rather than refusing", async () => {
+      const runtime = await process("api").boot();
+
+      try {
+        const app = runtime.service(WebhookApi);
+        const { endpoint } = await app.create({
+          organizationId: ORGANIZATION_ID,
+          url: "https://10.0.0.1/hooks/spend",
+          enabledEvents: ["gateway.request.completed"],
+        });
+
+        const result = await app.testFire({
+          organizationId: ORGANIZATION_ID,
+          endpointId: endpoint.id,
+        });
+
+        const log = await app.getDeliveries({
+          organizationId: ORGANIZATION_ID,
+          endpointId: endpoint.id,
+        });
+
+        // The egress fence refused the private address: the fire reached the real last hop.
+        expect(result).toMatchObject({ delivered: false, responseStatus: null });
+        expect(log.deliveries).toHaveLength(1);
+        expect(log.deliveries[0]?.error).toContain(`Webhook endpoint ${endpoint.id} (test)`);
       } finally {
         await runtime.stop();
       }
