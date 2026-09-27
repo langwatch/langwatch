@@ -116,6 +116,7 @@
     "@types/node": "catalog:",
     "@types/prompts": "catalog:",
     "@types/ws": "catalog:",
+    "@typescript-eslint/parser": "^8.58.1",
     "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "^5.0.0",
     "dotenv-cli": "^11.0.0",
