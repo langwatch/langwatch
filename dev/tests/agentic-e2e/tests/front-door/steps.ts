@@ -133,10 +133,13 @@ export async function signUpVerificationTokenAfterResponse(
   return findSignUpTokenFor(email);
 }
 
-const confirmedAddressSchema = z.object({
-  addressProof: z.string().min(1),
-  email: z.string().email(),
-});
+const confirmedAddressSchema = z.tuple([
+  z.object({
+    result: z.object({
+      data: z.object({ addressProof: z.string().min(1), email: z.string().email() }),
+    }),
+  }),
+]);
 
 /**
  * Proves a fresh address through the same public endpoints as the sign-up
@@ -148,19 +151,20 @@ export async function requestSignUpAddressProof(
   email: string,
 ): Promise<string> {
   const token = await requestSignUpVerificationToken(request, email);
-  const confirmationResponse = await request.post("/api/auth/sign-up/confirm-address", {
-    data: { token },
-    headers: betterAuthRequestHeaders(),
-  });
+  const confirmationResponse = await request.post(
+    "/api/trpc/auth.completeSignUpVerification?batch=1",
+    { data: { "0": { token } } },
+  );
   const confirmationBody: unknown = await confirmationResponse.json().catch(() => null);
   const confirmation = confirmedAddressSchema.safeParse(confirmationBody);
-  if (!confirmationResponse.ok() || !confirmation.success || confirmation.data.email !== email) {
+  const confirmed = confirmation.success ? confirmation.data[0].result.data : null;
+  if (!confirmationResponse.ok() || !confirmed || confirmed.email !== email) {
     throw new Error(
-      `confirm-address failed for ${email}: ${confirmationResponse.status()} ${JSON.stringify(confirmationBody).slice(0, 300)}`,
+      `completeSignUpVerification failed for ${email}: ${confirmationResponse.status()} ${JSON.stringify(confirmationBody).slice(0, 300)}`,
     );
   }
 
-  return confirmation.data.addressProof;
+  return confirmed.addressProof;
 }
 
 /**
