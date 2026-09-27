@@ -31,7 +31,6 @@ import {
   scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
-import type { ScenarioEventBroadcastPublisher } from "../../channels/redis/redis.scenario-event-broadcast.channel.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { ScenarioApp, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
@@ -63,7 +62,7 @@ async function buildProductionApp(publicBaseUrl: string | undefined, emitter = n
     secrets: scenarioTestSecrets,
     members: {
       ...scenarioHostMembers,
-      redis: createApiFixture<ScenarioEventBroadcastPublisher>(),
+      redis: null,
       publicBaseUrl,
       encryption: createApiFixture<Encryption>({
         encrypt: (value: string) => value,

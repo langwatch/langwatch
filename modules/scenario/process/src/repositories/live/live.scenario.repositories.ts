@@ -5,11 +5,6 @@ import { RunConfigurationsClickHouseRepository } from "../clickhouse/clickhouse.
 import { ClickHouseSimulationSession } from "../clickhouse/clickhouse.simulation-session.store.ts";
 import { ClickHouseStalledSimulationRunRepository } from "../clickhouse/clickhouse.stalled-simulation-run.repository.ts";
 import { PostgresScenarioRepositories } from "../prisma/prisma.scenario.repositories.ts";
-import {
-  DuplicatedCancellationConnection,
-  RedisCancellationPublisherAdapter,
-  RedisCancellationSubscriberAdapter,
-} from "../redis/redis.cancellation-channel.repository.ts";
 import { RedisScenarioTabStoreRepository } from "../redis/redis.scenario-tab-store.repository.ts";
 import { RedisSimulationRunProcessingRepository } from "../redis/redis.simulation-run-processing.repository.ts";
 import type { ScenarioRepositories } from "../scenario.repositories.ts";
@@ -27,10 +22,6 @@ export class LiveScenarioRepositories {
     return {
       ...PostgresScenarioRepositories.create({ prisma }),
       simulationRunProcessing: RedisSimulationRunProcessingRepository.create({ clickhouse, redis }),
-      cancellations: RedisCancellationPublisherAdapter.create(redis),
-      cancellationSubscriptions: RedisCancellationSubscriberAdapter.create(
-        DuplicatedCancellationConnection.over(redis),
-      ),
       stalledRuns: ClickHouseStalledSimulationRunRepository.create(clickhouse),
       tabs: RedisScenarioTabStoreRepository.create(redis),
       resultAtoms: ResultAtomsClickHouseRepository.create(sessions),

@@ -3,8 +3,8 @@ import { RedisConnectionService, type RedisConnection } from "@langwatch/redis-c
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
-  RedisCancellationPublisherAdapter,
-  RedisCancellationSubscriberAdapter,
+  RedisScenarioCancellationPublisherChannel,
+  RedisScenarioCancellationSubscriberChannel,
   type CancellationMessage,
 } from "../index.ts";
 
@@ -21,8 +21,8 @@ async function waitFor(condition: () => boolean, timeoutMs = 2_000): Promise<voi
 }
 
 function subscriber(messages: CancellationMessage[]) {
-  return RedisCancellationSubscriberAdapter.create(connection.duplicate()).subscribe((message) =>
-    messages.push(message),
+  return RedisScenarioCancellationSubscriberChannel.create(connection.duplicate()).subscribe(
+    (message) => messages.push(message),
   );
 }
 
@@ -52,7 +52,7 @@ describe.skipIf(!process.env.REDIS_URL)("Redis Scenario cancellation", () => {
       batchRunId: "batch-1",
     };
 
-    await RedisCancellationPublisherAdapter.create(connection).publish(message);
+    await RedisScenarioCancellationPublisherChannel.create(connection).publish(message);
     await waitFor(() => received.length === 1);
 
     expect(received).toEqual([message]);
@@ -65,7 +65,7 @@ describe.skipIf(!process.env.REDIS_URL)("Redis Scenario cancellation", () => {
     const second: CancellationMessage[] = [];
     const stopFirst = await subscriber(first);
     const stopSecond = await subscriber(second);
-    const publisher = RedisCancellationPublisherAdapter.create(connection);
+    const publisher = RedisScenarioCancellationPublisherChannel.create(connection);
 
     await publisher.publish({ projectId: "project-1", scenarioRunId: "run-a" });
     await publisher.publish({ projectId: "project-1", scenarioRunId: "run-b" });
@@ -77,7 +77,7 @@ describe.skipIf(!process.env.REDIS_URL)("Redis Scenario cancellation", () => {
   });
 
   it("does not replay a cancellation published before subscription", async () => {
-    const publisher = RedisCancellationPublisherAdapter.create(connection);
+    const publisher = RedisScenarioCancellationPublisherChannel.create(connection);
     await publisher.publish({ projectId: "project-1", scenarioRunId: "run-old" });
 
     const received: CancellationMessage[] = [];

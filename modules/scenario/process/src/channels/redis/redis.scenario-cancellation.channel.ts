@@ -8,11 +8,11 @@ import {
 
 export const CANCELLATION_CHANNEL = "scenario:cancel";
 
-export type CancellationPublisher = {
+export type CancellationPublisherClient = {
   publish: (channel: string, message: string) => Promise<number>;
 };
 
-export type CancellationSubscriber = {
+export type CancellationSubscriberClient = {
   subscribe: (channel: string) => Promise<unknown>;
   on: (event: "message", handler: (channel: string, message: string) => void) => void;
   quit: () => Promise<unknown>;
@@ -20,12 +20,12 @@ export type CancellationSubscriber = {
 
 const logger = createLogger("langwatch:scenarios:cancellation-channel");
 
-export class RedisCancellationPublisherAdapter implements CancellationPublisherPort {
-  static create(publisher: CancellationPublisher): RedisCancellationPublisherAdapter {
-    return new RedisCancellationPublisherAdapter(publisher);
+export class RedisScenarioCancellationPublisherChannel implements CancellationPublisherPort {
+  static create(publisher: CancellationPublisherClient): RedisScenarioCancellationPublisherChannel {
+    return new RedisScenarioCancellationPublisherChannel(publisher);
   }
 
-  private constructor(private readonly publisher: CancellationPublisher) {}
+  private constructor(private readonly publisher: CancellationPublisherClient) {}
 
   async publish(message: CancellationMessage): Promise<void> {
     await this.publisher.publish(CANCELLATION_CHANNEL, JSON.stringify(message));
@@ -50,12 +50,14 @@ export class UnavailableCancellationPublisherAdapter implements CancellationPubl
   }
 }
 
-export class RedisCancellationSubscriberAdapter implements CancellationSubscriberPort {
-  static create(subscriber: CancellationSubscriber): RedisCancellationSubscriberAdapter {
-    return new RedisCancellationSubscriberAdapter(subscriber);
+export class RedisScenarioCancellationSubscriberChannel implements CancellationSubscriberPort {
+  static create(
+    subscriber: CancellationSubscriberClient,
+  ): RedisScenarioCancellationSubscriberChannel {
+    return new RedisScenarioCancellationSubscriberChannel(subscriber);
   }
 
-  private constructor(private readonly subscriber: CancellationSubscriber) {}
+  private constructor(private readonly subscriber: CancellationSubscriberClient) {}
 
   async subscribe(
     onCancellation: (message: CancellationMessage) => void,
@@ -104,12 +106,14 @@ export class RedisCancellationSubscriberAdapter implements CancellationSubscribe
  * A dedicated connection, opened on first subscribe: a client in subscribe mode
  * can issue nothing else, and a process that never consumes never opens one.
  */
-export class DuplicatedCancellationConnection implements CancellationSubscriber {
-  #connection: CancellationSubscriber | undefined;
+export class DuplicatedCancellationConnection implements CancellationSubscriberClient {
+  #connection: CancellationSubscriberClient | undefined;
 
-  private constructor(private readonly source: { duplicate(): CancellationSubscriber }) {}
+  private constructor(private readonly source: { duplicate(): CancellationSubscriberClient }) {}
 
-  static over(source: { duplicate(): CancellationSubscriber }): DuplicatedCancellationConnection {
+  static over(source: {
+    duplicate(): CancellationSubscriberClient;
+  }): DuplicatedCancellationConnection {
     return new DuplicatedCancellationConnection(source);
   }
 
@@ -125,7 +129,7 @@ export class DuplicatedCancellationConnection implements CancellationSubscriber 
     return this.#connection?.quit();
   }
 
-  #opened(): CancellationSubscriber {
+  #opened(): CancellationSubscriberClient {
     this.#connection ??= this.source.duplicate();
     return this.#connection;
   }

@@ -15,6 +15,12 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { AgentTestingRunDrawer } from "../../agent-testing/drawers/agent-testing-run-drawer.tsx";
 import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer.tsx";
 
+// Trace lends the thread; a synchronous stand-in keeps this suite on the drawer's layout.
+vi.mock("../../../../behavior/lent-trace.tsx", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ConversationThread: (await import("./stub-conversation-thread.tsx")).StubConversationThread,
+}));
+
 const mockGetRunState = vi.hoisted(() => vi.fn());
 const mockGetScenario = vi.hoisted(() => vi.fn());
 const mockGetBatchRunData = vi.hoisted(() => vi.fn());
@@ -724,31 +730,15 @@ describe("the wide run detail drawer", () => {
 
     const panel = screen.getByTestId("run-verdict-panel");
     const failed = within(panel).getByTestId("run-verdict-failed-criteria");
-    const inconclusive = within(panel).getByTestId(
-      "run-verdict-inconclusive-criteria",
-    );
-    expect(
-      within(inconclusive).getByText("Inconclusive criteria"),
-    ).toBeInTheDocument();
-    expect(
-      within(inconclusive).getByText("opens a ticket"),
-    ).toBeInTheDocument();
-    expect(
-      within(failed).queryByText("opens a ticket"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(failed).getByText("names the refund window"),
-    ).toBeInTheDocument();
+    const inconclusive = within(panel).getByTestId("run-verdict-inconclusive-criteria");
+    expect(within(inconclusive).getByText("Inconclusive criteria")).toBeInTheDocument();
+    expect(within(inconclusive).getByText("opens a ticket")).toBeInTheDocument();
+    expect(within(failed).queryByText("opens a ticket")).not.toBeInTheDocument();
+    expect(within(failed).getByText("names the refund window")).toBeInTheDocument();
     const text = panel.textContent ?? "";
-    expect(text.indexOf("Failed criteria")).toBeLessThan(
-      text.indexOf("Inconclusive criteria"),
-    );
-    expect(text.indexOf("Inconclusive criteria")).toBeLessThan(
-      text.indexOf("Passed criteria"),
-    );
-    expect(
-      inconclusive.querySelectorAll("svg.lucide-circle-dashed"),
-    ).toHaveLength(1);
+    expect(text.indexOf("Failed criteria")).toBeLessThan(text.indexOf("Inconclusive criteria"));
+    expect(text.indexOf("Inconclusive criteria")).toBeLessThan(text.indexOf("Passed criteria"));
+    expect(inconclusive.querySelectorAll("svg.lucide-circle-dashed")).toHaveLength(1);
     expect(panel.querySelectorAll("svg.lucide-circle-x")).toHaveLength(1);
   });
 

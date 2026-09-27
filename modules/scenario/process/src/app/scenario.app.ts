@@ -139,6 +139,14 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import { MemoryScenarioCancellationChannel } from "../channels/memory/memory.scenario-cancellation.channel.ts";
+import {
+  DuplicatedCancellationConnection,
+  RedisScenarioCancellationPublisherChannel,
+  RedisScenarioCancellationSubscriberChannel,
+  type CancellationPublisherClient,
+  type CancellationSubscriberClient,
+} from "../channels/redis/redis.scenario-cancellation.channel.ts";
 import type { ScenarioEventBroadcastPublisher } from "../channels/redis/redis.scenario-event-broadcast.channel.ts";
 import { scenarioEventBroadcastChannels } from "../channels/scenario-event-broadcast-channels.registry.ts";
 import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
@@ -267,6 +275,10 @@ export type ScenarioReadOnlyClickHouse = Readonly<{
   }): Promise<{ rows: Row[] }>;
 }>;
 
+/** The process's Redis as scenario reaches it: fan-out publishes and a duplicable subscriber. */
+export type ScenarioRedis = ScenarioEventBroadcastPublisher &
+  CancellationPublisherClient & { duplicate(): CancellationSubscriberClient };
+
 type ScenarioProcessMembers = Readonly<{
   clickhouse: ScenarioReadOnlyClickHouse;
   encryption: Readonly<{ encrypt(plaintext: string): string; decrypt(ciphertext: string): string }>;
@@ -277,7 +289,8 @@ type ScenarioProcessMembers = Readonly<{
     ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number }>>;
   }>;
   idempotency: Readonly<{ claim(key: string, ttlSeconds: number): Promise<boolean> }>;
-  redis: ScenarioEventBroadcastPublisher;
+  /** Broadcasts and cancel signals across the fleet; absent in a memory process. */
+  redis: ScenarioRedis | null;
   publicBaseUrl: string | undefined;
   nlpServiceUrl: string | undefined;
   nlpCodeBlockTimeoutSeconds: string | undefined;
@@ -370,7 +383,19 @@ export class ScenarioApp implements ScenarioApi {
       nlpServiceUrl: setup.members.nlpServiceUrl ?? "",
       legacyDefaultModel: config.defaultModel ?? DEFAULT_MODEL,
     };
-    const broadcast = scenarioEventBroadcastChannels.live.create(setup.members.redis);
+    const { redis } = setup.members;
+    const broadcast = redis
+      ? scenarioEventBroadcastChannels.live.create(redis)
+      : scenarioEventBroadcastChannels.memory.create();
+    const memoryCancellations = MemoryScenarioCancellationChannel.create();
+    const cancellations = redis
+      ? RedisScenarioCancellationPublisherChannel.create(redis)
+      : memoryCancellations;
+    const cancellationSubscriptions = redis
+      ? RedisScenarioCancellationSubscriberChannel.create(
+          DuplicatedCancellationConnection.over(redis),
+        )
+      : memoryCancellations;
     const platformLinks = ScenarioPlatformLinkService.create({
       featureFlags: setup.dependencies.featureFlags,
       projects: setup.dependencies.projects,
@@ -457,7 +482,7 @@ export class ScenarioApp implements ScenarioApi {
       simulationCommands,
       simulationProcessing: SimulationProcessingService.create({
         runs: setup.repositories.simulationRunProcessing,
-        cancellations: setup.repositories.cancellations,
+        cancellations,
         traces: setup.dependencies.traces,
         retention: setup.dependencies.retention,
         commands: simulationCommands,
@@ -493,8 +518,8 @@ export class ScenarioApp implements ScenarioApi {
           scenarios,
           simulations,
           secretCipher,
-          cancellations: setup.repositories.cancellations,
-          cancellationSubscriptions: setup.repositories.cancellationSubscriptions,
+          cancellations,
+          cancellationSubscriptions,
           config: setup.config,
           host: {
             nlpServiceUrl: setup.members.nlpServiceUrl,

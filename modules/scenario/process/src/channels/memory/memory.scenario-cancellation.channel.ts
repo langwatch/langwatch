@@ -5,7 +5,7 @@ import type {
 } from "../../app/scenario.app.ts";
 
 /** Cancellations published in one process, kept in order and handed to its subscribers. */
-export class MemoryCancellationChannelRepository
+export class MemoryScenarioCancellationChannel
   implements CancellationPublisher, CancellationSubscriber
 {
   readonly published: CancellationMessage[] = [];
@@ -13,8 +13,8 @@ export class MemoryCancellationChannelRepository
 
   private constructor() {}
 
-  static create(): MemoryCancellationChannelRepository {
-    return new MemoryCancellationChannelRepository();
+  static create(): MemoryScenarioCancellationChannel {
+    return new MemoryScenarioCancellationChannel();
   }
 
   async publish(message: CancellationMessage): Promise<void> {

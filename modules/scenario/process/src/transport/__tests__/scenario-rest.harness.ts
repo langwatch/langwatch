@@ -34,9 +34,12 @@ import {
   scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
-import type { ScenarioReadOnlyClickHouse, ScenarioTabStore } from "../../app/scenario.app.ts";
-import { ScenarioApp } from "../../app/scenario.app.ts";
-import type { ScenarioEventBroadcastPublisher } from "../../channels/redis/redis.scenario-event-broadcast.channel.ts";
+import {
+  ScenarioApp,
+  type ScenarioReadOnlyClickHouse,
+  type ScenarioRedis,
+  type ScenarioTabStore,
+} from "../../app/scenario.app.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 
 export const PROJECT_ID = "project_scenario_rest";
@@ -47,7 +50,7 @@ export async function createScenarioRestTestApp(
   options: {
     simulations?: Partial<SimulationService>;
     tabs?: Partial<ScenarioTabStore>;
-    redis?: Partial<ScenarioEventBroadcastPublisher>;
+    redis?: Partial<ScenarioRedis>;
     traces?: Partial<TraceApi>;
     billing?: Partial<BillingApi>;
     plans?: Partial<EntitlementApi>;
@@ -59,7 +62,7 @@ export async function createScenarioRestTestApp(
     options.simulations ?? {},
     "Simulation service",
   );
-  const redis = createApiFixture<ScenarioEventBroadcastPublisher>(options.redis ?? {}, "Redis");
+  const redis = createApiFixture<ScenarioRedis>(options.redis ?? {}, "Redis");
 
   const app = await ScenarioApp.create({
     repositories: {
