@@ -105,7 +105,8 @@ export interface SocialProviderDeps {
    * Called with the Microsoft id token claims before better-auth
    * looks the account up, so an account stored under its pre-3.17 key can be
    * moved onto the one the lookup asks for (`microsoft-account-rekey.ts`).
-   * Must not throw: a failure here costs the re-key, never the sign-in.
+   * A throw stops the sign-in: the callback fails and the user retries,
+   * rather than better-auth looking up an account still on its old key.
    */
   onMicrosoftProfile?: (profile: Record<string, unknown>) => Promise<void>;
 }

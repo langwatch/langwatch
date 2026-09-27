@@ -35,3 +35,19 @@ Feature: Azure AD accounts keep signing in after the better-auth 1.7 upgrade
     And a second Microsoft account still stored under the token's sub
     When the user signs in with Microsoft
     Then both accounts are left as they are
+
+  @integration
+  Scenario: A pre-3.17 Azure AD user signs in through the Microsoft callback onto their existing account
+    Given a user whose Microsoft account is stored under its sub and the synthetic issuer
+    And the identifier the upgrade adopted from that account
+    When the user completes a Microsoft sign-in
+    Then the account is moved onto the token's issuer and oid before it is looked up
+    And the sign-in lands on the existing user with no second user or account
+
+  @unit @integration
+  Scenario: A sign-in whose account move fails is stopped instead of reaching account linking
+    Given a user whose Microsoft account is stored under its sub and the synthetic issuer
+    When the user signs in with Microsoft and the account cannot be moved
+    Then the sign-in fails without a session
+    And no second user or account is created and the account keeps its old key
+    And signing in again moves the account and signs the user in

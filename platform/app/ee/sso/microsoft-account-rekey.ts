@@ -18,6 +18,30 @@
  * `sub` is the row better-auth 1.6 would have found for it, and it is moved to
  * `(iss, oid)`. Works for single-tenant and multi-tenant (`common`,
  * `organizations`) deployments alike, with no operator step.
+ *
+ * Exempt from the identity replay-parity invariant (ADR-101 §3), on purpose.
+ * The account key is fold-owned for a user whose identity history exists:
+ * `Identifier.issuer`/`providerAccountId` and the same columns of `Account`
+ * (`FOLD_OWNED_ACCOUNT_COLUMNS`) are written by
+ * `PrismaIdentityProjectionRepository`, and this module writes both directly.
+ * What that costs and why it is accepted:
+ *
+ * - Live folds keep the move. The fold loads its state from the `Identifier`
+ *   rows, so every later event for the user re-projects the moved key.
+ * - A rebuild from the event log restores the pre-3.17 key on both tables.
+ *   That is exactly the state this module takes as input, and it runs on
+ *   every Microsoft callback before better-auth's lookup, so the next
+ *   sign-in moves the rows again and the lookup still finds them.
+ * - No existing identity fact states a key move. Detach plus attach would
+ *   re-derive the identifier id, and the fold deletes the `Account` row of a
+ *   detached identifier, taking the user's tokens with it mid sign-in. A
+ *   dedicated fact is a new event type every folding pod has to understand
+ *   before any pod writes one, which a one-time upgrade move does not
+ *   justify.
+ * - A user the identifier backfill still holds at `migrated` is re-read on
+ *   the next pass: the moved account then plans an identifier under the new
+ *   subject, and the moved row is reported as `surplus_row` on the migrations
+ *   page until an operator detaches it. A finalized user is never re-run.
  */
 
 import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
@@ -61,8 +85,10 @@ export type MicrosoftAccountRekeyResult = "rekeyed" | "unchanged";
 
 /**
  * Applies the move to the `Account` row still on the legacy key, and to the
- * `Identifier` rows seeded from it. A row already on the 1.7 key, or a
- * subject no legacy row holds, leaves everything as it is.
+ * `Identifier` rows seeded from it, in one transaction so the fold never
+ * reads one table moved and the other not. A row already on the 1.7 key, or
+ * a subject no legacy row holds, leaves everything as it is. Both writes are
+ * the replay-parity exemption the module docblock describes.
  */
 export async function rekeyLegacyMicrosoftAccount({
   prisma,
@@ -113,8 +139,13 @@ export async function rekeyLegacyMicrosoftAccount({
 
 /**
  * The sign-in callback `buildSocialProviders` takes as `onMicrosoftProfile`.
- * Never throws: when the re-key fails the sign-in carries on to better-auth's
- * own lookup, exactly as it would without this step.
+ *
+ * A failed move stops the sign-in. Carrying on would send better-auth's
+ * lookup past a row still on the legacy key, into account linking, which
+ * either refuses the user or gives them a second account beside the one that
+ * holds their access. The error propagates out of the callback instead, the
+ * rows stay as they were, and the next attempt tries the move again. A token
+ * that asks for no move, or a move with nothing left to do, proceeds.
  */
 export function microsoftProfileRekey({
   prisma,
@@ -133,10 +164,11 @@ export function microsoftProfileRekey({
         );
       }
     } catch (error) {
-      logger.warn(
+      logger.error(
         { error },
-        "could not move a pre-3.17 Microsoft account onto its better-auth 1.7 key",
+        "could not move a pre-3.17 Microsoft account onto its better-auth 1.7 key; the sign-in is stopped",
       );
+      throw error;
     }
   };
 }

@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { microsoftAccountKeyMove } from "../microsoft-account-rekey";
+import {
+  microsoftAccountKeyMove,
+  microsoftProfileRekey,
+} from "../microsoft-account-rekey";
 import { buildSocialProviders } from "../providers";
 
 const TENANT = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";
@@ -32,6 +35,46 @@ describe("microsoftAccountKeyMove", () => {
       expect(
         microsoftAccountKeyMove({ ...token, sub: "same", oid: "same" }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("microsoftProfileRekey", () => {
+  const failingPrisma = () => ({
+    $transaction: vi.fn(async () => {
+      throw new Error("connection terminated");
+    }),
+  });
+
+  describe("when the move fails", () => {
+    /** @scenario "A sign-in whose account move fails is stopped instead of reaching account linking" */
+    it("propagates the failure so the sign-in stops", async () => {
+      const prisma = failingPrisma();
+      const signIn = microsoftProfileRekey({ prisma: prisma as never });
+
+      await expect(signIn(token)).rejects.toThrow("connection terminated");
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the token asks for no move", () => {
+    it("proceeds without touching the database", async () => {
+      const prisma = failingPrisma();
+      const signIn = microsoftProfileRekey({ prisma: prisma as never });
+
+      await expect(
+        signIn({ ...token, oid: undefined }),
+      ).resolves.toBeUndefined();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when there is nothing left to move", () => {
+    it("proceeds", async () => {
+      const prisma = { $transaction: vi.fn(async () => "unchanged") };
+      const signIn = microsoftProfileRekey({ prisma: prisma as never });
+
+      await expect(signIn(token)).resolves.toBeUndefined();
     });
   });
 });

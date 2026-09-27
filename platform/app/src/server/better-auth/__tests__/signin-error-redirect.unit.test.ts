@@ -18,7 +18,11 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { withholdInternalSignInError } from "../signin-error-redirect";
+import { GENERIC_SIGN_IN_ERROR_CODE } from "~/features/auth/logic/signInErrorCodes";
+import {
+  redirectFailedSignInCallback,
+  withholdInternalSignInError,
+} from "../signin-error-redirect";
 
 const ERROR_PAGE = "https://app.langwatch.test/auth/error";
 
@@ -237,5 +241,69 @@ describe("given an answer that is not a failed sign-in", () => {
     ).toBe(bare);
 
     expect(errorLog).not.toHaveBeenCalled();
+  });
+});
+
+describe("given a sign-in callback that fails on the server", () => {
+  describe("when the browser receives the answer", () => {
+    /** @scenario "A sign-in callback that fails on the server lands on the error screen" */
+    it.each([
+      "/api/auth/callback/microsoft",
+      "/api/auth/oauth2/callback/okta",
+      "/api/auth/sso/callback/conn_1",
+      "/api/auth/sso/saml2/sp/acs/conn_1",
+    ])("redirects %s to the error screen with the generic code and trace", (path) => {
+      const answered = redirectFailedSignInCallback({
+        response: new Response(null, { status: 500 }),
+        path,
+        errorPageUrl: ERROR_PAGE,
+        traceId: "trace_1",
+      });
+
+      expect(answered.status).toBe(302);
+      const location = locationOf(answered);
+      expect(location.pathname).toBe("/auth/error");
+      expect(location.searchParams.get("error")).toBe(
+        GENERIC_SIGN_IN_ERROR_CODE,
+      );
+      expect(location.searchParams.get("trace")).toBe("trace_1");
+      expect(errorLog).toHaveBeenCalledWith(
+        expect.objectContaining({ path, traceId: "trace_1", status: 500 }),
+        expect.any(String),
+      );
+    });
+  });
+});
+
+describe("given an auth request that is not a sign-in callback", () => {
+  describe("when it fails on the server", () => {
+    /** @scenario "A server error on an auth route that is not a callback keeps its status" */
+    it.each([
+      "/api/auth/sign-in/email",
+      "/api/auth/get-session",
+      "/api/auth/sso/saml2/sp/metadata",
+    ])("answers %s with the server error itself", (path) => {
+      const response = new Response(null, { status: 500 });
+      const answered = redirectFailedSignInCallback({
+        response,
+        path,
+        errorPageUrl: ERROR_PAGE,
+        traceId: "trace_1",
+      });
+      expect(answered).toBe(response);
+    });
+  });
+
+  describe("when a callback answers below 500", () => {
+    it("leaves the answer alone", () => {
+      const response = new Response(null, { status: 302 });
+      expect(
+        redirectFailedSignInCallback({
+          response,
+          path: "/api/auth/callback/microsoft",
+          errorPageUrl: ERROR_PAGE,
+        }),
+      ).toBe(response);
+    });
   });
 });

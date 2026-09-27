@@ -85,3 +85,20 @@ Feature: What a failed single sign-on is allowed to say
     # `?error_description=` is as caller-controlled as `?error=`, and the
     # screen already refuses to echo the second. Echoing the first would put
     # attacker-chosen prose under LangWatch branding just the same.
+
+  # A sign-in callback is opened by the browser, not by code, so a server
+  # error there must land on the sign-in error screen rather than a blank
+  # page. Other auth routes are called by the app and API clients, which read
+  # the status, so they keep their 5xx.
+  @unit
+  Scenario: A sign-in callback that fails on the server lands on the error screen
+    Given a sign-in callback from an identity provider fails with a server error
+    When the person's browser receives the answer
+    Then they are redirected to the sign-in error screen with the generic code
+    And the trace id travels with it and the cause is logged
+
+  @unit
+  Scenario: A server error on an auth route that is not a callback keeps its status
+    Given an auth request that is not a sign-in callback fails with a server error
+    When the caller receives the answer
+    Then it is the server error itself, not a redirect
