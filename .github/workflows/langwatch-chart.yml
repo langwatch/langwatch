@@ -245,7 +245,7 @@ jobs:
       - run: helm repo add langwatch https://langwatch.github.io/langwatch
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/platform-api..."
+          install: "@langwatch/platform-api... @langwatch/langy-browser..."
       - name: Generate required files
         run: pnpm start:prepare:files && pnpm ensure:built
       # The integration config's globalSetup runs ClickHouse migrations via
