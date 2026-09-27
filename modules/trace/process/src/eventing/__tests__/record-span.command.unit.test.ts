@@ -242,13 +242,18 @@ describe("EventingRecordSpanAdapter", () => {
     async function emittedResourceAfterReceiver(apiKeyId: string | null) {
       const input = commandData({ resource: { attributes: [] } });
       const request = { resourceSpans: [{ resource: input.resource }] };
-      applyOtlpReceiverPolicy(request, "traces", apiKeyId, {
-        resourceAttributeKeysToRemove: [],
-        resourceAttributes: [
-          { key: "langwatch.source", value: { stringValue: "claude_code" } },
-          { key: "langwatch.organization_id", value: { stringValue: "org_1" } },
-          { key: "langwatch.origin", value: { stringValue: "coding_agent" } },
-        ],
+      applyOtlpReceiverPolicy({
+        request,
+        signal: "traces",
+        apiKeyId,
+        policy: {
+          resourceAttributeKeysToRemove: [],
+          resourceAttributes: [
+            { key: "langwatch.source", value: { stringValue: "claude_code" } },
+            { key: "langwatch.organization_id", value: { stringValue: "org_1" } },
+            { key: "langwatch.origin", value: { stringValue: "coding_agent" } },
+          ],
+        },
       });
       input.resource = request.resourceSpans[0]!.resource;
 

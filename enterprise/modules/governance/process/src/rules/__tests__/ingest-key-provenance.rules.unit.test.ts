@@ -68,7 +68,7 @@ describe("Governance receiver policy", () => {
         resourceLogs: [group, {}],
         resourceMetrics: [group, {}],
       };
-      applyOtlpReceiverPolicy(request, signal, "key_real", policies[signal]);
+      applyOtlpReceiverPolicy({ request, signal, apiKeyId: "key_real", policy: policies[signal] });
       const rows = attributes(request, signal);
       const expectedBilling = { traces: "true", logs: "true", metrics: void 0 }[signal];
 
@@ -129,7 +129,7 @@ describe("Governance receiver policy", () => {
         resourceSpans: [{ scopeSpans: groups }, { scopeSpans: [{}] }],
         resourceMetrics: [{ scopeMetrics: groups }, { scopeMetrics: [{}] }],
       };
-      const result = applyOtlpReceiverPolicy(request, signal, "key_real", policy);
+      const result = applyOtlpReceiverPolicy({ request, signal, apiKeyId: "key_real", policy });
       expect(result.droppedScopes).toBe(3);
       const scopes =
         signal === "traces"
@@ -153,8 +153,14 @@ describe("Governance receiver policy", () => {
       resourceSpans: [{ scopeSpans: [{ scope: { name: "custom" } }] }],
       resourceLogs: [{ scopeLogs: [{ scope: { name: "custom" } }] }],
     };
-    expect(applyOtlpReceiverPolicy(request, "traces", "key", other.traces).droppedScopes).toBe(0);
-    expect(applyOtlpReceiverPolicy(request, "logs", "key", vscode.logs).droppedScopes).toBe(0);
+    expect(
+      applyOtlpReceiverPolicy({ request, signal: "traces", apiKeyId: "key", policy: other.traces })
+        .droppedScopes,
+    ).toBe(0);
+    expect(
+      applyOtlpReceiverPolicy({ request, signal: "logs", apiKeyId: "key", policy: vscode.logs })
+        .droppedScopes,
+    ).toBe(0);
     expect(request.resourceSpans?.[0]?.scopeSpans?.[0]?.scope?.name).toBe("custom");
     expect(request.resourceLogs?.[0]?.scopeLogs?.[0]?.scope?.name).toBe("custom");
   });
