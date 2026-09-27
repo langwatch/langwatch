@@ -19,11 +19,55 @@ export interface ProjectKeySources {
   fetchKeyBySlug: (slug: string) => Promise<string>;
 }
 
-/** Reads a project's key by id. A 401 or 403 on the way keeps its status for the caller. */
+/**
+ * A failure on the way to the key, naming the step that failed: the lookup
+ * answers to the permission to view the project, the key to the permission to
+ * manage it, so the caller's guidance depends on which one refused.
+ */
+export class ProjectKeyError extends Error {
+  constructor(
+    readonly stage: "lookup" | "key",
+    readonly status: number | undefined,
+    readonly code: string | undefined,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ProjectKeyError";
+  }
+}
+
+function asProjectKeyError(stage: "lookup" | "key", error: unknown): ProjectKeyError {
+  const { status, httpStatus, code, message } = (error ?? {}) as {
+    status?: unknown;
+    httpStatus?: unknown;
+    code?: unknown;
+    message?: unknown;
+  };
+  return new ProjectKeyError(
+    stage,
+    typeof status === "number" ? status : typeof httpStatus === "number" ? httpStatus : undefined,
+    typeof code === "string" ? code : undefined,
+    typeof message === "string" ? message : "the project's key could not be read",
+  );
+}
+
+/** Reads a project's key by id. A failure keeps its status and names the step that failed. */
 export function createProjectKeyReader(
   sources: ProjectKeySources,
 ): (projectId: string) => Promise<string> {
-  return async (projectId) => sources.fetchKeyBySlug(await sources.lookupSlug(projectId));
+  return async (projectId) => {
+    let slug: string;
+    try {
+      slug = await sources.lookupSlug(projectId);
+    } catch (error) {
+      throw asProjectKeyError("lookup", error);
+    }
+    try {
+      return await sources.fetchKeyBySlug(slug);
+    } catch (error) {
+      throw asProjectKeyError("key", error);
+    }
+  };
 }
 
 /** The reader over the platform: the signed-in credentials for the lookup, the device session for the key. */

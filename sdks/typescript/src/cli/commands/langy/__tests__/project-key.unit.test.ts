@@ -113,11 +113,55 @@ describe("platformProjectKeyReader", () => {
 });
 
 describe("createProjectKeyReader", () => {
-  it("fetches the key for the slug the lookup found", async () => {
-    const read = createProjectKeyReader({
-      lookupSlug: async (id) => (id === "project_acme" ? "acme-shop" : "other"),
-      fetchKeyBySlug: async (slug) => `key-for-${slug}`,
+  describe("given a lookup that finds the project's slug", () => {
+    describe("when the key is read by the project's id", () => {
+      it("fetches the key for the slug the lookup found", async () => {
+        const read = createProjectKeyReader({
+          lookupSlug: async (id) => (id === "project_acme" ? "acme-shop" : "other"),
+          fetchKeyBySlug: async (slug) => `key-for-${slug}`,
+        });
+        await expect(read("project_acme")).resolves.toBe("key-for-acme-shop");
+      });
     });
-    await expect(read("project_acme")).resolves.toBe("key-for-acme-shop");
+  });
+
+  describe("given a lookup the platform refuses", () => {
+    describe("when the key is read", () => {
+      it("names the lookup as the step that failed and keeps its status", async () => {
+        const fetched: string[] = [];
+        const read = createProjectKeyReader({
+          lookupSlug: async () => {
+            throw Object.assign(new Error("Insufficient permissions"), { status: 403 });
+          },
+          fetchKeyBySlug: async (slug) => (fetched.push(slug), "never"),
+        });
+        await expect(read("project_acme")).rejects.toMatchObject({
+          stage: "lookup",
+          status: 403,
+        });
+        expect(fetched).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a key exchange the platform refuses", () => {
+    describe("when the key is read", () => {
+      it("names the key as the step that failed, with its status and code", async () => {
+        const read = createProjectKeyReader({
+          lookupSlug: async () => "acme-shop",
+          fetchKeyBySlug: async () => {
+            throw Object.assign(new Error("No project"), {
+              status: 404,
+              code: "project_not_found",
+            });
+          },
+        });
+        await expect(read("project_acme")).rejects.toMatchObject({
+          stage: "key",
+          status: 404,
+          code: "project_not_found",
+        });
+      });
+    });
   });
 });

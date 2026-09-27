@@ -226,10 +226,29 @@ export function startLangySession(options: LangySessionOptions): LangySession {
           message: `The LangWatch login on this machine has expired, so ${file} was not changed. Tell the user in one line to run \`langwatch login --device\` in that terminal, and offer to write the credentials again after.`,
         });
       }
+      const { stage, code } = refusalStep(error);
+      if (status === 403 && stage === "lookup") {
+        throw new LocalCallFailure({
+          code: "key_refused",
+          message: `The LangWatch login on this machine cannot see ${project.name} (it needs project:view), so ${file} was not changed. Tell the user in one line to sign in with an account that belongs to the project (\`langwatch login --device\`), and offer to write the credentials again after.`,
+        });
+      }
       if (status === 403) {
         throw new LocalCallFailure({
           code: "key_refused",
           message: `LangWatch did not hand out the project's key to this login: it needs admin access (project:manage) on ${project.name}, so ${file} was not changed. Tell the user in one line that a project admin can grant it, and offer to write the credentials again after.`,
+        });
+      }
+      if (code === "endpoint_missing") {
+        throw new LocalCallFailure({
+          code: "key_refused",
+          message: `This LangWatch server is older than the command line and cannot hand out a project's key to it, so ${file} was not changed. Tell the user in one line that the credentials were not written and that updating LangWatch fixes it.`,
+        });
+      }
+      if (status === 404) {
+        throw new LocalCallFailure({
+          code: "key_refused",
+          message: `LangWatch found no project ${project.name} for the login on this machine, so ${file} was not changed. Tell the user in one line to sign in to the organization that owns the project (\`langwatch login --device\`), and offer to write the credentials again after.`,
         });
       }
       throw new LocalCallFailure({
@@ -662,6 +681,15 @@ function runFileTool({
 }
 
 /** The HTTP status a rejected key request carries, whichever client threw it. */
+/** Which step refused the key (the key exchange unless the error names the lookup) and its code. */
+function refusalStep(error: unknown): { stage: "lookup" | "key"; code: string | undefined } {
+  const { stage, code } = (error ?? {}) as { stage?: unknown; code?: unknown };
+  return {
+    stage: stage === "lookup" ? "lookup" : "key",
+    code: typeof code === "string" ? code : undefined,
+  };
+}
+
 function refusalStatus(error: unknown): number | undefined {
   if (typeof error !== "object" || error === null) return undefined;
   const { status, httpStatus } = error as {
