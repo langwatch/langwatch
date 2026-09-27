@@ -169,12 +169,12 @@ func (s *llmStreamSniffer) inspectPayload(payload []byte) {
 	e := decodeProviderErrorBody(payload, 0, "text/event-stream")
 	s.entry.setLLMError(e)
 
-	hard := hasHardLimitReason(e)
-	strikes := s.entry.strikeRateLimit()
-	if !hard {
+	// The consecutive-429 count is left to the status path: an in-stream error
+	// is not a rejected call, and counting it would let a later burst of 429s
+	// reach the cut sooner and end the worker's retries.
+	if !hasHardLimitReason(e) {
 		s.logger.Info("otelrelay llm in-stream error event captured",
-			zap.String("conversation", s.entry.info.ConversationID),
-			zap.Int("consecutive", strikes))
+			zap.String("conversation", s.entry.info.ConversationID))
 		return
 	}
 
@@ -188,6 +188,5 @@ func (s *llmStreamSniffer) inspectPayload(payload []byte) {
 	s.entry.latchLLMStreamCut(cutBody)
 	s.logger.Info("otelrelay llm in-stream failure latched for retry cut",
 		zap.String("conversation", s.entry.info.ConversationID),
-		zap.Bool("hard_limit", hard),
-		zap.Int("consecutive", strikes))
+		zap.Bool("hard_limit", true))
 }

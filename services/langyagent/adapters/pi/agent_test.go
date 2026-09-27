@@ -600,8 +600,12 @@ func TestStreamState_RetryEventsDrawTheStatusLine(t *testing.T) {
 		got = append(got, f.JSON())
 		return true
 	})
-	state.apply(wireEvent{Type: eventRetrying, TurnID: "t1", Attempt: 2, MaxAttempts: 5, DelayMs: 2140})
-	state.apply(wireEvent{Type: eventRetrySettled, TurnID: "t1"})
+	if !state.apply(wireEvent{Type: eventRetrying, TurnID: "t1", Attempt: 2, MaxAttempts: 5, DelayMs: 2140}) {
+		t.Fatal("the retrying status did not reach the relay")
+	}
+	if !state.apply(wireEvent{Type: eventRetrySettled, TurnID: "t1"}) {
+		t.Fatal("the cleared status did not reach the relay")
+	}
 
 	want := []string{
 		`{"type":"status","status":"Retrying (2 of 5)"}`,
