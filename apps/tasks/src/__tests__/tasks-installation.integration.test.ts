@@ -146,10 +146,10 @@ describe("the tasks process installation", () => {
         "report-schedule-backfill",
         "stripe-prices-sync",
         "dataset-content-backfill",
+        "demo-data",
         "model-registry-sync",
         "process-manager-purge",
         "stalled-runs-backfill",
-        "seed-demo",
         "topic-clustering-run",
       ]);
     } finally {

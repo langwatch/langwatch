@@ -15,6 +15,7 @@ import { dataPrivacyServer } from "@langwatch/data-privacy-process";
 import { dataRetentionServer } from "@langwatch/data-retention-process";
 import { datasetServer } from "@langwatch/dataset-process";
 import { billingServer } from "@langwatch/enterprise-billing-process";
+import { demoDataServer } from "@langwatch/enterprise-demo-data-process";
 import { enterpriseGatewayServer } from "@langwatch/enterprise-gateway-process";
 import { governanceServer } from "@langwatch/enterprise-governance-process";
 import { licensingServer } from "@langwatch/enterprise-licensing-process";
@@ -22,7 +23,6 @@ import { managedProviderServer } from "@langwatch/enterprise-managed-provider-pr
 import { enterpriseOpsServer } from "@langwatch/enterprise-ops-process";
 import { saasServer } from "@langwatch/enterprise-saas-process";
 import { scimServer } from "@langwatch/enterprise-scim-process";
-import { seedDemoServer } from "@langwatch/enterprise-seed-demo-process";
 import { ssoServer } from "@langwatch/enterprise-sso-process";
 import { entitlementServer } from "@langwatch/entitlement-process";
 import { evaluationServer } from "@langwatch/evaluation-process";
@@ -75,6 +75,7 @@ export const serverModules = [
   dataPrivacyServer,
   dataRetentionServer,
   datasetServer,
+  demoDataServer,
   enterpriseGatewayServer,
   enterpriseOpsServer,
   entitlementServer,
@@ -108,7 +109,6 @@ export const serverModules = [
   scenarioServer,
   scimServer,
   secretServer,
-  seedDemoServer,
   shareServer,
   ssoServer,
   storedObjectServer,

@@ -211,6 +211,12 @@
       "path": "enterprise/modules/billing/process/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/demo-data/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/demo-data/process/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/enterprise-gateway/contract/tsconfig.json"
     },
     {
@@ -266,12 +272,6 @@
     },
     {
       "path": "enterprise/modules/scim/process/tsconfig.json"
-    },
-    {
-      "path": "enterprise/modules/seed-demo/contract/tsconfig.json"
-    },
-    {
-      "path": "enterprise/modules/seed-demo/process/tsconfig.json"
     },
     {
       "path": "enterprise/modules/sso/browser/tsconfig.json"
