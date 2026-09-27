@@ -147,6 +147,8 @@ export interface BlockAccumulator {
   readonly joins: LangWatchQLJoinEdge[];
   readonly filteredColumns: string[];
   readonly groupByColumns: string[];
+  /** Alias of each app function column in this block's SELECT list, to the function's name. */
+  readonly appFunctionAliases: ReadonlyMap<string, string>;
   hasGroupBy: boolean;
   isAggregated: boolean;
 }

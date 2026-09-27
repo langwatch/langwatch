@@ -393,6 +393,112 @@ function appFunctionPositionMessage(name: string): string {
   return `The function "${echoIdentifier(name)}" ${APP_FUNCTION_POSITION_PLACE} ${advice}`;
 }
 
+const APP_FUNCTION_ALIAS_EVAL_ADVICE =
+  "Its answer is decided after the query runs, so this clause would read the text it judges instead. " +
+  "Run the statement as an Instant Eval first, then sort, group or filter the answers " +
+  "with a second query over analytics.judgments.";
+
+const APP_FUNCTION_ALIAS_EXTRACTION_ADVICE =
+  "Its value is filled in after the query runs, so this clause would read the key it was called with instead. " +
+  "Sort, group or filter on a plain column.";
+
+function appFunctionAliasMessage({ alias, name }: { alias: string; name: string }): string {
+  const advice = isEvalFunctionName(name)
+    ? APP_FUNCTION_ALIAS_EVAL_ADVICE
+    : APP_FUNCTION_ALIAS_EXTRACTION_ADVICE;
+  return `The column "${echoIdentifier(alias)}" is the answer of "${echoIdentifier(name)}", which can only be read in the SELECT list. ${advice}`;
+}
+
+/** Clauses that would read an app function column's key rather than its answer. */
+const CLAUSES_READING_THE_KEY: ReadonlySet<LangWatchQLClause> = new Set([
+  "filter",
+  "group",
+  "having",
+  "order",
+  "window",
+]);
+
+/**
+ * The alias and 1-based SELECT position of every app function column in a
+ * SELECT list; ClickHouse resolves both in WHERE, GROUP BY, HAVING and ORDER BY.
+ */
+function appFunctionColumns(select: unknown): {
+  aliases: Map<string, string>;
+  positions: Map<number, { alias: string; name: string }>;
+} {
+  const aliases = new Map<string, string>();
+  const positions = new Map<number, { alias: string; name: string }>();
+  if (!Array.isArray(select)) return { aliases, positions };
+  for (const [index, element] of select.entries()) {
+    if (!isNode(element)) continue;
+    const [definition] = directAppFunctionCalls(element);
+    const [alias] = aliasOf(element);
+    if (!definition || alias === undefined) continue;
+    aliases.set(alias, definition.name);
+    positions.set(index + 1, { alias, name: definition.name });
+  }
+  return { aliases, positions };
+}
+
+/** Refuses `ORDER BY 2` or `GROUP BY 2` when the second SELECT column is an app function. */
+function refusePositionalAppFunctionReferences({
+  node,
+  frame,
+  ctx,
+  positions,
+}: NodeArgs & { positions: ReadonlyMap<number, { alias: string; name: string }> }): void {
+  if (positions.size === 0) return;
+  const orderBy = Array.isArray(node.order_by) ? node.order_by : [];
+  const groupBy = Array.isArray(node.group_by) ? node.group_by : [];
+  const references: { expression: unknown; clause: LangWatchQLClause }[] = [
+    ...orderBy.map((element) => ({
+      expression: isNode(element) ? element.expression : undefined,
+      clause: "order" as const,
+    })),
+    ...groupBy.map((expression) => ({ expression, clause: "group" as const })),
+  ];
+  for (const { expression, clause } of references) {
+    if (!isNode(expression) || expression.type !== "Literal") continue;
+    const position = Number(expression.value);
+    const column = Number.isInteger(position) ? positions.get(position) : undefined;
+    if (!column) continue;
+    report({
+      ctx,
+      frame: { ...frame, clause },
+      code: "APP_FUNCTION_POSITION",
+      message: appFunctionAliasMessage(column),
+      node: expression,
+    });
+  }
+}
+
+/** Refuses a reference to an app function column's alias outside the SELECT list. */
+function refuseAppFunctionAliasReference({
+  name,
+  nameParts,
+  node,
+  frame,
+  ctx,
+}: {
+  name: string;
+  nameParts: readonly string[] | undefined;
+  node: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): void {
+  if (!frame.block || !CLAUSES_READING_THE_KEY.has(frame.clause)) return;
+  if (nameParts !== undefined && nameParts.length > 1) return;
+  const functionName = frame.block.appFunctionAliases.get(name);
+  if (functionName === undefined) return;
+  report({
+    ctx,
+    frame,
+    code: "APP_FUNCTION_POSITION",
+    message: appFunctionAliasMessage({ alias: name, name: functionName }),
+    node,
+  });
+}
+
 function reportAppFunctionPosition({
   name,
   node,
@@ -873,11 +979,13 @@ function enterSelectWithUnionQuery({ node, frame }: NodeArgs): Frame {
 function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
   recordTopLevelLimit({ node, frame, ctx });
   const isOutermostSelect = frame.isRootSelect === true;
+  const { aliases, positions } = appFunctionColumns(node.select);
   const block: BlockAccumulator = {
     tables: [],
     joins: [],
     filteredColumns: [],
     groupByColumns: [],
+    appFunctionAliases: aliases,
     hasGroupBy:
       (Array.isArray(node.group_by) && node.group_by.length > 0) || node.group_by_all === true,
     isAggregated: false,
@@ -887,6 +995,7 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
   // `isRootSelect` is spent here: it marked this SELECT as the outermost one,
   // and clearing it stops a subquery or a CTE body claiming the same standing.
   const here: Frame = { ...frame, block, isOutermostSelect, isRootSelect: false };
+  refusePositionalAppFunctionReferences({ node, frame: here, ctx, positions });
   if (!Array.isArray(node.with)) return here;
   const ctes = [...frame.ctes];
   for (const item of node.with) {
@@ -1251,6 +1360,7 @@ function visitIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
     ? nameParts.filter((part): part is string => typeof part === "string")
     : undefined;
   gateColumnReference({ name, nameParts: segments, ctx, frame, node });
+  refuseAppFunctionAliasReference({ name, nameParts: segments, node, frame, ctx });
   noteColumnPosition({ name, frame });
   return frame;
 }
