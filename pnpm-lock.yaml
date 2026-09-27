@@ -14820,6 +14820,9 @@ importers:
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@langwatch/annotation-contract':
+        specifier: workspace:*
+        version: link:../../modules/annotation/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../api
@@ -14862,6 +14865,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../modules/trace/contract
+      '@langwatch/workflow-contract':
+        specifier: workspace:*
+        version: link:../../modules/workflow/contract
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.2.8)
