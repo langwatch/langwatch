@@ -20,6 +20,7 @@ import {
 
 import { type TraceAppDependencies } from "../app/trace.app.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import type * as traceLegacyReadRepositoryModule from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import {
@@ -161,6 +162,7 @@ export function composeTraceAppDependencies(
     repository: options.repositories.list,
     evaluations: options.evaluations,
     topicService: options.topics,
+    facets: CLICKHOUSE_FACET_CATALOG,
   });
   const protections = TraceViewerProtectionService.create(options.protections);
   const summaryStore = options.summaryStore;

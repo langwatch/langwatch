@@ -188,12 +188,12 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageReposi
     const tenantId = spans[0]!.tenantId;
     for (const span of spans) {
       if (span.tenantId !== tenantId) {
-        throw new SecurityError(
-          "TraceSpanStorageClickHouseRepository.insertSpans",
-          "all spans in a single batch must share the same tenantId",
+        throw new SecurityError({
+          operation: "TraceSpanStorageClickHouseRepository.insertSpans",
+          message: "all spans in a single batch must share the same tenantId",
           tenantId,
-          { mismatchedTenantId: span.tenantId },
-        );
+          context: { mismatchedTenantId: span.tenantId },
+        });
       }
     }
 

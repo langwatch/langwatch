@@ -11,10 +11,17 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import type { TraceApi } from "@langwatch/trace-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
+import type { TraceListRead } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
+import { createTraceAppHarness } from "../../app/__tests__/support/trace-app.harness.ts";
+import type { TracesListReader } from "../../app/trace.app.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { TraceFacetValuesService } from "../../services/trace-facet-values.service.ts";
+import { TraceTopicNamingService } from "../../services/trace-topic-naming.service.ts";
+import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
 
 const boundaryErrorHandler: RestErrorHandler = (error, c) => {
@@ -26,25 +33,38 @@ const boundaryErrorHandler: RestErrorHandler = (error, c) => {
 
 function mount(
   overrides: Readonly<{
-    resolveApiKeyProtections?: TraceApi["resolveApiKeyProtections"];
+    resolveApiKeyProtections?: TraceViewerProtectionService["resolveForApiKey"];
   }> = {},
 ) {
-  const readDiscover: TraceApi["readDiscover"] = vi.fn(async () => ({
+  const readDiscover = vi.fn<TracesListReader["getDiscover"]>(async () => ({
     facets: [],
     pending: false,
   }));
-  const readFacetValues: TraceApi["readFacetValues"] = vi.fn(async () => ({
+  const readFacetValues = vi.fn<TracesListReader["getFacetValues"]>(async () => ({
     values: [{ value: "gpt-5-mini", count: 3 }],
     totalDistinct: 1,
   }));
-  const resolveApiKeyProtections: TraceApi["resolveApiKeyProtections"] =
-    overrides.resolveApiKeyProtections ??
-    vi.fn(async () => ({ canSeeCapturedInput: true, canSeeCapturedOutput: true }));
+  const facetValues = TraceFacetValuesService.create({
+    repository: createApiFixture<TraceListRead>({}, "list repository"),
+    topicNaming: TraceTopicNamingService.create({
+      topicService: createApiFixture<TopicApi>({}, "topics"),
+    }),
+    facets: CLICKHOUSE_FACET_CATALOG,
+  });
 
-  const stub = createApiFixture<TraceApi>({
-    resolveApiKeyProtections,
-    readDiscover,
-    readFacetValues,
+  const stub = createTraceAppHarness({
+    protections: createApiFixture<TraceViewerProtectionService>({
+      resolveForApiKey:
+        overrides.resolveApiKeyProtections ??
+        (async () => ({ canSeeCapturedInput: true, canSeeCapturedOutput: true })),
+    }),
+    traces: {
+      list: createApiFixture<TracesListReader>({
+        getDiscover: readDiscover,
+        getFacetValues: readFacetValues,
+        resolveFacetKey: (input) => facetValues.resolveFacetKey(input),
+      }),
+    },
   });
 
   const runtime = createRestRuntime({

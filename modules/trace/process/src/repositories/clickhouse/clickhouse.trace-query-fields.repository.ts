@@ -1,11 +1,11 @@
 import type { CategoricalRead, FieldDef, FieldNeeds, RangeRead } from "@langwatch/trace-contract";
 import { UNSUPPORTED } from "@langwatch/trace-contract";
 
-import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "../../rules/trace-facet-registry.rules.ts";
 import {
   type ExpressionCategoricalDef,
   type RangeFacetDef,
 } from "../../rules/trace-facet-registry.rules.ts";
+import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./clickhouse.trace-facet-registry.mapper.ts";
 import { ClickHouseTraceQueryCustomFieldsAdapter } from "./clickhouse.trace-query-custom-fields.repository.ts";
 import { INSTANT_EVAL_FIELD_DEFS } from "./clickhouse.trace-query-instant-eval-fields.repository.ts";
 import { META_FIELD_DEFS } from "./clickhouse.trace-query-meta-fields.repository.ts";

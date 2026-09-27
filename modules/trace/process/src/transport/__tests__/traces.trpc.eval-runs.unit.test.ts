@@ -41,11 +41,13 @@ function harness() {
   const findExplorerEvalRuns = vi.fn<TraceApi["findExplorerEvalRuns"]>(async () => [RESOLVED]);
   const compileExplorerTraceFilter = vi.fn<TraceApi["compileExplorerTraceFilter"]>(() => COMPILED);
   const readFilteredFacets = vi.fn<TraceApi["readFilteredFacets"]>(async () => FILTERED_FACETS);
+  const readDiscoverForQuery = vi.fn<TraceApi["readDiscoverForQuery"]>(async () => FILTERED_FACETS);
   const app = createApiFixture<TraceApi>({
     findExplorerEvalRuns,
     compileExplorerTraceFilter,
     translateTraceFilter: () => COMPILED,
     readFilteredFacets,
+    readDiscoverForQuery,
     resolveViewerProtections: async () => ({}),
     extractTraceFreeTextTerms: () => [],
     readTraceList: async () => ({ items: [], totalHits: 0, evaluations: {}, nextCursor: null }),
@@ -85,6 +87,7 @@ function harness() {
     compileExplorerTraceFilter,
     findExplorerEvalRuns,
     readFilteredFacets,
+    readDiscoverForQuery,
   };
 }
 
@@ -132,8 +135,8 @@ describe("given a read whose query carries an eval chip with a registered run", 
   });
 
   describe("when the sidebar reads its facet counts", () => {
-    it("counts over the same runs, so a chip does not empty the sidebar", async () => {
-      const { caller, readFilteredFacets } = harness();
+    it("hands the chip's run claim to the discover read, so a chip does not empty the sidebar", async () => {
+      const { caller, readDiscoverForQuery } = harness();
 
       await expect(
         caller.discover({
@@ -143,8 +146,8 @@ describe("given a read whose query carries an eval chip with a registered run", 
           evalRuns: claim,
         }),
       ).resolves.toEqual(FILTERED_FACETS);
-      expect(readFilteredFacets).toHaveBeenCalledWith(
-        expect.objectContaining({ evalRuns: [RESOLVED] }),
+      expect(readDiscoverForQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ evalRuns: claim }),
       );
     });
   });

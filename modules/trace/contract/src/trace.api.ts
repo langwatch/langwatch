@@ -63,7 +63,11 @@ import type {
 } from "./trace-query.contract.ts";
 import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
 import type { TraceRecord } from "./trace-record.ts";
-import type { TraceMetadataUpdate } from "./trace-rest.schemas.ts";
+import type {
+  TraceFacetsAnswer,
+  TraceFacetsQuery,
+  TraceMetadataUpdate,
+} from "./trace-rest.schemas.ts";
 import type {
   ScenarioRoleMetrics,
   ScenarioRoleMetricsInput,
@@ -246,6 +250,20 @@ export interface TraceApi extends TraceOtlpIngestApi {
     occurredAtMs?: number;
     viewerUserId: string;
   }): Promise<SpanDetail>;
+  /** `GET /api/traces/facets` for an API key: the discovery payload, or one field's paged values. */
+  readTraceFacetsForApiKey(input: {
+    projectId: string;
+    query: TraceFacetsQuery;
+    apiKeyId: string | null;
+    userId: string | null;
+  }): Promise<TraceFacetsAnswer>;
+  /** The discover vocabulary, or the facet counts under `query` when one is given. */
+  readDiscoverForQuery(input: {
+    projectId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    query?: string | null;
+    evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+  }): Promise<DiscoverResult>;
   /** Renames a trace after trimming; a name out of bounds refuses with `ValidationError`. */
   renameTrace(
     input: { projectId: string; traceId: string; newName: string },

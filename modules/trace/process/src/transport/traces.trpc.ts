@@ -458,27 +458,16 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
 
   .procedure("discover")
   .withPermission("traces:view")
-  .handle(async ({ app, input }) => {
-    // No `query` field at all is the vocabulary read; a `query` field, empty
-    // string included, asks for counts under it (and the hidden origins).
-    if (input.query === null || input.query === undefined) {
-      return discoverResultSchema.parse(
-        await app.readDiscover({ tenantId: input.projectId, timeRange: input.timeRange }),
-      );
-    }
-
-    return discoverResultSchema.parse(
-      await app.readFilteredFacets({
+  .handle(async ({ app, input }) =>
+    discoverResultSchema.parse(
+      await app.readDiscoverForQuery({
         projectId: input.projectId,
         timeRange: input.timeRange,
         query: input.query,
-        evalRuns: await app.findExplorerEvalRuns({
-          projectId: input.projectId,
-          evalRuns: input.evalRuns,
-        }),
+        evalRuns: input.evalRuns,
       }),
-    );
-  })
+    ),
+  )
 
   /**
    * Pushes `discover_updated` when a tenant's facet payload finishes

@@ -13,7 +13,10 @@ import type {
   TraceListItem,
   TraceListPage,
   TraceListRead,
+  Protections,
 } from "@langwatch/trace-contract";
+
+import type { FacetCatalog } from "#rules/trace-facet-registry.rules";
 
 import type { FacetFilterResolver } from "../rules/trace-facet-filter.rules.ts";
 import type { DiscoverParams, FacetValuesParams } from "../rules/trace-list-cache-key.rules.ts";
@@ -84,18 +87,20 @@ export class TraceListService {
     repository,
     evaluations,
     topicService,
+    facets,
   }: {
     repository: TraceListRead;
     evaluations: EvaluationApi;
     topicService: TopicApi;
+    facets: FacetCatalog;
   }): TraceListService {
     const topicNaming = TraceTopicNamingService.create({ topicService });
 
     return new TraceListService({
       repository,
       evaluations,
-      discover: TraceDiscoverService.create({ repository, topicNaming }),
-      facetValues: TraceFacetValuesService.create({ repository, topicNaming }),
+      discover: TraceDiscoverService.create({ repository, topicNaming, facets }),
+      facetValues: TraceFacetValuesService.create({ repository, topicNaming, facets }),
     });
   }
 
@@ -131,6 +136,11 @@ export class TraceListService {
   }
 
   /** One facet's values, cached, for a sidebar drill-in. */
+  /** The facet-store key a REST `field` names, judged against this list's facet catalogue. */
+  resolveFacetKey(input: { field: string; protections: Protections }): string {
+    return this.facetValues.resolveFacetKey(input);
+  }
+
   getFacetValues(params: FacetValuesParams): Promise<FacetValuesResult> {
     return this.facetValues.getFacetValues(params);
   }

@@ -35,12 +35,17 @@ function harness() {
     pending: false,
   }));
   const findExplorerEvalRuns = vi.fn<TraceApi["findExplorerEvalRuns"]>(async () => []);
+  const readDiscoverForQuery = vi.fn<TraceApi["readDiscoverForQuery"]>(async () => ({
+    facets: [FACET],
+    pending: false,
+  }));
   const readFacetValues = vi.fn<TraceApi["readFacetValues"]>(async () => ({
     values: [{ value: "error", count: 4 }],
     totalDistinct: 1,
   }));
   const updateTraceMetadata = vi.fn<TraceApi["updateTraceMetadata"]>(async () => {});
   const app = createApiFixture<TraceApi>({
+    readDiscoverForQuery,
     readDiscover,
     readFilteredFacets,
     findExplorerEvalRuns,
@@ -78,62 +83,26 @@ function harness() {
   return {
     caller: router.createCaller({ actor: { id: "reader-1" } }),
     readDiscover,
+    readDiscoverForQuery,
     readFilteredFacets,
     updateTraceMetadata,
   };
 }
 
-describe("given no query", () => {
-  describe("when the sidebar reads its facets", () => {
-    it("serves the tenant's cached discovery, pending flag and all", async () => {
-      const { caller, readDiscover, readFilteredFacets } = harness();
+describe("given the sidebar's facet read", () => {
+  describe("when it asks with or without a query", () => {
+    it("hands the request to the app's discover read and answers its payload", async () => {
+      const { caller, readDiscoverForQuery } = harness();
 
       await expect(
-        caller.discover({ projectId: PROJECT_ID, timeRange: TIME_RANGE }),
-      ).resolves.toEqual({ facets: [FACET], pending: true });
-      expect(readDiscover).toHaveBeenCalledWith({
-        tenantId: PROJECT_ID,
-        timeRange: TIME_RANGE,
-      });
-      expect(readFilteredFacets).not.toHaveBeenCalled();
-    });
-  });
-});
-
-describe("given an empty query the sidebar asked to count under", () => {
-  describe("when the sidebar reads its facets", () => {
-    it("counts, so the hidden origins stay out of every facet but Origin", async () => {
-      const { caller, readDiscover, readFilteredFacets } = harness();
-
-      await caller.discover({ projectId: PROJECT_ID, timeRange: TIME_RANGE, query: "" });
-
-      expect(readFilteredFacets).toHaveBeenCalledWith(expect.objectContaining({ query: "" }));
-      expect(readDiscover).not.toHaveBeenCalled();
-    });
-  });
-});
-
-describe("given an active query", () => {
-  describe("when the sidebar reads its facets", () => {
-    /** @scenario "Facet counts are cached only per query and window" */
-    it("counts under it, in the window the list reads, uncached", async () => {
-      const { caller, readDiscover, readFilteredFacets } = harness();
-
-      await expect(
-        caller.discover({
-          projectId: PROJECT_ID,
-          timeRange: TIME_RANGE,
-          query: "status:error",
-        }),
+        caller.discover({ projectId: PROJECT_ID, timeRange: TIME_RANGE, query: "status:error" }),
       ).resolves.toEqual({ facets: [FACET], pending: false });
-      expect(readFilteredFacets).toHaveBeenCalledWith(
-        expect.objectContaining({
-          projectId: PROJECT_ID,
-          timeRange: TIME_RANGE,
-          query: "status:error",
-        }),
-      );
-      expect(readDiscover).not.toHaveBeenCalled();
+      expect(readDiscoverForQuery).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        timeRange: TIME_RANGE,
+        query: "status:error",
+        evalRuns: undefined,
+      });
     });
   });
 });

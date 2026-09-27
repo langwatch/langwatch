@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { FACET_REGISTRY } from "../../../rules/trace-facet-registry.rules.ts";
 import { KEY_DISCOVERY_SETTINGS } from "../clickhouse.trace-facet-query.repository.ts";
+import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
 import {
   ClickHouseTraceFacetSpanAttributeKeysRepository,
   SPAN_ATTRIBUTE_KEYS_FACET,

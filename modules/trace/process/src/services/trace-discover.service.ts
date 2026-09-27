@@ -15,6 +15,7 @@ import type {
 } from "@langwatch/trace-contract";
 
 import type {
+  FacetCatalog,
   ExpressionCategoricalDef,
   FacetDefinition,
   FacetTable,
@@ -23,7 +24,6 @@ import type {
 
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
 import type { FacetFilterResolver } from "../rules/trace-facet-filter.rules.ts";
-import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "../rules/trace-facet-registry.rules.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import {
   discoverCacheKey,
@@ -134,9 +134,11 @@ function facetFilters(filterFor: FacetFilterResolver): FacetFilters {
  * table and the arrayJoin, queryBuilder and dynamic-keys facets that must run alone.
  */
 function partitionFacetRegistry({
+  registry,
   filters,
   includeDynamicKeys,
 }: {
+  registry: readonly FacetDefinition[];
   filters: FacetFilters;
   includeDynamicKeys: boolean;
 }): {
@@ -158,7 +160,7 @@ function partitionFacetRegistry({
     return slot;
   };
 
-  for (const def of FACET_REGISTRY) {
+  for (const def of registry) {
     const isGroupableCategorical =
       def.kind === "categorical" &&
       isExpressionCategorical(def) &&
@@ -210,18 +212,22 @@ export class TraceDiscoverService {
   private constructor(
     private readonly repository: TraceListRead,
     private readonly descriptors: TraceFacetDescriptorService,
+    private readonly facets: FacetCatalog,
   ) {}
 
   static create({
     repository,
     topicNaming,
+    facets,
   }: {
     repository: TraceListRead;
     topicNaming: TraceTopicNamingService;
+    facets: FacetCatalog;
   }): TraceDiscoverService {
     return new TraceDiscoverService(
       repository,
-      TraceFacetDescriptorService.create({ repository, topicNaming }),
+      TraceFacetDescriptorService.create({ repository, topicNaming, facets }),
+      facets,
     );
   }
 
@@ -357,7 +363,11 @@ export class TraceDiscoverService {
     includeDynamicKeys: boolean;
   }): Promise<FacetDescriptor[]> {
     const filters = facetFilters(filterFor);
-    const { batched, standalone } = partitionFacetRegistry({ filters, includeDynamicKeys });
+    const { batched, standalone } = partitionFacetRegistry({
+      registry: this.facets.registry,
+      filters,
+      includeDynamicKeys,
+    });
     const taskTimings: { label: string; durationMs: number }[] = [];
     const startedAt = nowInstant().epochMilliseconds;
     const wrap = <T>(label: string, p: Promise<T>): Promise<T> => {
@@ -386,7 +396,7 @@ export class TraceDiscoverService {
 
     // Assemble in registry order so the sidebar's group ordering is preserved.
     const facets: FacetDescriptor[] = [];
-    for (const def of FACET_REGISTRY) {
+    for (const def of this.facets.registry) {
       const descriptor = await this.descriptors.buildDescriptor({
         def,
         params,
@@ -416,7 +426,7 @@ export class TraceDiscoverService {
             tenantId: params.tenantId,
             timeRange: params.timeRange,
             table: slot.table,
-            timeColumn: TABLE_TIME_COLUMNS[slot.table],
+            timeColumn: this.facets.timeColumns[slot.table],
             categoricalSpecs: slot.categoricals.map((d) => ({
               key: d.key,
               expression: d.expression,
@@ -488,24 +498,24 @@ export class TraceDiscoverService {
     filters: FacetFilters,
     wrap: TaskTimer,
   ): Promise<Outcome>[] {
-    return FACET_REGISTRY.filter(
-      (def): def is RangeFacetDef => def.kind === "range" && def.isDiscrete === true,
-    ).map((def) =>
-      wrap(
-        `discrete:${def.key}`,
-        this.repository
-          .findDiscreteValues({
-            tenantId: params.tenantId,
-            timeRange: params.timeRange,
-            table: def.table,
-            timeColumn: TABLE_TIME_COLUMNS[def.table],
-            column: def.expression,
-            limit: DISCRETE_VALUE_LIMIT,
-            ...(filters.of(def) ? { filterWhere: filters.of(def) } : {}),
-          })
-          .then((result): Outcome => ({ kind: "discrete", key: def.key, result })),
-      ),
-    );
+    return this.facets.registry
+      .filter((def): def is RangeFacetDef => def.kind === "range" && def.isDiscrete === true)
+      .map((def) =>
+        wrap(
+          `discrete:${def.key}`,
+          this.repository
+            .findDiscreteValues({
+              tenantId: params.tenantId,
+              timeRange: params.timeRange,
+              table: def.table,
+              timeColumn: this.facets.timeColumns[def.table],
+              column: def.expression,
+              limit: DISCRETE_VALUE_LIMIT,
+              ...(filters.of(def) ? { filterWhere: filters.of(def) } : {}),
+            })
+            .then((result): Outcome => ({ kind: "discrete", key: def.key, result })),
+        ),
+      );
   }
 
   private logSlowDiscover({

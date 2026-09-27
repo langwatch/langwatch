@@ -14,9 +14,12 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  CLICKHOUSE_FACET_CATALOG,
+  FACET_REGISTRY,
+} from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { ClickHouseTraceQueryRepository } from "../../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import { createFacetFilterResolver } from "../../rules/trace-facet-filter.rules.ts";
-import { FACET_REGISTRY } from "../../rules/trace-facet-registry.rules.ts";
 import {
   explorerOriginExclusion,
   HIDDEN_ORIGINS_PARAM,
@@ -79,6 +82,7 @@ async function facetsFor({
 }) {
   const { repository, calls } = recordingRepository();
   const service = TraceListService.create({
+    facets: CLICKHOUSE_FACET_CATALOG,
     repository,
     evaluations: createApiFixture<EvaluationApi>({}),
     topicService: createApiFixture<TopicApi>({ getNamesByIds: async () => new Map() }),

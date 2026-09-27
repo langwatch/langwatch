@@ -15,8 +15,9 @@ import type {
 } from "@langwatch/trace-contract";
 import { TraceAttributeValuesWithheldError } from "@langwatch/trace-contract";
 
+import type { FacetCatalog } from "#rules/trace-facet-registry.rules";
+
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
-import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "../rules/trace-facet-registry.rules.ts";
 import {
   facetValuesCacheKey,
   type FacetValuesParams,
@@ -91,16 +92,19 @@ export class TraceFacetValuesService {
   private constructor(
     private readonly repository: TraceListRead,
     private readonly topicNaming: TraceTopicNamingService,
+    private readonly facets: FacetCatalog,
   ) {}
 
   static create({
     repository,
     topicNaming,
+    facets,
   }: {
     repository: TraceListRead;
     topicNaming: TraceTopicNamingService;
+    facets: FacetCatalog;
   }): TraceFacetValuesService {
-    return new TraceFacetValuesService(repository, topicNaming);
+    return new TraceFacetValuesService(repository, topicNaming, facets);
   }
 
   /**
@@ -108,18 +112,12 @@ export class TraceFacetValuesService {
    * legacy `attribute.<key>` are one case. Throws
    * `TraceAttributeValuesWithheldError` (403) or `RequestValidationError` (422).
    */
-  static resolveFacetKey({
-    field,
-    protections,
-  }: {
-    field: string;
-    protections: Protections;
-  }): string {
+  resolveFacetKey({ field, protections }: { field: string; protections: Protections }): string {
     const trimmed = field.trim();
     const normalized = trimmed.startsWith(TRACE_ATTRIBUTE_PREFIX)
       ? `${TRACE_ATTRIBUTE_PREFIX_LEGACY}${trimmed.slice(TRACE_ATTRIBUTE_PREFIX.length)}`
       : trimmed;
-    const drillableKeys = FACET_REGISTRY.filter((d) => d.kind !== "range").map((d) => d.key);
+    const drillableKeys = this.facets.registry.filter((d) => d.kind !== "range").map((d) => d.key);
 
     for (const prefix of STORE_ATTRIBUTE_PREFIXES) {
       if (!normalized.startsWith(prefix)) continue;
@@ -248,7 +246,7 @@ export class TraceFacetValuesService {
       );
     }
 
-    const def = FACET_REGISTRY.find((d) => d.key === params.facetKey);
+    const def = this.facets.registry.find((d) => d.key === params.facetKey);
     if (!def) {
       throw new Error(`Unknown facet: ${params.facetKey}`);
     }
@@ -263,7 +261,7 @@ export class TraceFacetValuesService {
         tenantId: params.tenantId,
         timeRange: params.timeRange,
         table: def.table,
-        timeColumn: TABLE_TIME_COLUMNS[def.table],
+        timeColumn: this.facets.timeColumns[def.table],
         facetExpression: def.expression,
         limit: params.limit,
         offset: params.offset,

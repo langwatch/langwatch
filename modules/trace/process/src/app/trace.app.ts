@@ -29,12 +29,16 @@ import { type MembersRead, type RateLimiter } from "@langwatch/process-stores/me
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareViewer, ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
   TraceCapabilityUnavailableError,
   type ExportProgressEvent,
   type Protections,
+  type TraceFacetsAnswer,
+  type TraceFacetsQuery,
+  discoverResultSchema,
+  traceFacetValuesResponseSchema,
   type TraceEditOverlayPatch,
   TraceIngestionUnavailableError,
   recordCapturedSpanInputSchema,
@@ -267,6 +271,7 @@ import type {
   CollectorSpanIngest,
 } from "../services/trace-collector-dispatch.service.ts";
 import { TraceExportProgressService } from "../services/trace-export-progress.service.ts";
+import { TraceFacetValuesService } from "../services/trace-facet-values.service.ts";
 import { AmbiguousTraceIdPrefixError } from "../services/trace-legacy-read.service.ts";
 import { TraceSharedReadService } from "../services/trace-shared-read.service.ts";
 import { TraceTranscriptReadService } from "../services/trace-transcript-read.service.ts";
@@ -277,6 +282,13 @@ import type {
 } from "../transport/trace-legacy.rest.ts";
 
 const logger = createLogger("langwatch:trace:app");
+
+const FACETS_DAY_MS = 24 * 60 * 60 * 1000;
+
+/** One facets window bound as epoch milliseconds, whichever way it was written. */
+function facetWindowBound(value: string): number {
+  return /^\d+$/.test(value) ? Number(value) : toEpochMs(value);
+}
 
 /** Who a write is attributed to. */
 export interface TraceCaller {
@@ -329,6 +341,7 @@ export type TracesListReader = Readonly<{
     prefix: string;
     limit?: number;
   }): Promise<string[]>;
+  resolveFacetKey(input: { field: string; protections: Protections }): string;
   getDiscover(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
@@ -1209,6 +1222,67 @@ export class TraceApp implements TraceApi, CollectorApp {
     redactedDetail.restrictedAttributes = protections.restrictedAttributes ?? null;
 
     return redactedDetail;
+  }
+
+  /** `GET /api/traces/facets`: the discovery payload, or one field's paged values. */
+  async readTraceFacetsForApiKey(input: {
+    projectId: string;
+    query: TraceFacetsQuery;
+    apiKeyId: string | null;
+    userId: string | null;
+  }): Promise<TraceFacetsAnswer> {
+    const { field, prefix, limit, offset, startDate, endDate } = input.query;
+    // One clock read for both ends, so the default window is exactly one day.
+    const now = nowInstant().epochMilliseconds;
+    const timeRange = {
+      from: startDate === undefined ? now - FACETS_DAY_MS : facetWindowBound(startDate),
+      to: endDate === undefined ? now : facetWindowBound(endDate),
+    };
+    if (field === undefined) {
+      return discoverResultSchema.parse(
+        await this.readDiscover({ tenantId: input.projectId, timeRange }),
+      );
+    }
+    const protections = await this.resolveApiKeyProtections({
+      projectId: input.projectId,
+      apiKeyId: input.apiKeyId,
+      userId: input.userId,
+    });
+    const facetKey = this.#dependencies.traces.list.resolveFacetKey({ field, protections });
+    const result = await this.readFacetValues({
+      tenantId: input.projectId,
+      timeRange: TraceFacetValuesService.visibleWindow({ timeRange, facetKey, protections }),
+      facetKey,
+      limit,
+      offset,
+      ...(prefix === undefined ? {} : { prefix }),
+    });
+    return traceFacetValuesResponseSchema.parse({
+      values: result.values,
+      total: result.totalDistinct,
+      hasMore: offset + result.values.length < result.totalDistinct,
+    });
+  }
+
+  /** No `query` at all is the vocabulary read; a `query`, empty included, asks for counts. */
+  async readDiscoverForQuery(input: {
+    projectId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    query?: string | null;
+    evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+  }): Promise<DiscoverResult> {
+    if (input.query === null || input.query === undefined) {
+      return this.readDiscover({ tenantId: input.projectId, timeRange: input.timeRange });
+    }
+    return this.readFilteredFacets({
+      projectId: input.projectId,
+      timeRange: input.timeRange,
+      query: input.query,
+      evalRuns: await this.findExplorerEvalRuns({
+        projectId: input.projectId,
+        evalRuns: input.evalRuns,
+      }),
+    });
   }
 
   /** Trimmed first, so the event always carries a canonical name. */

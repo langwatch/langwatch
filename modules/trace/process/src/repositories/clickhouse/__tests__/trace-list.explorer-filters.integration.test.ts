@@ -15,12 +15,12 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { FACET_REGISTRY } from "../../../rules/trace-facet-registry.rules.ts";
 import {
   andFilterConditions,
   findHiddenOriginConditions,
   type TraceFilterWhere,
 } from "../../../rules/trace-filter-hidden-origins.rules.ts";
+import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
 import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {

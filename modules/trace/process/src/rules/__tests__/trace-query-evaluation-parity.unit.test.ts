@@ -8,12 +8,9 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { FACET_REGISTRY } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { ClickHouseTraceQueryRepository } from "../../repositories/clickhouse/clickhouse.trace-query.repository.ts";
-import {
-  type ExpressionCategoricalDef,
-  type RangeFacetDef,
-  FACET_REGISTRY,
-} from "../trace-facet-registry.rules.ts";
+import type { ExpressionCategoricalDef, RangeFacetDef } from "../trace-facet-registry.rules.ts";
 import { traceMatchesQuery, traceQueryFieldNeeds } from "../trace-query-evaluation.rules.ts";
 
 const evaluateQueryInMemory = (queryText: string, trace: InMemoryTrace) =>
