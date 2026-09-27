@@ -24,7 +24,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
         usageWarnings: createApiFixture<MeteredUsageWarningService>({}),
         members: { isSaas: false, nodeEnvironment: "test" },
         repositories: MemoryBillingRepositories.create(),
-        config: { bankDetails: undefined },
+        config: { bankDetails: undefined, licensePaymentLinkId: undefined },
         peers,
         stripeSecretKey: undefined,
       });
@@ -44,7 +44,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
         usageWarnings: createApiFixture<MeteredUsageWarningService>({}),
         members: { isSaas: true, nodeEnvironment: "test" },
         repositories: MemoryBillingRepositories.create(),
-        config: { bankDetails: undefined },
+        config: { bankDetails: undefined, licensePaymentLinkId: undefined },
         peers,
         stripeSecretKey: undefined,
       });

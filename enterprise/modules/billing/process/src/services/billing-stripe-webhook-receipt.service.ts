@@ -14,8 +14,8 @@ const logger = createLogger("langwatch:billing:stripe-webhook");
 export interface StripeWebhookEvents {
   /** False where the deployment does no billing: the delivery then answers 404. */
   dispatchesEvents(): boolean;
-  /** The signing secret, read per request so a rotation without a restart works. */
-  findSigningSecret(): string | undefined;
+  /** Whether this deployment holds the signing secret the signature is checked against. */
+  hasSigningSecret(): boolean;
   /** Verifies the signature over the raw bytes; throwing means payload or signature is wrong. */
   constructEvent(input: { rawBody: Uint8Array; signature: string }): Stripe.Event;
   handleEvent(event: Stripe.Event): Promise<HandleEventResult>;
@@ -39,7 +39,7 @@ export class StripeWebhookReceiptService {
       throw new NotFoundError("Billing webhooks are not enabled");
     }
 
-    const secret = this.events.findSigningSecret();
+    const secret = this.events.hasSigningSecret();
     if (!signature || !secret) {
       logger.error(
         { signature: !!signature, secret: !!secret },

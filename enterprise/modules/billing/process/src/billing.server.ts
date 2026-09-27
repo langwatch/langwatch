@@ -37,16 +37,18 @@ import {
   type UsageReportingService,
 } from "./services/usage-reporting.service.ts";
 import { StripePricesSyncTask } from "./tasks/stripe-prices-sync.task.ts";
+import { billingStripeWebhookRest } from "./transport/billing-stripe-webhook.rest.ts";
 import { connectedBillingTrpcTransport } from "./transport/connected-billing.trpc.ts";
+import { currencyTrpcTransport } from "./transport/currency.trpc.ts";
 
 /**
- * Billing as an installed module. Its three doors stay unmounted until the app
- * implements the operations behind them; the factories below serve today's callers.
+ * Billing as an installed module: the connected-billing door and the Stripe
+ * callback; the factories below serve today's callers.
  */
 export const billingServer = defineServerModule("billing")
   .withRepositories(billingRepositories)
   .withApp(BillingApp)
-  .withTransports(connectedBillingTrpcTransport)
+  .withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport)
   .withEventing(connectedBillingEventing)
   .withEventing(billingReportingEventing)
   .withTasks(async ({ secrets }) => [

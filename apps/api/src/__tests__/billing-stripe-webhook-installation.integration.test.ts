@@ -1,0 +1,58 @@
+/**
+ * The Stripe callback main served at `POST /api/webhooks/stripe`, answered by
+ * the installed billing module over memory stores (ARCHITECTURE.md §13).
+ * @vitest-environment node
+ * @see enterprise/modules/billing/specs/stripe-webhook.feature
+ */
+import { RestHost } from "@langwatch/api/rest";
+import { serverModules } from "@langwatch/installed-server-modules";
+import { describe, expect, it } from "vitest";
+
+import { bootApi } from "./api-installation.fixture.ts";
+
+const closed = {
+  authenticate: () => {
+    throw new Error("the provider callback resolves no credential.");
+  },
+};
+
+describe("the api process installation", () => {
+  /** @scenario "A deployment with no Stripe composed answers the callback with 404" */
+  it("answers the Stripe callback from the installed billing module", async () => {
+    const { runtime } = await bootApi();
+
+    try {
+      const host = RestHost.create({
+        identities: {
+          project: closed,
+          organization: closed,
+          apiKey: closed,
+          scimToken: closed,
+          "instance-admin": closed,
+          browser: closed,
+        },
+        bearers: () => closed,
+        audit: { record: async () => {} },
+      });
+      const isCallback = (transport: { protocol: string; namespace?: string }) =>
+        transport.protocol === "rest" && transport.namespace === "billing-stripe-webhook";
+      const owner = serverModules.find((module) => (module.transports ?? []).some(isCallback));
+      const callback = owner?.transports?.find(isCallback);
+      if (!owner || !callback) throw new Error("no installed module declares the Stripe callback");
+      expect(owner.name).toBe("billing");
+      host.mount(callback.router(), () => runtime.service(owner.apiContract));
+
+      const delivered = await host.app.fetch(
+        new Request("http://api.test/api/webhooks/stripe", {
+          method: "POST",
+          headers: { "stripe-signature": "t=1,v1=abc", "content-type": "application/json" },
+          body: '{"id":"evt_1"}',
+        }),
+      );
+
+      expect(delivered.status).toBe(404);
+    } finally {
+      await runtime.stop();
+    }
+  });
+});

@@ -29,7 +29,7 @@ const EVENT: Stripe.Event = {
 };
 
 const dispatchesEvents = vi.fn<() => boolean>();
-const findSigningSecret = vi.fn<() => string | undefined>();
+const hasSigningSecret = vi.fn<() => boolean>();
 const constructEvent = vi.fn<StripeWebhookEvents["constructEvent"]>();
 const handleEvent = vi.fn<StripeWebhookEvents["handleEvent"]>();
 
@@ -46,7 +46,7 @@ function mounted() {
     app: () =>
       StripeWebhookReceiptService.create({
         dispatchesEvents,
-        findSigningSecret,
+        hasSigningSecret,
         constructEvent,
         handleEvent,
       }),
@@ -66,7 +66,7 @@ function deliver(headers: Record<string, string> = { "stripe-signature": "t=1,v1
 beforeEach(() => {
   vi.clearAllMocks();
   dispatchesEvents.mockReturnValue(true);
-  findSigningSecret.mockReturnValue("whsec_test");
+  hasSigningSecret.mockReturnValue(true);
   constructEvent.mockReturnValue(EVENT);
   handleEvent.mockResolvedValue({ status: "ok" } satisfies HandleEventResult);
 });
@@ -128,7 +128,7 @@ describe("given a deployment that bills through the provider", () => {
 
   describe("when this deployment holds no signing secret", () => {
     it("refuses with the same sentence rather than verifying against nothing", async () => {
-      findSigningSecret.mockReturnValue(undefined);
+      hasSigningSecret.mockReturnValue(false);
 
       const response = await deliver();
 

@@ -590,6 +590,10 @@ export interface OrganizationApi {
   applyPendingInvite(
     input: Readonly<{ userId: string; organizationId: string; email: string }>,
   ): Promise<OrganizationPendingInviteApplied>;
+  /** Opens the invitations a completed seat checkout paid for, as main's billing webhook did. */
+  approvePaymentPendingInvites(
+    input: Readonly<{ subscriptionId: string; organizationId: string }>,
+  ): Promise<void>;
 
   /** One team-role change, with the personal-team, plan and seat guards. */
   changeTeamMemberRole(
