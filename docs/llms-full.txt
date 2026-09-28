@@ -61445,7 +61445,7 @@ LangWatch is configured through environment variables. How you set them depends 
 
 <Note>
   There is no in-process worker mode. The app and the background workers are always separate
-  processes/pods — see [Architecture](/self-hosting/infrastructure/architecture) and the `workers.*`
+  processes/pods. See [Architecture](/self-hosting/infrastructure/architecture) and the `workers.*`
   Helm values below.
 </Note>
 
@@ -61818,7 +61818,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.governance.erasurePseudonymSecret.value` | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET`. Derives the stand-in that replaces an erased identifier. Optional until somebody is erased; required in the app and the workers alike afterwards, with the same value in both |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
-| `workers.enabled` | Not an environment variable — toggles whether the separate workers Deployment is created at all. There is no in-process worker mode to fall back to. |
+| `workers.enabled` | Not an environment variable. It toggles whether the separate workers Deployment is created at all. There is no in-process worker mode to fall back to. |
 
 <Tip>
 For production, use `secretKeyRef` instead of inline values. This references a Kubernetes Secret:
