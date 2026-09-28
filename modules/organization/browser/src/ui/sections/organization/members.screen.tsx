@@ -316,7 +316,7 @@ function MembersList({
               />
               <PageLayout.HeaderButton onClick={() => openDrawer("inviteMember")}>
                 <Plus size={20} />
-                Add members
+                Invite people
               </PageLayout.HeaderButton>
             </HStack>
           )}
