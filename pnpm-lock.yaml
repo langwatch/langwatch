@@ -14075,9 +14075,6 @@ importers:
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-migrations
-      '@langwatch/data-privacy-process':
-        specifier: workspace:*
-        version: link:../../data-privacy/process
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
