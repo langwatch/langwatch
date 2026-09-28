@@ -11,7 +11,6 @@ import type {
 } from "@langwatch/experiment-contract";
 import { generateHumanReadableId } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
-import type { RunActor } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { comparisonSkipMessage } from "../eventing/experiment-comparison-skip.process.ts";
@@ -33,25 +32,6 @@ import { ExperimentRunLoopService, type PhaseTwoPlan } from "./experiment-run-lo
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";
 import { ExperimentRunStorageService } from "./experiment-run-storage.service.ts";
 import { ExperimentWorkflowCellService } from "./experiment-workflow-cell.service.ts";
-
-/** The agent fields the ownership check reads. */
-export type ExperimentConnectedAgentSubject = {
-  id: string;
-  name: string;
-  type: string;
-  ownerUserId?: string | null;
-};
-
-/**
- * Refuses a run against a personal development agent of someone other than the
- * actor, before any cell exists.
- */
-export abstract class ExperimentConnectedAgentOwnership {
-  abstract assertRunnable(input: {
-    agents: readonly ExperimentConnectedAgentSubject[];
-    actor: RunActor | undefined;
-  }): Promise<void>;
-}
 
 const logger = createLogger("langwatch:experiment:run-driver");
 
@@ -82,7 +62,7 @@ export class ExperimentRunDriverService {
     // A personal development agent runs on one person's own machine, so only
     // that person may send it a turn. Refused before any cell exists, the way a
     // simulation refuses it when the run is scheduled.
-    await ports.connectedAgentOwnership.assertRunnable({
+    await ports.connectedAgentOwnership.assertConnectedAgentsRunnable({
       agents: [...loadedAgents.values()],
       actor,
     });

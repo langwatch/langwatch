@@ -5,6 +5,7 @@
  */
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   ClickHouseQueryClient,
@@ -15,6 +16,7 @@ import {
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
@@ -25,6 +27,8 @@ import { memoryStores } from "@langwatch/process-stores";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
@@ -79,7 +83,10 @@ async function bootWorker() {
     .withKeyvalue(
       createApiFixture<NonNullable<ProcessMembers["redis"]>>({}, "redis (unused at boot)"),
     )
+    .withConfig({ experiment: { blockLocalHttpCalls: false, allowedProxyHosts: [] } })
     .withMember("publicBaseUrl", undefined)
+    .withMember("processName", "langwatch-test")
+    .withMember("isSaas", false)
     .withObservability((observability) => observability.withLogging(createTestLogger().logger))
     .provide({
       workflow: createApiFixture<WorkflowApi>({}),
@@ -91,6 +98,10 @@ async function bootWorker() {
       authz: createApiFixture<AuthzApi>({}),
       project: createApiFixture<ProjectApi>({}),
       entitlement: createApiFixture<EntitlementApi>({}),
+      evaluation: createApiFixture<EvaluationApi>({}),
+      "api-key": createApiFixture<ApiKeyApi>({}),
+      suite: createApiFixture<SuiteApi>({}),
+      "stored-object": createApiFixture<StoredObjectApi>({}),
       "model-provider": createApiFixture<ModelProviderApi>({
         listCosts: () => Promise.resolve([customCost]),
       }),

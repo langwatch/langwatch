@@ -7692,6 +7692,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
@@ -7819,6 +7822,9 @@ importers:
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../stored-object/contract
+      '@langwatch/suite-contract':
+        specifier: workspace:*
+        version: link:../../suite/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time

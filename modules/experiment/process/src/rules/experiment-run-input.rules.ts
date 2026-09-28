@@ -5,11 +5,13 @@
  */
 
 import type {
+  AgentApi,
   Agent as TypedAgent,
   CallOutcome,
   DispatchAgent,
   DispatchCall,
 } from "@langwatch/agent-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type {
   CarriedOverCell,
   EvaluationsV3State,
@@ -18,18 +20,15 @@ import type {
 } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { ResultMapperConfig } from "../eventing/experiment-result-mapping.process.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
 import type { ExperimentAttachmentInputService } from "../services/experiment-attachment-input.service.ts";
-import type { ExperimentStudioDispatch } from "../services/experiment-cell-execution.service.ts";
-import type { ExperimentConnectedDispatch } from "../services/experiment-connected-cell.service.ts";
 import type { LoadedWorkflow } from "../services/experiment-execution-data.service.ts";
-import type { ExperimentConnectedAgentOwnership } from "../services/experiment-run-driver.service.ts";
 import type { ExperimentModelCost } from "../services/experiment-run-orchestrator.service.ts";
 import type { ExperimentSandboxCredential } from "../services/experiment-run-sandbox-key.service.ts";
-import type { ExperimentEvaluationReporting } from "../services/experiment-run-storage.service.ts";
 import type { ExperimentService } from "../services/experiment.service.ts";
 
 /**
@@ -37,8 +36,8 @@ import type { ExperimentService } from "../services/experiment.service.ts";
  * rather than threaded per-signature or read off a process singleton.
  */
 export type ExperimentRunCollaborators = {
-  /** The studio engine each cell is dispatched to. */
-  studio: ExperimentStudioDispatch;
+  /** The studio engine each cell is dispatched to, through the workflow module. */
+  studio: Pick<WorkflowApi, "postStudioEvent">;
   /** The deployment's price table, for cells the engine reports untariffed. */
   cost: ExperimentModelCost;
   /** The stop signal and the owner record this run's abort is authorized against. */
@@ -46,13 +45,13 @@ export type ExperimentRunCollaborators = {
   /** The Eventing command surface a run's results are dispatched through. */
   experiments: ExperimentService;
   /** Where a cell's evaluator result is reported as an evaluation. */
-  evaluationReporting: ExperimentEvaluationReporting;
+  evaluationReporting: Pick<EvaluationApi, "reportEvaluation">;
   /** The scoped key a run lends to the code it executes. */
   sandboxCredentials: ExperimentSandboxCredential;
   /** One turn to a connected agent, through the runtime a live SDK registered on. */
-  connectedDispatch: ExperimentConnectedDispatch;
+  connectedDispatch: Pick<AgentApi, "callConnected">;
   /** Refuses a run against someone else's personal development agent. */
-  connectedAgentOwnership: ExperimentConnectedAgentOwnership;
+  connectedAgentOwnership: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
   /** Reads the row's image and file values into what a target can open. */
   attachments: ExperimentAttachmentInputService;
 };

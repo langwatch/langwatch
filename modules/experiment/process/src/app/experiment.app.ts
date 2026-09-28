@@ -4,10 +4,12 @@ import { on, type EventEmitter } from "node:events";
  * The experiment feature's application: what both of its doors call.
  */
 import { AgentApi } from "@langwatch/agent-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi, type Dataset } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import {
@@ -73,6 +75,8 @@ import {
   type ExperimentUsageCount,
   type ExperimentCopied,
   type ExperimentCopyInput,
+  experimentConfig,
+  type ExperimentServerConfig,
   type ExperimentEvaluationsListInput,
   type ExperimentEvaluationsListPage,
   type ExperimentIdOrSlugInput,
@@ -85,6 +89,8 @@ import { MonitorApi } from "@langwatch/monitor-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
+import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { SuiteApi } from "@langwatch/suite-contract";
 import {
   WorkflowApi,
   type StudioWorkflow,
@@ -238,8 +244,8 @@ const NO_RUNS: ExperimentRunAggregate = { runsCount: 0, lastRunAt: null };
 type ExperimentSetup = FeatureSetup<
   typeof ExperimentApp.dependencies,
   MembersRead<readonly ["prisma", "clickhouse", "redis", "logger"]> &
-    Readonly<{ publicBaseUrl: string | undefined }>,
-  undefined
+    Readonly<{ publicBaseUrl: string | undefined; processName: string; isSaas: boolean }>,
+  ExperimentServerConfig
 >;
 
 export class ExperimentApp implements ExperimentApi {
@@ -260,14 +266,25 @@ export class ExperimentApp implements ExperimentApi {
     retention: DataRetentionApi,
     /** Owns the project's custom model cost rules the optimizer log prices against. */
     modelProviders: ModelProviderApi,
+    /** Where a run's evaluator results are reported as evaluations. */
+    evaluation: EvaluationApi,
+    /** Mints the sandbox key a run lends the code it executes. */
+    apiKeys: ApiKeyApi,
+    /** Owns the rule refusing a run against someone else's personal agent. */
+    suite: SuiteApi,
+    /** Reads a row's stored attachment for the target it is dispatched to. */
+    storedObjects: StoredObjectApi,
   };
+  static readonly config = experimentConfig;
   static readonly reads = [
     ...reads("prisma", "clickhouse", "redis", "logger"),
     "publicBaseUrl",
+    "processName",
+    "isSaas",
   ] as const;
 
   static create(setup: ExperimentSetup): ExperimentApp {
-    const { members, dependencies } = setup;
+    const { members, dependencies, config } = setup;
     const commands = ExperimentRunCommandDispatcherService.create();
     const built = buildExperimentInfrastructure({
       prisma: members.prisma,
@@ -276,6 +293,12 @@ export class ExperimentApp implements ExperimentApi {
       logger: members.logger,
       execution: commands,
       publicBaseUrl: members.publicBaseUrl,
+      processName: members.processName,
+      attachmentEgress: {
+        blockLocal: config.blockLocalHttpCalls,
+        allowedHosts: config.allowedProxyHosts,
+        verifyTls: members.isSaas,
+      },
       dependencies,
     });
     return new ExperimentApp({

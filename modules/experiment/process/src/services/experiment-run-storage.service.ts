@@ -4,7 +4,7 @@
  * Phase 2 comparison cells read.
  */
 
-import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import {
   isComparisonEvaluator,
@@ -23,14 +23,8 @@ import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import type { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
-/**
- * Where a workbench cell's evaluator result is reported as an evaluation.
- * The Evaluation feature owns the command; a core feature server may not
- * import another's, so the run reports through here, bound by the process.
- */
-export abstract class ExperimentEvaluationReporting {
-  abstract reportEvaluation(data: ReportEvaluationCommandData): Promise<unknown>;
-}
+/** Where a workbench cell's evaluator result is reported as an evaluation: the owner's op. */
+type ExperimentEvaluationReporting = Pick<EvaluationApi, "reportEvaluation">;
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 

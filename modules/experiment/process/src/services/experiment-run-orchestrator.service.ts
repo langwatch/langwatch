@@ -373,7 +373,7 @@ export class ExperimentRunOrchestratorService {
     runId: string;
   }): Promise<{ success: true; runId: string; message: "Abort requested" }> {
     if (!input.ports || !input.progress) {
-      throw new ExperimentRunLoopUnavailableError("experiment run loop");
+      throw new ExperimentRunLoopUnavailableError({ capability: "experiment run loop" });
     }
 
     const ownerProjectId =

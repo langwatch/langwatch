@@ -48,6 +48,13 @@ type WorkflowRow = Omit<
 
 type VersionRow = Omit<WorkflowVersion, "dsl"> & { dsl?: unknown };
 
+const workflowFieldSourceRowsSchema = z.array(
+  z.object({ id: z.string(), currentVersion: z.object({ dsl: z.unknown() }).nullish() }),
+);
+const workflowSummaryRowsSchema = z.array(z.object({ id: z.string(), name: z.string() }));
+const workflowIdRowSchema = z.object({ id: z.string() });
+const workflowVersionsRowSchema = z.object({ versions: z.array(z.unknown()) });
+
 const mapWorkflow = (row: unknown): Workflow => {
   const value = row as WorkflowRow;
   return workflowSchema.parse({
@@ -70,8 +77,6 @@ const mapVersion = (row: unknown, includeDsl = true): WorkflowVersion => {
   });
 };
 
-const workflowVersionsRowSchema = z.object({ versions: z.array(z.unknown()) });
-
 export class PrismaWorkflowRepository extends WorkflowRepository {
   async findFieldSources(input: {
     projectId: string;
@@ -81,9 +86,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
       where: { id: { in: input.workflowIds }, projectId: input.projectId, archivedAt: null },
       select: { id: true, currentVersion: { select: { dsl: true } } },
     });
-    const sources = z
-      .array(z.object({ id: z.string(), currentVersion: z.object({ dsl: z.unknown() }).nullish() }))
-      .parse(rows);
+    const sources = workflowFieldSourceRowsSchema.parse(rows);
 
     return sources.map(({ id, currentVersion }) => ({ id, dsl: currentVersion?.dsl }));
   }
@@ -97,7 +100,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
       select: { id: true, name: true },
     });
 
-    return z.array(z.object({ id: z.string(), name: z.string() })).parse(rows);
+    return workflowSummaryRowsSchema.parse(rows);
   }
 
   async archiveLinked(input: WorkflowReference): Promise<{ id: string }> {
@@ -107,7 +110,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
       select: { id: true },
     });
 
-    return z.object({ id: z.string() }).parse(row);
+    return workflowIdRowSchema.parse(row);
   }
 
   async deleteUncommitted(input: WorkflowReference): Promise<void> {
@@ -180,6 +183,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
       versions: workflowVersionsRowSchema.parse(row).versions.map((version) => mapVersion(version)),
     }));
   }
+
   async findVersions(input: {
     workflowId: string;
     projectId: string;

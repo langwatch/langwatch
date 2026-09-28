@@ -11,10 +11,8 @@ import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { generateOtelTraceId } from "@langwatch/trace-contract";
 import type {
   ExecutionState,
-  StudioClientEvent,
   StudioServerEvent,
   StudioWorkflow,
-  WorkflowRunOrigin,
   WorkflowApi,
 } from "@langwatch/workflow-contract";
 
@@ -34,21 +32,6 @@ import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.r
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";
-
-/**
- * Abstraction hiding engine dependencies and error handling. Stream failures
- * reported as studio events so runs are watched, not awaited.
- */
-export abstract class ExperimentStudioDispatch {
-  abstract postEvent(input: {
-    projectId: string;
-    event: StudioClientEvent;
-    onEvent: (event: StudioServerEvent) => void;
-    /** Asked before and during every read; absent means the run cannot be stopped. */
-    isAborted?: () => Promise<boolean>;
-    origin?: WorkflowRunOrigin;
-  }): Promise<void>;
-}
 
 const sandboxKey = ExperimentRunSandboxKeyService.create();
 
@@ -172,7 +155,7 @@ export class ExperimentCellExecutionService {
     };
 
     const evaluatorEvents: StudioServerEvent[] = [];
-    await this.ports.studio.postEvent({
+    await this.ports.studio.postStudioEvent({
       projectId,
       event: await this.workflows.enrichStudioEvent({ event: evaluatorEvent, projectId }),
       isAborted,
@@ -325,7 +308,7 @@ export class ExperimentCellExecutionService {
     let targetFailed = false;
     const targetEvents: StudioServerEvent[] = [];
 
-    await this.ports.studio.postEvent({
+    await this.ports.studio.postStudioEvent({
       projectId,
       event: enrichedEvent,
       isAborted,

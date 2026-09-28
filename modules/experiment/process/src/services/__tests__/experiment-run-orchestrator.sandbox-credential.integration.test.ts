@@ -25,7 +25,7 @@ const ports = createApiFixture<ExperimentRunCollaborators>(
   {
     attachments: createNoAttachmentsFixture(),
     studio: {
-      postEvent: async ({
+      postStudioEvent: async ({
         event,
       }: {
         event: { type: string; payload: Record<string, any> };

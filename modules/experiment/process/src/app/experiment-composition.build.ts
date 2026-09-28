@@ -7,24 +7,29 @@ import { EventEmitter } from "node:events";
  */
 import type { ClickHouseSettings } from "@clickhouse/client";
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { ExperimentRunLoopUnavailableError } from "@langwatch/experiment-contract";
 import { generate } from "@langwatch/ksuid";
-import {
-  getStaticModelCostRates,
-  type ModelCostRate,
-  type ModelProviderApi,
-} from "@langwatch/model-provider-contract";
+import { getStaticModelCostRates, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import {
+  HttpExperimentAttachmentLinkChannel,
+  type ExperimentAttachmentEgressPolicy,
+} from "../channels/http/http.experiment-attachment-link.channel.ts";
 import {
   buildExperimentRunProcessingPipeline,
   type ExperimentRunProcessingPipeline,
@@ -39,10 +44,17 @@ import type { ExperimentIdLookupRepository } from "../repositories/experiment-id
 import { PrismaExperimentPeopleRepository } from "../repositories/prisma/prisma.experiment-people.repository.ts";
 import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
 import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experiment.repository.ts";
+import { RedisExperimentRunAbortRepository } from "../repositories/redis/redis.experiment-run-abort.repository.ts";
 import { RedisExperimentRunProcessingRepository } from "../repositories/redis/redis.experiment-run-processing.repository.ts";
 import { RedisExperimentRunProgressRepository } from "../repositories/redis/redis.experiment-run-progress.repository.ts";
+import { modelCostRatesOf } from "../rules/experiment-model-cost.rules.ts";
+import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
+import { ExperimentAttachmentInputService } from "../services/experiment-attachment-input.service.ts";
 import type { ExecutionDataServices } from "../services/experiment-execution-data.service.ts";
+import { ExperimentPollingRunService } from "../services/experiment-polling-run.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
+import { ExperimentRunModelCostService } from "../services/experiment-run-model-cost.service.ts";
+import { ExperimentRunSandboxCredentialService } from "../services/experiment-run-sandbox-credential.service.ts";
 import { ExperimentTargetEntityNamesService } from "../services/experiment-target-entity-names.service.ts";
 import { ExperimentWorkbenchTargetNamesService } from "../services/experiment-workbench-target-names.service.ts";
 import { WorkflowEvaluationService } from "../services/experiment-workflow-evaluation.service.ts";
@@ -230,19 +242,10 @@ function authzPermissions(authz: AuthzApi): ExperimentPermissions {
 /** The project's custom cost rules ahead of the static catalogue, as main's getLLMModelCosts. */
 function modelCostCatalogue(modelProviders: ModelProviderApi): ExperimentModelCosts {
   return {
-    listFor: async ({ projectId }) => {
-      const custom = await modelProviders.listCosts({ projectId });
-      const customRates: ModelCostRate[] = custom.map((cost) => ({
-        model: cost.model,
-        regex: cost.regex,
-        inputCostPerToken: cost.inputCostPerToken ?? undefined,
-        outputCostPerToken: cost.outputCostPerToken ?? undefined,
-        cacheReadCostPerToken: cost.cacheReadCostPerToken ?? undefined,
-        cacheCreationCostPerToken: cost.cacheCreationCostPerToken ?? undefined,
-        cacheCreation1hCostPerToken: cost.cacheCreation1hCostPerToken ?? undefined,
-      }));
-      return [...customRates, ...getStaticModelCostRates()];
-    },
+    listFor: async ({ projectId }) => [
+      ...modelCostRatesOf(await modelProviders.listCosts({ projectId })),
+      ...getStaticModelCostRates(),
+    ],
   };
 }
 
@@ -316,6 +319,84 @@ export function buildExperimentIdLookup(
   }).idLookup();
 }
 
+/**
+ * The workbench run loop over this module's own Redis state and its peers' operations, ported
+ * from the retired `api-experiment-run.composition.ts`. Without Redis or a public address it
+ * refuses to start a run by name, as that composition did; a poll still reads Redis if present.
+ */
+export function buildExperimentRunLoop(input: {
+  redis: ProcessMembers["redis"] | undefined;
+  publicBaseUrl: string | undefined;
+  /** Names this process in a refusal. */
+  processName: string;
+  logger: Pick<Logger, "warn">;
+  experiments: ExperimentService;
+  services: ExecutionDataServices;
+  attachments: ExperimentAttachmentInputService;
+  connectedAgentOwnership: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
+  dependencies: {
+    workflows: WorkflowApi;
+    modelProviders: ModelProviderApi;
+    evaluation: EvaluationApi;
+    projects: ProjectApi;
+    apiKeys: ApiKeyApi;
+    agents: AgentApi;
+  };
+}): ExperimentV3RunLoop {
+  const { redis, publicBaseUrl, dependencies } = input;
+  const shared = {
+    services: input.services,
+    workflows: dependencies.workflows,
+    defaultConcurrency: RUN_DEFAULT_CONCURRENCY,
+  };
+  if (!redis || !publicBaseUrl) {
+    const capability = redis
+      ? "public address, so a run could not answer with the link to its own results"
+      : "progress store, so a run it started could never be polled for";
+    input.logger.warn({ capability }, "experiment runs are refused in this process");
+    return {
+      ...shared,
+      ports: null,
+      progress: redis ? RedisExperimentRunProgressRepository.create({ redis }) : null,
+      startRun: () =>
+        Promise.reject(
+          new ExperimentRunLoopUnavailableError({ capability, process: input.processName }),
+        ),
+    };
+  }
+
+  const progress = RedisExperimentRunProgressRepository.create({ redis });
+  const ports: ExperimentRunCollaborators = {
+    studio: dependencies.workflows,
+    cost: ExperimentRunModelCostService.create({ modelProviders: dependencies.modelProviders }),
+    abort: RedisExperimentRunAbortRepository.create({ redis }),
+    experiments: input.experiments,
+    evaluationReporting: dependencies.evaluation,
+    sandboxCredentials: ExperimentRunSandboxCredentialService.create({
+      projects: dependencies.projects,
+      apiKeys: dependencies.apiKeys,
+    }),
+    connectedDispatch: dependencies.agents,
+    connectedAgentOwnership: input.connectedAgentOwnership,
+    attachments: input.attachments,
+  };
+
+  return {
+    ...shared,
+    ports,
+    progress,
+    startRun: (run) =>
+      ExperimentPollingRunService.create().startPollingRun({
+        ...run,
+        ports,
+        workflows: dependencies.workflows,
+        progress,
+        baseUrl: publicBaseUrl,
+        defaultConcurrency: run.defaultConcurrency ?? RUN_DEFAULT_CONCURRENCY,
+      }),
+  };
+}
+
 export function buildExperimentInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
   clickhouse: ClickHouseQueryClient;
@@ -326,6 +407,9 @@ export function buildExperimentInfrastructure(input: {
   execution: ExperimentRunCommandDispatcherService;
   /** This deployment's public origin, for the link a run answers with. */
   publicBaseUrl: string | undefined;
+  processName: string;
+  /** The fence a run reads a row's attachment link behind. */
+  attachmentEgress: ExperimentAttachmentEgressPolicy;
   dependencies: {
     workflows: WorkflowApi;
     dataset: DatasetApi;
@@ -340,6 +424,10 @@ export function buildExperimentInfrastructure(input: {
     entitlement: EntitlementApi;
     /** The project's custom model cost rules. */
     modelProviders: ModelProviderApi;
+    evaluation: EvaluationApi;
+    apiKeys: ApiKeyApi;
+    suite: SuiteApi;
+    storedObjects: StoredObjectApi;
   };
 }): Omit<ExperimentAppDependencies, "runLookup"> {
   const { prisma, clickhouse, redis, logger, execution, publicBaseUrl, dependencies } = input;
@@ -381,17 +469,20 @@ export function buildExperimentInfrastructure(input: {
     entitlements: dependencies.entitlement,
     projects: dependencies.projects,
   };
-  const runLoop: ExperimentV3RunLoop = {
-    ports: null,
-    // The READ half, derivable from the deployment's own Redis: a poll of a
-    // run this process did not start is still this process's to answer.
-    // `ports` stays null — starting a run belongs to the worker.
-    progress: redis ? RedisExperimentRunProgressRepository.create({ redis }) : null,
+  const runLoop = buildExperimentRunLoop({
+    redis,
+    publicBaseUrl,
+    processName: input.processName,
+    logger,
+    experiments,
     services,
-    workflows: dependencies.workflows,
-    defaultConcurrency: RUN_DEFAULT_CONCURRENCY,
-    startRun: () => Promise.reject(new ExperimentCapabilityUnavailableError("experiment run loop")),
-  };
+    attachments: ExperimentAttachmentInputService.create({
+      storedObjects: dependencies.storedObjects,
+      links: HttpExperimentAttachmentLinkChannel.create({ policy: input.attachmentEgress }),
+    }),
+    connectedAgentOwnership: dependencies.suite,
+    dependencies,
+  });
 
   const targetNames = ExperimentWorkbenchTargetNamesService.create();
   const targetEntities = ExperimentTargetEntityNamesService.create({

@@ -21,6 +21,8 @@ function infrastructure(redis: unknown) {
     logger: createTestLogger().logger,
     execution: ExperimentRunCommandDispatcherService.create(),
     publicBaseUrl: undefined,
+    processName: "langwatch-test",
+    attachmentEgress: { blockLocal: true, allowedHosts: [], verifyTls: true },
     dependencies: {} as never,
   });
 }

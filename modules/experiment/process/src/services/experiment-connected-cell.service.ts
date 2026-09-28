@@ -40,19 +40,6 @@ import type { ExperimentAttachmentInputService } from "./experiment-attachment-i
 import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
-/**
- * Dispatches one turn to a connected agent, through the runtime a live SDK
- * process registered its instances on (ADR-128).
- */
-export abstract class ExperimentConnectedDispatch {
-  abstract dispatch(input: {
-    projectId: string;
-    agent: DispatchAgent;
-    call: DispatchCall;
-    signal: AbortSignal;
-  }): Promise<CallOutcome>;
-}
-
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 
 /** One turn to a connected agent, as the cell executor asks for it. */
@@ -97,7 +84,7 @@ export class ExperimentConnectedCellService {
     return new ExperimentConnectedCellService({
       cells,
       attachments: ports.attachments,
-      dispatch: dispatch ?? ((params) => ports.connectedDispatch.dispatch(params)),
+      dispatch: dispatch ?? ((params) => ports.connectedDispatch.callConnected(params)),
       sleep: sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms))),
       now: now ?? (() => nowInstant().epochMilliseconds),
     });

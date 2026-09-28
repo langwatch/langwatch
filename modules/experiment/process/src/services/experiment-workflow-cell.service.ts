@@ -342,7 +342,7 @@ export class ExperimentWorkflowCellService {
       );
 
       const events: StudioServerEvent[] = [];
-      await this.ports.studio.postEvent({
+      await this.ports.studio.postStudioEvent({
         projectId,
         event: enrichedEvent,
         isAborted,

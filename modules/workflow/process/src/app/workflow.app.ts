@@ -218,6 +218,8 @@ export interface WorkflowStudioRuns {
     projectId: string;
     event: StudioClientEvent;
     onEvent: (event: StudioServerEvent) => void;
+    isAborted?: () => Promise<boolean>;
+    origin?: WorkflowRunOrigin;
   }): Promise<void>;
 }
 
@@ -815,6 +817,8 @@ export class WorkflowApp implements WorkflowApi {
     projectId: string;
     event: StudioClientEvent;
     onEvent: (event: StudioServerEvent) => void;
+    isAborted?: () => Promise<boolean>;
+    origin?: WorkflowRunOrigin;
   }): Promise<void> {
     return this.#members.studioRuns.postEvent(input);
   }
