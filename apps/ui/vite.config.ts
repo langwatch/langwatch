@@ -381,6 +381,14 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           changeOrigin: true,
           secure: false,
         },
+        // The API process serves the sandboxed chart frame in production; in
+        // dev the frontend owns the root, so it needs its own entry or it
+        // falls through to the SPA and every widget frame renders blank.
+        "^/sandbox/chart-frame(?:\\?.*)?$": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
         // Exact /mcp match (not prefix) to avoid swallowing /mcp/authorize; include query handling.
         "^/mcp(?:\\?.*)?$": {
           target: API_TARGET,
