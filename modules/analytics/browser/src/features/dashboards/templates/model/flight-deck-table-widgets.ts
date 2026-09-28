@@ -35,7 +35,7 @@ export const COST_EFFICIENCY_CODE = widgetCode({
       <div style={{ margin: "12px 0 4px", fontSize: 11, fontWeight: 500, color: C.subtle }}>
         Highest-cost models
       </div>
-      <Bars rows={ranked} format={usd} />
+      <Bars rows={ranked} format={usd} height={128} />
     </Panel>
   );`,
 });
@@ -188,7 +188,7 @@ function Feedback({ value }) {
 function TraceLink({ id }) {
   const open = () => LW.navigate("trace", { traceId: id });
   return (
-    <span onClick={open} title={id} style={{ cursor: "pointer", display: "block", maxWidth: 64,
+    <span onClick={open} title={id} style={{ cursor: "pointer", display: "block", maxWidth: 240,
       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
       {mono(id, C.teal)}
     </span>
@@ -207,7 +207,7 @@ function TraceLink({ id }) {
   ];
   return (
     <Panel>
-      <Table columns={columns} rows={main.data} />
+      <Table columns={columns} rows={main.data} rowPadding={3} />
     </Panel>
   );`,
 });

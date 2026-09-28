@@ -9,6 +9,7 @@ export const STATUS_CODE = widgetCode({
   summary: "Request volume, success rate, p95 latency and total cost against the period before.",
   subtitle: "Traffic, quality, latency and cost at a glance",
   source: "traces",
+  compactCallToAction: true,
   parts: [NUMBERS],
   components: `// rising is what a rise means for this figure: "good", "bad" or "neutral".
 function Change({ current, previous, rising }) {
@@ -32,9 +33,11 @@ function Change({ current, previous, rising }) {
 
 function Tile({ label, value, current, previous, rising }) {
   return (
-    <div style={{ border: "1px solid " + C.border, borderRadius: 8, padding: "10px 12px" }}>
+    <div style={{ border: "1px solid " + C.border, borderRadius: 8, padding: "10px 12px",
+      background: C.muted + "66" }}>
       <div style={{ fontSize: 11, fontWeight: 500, color: C.subtle }}>{label}</div>
-      <div style={{ marginTop: 2, fontSize: 20, lineHeight: "24px", fontWeight: 600 }}>{value}</div>
+      <div style={{ marginTop: 2, fontSize: 20, lineHeight: "24px", fontWeight: 600,
+        letterSpacing: "-0.025em" }}>{value}</div>
       <Change current={current} previous={previous} rising={rising} />
     </div>
   );
@@ -96,8 +99,9 @@ export const THROUGHPUT_CODE = widgetCode({
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={C.border} />
-            <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28} />
-            <YAxis yAxisId="req" tick={AXIS} tickLine={false} axisLine={false} width={40}
+            <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
+              dy={4} />
+            <YAxis yAxisId="req" tick={AXIS} tickLine={false} axisLine={false} width={44}
               tickFormatter={count} />
             <YAxis yAxisId="ms" orientation="right" tick={AXIS} tickLine={false}
               axisLine={false} width={48} tickFormatter={ms} />
@@ -148,7 +152,8 @@ export const QUALITY_CODE = widgetCode({
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={C.border} />
-            <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28} />
+            <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
+              dy={4} />
             <YAxis tick={AXIS} tickLine={false} axisLine={false} width={40} domain={[0, 1]}
               tickFormatter={(value) => pct(value, 0)} />
             <Tooltip contentStyle={TIP} formatter={(value, name) => [pct(value), name]} />
@@ -190,7 +195,8 @@ export const FEEDBACK_CODE = widgetCode({
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={C.border} />
-            <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28} />
+            <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
+              dy={4} />
             <YAxis tick={AXIS} tickLine={false} axisLine={false} width={40} domain={[0, 1]}
               tickFormatter={(value) => pct(value, 0)} />
             <Tooltip contentStyle={TIP} formatter={(value) => [pct(value, 0), "positive"]} />

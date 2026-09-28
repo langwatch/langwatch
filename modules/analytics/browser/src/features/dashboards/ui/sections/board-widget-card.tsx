@@ -1,24 +1,26 @@
 /**
- * One stored widget on a board: its name, a drag handle and its menu over the
- * widget's sandboxed frame, drawn over the board's period and grain. Edit
- * opens the shared in-place editor on this widget's own code and queries.
+ * One stored widget on a board: its name and menu over the widget's sandboxed
+ * frame, drawn over the board's period and grain. The drag handle shows on hover
+ * or focus. Edit opens the shared in-place editor on the widget's code and queries.
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { GripVertical } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { chartGridCardHeightPx } from "../../../../model/chart-grid.ts";
 import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-definition.ts";
 import { CHART_GRID_DRAG_HANDLE_CLASS } from "../../../../ui/sections/chart-grid.tsx";
 import { DashboardWidgetFrameOverWindow } from "../../../../ui/sections/dashboard-widget-frame.tsx";
 import { DashboardWidgetInPlaceEditor } from "../../../../ui/sections/dashboard-widget-in-place-editor.tsx";
+import { boardCardHeightPx } from "../../model/board-grid.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
 
-/** The room the header row and the card's padding take from the widget's frame. */
-const CARD_CHROME_PX = 56;
+/** The title row's height: its top padding and one 13px line. */
+const HEADER_HEIGHT_PX = 33;
+/** The room the title row, the frame's bottom padding and the border take from the frame. */
+const CARD_CHROME_PX = HEADER_HEIGHT_PX + 8 + 2;
 
 export function BoardWidgetCard({
   widget,
@@ -57,8 +59,10 @@ export function BoardWidgetCard({
 
   return (
     <VStack
+      className="group"
+      position="relative"
       align="stretch"
-      gap={2}
+      gap={0}
       height="full"
       minWidth={0}
       overflow="hidden"
@@ -67,20 +71,30 @@ export function BoardWidgetCard({
       borderRadius="xl"
       background="bg.panel"
       boxShadow="0 1px 2px rgb(16 16 32 / 0.04)"
-      paddingX={4}
-      paddingTop={2.5}
-      paddingBottom={3}
     >
-      <HStack gap={1}>
-        <Text flex={1} minWidth={0} truncate fontSize="13px" fontWeight="semibold">
-          {widget.name}
-        </Text>
+      <Text
+        height={`${HEADER_HEIGHT_PX}px`}
+        paddingTop="14px"
+        paddingLeft={4}
+        paddingRight={16}
+        truncate
+        fontSize="13px"
+        lineHeight="19px"
+        fontWeight="medium"
+      >
+        {widget.name}
+      </Text>
+      <HStack position="absolute" top="13px" right={4} gap={0}>
         <Box
           className={CHART_GRID_DRAG_HANDLE_CLASS}
           cursor="grab"
           color="gray.400"
           padding={1}
           title="Drag to move"
+          opacity={0}
+          transition="opacity 0.15s"
+          _groupHover={{ opacity: 1 }}
+          _groupFocusWithin={{ opacity: 1 }}
         >
           <GripVertical size={14} aria-hidden />
         </Box>
@@ -92,7 +106,7 @@ export function BoardWidgetCard({
           onDelete={onDelete}
         />
       </HStack>
-      <Box flex={1} minHeight={0}>
+      <Box flex={1} minHeight={0} paddingX={2} paddingBottom={2}>
         <DashboardWidgetFrameOverWindow
           id={widget.id}
           graph={widget.definition}
@@ -100,7 +114,7 @@ export function BoardWidgetCard({
           projectSlug={projectSlug}
           dashboardId={dashboardId}
           widgetName={widget.name}
-          maxHeight={Math.max(chartGridCardHeightPx(widget.placement.rowSpan) - CARD_CHROME_PX, 60)}
+          maxHeight={Math.max(boardCardHeightPx(widget.placement.rowSpan) - CARD_CHROME_PX, 60)}
           timeWindow={timeWindow}
           granularitySeconds={granularitySeconds}
         />
