@@ -40854,7 +40854,7 @@ When a conversation is over the budget, you still get a verdict: every turn is s
 eval(conversation_bounded(m.ConversationId, 8000, ''), 'the customer left angry') AS q1
 ```
 
-[`conversation` or `llm_readable_thread`](/api-reference/query/extraction-functions#conversation-or-llm_readable_thread) has the measurements behind the choice.
+[Which thread function to use](/api-reference/query/extraction-functions#which-thread-function-to-use) has the measurements behind the choice.
 
 ## Writing your own statement
 
@@ -46488,7 +46488,7 @@ A trace is one request and response. A thread is the whole conversation, grouped
 
 Pick **Thread Level** in the drawer. The evaluator's variables now map to the **Current Thread** source, whose `traces` field holds every trace in the thread with its input and output.
 
-The **Full Thread (AI-Readable)** field (`formatted_traces`) holds the thread as one text: each turn once, with the agent's work between the user message and the reply (model calls with token counts, tool calls with their arguments and results, retrievals), cut to 64,000 tokens. It is the same rendering as the [`llm_readable_thread`](/api-reference/query/extraction-functions#conversation-or-llm_readable_thread) query function.
+The **Full Thread (AI-Readable)** field (`formatted_traces`) holds the thread as one text: each turn once, with the agent's work between the user message and the reply (model calls with token counts, tool calls with their arguments and results, retrievals), cut to 64,000 tokens. It is the same rendering as the [`llm_readable_thread`](/api-reference/query/extraction-functions#which-thread-function-to-use) query function.
 
 <Frame>
   <img
@@ -71417,13 +71417,13 @@ The first argument is the key and can be any expression the query already allows
 
 The schema endpoint publishes each function's `encoding`. A function marked `json` returns a string whose contents are JSON, so parse it back rather than treating it as prose.
 
-## `conversation` or `llm_readable_thread`
+## Which thread function to use
 
 Both read a whole thread. They differ in what they show of each turn.
 
 Use `conversation` for questions about what was said: tone, language, whether the user got an answer, a handoff, an apology. Use `llm_readable_thread` for questions about what the agent did: the tools it called, their arguments and results, the documents it retrieved, the tests it ran, its token usage.
 
-When unsure, use `llm_readable_thread`. On the judge-lab benchmark it answers questions about the conversation within 2.5 points of `conversation`, while `conversation` loses 14 to 22 points on questions about tools. The cost is tokens: `llm_readable_thread` is about 1.8 times the size on short threads and 3 to 10 times on long agent sessions.
+When unsure, use `llm_readable_thread`. On our judge benchmark it answers questions about the conversation within 2.5 points of `conversation`, while `conversation` loses 14 to 22 points on questions about tools. The cost is tokens: `llm_readable_thread` is about 1.8 times the size on short threads and 3 to 10 times on long agent sessions.
 
 For one trace rather than a whole thread, use `llm_readable_trace`.
 
