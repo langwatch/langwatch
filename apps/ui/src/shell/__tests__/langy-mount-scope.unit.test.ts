@@ -2,9 +2,12 @@
  * Langy mounts once per layout route; every route below a layout gets the panel.
  * Spec: specs/langy/langy-mount-scope.feature
  */
+import { webModules } from "@langwatch/installed-web-modules";
+import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import { describe, expect, it } from "vitest";
 
 import { uiRouteTable, type UiRouteDescriptor } from "../ui-route-table";
+import { uiUnservedPageLoaders } from "../ui-unserved-pages";
 
 const LANGY_LAYOUT = "layouts/project-langy";
 const APP_CHROME = "chrome";
@@ -56,6 +59,24 @@ describe("given a page a signed-out reader can open", () => {
       expect(layoutAncestors({ path: "/share/:id", layout: APP_CHROME })).toBe(0);
       // The detector, proved against a page that IS inside the chrome.
       expect(layoutAncestors({ path: "/settings/members", layout: APP_CHROME })).toBe(1);
+    });
+  });
+});
+
+describe("given the installed web modules", () => {
+  describe("when the Langy layout route's page key is resolved", () => {
+    /**
+     * A placeholder here drew the page with no panel above it, so an ask from
+     * a dashboard board changed state that nothing rendered.
+     *
+     * @scenario The Langy layout route is served by the Langy module
+     */
+    it("is declared by the langy module, not held by a placeholder", () => {
+      const screens = installedModuleScreens(webModules).loaders;
+
+      expect(screens[LANGY_LAYOUT]).toBeTypeOf("function");
+      expect(uiUnservedPageLoaders[LANGY_LAYOUT]).toBeUndefined();
+      expect(langyLayoutAncestors("/:project/dashboards/:dashboardId")).toBe(1);
     });
   });
 });

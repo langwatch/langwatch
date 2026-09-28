@@ -5,7 +5,6 @@
  */
 
 import type { UiPageLoaderRegistry } from "@langwatch/ui-kernel/feature-install";
-import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
 
 export function UiUnservedPage() {
   return (
@@ -18,8 +17,6 @@ export function UiUnservedPage() {
   );
 }
 
-/** A layout no module has re-homed draws its children, unframed but present. */
-const unservedLayout = async () => ({ default: UiRouteOutlet });
 const unservedPage = async () => ({ default: UiUnservedPage });
 
 /**
@@ -27,7 +24,6 @@ const unservedPage = async () => ({ default: UiUnservedPage });
  * entry here dead, which `every-route-page-is-declared` fails on.
  */
 export const uiUnservedPageLoaders: UiPageLoaderRegistry = {
-  "layouts/project-langy": unservedLayout,
   "pages/[project]/automations/activity": unservedPage,
   "pages/[project]/evaluations/[id]/edit/choose": unservedPage,
   "pages/[project]/analytics/custom/index": unservedPage,
