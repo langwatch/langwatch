@@ -9,6 +9,7 @@ import {
   answeringUiTransport,
   type UiProcedureAnswer,
 } from "@langwatch/browser-host/testing-transport";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
@@ -29,10 +30,11 @@ export function renderDashboards({
   answer?: UiProcedureAnswer;
 }) {
   const queryClient = createUiQueryClient({ onMutationError: () => void 0 });
+  const blockQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <AnalyticsTestHarness host={host}>
       <analyticsApi.Provider client={answeringUiTransport(answer)} queryClient={queryClient}>
-        {element}
+        <QueryClientProvider client={blockQueryClient}>{element}</QueryClientProvider>
       </analyticsApi.Provider>
     </AnalyticsTestHarness>,
   );

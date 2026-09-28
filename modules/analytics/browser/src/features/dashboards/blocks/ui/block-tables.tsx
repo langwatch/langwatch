@@ -37,12 +37,19 @@ function colorFor({ neutral, good }: { neutral: boolean; good: boolean }): strin
   return good ? "green.fg" : "red.fg";
 }
 
+/** The delta line's arrow: up, down, or flat when neither. */
+function deltaIcon({ up, down }: { up: boolean; down: boolean }) {
+  if (up) return ArrowUpRight;
+  if (down) return ArrowDownRight;
+  return ArrowRight;
+}
+
 function DeltaLine({ delta, polarity }: { delta: number; polarity: Polarity }) {
   const up = delta > 0.0005;
   const down = delta < -0.0005;
   const good = polarity === "upGood" ? up : down;
   const color = colorFor({ neutral: polarity === "neutral" || (!up && !down), good });
-  const Icon = up ? ArrowUpRight : down ? ArrowDownRight : ArrowRight;
+  const Icon = deltaIcon({ up, down });
   return (
     <HStack gap={0.5} fontSize="11px" color={color}>
       <Icon size={12} />
