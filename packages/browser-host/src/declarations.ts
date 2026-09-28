@@ -23,11 +23,50 @@ import type {
   Signature,
   WorkflowField,
 } from "@langwatch/workflow-contract";
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentType, ReactElement, ReactNode } from "react";
+import type { IconType } from "react-icons";
 
 /** A component a module declares, loaded the first time something draws it. */
 export type UiDeclaredComponent<Props> = {
   readonly load: () => Promise<{ readonly default: ComponentType<Props> }>;
+};
+
+/** What a surface hands trace's lent agent actions menu: copy a prompt, ask Langy, or read docs. */
+export type UiAgentActionsMenuProps = {
+  /** Labels the default outline button. Ignored when `trigger` is given. */
+  triggerLabel?: string;
+  /** The surface's own trigger: one element, because `Menu.Trigger asChild` clones it. */
+  trigger?: ReactElement;
+  /** Match the sibling buttons of the surface this sits in. */
+  size?: "sm" | "md";
+  /** Null where the surface knows Langy is out of reach; otherwise `useCanAskLangy` decides. */
+  langy: {
+    prompt: string;
+    label: string;
+    hint: string;
+    /** Takes the prompt instead of the Langy store, for a surface animating its own composer. */
+    onAsk?: (prompt: string) => void;
+  } | null;
+  copy: {
+    /** What the reader gets while the skill is on its way; absent, the setup prompt of `skill`. */
+    prompt?: string;
+    label: string;
+    hint: string;
+    copiedTitle: string;
+    /** The skill whose instructions the copy carries, when there is one. */
+    skill?: string;
+    /** A freshly minted token to put in front of those instructions. */
+    apiKey?: string;
+    /** The endpoint that token belongs to, on a self-hosted deployment. */
+    endpoint?: string;
+  };
+  docs: {
+    href: string;
+    label: string;
+    hint: string;
+    /** Overrides the book glyph where the surface reads better with another. */
+    icon?: IconType;
+  };
 };
 
 /** What organization's Authentication overview hands each card. */
@@ -117,6 +156,12 @@ export type UiDatasetEditorTableProps = {
 };
 
 /** What a screen hands dataset's lent record sync, which renders nothing and saves edits. */
+/** What a screen hands dataset's lent picker list: whether to fetch yet, and where a pick goes. */
+export type UiDatasetPickerListProps = {
+  enabled?: boolean;
+  onSelect: (dataset: { datasetId: string; name: string; columnTypes: UiDatasetColumn[] }) => void;
+};
+
 export type UiDatasetRecordSyncProps = {
   projectId: string | undefined;
   /** dbDatasetId -> recordId -> changed columns; `_delete: true` marks a deletion. */
@@ -540,6 +585,7 @@ export type UiAnnotationFormFooterProps = { state: AnnotationFormState; padding:
 
 export type UiDeclaredCapabilities = {
   addOrEditDatasetDrawer: UiDeclaredComponent<UiAddOrEditDatasetDrawerProps>;
+  agentActionsMenu: UiDeclaredComponent<UiAgentActionsMenuProps>;
   annotateBody: UiDeclaredComponent<UiAnnotateBodyProps>;
   annotationFormFooter: UiDeclaredComponent<UiAnnotationFormFooterProps>;
   annotationQueueConversation: UiDeclaredComponent<UiAnnotationQueueConversationProps>;
@@ -550,6 +596,7 @@ export type UiDeclaredCapabilities = {
   conversationThread: UiDeclaredComponent<UiConversationThreadProps>;
   customGraph: UiDeclaredComponent<UiCustomGraphProps>;
   datasetEditorTable: UiDeclaredComponent<UiDatasetEditorTableProps>;
+  datasetPickerList: UiDeclaredComponent<UiDatasetPickerListProps>;
   datasetRecordSync: UiDeclaredComponent<UiDatasetRecordSyncProps>;
   editModelProviderForm: UiDeclaredComponent<UiEditModelProviderFormProps>;
   heroAskField: UiDeclaredComponent<UiHeroAskFieldProps>;

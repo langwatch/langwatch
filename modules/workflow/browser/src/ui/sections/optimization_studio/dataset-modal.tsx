@@ -3,10 +3,8 @@
  * platform: the shared dataset picker for choosing, the shared TanStack editor for
  * editing.
  */
-import { Box, Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { DatasetPickerList } from "@langwatch/dataset-browser/dataset-picker-list";
-import { UploadCSVDrawer } from "@langwatch/dataset-browser/upload-csv-drawer";
 import {
   datasetColumnsSchema,
   type DatasetColumns,
@@ -26,6 +24,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Database, Plus, Upload } from "react-feather";
 
 import { DatasetEditorTable } from "../../../behavior/optimization_studio/lent-dataset-editor-table.tsx";
+import { DatasetPickerList } from "../../../behavior/optimization_studio/lent-dataset-picker-list.tsx";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 
 const DRAFT_DATASET_COLUMNS: DatasetColumns = [
@@ -111,7 +110,6 @@ export function DatasetModal({
 }) {
   const [editingDataset, setEditingDataset] = useState<Entry["dataset"] | undefined>();
   const editorPortalRef = useRef<HTMLDivElement | null>(null);
-  const uploadCSVModal = useDisclosure();
   const { openDrawer } = useDrawer();
   const updateNodeInternals = useUpdateNodeInternals();
 
@@ -136,6 +134,12 @@ export function DatasetModal({
   }) => {
     attachDataset({ id: dataset.datasetId, name: dataset.name }, dataset.columnTypes);
     onClose();
+  };
+
+  // The workflow node needs the dataset's columns straight away, which a direct upload
+  // still processing doesn't have yet, so the upload keeps the in-browser parse.
+  const handleUploadCsv = () => {
+    openDrawer("uploadCSV", { enableDirectUpload: false, onSuccess: handlePick });
   };
 
   const handleNewDraft = () => {
@@ -239,7 +243,7 @@ export function DatasetModal({
                   size="sm"
                   variant="outline"
                   data-testid="upload-csv-dataset"
-                  onClick={() => uploadCSVModal.onOpen()}
+                  onClick={handleUploadCsv}
                 >
                   <Upload size={14} /> Upload CSV
                 </Button>
@@ -257,24 +261,6 @@ export function DatasetModal({
           </>
         )}
       </Dialog.Content>
-      {uploadCSVModal.open && (
-        <UploadCSVDrawer
-          isOpen={uploadCSVModal.open}
-          onClose={uploadCSVModal.onClose}
-          // The workflow picker needs the dataset's columns synchronously to
-          // wire the node, which a still-processing direct upload doesn't have
-          // yet — keep the in-browser-parse flow here.
-          enableDirectUpload={false}
-          onSuccess={(dataset) => {
-            uploadCSVModal.onClose();
-            handlePick({
-              datasetId: dataset.datasetId,
-              name: dataset.name,
-              columnTypes: dataset.columnTypes,
-            });
-          }}
-        />
-      )}
     </Dialog.Root>
   );
 }

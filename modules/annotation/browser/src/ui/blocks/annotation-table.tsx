@@ -1,14 +1,4 @@
-import {
-  Badge,
-  Box,
-  chakra,
-  HStack,
-  IconButton,
-  Skeleton,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, HStack, IconButton, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Menu } from "@langwatch/design-system/menu";
@@ -22,8 +12,6 @@ import type { AnnotationRow, AnnotationUser, DisplayMoment } from "../../model/a
 import { AnnotationAvatarGroup } from "../elements/annotation-avatar-group.tsx";
 import { AnnotationCommentsChip } from "../elements/annotation-comments-chip.tsx";
 import { AnnotationSuggestionsChip } from "../elements/annotation-suggestions-chip.tsx";
-
-const ChakraButton = chakra("button");
 
 type ActiveScoreType = { id: string; name: string };
 
@@ -71,15 +59,6 @@ function headerCheckedState({
   if (someRowsSelected) return "indeterminate";
 
   return false;
-}
-
-/** A checkbox's boolean-or-indeterminate state, as the string `aria-checked` wants. */
-function ariaCheckedValue(checked: boolean | "indeterminate"): "true" | "false" | "mixed" {
-  if (checked === true) return "true";
-
-  if (checked === false) return "false";
-
-  return "mixed";
 }
 
 export function AnnotationTable({
@@ -205,29 +184,22 @@ function SelectCheckbox({
   checked: boolean | "indeterminate";
   onToggle: () => void;
 }) {
+  // The cell's click stays here: ticking a row selects it, never opens it.
   return (
-    <ChakraButton
-      type="button"
-      role="checkbox"
-      aria-label={ariaLabel}
-      aria-checked={ariaCheckedValue(checked)}
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      minHeight="32px"
-      paddingX={2}
-      bg="transparent"
-      border="none"
-      cursor="pointer"
-      onClick={(event) => {
-        event.stopPropagation();
-        onToggle();
-      }}
-    >
-      <Box pointerEvents="none" display="inline-flex" aria-hidden="true">
-        <Checkbox size="sm" checked={checked} />
-      </Box>
-    </ChakraButton>
+    <Box onClick={(event) => event.stopPropagation()}>
+      <Checkbox
+        size="sm"
+        checked={checked}
+        onCheckedChange={onToggle}
+        inputProps={{ "aria-label": ariaLabel }}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        minHeight="32px"
+        paddingX={2}
+        cursor="pointer"
+      />
+    </Box>
   );
 }
 
