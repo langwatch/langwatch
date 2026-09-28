@@ -10,7 +10,7 @@ import { Check, ChevronsUpDown } from "lucide-react";
 
 import { useProjectPickGroups } from "../../behavior/use-project-pick-groups.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
-import type { ProductId } from "../../model/products.ts";
+import { isProjectScopedProduct, type ProductId } from "../../model/products.ts";
 import type { ProjectPickGroup } from "../../model/project-pick-items.ts";
 import { ProjectSwitcherCombobox } from "../blocks/project-switcher-combobox.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
@@ -51,7 +51,7 @@ function MeScopeChip() {
 const PROJECT_SEARCH_THRESHOLD = 8;
 
 /**
- * The LLM Ops scope: the current project as a chip, opening a menu of the
+ * The project scope (LLM Ops, Dashboards): the current project as a chip, opening a menu of the
  * organization's projects (plus a per-team create entry). Organization
  * choice lives in its own control, so this menu stays within the current one.
  */
@@ -152,14 +152,14 @@ function ProjectMenu({
 }
 
 /**
- * The product-native scope in the top bar: LLM Ops shows the project chip,
- * Me shows a Personal badge, and organization-wide products (Gateway,
- * Governance) show nothing — the organization control already says it all.
+ * The product-native scope in the top bar: project products show the project
+ * chip, Me a Personal badge, and organization-wide products nothing (the
+ * organization control already says it all).
  */
 export function ProductScopeControl({ activeProductId }: { activeProductId: ProductId | null }) {
   // Each scope renders its own leading divider, so a scope that has
   // nothing to show leaves no separator behind it.
-  if (activeProductId === "llm-ops") return <ProjectScopeMenu />;
+  if (isProjectScopedProduct(activeProductId)) return <ProjectScopeMenu />;
   if (activeProductId === "me") return <MeScopeChip />;
   return null;
 }

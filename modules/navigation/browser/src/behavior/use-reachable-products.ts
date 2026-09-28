@@ -41,10 +41,12 @@ export function useReachableProducts({
   const NOT_ASKED = { enabled: false, isLoading: false };
   const gatewayFlag = enabled ? host.featureFlag("release_ui_ai_gateway_menu_enabled") : NOT_ASKED;
   const governanceFlag = enabled ? host.featureFlag("release_ui_ai_governance_enabled") : NOT_ASKED;
+  const dashboardsFlag = enabled ? host.featureFlag("release_dashboards") : NOT_ASKED;
 
   const flagValues: Partial<Record<FrontendFeatureFlag, boolean>> = {
     release_ui_ai_gateway_menu_enabled: gatewayFlag.enabled,
     release_ui_ai_governance_enabled: governanceFlag.enabled,
+    release_dashboards: dashboardsFlag.enabled,
   };
 
   const reachableIds = enabled ? reachableProductIds({ flagValues, hasPermission }) : [];
@@ -61,7 +63,10 @@ export function useReachableProducts({
   return {
     reachableProducts,
     isLoading: enabled
-      ? isOrganizationLoading || gatewayFlag.isLoading || governanceFlag.isLoading
+      ? isOrganizationLoading ||
+        gatewayFlag.isLoading ||
+        governanceFlag.isLoading ||
+        dashboardsFlag.isLoading
       : false,
   };
 }

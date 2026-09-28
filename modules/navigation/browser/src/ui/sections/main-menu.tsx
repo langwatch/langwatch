@@ -4,10 +4,9 @@
  */
 
 import { nowInstant } from "@langwatch/time";
-import { GitPullRequest, LayoutDashboard, SquareTerminal } from "lucide-react";
+import { GitPullRequest, SquareTerminal } from "lucide-react";
 import React from "react";
 
-import { SavedDashboards } from "../../behavior/lent-saved-dashboards.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../../model/coding-agent-activity.ts";
 import { featureIcons } from "../../model/feature-icons.ts";
@@ -16,11 +15,7 @@ import {
   isOnlineEvaluationsActivePath,
 } from "../../model/navigation-active-state.ts";
 import { useNavigationHost, type NavigationProject } from "../../model/navigation-host.ts";
-import {
-  dashboardsAreaAt,
-  projectNavItems,
-  toProjectRoutePattern,
-} from "../../model/project-nav-items.ts";
+import { projectNavItems, toProjectRoutePattern } from "../../model/project-nav-items.ts";
 import { projectScopedDestination } from "../../model/project-scoped-nav.ts";
 import { CollapsibleMenuGroup } from "../blocks/collapsible-menu-group.tsx";
 import { SideMenuLink } from "../blocks/side-menu-link.tsx";
@@ -31,7 +26,7 @@ export { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../../model/menu-widths
 /**
  * The project navigation sections the LLM Ops sidebar renders. The Govern group
  * is gone because the product switcher replaces it, and the Ops group because
- * the settings menu holds the operations pages.
+ * the settings menu holds the operations pages. Dashboards is its own product.
  */
 export const MainMenuSections = function MainMenuSections({
   showExpanded,
@@ -49,9 +44,6 @@ export const MainMenuSections = function MainMenuSections({
     { enabled: !!project?.id },
   );
   const codingAgentLinks = useCodingAgentLinks();
-  const canSeeDashboards =
-    host.featureFlag("release_dashboards").enabled && host.hasPermission("analytics:view");
-  const dashboardsArea = canSeeDashboards ? dashboardsAreaAt(pathname) : void 0;
 
   const sectionProps = { showExpanded, project, pathname };
 
@@ -66,15 +58,7 @@ export const MainMenuSections = function MainMenuSections({
         showLabel={showExpanded}
       />
 
-      {dashboardsArea && showExpanded && (
-        <SavedDashboards activeDashboardId={dashboardsArea.dashboardId} />
-      )}
-
-      <ObserveSection
-        {...sectionProps}
-        codingAgentLinks={codingAgentLinks}
-        canSeeDashboards={canSeeDashboards}
-      />
+      <ObserveSection {...sectionProps} codingAgentLinks={codingAgentLinks} />
       <TestSection {...sectionProps} pendingAnnotationCount={pendingItemsCount.data?.count} />
       <BuildSection {...sectionProps} canSeeAutomations={host.hasPermission("triggers:view")} />
     </>
@@ -127,8 +111,7 @@ function ObserveSection({
   project,
   pathname,
   codingAgentLinks,
-  canSeeDashboards,
-}: ProjectSectionProps & { codingAgentLinks: CodingAgentLinks; canSeeDashboards: boolean }) {
+}: ProjectSectionProps & { codingAgentLinks: CodingAgentLinks }) {
   return (
     <SidebarSection id="observe" label="Observe" showExpanded={showExpanded}>
       <PageMenuLink
@@ -139,16 +122,6 @@ function ObserveSection({
         isActive={pathname.includes("/analytics")}
         showLabel={showExpanded}
       />
-      {canSeeDashboards && (
-        <PageMenuLink
-          path={projectNavItems.dashboards.path}
-          icon={LayoutDashboard}
-          label={projectNavItems.dashboards.title}
-          project={project}
-          isActive={dashboardsAreaAt(pathname) !== void 0}
-          showLabel={showExpanded}
-        />
-      )}
       <PageMenuLink
         path={projectNavItems.traces_v2.path}
         icon={featureIcons.traces_v2.icon}

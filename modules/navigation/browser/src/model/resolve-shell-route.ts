@@ -33,6 +33,25 @@ export interface ShellRoute {
   activeProductId: ProductId | null;
 }
 
+/**
+ * The product the chrome draws. Dashboards wins over the personal plane: its
+ * sidebar is the saved-dashboards list, which the Me sidebar does not carry.
+ */
+function activeProductFor({
+  isSettingsRoute,
+  isPersonalScopeRoute,
+  addressedProductId,
+}: {
+  isSettingsRoute: boolean;
+  isPersonalScopeRoute: boolean;
+  addressedProductId: ProductId | null;
+}): ProductId | null {
+  if (isSettingsRoute) return null;
+  if (addressedProductId === "dashboards") return "dashboards";
+  if (isPersonalScopeRoute) return "me";
+  return addressedProductId ?? "llm-ops";
+}
+
 /** Product and scope resolver; settings detour is not a product; match on segment boundary */
 export function resolveShellRoute({
   pathname,
@@ -54,9 +73,11 @@ export function resolveShellRoute({
     !isSettingsRoute &&
     !isOrgScopedProduct &&
     (isPersonalScope || isPathUnder({ pathname, base: "/me" }) || isOnOwnPersonalProject);
-  const activeProductId = isSettingsRoute
-    ? null
-    : ((isPersonalScopeRoute ? "me" : addressedProductId) ?? "llm-ops");
+  const activeProductId = activeProductFor({
+    isSettingsRoute,
+    isPersonalScopeRoute,
+    addressedProductId,
+  });
   const isOrgScopeRoute =
     isOrgScope || isSettingsRoute || isOrganizationScopedProduct(activeProductId);
 
