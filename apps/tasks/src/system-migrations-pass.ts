@@ -3,7 +3,6 @@ import {
   AuthzBindingIdService,
   PostgresAuthzAdapter,
 } from "@langwatch/authz-process";
-import { parseRoutingTable } from "@langwatch/clickhouse-client";
 import {
   createEventingGroupQueueFactory,
   EventSourcing,
@@ -18,11 +17,7 @@ import {
   IdentityOrganizationMigrations,
   IdentityUserMigrations,
 } from "@langwatch/identity-process";
-import {
-  OpsSystemMigrations,
-  RoutingTableOrganizationDataplaneService,
-  SystemMigrationsPassTask,
-} from "@langwatch/ops-process";
+import { OpsSystemMigrations, SystemMigrationsPassTask } from "@langwatch/ops-process";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
 import type { TaskInput } from "./config.ts";
@@ -95,9 +90,7 @@ export async function systemMigrationsPass(input: TaskInput): Promise<void> {
       isSaaS: () => input.config.isSaaS,
       migrations: () => migrations,
       userMigrations: () => userMigrations,
-      dataplane: RoutingTableOrganizationDataplaneService.create({
-        routes: parseRoutingTable(input.environment).routes,
-      }),
+      dataplane: input.connections.dataplane,
       newbornSweep: () => sweep.runPass(),
     });
     await SystemMigrationsPassTask.create({

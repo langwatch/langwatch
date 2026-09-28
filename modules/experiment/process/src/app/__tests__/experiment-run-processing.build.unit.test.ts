@@ -44,6 +44,7 @@ function build() {
       retentionReads += 1;
       return 49;
     },
+    retention: { resolve: async () => null },
     workflowEvaluations: createApiFixture<WorkflowEvaluationRunner>({}, "workflowEvaluations"),
     runCells: {
       folds: MemoryExperimentRunFoldRepository.create(),

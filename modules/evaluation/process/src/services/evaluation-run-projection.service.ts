@@ -8,7 +8,7 @@ import {
   type UpsertEvaluationRunCommand,
 } from "@langwatch/evaluation-contract";
 
-import type { EvaluationRetentionFloor } from "../app/evaluation.members.ts";
+import type { EvaluationRetentionLookup } from "../app/evaluation.members.ts";
 import { EvaluationRunProjectionRepository } from "../repositories/evaluation-run-projection.repository.ts";
 import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
 
@@ -19,14 +19,14 @@ import type { EvaluationRunRepository } from "../repositories/evaluation.reposit
 export class EvaluationRunProjectionService extends EvaluationRunProjectionRepository {
   static create(options: {
     repository: EvaluationRunRepository;
-    retentionFloor: EvaluationRetentionFloor;
+    retention: EvaluationRetentionLookup;
   }): EvaluationRunProjectionService {
-    return new EvaluationRunProjectionService(options.repository, options.retentionFloor);
+    return new EvaluationRunProjectionService(options.repository, options.retention);
   }
 
   private constructor(
     private readonly repository: EvaluationRunRepository,
-    private readonly retentionFloor: EvaluationRetentionFloor,
+    private readonly retention: EvaluationRetentionLookup,
   ) {
     super();
   }
@@ -55,7 +55,7 @@ export class EvaluationRunProjectionService extends EvaluationRunProjectionRepos
     try {
       return await this.repository.getByEvaluationId({
         ...evaluationRunLookupSchema.parse(input),
-        retentionFloor: this.retentionFloor,
+        retention: this.retention,
       });
     } catch (error) {
       if (error instanceof EvaluationNotFoundError) return null;

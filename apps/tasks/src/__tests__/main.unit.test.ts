@@ -41,6 +41,7 @@ function input() {
         close: async () => void 0,
       },
       redis: null,
+      dataplane: { dataplaneFor: () => ({ kind: "shared" as const }) },
     },
     environment: {},
     signal: new AbortController().signal,

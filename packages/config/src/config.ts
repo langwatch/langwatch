@@ -53,11 +53,11 @@ type Parsed<Node> =
 /** The parsed shape of one owner's slice — what its create() receives. */
 export type ConfigOf<Slice extends ConfigSlice> = Parsed<Slice>;
 
-/** An owner: a module or framework package. Secrets shape is structural (one id per handle). */
+/** An owner: a module or framework package. Secrets shape is structural (one id, or a prefix). */
 export type ConfigOwner = Readonly<{
   name: string;
   config?: ConfigSlice;
-  secrets?: Readonly<Record<string, Readonly<{ id: string }>>>;
+  secrets?: Readonly<Record<string, Readonly<{ id: string; family?: boolean }>>>;
 }>;
 
 export type ProcessConfigOf<Owners extends readonly ConfigOwner[]> = {
@@ -134,13 +134,19 @@ function refuseCrossClaims(
   const secretIds = new Map(
     owners.flatMap((o) => Object.values(o.secrets ?? {}).map((h) => [h.id, o.name] as const)),
   );
+  const families = owners.flatMap((o) =>
+    Object.values(o.secrets ?? {}).flatMap((h) => (h.family ? [[h.id, o.name] as const] : [])),
+  );
+  // A declared family claims every name under its prefix, so config may claim none of them.
+  const secretOwnerOf = (env: string): string | undefined =>
+    secretIds.get(env) ?? families.find(([prefix]) => env.startsWith(prefix))?.[1];
   const claimed = new Map<string, { leaf: ConfigLeaf; owner: string }>();
 
   for (const {
     owner,
     entry: [, leaf],
   } of all) {
-    const secretOwner = secretIds.get(leaf.env);
+    const secretOwner = secretOwnerOf(leaf.env);
     if (secretOwner !== undefined) throw new ConfigClaimsSecretError(leaf.env, owner, secretOwner);
 
     const held = claimed.get(leaf.env);

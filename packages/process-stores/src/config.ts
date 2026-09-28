@@ -31,7 +31,7 @@ export interface ClickHousePrivateRoute {
 export interface ClickHouseConfig {
   /** `CLICKHOUSE_URL` — the shared server. Absent where every tenant is private. */
   readonly url?: string;
-  /** `CLICKHOUSE_URL__<label>__<orgId>` — one entry per organization on its own server. */
+  /** `CLICKHOUSE_URL__<label>__<orgId>`, the stores' secret family parsed once at boot. */
   readonly privateRoutes?: readonly ClickHousePrivateRoute[];
   /** What sizes the per-endpoint pool, as main's `CLICKHOUSE_*` pool variables state it. */
   readonly poolSizing?: PoolSizingInput;

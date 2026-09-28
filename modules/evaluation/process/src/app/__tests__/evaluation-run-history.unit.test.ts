@@ -21,6 +21,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { LiveEvaluationRepositories } from "../../repositories/live/live.evaluation.repositories.ts";
+import { EvaluationRetentionDaysService } from "../../services/evaluation-retention-days.service.ts";
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
 
 const TENANT = "project-1";
@@ -104,47 +105,6 @@ describe("given a process that installs the evaluation module over its repositor
       }
     });
   });
-
-  describe("when a run older than the platform default retention is looked up without its scheduled time", () => {
-    /** @scenario "A run lookup without a scheduled time stops at the platform default retention" */
-    it("refuses it as not found, reading the floor from data retention", async () => {
-      const runtime = await createApp({ role: "worker" })
-        .withModules([installableEvaluation])
-        .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
-        .withStores(memoryStores())
-        .provide({
-          workflow: createApiFixture<WorkflowApi>(),
-          trace: createApiFixture<TraceApi>(),
-          "model-provider": createApiFixture<ModelProviderApi>(),
-          "feature-flag": createApiFixture<FeatureFlagApi>(),
-          evaluator: createApiFixture<EvaluatorApi>(),
-          monitor: createApiFixture<MonitorApi>(),
-          dataset: createApiFixture<DatasetApi>(),
-          experiment: createApiFixture<ExperimentApi>(),
-          automation: createApiFixture<AutomationApi>(),
-          analytics: createApiFixture<AnalyticsApi>(),
-          "data-retention": createApiFixture<DataRetentionApi>({
-            getPlatformDefaultRetentionDays: () => 30,
-          }),
-        })
-        .boot();
-
-      try {
-        const app = runtime.service(EvaluationApi);
-        const old = NOW - 31 * DAY_MS;
-        await app.upsertRun({
-          tenantId: TENANT,
-          data: run({ scheduledAt: old, createdAt: old, startedAt: old, completedAt: old }),
-        });
-
-        await expect(
-          app.getRunByEvaluationId({ tenantId: TENANT, evaluationId: "evaluation-1" }),
-        ).rejects.toMatchObject({ code: "evaluation_not_found" });
-      } finally {
-        await runtime.stop();
-      }
-    });
-  });
 });
 
 describe("given the live evaluation repositories over the process's ClickHouse member", () => {
@@ -172,12 +132,72 @@ describe("given the live evaluation repositories over the process's ClickHouse m
         repositories.runs.getByEvaluationId({
           tenantId: TENANT,
           evaluationId: "evaluation-1",
-          retentionFloor: { getFloorMs: async () => 0 },
+          retention: EvaluationRetentionDaysService.create(
+            createApiFixture<DataRetentionApi>({
+              getPlatformDefaultRetentionDays: () => 30,
+              getRetentionDays: async () => 30,
+            }),
+          ),
         }),
       ).rejects.toMatchObject({ code: "evaluation_not_found" });
 
       expect(statements.length).toBeGreaterThan(1);
       expect(statements.every((statement) => statement.tenantId === TENANT)).toBe(true);
+    });
+  });
+});
+
+describe("given the live run read over a tenant's retention from data retention", () => {
+  /** The fallback probe's lower bound, after the recent-window probe misses. */
+  async function fallbackFloorMs(retention: Pick<DataRetentionApi, "getRetentionDays">) {
+    const probes: number[] = [];
+    const repositories = LiveEvaluationRepositories.create({
+      prisma: createApiFixture<ProcessMembers["prisma"]>(),
+      clickhouse: createApiFixture<ProcessMembers["clickhouse"]>({
+        query: async (request) => {
+          const sinceMs = request.params?.sinceMs;
+          if (typeof sinceMs === "number") probes.push(sinceMs);
+          return { rows: [] };
+        },
+      }),
+      redis: createApiFixture<ProcessMembers["redis"]>(),
+      objectStorage: createApiFixture<ProcessMembers["objectStorage"]>(),
+    });
+    const before = nowInstant().epochMilliseconds;
+    await expect(
+      repositories.runs.getByEvaluationId({
+        tenantId: TENANT,
+        evaluationId: "evaluation-1",
+        retention: EvaluationRetentionDaysService.create(
+          createApiFixture<DataRetentionApi>({
+            getPlatformDefaultRetentionDays: () => 30,
+            getRetentionDays: retention.getRetentionDays,
+          }),
+        ),
+      }),
+    ).rejects.toMatchObject({ code: "evaluation_not_found" });
+    return { before, floorMs: probes.at(-1) };
+  }
+
+  describe("when a run is looked up without its scheduled time", () => {
+    /** @scenario "A run lookup without a scheduled time stops at the tenant's retention horizon" */
+    it("floors the scan at the tenant's retention plus two days' margin", async () => {
+      const { before, floorMs } = await fallbackFloorMs({ getRetentionDays: async () => 90 });
+
+      expect(floorMs).toBeLessThanOrEqual(before - 92 * DAY_MS + 1_000);
+      expect(floorMs).toBeGreaterThan(before - 93 * DAY_MS);
+    });
+
+    /** @scenario "A run lookup whose tenant retention cannot be read stops at the platform default" */
+    it("floors the scan at the platform default when data retention refuses", async () => {
+      const { before, floorMs } = await fallbackFloorMs({
+        getRetentionDays: async () => {
+          throw new Error("retention store unavailable");
+        },
+      });
+
+      expect(floorMs).toBeLessThanOrEqual(before - 32 * DAY_MS + 1_000);
+      expect(floorMs).toBeGreaterThan(before - 33 * DAY_MS);
     });
   });
 });

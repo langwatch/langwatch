@@ -328,6 +328,10 @@ export class ExperimentApp implements ExperimentApi {
           clickhouse: members.clickhouse,
           redis: members.redis,
           defaultRetentionDays: () => dependencies.retention.getPlatformDefaultRetentionDays(),
+          retention: {
+            resolve: (tenantId) =>
+              dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+          },
           workflowEvaluations: built.workflowEvaluations,
           runCells,
           commands,

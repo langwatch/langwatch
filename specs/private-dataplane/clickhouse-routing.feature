@@ -43,10 +43,28 @@ Feature: Private ClickHouse Routing
   #
   # Main's `CLICKHOUSE_URL__<label>__<orgId>` family stays as it is, so no
   # deployment changes. Each URL carries a password, so the stores declare the
-  # family as secrets, resolve it through the chain once at boot, and hand the
-  # routing table to the clickhouse member; nothing else reads the environment,
-  # and no route URL is ever printed. There is no second key.
+  # family as one `Secret.family("CLICKHOUSE_URL__")` handle (ADR-132), resolve it
+  # through the chain once at boot, and hand the routing table to the clickhouse
+  # member; nothing else reads the environment, and no route URL is ever printed.
   # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: The stores parse the route family into the clickhouse member at boot
+    Given CLICKHOUSE_URL__acme__org_1 names an organization's own server and CLICKHOUSE_URL is unset
+    When the process opens its stores
+    Then the clickhouse member exists and answers org_1 among its private routes
+
+  @unit
+  Scenario: A route entry naming no organization is skipped
+    Given CLICKHOUSE_URL__acme__ is set beside a shared CLICKHOUSE_URL
+    When the process opens its stores
+    Then the clickhouse member answers no private route, and the warning names the variable only
+
+  @unit
+  Scenario: The migration runner reads the stores' parse of the route family
+    Given CLICKHOUSE_URL__acme__org_1 names an organization's own server
+    When the migration runner opens its connections
+    Then its dataplane answers org_1 as private and every other organization as shared
 
   # ---------------------------------------------------------------------------
   # Organization-level routing

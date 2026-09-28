@@ -129,4 +129,22 @@ describe("config and secrets stay separate", () => {
       /"sneaky" declares "SIGNING_KEY" as config, but "security" declares it as a secret/,
     );
   });
+
+  /** @scenario "A config leaf under a declared family prefix refuses naming both owners" */
+  it("refuses a config leaf read from a name under a declared secret family's prefix", () => {
+    const stores = {
+      name: "stores",
+      secrets: { clickhouseRoutes: { id: "CLICKHOUSE_URL__", family: true } },
+    } as const;
+    const sneaky = {
+      name: "sneaky",
+      config: Config.define((c) => ({
+        route: c.env("CLICKHOUSE_URL__acme__org_1", z.string().optional()),
+      })),
+    } as const;
+
+    expect(() => parseProcessConfig({ owners: [stores, sneaky], environment: {} })).toThrow(
+      expect.objectContaining({ code: "config_claims_secret" }),
+    );
+  });
 });

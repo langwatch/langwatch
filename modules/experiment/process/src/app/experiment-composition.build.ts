@@ -9,10 +9,13 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { RetentionPolicyResolver } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { getStaticModelCostRates, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -87,13 +90,6 @@ import type {
   ExperimentPermissions,
   ExperimentWorkflowAuthoring,
 } from "./experiment.app.ts";
-
-/**
- * The retention floor a DSPy run read is bounded by. Fixed, exactly as the
- * deleted composition's own `FixedExperimentDspyRetention` fixed it, rather
- * than reading a per-project policy nothing here owns.
- */
-const DSPY_DEFAULT_RETENTION_DAYS = 49;
 
 /** A draft name and an archived-slug disambiguator; never a row's own id. */
 const EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE = "expdisambig";
@@ -173,19 +169,25 @@ class ClickHouseMemberSession {
 }
 
 /**
- * A fixed retention floor, over no per-project policy.
+ * A DSPy step's retention: its tenant's traces retention, as main stamped it. Data retention
+ * answers the platform default for a project it cannot place, and a refusal fails the write.
  */
-class FixedExperimentDspyRetention extends ExperimentDspyRetentionRepository {
-  static create(days: number): FixedExperimentDspyRetention {
-    return new FixedExperimentDspyRetention(days);
+class TenantExperimentDspyRetention extends ExperimentDspyRetentionRepository {
+  static create(
+    retention: Pick<DataRetentionApi, "getRetentionDays">,
+  ): TenantExperimentDspyRetention {
+    return new TenantExperimentDspyRetention(retention);
   }
 
-  private constructor(private readonly days: number) {
+  private constructor(private readonly retention: Pick<DataRetentionApi, "getRetentionDays">) {
     super();
   }
 
-  findTraceRetentionDays(_tenantId: string): Promise<number> {
-    return Promise.resolve(this.days);
+  findTraceRetentionDays(tenantId: string): Promise<number> {
+    return this.retention.getRetentionDays({
+      projectId: tenantId,
+      category: RETENTION_TABLE_CATEGORY_MAP.dspy_steps,
+    });
   }
 }
 
@@ -435,6 +437,8 @@ export function buildExperimentRunProcessing(input: {
   clickhouse: ClickHouseQueryClient;
   redis: ProcessMembers["redis"] | undefined;
   defaultRetentionDays: () => number;
+  /** Each tenant's retention, which the run pipeline declares (§9). */
+  retention: RetentionPolicyResolver;
   workflowEvaluations: WorkflowEvaluationRunner;
   runCells: ExperimentRunCells;
   /** The pipeline's own senders, which the manager's intents send through once connected. */
@@ -455,6 +459,7 @@ export function buildExperimentRunProcessing(input: {
       complete: completeRun({ commands, boardWriteBack: runCells.boardWriteBack }),
     },
     runFrames: createExperimentRunFramesSubscriber({ stream: runCells.stream }),
+    retention: input.retention,
   };
   if (redis) {
     const cached = RedisExperimentRunProcessingRepository.create({
@@ -525,6 +530,8 @@ export function buildExperimentInfrastructure(input: {
     apiKeys: ApiKeyApi;
     suite: SuiteApi;
     storedObjects: StoredObjectApi;
+    /** Each tenant's traces retention, which DSPy step rows are stamped with. */
+    retention: Pick<DataRetentionApi, "getRetentionDays">;
   };
 }): Omit<ExperimentAppDependencies, "runLookup" | "runProcessing"> & {
   runCells: ExperimentRunCells;
@@ -543,7 +550,7 @@ export function buildExperimentInfrastructure(input: {
     }),
     dspyRepository: ClickHouseExperimentDspyRepository.create({
       resolveClient,
-      retention: FixedExperimentDspyRetention.create(DSPY_DEFAULT_RETENTION_DAYS),
+      retention: TenantExperimentDspyRetention.create(dependencies.retention),
       telemetry: runHistoryTelemetry,
     }),
     execution,

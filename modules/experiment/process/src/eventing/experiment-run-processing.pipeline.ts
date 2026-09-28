@@ -10,6 +10,7 @@ import {
   type EventingSetup,
   type FoldProjectionStore,
   type Projection,
+  type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
@@ -93,6 +94,8 @@ export interface ClickhouseExperimentRunProcessingRepository {
   runExecution: ExperimentRunExecutionEffects;
   /** The progress fold's reaction: each event's frames, live on the run's channel. */
   runFrames: ExperimentRunProgressSubscriber;
+  /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
+  retention?: RetentionPolicyResolver;
 }
 
 export type ExperimentRunProcessingPipeline = StaticPipelineDefinition<
@@ -155,7 +158,7 @@ export function buildExperimentRunProcessingPipeline(
     )
     .withProjectionSubscriber(deps.runFrames.name, deps.runFrames.spec);
 
-  return builder
+  return (deps.retention ? builder.withRetention(deps.retention) : builder)
     .withCommand("startExperimentRun", StartExperimentRunCommand)
     .withCommand("recordTargetResult", RecordTargetResultCommand)
     .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)

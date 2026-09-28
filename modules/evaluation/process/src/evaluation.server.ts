@@ -8,7 +8,7 @@ import type {
   EvaluationExecutionIntent,
   EvaluationInputStorage,
   EvaluationInputsOffload,
-  EvaluationRetentionFloor,
+  EvaluationRetentionLookup,
   EvaluationSettingsRecovery,
   ExecuteEvaluationCommandDeps,
 } from "./app/evaluation.members.ts";
@@ -67,8 +67,8 @@ export type EvaluationInputsOffloadStore = EvaluationInputsOffloadService;
 /** The tenant-routed ClickHouse the run repositories read and write on. */
 export type EvaluationClickHouseAccess = Readonly<{
   resolveClient: EvaluationClickHouseResolver;
-  /** The day a run read will not look below — the deployment's own retention default. */
-  retentionFloor: EvaluationRetentionFloor;
+  /** Each tenant's retention, which a run read floors its partition scan at. */
+  retention: EvaluationRetentionLookup;
 }>;
 
 /** Reads `evaluation_runs` directly, with no execution capability composed. */

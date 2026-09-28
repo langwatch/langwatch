@@ -875,6 +875,14 @@ key** (`github.appId ← GITHUB_APP_ID`); a module with a schema and no slice
 fails to compile. `.readonly()` on the schema is the immutability story —
 no `Object.freeze`, no mirror types, no re-plumbing.
 
+**A family handle answers every name under one prefix** (Alex, 2026-09-29; ADR-132 amendment).
+`Secret.family(prefix)` resolves to a name-to-value map, for a credential a deployment names by
+convention (main's `CLICKHOUSE_URL__<label>__<orgId>`). The env and `.env` adapters scan by prefix
+and 1Password answers none; the resolver scopes a family like any handle and answers only names
+under its prefix; the preflight treats a family as optional; and a config leaf may not claim a
+name under a declared prefix (`ConfigClaimsSecretError`). It is the one enumeration the chain
+does, bounded by a prefix its owner declared.
+
 **Defaults are production-shaped; development earns convenience explicitly.**
 `developmentDefault` values (localhost store URLs) apply only under
 `NODE_ENV=development` — so a bare `pnpm dev` boots with zero configuration —
@@ -1091,9 +1099,12 @@ never thinks about resolution at all. The per-module resolver adapters
 **The `clickhouse` member exposes its routing table** (Alex, 2026-09-28):
 `privateRoutes()` answers the organizations it routes to a private endpoint, parsed once at boot
 from main's `CLICKHOUSE_URL__<label>__<orgId>=<url>` family, unchanged for a deployment. The URLs
-carry credentials, so the stores declare the family as secrets and resolve it through the chain,
-never by reading the environment or printing a route (ruled 2026-09-28, landing: the secrets
-package has no family handle yet). `CLICKHOUSE_PRIVATE_ROUTES` is not read.
+carry credentials, so the stores declare the family as one `Secret.family("CLICKHOUSE_URL__")`
+handle (§6), resolve it through the chain and parse it once at boot into the member, which opens
+whenever routes exist even with no shared `CLICKHOUSE_URL`. Nothing reads the environment for a
+route and no route URL is printed: a skipped entry is logged by its variable name.
+`CLICKHOUSE_PRIVATE_ROUTES` is not read. The tasks runner, which opens no member for its
+migration pass, holds the stores' same handle and builds its dataplane from the stores' parse.
 A module needing that deployment fact (ops' cohort exclusion,
 read through `RoutingTableOrganizationDataplaneService`) reads the member, never a second
 declaration of the env family in its own config.

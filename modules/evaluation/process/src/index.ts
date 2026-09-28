@@ -15,7 +15,7 @@ export type {
   EvaluationSettingsRecovery,
   EvaluationInputsOffload,
   EvaluationInputsResolution,
-  EvaluationRetentionFloor,
+  EvaluationRetentionLookup,
   EvaluationLangevals,
   EvaluationModelEnv,
   EvaluationSpanDigest,

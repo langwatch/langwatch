@@ -6,6 +6,7 @@ import {
   type EventingSetup,
   type EventSubscriberDefinition,
   type Projection,
+  type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
@@ -29,6 +30,8 @@ export interface LogProcessingPipelineDeps {
   logCommandShardCount: number;
   /** Cross-pipeline dispatchers (e.g. coding-agent log-facts, ADR-056). */
   subscribers?: EventSubscriberDefinition<LogProcessingEvent>[];
+  /** Each tenant's retention, stamped on the log rows in place of the default (§9). */
+  retention?: RetentionPolicyResolver;
 }
 
 export interface LogProcessingAdapterOptions {
@@ -36,6 +39,7 @@ export interface LogProcessingAdapterOptions {
   defaultRetentionDays: number;
   logCommandShardCount: number;
   subscribers?: EventSubscriberDefinition<LogProcessingEvent>[];
+  retention?: RetentionPolicyResolver;
 }
 
 export type LogProcessingPipeline = StaticPipelineDefinition<
@@ -62,6 +66,7 @@ export function createLogProcessingPipeline(
   for (const subscriber of deps.subscribers ?? []) {
     builder = builder.withEventSubscriber(subscriber.name, subscriber);
   }
+  if (deps.retention) builder = builder.withRetention(deps.retention);
 
   return builder
     .withCommand("recordLogRecord", RecordCanonicalLogCommand, {
@@ -92,6 +97,7 @@ export class LogProcessingAdapter {
       ),
       logCommandShardCount: this.options.logCommandShardCount,
       subscribers: this.options.subscribers,
+      ...(this.options.retention === undefined ? {} : { retention: this.options.retention }),
     });
   }
 }

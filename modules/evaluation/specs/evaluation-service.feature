@@ -152,11 +152,19 @@ Feature: Evaluation service boundary
     When a run is looked up for a tenant
     Then every statement names that tenant and carries only settings the member accepts
 
+  # The ClickHouse run read owns the floor: the tenant's retention plus two days' margin, as on main.
+  # The memory tier has no partitions to prune and no TTL, so it does not floor.
   @unit
-  Scenario: A run lookup without a scheduled time stops at the platform default retention
-    Given a process that installs the evaluation module over its repositories
-    When a run older than the platform default retention is looked up without its scheduled time
-    Then it is refused as not found
+  Scenario: A run lookup without a scheduled time stops at the tenant's retention horizon
+    Given the live run read over a tenant's retention from data retention
+    When a run is looked up without its scheduled time
+    Then the fallback scan starts at the tenant's retention plus two days' margin, not the platform default
+
+  @unit
+  Scenario: A run lookup whose tenant retention cannot be read stops at the platform default
+    Given data retention refuses to answer a tenant's retention
+    When a run is looked up without its scheduled time
+    Then the fallback scan starts at the platform default plus the margin, bounded rather than unbounded
 
   @unit
   Scenario: An evaluation report travels on the pipeline's own sender
