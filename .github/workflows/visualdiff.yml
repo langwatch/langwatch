@@ -260,6 +260,8 @@ jobs:
             ${{ runner.temp }}/visualdiff-run/findings.json
             ${{ runner.temp }}/visualdiff-run/findings.md
             ${{ runner.temp }}/visualdiff-run/findings.jsonl
+            ${{ runner.temp }}/visualdiff-run/run.log
+            ${{ runner.temp }}/visualdiff-run/logs/
           if-no-files-found: warn
           retention-days: 14
 
