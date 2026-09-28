@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -23,6 +24,20 @@ const baseline = parseBaseline(
   readFileSync(resolve(import.meta.dirname, "migration-safety.baseline.txt"), "utf8"),
 );
 
+/** Name and recorded blob sha of each migration merged in from main. */
+const fromMain = parseBaseline(
+  readFileSync(resolve(import.meta.dirname, "migration-safety.from-main.txt"), "utf8"),
+).map((line) => {
+  const [name = "", blob = ""] = line.split(/\s+/);
+  return { name, blob };
+});
+
+/** What `git hash-object` prints for this file: sha1 over "blob <size>\0" + its bytes. */
+function gitBlobSha({ path }: { path: string }): string {
+  const content = readFileSync(path);
+  return createHash("sha1").update(`blob ${content.length}\0`).update(content).digest("hex");
+}
+
 /** One migration folder, its `.sql` files concatenated in the order Prisma applies them. */
 function readMigration(name: string): MigrationSource {
   const directory = resolve(MIGRATIONS_DIR, name);
@@ -39,7 +54,10 @@ const migrations: MigrationSource[] = readdirSync(MIGRATIONS_DIR)
   .toSorted()
   .map(readMigration);
 
-const unshipped = migrations.filter((migration) => !baseline.includes(migration.name));
+const unshipped = migrations.filter(
+  (migration) =>
+    !baseline.includes(migration.name) && !fromMain.some((entry) => entry.name === migration.name),
+);
 
 const scan = (sql: string) => scanPostgresMigration({ name: "20991231000000_fixture", sql });
 const rules = (sql: string) => scan(sql).map((finding) => finding.rule);
@@ -133,6 +151,20 @@ describe("Postgres migration safety", () => {
     it("names only migrations that exist on disk", () => {
       const names = new Set(migrations.map((migration) => migration.name));
       expect(baseline.filter((name) => !names.has(name))).toEqual([]);
+    });
+  });
+
+  describe("given the migrations merged in from main", () => {
+    /** @scenario "A migration merged in from main is skipped only while it matches main's bytes" */
+    it("skips each listed migration and holds it to the blob sha main ships", () => {
+      expect(fromMain.length).toBeGreaterThan(0);
+      const drifted = fromMain.filter(
+        (entry) =>
+          gitBlobSha({ path: resolve(MIGRATIONS_DIR, entry.name, "migration.sql") }) !== entry.blob,
+      );
+      expect(drifted.map((entry) => entry.name)).toEqual([]);
+      const skipped = new Set(fromMain.map((entry) => entry.name));
+      expect(unshipped.filter((migration) => skipped.has(migration.name))).toEqual([]);
     });
   });
 });

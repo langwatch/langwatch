@@ -99,6 +99,12 @@ import across package boundaries is refused by `langwatch/package-boundaries` an
 neither package depends on the other. Collapsing them into one module is a
 workspace dependency plus an install; it is worth doing and it is not urgent.
 
+**Migrations merged in from main** (Alex, 2026-09-28): main ships its own
+migrations and Prisma checksums them, so one the scanner refuses cannot be fixed
+here. `migration-safety.from-main.txt` lists each by name, main PR and the git
+blob sha of its `migration.sql`; the scanner skips them, and the test fails any
+entry whose file no longer hashes to that sha. The frozen baseline stays frozen.
+
 **The pre-roll gate**, `charts/langwatch/templates/app/migrate-pre-roll-job.yaml`:
 a `pre-upgrade` hook Job on the new image, running `start:prepare:db` and nothing
 else, before helm applies any Deployment. It is fail-closed — a migration that
