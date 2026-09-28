@@ -1,34 +1,25 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2023", "dom", "dom.iterable"],
     "jsx": "react-jsx",
+    "types": ["node"],
     "noUncheckedIndexedAccess": true,
-    "types": ["vite/client"],
-    "verbatimModuleSyntax": true,
-
-    "rootDir": ".",
-
-    "outDir": "dist"
+    "verbatimModuleSyntax": true
   },
   "include": [
-    ".storybook/**/*.ts",
-    ".storybook/**/*.tsx",
     "src/**/*.ts",
     "src/**/*.tsx",
-    "stories/**/*.ts",
-    "stories/**/*.tsx",
-    "tests/**/*.ts",
-    "tests/**/*.tsx"
+    "gallery/**/*.ts",
+    "gallery/**/*.tsx",
+    "vitest.config.ts"
   ],
 
   "references": [
     {
       "path": "tsconfig.build.json"
-    },
-    {
-      "path": "../design-system-internal/tsconfig.build.json"
     }
   ]
 }

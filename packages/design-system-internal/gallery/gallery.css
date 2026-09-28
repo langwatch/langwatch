@@ -1,0 +1,45 @@
+/* Layout glue for the gallery page only: tokens, never literals of colour or type. */
+
+.gallery-panes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+.gallery-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-width: 0;
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.gallery-menu-room {
+  min-height: 190px;
+}
+
+.gallery-narrow {
+  max-width: 320px;
+}
+
+.gallery-frame {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: clip;
+}
+
+.gallery-frame .ds-topbar {
+  border-bottom: 0;
+}
+
+@media (max-width: 719px) {
+  .gallery-panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gallery-pane {
+    padding: var(--space-4);
+  }
+}

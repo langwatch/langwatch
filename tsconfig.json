@@ -193,6 +193,9 @@
       "path": "packages/design-system/tsconfig.json"
     },
     {
+      "path": "packages/design-system-internal/tsconfig.json"
+    },
+    {
       "path": "tools/dev-runtime/tsconfig.json"
     },
     {

@@ -15674,6 +15674,9 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/design-system-internal':
+        specifier: workspace:*
+        version: link:../design-system-internal
       '@storybook/addon-a11y':
         specifier: ^10.5.10
         version: 10.5.10(storybook@10.5.10(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.9.6)(react@19.2.8))
@@ -16390,6 +16393,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../design-system
+      '@langwatch/design-system-internal':
+        specifier: workspace:*
+        version: link:../design-system-internal
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config

@@ -338,6 +338,7 @@
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
+    "@langwatch/design-system-internal": "workspace:*",
     "@storybook/addon-a11y": "^10.5.10",
     "@storybook/addon-docs": "^10.5.10",
     "@storybook/react-vite": "^10.5.10",
