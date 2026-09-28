@@ -27,28 +27,13 @@ import {
   langyFrameEnvelopeSchema,
   langyRelayFrameSchema,
 } from "../../rules/langy-relay-frame.rules.ts";
-import type { LangyResourceLinksRepository } from "../langy-live-turn.repository.ts";
-import type { LangyStreamRedis } from "../langy-token-buffer.repository.ts";
-import {
-  LangyFrameDedupRedisRepository,
-  type LangyFrameDedupRedis,
-} from "./redis.langy-frame-dedup.repository.ts";
-import {
-  type LangyLinkRedis,
-  LangyResourceLinksRedisRepository,
-} from "./redis.langy-resource-links.repository.ts";
-import { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
-import {
-  LangyTurnHandoffRedisRepository,
-  type LangyHandoffRedis,
-} from "./redis.langy-turn-handoff.repository.ts";
+import type {
+  LangyFrameDedupRepository,
+  LangyResourceLinksRepository,
+  LangyTurnHandoffRepository,
+} from "../langy-live-turn.repository.ts";
 
 type PlatformProgress = { headline: string };
-
-export type LangyRelayRedis = LangyStreamRedis &
-  LangyFrameDedupRedis &
-  LangyLinkRedis &
-  LangyHandoffRedis;
 
 /** The CLI grammar the agent uses to say WHICH resource to open — never an
  * address. `langwatch navigate open <resourceId>`; the platform resolves
@@ -338,32 +323,23 @@ export class RedisLangyTurnRelayRepository {
   private constructor(private readonly deps: LangyTurnRelayDeps) {}
 
   static create(options: {
-    redis?: LangyRelayRedis;
     conversations: LangyRelayConversations;
     baseHost: string;
-    buffer?: LangyRelayBuffer;
+    buffer: LangyRelayBuffer;
+    resourceLinks: LangyResourceLinksRepository;
+    /** The turn's own seen-nonce set; `reserveFrameNonce` overrides it. */
+    frameDedup?: LangyFrameDedupRepository;
+    /** The per-turn handoff, read project-scoped; the two functions below override it. */
+    handoff?: LangyTurnHandoffRepository;
     reserveFrameNonce?: LangyTurnRelayDeps["reserveFrameNonce"];
     readHandoffRunToken?: LangyTurnRelayDeps["readHandoffRunToken"];
     refreshHandoffTtl?: LangyTurnRelayDeps["refreshHandoffTtl"];
-    resourceLinks?: LangyResourceLinksRepository;
     resolveResourceUrl?: LangyTurnRelayDeps["resolveResourceUrl"];
     resolveCapabilityProgress?: (name: string) => PlatformProgress | null;
     logger?: LangyTurnRelayDeps["logger"];
   }): RedisLangyTurnRelayRepository {
-    const redis = options.redis;
-    const buffer =
-      options.buffer ?? (redis ? LangyTokenBufferRedisRepository.create({ redis }) : undefined);
-    if (!buffer) {
-      throw new Error("Langy relay requires Redis or a buffer");
-    }
-    const frameDedup = redis ? LangyFrameDedupRedisRepository.create({ redis }) : null;
-    const handoff = redis ? LangyTurnHandoffRedisRepository.create({ redis }) : null;
-    const resourceLinks =
-      options.resourceLinks ??
-      (redis ? LangyResourceLinksRedisRepository.create({ redis }) : undefined);
-    if (!resourceLinks) {
-      throw new Error("Langy relay requires Redis or resource links");
-    }
+    const { buffer, resourceLinks, frameDedup } = options;
+    const handoff = options.handoff ?? null;
     const reserveFrameNonce =
       options.reserveFrameNonce ?? frameDedup?.reserveFrameNonce.bind(frameDedup);
     if (!reserveFrameNonce) {
@@ -1034,7 +1010,7 @@ function safeJson(s: string): unknown {
 }
 
 function handoffRunTokenReader(
-  handoff: LangyTurnHandoffRedisRepository | null,
+  handoff: LangyTurnHandoffRepository | null,
 ): Pick<LangyTurnRelayDeps, "readHandoffRunToken"> {
   if (!handoff) return {};
   return {
@@ -1048,7 +1024,7 @@ function handoffRunTokenReader(
 }
 
 function handoffTtlRefresher(
-  handoff: LangyTurnHandoffRedisRepository | null,
+  handoff: LangyTurnHandoffRepository | null,
 ): Pick<LangyTurnRelayDeps, "refreshHandoffTtl"> {
   if (!handoff) return {};
   return {
