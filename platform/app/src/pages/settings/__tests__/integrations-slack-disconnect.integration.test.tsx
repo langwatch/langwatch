@@ -67,6 +67,14 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
+    langy: {
+      getCodeAccessPreference: {
+        useQuery: () => ({ data: { preference: null }, refetch: vi.fn() }),
+      },
+      setCodeAccessPreference: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
     slackIntegration: {
       getStatus: {
         useQuery: () =>

@@ -29,6 +29,25 @@ vi.mock("~/utils/compat/next-router", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    useUtils: () => ({
+      slackIntegration: {
+        getStatus: { invalidate: vi.fn() },
+        getLegacyTokenCensus: { invalidate: vi.fn() },
+      },
+    }),
+    slackIntegration: {
+      getStatus: {
+        useQuery: () => ({ data: undefined, isLoading: true, error: null }),
+      },
+      getLegacyTokenCensus: {
+        useQuery: () => ({ data: { count: 0, automations: [] } }),
+      },
+      connect: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      disconnect: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      switchToIntegration: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
     github: {
       getConnectionStatus: {
         useQuery: () => ({
@@ -73,6 +92,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1", name: "Acme Corp" },
     project: { id: "p_1", slug: "acme" },
+    hasPermission: () => true,
   }),
 }));
 

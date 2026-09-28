@@ -25,7 +25,7 @@
  */
 
 import { z } from "zod";
-import { resolveProjectPermission } from "~/server/api/rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -41,12 +41,12 @@ export const slackIntegrationRouter = createTRPCRouter({
       // Whether THIS caller may change the connection of THIS project — the
       // settings picker can reach projects the session is not on, and the
       // session project's permission says nothing about those.
-      const { permitted } = await resolveProjectPermission(
+      const canManage = await probeProjectPermission(
         ctx,
         input.projectId,
         "project:update",
       );
-      return { ...status, canManage: permitted };
+      return { ...status, canManage };
     }),
 
   getLegacyTokenCensus: protectedProcedure
