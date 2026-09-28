@@ -39,51 +39,38 @@ export interface ConversationDetail {
   proseChars: number;
   turnTextChars: number;
   isNestedShown: boolean;
+  /** Steps kept per turn; the rest are elided from its middle, model calls first. */
+  maxStepsPerTurn: number;
 }
 
-/**
- * The detail levels a budgeted render tries in order. Tool results keep the
- * most at every level: that is where a long thread's evidence sits.
- */
-export const CONVERSATION_DETAIL_LEVELS: readonly ConversationDetail[] = [
-  {
-    toolInputChars: 4_000,
-    toolOutputChars: 16_000,
-    proseChars: 2_000,
-    turnTextChars: Number.POSITIVE_INFINITY,
-    isNestedShown: true,
-  },
-  {
-    toolInputChars: 1_200,
-    toolOutputChars: 4_000,
-    proseChars: 600,
-    turnTextChars: 6_000,
-    isNestedShown: true,
-  },
-  {
-    toolInputChars: 400,
-    toolOutputChars: 1_200,
-    proseChars: 0,
-    turnTextChars: 1_500,
-    isNestedShown: true,
-  },
-  {
-    toolInputChars: 200,
-    toolOutputChars: 400,
-    proseChars: 0,
-    turnTextChars: 500,
-    isNestedShown: true,
-  },
-  {
-    toolInputChars: 120,
-    toolOutputChars: 200,
-    proseChars: 0,
-    turnTextChars: 240,
-    isNestedShown: false,
-  },
-];
+/** Everything, each value capped at a size no judge needs more of. */
+export const FULL_CONVERSATION_DETAIL: ConversationDetail = {
+  toolInputChars: 4_000,
+  toolOutputChars: 16_000,
+  proseChars: 2_000,
+  turnTextChars: Number.POSITIVE_INFINITY,
+  isNestedShown: true,
+  maxStepsPerTurn: Number.POSITIVE_INFINITY,
+};
 
-export const FULL_CONVERSATION_DETAIL = CONVERSATION_DETAIL_LEVELS[0]!;
+/** The smallest value caps a budgeted render goes down to before it elides steps. */
+const MIN_CAPS = { toolInputChars: 120, toolOutputChars: 160, turnTextChars: 240 };
+
+/**
+ * Every cap scaled by `scale` in (0, 1], never below the floors. Tool results
+ * keep the most at every scale: that is where a long thread's evidence sits.
+ */
+export function conversationDetailAtScale(scale: number): ConversationDetail {
+  const at = (full: number, floor: number) => Math.max(floor, Math.floor(full * scale));
+  return {
+    toolInputChars: at(FULL_CONVERSATION_DETAIL.toolInputChars, MIN_CAPS.toolInputChars),
+    toolOutputChars: at(FULL_CONVERSATION_DETAIL.toolOutputChars, MIN_CAPS.toolOutputChars),
+    proseChars: scale >= 0.1 ? Math.floor(FULL_CONVERSATION_DETAIL.proseChars * scale) : 0,
+    turnTextChars: at(12_000, MIN_CAPS.turnTextChars),
+    isNestedShown: scale >= 0.02,
+    maxStepsPerTurn: Number.POSITIVE_INFINITY,
+  };
+}
 
 /** A value cut to `maxChars`, keeping its opening and its ending. */
 export function clipKeepingEnds({ text, maxChars }: { text: string; maxChars: number }): string {
@@ -111,11 +98,84 @@ export function renderConversationSteps({
   steps: readonly ConversationStep[];
   detail: ConversationDetail;
 }): string {
-  const lines = steps.flatMap((step) => {
-    if (step.depth > 0 && !detail.isNestedShown) return [];
-    return [`${"  ".repeat(step.depth)}- ${renderStep({ step, detail })}`];
+  const shown = steps.filter((step) => step.depth === 0 || detail.isNestedShown);
+  const kept = keepSteps({ steps: shown, max: detail.maxStepsPerTurn });
+  const quietModels = kept.flatMap((entry) =>
+    "omitted" in entry && entry.omitted.every((step) => step.kind === "model") ? entry.omitted : [],
+  );
+  const lines = kept.flatMap((entry) => {
+    if (!("omitted" in entry)) {
+      return [`${"  ".repeat(entry.step.depth)}- ${renderStep({ step: entry.step, detail })}`];
+    }
+    return entry.omitted.every((step) => step.kind === "model")
+      ? []
+      : [`- […${omittedText(entry.omitted)} omitted…]`];
   });
+  if (quietModels.length > 0) {
+    lines.unshift(`- […${omittedText(quietModels)} omitted${usageRange(quietModels)}…]`);
+  }
   return lines.length > 0 ? ["**Steps:**", "", ...lines].join("\n") : "";
+}
+
+type KeptStep = { step: ConversationStep } | { omitted: ConversationStep[] };
+
+/**
+ * At most `max` steps, the dropped ones taken from the middle of the turn and
+ * model calls before anything else: a tool line already names the tool the
+ * model asked for, and the turn's first and last steps frame what it did.
+ */
+function keepSteps({ steps, max }: { steps: ConversationStep[]; max: number }): KeptStep[] {
+  if (steps.length <= max) return steps.map((step) => ({ step }));
+  const middleOut = steps
+    .map((step, index) => ({ step, index, distance: Math.abs(index - (steps.length - 1) * 0.4) }))
+    .toSorted(
+      (a, b) =>
+        Number(b.step.kind === "model") - Number(a.step.kind === "model") ||
+        a.distance - b.distance,
+    );
+  const dropped = new Set(middleOut.slice(0, steps.length - max).map(({ index }) => index));
+  const kept: KeptStep[] = [];
+  let run: ConversationStep[] = [];
+  steps.forEach((step, index) => {
+    if (dropped.has(index)) {
+      run.push(step);
+      return;
+    }
+    if (run.length > 0) kept.push({ omitted: run });
+    run = [];
+    kept.push({ step });
+  });
+  if (run.length > 0) kept.push({ omitted: run });
+  return kept;
+}
+
+/** What the omitted model calls carried, so a question about context size still has an answer. */
+function usageRange(steps: ConversationStep[]): string {
+  const contexts = steps.flatMap((step) =>
+    step.usage
+      ? [(step.usage.input ?? 0) + (step.usage.cacheRead ?? 0) + (step.usage.cacheWrite ?? 0)]
+      : [],
+  );
+  if (contexts.length === 0) return "";
+  const cacheReads = steps.flatMap((step) =>
+    step.usage?.cacheRead !== undefined ? [step.usage.cacheRead] : [],
+  );
+  const cache =
+    cacheReads.length > 0
+      ? `, cache read ${Math.min(...cacheReads)} to ${Math.max(...cacheReads)}`
+      : "";
+  return `: context ${Math.min(...contexts)} to ${Math.max(...contexts)} tokens${cache}`;
+}
+
+function omittedText(steps: ConversationStep[]): string {
+  const models = steps.filter((step) => step.kind === "model").length;
+  const others = steps.length - models;
+  return [
+    models > 0 ? `${models} model call${models === 1 ? "" : "s"}` : "",
+    others > 0 ? `${others} other step${others === 1 ? "" : "s"}` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
 }
 
 function renderStep({

@@ -16,7 +16,7 @@ export {
 export type { ConversationRoleMode, ConversationTurn, DisplayPart } from "./display-part.ts";
 export {
   clipKeepingEnds,
-  CONVERSATION_DETAIL_LEVELS,
+  conversationDetailAtScale,
   type ConversationDetail,
   type ConversationStep,
   type ConversationStepKind,

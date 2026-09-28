@@ -151,3 +151,35 @@ describe("TraceApi.formatSpansDigest on a coding agent turn", () => {
     expect(digest.split("same_as_parent").length - 1).toBe(2);
   });
 });
+
+describe("TraceApi.formatSpansDigest on an agent loop", () => {
+  /** @scenario "A model call prints only the messages the previous call on its model did not send" */
+  it("prints each model call's new messages and names the call that sent the rest", async () => {
+    const history: { role: string; content: string }[] = [
+      { role: "user", content: "FIRST QUESTION about cottage C-114" },
+    ];
+    const spans: Span[] = [];
+    for (let call = 0; call < 6; call++) {
+      spans.push({
+        span_id: `llm-${call}`,
+        trace_id: "t1",
+        type: "llm",
+        name: "chat",
+        model: "gpt-5-mini",
+        timestamps: { started_at: 1_000 + call * 100, finished_at: 1_050 + call * 100 },
+        input: { type: "chat_messages", value: [...history] },
+        output: { type: "chat_messages", value: [{ role: "assistant", content: `step ${call}` }] },
+      });
+      history.push(
+        { role: "assistant", content: `step ${call}` },
+        { role: "tool", content: `result ${call}` },
+      );
+    }
+
+    const digest = await createTraceApp().formatSpansDigest({ spans });
+
+    expect(digest.split("FIRST QUESTION").length - 1).toBe(1);
+    expect(digest).toContain("the first 3 messages, as sent by [llm-1]");
+    expect(digest.split("result 0").length - 1).toBe(1);
+  });
+});

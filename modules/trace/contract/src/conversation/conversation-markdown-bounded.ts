@@ -8,7 +8,7 @@ import {
   type ConversationMarkdownChunk,
   joinConversationMarkdown,
 } from "./conversation-markdown.ts";
-import { CONVERSATION_DETAIL_LEVELS } from "./conversation-steps.ts";
+import { type ConversationDetail, conversationDetailAtScale } from "./conversation-steps.ts";
 import type { ConversationTurnSource, ParsedTurn } from "./parsed-turns.ts";
 
 /**
@@ -72,7 +72,14 @@ export function renderConversationMarkdown({
   return dropMiddleTurns({ chunks: shortened.chunks, maxTokens });
 }
 
-/** The lower detail levels in order, stopping at the first that fits. */
+/** Below this, a scale step changes too little to be worth another render. */
+const SCALE_PRECISION = 0.01;
+
+/**
+ * The most detail that fits: every value cap scaled down together, then, at
+ * the smallest caps, fewer steps per turn. Both searches are binary, since a
+ * render is linear in the thread and the fit is monotone in either knob.
+ */
 function shortenEveryTurn({
   conversationId,
   turns,
@@ -82,14 +89,44 @@ function shortenEveryTurn({
   turns: ParsedTurn<ConversationTurnSource>[];
   maxTokens: number;
 }): { fits: boolean; text: string; chunks: ConversationMarkdownChunk[] } {
-  let chunks: ConversationMarkdownChunk[] = [];
-  let text = "";
-  for (const detail of CONVERSATION_DETAIL_LEVELS.slice(1)) {
-    chunks = buildConversationMarkdownChunks({ conversationId, turns, detail });
-    text = joinConversationMarkdown(chunks);
-    if (estimateTokensFromBytes(text) <= maxTokens) return { fits: true, text, chunks };
+  const attempt = (detail: ConversationDetail) => {
+    const chunks = buildConversationMarkdownChunks({ conversationId, turns, detail });
+    const text = joinConversationMarkdown(chunks);
+    return { fits: estimateTokensFromBytes(text) <= maxTokens, text, chunks };
+  };
+  const smallest = attempt(conversationDetailAtScale(0));
+  if (smallest.fits) {
+    let best = smallest;
+    let low = 0;
+    let high = 1;
+    while (high - low > SCALE_PRECISION) {
+      const mid = (low + high) / 2;
+      const tried = attempt(conversationDetailAtScale(mid));
+      if (tried.fits) {
+        best = tried;
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+    return best;
   }
-  return { fits: false, text, chunks };
+  const mostSteps = Math.max(0, ...turns.map((parsed) => parsed.turn.steps?.length ?? 0));
+  let best = smallest;
+  let low = 0;
+  let high = mostSteps;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    const tried = attempt({ ...conversationDetailAtScale(0), maxStepsPerTurn: mid });
+    if (tried.fits) {
+      best = tried;
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+  if (!best.fits) best = attempt({ ...conversationDetailAtScale(0), maxStepsPerTurn: 0 });
+  return best;
 }
 
 /** The last resort: keep turns from both ends at the lowest detail level. */

@@ -257,6 +257,53 @@ describe("renderThreadConversation", () => {
   });
 });
 
+describe("renderThreadConversation on one coding turn of hundreds of steps", () => {
+  /** @scenario "A conversation over the budget shortens every turn before it drops one" */
+  it("elides model calls from the middle of the turn before any tool call, and keeps the turn", () => {
+    const spans: Span[] = [
+      span({ span_id: "root", parent_id: null, type: "span", name: "claude_code.interaction" }),
+    ];
+    for (let i = 0; i < 300; i++) {
+      spans.push(
+        span({
+          span_id: `llm-${i}`,
+          type: "llm",
+          model: "claude-opus-5",
+          timestamps: { started_at: T0 + i * 10, finished_at: T0 + i * 10 + 5 },
+          output: { type: "text", value: "[tool_use: Read]\n{}" },
+          metrics: { prompt_tokens: 2, cache_read_input_tokens: 40_000 + i, completion_tokens: 50 },
+        }),
+        span({
+          span_id: `tool-${i}`,
+          type: "span",
+          name: "claude_code.tool",
+          timestamps: { started_at: T0 + i * 10 + 6, finished_at: T0 + i * 10 + 9 },
+          input: { type: "json", value: { file_path: `src/file-${i}.ts` } },
+          output: { type: "json", value: { success: true } },
+          params: { tool_name: "Read" },
+        }),
+      );
+    }
+    const coding: Trace = {
+      ...agentTurn({ index: 0, user: "Read the files.", reply: "Done.", history: [] }),
+      spans,
+    };
+    const whole = renderThreadConversation({ threadKey: "sess-1", traces: [coding] });
+
+    const cut = renderThreadConversation({
+      threadKey: "sess-1",
+      traces: [coding],
+      maxTokens: Math.floor(whole.estimatedTokens * 0.45),
+    });
+
+    expect(cut.estimatedTokens).toBeLessThanOrEqual(Math.floor(whole.estimatedTokens * 0.45));
+    expect(cut.omittedTurns).toBe(0);
+    expect(cut.text).toContain("Read the files.");
+    expect(cut.text).toMatch(/model calls? omitted/);
+    for (const i of [0, 150, 299]) expect(cut.text).toContain(`src/file-${i}.ts`);
+  });
+});
+
 describe("extractConversationSteps", () => {
   describe("given a tool span with execution and blocked-on-user children that repeat it", () => {
     /** @scenario "A child span that repeats its parent's input and output is folded into the parent" */

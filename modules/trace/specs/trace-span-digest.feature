@@ -36,3 +36,10 @@ Feature: Evaluation trace digests
     When an evaluation asks Trace to format its spans
     Then the tool command is printed once for the tool span
     And each child names that it repeats its parent
+
+  @unit
+  Scenario: A model call prints only the messages the previous call on its model did not send
+    Given a trace of an agent loop whose every model call resends the whole history
+    When an evaluation asks Trace to format its spans
+    Then each model call prints only its new messages and names the call that sent the rest
+    And the first user message is printed once

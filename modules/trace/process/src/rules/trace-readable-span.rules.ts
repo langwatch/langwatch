@@ -302,6 +302,7 @@ function readableSpansForDigest(spans: Span[]): {
   shared: [string, Attributes[string]][];
 } {
   const readableSpans = spans.map((span) => langwatchSpanToReadableSpan(span));
+  printHistoryOnce({ spans, readableSpans });
   const shared = sharedAttributes(readableSpans);
   for (const span of readableSpans) {
     for (const [key] of shared) delete span.attributes[key];
@@ -316,6 +317,44 @@ function readableSpansForDigest(spans: Span[]): {
     if (parent) foldRepeatOfParent({ attrs: span.attributes, parent });
   }
   return { readableSpans, shared };
+}
+
+/**
+ * Each LLM span's input messages less the ones the previous call on the same
+ * model already sent: an agent loop resends the whole history on every call,
+ * so printed whole a long turn's digest grows with its square.
+ */
+function printHistoryOnce({
+  spans,
+  readableSpans,
+}: {
+  spans: Span[];
+  readableSpans: ReadableSpan[];
+}): void {
+  const previousByModel = new Map<string, { spanId: string; messages: string[] }>();
+  const order = spans
+    .map((span, index) => ({ span, index }))
+    .toSorted((a, b) => a.span.timestamps.started_at - b.span.timestamps.started_at);
+  for (const { span, index } of order) {
+    if (span.type !== "llm" || span.input?.type !== "chat_messages") continue;
+    if (!Array.isArray(span.input.value)) continue;
+    const messages = span.input.value.map((message) => JSON.stringify(message));
+    const model = ("model" in span && span.model) || "";
+    const previous = previousByModel.get(model);
+    previousByModel.set(model, { spanId: span.span_id, messages });
+    const repeated = previous ? commonPrefixLength(previous.messages, messages) : 0;
+    if (!previous || repeated === 0) continue;
+    const attrs = readableSpans[index]!.attributes;
+    attrs["gen_ai.input.messages"] = `[${messages.slice(repeated).join(",")}]`;
+    attrs["gen_ai.input.messages_repeated"] =
+      `the first ${repeated} messages, as sent by [${previous.spanId}]`;
+  }
+}
+
+function commonPrefixLength(a: readonly string[], b: readonly string[]): number {
+  let length = 0;
+  while (length < a.length && length < b.length && a[length] === b[length]) length++;
+  return length;
 }
 
 function foldRepeatOfParent({ attrs, parent }: { attrs: Attributes; parent: Attributes }): void {
