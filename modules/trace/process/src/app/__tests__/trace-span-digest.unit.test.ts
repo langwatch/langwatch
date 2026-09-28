@@ -1,5 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { Span, TraceApi } from "@langwatch/trace-contract";
+import type { ChatMessage, Span, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { TraceApp, type TraceAppDependencies } from "../trace.app.ts";
@@ -155,7 +155,7 @@ describe("TraceApi.formatSpansDigest on a coding agent turn", () => {
 describe("TraceApi.formatSpansDigest on an agent loop", () => {
   /** @scenario "A model call prints only the messages the previous call on its model did not send" */
   it("prints each model call's new messages and names the call that sent the rest", async () => {
-    const history: { role: string; content: string }[] = [
+    const history: ChatMessage[] = [
       { role: "user", content: "FIRST QUESTION about cottage C-114" },
     ];
     const spans: Span[] = [];
