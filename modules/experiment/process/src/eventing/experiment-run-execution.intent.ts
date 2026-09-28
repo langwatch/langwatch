@@ -1,18 +1,33 @@
 /**
- * What the run manager's `failCell` and `complete` intents do once the outbox delivers them: each
- * sends one of the run pipeline's own commands, so the fact lands as an event like any other.
+ * What the run manager's intents do once the outbox delivers them: each sends one of the run
+ * pipeline's own commands, so the cell runs, or the fact lands, as an event like any other.
  */
 import type { IntentExecutor } from "@langwatch/eventing";
 import { ExperimentCellLostError } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
-import type { CompleteRunIntent, FailCellIntent } from "./experiment-run-execution.schemas.ts";
+import type {
+  CompleteRunIntent,
+  ExecuteCellIntent,
+  FailCellIntent,
+} from "./experiment-run-execution.schemas.ts";
 
 type RunCommands = Pick<
   ExperimentRunCommandDispatcherService,
-  "failExperimentCell" | "completeExperimentRun"
+  "executeExperimentCell" | "failExperimentCell" | "completeExperimentRun"
 >;
+
+/** A cell the window opened, run by the worker's ExecuteExperimentCell command. */
+export function executeCell(commands: RunCommands): IntentExecutor<ExecuteCellIntent> {
+  return async (payload, context) => {
+    await commands.executeExperimentCell({
+      tenantId: context.tenantId,
+      occurredAt: nowInstant().epochMilliseconds,
+      ...payload,
+    });
+  };
+}
 
 /** A lost cell finishes failed, under the key its own finish would carry (spec section 3). */
 export function failLostCell(commands: RunCommands): IntentExecutor<FailCellIntent> {

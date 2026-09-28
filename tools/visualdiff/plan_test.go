@@ -49,6 +49,9 @@ func TestMonolithStackSkipsMigrations(t *testing.T) {
 	if hasEnv(env, "PORT=1") {
 		t.Fatal("an inherited PORT overrode the stack's own port")
 	}
+	if !hasEnv(env, "LANGWATCH_API_PORT=6670") || hasEnv(env, "LANGWATCH_API_PORT=5670") {
+		t.Fatalf("the monolith API must listen where its Vite proxies /api, PORT+1000: %v", env)
+	}
 
 	modular := Stack{Name: "candidate", BasePort: 5680, Ports: PortsFor(5680), Layout: LayoutModular, RedisDBIndex: "12"}
 	for _, unwanted := range []string{"SKIP_PRISMA_MIGRATE=true", "SKIP_CLICKHOUSE_MIGRATE=true", "SKIP_LWQL_PROVISION=true"} {
@@ -83,6 +86,12 @@ func TestStackStartCommandsCoverEveryProcess(t *testing.T) {
 	monolith := Stack{Layout: LayoutMonolith}
 	if got := len(monolith.StartCommands()); got != 1 {
 		t.Fatalf("the monolith serves everything from one process: got %d", got)
+	}
+}
+
+func TestLaneLogNamesCarryNoColon(t *testing.T) {
+	if got := LaneLogName("base", "dev:app"); got != "base-dev-app.log" {
+		t.Fatalf("an artifact upload refuses a colon in a file name: got %q", got)
 	}
 }
 

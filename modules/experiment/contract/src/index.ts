@@ -13,6 +13,7 @@ export * from "./experiment-workbench-rest.ts";
 export * from "./experiment.trpc.ts";
 export * from "./experiment-run-eventing.commands.ts";
 export * from "./experiment-run-eventing.events.ts";
+export * from "./experiment-run-plan.ts";
 export * from "./experiment-execution.errors.ts";
 export * from "./experiment.errors.ts";
 export * from "./experiment.api.ts";

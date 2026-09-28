@@ -41,6 +41,18 @@ func TestABlankPageIsAFinding(t *testing.T) {
 	}
 }
 
+// @scenario "A screen whose modules still did not load is a capture failure, not a blank page"
+func TestAPageWhoseModulesDidNotLoadIsTheToolsFailureNotBlank(t *testing.T) {
+	unloaded := &Capture{Blank: true, ModuleFailures: []string{"FAIL GET /@fs/repo/x.tsx net::ERR_HTTP2_PROTOCOL_ERROR"}}
+	for _, row := range []Row{pair(&Capture{}, unloaded), pair(unloaded, &Capture{})} {
+		class, why := Classify(row)
+		if class != ClassCaptureFailed || !class.IsFinding() {
+			t.Fatalf("got %s (%s)", class, why)
+		}
+		mustContain(t, why, "ERR_HTTP2_PROTOCOL_ERROR")
+	}
+}
+
 // @scenario "A candidate ending on a different path is a finding"
 func TestACandidateEndingOnADifferentPathIsAFinding(t *testing.T) {
 	moved := pair(&Capture{URL: "http://base/p/datasets"}, &Capture{URL: "http://candidate/p/home"})

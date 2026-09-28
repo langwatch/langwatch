@@ -32,6 +32,38 @@ export const runPool = async <Item>({
   await Promise.all(Array.from({ length: lanes }, (_, index) => lane(index)));
 };
 
+/**
+ * runPoolWithRecapture runs items through runPool and holds back every result `spoiled`
+ * rejects; once the pool is done each is taken again on lane 0, alone, and only that retake
+ * is kept. It returns the items it held back.
+ */
+export const runPoolWithRecapture = async <Item, Result>({
+  items,
+  width,
+  take,
+  spoiled,
+  keep,
+}: {
+  items: readonly Item[];
+  width: number;
+  take: (job: { item: Item; lane: number }) => Promise<Result>;
+  spoiled: (result: Result) => boolean;
+  keep: (result: Result) => void;
+}): Promise<Item[]> => {
+  const heldBack: Item[] = [];
+  await runPool({
+    items,
+    width,
+    work: async ({ item, lane }) => {
+      const result = await take({ item, lane });
+      if (spoiled(result)) heldBack.push(item);
+      else keep(result);
+    },
+  });
+  for (const item of heldBack) keep(await take({ item, lane: 0 }));
+  return heldBack;
+};
+
 /** LAST_ACTIONS change what every other screen shows, so their flows run alone, after the rest. */
 const LAST_ACTIONS = new Set(["editProjectSettings"]);
 

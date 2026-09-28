@@ -248,12 +248,13 @@ Feature: visualdiff catches regressions and reports its own coverage
   Rule: A finished run shows its screens on the branch's pull request
 
     @unit
-    Scenario: A run's screens are chosen by what changed most, then what broke, then the key pages
-      Given a run with changed routes, candidate failures and the configured key pages
+    Scenario: A run's screens are the key pages, then one finding or change per area, largest first
+      Given a run with key pages, findings and changes across several areas
       When its screens are selected for the pull request
-      Then the changed routes come first, the largest diff first
-      And the candidate's failures follow, the worst class first
-      And the key pages fill what is left, up to publish.screens
+      Then every configured key page comes first
+      And the findings follow, then the other changes, the largest first
+      And no area repeats until every area with a screen to show has one
+      And a blank, failed or unloaded capture is never shown
 
     @unit
     Scenario: A screen that could leak a secret or a local path is never published
@@ -275,3 +276,20 @@ Feature: visualdiff catches regressions and reports its own coverage
       Then it posts the comment with its images attached through gh, each scaled to publish.width and cut at publish.maxHeight
       And when the PR already carries the marked comment, that comment takes the posted body and the post is deleted
       And with no open PR, gh signed out, or -no-publish, it logs why and posts nothing
+      And `visualdiff publish -run-dir DIR -pr N -link URL` publishes a finished run to the named pull request, linking its report
+
+  Rule: A capture the dev server spoiled is taken again alone, and never read as the product's
+
+    @unit
+    Scenario: A blank capture or one whose modules failed to load is taken again alone
+      Given a side capturing its routes on several pages at once
+      When a capture comes back blank or with its own module requests failed
+      Then it is held back and taken again on one page once every other route is done
+      And only the retake is reported
+
+    @unit
+    Scenario: A screen whose modules still did not load is a capture failure, not a blank page
+      Given a capture whose own module requests failed on either side
+      When the row is classified
+      Then it is "capture-failed", a finding naming the side and the first failed module
+      And a live base holding one is not cached as a baseline

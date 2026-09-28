@@ -601,6 +601,10 @@ func (run *session) cacheBaseline(baseline Baseline, stream RunnerStream) {
 	if baseline.Cached || baseline.Dir == "" {
 		return
 	}
+	if unloaded := UnloadedBaseCaptures(stream.Captures); unloaded > 0 {
+		fmt.Fprintf(run.streams.Err, "baseline: not cached, %d base capture(s) did not load their own modules\n", unloaded)
+		return
+	}
 	if err := SaveBaseline(baseline, stream.Captures); err != nil {
 		fmt.Fprintf(run.streams.Err, "baseline: could not cache %s: %v\n", baseline.Dir, err)
 		return
@@ -829,12 +833,6 @@ func StartStack(ctx context.Context, stack Stack, logDir string) (func(), error)
 	return stop, nil
 }
 
-// laneLogName names a lane's log file. actions/upload-artifact refuses a
-// colon in a file name, and pnpm scripts are named like dev:app.
-func laneLogName(stackName, script string) string {
-	return stackName + "-" + strings.ReplaceAll(script, ":", "-") + ".log"
-}
-
 // lane is one process of a stack: the pnpm script and where its log goes.
 type lane struct {
 	argv   []string
@@ -843,7 +841,7 @@ type lane struct {
 
 func startLane(ctx context.Context, stack Stack, one lane) (*exec.Cmd, error) {
 	argv := one.argv
-	logPath := filepath.Join(one.logDir, laneLogName(stack.Name, argv[0]))
+	logPath := filepath.Join(one.logDir, LaneLogName(stack.Name, argv[0]))
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600) // #nosec G304 -- path built from the run dir and the stack's own lane name.
 	if err != nil {
 		return nil, err
@@ -861,6 +859,12 @@ func startLane(ctx context.Context, stack Stack, one lane) (*exec.Cmd, error) {
 		return nil, fmt.Errorf("start %s %s: %w", stack.Name, argv[0], err)
 	}
 	return command, nil
+}
+
+// LaneLogName is one lane's log file, its script's colon made a dash: an
+// uploaded CI artifact refuses a file name with a colon in it.
+func LaneLogName(stack, script string) string {
+	return stack + "-" + strings.ReplaceAll(script, ":", "-") + ".log"
 }
 
 // RunnerPackage is the workspace package that drives Playwright.

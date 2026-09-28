@@ -63,6 +63,16 @@ export const recordEvaluatorResultCommandDataSchema = z.object({
   cost: z.number().nullable().optional(),
   inputs: z.record(z.string(), z.unknown()).nullable().optional(),
   duration: z.number().nullable().optional(),
+  /** What a failed evaluator's frame showed (ARCHITECTURE §9): its error type, trace and code. */
+  errorType: z.string().nullable().optional(),
+  traceback: z.array(z.string()).nullable().optional(),
+  domainError: z
+    .custom<SerializedHandledError>((value) => typeof value === "object" && value !== null)
+    .nullable()
+    .optional(),
+  /** The evaluator's raw answer, and the currency its cost is in. */
+  rawResponse: z.unknown().optional(),
+  costCurrency: z.string().nullable().optional(),
   /**
    * True when the verdict was copied into the run from the board rather than
    * produced by it. See `evaluatorResultEventDataSchema`, which this mirrors.

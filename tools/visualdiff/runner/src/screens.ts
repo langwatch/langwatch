@@ -5,10 +5,11 @@ import { DeadlineAlarm } from "./deadline-alarm";
 import { fillPath, sideFixtures } from "./flows/context";
 import { declinePasskeyOffer } from "./flows/primitives";
 import { resolveAction } from "./flows/registry";
+import { needsRecapture } from "./module-load";
 import { safeName } from "./pairing";
 import { note, type CaptureMessage, type Plan, type PlanFlow } from "./protocol";
-import { runPool } from "./schedule";
-import { shellBroken, type ShellProbe } from "./shell";
+import { runPoolWithRecapture } from "./schedule";
+import { SHELL_PROBE, shellBroken, type ShellProbe } from "./shell";
 
 export type Collect = (message: CaptureMessage) => void;
 
@@ -70,7 +71,11 @@ const captureRoute = async ({
   });
 };
 
-/** captureRoutes renders every route across a side's pages, each page taking the next route. */
+/**
+ * captureRoutes warms the dev server on the first SHELL_PROBE routes, one at a time (the
+ * fail-fast probe), then spreads the rest over the side's pages. A capture the concurrency
+ * may have spoiled is held back and taken again alone, once, after the pool.
+ */
 export const captureRoutes = async ({
   plan,
   pages,
@@ -82,22 +87,33 @@ export const captureRoutes = async ({
 }): Promise<void> => {
   const [first] = pages;
   if (first === undefined) return;
-  const probes: ShellProbe[] = [];
-  const probing = plan.failFast === true && first.name === "candidate";
   const alarm = new DeadlineAlarm(first.name);
-  await runPool({
-    items: plan.routes,
+  const capture = (route: string, side: Side): Promise<CaptureMessage> =>
+    captureRoute({ plan, route, side, alarm });
+  const probing = plan.failFast === true && first.name === "candidate";
+  const probes: ShellProbe[] = [];
+  for (const route of plan.routes.slice(0, SHELL_PROBE)) {
+    const taken = await capture(route, first);
+    const message = needsRecapture(taken) ? await capture(route, first) : taken;
+    collect(message);
+    if (!probing) continue;
+    probes.push({ capture: message, blank: message.blank });
+    const broken = shellBroken({ probes });
+    if (broken !== "") throw new Error(`the candidate's shell does not render: ${broken}`);
+  }
+  const heldBack = await runPoolWithRecapture({
+    items: plan.routes.slice(SHELL_PROBE),
     width: pages.length,
-    work: async ({ item, lane }) => {
-      const side = pages[lane] ?? first;
-      const message = await captureRoute({ plan, route: item, side, alarm });
-      collect(message);
-      if (!probing) return;
-      probes.push({ capture: message, blank: message.blank });
-      const broken = shellBroken({ probes });
-      if (broken !== "") throw new Error(`the candidate's shell does not render: ${broken}`);
-    },
+    take: ({ item, lane }) => capture(item, pages[lane] ?? first),
+    spoiled: needsRecapture,
+    keep: collect,
   });
+  if (heldBack.length > 0) {
+    note({
+      text: `${first.name} recaptured ${heldBack.length} route(s) alone: ${heldBack.join(", ")}`,
+      err: process.stderr,
+    });
+  }
 };
 
 /** captureFlow runs one flow's steps on one page; each step's first action opens its own screen. */

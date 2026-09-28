@@ -17,7 +17,7 @@ describe("Feature: Visual diff between two refs", () => {
 
         expect(first.consoleErrors).toEqual(["TypeError: cannot read properties of undefined"]);
         expect(first.failedRequests).toEqual(["500 GET /api/automations"]);
-        expect(second).toEqual({ consoleErrors: [], failedRequests: [] });
+        expect(second).toEqual({ consoleErrors: [], failedRequests: [], moduleFailures: [] });
       });
 
       /** @scenario Console errors and failed requests are recorded per step */

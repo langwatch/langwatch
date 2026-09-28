@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -22,6 +23,9 @@ type Capture struct {
 	Screenshot     string   `json:"screenshot"`
 	ConsoleErrors  []string `json:"consoleErrors"`
 	FailedRequests []string `json:"failedRequests"`
+	// ModuleFailures are the page's own modules that failed to load: the
+	// dev server's failure under load, never the screen's (ClassCaptureFailed).
+	ModuleFailures []string `json:"moduleFailures,omitempty"`
 	NotFound       bool     `json:"notFound"`
 	Blank          bool     `json:"blank"`
 	AriaSnapshot   string   `json:"ariaSnapshot,omitempty"`
@@ -129,7 +133,7 @@ func WriteReport(dir string, rows []Row, meta ReportMeta) error {
 	if err := os.WriteFile(filepath.Join(dir, "findings.md"), []byte(renderMarkdown(rows, meta)), 0o600); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "report.html"), []byte(renderHTML(rows, meta)), 0o600)
+	return os.WriteFile(filepath.Join(dir, "report.html"), []byte(renderHTML(dir, rows, meta)), 0o600)
 }
 
 // CountFindings counts the rows worth a person's attention.
@@ -209,7 +213,7 @@ img{width:100%;border:1px solid #eaecf0;border-radius:4px}
 
 func classColour(class Classification) string {
 	switch class {
-	case ClassRegression, ClassMissingCandidate, ClassBrokenBoth, ClassBlank, ClassNotFound:
+	case ClassRegression, ClassMissingCandidate, ClassBrokenBoth, ClassBlank, ClassNotFound, ClassCaptureFailed:
 		return "#b42318"
 	case ClassAPIError, ClassRedirect, ClassControls, ClassMissingBase:
 		return "#b54708"
@@ -222,7 +226,7 @@ func classColour(class Classification) string {
 	}
 }
 
-func renderHTML(rows []Row, meta ReportMeta) string {
+func renderHTML(dir string, rows []Row, meta ReportMeta) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "<!doctype html><meta charset=\"utf-8\"><title>Visual diff — %s vs %s</title>\n<style>%s</style>\n",
 		html.EscapeString(meta.BaseRef), html.EscapeString(meta.CandidateRef), reportStyle)
@@ -244,10 +248,10 @@ func renderHTML(rows []Row, meta ReportMeta) string {
 		writeSideDetail(&out, "base", row.Base)
 		writeSideDetail(&out, "candidate", row.Candidate)
 		fmt.Fprint(&out, "<div class=\"shots\">")
-		writeFigure(&out, "base", row.Base)
-		writeFigure(&out, "candidate", row.Candidate)
+		writeFigure(&out, figure{dir: dir, side: "base", capture: row.Base})
+		writeFigure(&out, figure{dir: dir, side: "candidate", capture: row.Candidate})
 		if row.DiffFile != "" {
-			fmt.Fprintf(&out, "<figure><figcaption>diff</figcaption><img loading=\"lazy\" src=\"file://%s\"></figure>", html.EscapeString(row.DiffFile))
+			fmt.Fprintf(&out, "<figure><figcaption>diff</figcaption><img loading=\"lazy\" src=\"%s\"></figure>", html.EscapeString(ImageSource(dir, row.DiffFile)))
 		}
 		fmt.Fprint(&out, "</div></div>\n")
 	}
@@ -270,11 +274,30 @@ func writeSideDetail(out *strings.Builder, side string, capture *Capture) {
 	}
 }
 
-func writeFigure(out *strings.Builder, side string, capture *Capture) {
+// figure is one side's screenshot, placed relative to the report's directory.
+type figure struct {
+	dir     string
+	side    string
+	capture *Capture
+}
+
+func writeFigure(out *strings.Builder, one figure) {
+	capture := one.capture
 	if capture == nil || capture.Screenshot == "" {
-		fmt.Fprintf(out, "<figure><figcaption>%s</figcaption></figure>", side)
+		fmt.Fprintf(out, "<figure><figcaption>%s</figcaption></figure>", one.side)
 		return
 	}
-	fmt.Fprintf(out, "<figure><figcaption>%s <span class=\"mono\">%s</span></figcaption><img loading=\"lazy\" src=\"file://%s\"></figure>",
-		side, html.EscapeString(capture.URL), html.EscapeString(capture.Screenshot))
+	fmt.Fprintf(out, "<figure><figcaption>%s <span class=\"mono\">%s</span></figcaption><img loading=\"lazy\" src=\"%s\"></figure>",
+		one.side, html.EscapeString(capture.URL), html.EscapeString(ImageSource(one.dir, capture.Screenshot)))
+}
+
+// ImageSource is an image's address relative to the report's directory, so
+// a report opened from a downloaded CI artifact still shows its screenshots.
+// A path that cannot be made relative keeps its file:// address.
+func ImageSource(dir, path string) string {
+	relative, err := filepath.Rel(dir, path)
+	if err != nil || !filepath.IsAbs(path) {
+		return "file://" + path
+	}
+	return (&url.URL{Path: filepath.ToSlash(relative)}).String()
 }

@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import type { Browser, BrowserContext, Page, Request, Response } from "playwright";
 import { chromium } from "playwright";
 
+import { isModuleConsoleError, isModuleRequest } from "./module-load";
 import { isExpectedThrottle, isThrottleConsoleError } from "./noise";
 import {
   note,
@@ -12,7 +13,7 @@ import {
   type SettleConfig,
   type Viewport,
 } from "./protocol";
-import { StepRecorder } from "./recorder";
+import { StepRecorder, type Drained } from "./recorder";
 import { InFlightTracker, shouldIgnoreRequest } from "./settle";
 
 /** Animations and carets are the largest source of pixel noise between two identical screens. */
@@ -88,28 +89,14 @@ export class Side {
     page.on("requestfinished", (request: Request) => {
       this.tracker.settled({ key: request, now: Date.now() });
     });
-    page.on("requestfailed", (request: Request) => {
-      this.tracker.settled({ key: request, now: Date.now() });
-      const url = request.url();
-      if (shouldIgnoreRequest({ url, resourceType: request.resourceType() })) return;
-      this.recorder.failedRequest(
-        `FAIL ${request.method()} ${this.relative(url)} ${request.failure()?.errorText ?? ""}`,
-      );
-    });
-    page.on("response", (response: Response) => {
-      const request = response.request();
-      const status = response.status();
-      if (status < 400) return;
-      const url = request.url();
-      if (shouldIgnoreRequest({ url, resourceType: request.resourceType() })) return;
-      if (isExpectedThrottle({ url, status })) return;
-      this.recorder.failedRequest(`${status} ${request.method()} ${this.relative(url)}`);
-    });
+    page.on("requestfailed", (request: Request) => this.requestFailed(request));
+    page.on("response", (response: Response) => this.responded(response));
     page.on("console", (message) => {
       if (message.type() !== "error") return;
       const text = message.text();
       const { url } = message.location();
       if (isThrottleConsoleError({ text, url })) return;
+      if (isModuleConsoleError(text)) this.recorder.moduleFailure(text);
       this.recorder.consoleError(text);
     });
     page.on("pageerror", (error) => {
@@ -121,6 +108,38 @@ export class Side {
   async goto(path: string): Promise<void> {
     this.tracker.navigated(Date.now());
     await this.page.goto(this.baseUrl + path, { waitUntil: "commit", timeout: 20_000 });
+  }
+
+  private requestFailed(request: Request): void {
+    this.tracker.settled({ key: request, now: Date.now() });
+    const url = request.url();
+    const errorText = request.failure()?.errorText ?? "";
+    const failure = `FAIL ${request.method()} ${this.relative(url)} ${errorText}`;
+    this.recordModuleFailure({ request, failure });
+    if (shouldIgnoreRequest({ url, resourceType: request.resourceType() })) return;
+    this.recorder.failedRequest(failure);
+  }
+
+  private responded(response: Response): void {
+    const request = response.request();
+    const status = response.status();
+    if (status < 400) return;
+    const url = request.url();
+    const failure = `${status} ${request.method()} ${this.relative(url)}`;
+    this.recordModuleFailure({ request, failure });
+    if (shouldIgnoreRequest({ url, resourceType: request.resourceType() })) return;
+    if (isExpectedThrottle({ url, status })) return;
+    this.recorder.failedRequest(failure);
+  }
+
+  /** recordModuleFailure keeps a failed load of one of the page's own modules apart. */
+  private recordModuleFailure({ request, failure }: { request: Request; failure: string }): void {
+    const origin = new URL(this.baseUrl).origin;
+    const url = request.url();
+    const resourceType = request.resourceType();
+    if (!isModuleRequest({ url, resourceType, origin })) return;
+    if (/net::ERR_ABORTED/.test(failure)) return;
+    this.recorder.moduleFailure(failure);
   }
 
   relative(url: string): string {
@@ -165,7 +184,7 @@ export class Side {
   }
 
   /** drain hands back everything reported since the last drain, and forgets it. */
-  drain(): { consoleErrors: string[]; failedRequests: string[] } {
+  drain(): Drained {
     return this.recorder.drain();
   }
 
@@ -309,6 +328,7 @@ export const captureMessage = ({
     screenshot,
     consoleErrors: drained.consoleErrors,
     failedRequests: drained.failedRequests,
+    moduleFailures: drained.moduleFailures,
     notFound,
     blank,
     ariaSnapshot,

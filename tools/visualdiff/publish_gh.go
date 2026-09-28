@@ -26,6 +26,11 @@ type PublishRequest struct {
 	Findings     int
 	Config       PublishConfig
 	Stderr       io.Writer
+	// PR is the pull request to publish to; empty publishes to the open one
+	// of the branch checked out at Root. Link is where the run's full report
+	// lives, shown under the headline.
+	PR   string
+	Link string
 }
 
 // Publish shows a run's selected screens on the pull request of the branch
@@ -33,7 +38,7 @@ type PublishRequest struct {
 // It returns the comment's address, or "" when it skipped, having said why.
 func Publish(ctx context.Context, request PublishRequest) (string, error) {
 	gh := ghClient{run: request.Run, root: request.Root}
-	pr, skip := gh.pullRequest(ctx)
+	pr, skip := gh.pullRequest(ctx, request.PR)
 	if skip != "" {
 		fmt.Fprintf(request.Stderr, "publish: skipped, %s\n", skip)
 		return "", nil
@@ -62,7 +67,7 @@ func (request PublishRequest) stage(ctx context.Context, picks []ScreenPick) ([]
 	dir := filepath.Join(request.RunDir, PublishDir)
 	_ = os.RemoveAll(dir)
 	headline := headlineFor(request.Rows, request.Findings)
-	headline.RunID = filepath.Base(request.RunDir)
+	headline.RunID, headline.Link = filepath.Base(request.RunDir), request.Link
 	headline.BaseCommit, _ = resolveCommit(ctx, gitRef{run: request.Run, root: request.Root, ref: request.BaseRef})
 	headline.CandidateCommit, _ = resolveCommit(ctx, gitRef{run: request.Run, root: request.Root, ref: request.CandidateRef})
 	body, images := RenderComment(headline, picks)
@@ -100,14 +105,18 @@ func (gh ghClient) output(ctx context.Context, spec commandSpec) (string, error)
 	return strings.TrimSpace(out.String()), err
 }
 
-// pullRequest is the open PR of the branch at root, or why there is none to publish to.
-func (gh ghClient) pullRequest(ctx context.Context) (string, string) {
+// pullRequest is the named PR, else the open PR of the branch at root, or
+// why there is none to publish to.
+func (gh ghClient) pullRequest(ctx context.Context, named string) (string, string) {
+	if _, err := gh.output(ctx, commandSpec{name: "gh", args: []string{"auth", "status"}}); err != nil {
+		return "", "gh is not signed in"
+	}
+	if named != "" {
+		return named, ""
+	}
 	branch, err := gh.output(ctx, commandSpec{name: "git", args: []string{"rev-parse", "--abbrev-ref", "HEAD"}})
 	if err != nil || branch == "" || branch == "HEAD" {
 		return "", "the checkout is on no branch"
-	}
-	if _, err := gh.output(ctx, commandSpec{name: "gh", args: []string{"auth", "status"}}); err != nil {
-		return "", "gh is not signed in"
 	}
 	number, err := gh.output(ctx, commandSpec{name: "gh", args: []string{"pr", "list", "--head", branch, "--state", "open", "--json", "number", "--jq", ".[0].number"}})
 	if err != nil || number == "" || number == "null" {

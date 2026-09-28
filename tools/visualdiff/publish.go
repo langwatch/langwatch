@@ -48,75 +48,121 @@ type ScreenPick struct {
 	Paired bool
 }
 
-// failureClasses are the candidate-side failures a comment shows after the
-// largest changes: each has a candidate screenshot to show.
-var failureClasses = map[Classification]bool{
-	ClassRegression: true, ClassNotFound: true, ClassBlank: true, ClassAPIError: true,
-	ClassRedirect: true, ClassControls: true,
-}
-
-// SelectScreens picks what a PR comment shows, in order: the changed routes
-// with the largest diff, then the candidate's failures, then the key pages,
-// never a screen the secret guard refuses, and at most config.Screens.
+// SelectScreens picks what a PR comment shows: the key pages, always, then
+// the findings and then the other changes, largest first, one screen per area
+// before any area repeats. A blank, failed or unloaded capture never shows,
+// nor a screen the secret guard refuses; at most config.Screens.
 func SelectScreens(rows []Row, config PublishConfig) []ScreenPick {
 	config = config.filled()
-	picker := screenPicker{limit: config.Screens, seen: map[string]bool{}}
-	picker.take(changedRoutes(rows), "changed")
-	picker.take(failedScreens(rows), "failure")
-	picker.take(keyPages(rows, config.KeyPages), "key page")
+	picker := screenPicker{limit: config.Screens, seen: map[string]bool{}, areas: map[string]bool{}}
+	keys := keyPages(rows, config.KeyPages)
+	for index := range keys {
+		picker.take(keys[index], "key page")
+	}
+	ranked := rankedScreens(rows)
+	for index := range ranked {
+		if !picker.areas[ScreenArea(ranked[index])] {
+			picker.take(ranked[index], rankReason(ranked[index]))
+		}
+	}
+	for index := range ranked {
+		picker.take(ranked[index], rankReason(ranked[index]))
+	}
 	return picker.picks
 }
 
 type screenPicker struct {
 	limit int
 	seen  map[string]bool
+	areas map[string]bool
 	picks []ScreenPick
 }
 
-func (picker *screenPicker) take(rows []Row, reason string) {
+func (picker *screenPicker) take(row Row, reason string) {
+	identity := fmt.Sprintf("%s|%s|%s|%d", row.Edition, row.Kind, row.Key, row.Index)
+	if len(picker.picks) >= picker.limit || picker.seen[identity] || !showable(row) || !publishable(row) {
+		return
+	}
+	picker.seen[identity] = true
+	picker.areas[ScreenArea(row)] = true
+	picker.picks = append(picker.picks, ScreenPick{Row: row, Reason: reason, Paired: baseReadable(row)})
+}
+
+// showable is a candidate capture that rendered: never blank, never failed,
+// never one whose own modules did not load.
+func showable(row Row) bool {
+	candidate := row.Candidate
+	return candidate != nil && !candidate.Blank && candidate.Error == "" && len(candidate.ModuleFailures) == 0 &&
+		row.Class != ClassCaptureFailed
+}
+
+// rankedScreens are the findings, then the changes past noise, each largest first.
+func rankedScreens(rows []Row) []Row {
+	var findings, changes []Row
 	for index := range rows {
 		row := rows[index]
-		identity := fmt.Sprintf("%s|%s|%s|%d", row.Edition, row.Kind, row.Key, row.Index)
-		if len(picker.picks) >= picker.limit || picker.seen[identity] || !publishable(row) {
-			continue
-		}
-		picker.seen[identity] = true
-		picker.picks = append(picker.picks, ScreenPick{Row: row, Reason: reason, Paired: baseReadable(row)})
-	}
-}
-
-// changedRoutes are the routes whose pixels moved past noise, largest first.
-func changedRoutes(rows []Row) []Row {
-	var changed []Row
-	for index := range rows {
-		row := &rows[index]
-		if row.Kind == "route" && row.Diffed && row.Ratio >= NoiseRatio && !failureClasses[row.Class] {
-			changed = append(changed, *row)
+		switch {
+		case row.Finding():
+			findings = append(findings, row)
+		case row.Diffed && row.Ratio >= NoiseRatio:
+			changes = append(changes, row)
 		}
 	}
-	sort.SliceStable(changed, func(i, j int) bool { return changed[i].Ratio > changed[j].Ratio })
-	return changed
-}
-
-// failedScreens are the candidate's failures, the worst class first.
-func failedScreens(rows []Row) []Row {
-	var failed []Row
-	for index := range rows {
-		if failureClasses[rows[index].Class] {
-			failed = append(failed, rows[index])
-		}
+	largestFirst := func(list []Row) {
+		sort.SliceStable(list, func(i, j int) bool { return list[i].Ratio > list[j].Ratio })
 	}
-	sort.SliceStable(failed, func(i, j int) bool { return classRank(failed[i].Class) < classRank(failed[j].Class) })
-	return failed
+	largestFirst(findings)
+	largestFirst(changes)
+	return append(findings, changes...)
 }
 
-// keyPages are the configured pages, in the order configured.
+func rankReason(row Row) string {
+	if row.Finding() {
+		return "finding"
+	}
+	return "changed"
+}
+
+// flowAreas name the area of a flow whose leading word is not one.
+var flowAreas = map[string]string{"sign": "auth", "trace": "traces", "annotate": "traces"}
+
+// ScreenArea is the product area a screen belongs to (project, traces,
+// analytics, settings, governance, ops, me, auth, ...): a route's section,
+// or a flow id's leading word.
+func ScreenArea(row Row) string {
+	if row.Kind == "flow" {
+		word, _, _ := strings.Cut(row.Key, "-")
+		if area, ok := flowAreas[word]; ok {
+			return area
+		}
+		return word
+	}
+	segments := strings.Split(strings.Trim(row.Key, "/"), "/")
+	area := segments[0]
+	if area == "{slug}" || area == "@project" {
+		if len(segments) == 1 {
+			return "project"
+		}
+		area = segments[1]
+	}
+	switch area {
+	case "messages":
+		return "traces"
+	case "login", "signin", "signup", "auth":
+		return "auth"
+	}
+	return area
+}
+
+// keyPages are the configured pages, in the order configured, the first
+// edition's row of each.
 func keyPages(rows []Row, pages []string) []Row {
 	var found []Row
 	for _, page := range pages {
 		for index := range rows {
 			if rows[index].Kind == "route" && rows[index].Key == page {
 				found = append(found, rows[index])
+				break
 			}
 		}
 	}
@@ -182,6 +228,8 @@ type PublishHeadline struct {
 	Rows            int
 	Findings        int
 	Classes         map[Classification]int
+	// Link is where the run's full report lives; empty shows no link.
+	Link string
 }
 
 // headlineFor counts a run's rows by class for the comment.
@@ -208,6 +256,9 @@ func RenderComment(headline PublishHeadline, picks []ScreenPick) (string, []Publ
 	fmt.Fprintf(&body, "### visualdiff: %d screens, %d findings\n\n", headline.Rows, headline.Findings)
 	fmt.Fprintf(&body, "Run `%s` · base `%s` · candidate `%s`\n\n", headline.RunID, short(headline.BaseCommit), short(headline.CandidateCommit))
 	body.WriteString(classLine(headline.Classes) + "\n")
+	if headline.Link != "" {
+		fmt.Fprintf(&body, "\n[Full report](%s)\n", headline.Link)
+	}
 	var images []PublishedImage
 	for index := range picks {
 		pick := &picks[index]

@@ -81,6 +81,8 @@ export interface CaptureMessage {
   screenshot: string;
   consoleErrors: string[];
   failedRequests: string[];
+  /** moduleFailures are the page's own modules that failed to load, the tool's failure. */
+  moduleFailures?: string[];
   notFound: boolean;
   blank: boolean;
   /** ariaSnapshot is the page's accessibility tree as YAML, the screen's text evidence. */

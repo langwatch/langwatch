@@ -14,6 +14,15 @@ import {
 } from "@langwatch/eventing";
 
 import type { ExperimentApp } from "../app/experiment.app.ts";
+import type {
+  ExperimentRunPlanFoldState,
+  ExperimentRunProgressState,
+} from "../repositories/experiment-run-fold.repository.ts";
+import {
+  ExecuteExperimentCellCommand,
+  type ExecuteExperimentCellCommandData,
+  executeExperimentCellJobId,
+} from "./experiment-run-cell.commands.ts";
 import {
   type AbortRequestedEventData,
   type CellFinishedEventData,
@@ -34,6 +43,12 @@ import {
   workflowEvaluationRequestedEventSchema,
 } from "./experiment-run-events.process.ts";
 import {
+  type ExperimentRunExecutionEffects,
+  experimentRunExecutionProcess,
+} from "./experiment-run-execution.process.ts";
+import { EXPERIMENT_RUN_EXECUTION_PROCESS_NAME } from "./experiment-run-execution.schemas.ts";
+import { ExperimentRunPlanFoldProjection } from "./experiment-run-plan.projection.ts";
+import {
   AbortExperimentRunCommand,
   CompleteExperimentRunCommand,
   ComputeExperimentRunMetricsCommand,
@@ -43,6 +58,7 @@ import {
   RequestWorkflowEvaluationCommand,
   StartExperimentRunCommand,
 } from "./experiment-run-processing.commands.ts";
+import { ExperimentRunProgressFoldProjection } from "./experiment-run-progress.projection.ts";
 import {
   type ClickHouseExperimentRunResultRecord,
   ExperimentRunResultStorageMapProjection,
@@ -67,6 +83,13 @@ export interface ClickhouseExperimentRunProcessingRepository {
   experimentRunItemAppendStore: AppendStore<ClickHouseExperimentRunResultRecord>;
   /** Runs a requested workflow evaluation; hosted only where the pipeline is drained. */
   workflowEvaluations: WorkflowEvaluationRunner;
+  /** The run's plan, written once, and the progress its cells read (spec section 7). */
+  experimentRunPlanFoldStore: FoldProjectionStore<ExperimentRunPlanFoldState>;
+  experimentRunProgressFoldStore: FoldProjectionStore<ExperimentRunProgressState>;
+  /** Runs one cell where the pipeline is drained. */
+  executeCell: ExecuteExperimentCellCommand;
+  /** What the run's execution manager's intents send. */
+  runExecution: ExperimentRunExecutionEffects;
 }
 
 export type ExperimentRunProcessingPipeline = StaticPipelineDefinition<
@@ -80,6 +103,7 @@ export type ExperimentRunProcessingPipeline = StaticPipelineDefinition<
   | { name: "requestWorkflowEvaluation"; payload: WorkflowEvaluationRequestedEventData }
   | { name: "failExperimentCell"; payload: CellFinishedEventData }
   | { name: "abortExperimentRun"; payload: AbortRequestedEventData }
+  | { name: "executeExperimentCell"; payload: ExecuteExperimentCellCommandData }
 >;
 
 /** The run pipeline over the stores a deployment composed for it. */
@@ -107,6 +131,12 @@ export function buildExperimentRunProcessingPipeline(
         store: deps.experimentRunStateFoldStore,
       }),
     )
+    .withClickHouseFoldProjection(
+      ExperimentRunPlanFoldProjection.create({ store: deps.experimentRunPlanFoldStore }),
+    )
+    .withClickHouseFoldProjection(
+      ExperimentRunProgressFoldProjection.create({ store: deps.experimentRunProgressFoldStore }),
+    )
     .withClickHouseMapProjection(
       ExperimentRunResultStorageMapProjection.create({
         store: deps.experimentRunItemAppendStore,
@@ -115,6 +145,10 @@ export function buildExperimentRunProcessingPipeline(
     .withEventSubscriber(
       "workflowEvaluationRequested",
       createWorkflowEvaluationRequestedSubscriber(deps.workflowEvaluations),
+    )
+    .withProcessManager(
+      EXPERIMENT_RUN_EXECUTION_PROCESS_NAME,
+      experimentRunExecutionProcess(deps.runExecution),
     );
 
   return builder
@@ -126,5 +160,11 @@ export function buildExperimentRunProcessingPipeline(
     .withCommand("requestWorkflowEvaluation", RequestWorkflowEvaluationCommand)
     .withCommand("failExperimentCell", FailExperimentCellCommand)
     .withCommand("abortExperimentRun", AbortExperimentRunCommand)
+    .withCommandInstance({
+      name: "executeExperimentCell",
+      handlerClass: ExecuteExperimentCellCommand,
+      instance: deps.executeCell,
+      options: { deduplication: { makeId: executeExperimentCellJobId, ttlMs: 60_000 } },
+    })
     .build();
 }
