@@ -21,13 +21,16 @@ Mine, Team and Organisation. The **+** button creates a new board.
 
 ## Start from a template
 
-A board with nothing on it offers its templates under "Start from a template":
+A board without widgets offers its templates under "Start from a template":
 the Agent Flight Deck, then one template for every section of the question
-picker ("What happened?", "What changed?" and so on). Choosing one creates a new
-board named after it (numbered "Agent Flight Deck 2" and so on if the name is
-taken), visible only to you, with a widget answering each question in that
-section. A widget whose data is not set up yet says what is missing and links to
-the page that sets it up, such as evaluations, scenarios or feedback.
+picker ("What happened?", "What changed?" and so on).
+
+Choosing one creates a new board named after it (numbered "Agent Flight Deck 2"
+and so on if the name is taken), visible only to you, with a widget answering
+each question in that section.
+
+A widget whose data is not set up yet says what is missing and links to the
+page that sets it up, such as evaluations, scenarios or feedback.
 
 The Agent Flight Deck holds ten widgets:
 
@@ -43,7 +46,7 @@ The Agent Flight Deck holds ten widgets:
 - Most impactful traces
 
 A new board is yours like any other: every widget on it can be edited,
-duplicated, moved, resized or deleted, and nothing you change affects the
+duplicated, moved, resized or deleted, and your changes do not affect the
 template.
 
 ## Period and grain
@@ -51,6 +54,13 @@ template.
 Every board has a period, from one hour to one year, defaulting to 30 days,
 and a grain: auto, hour, day or week. Every widget on the board reads over that
 period and grain.
+
+## Keep the data fresh
+
+The board header shows when the data was last updated, as "Updated … ago".
+The refresh button reloads every widget on the board now. The auto-refresh
+menu next to it reloads every widget every minute, every 5 minutes, or never
+(Off).
 
 ## Building your own board
 
@@ -69,10 +79,14 @@ creator or a project admin can change its visibility or delete it.
 ## Asking questions
 
 The question picker lists suggested questions. Picking one sends a detailed
-prompt to Langy, with the board as context. Langy answers in its own panel.
-Nothing is added to the board. There is also an ask bar at the top of every
-board for asking Langy about that board directly. Both need Langy to be enabled
-for your project.
+prompt to Langy, with the board as context. Langy answers in its own panel;
+Langy does not add widgets to the board.
+
+On a board that already has widgets, the **Add a block** area at the bottom of
+the board opens the question picker (an empty board shows only the templates
+and the ask bar). There is also an ask bar at the top of every board for
+asking Langy about that board directly. Both need Langy to be enabled for your
+project.
 
 ## How the data is read
 
