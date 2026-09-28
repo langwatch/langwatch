@@ -4,7 +4,7 @@ import { readCustomKeys } from "~/server/modelProviders/customKeys";
  * A model provider row as the checkup tests it: the `customKeys` column is
  * stored encrypted, so it is read through `readCustomKeys` before a key is
  * looked up in it. A row whose keys will not decrypt holds no keys and is
- * flagged `keysUnreadable`, so the checkup names the decryption failure
+ * flagged `hasUnreadableKeys`, so the checkup names the decryption failure
  * instead of reporting a missing key.
  */
 export function checkupModelProviderRow(row: {
@@ -15,7 +15,7 @@ export function checkupModelProviderRow(row: {
   id: string;
   provider: string;
   customKeys: Record<string, string>;
-  keysUnreadable: boolean;
+  hasUnreadableKeys: boolean;
 } {
   const read = readCustomKeys(row.customKeys);
   const customKeys: Record<string, string> = {};
@@ -26,6 +26,6 @@ export function checkupModelProviderRow(row: {
     id: row.id,
     provider: row.provider,
     customKeys,
-    keysUnreadable: read.state === "unreadable",
+    hasUnreadableKeys: read.state === "unreadable",
   };
 }

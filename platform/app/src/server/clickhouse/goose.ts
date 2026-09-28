@@ -349,12 +349,20 @@ export async function waitForClickHouseReady({
   let lastLogAt: number | undefined;
 
   for (;;) {
-    const failure = await pingFailure(ping);
+    // A hanging ping must not hold the boot much past the wait: each one is
+    // capped at the time left, but never below one retry interval. A zero
+    // wait's single attempt keeps the client's own request timeout.
+    const failure = await pingFailure(
+      ping,
+      waitSeconds > 0
+        ? Math.max(deadline - now(), WAIT_RETRY_INTERVAL_MS)
+        : null,
+    );
     if (!failure) return;
     const current = now();
     throwUnlessRetryable({
       error: failure.error,
-      timedOut: current >= deadline,
+      isPastDeadline: current >= deadline,
       displayUrl,
       waitSeconds,
     });
@@ -372,27 +380,56 @@ export async function waitForClickHouseReady({
   }
 }
 
-/** The ping's rejection, or null when it succeeded. */
+/**
+ * The ping's rejection, or null when it succeeded. Past `timeoutMs` the ping
+ * counts as a timed-out connection, which the caller retries or reports.
+ */
 async function pingFailure(
   ping: () => Promise<void>,
+  timeoutMs: number | null,
 ): Promise<{ error: unknown } | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await ping();
+    const attempt = ping();
+    if (timeoutMs === null) {
+      await attempt;
+    } else {
+      // A late rejection from the abandoned ping must not go unhandled.
+      attempt.catch(() => undefined);
+      await Promise.race([
+        attempt,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () =>
+              reject(
+                Object.assign(
+                  new Error(`no answer within ${Math.ceil(timeoutMs / 1000)}s`),
+                  { code: "ETIMEDOUT" },
+                ),
+              ),
+            timeoutMs,
+          );
+          timer.unref?.();
+        }),
+      ]);
+    }
     return null;
   } catch (error) {
     return { error };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
 /** Throws the preflight failure unless the error is worth another attempt. */
 function throwUnlessRetryable({
   error,
-  timedOut,
+  isPastDeadline,
   displayUrl,
   waitSeconds,
 }: {
   error: unknown;
-  timedOut: boolean;
+  isPastDeadline: boolean;
   displayUrl: string;
   waitSeconds: number;
 }): void {
@@ -405,7 +442,7 @@ function throwUnlessRetryable({
       cause,
     );
   }
-  if (!timedOut) return;
+  if (!isPastDeadline) return;
   const waited =
     waitSeconds > 0
       ? ` after waiting ${waitSeconds}s (CLICKHOUSE_MIGRATE_WAIT_SECONDS)`

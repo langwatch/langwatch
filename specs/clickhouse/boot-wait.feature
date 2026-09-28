@@ -19,6 +19,12 @@ Feature: Migrations wait for a ClickHouse that is still starting
     Then the migration step fails naming the server and the wait setting
 
   @unit
+  Scenario: A ClickHouse that never answers fails at the wait
+    Given a ClickHouse ping that never answers
+    When the configured wait passes
+    Then the migration step abandons the ping and fails
+
+  @unit
   Scenario: A server that answers with an error is not retried
     Given ClickHouse answers the check with an authentication failure
     When the migration step checks the server

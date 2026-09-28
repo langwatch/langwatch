@@ -165,7 +165,7 @@ export interface CheckupDeps {
       provider: string;
       customKeys: Record<string, string>;
       /** The stored keys did not decrypt, e.g. after a CREDENTIALS_SECRET change. */
-      keysUnreadable: boolean;
+      hasUnreadableKeys: boolean;
     }[]
   >;
   /** Throws `ModelProviderTestRateLimitedError` past the budget. */
@@ -907,11 +907,13 @@ export class CheckupService {
 
 /** A failing verdict naming every provider whose stored keys did not decrypt. */
 function unreadableKeysVerdict(
-  providers: { provider: string; keysUnreadable: boolean }[],
+  providers: { provider: string; hasUnreadableKeys: boolean }[],
 ): CheckVerdict | null {
   const names = [
     ...new Set(
-      providers.filter((row) => row.keysUnreadable).map((row) => row.provider),
+      providers
+        .filter((row) => row.hasUnreadableKeys)
+        .map((row) => row.provider),
     ),
   ].sort();
   if (names.length === 0) return null;

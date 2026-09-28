@@ -6,7 +6,7 @@
  * @see ../../../../../../specs/clickhouse/boot-wait.feature
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   DEFAULT_CLICKHOUSE_WAIT_SECONDS,
@@ -99,6 +99,35 @@ describe("waitForClickHouseReady", () => {
         expect(clock.now()).toBe(60_000);
         // One line every ten seconds, not one per attempt.
         expect(logs).toHaveLength(6);
+      });
+    });
+  });
+
+  describe("given a ping that never answers", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    describe("when the configured wait passes", () => {
+      /** @scenario "A ClickHouse that never answers fails at the wait" */
+      it("abandons the ping and fails at the deadline", async () => {
+        const outcome = waitForClickHouseReady({
+          displayUrl: redactUrl(SERVER_URL),
+          waitSeconds: 2,
+          ping: () => new Promise<void>(() => undefined),
+          log: () => undefined,
+        }).catch((caught: unknown) => caught);
+
+        await vi.advanceTimersByTimeAsync(2_000);
+        const error = await outcome;
+
+        expect(error).toBeInstanceOf(MigrationError);
+        expect((error as MigrationError).message).toContain(
+          "no answer within 2s",
+        );
       });
     });
   });

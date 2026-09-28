@@ -30,7 +30,7 @@ describe("checkupModelProviderRow", () => {
           id: "mp_1",
           provider: "openai",
           customKeys: { OPENAI_API_KEY: "sk-real" },
-          keysUnreadable: false,
+          hasUnreadableKeys: false,
         });
       });
     });
@@ -46,7 +46,7 @@ describe("checkupModelProviderRow", () => {
         });
 
         expect(row.customKeys).toEqual({});
-        expect(row.keysUnreadable).toBe(true);
+        expect(row.hasUnreadableKeys).toBe(true);
       });
     });
   });
@@ -60,7 +60,7 @@ describe("checkupModelProviderRow", () => {
           customKeys: null,
         });
 
-        expect(row.keysUnreadable).toBe(false);
+        expect(row.hasUnreadableKeys).toBe(false);
       });
     });
   });
