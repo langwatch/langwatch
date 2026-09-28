@@ -50,16 +50,16 @@ not be completed — the same ladder as `apidiff`.
    A persistent worktree skips the install and generated files when its
    commit's tree matches the last prepare that finished
    (`.visualdiff/worktrees/<side>.prepared`) - and only then does it become a `haven up --agent --detach` stack under
-     its own run-scoped slug, with haven's own automatic prep doing migrate and
-     seed. With `-no-haven`, visualdiff provisions the old way instead:
-     `pnpm install --prefer-offline` and `pnpm run start:prepare:files` in each
-     worktree, then each ref's stack starts on its own ports - the base at
-     `-base-port` (5670 by default), the candidate ten above it, so the two can
-     never collide. A modular checkout runs `dev:ui`, `dev:api` and
-     `dev:worker`; a monolith checkout runs `dev:app` with the Prisma,
-     ClickHouse and provisioning steps skipped, because both refs share your
-     local databases and the older ref must not re-apply its own migration set
-     over them.
+   its own run-scoped slug, with haven's own automatic prep doing migrate and
+   seed. With `-no-haven`, visualdiff provisions the old way instead:
+   `pnpm install --prefer-offline` and `pnpm run start:prepare:files` in each
+   worktree, then each ref's stack starts on its own ports - the base at
+   `-base-port` (5670 by default), the candidate ten above it, so the two can
+   never collide. A modular checkout runs `dev:ui`, `dev:api` and
+   `dev:worker`; a monolith checkout runs `dev:app` with the Prisma,
+   ClickHouse and provisioning steps skipped, because both refs share your
+   local databases and the older ref must not re-apply its own migration set
+   over them.
 3. Polls both stacks until they answer, then seeds each through its own API.
    On haven, when both sides boot live and the first edition is the seeded
    one, the candidate is captured as soon as it is up: the base boots and
