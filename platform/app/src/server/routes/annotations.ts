@@ -25,6 +25,7 @@ import {
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 
 const logger = createLogger("langwatch:annotations");
@@ -97,6 +98,47 @@ async function authenticateRequest(c: Context, permission: Permission) {
   };
 
   return { project: resolved.project, markUsed };
+}
+
+/**
+ * Records an annotation change on its trace, as the app's annotation router
+ * does. `has:annotation` reads the trace summary's annotation ids, which only
+ * these trace commands write: an annotation kept in Postgres alone is listed by
+ * this API and invisible to search.
+ *
+ * Best-effort: Postgres is the source of truth, so a failed sync is logged and
+ * the backfill task reconciles it, rather than failing a write that happened.
+ */
+async function syncAnnotationToTrace({
+  action,
+  projectId,
+  traceId,
+  annotationId,
+}: {
+  action: "add" | "remove";
+  projectId: string;
+  traceId: string;
+  annotationId: string;
+}): Promise<void> {
+  const command = {
+    tenantId: projectId,
+    traceId,
+    annotationId,
+    occurredAt: Date.now(),
+  };
+  try {
+    const traces = getApp().traces;
+    if (action === "add") {
+      await traces.addAnnotation(command);
+    } else {
+      await traces.removeAnnotation(command);
+    }
+  } catch (error) {
+    logger.error(
+      { error, traceId, projectId, action },
+      "Failed to sync annotation to the trace",
+    );
+  }
 }
 
 /**
@@ -195,8 +237,14 @@ secured.access(annotationsManageAuth).delete("/annotations/:id", async (c) => {
 
   try {
     const annotationId = c.req.param("id");
-    await prisma.annotation.delete({
+    const deleted = await prisma.annotation.delete({
       where: { id: annotationId, projectId: project.id },
+    });
+    await syncAnnotationToTrace({
+      action: "remove",
+      projectId: project.id,
+      traceId: deleted.traceId,
+      annotationId: deleted.id,
     });
     markUsed();
     return c.json({ status: "success", message: "Annotation deleted." });
@@ -372,6 +420,12 @@ secured
           traceId: trace,
           email,
         },
+      });
+      await syncAnnotationToTrace({
+        action: "add",
+        projectId: project.id,
+        traceId: trace,
+        annotationId: addAnnotation.id,
       });
 
       markUsed();
