@@ -268,6 +268,12 @@ Feature: One automation flow with a subject choice
       Then the card says it is checking the connection
       And it neither offers actions nor tells the user to ask an administrator
 
+    @integration
+    Scenario: The Slack card names the project it configures
+      Given the user opens the integrations settings from a project
+      When the Slack card picks that project
+      Then the picker's heading names the project, not just "Project"
+
   Rule: An automation's own stored token outranks the project integration
 
     Existing automations carry their own encrypted token, possibly for a

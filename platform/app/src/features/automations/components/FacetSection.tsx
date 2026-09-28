@@ -63,8 +63,14 @@ export function FacetSection({
         </Tooltip>
       ) : null}
       {complete ? (
-        <Box as="span" color="green.solid" display="inline-flex">
-          <Check size={14} />
+        <Box
+          as="span"
+          color="green.solid"
+          display="inline-flex"
+          role="img"
+          aria-label="Answered"
+        >
+          <Check size={14} aria-hidden="true" />
         </Box>
       ) : null}
     </HStack>

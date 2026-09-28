@@ -18,6 +18,7 @@ import {
 } from "~/server/app-layer/automations/graph-alert.builder";
 import { reportSourceSchema } from "~/server/app-layer/automations/report.builder";
 import type { FilterField } from "~/server/filters/types";
+import { queryIsValid } from "./conditionQuery";
 import { describeCron, isValidCron } from "./reportSchedule";
 
 /**
@@ -465,6 +466,18 @@ export function subjectIsSet(draft: AutomationDraft): boolean {
 }
 
 /** A trace-subject query is set when it has non-whitespace content. */
+/**
+ * `subjectIsSet`, and for a trace query also that it parses and names nothing
+ * suspicious: the green check means "this will match", not "this is filled".
+ */
+export function subjectIsValid(draft: AutomationDraft): boolean {
+  if (!subjectIsSet(draft)) return false;
+  if (draft.source !== "trace" || !filterQueryIsSet(draft.filterQuery)) {
+    return true;
+  }
+  return queryIsValid(draft.filterQuery);
+}
+
 export function filterQueryIsSet(filterQuery: string | null): boolean {
   return (filterQuery ?? "").trim().length > 0;
 }

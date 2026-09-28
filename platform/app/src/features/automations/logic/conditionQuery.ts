@@ -15,13 +15,19 @@
  */
 import type { LiqeQuery, ParserAst, TagToken } from "liqe";
 import {
+  DYNAMIC_PREFIXES,
+  FIELD_VALUES,
+  SCENARIO_FIELDS,
   SEARCH_FIELDS,
   type SearchFieldMeta,
 } from "~/server/app-layer/traces/query-language/metadata";
 import {
+  ParseError,
   parse,
   stripAtSigils,
 } from "~/server/app-layer/traces/query-language/parse";
+import { validateAst } from "~/server/app-layer/traces/query-language/queries";
+import { walkAST } from "~/server/app-layer/traces/query-language/walk";
 
 /** Comparators the builder exposes. Categorical / text / existence fields get
  *  `is` / `is_not`; range fields get the numeric comparators plus `between`. */
@@ -269,4 +275,93 @@ export function queryToConditions(query: string): Condition[] | null {
 /** Whether a query can be shown in the structured builder without loss. */
 export function queryIsStructurable(query: string): boolean {
   return queryToConditions(query) !== null;
+}
+
+// ── check ────────────────────────────────────────────────────────────────
+
+/** What the Code tab says about a query: a blocking `error` when it cannot
+ *  run, and `warnings` for clauses that parse but look like typos. */
+export interface QueryCheck {
+  error: string | null;
+  warnings: string[];
+}
+
+/** Legacy aliases the translator still accepts beside `DYNAMIC_PREFIXES`. */
+const LEGACY_FIELD_PREFIXES = ["attribute.", "event.", "eval."];
+
+function isKnownField(field: string): boolean {
+  if (Object.hasOwn(SEARCH_FIELDS, field) || SCENARIO_FIELDS.has(field)) {
+    return true;
+  }
+  return [
+    ...DYNAMIC_PREFIXES.map((d) => d.prefix),
+    ...LEGACY_FIELD_PREFIXES,
+  ].some((prefix) => field.startsWith(prefix) && field.length > prefix.length);
+}
+
+/** Fields whose `FIELD_VALUES` list is the whole domain, not a suggestion. */
+const CLOSED_VALUE_FIELDS = new Set([
+  "status",
+  "spanStatus",
+  "has",
+  "none",
+  "scenarioVerdict",
+  "scenarioStatus",
+  "evaluatorStatus",
+  "evaluatorVerdict",
+]);
+
+function knownValuesOf(field: string): string[] | null {
+  if (!CLOSED_VALUE_FIELDS.has(field)) return null;
+  return FIELD_VALUES[field] ?? null;
+}
+
+/** Check a query the way the search bar does: the parser and semantic guard
+ *  decide `error`; an unknown field or a value outside a closed set
+ *  (`status:error#simplified`) is a warning: it can never match. */
+export function checkQuery(query: string): QueryCheck {
+  if (stripAtSigils(query).trim().length === 0) {
+    return { error: null, warnings: [] };
+  }
+  let ast: LiqeQuery;
+  try {
+    ast = parse(query);
+  } catch (e) {
+    return {
+      error:
+        e instanceof ParseError
+          ? e.message
+          : "Invalid query syntax — check for unmatched quotes or parentheses.",
+      warnings: [],
+    };
+  }
+  const semanticError = validateAst(ast);
+  if (semanticError) return { error: semanticError, warnings: [] };
+
+  const warnings: string[] = [];
+  walkAST(ast, (node) => {
+    if (node.type !== "Tag" || node.field.type !== "Field") return;
+    const field = node.field.name;
+    if (!isKnownField(field)) {
+      warnings.push(`Unknown field \`${field}\`: it will never match.`);
+      return;
+    }
+    if (node.expression.type !== "LiteralExpression") return;
+    const value = String(node.expression.value);
+    const known = knownValuesOf(field);
+    if (known && !value.includes("*") && !known.includes(value.toLowerCase())) {
+      warnings.push(
+        `\`${field}\` is never \`${value}\`: expected one of ${known.join(", ")}.`,
+      );
+    }
+  });
+  return { error: null, warnings };
+}
+
+/** True when a query is set, parses, and carries nothing suspicious. */
+export function queryIsValid(query: string | null): boolean {
+  const q = query ?? "";
+  if (stripAtSigils(q).trim().length === 0) return false;
+  const check = checkQuery(q);
+  return check.error === null && check.warnings.length === 0;
 }

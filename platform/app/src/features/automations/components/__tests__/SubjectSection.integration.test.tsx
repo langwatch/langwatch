@@ -469,6 +469,65 @@ describe("SubjectSection", () => {
     });
   });
 
+  describe("given a trace query typed in the Code tab", () => {
+    const seedQuery = (filterQuery: string) =>
+      useAutomationStore.getState().hydrate({
+        ...INITIAL_DRAFT,
+        source: "trace",
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        filterQuery,
+      });
+
+    describe("when the query cannot parse", () => {
+      /** @scenario "The Code tab only marks a query answered when it parses" */
+      it("shows the parse error inline and no answered check", () => {
+        seedQuery("status:error AND (model:gpt");
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByRole("alert")).toHaveTextContent(/./);
+        expect(screen.queryByRole("img", { name: "Answered" })).toBeNull();
+      });
+    });
+
+    describe("when a clause names a value its field never has", () => {
+      /** @scenario "The Code tab only marks a query answered when it parses" */
+      it("warns that it never matches and shows no answered check", () => {
+        seedQuery("status:error#simplified");
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByRole("status")).toHaveTextContent(
+          "`status` is never `error#simplified`: expected one of error, warning, ok.",
+        );
+        expect(screen.queryByRole("img", { name: "Answered" })).toBeNull();
+      });
+    });
+
+    describe("when a clause names an unknown field", () => {
+      it("warns that the field is unknown", () => {
+        seedQuery("stauts:error");
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByRole("status")).toHaveTextContent(
+          "Unknown field `stauts`",
+        );
+      });
+    });
+
+    describe("when the query parses and names real fields", () => {
+      /** @scenario "The Code tab only marks a query answered when it parses" */
+      it("marks the section answered and says nothing more", () => {
+        seedQuery("status:error AND trace.attribute.plan:pro");
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.getByRole("img", { name: "Answered" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(screen.queryByRole("status")).toBeNull();
+      });
+    });
+  });
+
   describe("given the condition preview failed", () => {
     /** @scenario "A failed preview shows nothing and never blocks saving" */
     it("says nothing and leaves the draft alone", () => {

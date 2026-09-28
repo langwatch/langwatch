@@ -7,6 +7,7 @@ import {
   filtersAreSet,
   isNotifyAction,
   subjectIsSet,
+  subjectIsValid,
 } from "./draftReducer";
 import { watchSummary, watchSummaryLine } from "./watchSummary";
 
@@ -74,7 +75,7 @@ export function stepIsComplete({
     case "watch":
       // For a graph the threshold rule is part of what it watches, so the
       // step is only answered once the rule is too.
-      return subjectIsSet(draft) && cadenceIsSet(draft);
+      return subjectIsValid(draft) && cadenceIsSet(draft);
     case "delivery":
       return configIsComplete(draft);
     case "review":

@@ -13,6 +13,8 @@ import { Calendar, TrendingUp } from "react-feather";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";
+import { MatchesEveryTraceNotice } from "~/features/automations/components/MatchesEveryTraceNotice";
+import { EmailList } from "~/features/automations/components/page/AutomationTableCells";
 import { HistorySection } from "~/features/automations/components/view/HistorySection";
 import { MatchingTracesSection } from "~/features/automations/components/view/MatchingTracesSection";
 import { NextFiringSection } from "~/features/automations/components/view/NextFiringSection";
@@ -21,6 +23,7 @@ import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
+import { matchesEveryTrace } from "~/features/automations/logic/matchesEveryTrace";
 import {
   isAutomationPauseReason,
   RUNAWAY_PAUSE_EXPLANATION,
@@ -72,6 +75,14 @@ export function ViewAutomationDrawer({
   // trace search query (ADR-043). A graph alert watches a metric, and a
   // legacy `filters` row has no query to run — both simply get no control.
   const traceQuery = !isGraphAlert ? (trigger?.filterQuery ?? null) : null;
+  const unconditioned =
+    !!trigger &&
+    !isGraphAlert &&
+    !isSchedule &&
+    matchesEveryTrace({
+      filterQuery: trigger.filterQuery,
+      filters: trigger.filters,
+    });
 
   // Resolve the watched graph's JSON so the stored series key renders as its
   // human label (falls back to the raw key when the graph is gone), and the
@@ -124,8 +135,8 @@ export function ViewAutomationDrawer({
       }
       case "SEND_EMAIL":
         return actionParams.members?.length ? (
-          <Text textStyle="sm" wordBreak="break-all">
-            {actionParams.members.join(", ")}
+          <Text textStyle="sm" overflowWrap="anywhere">
+            <EmailList emails={actionParams.members} />
           </Text>
         ) : null;
       case "SEND_WEBHOOK": {
@@ -202,9 +213,16 @@ export function ViewAutomationDrawer({
     if (trigger.filters && typeof trigger.filters === "string") {
       const parsed = parseFiltersObject(trigger.filters);
       if (parsed && Object.keys(parsed).length > 0) {
-        return <FilterDisplay filters={trigger.filters} hasBorder={true} />;
+        return (
+          <FilterDisplay
+            filters={trigger.filters}
+            hasBorder={true}
+            shouldClampValues={false}
+          />
+        );
       }
     }
+    if (unconditioned) return <MatchesEveryTraceNotice />;
     return (
       <Text textStyle="sm" color="fg.muted">
         No conditions
@@ -317,6 +335,7 @@ export function ViewAutomationDrawer({
                 projectId={project?.id ?? ""}
                 isGraphAlert={isGraphAlert}
                 canRunConditions={!!traceQuery}
+                matchesEveryTrace={unconditioned}
               />
             ) : null}
 

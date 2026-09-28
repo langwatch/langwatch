@@ -35,6 +35,7 @@ import { AutomationsHistory } from "~/features/automations/components/page/Autom
 import {
   AutomationRow,
   describeSchedule,
+  EmailList,
   EmptyHint,
   MetricHeader,
   ReportRunCells,
@@ -350,7 +351,7 @@ function AutomationsPage() {
       case "SEND_SLACK_MESSAGE":
         return <SlackNotifyCell actionParams={actionParams} />;
       case "SEND_EMAIL":
-        return (actionParams as { members: string[] }).members?.join(", ");
+        return <EmailList emails={actionParams.members ?? []} />;
       case "ADD_TO_DATASET":
         return getDatasetName(actionParams) ?? "";
     }

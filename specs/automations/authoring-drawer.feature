@@ -243,6 +243,16 @@ Feature: Staged automation authoring drawer
       Then the user selects the target dataset
       And no template section is shown
 
+    # The mapping decides what each row carries; no other screen edits an
+    # automation's mapping, so the delivery step has to.
+    @integration
+    Scenario: The dataset delivery step edits the column mapping it saves
+      Given the user is configuring an add-to-dataset action on a dataset with columns
+      When the dataset is chosen
+      Then a mapping editor shows each column with the trace field that fills it, starting from the automatic match
+      And the columns still filled from the metadata key of the same name are named
+      And an edited mapping is saved with the automation and shown again when it is reopened
+
     # A project with no dataset has nothing to select, so the create
     # affordance is the only way out of the section. Creation is the dataset
     # drawer's job, so the section hands over to it and comes back.
@@ -521,3 +531,19 @@ Feature: Staged automation authoring drawer
       When the user opens the automation's detail panel
       Then the panel shows the template-error warning
       And the panel shows any missing variable names from that dispatch
+
+  Rule: The trace query is only marked answered when it can match
+
+    @integration
+    Scenario: A trace-explorer link opens the automation drawer with only the filter it carries
+      Given a trace-explorer link to "/traces?drawer.open=automation&drawer.initialFilterQuery=status%3Aerror#simplified"
+      When the user follows it
+      Then the automation drawer opens with the condition "status:error"
+      And the "#simplified" fragment is not part of the condition
+
+    @unit @integration
+    Scenario: The Code tab only marks a query answered when it parses
+      Given the user is editing the trace condition as code
+      When the query cannot parse, names an unknown field, or names a value its field never has
+      Then the reason shows under the editor
+      And "Which traces" shows no answered check until the query is clean

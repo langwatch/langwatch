@@ -14,6 +14,7 @@ import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
+import { Fragment } from "react";
 import { HelpCircle, Plus } from "react-feather";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
@@ -23,6 +24,7 @@ import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
+import { matchesEveryTrace } from "~/features/automations/logic/matchesEveryTrace";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { useSwitchToProjectIntegration } from "~/features/automations/logic/useSwitchToProjectIntegration";
@@ -32,6 +34,7 @@ import { automationContextChip } from "~/features/langy/logic/langyContextChips"
 import type { Monitor, TriggerAction } from "~/generated/prisma/client";
 import type { RouterOutputs } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { MatchesEveryTraceNotice } from "../MatchesEveryTraceNotice";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 type TriggerStats = RouterOutputs["automation"]["getTriggerStats"][number];
@@ -448,6 +451,27 @@ export function GraphWatchCell({
   );
 }
 
+/** Email addresses that wrap at their seams (after `@`, before a `.`) rather
+ *  than mid-word, so a narrow Delivery cell never reads "haven.loca / lhost". */
+export function EmailList({ emails }: { emails: string[] }) {
+  return (
+    <>
+      {emails.map((email, i) => (
+        <Fragment key={`${i}-${email}`}>
+          {i > 0 ? ", " : null}
+          <span>
+            {email
+              .split(/(?=\.)|(?<=@)/)
+              .flatMap((part, j) =>
+                j === 0 ? [part] : [<wbr key={`${j}-${part}`} />, part],
+              )}
+          </span>
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
 /** The firing rule under a graph-watching row's "Watches" cell. Mirrors the
  *  dashboard "Configure Alert" copy (`greater than`, `over 5 minutes`) so both
  *  creation paths read the same. */
@@ -491,11 +515,17 @@ export function TraceFilterCell({
   filters: unknown;
   applyChecks: (checks: Monitor[]) => React.ReactNode;
 }) {
+  const unconditioned = matchesEveryTrace({
+    filterQuery,
+    filters,
+    checkCount: checks.length,
+  });
   return (
     <VStack gap={2} align="stretch" minWidth={0}>
       <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
         Trace filter
       </Text>
+      {unconditioned ? <MatchesEveryTraceNotice /> : null}
       {applyChecks(checks)}
       {filterQuery ? (
         // ADR-043: a trace-subject automation shows its search query.
@@ -511,7 +541,11 @@ export function TraceFilterCell({
           </Code>
         </HoverableBigText>
       ) : filters && typeof filters === "string" && filters !== "{}" ? (
-        <FilterDisplay filters={filters} hasBorder={true} />
+        <FilterDisplay
+          filters={filters}
+          hasBorder={true}
+          shouldClampValues={false}
+        />
       ) : null}
     </VStack>
   );

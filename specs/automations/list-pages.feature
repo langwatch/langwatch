@@ -99,3 +99,36 @@ Feature: Automations list pages, providers, and shared copy
       When the user searches the field list
       Then "tokensEstimated" is never offered as its own field
       And searching "estimated" surfaces "tokens" instead
+
+  Rule: A condition that can never match, or matches everything, says so
+
+    A stored structured filter on a keyed field (`metadata.value`,
+    `evaluations.passed`) selects by a key. Stored as a bare list it names no
+    key, so it can never match; stored nested it must still say which key it
+    reads. An automation with no condition at all acts on every trace.
+
+    @unit @integration
+    Scenario: A keyed filter chip names its key
+      Given an automation whose filter is {"metadata.value": {"plan": ["true"]}}
+      When its conditions render in the list or the drawer
+      Then the chip reads "Metadata · plan" with the value "true"
+
+    @unit @integration
+    Scenario: A keyed filter stored without its key is flagged as never matching
+      Given an automation whose filter is {"metadata.value": ["true"]}
+      When its conditions render in the list or the drawer
+      Then the chip is a warning reading "never matches: needs a metadata key"
+      And its tooltip shows the nested shape the condition needed
+
+    @integration
+    Scenario: An automation with no condition is flagged as matching every trace
+      Given a trace automation with no query, empty filters and no checks
+      When it renders in the list or the drawer
+      Then it is flagged "Matches every trace" in a warning tone
+      And the drawer's history does not claim it only acts on matching traces
+
+    @integration
+    Scenario: The Delivery column never breaks an email address mid-word
+      Given an email automation delivering to a long address
+      When the Delivery cell is too narrow for it
+      Then the address wraps after the "@" or before a "." and not mid-word

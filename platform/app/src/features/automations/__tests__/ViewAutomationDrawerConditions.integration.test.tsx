@@ -3,7 +3,7 @@
  *
  * The View drawer's Conditions section: a query-subject automation shows its
  * search query (ADR-043), legacy structured filters render via FilterDisplay,
- * and an automation with neither shows the "No conditions" empty state (the
+ * and an automation with neither is flagged as matching every trace (the
  * stored `filters` string is "{}" for query automations, which is truthy, so
  * emptiness must be judged on the parsed object).
  */
@@ -172,11 +172,26 @@ describe("ViewAutomationDrawer conditions section", () => {
     });
 
     describe("when the drawer renders", () => {
-      it("shows the no-conditions empty state", () => {
+      /** @scenario "An automation with no condition is flagged as matching every trace" */
+      it("warns that it matches every trace", () => {
         renderDrawer();
 
-        expect(screen.getByText("No conditions")).toBeDefined();
+        expect(screen.getByTestId("matches-every-trace")).toHaveTextContent(
+          "Matches every trace",
+        );
         expect(screen.queryByTestId("filter-display")).toBeNull();
+      });
+
+      /** @scenario "An automation with no condition is flagged as matching every trace" */
+      it("does not claim in its history that it only acts on matching traces", () => {
+        renderDrawer();
+
+        expect(
+          screen.getByText(
+            /It has no condition, so it will act on every trace/,
+          ),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/only acts on traces that match/)).toBeNull();
       });
     });
   });

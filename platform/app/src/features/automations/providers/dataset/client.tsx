@@ -4,12 +4,17 @@ import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
 import { DatasetSelector } from "~/components/datasets/DatasetSelector";
+import { TracesMapping } from "~/components/traces/TracesMapping";
 import type { Dataset } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import {
   type DatasetColumns,
   datasetColumnsSchema,
 } from "~/server/datasets/types";
+import {
+  type MappingState,
+  mappingStateSchema,
+} from "~/server/tracer/tracesMapping";
 import { api } from "~/utils/api";
 import { keepDraftOnSubFlowReturn } from "../../state/subFlow";
 import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../types";
@@ -92,6 +97,17 @@ function columnsOf(dataset: Dataset | undefined): DatasetColumns {
   return parsed.success ? parsed.data : [];
 }
 
+/** Columns whose mapping is still the fallback: the trace metadata key with
+ *  the column's own name. Worth naming, since a trace without that key leaves
+ *  the column empty. */
+export function metadataFallbackColumns(mapping: DatasetMapping): string[] {
+  return Object.entries(mapping.mapping)
+    .filter(
+      ([column, entry]) => entry.source === "metadata" && entry.key === column,
+    )
+    .map(([column]) => column);
+}
+
 function hasMapping(mapping: DatasetMapping): boolean {
   return Object.keys(mapping.mapping).length > 0;
 }
@@ -142,10 +158,8 @@ function DatasetConfigForm({
   );
   const { openDrawer, goBack } = useDrawer();
 
-  // Picking a dataset derives a default column mapping from that dataset's
-  // columns and stores it on the slice, so the saved trigger carries a
-  // non-empty mapping. The dataset-view editor can refine it later; here we
-  // guarantee rows are never written blank.
+  // Picking a dataset derives a default column mapping from its columns, so
+  // the saved trigger never writes blank rows; the editor below refines it.
   const selectDataset = (datasetId: string) => {
     const dataset = datasets.data?.find((d) => d.id === datasetId);
     onChange({
@@ -181,10 +195,16 @@ function DatasetConfigForm({
         setValue={(_field: string, value: string) => selectDataset(value)}
         onCreateNew={openDatasetCreation}
       />
-      <Text color="fg.muted" textStyle="xs">
-        Columns map to the matching trace fields automatically; refine the
-        mapping from the dataset view after creating.
-      </Text>
+      {slice.datasetId && hasMapping(slice.mapping) ? (
+        <DatasetMappingEditor
+          key={slice.datasetId}
+          columns={columnsOf(
+            datasets.data?.find((d) => d.id === slice.datasetId),
+          ).map((column) => column.name)}
+          mapping={slice.mapping}
+          onMappingChange={(mapping) => onChange({ ...slice, mapping })}
+        />
+      ) : null}
     </VStack>
   );
 
@@ -225,6 +245,54 @@ function DatasetConfigForm({
       },
     });
   }
+}
+
+/**
+ * Which trace field fills each dataset column, saved with the automation. The
+ * same editor the traces view uses to add rows by hand, started from the
+ * automatic mapping and bound to the slice, so reopening shows what was saved.
+ */
+function DatasetMappingEditor({
+  columns,
+  mapping,
+  onMappingChange,
+}: {
+  columns: string[];
+  mapping: DatasetMapping;
+  onMappingChange: (mapping: DatasetMapping) => void;
+}) {
+  const parsed = mappingStateSchema.safeParse(mapping);
+  const fallbacks = metadataFallbackColumns(mapping);
+  const save = (next: MappingState) => {
+    if (JSON.stringify(next) === JSON.stringify(mapping)) return;
+    onMappingChange(next);
+  };
+
+  return (
+    <VStack align="stretch" gap={2} data-testid="dataset-mapping-editor">
+      <Text color="fg.muted" textStyle="xs">
+        Each column is filled from the trace field chosen for it. Columns start
+        matched by name; change any of them here, and the mapping is saved with
+        the automation.
+      </Text>
+      {columns.length > 0 ? (
+        <TracesMapping
+          traces={[]}
+          traceMapping={parsed.success ? parsed.data : undefined}
+          targetFields={columns}
+          setTraceMapping={save}
+          disableExpansions
+        />
+      ) : null}
+      {fallbacks.length > 0 ? (
+        <Text color="orange.fg" textStyle="xs" data-testid="metadata-fallback">
+          Filled from the trace metadata key with the same name:{" "}
+          {fallbacks.join(", ")}. A trace without that key leaves the column
+          empty, so pick the field it should come from.
+        </Text>
+      ) : null}
+    </VStack>
+  );
 }
 
 const client: ClientDef<DatasetSlice> = {

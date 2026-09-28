@@ -169,6 +169,17 @@ describe("given the project's Slack connection is still being checked", () => {
   });
 });
 
+describe("given the Slack card opens on the viewer's project", () => {
+  afterEach(cleanup);
+
+  /** @scenario "The Slack card names the project it configures" */
+  it("names that project in the picker's heading", () => {
+    renderPage();
+
+    expect(screen.getByText("Project · Checkout")).toBeInTheDocument();
+  });
+});
+
 describe("given a project whose Slack connection several automations post through", () => {
   beforeEach(() => {
     disconnectCalls.length = 0;

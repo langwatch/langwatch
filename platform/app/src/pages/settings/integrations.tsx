@@ -108,7 +108,9 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
       <VStack align="stretch" gap={6} padding={6} maxWidth="720px">
         <Heading size="md">Integrations</Heading>
         <SlackIntegrationCard />
-        {!canManageOrganization ? null : (
+        {!canManageOrganization ? (
+          <LangyCodeAccessPreference standalone />
+        ) : (
           <Card.Root id="github">
             <Card.Body>
               <VStack align="stretch" gap={3}>
@@ -178,7 +180,13 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
  * choice is made in the chat, so this line only appears once one is stored,
  * and its one job is to let the reader take it back.
  */
-function LangyCodeAccessPreference() {
+function LangyCodeAccessPreference({
+  standalone = false,
+}: {
+  /** Outside the manager-only GitHub card: its own card, so every member
+   *  can see and clear their project's choice. */
+  standalone?: boolean;
+}) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
   const preference = api.langy.getCodeAccessPreference.useQuery(
@@ -193,13 +201,13 @@ function LangyCodeAccessPreference() {
 
   if (preference.data?.preference !== "github" || !projectId) return null;
 
-  return (
+  const line = (
     <HStack
       gap={3}
       justifyContent="space-between"
-      borderTopWidth="1px"
+      borderTopWidth={standalone ? "0" : "1px"}
       borderColor="border.muted"
-      paddingTop={3}
+      paddingTop={standalone ? 0 : 3}
     >
       <Text fontSize="sm" color="fg.muted">
         Langy uses GitHub for code changes
@@ -213,6 +221,20 @@ function LangyCodeAccessPreference() {
         Change
       </Button>
     </HStack>
+  );
+  if (!standalone) return line;
+  return (
+    <Card.Root id="langy-code-access">
+      <Card.Body>
+        <VStack align="stretch" gap={2}>
+          <HStack gap={2}>
+            <GitHub size={18} />
+            <Heading size="sm">Langy code access</Heading>
+          </HStack>
+          {line}
+        </VStack>
+      </Card.Body>
+    </Card.Root>
   );
 }
 
@@ -356,8 +378,8 @@ function SlackIntegrationCard() {
   const selectedProjectName = useMemo(
     () =>
       availableProjects.find((candidate) => candidate.id === selectedProjectId)
-        ?.name ?? null,
-    [availableProjects, selectedProjectId],
+        ?.name ?? (project?.id === selectedProjectId ? project.name : null),
+    [availableProjects, selectedProjectId, project],
   );
 
   return (
@@ -383,7 +405,11 @@ function SlackIntegrationCard() {
             availableProjects={availableProjects}
             allowedScopeTypes={["PROJECT"]}
             singleSelect
-            label="Project"
+            label={
+              selectedProjectName
+                ? `Project · ${selectedProjectName}`
+                : "Project"
+            }
           />
           {selectedProjectId ? (
             // Keyed on the project so switching the picker remounts the form.

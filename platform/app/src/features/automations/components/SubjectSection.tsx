@@ -31,7 +31,7 @@ import {
 import { api } from "~/utils/api";
 import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import { queryIsStructurable } from "../logic/conditionQuery";
+import { checkQuery, queryIsStructurable } from "../logic/conditionQuery";
 import { type DailyCapAdvice, dailyCapAdvice } from "../logic/dailyCapAdvice";
 import {
   type AutomationDraft,
@@ -40,6 +40,7 @@ import {
   isNotifyAction,
   type ReportSourceKind,
   subjectIsSet,
+  subjectIsValid,
 } from "../logic/draftReducer";
 import { estimateFiringRate, estimateRatePerDay } from "../logic/firingRate";
 import { deriveSeriesOptionsFromGraph } from "../logic/seriesOptions";
@@ -116,7 +117,7 @@ export function SubjectSection({
       title={title}
       help={SUBJECT_HELP[draft.source]}
       accordion={accordion}
-      complete={subjectIsSet(draft)}
+      complete={subjectIsValid(draft)}
       summary={subjectSummary(draft)}
     >
       {draft.source === "customGraph" ? (
@@ -635,6 +636,12 @@ function TraceQuerySubject({
   }, [query]);
 
   const trimmed = debounced.trim();
+  // A query the parser rejects is reported inline; the preview would only
+  // repeat the same failure as a server error.
+  const debouncedParses = useMemo(
+    () => checkQuery(debounced).error === null,
+    [debounced],
+  );
   const timeRange = useMemo(() => {
     const to = Date.now();
     return { from: to - PREVIEW_WINDOW_MS, to };
@@ -650,7 +657,10 @@ function TraceQuerySubject({
       pageSize: 5,
       query: trimmed,
     },
-    { enabled: !!projectId && trimmed.length > 0, ...PREVIEW_LIST_OPTIONS },
+    {
+      enabled: !!projectId && trimmed.length > 0 && debouncedParses,
+      ...PREVIEW_LIST_OPTIONS,
+    },
   );
 
   // The plan's daily ceiling on persist actions, read once and held: it moves
@@ -732,20 +742,46 @@ function TraceQuerySubject({
           </HStack>
         </VStack>
       )}
-      <TracePreview
-        trimmed={trimmed}
-        fetching={preview.isFetching}
-        hasData={preview.data != null}
-        error={preview.error}
-        totalHits={preview.data?.totalHits ?? null}
-        sample={preview.data?.items ?? []}
-        cadence={cadence}
-        canBatch={canBatch}
-        showFiringRate={purpose === "automation"}
-        requireQuery={purpose === "automation"}
-        setupComplete={configComplete}
-        capAdvice={capAdvice}
-      />
+      <QueryCheckNotice query={debounced} />
+      {debouncedParses ? (
+        <TracePreview
+          trimmed={trimmed}
+          fetching={preview.isFetching}
+          hasData={preview.data != null}
+          error={preview.error}
+          totalHits={preview.data?.totalHits ?? null}
+          sample={preview.data?.items ?? []}
+          cadence={cadence}
+          canBatch={canBatch}
+          showFiringRate={purpose === "automation"}
+          requireQuery={purpose === "automation"}
+          setupComplete={configComplete}
+          capAdvice={capAdvice}
+        />
+      ) : null}
+    </VStack>
+  );
+}
+
+/** The query's own verdict, before the preview's server round trip: a parse
+ *  error in red, a clause that can never match in orange. */
+function QueryCheckNotice({ query }: { query: string }) {
+  const check = useMemo(() => checkQuery(query), [query]);
+  if (check.error) {
+    return (
+      <Text textStyle="xs" color="fg.error" role="alert">
+        {check.error}
+      </Text>
+    );
+  }
+  if (check.warnings.length === 0) return null;
+  return (
+    <VStack align="stretch" gap={0.5} role="status">
+      {check.warnings.map((warning) => (
+        <Text key={warning} textStyle="xs" color="orange.fg">
+          {warning}
+        </Text>
+      ))}
     </VStack>
   );
 }

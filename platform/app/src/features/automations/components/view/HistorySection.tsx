@@ -34,6 +34,7 @@ export function HistorySection({
   projectId,
   isGraphAlert,
   canRunConditions,
+  matchesEveryTrace = false,
 }: {
   automationId: string;
   projectId: string;
@@ -41,6 +42,8 @@ export function HistorySection({
   /** Whether the drawer is also offering to run the conditions now — the
    *  empty state points at that control only when it exists. */
   canRunConditions: boolean;
+  /** No condition at all: the empty state must not promise it filters. */
+  matchesEveryTrace?: boolean;
 }) {
   const historyQuery = api.automation.getFireHistory.useInfiniteQuery(
     { projectId, triggerId: automationId, limit: FIRE_PAGE_SIZE },
@@ -76,6 +79,7 @@ export function HistorySection({
         <EmptyHistory
           isGraphAlert={isGraphAlert}
           canRunConditions={canRunConditions}
+          matchesEveryTrace={matchesEveryTrace}
         />
       ) : (
         <Timeline
@@ -225,15 +229,25 @@ function TimelineRow({
 function EmptyHistory({
   isGraphAlert,
   canRunConditions,
+  matchesEveryTrace,
 }: {
   isGraphAlert: boolean;
   canRunConditions: boolean;
+  matchesEveryTrace: boolean;
 }) {
   if (isGraphAlert) {
     return (
       <Text textStyle="sm" color="fg.muted">
         This automation has not fired yet, and has not been checked yet either.
         It is checked as data arrives for the graph it watches.
+      </Text>
+    );
+  }
+  if (matchesEveryTrace) {
+    return (
+      <Text textStyle="sm" color="fg.muted">
+        This automation has not fired yet. It has no condition, so it will act
+        on every trace that arrives.
       </Text>
     );
   }
