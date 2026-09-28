@@ -44,6 +44,7 @@ describe("TraceApi.renderThreadTranscript", () => {
     it("renders the conversation heading and every turn in the order given", async () => {
       const transcript = await createTraceApp().renderThreadTranscript({
         threadKey: "thread-7",
+        view: "conversation",
         traces: [
           trace({
             trace_id: "trace-1",
@@ -74,6 +75,7 @@ describe("TraceApi.renderThreadTranscript", () => {
     it("reads the reply from the trace's chosen LLM span", async () => {
       const transcript = await createTraceApp().renderThreadTranscript({
         threadKey: "thread-7",
+        view: "conversation",
         traces: [
           trace({
             input: { value: "" },
@@ -111,6 +113,7 @@ describe("TraceApi.renderThreadTranscript", () => {
 
       const transcript = await createTraceApp().renderThreadTranscript({
         threadKey: "thread-7",
+        view: "conversation",
         traces,
         maxTokens: 600,
       });

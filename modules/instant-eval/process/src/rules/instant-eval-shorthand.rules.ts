@@ -259,13 +259,13 @@ const TEMPLATES: Readonly<Record<InstantEvalTarget, TargetTemplate>> = {
     conditions: ["m.ConversationId != ''"],
     groupBy: "m.ConversationId",
     orderBy: "ThreadId",
-    // Bounded at everything the judge's state leaves, so an ordinary
-    // conversation reaches it whole and a long one is shortened turn by turn
-    // rather than cut in its middle.
+    // The steps view, bounded at everything the judge's state leaves: judged
+    // on judge-lab it answers conversation questions as well as the chat-like
+    // transcript and questions about tools far better (langwatch#8335).
     text: (budget) =>
-      `conversation_bounded(m.ConversationId, ${sqlInteger(
+      `llm_readable_thread(m.ConversationId, ${sqlInteger(
         instantEvalTranscriptRenderTokens({ textBudgetTokens: budget.availableTokens }),
-      )}, '')`,
+      )})`,
     filterPlacement: "trace-subquery",
     filterTraceColumn: "m.TraceId",
   },

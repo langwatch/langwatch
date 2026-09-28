@@ -95,10 +95,9 @@ const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
 export type ConversationView = "conversation" | "steps";
 
 /**
- * The one line the conversation view keeps of a turn's steps: the tools it
- * used, in order of first use, a repeat counted rather than listed. Names only:
- * measured on judge-lab, argument hints cost up to twice the tokens on coding
- * sessions for no accuracy. Empty when the turn used none.
+ * The conversation view's one line of a turn's steps: the tools it used, in
+ * order, a repeat counted. Names only: on judge-lab, argument hints doubled the
+ * tokens of coding sessions for no accuracy. Empty when it used none.
  */
 export function renderToolLine({ steps }: { steps: readonly ConversationStep[] }): string {
   const used = steps.filter(
