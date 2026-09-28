@@ -36,12 +36,12 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/prisma-client": "workspace:*",
     "@langwatch/time": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
