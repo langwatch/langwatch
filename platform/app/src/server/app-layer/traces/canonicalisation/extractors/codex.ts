@@ -62,10 +62,7 @@ import {
   CODEX_PROVIDER_KEY,
   isCodexModel,
 } from "~/server/modelProviders/codexRestrictions";
-import {
-  CODEX_EXEC_SCOPE,
-  isCodexScope,
-} from "../../coding-agent-span-filter";
+import { CODEX_EXEC_SCOPE, isCodexScope } from "../../coding-agent-span-filter";
 import { ATTR_KEYS } from "./_constants";
 import type {
   CanonicalAttributesExtractor,
