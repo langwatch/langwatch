@@ -25,6 +25,15 @@ import {
   TraceCanonicalisationService as TraceCanonicalisationServiceContract,
 } from "@langwatch/trace-contract";
 
+import {
+  type AttributeCanonicaliser,
+  canonicalLogRecordStore,
+  canonicalSpanStore,
+  type ExtractorContext,
+  type LogExtractorContext,
+  remainingAttributes,
+  remainingEvents,
+} from "../rules/canonical-attributes.rules.ts";
 import { parseJsonStringValues } from "../rules/canonical-json.rules.ts";
 import {
   extractLastUserMessageText,
@@ -34,12 +43,6 @@ import {
   claudeCacheWritesLongLived,
   isConversationalQuerySource,
 } from "../rules/claude-code-call-policy.rules.ts";
-import type {
-  ExtractorContext,
-  LogExtractorContext,
-  AttributeCanonicaliser,
-} from "./canonical-attributes.service.ts";
-import { CanonicalLogRecordStore, CanonicalSpanStore } from "./canonical-attributes.service.ts";
 import { ClaudeCodeCanonicaliserService } from "./claude-code-canonicaliser.service.ts";
 import { ClaudeCodeRequestService } from "./claude-code-request.service.ts";
 import { ClaudeCodeResponseService } from "./claude-code-response.service.ts";
@@ -97,7 +100,7 @@ export class TraceCanonicalisationService extends TraceCanonicalisationServiceCo
     input: CanonicalizeSpanAttributesInput,
   ): CanonicalizeSpanAttributesResult {
     const parsed = canonicalizeSpanAttributesInputSchema.parse(input);
-    const bag = CanonicalSpanStore.create({
+    const bag = canonicalSpanStore({
       spanAttributes: parseJsonStringValues(parsed.spanAttributes),
       events: parsed.events,
     });
@@ -134,20 +137,20 @@ export class TraceCanonicalisationService extends TraceCanonicalisationServiceCo
     }
 
     const merged: ExtractorContext["out"] = {
-      ...bag.attrs.remaining(),
+      ...remainingAttributes(bag.attrs),
       ...out,
     };
 
     return canonicalizeSpanAttributesResultSchema.parse({
       attributes: merged,
-      events: bag.events.remaining(),
+      events: remainingEvents(bag.events),
       appliedRules,
     });
   }
 
   canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult {
     const parsed = canonicalizeLogRecordInputSchema.parse(input);
-    const bag = CanonicalLogRecordStore.create({
+    const bag = canonicalLogRecordStore({
       scopeName: parsed.scopeName,
       body: parsed.body,
       attributes: parseJsonStringValues(parsed.attributes),

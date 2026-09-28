@@ -1,12 +1,12 @@
 import { Socket } from "node:net";
 
 import { createLogger } from "@langwatch/observability";
-import type { VoiceMediaUpgrade } from "@langwatch/scenario-contract";
-
 import {
   VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE,
+  type VoiceMediaUpgrade,
   type VoiceMediaUpgradeRefusedMessage,
-} from "../channels/voice-nonce-handoff.channels.ts";
+} from "@langwatch/scenario-contract";
+
 import { handOffVoiceSocket } from "../channels/voice-socket-handoff.channels.ts";
 import type { VoiceNonceRegistryService } from "./voice-nonce-registry.service.ts";
 

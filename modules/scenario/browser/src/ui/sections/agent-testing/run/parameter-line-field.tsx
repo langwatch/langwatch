@@ -59,42 +59,41 @@ export function ParameterLineField({
 
   return (
     <Box position="relative" flex={flex} minWidth={minWidth}>
-      <Input
-        {...DIALOG_FIELD_STYLE}
-        ref={inputRef}
-        width="full"
-        fontFamily="mono"
-        fontSize="12px"
-        autoComplete="off"
-        spellCheck={false}
-        aria-label={ariaLabel}
-        aria-invalid={error ? true : undefined}
-        aria-expanded={list.isListOpen}
-        aria-autocomplete="list"
-        role="combobox"
-        aria-controls={list.isListOpen ? listboxId : undefined}
-        aria-activedescendant={
-          list.isListOpen && list.items[activeIndex] ? optionId(activeIndex) : undefined
-        }
-        placeholder={placeholder}
-        value={value}
-        disabled={disabled}
-        onChange={(event) =>
-          list.edit({
-            text: event.target.value,
-            at: event.target.selectionStart ?? event.target.value.length,
-          })
-        }
-        onKeyDown={list.onKeyDown}
-        onKeyUp={list.syncCursor}
-        onClick={list.syncCursor}
-        onFocus={() => {
-          list.syncCursor();
-          list.open();
-        }}
-        onBlur={list.closeAfterBlur}
-        data-testid={testId}
-      />
+      {/* A native input carries the ARIA 1.2 combobox role; Input lends it the field's look. */}
+      <Input {...DIALOG_FIELD_STYLE} asChild width="full" fontFamily="mono" fontSize="12px">
+        <input
+          ref={inputRef}
+          autoComplete="off"
+          spellCheck={false}
+          aria-label={ariaLabel}
+          aria-invalid={error ? true : undefined}
+          aria-expanded={list.isListOpen}
+          aria-autocomplete="list"
+          role="combobox"
+          aria-controls={list.isListOpen ? listboxId : undefined}
+          aria-activedescendant={
+            list.isListOpen && list.items[activeIndex] ? optionId(activeIndex) : undefined
+          }
+          placeholder={placeholder}
+          value={value}
+          disabled={disabled}
+          onChange={(event) =>
+            list.edit({
+              text: event.target.value,
+              at: event.target.selectionStart ?? event.target.value.length,
+            })
+          }
+          onKeyDown={list.onKeyDown}
+          onKeyUp={list.syncCursor}
+          onClick={list.syncCursor}
+          onFocus={() => {
+            list.syncCursor();
+            list.open();
+          }}
+          onBlur={list.closeAfterBlur}
+          data-testid={testId}
+        />
+      </Input>
       {list.isListOpen && (
         <SuggestionPanel testId={`${testId}-suggestions`} listboxId={listboxId}>
           {list.items.map((row, index) => (
@@ -164,6 +163,8 @@ function ParameterSuggestionRowView({
         event.preventDefault();
         onSelect(row);
       }}
+      // The design system has no listbox option, and a native <option> holds text only.
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- rich row in an ARIA listbox
       role="option"
       aria-selected={isSelected}
       data-testid={`parameter-suggestion-${row.kind}-${row.value}`}

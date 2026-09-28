@@ -12,6 +12,7 @@ import {
   type organizationManagementRestMemberTeamSchema,
   OrganizationApi,
   type OrganizationCaller,
+  type OrganizationUpdatedMember,
   organizationManagementRestAccessBreakdownSchema,
   organizationManagementRestCreateInvitesSchema,
   organizationManagementRestCreatedInvitesSchema,
@@ -65,6 +66,14 @@ const memberWire = (member: {
   createdAt: toDate(member.createdAt),
   updatedAt: toDate(member.updatedAt),
   user: member.user,
+});
+
+/** The updated member, naming the teams a role change left without an admin when there are any. */
+const updatedMemberWire = (member: OrganizationUpdatedMember) => ({
+  ...memberWire(member),
+  ...(member.teamsLeftWithoutAdmin.length > 0
+    ? { teamsLeftWithoutAdmin: member.teamsLeftWithoutAdmin }
+    : {}),
 });
 
 /** The invite row fields this family reads, loosely typed against whatever the app hands back. */
@@ -246,37 +255,19 @@ export const organizationManagementRest: Readonly<{
       "Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan.",
   })
   .withMiddleware(organizationManagementEnterpriseGate)
-  .handle(async ({ app, input, scope, actor }) => {
-    const caller: OrganizationCaller | null = deriveCaller(actor);
-
-    let teamsLeftWithoutAdmin: { id: string; name: string }[] | undefined;
-    if (input.role !== undefined) {
-      const result = await app.changeMemberRole(
+  .handle(async ({ app, input, scope, actor }) =>
+    updatedMemberWire(
+      await app.updateMember(
         {
           organizationId: scope.id,
           userId: input.userId,
-          role: input.role as OrganizationUserRole,
-          ...(caller ? { planUser: caller } : {}),
+          role: input.role,
+          disabled: input.disabled,
         },
-        caller,
-      );
-      teamsLeftWithoutAdmin = [...result.teamsLeftWithoutAdmin];
-    } else {
-      await app.setMemberDisabled(
-        { organizationId: scope.id, userId: input.userId, disabled: input.disabled === true },
-        caller,
-      );
-    }
-
-    const member = await app.getMember({ organizationId: scope.id, userId: input.userId });
-
-    return {
-      ...memberWire(member),
-      ...(teamsLeftWithoutAdmin && teamsLeftWithoutAdmin.length > 0
-        ? { teamsLeftWithoutAdmin }
-        : {}),
-    };
-  })
+        deriveCaller(actor),
+      ),
+    ),
+  )
 
   .delete("/members/:userId", "removeOrganizationMember")
   .withPermission("organization:manage")

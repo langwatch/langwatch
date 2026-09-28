@@ -759,6 +759,29 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.InconclusiveCriteria).toEqual(["opens a ticket"]);
     });
 
+    /** @scenario "Met and unmet criteria are taken from the per-criterion verdicts when the lists are absent" */
+    it("derives the met, unmet and inconclusive lists from an event that sends only its verdicts", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "failure",
+            metCriteria: [],
+            unmetCriteria: [],
+            criteria: [
+              { criterion: "stays polite", status: "passed", reasoning: "Courteous." },
+              { criterion: "opens a ticket", status: "inconclusive", reasoning: "No spans." },
+              { criterion: "names the refund window", status: "failed", reasoning: "Never said." },
+            ],
+          },
+        }),
+      ]);
+
+      expect(state.MetCriteria).toEqual(["stays polite"]);
+      expect(state.UnmetCriteria).toEqual(["opens a ticket", "names the refund window"]);
+      expect(state.InconclusiveCriteria).toEqual(["opens a ticket"]);
+    });
+
     it("stores no inconclusive criteria when the event names none", () => {
       const state = foldEvents([
         createRunStartedEvent(),

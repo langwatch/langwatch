@@ -30,12 +30,25 @@ Feature: Per-criterion judge verdicts on scenario runs
     When the event is folded into the run
     Then that criterion is listed among the inconclusive criteria
 
+  @unit
+  Scenario: Met and unmet criteria are taken from the per-criterion verdicts when the lists are absent
+    Given a finished event carrying per-criterion verdicts and no met or unmet criteria lists
+    When the event is folded into the run
+    Then each passed criterion is listed among the met criteria
+    And each failed or inconclusive criterion is listed among the unmet criteria
+
   @integration
   Scenario: Per-criterion verdicts survive the run row
     Given a finished run stored with per-criterion verdicts
     When the run is read back
     Then each criterion reads back with its status, requirement and reasoning
     And a row written before the columns existed reads back with none
+
+  @integration
+  Scenario: A list read carries each criterion's requirement and reasoning
+    Given a finished run stored with per-criterion verdicts
+    When its scenario set or every suite is listed without whole conversations
+    Then each criterion reads back with its status, requirement and reasoning
 
   @unit
   Scenario: A run from an older SDK reads back with derived per-criterion results
@@ -48,7 +61,8 @@ Feature: Per-criterion judge verdicts on scenario runs
   Scenario: A criterion the per-criterion verdicts miss is derived from the lists
     Given a run whose per-criterion verdicts cover only some of its listed criteria
     When its per-criterion results are resolved
-    Then the stored verdicts come first and every missing criterion is derived from the lists
+    Then every missing criterion is derived from the lists
+    And the stored and derived criteria read in declared order
 
   @unit
   Scenario: The simulation runs API returns per-criterion results

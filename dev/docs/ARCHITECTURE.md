@@ -27,6 +27,11 @@ transport hosting, static serving, error formatting, lifecycle, signals,
 listeners, per-domain compositions, features trees — belongs to the framework
 packages below.
 
+`apps/scenario-child` is the one exception: a standalone program the scenario
+module spawns per run, which owns its own logic (adapters, turn execution) and
+reads the parent-child protocol from `@langwatch/scenario-contract` (Alex,
+2026-09-28).
+
 **The same code runs everywhere.** One `main.ts` per app, byte-identical
 across laptop, CI and production. Only the parsed environment differs. There
 is no dev-only branch anywhere in an app, because an app has nowhere to put
@@ -1097,6 +1102,12 @@ never thinks about resolution at all. The per-module resolver adapters
   port by the role that owns the children. The module resolves the public address itself, in its own
   app with an async create and a close, in the worker role only; other roles read it as
   `{ unavailable }`. It is never a module writing `process.env` (Alex, 2026-09-28).
+- Voice runs in a scenario child, the live "Talk to it" session included: the parent authenticates,
+  audits and bounds the session, then hands the socket to a child built for that one session (stripped
+  environment, egress policy, that session's credentials). On shutdown the parent admits nothing new
+  and each child ends its call cleanly, recorded as interrupted; phone jobs requeue. Every worker opens
+  a quick tunnel to the door port alone; nonces live in Redis and upgrades carry Twilio's signature
+  (Alex, 2026-09-28).
 - A protocol whose handler must write the raw Node response itself (hosted MCP's SDK transports) is a
   declared raw HTTP door, `RawHttpProtocol` (`@langwatch/api`): exact paths, prefixes claiming a path and
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
@@ -1414,8 +1425,10 @@ invented:
   The loader resolves a default-exported provider rendering
   `<SecretHostProvider value={host}>{children}</SecretHostProvider>`;
   `installedModuleHostMounts` collects every declared one in install order and
-  `createUiModuleHostStack` composes them into the root layout, below the
-  feature shell and below the router.
+  `createUiModuleHostStack` composes them inside the feature shell, below the
+  router, around both the page and the open drawer (`CurrentDrawer`): a drawer
+  reads the same hosts its screen does (moved out of the root layout in
+  cc00c8a30b, when drawers crashed without `ScenarioHostProvider`).
 
   Two constraints decided the position, and both rule out the alternative of
   wrapping the declaring module's own screen loaders:
@@ -1617,6 +1630,8 @@ const runtime = await createApp({ role: "api" }) // no server: nothing to tear d
   .withConfig({ annotation: {}, trace: {}, presence: {} })
 A test proving how code handles a wrong-typed input may cast it, marked `// wrong-typed input: <why>`
 directly above; the marker, not the test's name, excuses that one cast (Alex, 2026-09-27).
+Production code has no marker: a cast only the compiler cannot prove is listed by file and target,
+with its reason, in the stand-in-cast rule's audited boundaries (Alex, 2026-09-28).
   .withStores(memoryStores()) // branded → memory tier everywhere
   .boot();
 

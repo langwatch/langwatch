@@ -1,23 +1,6 @@
 import { type HandledError, handledErrorFromHerr } from "@langwatch/handled-error";
+import { goErrorEnvelopeSchema } from "@langwatch/scenario-contract";
 import { APICallError, RetryError } from "ai";
-import { z } from "zod";
-
-/**
- * nlpgo error envelope: `fault` is declared optional but never on wire; don't classify on it.
- * See scenario code-agent adapter's `parseErrorEnvelope`.
- */
-export const goErrorEnvelopeSchema = z.object({
-  error: z.object({
-    type: z.string(),
-    message: z.string().optional(),
-    meta: z.record(z.string(), z.unknown()).optional(),
-    trace_id: z.string().optional(),
-    span_id: z.string().optional(),
-    fault: z.enum(["customer", "platform", "provider"]).optional(),
-    tips: z.array(z.string()).optional(),
-    docs_url: z.string().optional(),
-  }),
-});
 
 /**
  * Maps AI SDK call failure to HandledError when response carries nlpgo's envelope.

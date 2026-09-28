@@ -2,9 +2,13 @@
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
+import {
+  type AttributeCanonicaliser,
+  type ExtractorContext,
+  takeAttribute,
+} from "../rules/canonical-attributes.rules.ts";
 import { ALLOWED_SPAN_TYPES } from "../rules/canonical-extraction.rules.ts";
 import { asNumber } from "../rules/canonical-guard.rules.ts";
-import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 export class OpenInferenceCanonicaliserService implements AttributeCanonicaliser {
   static create(): OpenInferenceCanonicaliserService {
@@ -25,7 +29,7 @@ export class OpenInferenceCanonicaliserService implements AttributeCanonicaliser
       return;
     }
 
-    const rawKind = attrs.take(ATTR_KEYS.OPENINFERENCE_SPAN_KIND);
+    const rawKind = takeAttribute(attrs, ATTR_KEYS.OPENINFERENCE_SPAN_KIND);
     const kind = typeof rawKind === "string" ? rawKind.toLowerCase() : null;
     if (kind && ALLOWED_SPAN_TYPES[kind] === true) {
       ctx.setAttr(ATTR_KEYS.SPAN_TYPE, kind);
@@ -37,19 +41,19 @@ export class OpenInferenceCanonicaliserService implements AttributeCanonicaliser
   private applyIdentity(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
 
-    const userId = attrs.take(ATTR_KEYS.OPENINFERENCE_USER_ID);
+    const userId = takeAttribute(attrs, ATTR_KEYS.OPENINFERENCE_USER_ID);
     if (typeof userId === "string" && userId.length > 0) {
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_USER_ID, userId);
       ctx.recordRule(`${this.id}:user.id`);
     }
 
-    const sessionId = attrs.take(ATTR_KEYS.OPENINFERENCE_SESSION_ID);
+    const sessionId = takeAttribute(attrs, ATTR_KEYS.OPENINFERENCE_SESSION_ID);
     if (typeof sessionId === "string" && sessionId.length > 0) {
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId);
       ctx.recordRule(`${this.id}:session.id`);
     }
 
-    const tags = attrs.take(ATTR_KEYS.OPENINFERENCE_TAG_TAGS);
+    const tags = takeAttribute(attrs, ATTR_KEYS.OPENINFERENCE_TAG_TAGS);
     if (tags !== void 0) {
       const labelsStr = typeof tags === "string" ? tags : JSON.stringify(tags);
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_LABELS, labelsStr);
@@ -70,14 +74,14 @@ export class OpenInferenceCanonicaliserService implements AttributeCanonicaliser
 
     let recordedAnyTokenCount = false;
     for (const [source, target] of counts) {
-      const value = asNumber(attrs.take(source));
+      const value = asNumber(takeAttribute(attrs, source));
       if (value !== null) {
         ctx.setAttrIfAbsent(target, value);
         recordedAnyTokenCount = true;
       }
     }
 
-    attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_TOTAL);
+    takeAttribute(attrs, ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_TOTAL);
 
     const detailCounts: [string, string][] = [
       [
@@ -94,7 +98,7 @@ export class OpenInferenceCanonicaliserService implements AttributeCanonicaliser
       ],
     ];
     for (const [source, target] of detailCounts) {
-      const value = asNumber(attrs.take(source));
+      const value = asNumber(takeAttribute(attrs, source));
       if (value !== null) {
         ctx.setAttrIfAbsent(target, value);
         recordedAnyTokenCount = true;

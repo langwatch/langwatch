@@ -1,3 +1,4 @@
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -22,6 +23,7 @@ function process(role: "api" | "worker") {
       dataset: createApiFixture<DatasetApi>({}),
       monitor: createApiFixture<MonitorApi>({}),
       annotation: createApiFixture<AnnotationApi>({}),
+      agent: createApiFixture<AgentApi>({}),
     });
 }
 

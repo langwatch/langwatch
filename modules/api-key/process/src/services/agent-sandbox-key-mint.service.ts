@@ -26,7 +26,7 @@ export const AGENT_SANDBOX_PERMISSIONS: readonly string[] = ["agentCache:manage"
 
 export class AgentSandboxKeyMintService {
   static create(options: {
-    apiKeys: ApiKeyApi;
+    apiKeys: Pick<ApiKeyApi, "create">;
     /** Resolves whose credential a personal workspace's key has to be. */
     projects: Pick<ProjectApi, "findPersonalWorkspaceOwner">;
     share: AgentSandboxKeyShareRepository;
@@ -35,7 +35,7 @@ export class AgentSandboxKeyMintService {
   }
 
   private constructor(
-    private readonly apiKeys: ApiKeyApi,
+    private readonly apiKeys: Pick<ApiKeyApi, "create">,
     private readonly projects: Pick<ProjectApi, "findPersonalWorkspaceOwner">,
     private readonly share: AgentSandboxKeyShareRepository,
   ) {}

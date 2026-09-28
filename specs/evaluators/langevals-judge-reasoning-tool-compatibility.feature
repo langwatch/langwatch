@@ -111,6 +111,12 @@ Feature: Evaluator judge reasoning and tool compatibility
     When the evaluator reads the answer
     Then the request is sent once more with a reminder to call the function
 
+  @unit
+  Scenario: A streamed judge call is sent once to a model that refuses a forced function call
+    Given an evaluator model that already refused a forced function call in this process
+    When the evaluator asks it to judge with a streamed answer
+    Then the request goes out once, with tool_choice "auto" and no reminder
+
   # Claude Sonnet 5 sometimes writes the rest of its call inside the first
   # text field ("...</reasoning><parameter name=\"result\">true"), leaving the
   # verdict field out. The verdict is never read out of that text: the judge
@@ -123,6 +129,7 @@ Feature: Evaluator judge reasoning and tool compatibility
     Then the request is sent once more with a reminder that every field is its own argument
     And the evaluation reaches a verdict from the second call
     And the cost covers both calls
+    And each call's own response keeps the usage the provider reported
 
   @unit
   Scenario: A judge whose call stays incomplete after the reminder fails with a clear error

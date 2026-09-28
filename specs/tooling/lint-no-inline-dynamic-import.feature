@@ -1,7 +1,9 @@
 Feature: The no-inline-dynamic-import lint rule
   An inline `import(...)` hides a dependency the reader expects to find at the
   top of the file. The places where loading late is the point are exempt: the
-  CLI and MCP server startup paths, the Google DLP channel, a web package's top-level entry files, the
+  CLI and MCP server startup paths, the Google DLP channel, the dev runtime's
+  backend entry (its boot guard must cover ESM link failures in the graph it loads),
+  a web package's top-level entry files, the
   UI application's routes and drawers, a component code-split through
   `lazy(() => import(...))`, and test files, where an import that follows
   `vi.mock` is what makes the mock apply.
@@ -29,6 +31,12 @@ Feature: The no-inline-dynamic-import lint rule
     Given the data-privacy Google DLP channel with an inline import()
     When the no-inline-dynamic-import rule runs over it
     Then it reports nothing, while a sibling channel is still reported
+
+  @unit
+  Scenario: The dev runtime's backend entry is exempt
+    Given tools/dev-runtime/src/backend.entrypoint.ts with an inline import()
+    When the no-inline-dynamic-import rule runs over it
+    Then it reports nothing, while a sibling dev-runtime file is still reported
 
   @unit
   Scenario: The CLI tsup config is exempt

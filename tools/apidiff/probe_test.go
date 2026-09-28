@@ -608,3 +608,26 @@ func TestCoverageNotesNeverFailTheRun(t *testing.T) {
 		}
 	}
 }
+
+func TestAOneSidedOperationStillReportsABranchServerError(t *testing.T) {
+	operation := Operation{Method: "POST", Path: "/api/internal/langy/relay/frames", InA: true}
+	cases := []struct {
+		name         string
+		main, branch int
+		want         int
+	}{
+		{"branch 500 where main answered 200", 200, 500, 1},
+		{"both 500", 500, 500, 0},
+		{"branch 4xx", 200, 422, 0},
+	}
+	for _, testCase := range cases {
+		transcript := Transcript{A: SideResult{Status: testCase.branch}, B: SideResult{Status: testCase.main}}
+		got := oneSidedServerError(operation, "mutation", transcript)
+		if len(got) != testCase.want {
+			t.Errorf("%s: %d findings, want %d", testCase.name, len(got), testCase.want)
+		}
+		if len(got) == 1 && got[0].Kind != FindingStatusDiff {
+			t.Errorf("%s: kind %q, want status_diff", testCase.name, got[0].Kind)
+		}
+	}
+}

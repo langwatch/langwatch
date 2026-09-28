@@ -16,6 +16,8 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0
 let pageLifetimeId: string | undefined;
 
 function generateId(): string {
+  // The contract requires a UUID visitor id, and stored visitors' buckets depend on it.
+  // oxlint-disable-next-line langwatch/id-generation-origin -- UUID required by the contract
   return crypto.randomUUID();
 }
 

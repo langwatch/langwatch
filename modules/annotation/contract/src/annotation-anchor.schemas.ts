@@ -112,25 +112,31 @@ export interface AnnotationSuggestionSource {
   anchorPath?: string | null;
 }
 
+/** Whether an annotation suggests the trace's expected output, and what it suggests. */
+export type AnnotationSuggestedOutput = { suggested: true; output: string } | { suggested: false };
+
 export function annotationSuggestedOutput({
   annotation,
   traceId,
 }: {
   annotation: AnnotationSuggestionSource;
   traceId: string;
-}): string | null {
+}): AnnotationSuggestedOutput {
   const anchor = readableAnnotationAnchor({
     anchorKind: annotation.anchorKind ?? null,
     anchorId: annotation.anchorId ?? null,
     anchorPath: annotation.anchorPath ?? null,
   });
-
-  if (!anchor.anchorKind) return annotation.expectedOutput ?? null;
-
   const isTraceOutput =
-    anchor.anchorKind === "field" && anchor.anchorId === traceId && anchor.anchorPath === "output";
+    !anchor.anchorKind ||
+    (anchor.anchorKind === "field" &&
+      anchor.anchorId === traceId &&
+      anchor.anchorPath === "output");
+  const output = annotation.expectedOutput;
 
-  return isTraceOutput ? (annotation.expectedOutput ?? null) : null;
+  return isTraceOutput && output !== null && output !== undefined
+    ? { suggested: true, output }
+    : { suggested: false };
 }
 
 export interface AnnotationAnchorRef {

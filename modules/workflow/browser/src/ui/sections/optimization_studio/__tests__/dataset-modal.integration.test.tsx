@@ -8,8 +8,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   uiDeclarations,
   type UiDatasetEditorTableProps,
+  type UiDatasetPickerListProps,
 } from "@langwatch/browser-host/declarations";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,12 +30,39 @@ const { mockOpenDrawer, mockDatasets } = vi.hoisted(() => ({
   },
 }));
 
-/** Dataset lends its editor; this stand-in reports an edited first cell the way the editor does. */
+/**
+ * Dataset lends its editor and its picker list. The editor stand-in reports an edited first
+ * cell the way the editor does; the picker stand-in hands back "turn 10" when it is picked.
+ */
 const datasetLends = uiDeclarations([
   {
     name: "dataset",
     installation: {
       capabilities: {
+        datasetPickerList: {
+          load: async () => ({
+            default: ({ onSelect }: UiDatasetPickerListProps) => (
+              <div data-testid="dataset-picker">
+                <button
+                  type="button"
+                  data-testid="dataset-card-turn 10"
+                  onClick={() =>
+                    onSelect({
+                      datasetId: "ds-1",
+                      name: "turn 10",
+                      columnTypes: [
+                        { name: "query", type: "string" },
+                        { name: "context", type: "string" },
+                      ],
+                    })
+                  }
+                >
+                  turn 10
+                </button>
+              </div>
+            ),
+          }),
+        },
         datasetEditorTable: {
           load: async () => ({
             default: ({
@@ -199,16 +227,12 @@ describe("Workflow dataset dialog", () => {
 
   describe("when choosing a dataset", () => {
     /** @scenario Choose opens the shared dataset picker */
-    it("opens the shared picker with search and dataset facts", () => {
+    it("opens the picker dataset lends", async () => {
       render(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />, {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByTestId("dataset-picker-search")).toBeInTheDocument();
-      expect(screen.getByTestId("dataset-card-turn 10")).toBeInTheDocument();
-      expect(screen.getByText("10 entries")).toBeInTheDocument();
-      expect(screen.getByText("2 columns")).toBeInTheDocument();
-      expect(screen.getByText(/Updated/)).toBeInTheDocument();
+      expect(await screen.findByTestId("dataset-picker")).toBeInTheDocument();
     });
 
     /** @scenario Picking a dataset binds it to the node */
@@ -219,7 +243,7 @@ describe("Workflow dataset dialog", () => {
         wrapper: Wrapper,
       });
 
-      await user.click(screen.getByTestId("dataset-card-turn 10"));
+      await user.click(await screen.findByTestId("dataset-card-turn 10"));
 
       const entry = getEntryNode();
       expect((entry?.data as Entry | undefined)?.dataset).toEqual({
@@ -231,6 +255,37 @@ describe("Workflow dataset dialog", () => {
       );
       expect(outputIds).toContain("query");
       expect(outputIds).toContain("context");
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  describe("when uploading a CSV", () => {
+    it("opens dataset's upload drawer by name and binds what it creates", async () => {
+      const user = userEvent.setup();
+      const onClose = vi.fn();
+      render(<DatasetModal open={true} onClose={onClose} node={ENTRY_NODE} />, {
+        wrapper: Wrapper,
+      });
+
+      await user.click(screen.getByTestId("upload-csv-dataset"));
+
+      expect(mockOpenDrawer).toHaveBeenCalledWith("uploadCSV", {
+        enableDirectUpload: false,
+        onSuccess: expect.any(Function),
+      });
+      const [, { onSuccess }] = mockOpenDrawer.mock.calls[0]!;
+      await act(async () => {
+        onSuccess({
+          datasetId: "ds-2",
+          name: "uploaded",
+          columnTypes: [{ name: "question", type: "string" }],
+        });
+      });
+
+      expect((getEntryNode()?.data as Entry | undefined)?.dataset).toEqual({
+        id: "ds-2",
+        name: "uploaded",
+      });
       expect(onClose).toHaveBeenCalled();
     });
   });

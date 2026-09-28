@@ -2,9 +2,12 @@
  * Langy mounts once per layout route; every route below a layout gets the panel.
  * Spec: specs/langy/langy-mount-scope.feature
  */
+import { webModules } from "@langwatch/installed-web-modules";
+import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import { describe, expect, it } from "vitest";
 
 import { uiRouteTable, type UiRouteDescriptor } from "../ui-route-table";
+import { uiUnservedPageLoaders } from "../ui-unserved-pages";
 
 const LANGY_LAYOUT = "layouts/project-langy";
 const APP_CHROME = "chrome";
@@ -56,6 +59,20 @@ describe("given a page a signed-out reader can open", () => {
       expect(layoutAncestors({ path: "/share/:id", layout: APP_CHROME })).toBe(0);
       // The detector, proved against a page that IS inside the chrome.
       expect(layoutAncestors({ path: "/settings/members", layout: APP_CHROME })).toBe(1);
+    });
+  });
+});
+
+describe("given the Langy layout route the table nests product pages under", () => {
+  describe("when the installed modules are asked who serves it", () => {
+    /**
+     * A bare outlet served this key once, so every project page rendered with
+     * no LangyProvider and the workbench threw from `useLangy`.
+     * @scenario A product page renders inside the Langy layout
+     */
+    it("is langy's declared layout, never an unframed placeholder", () => {
+      expect(installedModuleScreens(webModules).loaders[LANGY_LAYOUT]).toBeDefined();
+      expect(uiUnservedPageLoaders[LANGY_LAYOUT]).toBeUndefined();
     });
   });
 });

@@ -1,13 +1,15 @@
 /**
- * The module capabilities the chrome draws, reached through each module's
- * `./declaration` (ARCHITECTURE.md 10.1, "A capability travels by
- * declaration"): organization's join prompts.
+ * The module capabilities the chrome draws, by `./declaration` (ARCHITECTURE.md
+ * 10.1): organization's join prompts, and user's account-security offer where
+ * there is no join offer.
  */
 
 import { organizationWeb } from "@langwatch/organization-browser/declaration";
+import { userWeb } from "@langwatch/user-browser/declaration";
 import { lazy, Suspense, type ReactNode } from "react";
 
 const JoinYourTeamTakeover = lazy(organizationWeb.installation.capabilities.joinOffer.load);
+const SecureAccountNudge = lazy(userWeb.installation.capabilities.secureAccountNudge.load);
 const TeamAccessWaiting = lazy(organizationWeb.installation.capabilities.teamAccessWaiting.load);
 
 export function joinOffer({
@@ -17,7 +19,10 @@ export function joinOffer({
 }): ReactNode {
   return (
     <Suspense fallback={null}>
-      <JoinYourTeamTakeover currentOrganizationId={currentOrganizationId} />
+      <JoinYourTeamTakeover
+        currentOrganizationId={currentOrganizationId}
+        fallback={<SecureAccountNudge />}
+      />
     </Suspense>
   );
 }

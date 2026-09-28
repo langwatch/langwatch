@@ -1,3 +1,5 @@
+import type { Page } from "playwright";
+
 import type { Action, ActionContext } from "./context";
 import { argument, asRegExp, fillPath, scope } from "./context";
 
@@ -117,6 +119,19 @@ export const wait: Action = async (context) => {
   await context.side.page.waitForTimeout(
     Number(argument({ context, name: "millis", fallback: "500" })),
   );
+};
+
+/** declinePasskeyOffer answers "Not now" once; both refs store it, so later screens lack it. */
+export const declinePasskeyOffer = async (page: Page): Promise<boolean> => {
+  const dialog = page.getByRole("dialog").filter({ hasText: "Sign in faster next time" });
+  const shown = await dialog
+    .waitFor({ state: "visible", timeout: 8000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return false;
+  await dialog.getByRole("button", { name: "Not now", exact: true }).click({ timeout: 3000 });
+  await dialog.waitFor({ state: "hidden", timeout: 5000 }).catch(() => undefined);
+  return true;
 };
 
 /** dismissTour clears the product tour, which otherwise covers every screen behind it. */

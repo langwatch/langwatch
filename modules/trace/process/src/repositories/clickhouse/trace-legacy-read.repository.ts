@@ -2447,15 +2447,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     const byTrace = new Map<string, ProjectedAnnotation[]>();
     for (const row of rows) {
       const list = byTrace.get(row.traceId) ?? [];
+      const suggestion = annotationSuggestedOutput({ annotation: row, traceId: row.traceId });
       list.push({
         id: row.id,
         is_thumbs_up: row.isThumbsUp ?? null,
         comment: row.comment ?? null,
-        expected_output:
-          annotationSuggestedOutput({
-            annotation: row,
-            traceId: row.traceId,
-          }) ?? null,
+        expected_output: suggestion.suggested ? suggestion.output : null,
         scores: TraceLegacyReadClickHouseRepository.remapScoreOptionsToNames(
           row.scoreOptions,
           scoreNameById,

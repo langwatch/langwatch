@@ -1,7 +1,8 @@
-/** What analytics, navigation and organization lend this module (§3.4 rule 7). */
+/** What analytics, navigation, organization and trace lend this module (§3.4 rule 7). */
 
 import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
 import type {
+  UiAgentActionsMenuProps,
   UiCustomGraphProps,
   UiInlineCommandPaletteProps,
   UiProjectDepartmentFieldProps,
@@ -52,6 +53,24 @@ export function CustomGraph(props: UiCustomGraphProps) {
     () =>
       declarations
         .declared("customGraph")
+        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
+    [declarations],
+  );
+  return lent.map(({ key, Lent }) => (
+    <Suspense key={key} fallback={null}>
+      <Lent {...props} />
+    </Suspense>
+  ));
+}
+
+/** Trace's agent actions menu, drawn as trace lends it. */
+export function AgentActionsMenu(props: UiAgentActionsMenuProps) {
+  const declarations = useUiDeclarations();
+  // `lazy` once per declaration, never per render, so it is not remounted.
+  const lent = useMemo(
+    () =>
+      declarations
+        .declared("agentActionsMenu")
         .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
     [declarations],
   );

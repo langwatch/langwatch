@@ -15,6 +15,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type RefObject,
 } from "react";
 
 import { formatDurationSeconds } from "../../../model/duration.ts";
@@ -336,6 +337,282 @@ interface TerminalViewProps {
   sessionCostUsd?: number | null;
 }
 
+/** The row's anchor: its key and how far it sits below the top of the screen. */
+function anchorOf({
+  el,
+  node,
+}: {
+  el: HTMLDivElement;
+  node: HTMLDivElement | undefined;
+}): ScrollAnchor | null {
+  const rowKey = node?.dataset.rowKey;
+  if (!node || !rowKey) return null;
+  return { rowKey, offsetFromTop: node.offsetTop - el.scrollTop };
+}
+
+/**
+ * Put the reader back on the row they were on. What arrived ABOVE it moved its offset, so
+ * following the row moves the screen by exactly that; what arrived BELOW leaves the offset
+ * alone. A screen height delta can't tell the two apart and would move the reader by both.
+ */
+function restoreScrollAnchor({
+  el,
+  anchor,
+  rows,
+  lastScrollHeight,
+}: {
+  el: HTMLDivElement;
+  anchor: ScrollAnchor | null;
+  rows: ReadonlyMap<number, HTMLDivElement>;
+  lastScrollHeight: number;
+}): void {
+  const node = anchor ? findRow(rows, anchor.rowKey) : undefined;
+  if (anchor && node) {
+    el.scrollTop = node.offsetTop - anchor.offsetFromTop;
+    return;
+  }
+  // No row to follow: the reader has not taken the screen over yet, so what
+  // arrived is above them by definition.
+  el.scrollTop += el.scrollHeight - lastScrollHeight;
+}
+
+/** Whether the first entry changed to one that was already loaded below it. */
+function isPrepend({
+  previousFirst,
+  entries,
+}: {
+  previousFirst: TranscriptEntry | undefined;
+  entries: TranscriptEntry[];
+}): boolean {
+  if (previousFirst === undefined || entries[0] === previousFirst) return false;
+  return entries.includes(previousFirst);
+}
+
+/** Keeps the mounted rows by index, forgetting a row once it unmounts. */
+function trackRow({
+  rows,
+  fullIndex,
+  node,
+}: {
+  rows: Map<number, HTMLDivElement>;
+  fullIndex: number;
+  node: HTMLDivElement | null;
+}): void {
+  if (node) rows.set(fullIndex, node);
+  else rows.delete(fullIndex);
+}
+
+/** Whether the screen has content to scroll, so it can be put at its end. */
+function canPinToEnd({ el, entryCount }: { el: HTMLDivElement | null; entryCount: number }) {
+  if (!el || entryCount === 0) return false;
+  return el.scrollHeight > el.clientHeight;
+}
+
+/**
+ * The anchor the reader is held by across a history load, and the correction that
+ * restores it when earlier turns arrive ABOVE them: everything moves down by the
+ * inserted height, so the screen follows and the row under their eyes stays there.
+ */
+function useScrollAnchor({
+  screenRef,
+  rowRefs,
+  lastScrollHeightRef,
+  entries,
+  scrollbackStatus,
+}: {
+  screenRef: RefObject<HTMLDivElement | null>;
+  rowRefs: RefObject<Map<number, HTMLDivElement>>;
+  lastScrollHeightRef: RefObject<number>;
+  entries: TranscriptEntry[];
+  scrollbackStatus: ScrollbackStatus | undefined;
+}) {
+  const anchorRef = useRef<ScrollAnchor | null>(null);
+  const prevFirstEntryRef = useRef<TranscriptEntry | undefined>(entries[0]);
+  const prevStatusRef = useRef(scrollbackStatus);
+  const prependedThisCommitRef = useRef(false);
+
+  const rememberAnchor = useCallback(
+    ({ el, fullIndex }: { el: HTMLDivElement; fullIndex: number }) => {
+      anchorRef.current = anchorOf({ el, node: rowRefs.current.get(fullIndex) });
+    },
+    [rowRefs],
+  );
+
+  // This also covers the top slot changing shape. Runs before the follow-the-tail
+  // effect, which must not fire here.
+  useLayoutEffect(() => {
+    const previousFirst = prevFirstEntryRef.current;
+    const prepended = isPrepend({ previousFirst, entries });
+    prependedThisCommitRef.current = prepended;
+    prevFirstEntryRef.current = entries[0];
+    const statusChanged = prevStatusRef.current !== scrollbackStatus;
+    prevStatusRef.current = scrollbackStatus;
+
+    const el = screenRef.current;
+    if (!el) return;
+    if (prepended || (statusChanged && entries[0] === previousFirst)) {
+      restoreScrollAnchor({
+        el,
+        anchor: anchorRef.current,
+        rows: rowRefs.current,
+        lastScrollHeight: lastScrollHeightRef.current,
+      });
+    }
+    lastScrollHeightRef.current = el.scrollHeight;
+  }, [entries, scrollbackStatus, screenRef, rowRefs, lastScrollHeightRef]);
+
+  return { rememberAnchor, prependedThisCommitRef };
+}
+
+/**
+ * Scroll-to-timewarp: which beat the reader is on, whether they are caught up at the
+ * bottom, the anchor that holds them still while history loads above, and the buffer
+ * of earlier turns kept loaded ahead of them.
+ */
+function useTerminalScroll({
+  entries,
+  visibleIndices,
+  lastVisibleFullIndex,
+  scrollback,
+}: {
+  entries: TranscriptEntry[];
+  visibleIndices: number[];
+  lastVisibleFullIndex: number;
+  scrollback: TerminalViewProps["scrollback"];
+}) {
+  const screenRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const setRowRef = useCallback((fullIndex: number, node: HTMLDivElement | null) => {
+    trackRow({ rows: rowRefs.current, fullIndex, node });
+  }, []);
+
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [trackedFullIndex, setTrackedFullIndex] = useState(lastVisibleFullIndex);
+
+  // What the screen measured last, so a prepend can be told apart from a
+  // resize and undone by exactly the height that arrived above the reader.
+  const lastScrollHeightRef = useRef(0);
+  // Armed until the view has opened at the session's latest line: consumed by
+  // the first commit whose content can actually scroll, or by the reader
+  // taking over the scroll themselves.
+  const pinToEndArmedRef = useRef(true);
+
+  const scrollbackStatus = scrollback?.status;
+  const onLoadEarlier = scrollback?.onLoadEarlier;
+  const requestEarlierTurn = useCallback(() => {
+    if (scrollbackStatus === "available") onLoadEarlier?.();
+  }, [scrollbackStatus, onLoadEarlier]);
+
+  const { rememberAnchor, prependedThisCommitRef } = useScrollAnchor({
+    screenRef,
+    rowRefs,
+    lastScrollHeightRef,
+    entries,
+    scrollbackStatus,
+  });
+
+  const syncToScroll = useCallback(() => {
+    const el = screenRef.current;
+    if (!el) return;
+    const scrollTop = el.scrollTop;
+    const viewportBottom = scrollTop + el.clientHeight;
+    setIsAtBottom(el.scrollHeight - viewportBottom <= NEAR_BOTTOM_PX);
+    lastScrollHeightRef.current = el.scrollHeight;
+
+    // Keep the buffer of earlier turns ahead of the reader: the next one is
+    // asked for while the top is still a couple of viewports away, so a short
+    // turn never visibly loads in front of them.
+    if (scrollTop < preloadThresholdPx(el)) requestEarlierTurn();
+
+    const tracked = trackedIndexAt({
+      rows: rowRefs.current,
+      visibleIndices,
+      viewportBottom,
+    });
+    setTrackedFullIndex(tracked);
+    rememberAnchor({ el, fullIndex: tracked });
+  }, [visibleIndices, requestEarlierTurn, rememberAnchor]);
+
+  // The reader scrolling is the reader taking control of the position: from
+  // here on the view never jumps them to the end on its own.
+  const onScroll = useCallback(() => {
+    pinToEndArmedRef.current = false;
+    syncToScroll();
+  }, [syncToScroll]);
+
+  // Opening a session lands at its latest line, like a terminal at its prompt. Runs after the
+  // correction above, so early prepends leave the view pinned at the end while history stacks
+  // up. Armed until the first commit that can actually scroll; disarmed once the reader scrolls.
+  useLayoutEffect(() => {
+    const el = screenRef.current;
+    if (!pinToEndArmedRef.current || !el) return;
+    if (!canPinToEnd({ el, entryCount: entries.length })) return;
+    pinToEndArmedRef.current = false;
+    el.scrollTop = el.scrollHeight;
+    lastScrollHeightRef.current = el.scrollHeight;
+  }, [entries]);
+
+  // Fill and keep the buffer without waiting for a gesture: on open this is
+  // what loads the turns before the opened one until the screen (plus the
+  // preload buffer) is full, and after each landed turn it asks for the next
+  // one while the reader is still near the top.
+  useEffect(() => {
+    const el = screenRef.current;
+    if (el && el.scrollTop < preloadThresholdPx(el)) requestEarlierTurn();
+  }, [entries, requestEarlierTurn]);
+
+  // A row can change height outside any commit of this component (a tool output
+  // expanded, highlighting landing, an image loading). The prepend correction
+  // subtracts the last measured height, so the measurement has to follow them.
+  useEffect(() => {
+    const el = screenRef.current;
+    const content = contentRef.current;
+    if (!el || !content || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      lastScrollHeightRef.current = el.scrollHeight;
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
+
+  // New output arrives while the reader is caught up at the bottom: follow it down, like a
+  // real terminal. Scrolled up reading history: stay put — that's a choice, not something the
+  // screen fights. History arriving at the TOP is never new output, however close to the bottom.
+  const prevEntryCountRef = useRef(entries.length);
+  useEffect(() => {
+    const hasGrown = entries.length > prevEntryCountRef.current;
+    prevEntryCountRef.current = entries.length;
+    const el = screenRef.current;
+    if (!el) return;
+    if (hasGrown && isAtBottom && !prependedThisCommitRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
+    syncToScroll();
+    // Only re-run when the entry count changes — `syncToScroll`/`isAtBottom`
+    // would otherwise re-fire this on every scroll frame.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries.length]);
+
+  const jumpToBottom = useCallback(() => {
+    const el = screenRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    setIsAtBottom(true);
+    setTrackedFullIndex(lastVisibleFullIndex);
+  }, [lastVisibleFullIndex]);
+
+  return {
+    screenRef,
+    contentRef,
+    setRowRef,
+    isAtBottom,
+    trackedFullIndex,
+    onScroll,
+    jumpToBottom,
+  };
+}
+
 /**
  * Terminal recreation (whole session, no chrome); scroll-to-timewarp with bottom
  * bar tracking, auto-scroll catch-up, jump-to-bottom affordance.
@@ -383,175 +660,8 @@ export const TerminalView = memo(function TerminalView({
     [turnDividers, entries, visibleIndices],
   );
 
-  const screenRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const setRowRef = useCallback((fullIndex: number, node: HTMLDivElement | null) => {
-    if (node) rowRefs.current.set(fullIndex, node);
-    else rowRefs.current.delete(fullIndex);
-  }, []);
-
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const [trackedFullIndex, setTrackedFullIndex] = useState(lastVisibleFullIndex);
-
-  // What the screen measured last, so a prepend can be told apart from a
-  // resize and undone by exactly the height that arrived above the reader.
-  const prevFirstEntryRef = useRef<TranscriptEntry | undefined>(entries[0]);
-  const lastScrollHeightRef = useRef(0);
-  const prependedThisCommitRef = useRef(false);
-  // Armed until the view has opened at the session's latest line: consumed by
-  // the first commit whose content can actually scroll, or by the reader
-  // taking over the scroll themselves.
-  const pinToEndArmedRef = useRef(true);
-
-  const onLoadEarlier = scrollback?.onLoadEarlier;
-  const requestEarlierTurn = useCallback(() => {
-    if (scrollbackStatus === "available") onLoadEarlier?.();
-  }, [scrollbackStatus, onLoadEarlier]);
-
-  // The row the reader is on, and how far it sat below the top of the screen.
-  const anchorRef = useRef<ScrollAnchor | null>(null);
-  const rememberAnchor = useCallback(
-    ({ el, fullIndex }: { el: HTMLDivElement; fullIndex: number }) => {
-      const node = rowRefs.current.get(fullIndex);
-      const rowKey = node?.dataset.rowKey;
-      anchorRef.current =
-        node && rowKey ? { rowKey, offsetFromTop: node.offsetTop - el.scrollTop } : null;
-    },
-    [],
-  );
-
-  // Put the reader back on the row they were on. What arrived ABOVE it moved its offset, so
-  // following the row moves the screen by exactly that; what arrived BELOW leaves the offset
-  // alone. A screen height delta can't tell the two apart and would move the reader by both.
-  const restoreAnchor = useCallback((el: HTMLDivElement) => {
-    const anchor = anchorRef.current;
-    const node = anchor ? findRow(rowRefs.current, anchor.rowKey) : undefined;
-    if (anchor && node) {
-      el.scrollTop = node.offsetTop - anchor.offsetFromTop;
-      return;
-    }
-    // No row to follow: the reader has not taken the screen over yet, so what
-    // arrived is above them by definition.
-    el.scrollTop += el.scrollHeight - lastScrollHeightRef.current;
-  }, []);
-
-  const syncToScroll = useCallback(() => {
-    const el = screenRef.current;
-    if (!el) return;
-    const scrollTop = el.scrollTop;
-    const viewportBottom = scrollTop + el.clientHeight;
-    setIsAtBottom(el.scrollHeight - viewportBottom <= NEAR_BOTTOM_PX);
-    lastScrollHeightRef.current = el.scrollHeight;
-
-    // Keep the buffer of earlier turns ahead of the reader: the next one is
-    // asked for while the top is still a couple of viewports away, so a short
-    // turn never visibly loads in front of them.
-    if (scrollTop < preloadThresholdPx(el)) requestEarlierTurn();
-
-    const tracked = trackedIndexAt({
-      rows: rowRefs.current,
-      visibleIndices,
-      viewportBottom,
-    });
-    setTrackedFullIndex(tracked);
-    rememberAnchor({ el, fullIndex: tracked });
-  }, [visibleIndices, requestEarlierTurn, rememberAnchor]);
-
-  // The reader scrolling is the reader taking control of the position: from
-  // here on the view never jumps them to the end on its own.
-  const onScroll = useCallback(() => {
-    pinToEndArmedRef.current = false;
-    syncToScroll();
-  }, [syncToScroll]);
-
-  // Earlier turns arrive ABOVE the reader: everything moves down by the inserted height, so
-  // the screen follows and the row under their eyes stays there — this also covers the top
-  // slot changing shape. Runs before the follow-the-tail effect, which must not fire here.
-  const prevStatusRef = useRef(scrollbackStatus);
-  useLayoutEffect(() => {
-    const previousFirst = prevFirstEntryRef.current;
-    const nextFirst = entries[0];
-    const prepended =
-      previousFirst !== undefined && nextFirst !== previousFirst && entries.includes(previousFirst);
-    prependedThisCommitRef.current = prepended;
-    prevFirstEntryRef.current = nextFirst;
-    const statusChanged = prevStatusRef.current !== scrollbackStatus;
-    prevStatusRef.current = scrollbackStatus;
-
-    const el = screenRef.current;
-    if (!el) return;
-    if (prepended || (statusChanged && nextFirst === previousFirst)) {
-      restoreAnchor(el);
-    }
-    lastScrollHeightRef.current = el.scrollHeight;
-  }, [entries, scrollbackStatus, restoreAnchor]);
-
-  // Opening a session lands at its latest line, like a terminal at its prompt. Runs after the
-  // correction above, so early prepends leave the view pinned at the end while history stacks
-  // up. Armed until the first commit that can actually scroll; disarmed once the reader scrolls.
-  useLayoutEffect(() => {
-    if (!pinToEndArmedRef.current) return;
-    const el = screenRef.current;
-    if (!el || entries.length === 0) return;
-    if (el.scrollHeight > el.clientHeight) {
-      pinToEndArmedRef.current = false;
-      el.scrollTop = el.scrollHeight;
-      lastScrollHeightRef.current = el.scrollHeight;
-    }
-  }, [entries]);
-
-  // Fill and keep the buffer without waiting for a gesture: on open this is
-  // what loads the turns before the opened one until the screen (plus the
-  // preload buffer) is full, and after each landed turn it asks for the next
-  // one while the reader is still near the top.
-  useEffect(() => {
-    const el = screenRef.current;
-    if (!el) return;
-    if (el.scrollTop < preloadThresholdPx(el)) requestEarlierTurn();
-  }, [entries, requestEarlierTurn]);
-
-  // A row can change height outside any commit of this component: a tool
-  // output expanded, syntax highlighting landing, an image loading. The
-  // prepend correction above subtracts the last measured height, so the
-  // measurement has to follow those silent changes or the next prepend would
-  // move the screen by the wrong amount.
-  useEffect(() => {
-    const el = screenRef.current;
-    const content = contentRef.current;
-    if (!el || !content || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => {
-      lastScrollHeightRef.current = el.scrollHeight;
-    });
-    observer.observe(content);
-    return () => observer.disconnect();
-  }, []);
-
-  // New output arrives while the reader is caught up at the bottom: follow it down, like a
-  // real terminal. Scrolled up reading history: stay put — that's a choice, not something the
-  // screen fights. History arriving at the TOP is never new output, however close to the bottom.
-  const prevEntryCountRef = useRef(entries.length);
-  useEffect(() => {
-    const hasGrown = entries.length > prevEntryCountRef.current;
-    prevEntryCountRef.current = entries.length;
-    const el = screenRef.current;
-    if (!el) return;
-    if (hasGrown && isAtBottom && !prependedThisCommitRef.current) {
-      el.scrollTop = el.scrollHeight;
-    }
-    syncToScroll();
-    // Only re-run when the entry count changes — `syncToScroll`/`isAtBottom`
-    // would otherwise re-fire this on every scroll frame.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries.length]);
-
-  const jumpToBottom = useCallback(() => {
-    const el = screenRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-    setIsAtBottom(true);
-    setTrackedFullIndex(lastVisibleFullIndex);
-  }, [lastVisibleFullIndex]);
+  const { screenRef, contentRef, setRowRef, isAtBottom, trackedFullIndex, onScroll, jumpToBottom } =
+    useTerminalScroll({ entries, visibleIndices, lastVisibleFullIndex, scrollback });
 
   // Where the bottom bar counts to. Normally the beat the reader is on; when
   // the transcript renders nothing at all (an agent that reported economics

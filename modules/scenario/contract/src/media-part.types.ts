@@ -1,4 +1,3 @@
-/// <reference lib="dom" />
 import type { MediaPartData } from "@langwatch/trace-contract";
 
 /** The stored-object existence probe the host runs for a media part. */
@@ -9,9 +8,16 @@ export type MediaProbeResult =
   | null
   | undefined;
 
+/** The part of an audio element playback drives; structural, so a contract needs no DOM lib. */
+export interface MediaAudioElement {
+  readonly paused: boolean;
+  pause(): void;
+  play(): Promise<void>;
+}
+
 /** The props an audio element spreads so only one plays at a time. */
 export interface MediaAudioPlayback {
-  ref: (el: HTMLAudioElement | null) => void;
+  ref: (element: MediaAudioElement | null) => void;
   onPlay: () => void;
   onEnded: () => void;
 }

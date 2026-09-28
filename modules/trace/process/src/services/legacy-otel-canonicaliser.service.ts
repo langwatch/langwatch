@@ -3,12 +3,16 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 import {
+  type AttributeCanonicaliser,
+  type ExtractorContext,
+  takeAttribute,
+} from "../rules/canonical-attributes.rules.ts";
+import {
   ALLOWED_SPAN_TYPES,
   extractErrorInfo,
   inferSpanTypeIfAbsent,
   recordValueType,
 } from "../rules/canonical-extraction.rules.ts";
-import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 /** OTel span kinds that name a span type on their own, in the spelling they arrive with. */
 const SPAN_KIND_TYPES: readonly (readonly [string, string])[] = [
@@ -36,19 +40,19 @@ export class LegacyOtelCanonicaliserService implements AttributeCanonicaliser {
 
     this.liftValue({
       ctx,
-      value: attrs.take(ATTR_KEYS.INPUT_VALUE) ?? attrs.take(ATTR_KEYS.INPUT),
+      value: takeAttribute(attrs, ATTR_KEYS.INPUT_VALUE) ?? takeAttribute(attrs, ATTR_KEYS.INPUT),
       target: ATTR_KEYS.LANGWATCH_INPUT,
       rule: `${this.id}:input->langwatch.input`,
     });
     this.liftValue({
       ctx,
-      value: attrs.take(ATTR_KEYS.OUTPUT_VALUE) ?? attrs.take(ATTR_KEYS.OUTPUT),
+      value: takeAttribute(attrs, ATTR_KEYS.OUTPUT_VALUE) ?? takeAttribute(attrs, ATTR_KEYS.OUTPUT),
       target: ATTR_KEYS.LANGWATCH_OUTPUT,
       rule: `${this.id}:output->langwatch.output`,
     });
     this.liftValue({
       ctx,
-      value: attrs.take(ATTR_KEYS.AI_TOOL_CALL_ARGS),
+      value: takeAttribute(attrs, ATTR_KEYS.AI_TOOL_CALL_ARGS),
       target: ATTR_KEYS.LANGWATCH_INPUT,
       rule: `${this.id}:ai.toolCall.args->langwatch.input`,
     });
@@ -64,7 +68,8 @@ export class LegacyOtelCanonicaliserService implements AttributeCanonicaliser {
    */
   private canonicaliseSpanType(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
-    const directType = attrs.take(ATTR_KEYS.TYPE) ?? attrs.take(ATTR_KEYS.LANGWATCH_TYPE);
+    const directType =
+      takeAttribute(attrs, ATTR_KEYS.TYPE) ?? takeAttribute(attrs, ATTR_KEYS.LANGWATCH_TYPE);
     if (typeof directType === "string" && ALLOWED_SPAN_TYPES[directType] === true) {
       ctx.setAttr(ATTR_KEYS.SPAN_TYPE, directType);
       ctx.recordRule(`${this.id}:type(direct)`);
@@ -82,7 +87,7 @@ export class LegacyOtelCanonicaliserService implements AttributeCanonicaliser {
       }
     }
 
-    const requestType = attrs.take(ATTR_KEYS.LLM_REQUEST_TYPE);
+    const requestType = takeAttribute(attrs, ATTR_KEYS.LLM_REQUEST_TYPE);
     if (requestType === "chat" || requestType === "completion") {
       inferSpanTypeIfAbsent(ctx, "llm", `${this.id}:llm.request.type->llm`);
     }

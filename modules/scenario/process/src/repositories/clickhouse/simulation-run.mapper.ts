@@ -1,5 +1,5 @@
 import {
-  resolveCriterionResults,
+  deriveCriterionResults,
   SimulationRunStatus,
   SimulationVerdict,
   type SimulationRunData,
@@ -155,7 +155,7 @@ export function mapClickHouseRowToScenarioRunData(
   const unmetCriteria = row.UnmetCriteria ?? [];
   const inconclusiveCriteria = row.InconclusiveCriteria ?? [];
   const evaluations = columnsToEvaluations(row);
-  const criteria = resolveCriterionResults({
+  const criteria = deriveCriterionResults({
     criteria: columnsToCriteria(row),
     metCriteria,
     unmetCriteria,

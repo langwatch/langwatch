@@ -7,8 +7,8 @@ const mocks = vi.hoisted(() => ({
   mutateAsync: vi.fn<({ projectId }: { projectId: string }) => Promise<void>>(),
 }));
 
-vi.mock("@langwatch/organization-browser/surfaces/personal-workspace-features", () => ({
-  personalWorkspaceFeaturesApi: {
+vi.mock("../annotation-api.ts", () => ({
+  annotationApi: {
     personalWorkspaceFeatures: {
       get: { useQuery: () => ({ data: { datasets: false } }) },
       enableAll: { useMutation: () => ({ mutateAsync: mocks.mutateAsync, isPending: false }) },

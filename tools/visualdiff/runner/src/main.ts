@@ -5,6 +5,7 @@ import { openSide, captureMessage, type Side } from "./capture";
 import { diffScreenshots } from "./diff";
 import { signIn } from "./flows/actions";
 import { fillPath, sideFixtures } from "./flows/context";
+import { declinePasskeyOffer } from "./flows/primitives";
 import { resolveAction } from "./flows/registry";
 import { Pairing, readReplay, safeName } from "./pairing";
 import {
@@ -167,6 +168,8 @@ const signInSide = async ({ plan, side }: { plan: Plan; side: Side }): Promise<v
     );
     await side.waitUntilQuiet();
     if (failure === "" && !new URL(side.page.url()).pathname.startsWith("/auth/")) {
+      await declinePasskeyOffer(side.page);
+      await side.waitUntilQuiet();
       side.drain();
       return;
     }
@@ -217,7 +220,7 @@ const captureSide = async ({
   }
 };
 
-/** Replayed sides go first (they are free), then the candidate, so its breakage costs seconds. */
+/** Replayed sides go first (they are free), then the candidate, so it signs in first. */
 const captureOrder = (side: PlanSide): number => {
   if (side.replay !== undefined) return 0;
   return side.name === "candidate" ? 1 : 2;
@@ -248,9 +251,13 @@ const main = async (): Promise<void> => {
     await Promise.all(live.map((side) => side.browser.close().catch(() => undefined)));
     throw thrown;
   }
-  for (const side of live) {
-    await captureSide({ plan, side, collect });
-  }
+  // Both sides are signed in by now, so they capture at once; one failing stops the other.
+  await Promise.all(live.map((side) => captureSide({ plan, side, collect }))).catch(
+    async (thrown: unknown) => {
+      await Promise.all(live.map((side) => side.browser.close().catch(() => undefined)));
+      throw thrown;
+    },
+  );
   emit({ message: { type: "done" }, out });
 };
 

@@ -8,13 +8,13 @@ import dns from "node:dns/promises";
 
 import { parseProcessConfig } from "@langwatch/config";
 import { createSsrfUrlValidator } from "@langwatch/egress";
-import { scenarioConfig } from "@langwatch/scenario-contract";
-import { afterEach, describe, expect, it, vi } from "vitest";
-
 import {
   decodeScenarioEgressPolicy,
   encodeScenarioEgressPolicy,
-} from "../rules/child-egress-policy.rules.ts";
+  scenarioConfig,
+} from "@langwatch/scenario-contract";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { resolveChildTlsEnv } from "../rules/child-tls-env.rules.ts";
 
 /** The parent's two lines, then the child's one, for a given environment. */

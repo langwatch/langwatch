@@ -5,22 +5,24 @@
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 
+import {
+  isVoiceMediaUpgradeRefusedMessage,
+  isVoiceNonceRegisterAckMessage,
+  isVoiceNonceRegisterMessage,
+  VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE,
+  VOICE_NONCE_REGISTER_ACK_MESSAGE,
+  VOICE_NONCE_REGISTER_MESSAGE,
+  type VoiceNonceRegisterAckMessage,
+  type VoiceNonceRegisterMessage,
+} from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { VoiceNonceRegistryService } from "../../services/voice-nonce-registry.service.ts";
 import {
   handleVoiceNonceRegisterMessage,
-  isVoiceMediaUpgradeRefusedMessage,
-  isVoiceNonceRegisterAckMessage,
-  isVoiceNonceRegisterMessage,
   raceAgainstUpgradeRefusal,
   requestNonceRegistration,
-  VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE,
-  VOICE_NONCE_REGISTER_ACK_MESSAGE,
-  VOICE_NONCE_REGISTER_MESSAGE,
   VoiceMediaUpgradeRefusedError,
-  type VoiceNonceRegisterAckMessage,
-  type VoiceNonceRegisterMessage,
   VoiceNonceRegistrationFailedError,
   VoiceNonceRegistrationNoChannelError,
   VoiceNonceRegistrationTimeoutError,

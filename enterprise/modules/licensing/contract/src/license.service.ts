@@ -9,7 +9,11 @@ import type {
 } from "./license.ts";
 
 /** The provider-neutral source port Licensing implements for Entitlements. */
-export type { EntitlementSource, ResolvePlanInput } from "@langwatch/entitlement-contract";
+export type {
+  EntitlementGrant,
+  EntitlementSource,
+  ResolvePlanInput,
+} from "@langwatch/entitlement-contract";
 
 /** Application-facing capability supplied by the Enterprise license source. */
 export abstract class LicensingService {

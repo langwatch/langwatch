@@ -1,9 +1,3 @@
-export * from "./rules/child-egress-policy.rules.ts";
-export * from "./rules/scenario-log-context.rules.ts";
-export {
-  createChildProcessLogger,
-  decodeScenarioLogContext,
-} from "./app/scenario-composition.build.ts";
 export * from "./services/child-process-spawn.service.ts";
 export * from "./rules/child-tls-env.rules.ts";
 export {
@@ -19,20 +13,10 @@ export {
   type RecordEvaluationsDeps,
   evaluationsFingerprint,
 } from "./eventing/record-evaluations.commands.ts";
-export { HttpLitellmModelChannel } from "./channels/http/http.litellm-model.channel.ts";
-export type { LitellmModelChannel, LitellmModelInput } from "./channels/litellm-model.channel.ts";
-export { HttpNlpFetchChannel } from "./channels/http/http.nlp-fetch.channel.ts";
-export type { NlpFetchChannel, NlpFetchTimeouts } from "./channels/nlp-fetch.channel.ts";
 export * from "./services/node-scenario-child.service.ts";
 export { ScenarioProcessorMetricsService } from "./services/scenario-processor-metrics.service.ts";
 export * from "./channels/redis/redis.scenario-cancellation.channel.ts";
 export * from "./repositories/redis/redis.scenario-tab-store.repository.ts";
-export * from "./services/scenario-child-execution.service.ts";
-export * from "./channels/serialized-agent-channels.registry.ts";
-export * from "./channels/http/http.serialized-code-agent.channel.ts";
-export * from "./channels/http/http.serialized-http-agent.channel.ts";
-export * from "./channels/http/http.serialized-prompt-config.channel.ts";
-export * from "./channels/http/http.serialized-workflow-agent.channel.ts";
 export {
   BACKFILL_STALE_THRESHOLD_MS,
   SimulationRunMetricsStore,
@@ -64,8 +48,6 @@ export type {
   ScenarioClock,
   ScenarioExecutionPool,
   ScenarioExecutionRunner,
-  ScenarioHttpResponse,
-  ScenarioHttp,
   ScenarioId,
   ScenarioTestSuiteId,
   ScenarioProcessorServiceMetrics,

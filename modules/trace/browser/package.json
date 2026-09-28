@@ -13,11 +13,6 @@
       "types": "./dist/trace.web.d.ts",
       "default": "./src/trace.web.ts"
     },
-    "./surfaces/setup-with-agent-button": {
-      "langwatch-declaration-source": "./src/ui/sections/setup-with-agent-button.tsx",
-      "types": "./dist/ui/sections/setup-with-agent-button.d.ts",
-      "default": "./src/ui/sections/setup-with-agent-button.tsx"
-    },
     "./surfaces/presence-menu-item": {
       "langwatch-declaration-source": "./src/ui/sections/presence/presence-menu-item.tsx",
       "types": "./dist/ui/sections/presence/presence-menu-item.d.ts",

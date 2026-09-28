@@ -1,6 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
-import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
+import { type ExtractorContext, takeAttribute } from "./canonical-attributes.rules.ts";
 import { stringifyToolPayload } from "./gemini-content.rules.ts";
 import { setIfMissing, VERTEX_ADK_KEYS, VERTEX_ADK_RULE_PREFIX } from "./vertex-adk-core.rules.ts";
 
@@ -9,7 +9,7 @@ export function canonicaliseVertexAdkToolCall(ctx: ExtractorContext): void {
 
   const args = stringifyToolPayload(attrs.get(VERTEX_ADK_KEYS.TOOL_CALL_ARGS));
   if (args !== null) {
-    attrs.take(VERTEX_ADK_KEYS.TOOL_CALL_ARGS);
+    takeAttribute(attrs, VERTEX_ADK_KEYS.TOOL_CALL_ARGS);
     const hasSetArgs = [
       setIfMissing({ ctx, key: ATTR_KEYS.LANGWATCH_INPUT, value: args }),
       setIfMissing({
@@ -25,7 +25,7 @@ export function canonicaliseVertexAdkToolCall(ctx: ExtractorContext): void {
 
   const result = stringifyToolPayload(attrs.get(VERTEX_ADK_KEYS.TOOL_RESPONSE));
   if (result !== null) {
-    attrs.take(VERTEX_ADK_KEYS.TOOL_RESPONSE);
+    takeAttribute(attrs, VERTEX_ADK_KEYS.TOOL_RESPONSE);
     const hasSetResult = [
       setIfMissing({
         ctx,

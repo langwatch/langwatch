@@ -7,12 +7,16 @@ import {
   LangyProvider,
   useLangy,
 } from "@langwatch/langy-browser-kit";
+import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
 import { memo, type ReactNode, useEffect } from "react";
 
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";
 import { useShowLangy } from "../../behavior/use-show-langy.ts";
 import { LangySidecar } from "./langy-panel.tsx";
+
+/** The routed page, when the router mounts this layout with no children of its own. */
+const ROUTED_PAGE = <UiRouteOutlet />;
 
 /**
  * Layout route that mounts Langy once per project, above the swapping page.
@@ -28,7 +32,7 @@ export default function ProjectLangyLayout({ children }: { children?: ReactNode 
 
   return (
     <ProjectLangySubtree projectId={project?.id ?? "no-project"} showLangy={showLangy}>
-      {children}
+      {children ?? ROUTED_PAGE}
     </ProjectLangySubtree>
   );
 }

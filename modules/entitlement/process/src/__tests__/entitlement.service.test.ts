@@ -26,10 +26,10 @@ const paid = (type: string): Plan => ({
 describe("EntitlementService", () => {
   /** @scenario A valid license has precedence */
   it("selects a paid license without consulting subscriptions", async () => {
-    const subscription = vi.fn(async () => paid("GROWTH"));
+    const subscription = vi.fn(async () => ({ granted: true as const, plan: paid("GROWTH") }));
     const service = EntitlementService.create({
       baseline: free,
-      license: { resolve: async () => paid("ENTERPRISE") },
+      license: { resolve: async () => ({ granted: true, plan: paid("ENTERPRISE") }) },
       subscription: { resolve: subscription },
     });
 
@@ -43,10 +43,10 @@ describe("EntitlementService", () => {
   /** @scenario A subscription is used when no paid license exists */
   it("falls through a free license result to a paid subscription", async () => {
     const user = { id: "user", impersonator: { email: "operator@example.com" } };
-    const subscription = vi.fn(async () => paid("GROWTH"));
+    const subscription = vi.fn(async () => ({ granted: true as const, plan: paid("GROWTH") }));
     const service = EntitlementService.create({
       baseline: free,
-      license: { resolve: async () => free },
+      license: { resolve: async () => ({ granted: true, plan: free }) },
       subscription: { resolve: subscription },
     });
 
@@ -68,7 +68,7 @@ describe("EntitlementService", () => {
     const administratorEmails = new Set(["operator@example.com"]);
     const service = EntitlementService.create({
       baseline: free,
-      license: { resolve: async () => paid("ENTERPRISE") },
+      license: { resolve: async () => ({ granted: true, plan: paid("ENTERPRISE") }) },
       enrichers: [
         {
           enrich: (plan) => ({ ...plan, webhookEndpointsEnabled: true }),

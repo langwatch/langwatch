@@ -48,6 +48,7 @@ import {
   type SuiteTarget,
   type CreateSuiteCommand,
   type CompleteSuiteRunItemCommandData,
+  type ConnectedTargetAgent,
   type RecordSuiteRunItemStartedCommandData,
   type RegradeSuiteRunItemCommandData,
   type RunPlanWire,
@@ -74,6 +75,8 @@ import { ClickhouseSuiteEventingRepository } from "../repositories/clickhouse/cl
 import { RedisSuiteRunProcessingRepository } from "../repositories/redis/redis.suite-run-processing.repository.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
+import { AgentOwnerNamesService } from "../services/agent-owner-names.service.ts";
+import { ConnectedTargetService } from "../services/connected-target.service.ts";
 import { RunPlanReadService } from "../services/run-plan-read.service.ts";
 import { SuitePlatformLinkService } from "../services/suite-platform-link.service.ts";
 import { SuiteRunItemCommandsService } from "../services/suite-run-item-commands.service.ts";
@@ -277,6 +280,7 @@ export class SuiteApp implements SuiteApi {
   readonly #pipeline: SuiteRunProcessingPipeline | undefined;
   readonly #runItems: SuiteRunItemCommandsService;
   readonly #runPlans: RunPlanReadService;
+  readonly #connectedTargets: ConnectedTargetService;
 
   private constructor(
     dependencies: SuiteAppDependencies & {
@@ -293,6 +297,10 @@ export class SuiteApp implements SuiteApi {
     this.#runItems = runItems;
     this.#runPlans = runPlans;
     this.#dependencies = rest;
+    this.#connectedTargets = ConnectedTargetService.create({
+      agents: rest.agents,
+      owners: AgentOwnerNamesService.create(rest.agents),
+    });
   }
 
   /**
@@ -339,6 +347,13 @@ export class SuiteApp implements SuiteApi {
     attachments: readonly Pick<EvaluatorAttachment, "evaluatorId">[];
   }): Promise<Map<string, EvaluatorWithFields>> {
     return this.#dependencies.suites.getAttachedEvaluators(input);
+  }
+
+  assertConnectedAgentsRunnable(input: {
+    agents: readonly ConnectedTargetAgent[];
+    actor: RunActor | undefined;
+  }): Promise<void> {
+    return this.#connectedTargets.assertConnectedAgentsRunnable(input);
   }
 
   // -- reads -----------------------------------------------------------------

@@ -5,9 +5,14 @@
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
+import {
+  type AttributeCanonicaliser,
+  type ExtractorContext,
+  hasAttributeWithPrefix,
+  takeAttribute,
+} from "../rules/canonical-attributes.rules.ts";
 import { inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules.ts";
 import { isNonEmptyString } from "../rules/canonical-guard.rules.ts";
-import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 const COPILOT_ATTR_PREFIX = "github.copilot.";
 
@@ -53,7 +58,7 @@ export class CopilotCanonicaliserService implements AttributeCanonicaliser {
     // Scope/vendor attributes prevent foreign SDKs using the same operation names
     // from being classified as Copilot spans.
     const hasCopilotProvenance =
-      COPILOT_SCOPES.includes(scopeName) || attrs.hasByPrefix(COPILOT_ATTR_PREFIX);
+      COPILOT_SCOPES.includes(scopeName) || hasAttributeWithPrefix(attrs, COPILOT_ATTR_PREFIX);
     if (!hasCopilotProvenance) {
       return;
     }
@@ -74,14 +79,14 @@ export class CopilotCanonicaliserService implements AttributeCanonicaliser {
       typeof reasoningTokens === "number" &&
       ctx.out[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS] === void 0;
     if (canLiftReasoningTokens) {
-      attrs.take("gen_ai.usage.reasoning.output_tokens");
+      takeAttribute(attrs, "gen_ai.usage.reasoning.output_tokens");
       ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, reasoningTokens);
       ctx.recordRule(`${this.id}:usage.reasoning`);
     }
 
     const pseudoId = attrs.get("enduser.pseudo.id");
     if (isNonEmptyString(pseudoId) && ctx.out[ATTR_KEYS.LANGWATCH_USER_ID] === void 0) {
-      attrs.take("enduser.pseudo.id");
+      takeAttribute(attrs, "enduser.pseudo.id");
       ctx.setAttr(ATTR_KEYS.LANGWATCH_USER_ID, pseudoId);
       ctx.recordRule(`${this.id}:user.pseudo_id`);
     }
@@ -93,31 +98,31 @@ export class CopilotCanonicaliserService implements AttributeCanonicaliser {
   private liftCopilotMetadata(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
 
-    const premiumRequests = attrs.take(`${COPILOT_ATTR_PREFIX}total_premium_requests`);
+    const premiumRequests = takeAttribute(attrs, `${COPILOT_ATTR_PREFIX}total_premium_requests`);
     if (premiumRequests !== void 0 && premiumRequests !== null) {
       ctx.setAttr("metadata.copilot_premium_requests", attributeText(premiumRequests));
       ctx.recordRule(`${this.id}:premium_requests`);
     }
 
-    const copilotCost = attrs.take(`${COPILOT_ATTR_PREFIX}cost`);
+    const copilotCost = takeAttribute(attrs, `${COPILOT_ATTR_PREFIX}cost`);
     if (copilotCost !== void 0 && copilotCost !== null) {
       ctx.setAttr("metadata.copilot_cost", attributeText(copilotCost));
       ctx.recordRule(`${this.id}:cost_units`);
     }
 
-    const nanoAiu = attrs.take(`${COPILOT_ATTR_PREFIX}nano_aiu`);
+    const nanoAiu = takeAttribute(attrs, `${COPILOT_ATTR_PREFIX}nano_aiu`);
     if (nanoAiu !== void 0 && nanoAiu !== null) {
       ctx.setAttr("metadata.copilot_nano_aiu", attributeText(nanoAiu));
       ctx.recordRule(`${this.id}:nano_aiu`);
     }
 
-    const repository = attrs.take(`${COPILOT_ATTR_PREFIX}git.repository`);
+    const repository = takeAttribute(attrs, `${COPILOT_ATTR_PREFIX}git.repository`);
     if (isNonEmptyString(repository)) {
       ctx.setAttr("metadata.copilot_repository", repository);
       ctx.recordRule(`${this.id}:repository`);
     }
 
-    const organization = attrs.take(`${COPILOT_ATTR_PREFIX}github.org`);
+    const organization = takeAttribute(attrs, `${COPILOT_ATTR_PREFIX}github.org`);
     if (isNonEmptyString(organization)) {
       ctx.setAttr("metadata.copilot_organization", organization);
       ctx.recordRule(`${this.id}:organization`);

@@ -1,4 +1,5 @@
 import type { AuditLogRepositories } from "../audit-log.repositories.ts";
+import { MemoryAgentAuditLogMigrationRepository } from "./memory.agent-audit-log-migration.repository.ts";
 import { MemoryAuditLogRepository } from "./memory.audit-log.repository.ts";
 import { MemoryAuditLogStore } from "./memory.audit-log.store.ts";
 import { MemoryRecentTouchRepository } from "./memory.recent-touch.repository.ts";
@@ -12,6 +13,7 @@ export class MemoryAuditLogRepositories {
     return {
       entries: MemoryAuditLogRepository.create({ store }),
       recentTouches: MemoryRecentTouchRepository.create({ store }),
+      agentAuditLogIds: MemoryAgentAuditLogMigrationRepository.create({ store }),
     };
   }
 }

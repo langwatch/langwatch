@@ -34,28 +34,27 @@ describe("given the licence leg of a hosted deployment's plan resolution", () =>
   it("resolves ENTERPRISE for a valid, unexpired, correctly signed license", async () => {
     const source = cloudSource(ENTERPRISE_LICENSE_KEY);
 
-    const plan = await source.resolve({ organizationId: "org-1" });
+    const grant = await source.resolve({ organizationId: "org-1" });
 
-    expect(plan?.type).toBe("ENTERPRISE");
-    expect(plan?.free).toBe(false);
+    expect(grant).toMatchObject({ granted: true, plan: { type: "ENTERPRISE", free: false } });
   });
 
   /** @scenario "An absent license resolves the baseline plan" */
   it("answers unlicensed when no license key is stored for the organization", async () => {
     const source = cloudSource(null);
 
-    const plan = await source.resolve({ organizationId: "org-1" });
+    const grant = await source.resolve({ organizationId: "org-1" });
 
-    expect(plan?.free).toBe(true);
+    expect(grant).toMatchObject({ granted: true, plan: { free: true } });
   });
 
   /** @scenario "A license with an invalid signature resolves the baseline plan" */
   it("answers unlicensed when the stored license's signature does not verify", async () => {
     const source = cloudSource(TAMPERED_LICENSE_KEY);
 
-    const plan = await source.resolve({ organizationId: "org-1" });
+    const grant = await source.resolve({ organizationId: "org-1" });
 
-    expect(plan?.free).toBe(true);
+    expect(grant).toMatchObject({ granted: true, plan: { free: true } });
   });
 
   /** @scenario "An expired license resolves the baseline plan" */
@@ -65,8 +64,8 @@ describe("given the licence leg of a hosted deployment's plan resolution", () =>
     // expired, correctly signed Enterprise license still degrades here.
     const source = cloudSource(EXPIRED_ENTERPRISE_LICENSE_KEY);
 
-    const plan = await source.resolve({ organizationId: "org-1" });
+    const grant = await source.resolve({ organizationId: "org-1" });
 
-    expect(plan?.free).toBe(true);
+    expect(grant).toMatchObject({ granted: true, plan: { free: true } });
   });
 });

@@ -18,6 +18,7 @@ import type {
   DeleteRoutingPolicyInput,
   FindRoutingPolicyInput,
   ListRoutingPoliciesInput,
+  ResolveDefaultRoutingPolicyInput,
   RoutingPolicy,
   SetDefaultRoutingPolicyInput,
   UpdateRoutingPolicyInput,
@@ -28,6 +29,8 @@ export interface EnterpriseGatewayApi {
   /** Policies in an organization, optionally narrowed to one scope's choices. */
   listRoutingPolicies(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]>;
   getRoutingPolicy(input: FindRoutingPolicyInput): Promise<RoutingPolicy>;
+  /** The default policies binding a personal workspace, most specific first (team, then organization). */
+  findDefaultRoutingPolicies(input: ResolveDefaultRoutingPolicyInput): Promise<RoutingPolicy[]>;
   /** How many policies an organization holds (governance's setup checklist). */
   countRoutingPolicies(input: { organizationId: string }): Promise<number>;
   routingPolicyTierSuggestions(

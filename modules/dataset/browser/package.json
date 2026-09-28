@@ -18,20 +18,10 @@
       "types": "./dist/dataset-drawer.d.ts",
       "default": "./src/dataset-drawer.ts"
     },
-    "./dataset-picker-list": {
-      "langwatch-declaration-source": "./src/dataset-picker-list.ts",
-      "types": "./dist/dataset-picker-list.d.ts",
-      "default": "./src/dataset-picker-list.ts"
-    },
     "./dataset-record-sync": {
       "langwatch-declaration-source": "./src/dataset-record-sync.ts",
       "types": "./dist/dataset-record-sync.d.ts",
       "default": "./src/dataset-record-sync.ts"
-    },
-    "./upload-csv-drawer": {
-      "langwatch-declaration-source": "./src/upload-csv-drawer.ts",
-      "types": "./dist/upload-csv-drawer.d.ts",
-      "default": "./src/upload-csv-drawer.ts"
     }
   },
   "scripts": {

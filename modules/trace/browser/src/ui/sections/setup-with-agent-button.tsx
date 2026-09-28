@@ -1,9 +1,9 @@
 import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
+import type { UiAgentActionsMenuProps } from "@langwatch/browser-host/declarations";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useLangyStore } from "@langwatch/langy-browser-kit";
-import type React from "react";
 import { useState } from "react";
 import { LuBookOpen, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
 
@@ -111,7 +111,16 @@ export type SetupSurface = keyof typeof SETUP_SURFACES;
 
 /** The prompt handed to the reader's own coding agent. Exported for tests. */
 export function setupAgentPrompt(surface: SetupSurface): string {
-  const setup = SETUP_SURFACES[surface];
+  return promptFor(SETUP_SURFACES[surface]);
+}
+
+/** The setup prompt of the surface a skill sets up, for a menu handed only the skill. */
+function skillSetupPrompt(skill: string | undefined): string {
+  const setup = Object.values(SETUP_SURFACES).find((surface) => surface.skill === skill);
+  return setup ? promptFor(setup) : "";
+}
+
+function promptFor(setup: SurfaceSetup): string {
   return `${setup.trigger}.
 
 Use LangWatch's "${setup.skill}" skill for this: install it with \`npx skills add langwatch/skills/${setup.skill}\` and follow it. Every available skill is listed at ${SKILLS_DIRECTORY_URL}. Read the API key from the environment, never hardcode it, and tell me what you changed and how to verify it.`;
@@ -175,52 +184,7 @@ export function AgentActionsMenu({
   langy,
   copy,
   docs,
-}: {
-  /** Labels the default outline button. Ignored when `trigger` is given. */
-  triggerLabel?: string;
-  /**
-   * A trigger of the surface's own, in place of the default button.
-   * One element, because `Menu.Trigger asChild` clones it with the
-   * handlers and the ref: a string or a list has nowhere to put them.
-   */
-  trigger?: React.ReactElement;
-  /** Match the sibling buttons of the surface this sits in. */
-  size?: "sm" | "md";
-  /**
-   * Null where the surface already knows Langy is out of reach. Otherwise
-   * the entry still needs `useCanAskLangy` to agree.
-   */
-  langy: {
-    prompt: string;
-    label: string;
-    hint: string;
-    /**
-     * Takes the prompt instead of the Langy store, for a surface that
-     * animates its own composer on the way in.
-     */
-    onAsk?: (prompt: string) => void;
-  } | null;
-  copy: {
-    /** What the reader gets while the skill is still on its way. */
-    prompt: string;
-    label: string;
-    hint: string;
-    copiedTitle: string;
-    /** The skill whose instructions the copy carries, when there is one. */
-    skill?: string;
-    /** A freshly minted token to put in front of those instructions. */
-    apiKey?: string;
-    /** The endpoint that token belongs to, on a self-hosted deployment. */
-    endpoint?: string;
-  };
-  docs: {
-    href: string;
-    label: string;
-    hint: string;
-    /** Overrides the book glyph where the surface reads better with another. */
-    icon?: typeof LuBookOpen;
-  };
-}) {
+}: UiAgentActionsMenuProps) {
   const canAsk = useCanAskLangy();
   const askLangy = useLangyStore((s) => s.askLangy);
   const [isOpen, setIsOpen] = useState(false);
@@ -235,18 +199,20 @@ export function AgentActionsMenu({
   // confirmation rendered inside it would land in a menu that is already
   // gone. The toast also gives the clipboard-rejection path somewhere to go.
   const copyPrompt = () => {
-    void navigator.clipboard?.writeText(skillPrompt ?? copy.prompt).then(
-      () =>
-        toaster.create({
-          type: "success",
-          title: copy.copiedTitle,
-        }),
-      () =>
-        showErrorToast({
-          fallbackTitle: "Couldn't copy the prompt",
-          description: "Clipboard access is restricted. This can happen on non-HTTPS domains.",
-        }),
-    );
+    void navigator.clipboard
+      ?.writeText(skillPrompt ?? copy.prompt ?? skillSetupPrompt(copy.skill))
+      .then(
+        () =>
+          toaster.create({
+            type: "success",
+            title: copy.copiedTitle,
+          }),
+        () =>
+          showErrorToast({
+            fallbackTitle: "Couldn't copy the prompt",
+            description: "Clipboard access is restricted. This can happen on non-HTTPS domains.",
+          }),
+      );
   };
 
   return (

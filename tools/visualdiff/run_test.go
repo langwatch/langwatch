@@ -305,3 +305,29 @@ func mutatingCommands(commands []string) []string {
 	}
 	return out
 }
+
+// @scenario "A runner that cannot launch its browser stops the run before any stack boots"
+func TestAMissingBrowserStopsTheRunBeforeAnyStackBoots(t *testing.T) {
+	fake := &fakeRunner{}
+	deps := passingDeps(fake, nil, nil)
+	started := 0
+	deps.Start = func(context.Context, Stack, string) (func(), error) {
+		started++
+		return func() {}, nil
+	}
+	deps.Preflight = func(context.Context, string) error { return errors.New("cannot launch chromium") }
+
+	_, err := Execute(context.Background(), Request{Options: testOptions(t), Config: testConfig(), Deps: deps}, Streams{Out: io.Discard, Err: io.Discard})
+
+	if err == nil || !strings.Contains(err.Error(), "cannot launch chromium") {
+		t.Fatalf("err = %v, want the preflight failure", err)
+	}
+	if started != 0 {
+		t.Fatalf("%d stacks started after a failed preflight", started)
+	}
+	for _, command := range fake.rendered() {
+		if strings.HasPrefix(command, "git worktree add") {
+			t.Fatalf("a worktree was checked out after a failed preflight: %v", fake.rendered())
+		}
+	}
+}

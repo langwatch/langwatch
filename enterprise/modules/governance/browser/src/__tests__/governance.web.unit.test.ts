@@ -30,7 +30,6 @@ describe("given a browser that installs governance", () => {
       ["pages/governance/index"],
       ["pages/governance/inventory.enterprise"],
       ["pages/governance/ingestion-source-detail.enterprise"],
-      ["pages/governance/anomaly-rules.enterprise"],
       ["pages/governance/people"],
       ["pages/governance/agents"],
       ["pages/governance/costs"],
@@ -40,7 +39,6 @@ describe("given a browser that installs governance", () => {
       ["pages/governance/signals"],
       ["pages/governance/teams"],
       ["pages/governance/teams/[id]"],
-      ["pages/governance/users"],
       ["pages/governance/users/[id]"],
     ] as const)("answers with a component for %s", async (page) => {
       const screen = governanceWeb.installation.screens[page];

@@ -84,7 +84,12 @@ export {
   voiceCallMaxSeconds,
 } from "./voice/voice-limits.ts";
 export type { CallRecord, CallTurn } from "./voice/call-record.ts";
-export type { MediaAudioPlayback, MediaPartProps, MediaProbeResult } from "./media-part.types.ts";
+export type {
+  MediaAudioElement,
+  MediaAudioPlayback,
+  MediaPartProps,
+  MediaProbeResult,
+} from "./media-part.types.ts";
 export * from "./voice/voice-session.errors.ts";
 export { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "./voice/voice-public-url-env.ts";
 export type { VoiceMediaUpgrade } from "./voice/voice-media-upgrade.ts";
@@ -103,3 +108,9 @@ export {
   type RunEvaluatorDefinition,
   type RunEvaluators,
 } from "./scenario-run-evaluators.ts";
+// The parent-child protocol of the scenario child: the environment codecs, the nlpgo error envelope
+// both sides read, and the voice IPC messages.
+export * from "./child-egress-policy.ts";
+export * from "./scenario-log-context.ts";
+export * from "./nlpgo-error-envelope.ts";
+export * from "./voice/voice-child-messages.ts";

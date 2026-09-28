@@ -1,5 +1,5 @@
 /**
- * What a browser installs when it installs governance: the fifteen
+ * What a browser installs when it installs governance: the thirteen
  * organization-scoped screens the admin oversight dashboard routes today.
  * Always installed, so nothing here gates itself by tier or flag.
  */
@@ -40,14 +40,6 @@ export const governanceWeb = defineWebModule("governance")
     "pages/governance/ingestion-source-detail.enterprise": {
       path: "/governance/inventory/:id",
       load: () => import("./ui/sections/governance/governance-ingestion-source.screen.tsx"),
-    },
-    // origin/main has since folded this address into the inventory's Anomaly
-    // rules tab and redirects it; this branch still serves it as its own page.
-    // See the handoff's Wire differences before removing it.
-    "pages/governance/anomaly-rules.enterprise": {
-      path: "/governance/anomaly-rules",
-      label: "Anomaly Rules",
-      load: () => import("./ui/sections/governance/governance-anomaly-rules.screen.tsx"),
     },
     "pages/governance/people": {
       path: "/governance/people",
@@ -92,14 +84,6 @@ export const governanceWeb = defineWebModule("governance")
     "pages/governance/teams/[id]": {
       path: "/governance/teams/:id",
       load: () => import("./ui/sections/governance/governance-team.screen.tsx"),
-    },
-    // origin/main has since folded this address into the People page's Users
-    // tab and redirects it; this branch still serves it as its own page.
-    // See the handoff's Wire differences before removing it.
-    "pages/governance/users": {
-      path: "/governance/users",
-      label: "Users",
-      load: () => import("./ui/sections/governance/governance-users.screen.tsx"),
     },
     "pages/governance/users/[id]": {
       path: "/governance/users/:id",

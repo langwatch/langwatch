@@ -9,6 +9,7 @@ import {
   type GetAgentInput,
   type AgentProjectInput,
   type AgentIdsInput,
+  type AgentCreationWindowInput,
   type ListAgentsInput,
   type ConnectedAgentsInput,
   type ConnectedAgentsEnvironmentInput,
@@ -354,6 +355,20 @@ export class PrismaAgentRepository
       where: { id: input.id, projectId: input.projectId },
       data: { lastSeenAt: toDate(input.at) },
     });
+  }
+
+  async findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]> {
+    const rows = await this.prisma.agent.findMany({
+      where: {
+        projectId: input.projectId,
+        createdAt: { gte: toDate(input.from), lte: toDate(input.to) },
+        copiedFromAgentId: input.copiedFromAgentId,
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+
+    return rows.map((row) => row.id);
   }
 
   #writeError(error: unknown, input: GetAgentInput): never {

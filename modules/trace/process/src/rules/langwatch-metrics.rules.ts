@@ -1,6 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
-import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
+import { type ExtractorContext, takeAttribute } from "./canonical-attributes.rules.ts";
 import { isRecord } from "./canonical-guard.rules.ts";
 import { isLangWatchStructuredValue } from "./langwatch-structured-value.rules.ts";
 
@@ -70,7 +70,7 @@ const METRIC_FIELDS = [
 ] as const;
 
 function canonicaliseMetrics(ctx: ExtractorContext): void {
-  const rawMetrics = ctx.bag.attrs.take(ATTR_KEYS.LANGWATCH_METRICS);
+  const rawMetrics = takeAttribute(ctx.bag.attrs, ATTR_KEYS.LANGWATCH_METRICS);
   if (rawMetrics === void 0) return;
 
   const metricsValue = parseMetricsValue(rawMetrics);
@@ -106,7 +106,7 @@ function applyEvaluationPayload(ctx: ExtractorContext, parsed: Record<string, un
 }
 
 function canonicaliseEvaluation(ctx: ExtractorContext): void {
-  for (const event of ctx.bag.events.all()) {
+  for (const event of ctx.bag.events.events) {
     if (event.name !== "langwatch.evaluation.custom") continue;
 
     const jsonPayload = event.attributes.json_encoded_event;

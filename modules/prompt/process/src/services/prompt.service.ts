@@ -284,6 +284,10 @@ export class PromptService {
     return this.repository.countUsage(input);
   }
 
+  countVersionedPrompts(input: { projectId: string }): Promise<number> {
+    return this.repository.countVersioned(input);
+  }
+
   seedTagsForOrganization(input: { organizationId: string }): Promise<void> {
     return this.tagService.seedForOrganization(input);
   }

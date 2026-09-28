@@ -44,7 +44,9 @@ async function boot({ isSaas, billing }: { isSaas: boolean; billing: BillingApi 
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
       user: createEntitlementTestUsers(),
-      licensing: createApiFixture<LicensingApi>({ resolve: async () => free }),
+      licensing: createApiFixture<LicensingApi>({
+        resolve: async () => ({ granted: true, plan: free }),
+      }),
       billing,
       trace: createApiFixture<TraceApi>({}),
       organization: createApiFixture<OrganizationApi>({}),

@@ -3,14 +3,13 @@
  * process boundary.
  * Spec: specs/scenarios/child-execution-contract.feature
  */
-import { describe, expect, it } from "vitest";
-
 import {
-  buildChildEnvironment,
   decodeScenarioEgressPolicy,
   SCENARIO_EGRESS_POLICY_ENV,
-  type ScenarioChildProcessConfig,
-} from "../index.ts";
+} from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
+import { buildChildEnvironment, type ScenarioChildProcessConfig } from "../index.ts";
 
 const config: ScenarioChildProcessConfig = {
   packageRoot: "/app/apps/worker",

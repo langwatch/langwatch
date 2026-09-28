@@ -24,7 +24,7 @@ import {
 
 /** A source that always answers the same plan, or none at all. */
 export function fixedEntitlementSource(plan: Plan | null): EntitlementSource {
-  return { resolve: async () => plan };
+  return { resolve: async () => (plan ? { granted: true, plan } : { granted: false }) };
 }
 
 /** A counter that answers one figure, or {@link USAGE_UNKNOWN}. */

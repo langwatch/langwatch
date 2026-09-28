@@ -2,7 +2,7 @@ import type {
   AttributeCanonicaliser,
   ExtractorContext,
   LogExtractorContext,
-} from "./canonical-attributes.service.ts";
+} from "../rules/canonical-attributes.rules.ts";
 import { CodexLogCanonicaliserService } from "./codex-log.service.ts";
 import { CodexSpanCanonicaliserService } from "./codex-span.service.ts";
 

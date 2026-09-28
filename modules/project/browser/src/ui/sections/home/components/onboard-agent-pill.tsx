@@ -1,10 +1,7 @@
 import { HeroLeadPill } from "@langwatch/design-system/hero-lead-pill";
-import {
-  AgentActionsMenu,
-  setupAgentPrompt,
-} from "@langwatch/trace-browser/surfaces/setup-with-agent-button";
 import { LuBot, LuSparkles, LuTerminal } from "react-icons/lu";
 
+import { AgentActionsMenu } from "../../../../behavior/lent-peers.tsx";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { selfHostedEndpoint } from "../../../../model/self-hosted-endpoint.ts";
 
@@ -72,7 +69,7 @@ export function OnboardAgentPill({
           : null
       }
       copy={{
-        prompt: setupAgentPrompt("traces"),
+        // No prompt of its own: trace falls back to the tracing skill's setup prompt.
         skill: "tracing",
         // The project's own key, so the agent gets a setup it can run rather
         // than one that stops to ask for credentials.

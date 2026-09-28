@@ -8,7 +8,7 @@ import {
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
-import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -23,7 +23,7 @@ describe.skipIf(!DB_URL)("PrismaJoinCandidateRepository.findCandidateOrganizatio
     guard: PrismaTenancyGuardService.create(),
     logger: createLogger("langwatch:identity:test:join-candidate-repository"),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
-  const prisma = connection.client as PrismaClient;
+  const prisma = connection.client;
   const repository = PrismaJoinCandidateRepository.create(prisma);
 
   const organizationIds: string[] = [];

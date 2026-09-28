@@ -1,7 +1,11 @@
 import { METADATA_SUBKEY_PREFIXES } from "@langwatch/redaction/pii";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
-import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
+import {
+  type ExtractorContext,
+  takeAttribute,
+  takeAttributesByPrefix,
+} from "./canonical-attributes.rules.ts";
 import { isRecord } from "./canonical-guard.rules.ts";
 import { safeStringify } from "./langwatch-structured-value.rules.ts";
 
@@ -70,7 +74,9 @@ function hoistCustomMetadata(ctx: ExtractorContext, metadata: Record<string, unk
 function canonicaliseMetadataBlob(ctx: ExtractorContext): void {
   const { attrs } = ctx.bag;
   const metadata =
-    attrs.take("metadata") ?? attrs.take("langwatch.metadata") ?? attrs.take("langwatch.trace");
+    takeAttribute(attrs, "metadata") ??
+    takeAttribute(attrs, "langwatch.metadata") ??
+    takeAttribute(attrs, "langwatch.trace");
 
   if (isRecord(metadata)) {
     hoistReservedMetadata(ctx, metadata);
@@ -90,7 +96,7 @@ function canonicaliseMetadataBlob(ctx: ExtractorContext): void {
 function canonicaliseMetadataSubkeys(ctx: ExtractorContext): void {
   const { attrs } = ctx.bag;
   for (const prefix of METADATA_SUBKEY_PREFIXES) {
-    for (const { key, value } of attrs.takeByPrefix(prefix)) {
+    for (const { key, value } of takeAttributesByPrefix(attrs, prefix)) {
       const bareKey = key.slice(prefix.length);
       if (bareKey && value !== null && value !== void 0) {
         ctx.setAttr(
@@ -104,7 +110,7 @@ function canonicaliseMetadataSubkeys(ctx: ExtractorContext): void {
 
 function canonicaliseParams(ctx: ExtractorContext): void {
   const { attrs } = ctx.bag;
-  const params = attrs.take(ATTR_KEYS.LANGWATCH_PARAMS);
+  const params = takeAttribute(attrs, ATTR_KEYS.LANGWATCH_PARAMS);
   if (params !== void 0) {
     ctx.setAttr(ATTR_KEYS.LANGWATCH_PARAMS, params);
     ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:params`);

@@ -1,9 +1,13 @@
 import type { CanonicalAttributes, CanonicalEvent } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 
+import {
+  canonicalLogRecordStore,
+  canonicalSpanStore,
+  type ExtractorContext,
+  type LogExtractorContext,
+} from "../../rules/canonical-attributes.rules.ts";
 import { parseJsonStringValues as parseJsonStringAttrs } from "../../rules/canonical-json.rules.ts";
-import { CanonicalLogRecordStore, CanonicalSpanStore } from "../canonical-attributes.service.ts";
-import type { ExtractorContext, LogExtractorContext } from "../canonical-attributes.service.ts";
 
 export { parseJsonStringAttrs };
 
@@ -19,7 +23,7 @@ export function createExtractorContext(
   options?: { skipJsonParsing?: boolean },
 ): ExtractorContext {
   const parsed = options?.skipJsonParsing ? attrs : parseJsonStringAttrs(attrs);
-  const bag = CanonicalSpanStore.create({
+  const bag = canonicalSpanStore({
     spanAttributes: parsed as CanonicalAttributes,
     events: events ?? [],
   });
@@ -64,7 +68,7 @@ export function createLogExtractorContext(
   body = "",
 ): LogExtractorContext {
   const parsed = parseJsonStringAttrs(attrs);
-  const bag = CanonicalLogRecordStore.create({
+  const bag = canonicalLogRecordStore({
     scopeName,
     body,
     attributes: parsed as CanonicalAttributes,

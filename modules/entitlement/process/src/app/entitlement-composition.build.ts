@@ -11,6 +11,7 @@ import {
   type SendUsageLimitWarningInput,
   type UsageLimitWarning,
   type EntitlementApi as EntitlementApiContract,
+  type EntitlementGrant,
   type EntitlementSource,
 } from "@langwatch/entitlement-contract";
 import type { Logger } from "@langwatch/observability";
@@ -88,7 +89,7 @@ class BillingUsageWarning implements UsageWarning {
  * LangWatch Cloud's plan for an organization, read from billing's subscriptions: main's SaaS
  * plan provider. It is also the Cloud baseline, so a free plan keeps its subscription overrides.
  */
-class BillingSubscriptionPlans implements EntitlementSource, BaselinePlanSource {
+class BillingSubscriptionPlans implements BaselinePlanSource {
   static create(billing: Pick<BillingApi, "getActiveSubscriptionPlan">): BillingSubscriptionPlans {
     return new BillingSubscriptionPlans(billing);
   }
@@ -100,6 +101,19 @@ class BillingSubscriptionPlans implements EntitlementSource, BaselinePlanSource 
       organizationId: input.organizationId,
       user: input.user,
     });
+  }
+}
+
+/** The same subscription plans as a paid source: Cloud always answers a plan, so it grants one. */
+class BillingSubscriptionGrants implements EntitlementSource {
+  static create(plans: BillingSubscriptionPlans): BillingSubscriptionGrants {
+    return new BillingSubscriptionGrants(plans);
+  }
+
+  private constructor(private readonly plans: BillingSubscriptionPlans) {}
+
+  async resolve(input: ResolvePlanInput): Promise<EntitlementGrant> {
+    return { granted: true, plan: await this.plans.resolve(input) };
   }
 }
 
@@ -195,7 +209,7 @@ export function buildEntitlementInfrastructure(input: {
   const sources = {
     baseline: subscription ?? coreBaseline(input.isSaas),
     license: input.license,
-    subscription,
+    subscription: subscription ? BillingSubscriptionGrants.create(subscription) : undefined,
   };
 
   const plans = EntitlementService.create(sources);

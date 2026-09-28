@@ -4,11 +4,13 @@
  * externally (taken as dependency tokens).
  */
 import { renderLangyTurnContext, type LangyServerConfig } from "@langwatch/langy-contract";
+import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { type LangyWorker } from "../channels/langy-worker.channel.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
+import { RedisLangyTurnRelayRepository } from "../repositories/redis/redis.langy-turn-relay.repository.ts";
 import { langyWorkerRuntimeOf } from "../rules/langy-worker-runtime.rules.ts";
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
 import type { LangyVirtualKeyService } from "../services/langy-credential.service.ts";
@@ -22,6 +24,7 @@ import type {
 } from "../services/langy-postgres.service.ts";
 import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
 import type { LangyTurnTechnicalMembers } from "../services/langy-turn-shared.service.ts";
+import type { OpenLangyRelay } from "../services/langy.service.ts";
 import { LangyGithubPermit, type LangyModel, type LangyUiActionSurface } from "./langy.members.ts";
 
 /** The turn's three permit calls, on the feature package's own quota service. */
@@ -71,6 +74,7 @@ export function buildLangyInfrastructure(input: {
   uiActionSurface?: LangyUiActionSurface;
 }): LangyBuiltInfrastructure {
   const { redis, repositories, worker, models, sessionKeys, virtualKeys } = input;
+  const tokenBuffer = redis ? LangyTokenBufferRedisRepository.create({ redis }) : null;
 
   const permits = LangyGithubPrPermitsAdapter.create(
     LangyGithubPrQuotaService.create({
@@ -81,7 +85,7 @@ export function buildLangyInfrastructure(input: {
   const turns: LangyTurnTechnicalMembers = {
     models,
     worker,
-    tokenBuffer: redis ? LangyTokenBufferRedisRepository.create({ redis }) : null,
+    tokenBuffer,
     permits,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     sessionKeys,
@@ -112,8 +116,40 @@ export function buildLangyInfrastructure(input: {
     events: null,
     blockMetrics: LangyBlockMetricsOtelService.create(),
     ...(redis ? { feedbackPrompts: repositories.feedbackPrompts } : {}),
-    // No relay: opening one needs this process's public origin, which is not
-    // among the two members `LangyApp` reads. A process that serves the
-    // relay wires it in later, over this same build.
+    // No live buffer, no relay: the internal service answers 503 before opening one.
+    ...(redis
+      ? {
+          openRelay: relayOpener({
+            redis,
+            repositories,
+            baseHost: input.publicBaseUrl ?? "",
+          }),
+        }
+      : {}),
   };
+}
+
+const relayLogger = createLogger("langwatch:langy:relay");
+
+/**
+ * One relay per pushed connection, as main's relay route built it: frames are
+ * authenticated against the turn's project-scoped handoff first, deduplicated
+ * on the turn's nonce set, and fanned to the connection's own live buffer.
+ */
+function relayOpener(input: {
+  redis: RedisConnection;
+  repositories: LangyRepositories;
+  baseHost: string;
+}): OpenLangyRelay {
+  const { redis, repositories, baseHost } = input;
+  return (conversations) =>
+    RedisLangyTurnRelayRepository.create({
+      conversations,
+      buffer: LangyTokenBufferRedisRepository.create({ redis }),
+      frameDedup: repositories.frameDedup,
+      handoff: repositories.turnHandoff,
+      resourceLinks: repositories.resourceLinks,
+      baseHost,
+      logger: relayLogger,
+    });
 }

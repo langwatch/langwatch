@@ -191,12 +191,27 @@ def with_usage(response, prompt_tokens: int, completion_tokens: int):
     return response
 
 
+# @scenario "A streamed judge call is sent once to a model that refuses a forced function call"
+@pytest.mark.parametrize("known_refuser", [True, False])
+def test_streamed_call_to_a_refuser_is_sent_once_with_auto(provider, known_refuser):
+    provider.refusal = Exception(BEDROCK_FORCED_TOOL_REFUSAL)
+    if known_refuser:
+        litellm_patch.forced_tool_choice_refusers.add(MODEL)
+    stream = SimpleNamespace(choices=[])
+    provider.answers = [stream]
+
+    response = litellm.completion(**judge_request(stream=True))
+
+    expected = ["auto"] if known_refuser else [FORCED, "auto"]
+    assert [r["tool_choice"] for r in provider.requests] == expected
+    assert response is stream
+
+
 # @scenario "A judge that writes its verdict inside another field is asked once more"
 def test_call_with_the_verdict_inside_reasoning_is_asked_once_more(provider):
-    provider.answers = [
-        with_usage(tool_response(arguments=LEAKED_VERDICT_ARGUMENTS), 1000, 80),
-        with_usage(tool_response(arguments='{"reasoning": "r", "result": true}'), 1100, 40),
-    ]
+    first = with_usage(tool_response(arguments=LEAKED_VERDICT_ARGUMENTS), 1000, 80)
+    second = with_usage(tool_response(arguments='{"reasoning": "r", "result": true}'), 1100, 40)
+    provider.answers = [first, second]
 
     response = litellm.completion(**judge_request())
 
@@ -209,6 +224,8 @@ def test_call_with_the_verdict_inside_reasoning_is_asked_once_more(provider):
     assert read_tool_call_arguments(response, "evaluation", ["result"])["result"] is True
     assert (response.usage.prompt_tokens, response.usage.completion_tokens) == (2100, 120)
     assert response.usage.total_tokens == 2220
+    assert (second.usage.prompt_tokens, second.usage.total_tokens) == (1100, 1140)
+    assert (first.usage.prompt_tokens, first.usage.total_tokens) == (1000, 1080)
 
 
 # @scenario "A judge that writes its verdict inside another field is asked once more"

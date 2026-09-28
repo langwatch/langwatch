@@ -125,14 +125,15 @@ const Sparkline = ({
   const stroke = TREND_STROKE[trend];
 
   return (
-    <Box width={`${width}px`} height={`${height}px`} flexShrink={0}>
-      <svg
-        role="img"
-        aria-label={`Performance trend for ${name}`}
-        viewBox={`0 0 ${width} ${height}`}
-        width="100%"
-        height="100%"
-      >
+    <Box
+      as="figure"
+      margin={0}
+      aria-label={`Performance trend for ${name}`}
+      width={`${width}px`}
+      height={`${height}px`}
+      flexShrink={0}
+    >
+      <svg aria-hidden="true" viewBox={`0 0 ${width} ${height}`} width="100%" height="100%">
         {finitePoints.length > 1 ? (
           <polyline
             points={polyline}

@@ -7,6 +7,8 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const experimentWeb = defineWebModule("experiment")
+  // The replicate dialog reads workflow's port; workflow mounts it.
+  .withHosts({ requires: ["WorkflowHostApi"] })
   .withScreens({
     "pages/[project]/experiments/index": {
       load: () => import("./ui/sections/experiments/experiments.screen.tsx"),

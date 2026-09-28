@@ -1,6 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
-import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
+import { type ExtractorContext, takeAttribute } from "./canonical-attributes.rules.ts";
 import { isNonEmptyString } from "./canonical-guard.rules.ts";
 
 const VERCEL_RULE_PREFIX = "vercel";
@@ -30,20 +30,20 @@ export const AI_SDK_SPAN_TYPE_MAP: Record<string, string> = {
 
 export function canonicaliseVercelToolCall(ctx: ExtractorContext): void {
   const { attrs } = ctx.bag;
-  const toolName = attrs.take(ATTR_KEYS.AI_TOOL_CALL_NAME);
+  const toolName = takeAttribute(attrs, ATTR_KEYS.AI_TOOL_CALL_NAME);
   if (isNonEmptyString(toolName)) {
     ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_TOOL_NAME, toolName);
     ctx.recordRule(`${VERCEL_RULE_PREFIX}:ai.toolCall.name->gen_ai.tool.name`);
   }
 
-  const args = stringifyToolPayload(attrs.take(ATTR_KEYS.AI_TOOL_CALL_ARGS));
+  const args = stringifyToolPayload(takeAttribute(attrs, ATTR_KEYS.AI_TOOL_CALL_ARGS));
   if (args !== null) {
     ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_INPUT, args);
     ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS, args);
     ctx.recordRule(`${VERCEL_RULE_PREFIX}:ai.toolCall.args->input`);
   }
 
-  const result = stringifyToolPayload(attrs.take(ATTR_KEYS.AI_TOOL_CALL_RESULT));
+  const result = stringifyToolPayload(takeAttribute(attrs, ATTR_KEYS.AI_TOOL_CALL_RESULT));
   if (result !== null) {
     ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_OUTPUT, result);
     ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT, result);

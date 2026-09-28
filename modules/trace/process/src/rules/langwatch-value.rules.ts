@@ -1,6 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
-import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
+import { type ExtractorContext, takeAttribute } from "./canonical-attributes.rules.ts";
 import {
   extractSystemInstructionFromMessages,
   normalizeToMessages,
@@ -48,7 +48,7 @@ function publishInputChatMessages(
 
 function canonicaliseInput(ctx: ExtractorContext, reservedTypes: string[]): void {
   const { attrs } = ctx.bag;
-  const rawInput = attrs.take(ATTR_KEYS.LANGWATCH_INPUT);
+  const rawInput = takeAttribute(attrs, ATTR_KEYS.LANGWATCH_INPUT);
   if (rawInput !== void 0) {
     if (isLangWatchStructuredValue(rawInput)) {
       reservedTypes.push(`${ATTR_KEYS.LANGWATCH_INPUT}=${rawInput.type}`);
@@ -118,7 +118,7 @@ function setStructuredOutput(ctx: ExtractorContext, rawOutput: LangWatchStructur
 }
 
 function canonicaliseOutput(ctx: ExtractorContext, reservedTypes: string[]): void {
-  const rawOutput = ctx.bag.attrs.take(ATTR_KEYS.LANGWATCH_OUTPUT);
+  const rawOutput = takeAttribute(ctx.bag.attrs, ATTR_KEYS.LANGWATCH_OUTPUT);
   if (rawOutput === void 0) return;
 
   if (isLangWatchStructuredValue(rawOutput)) {

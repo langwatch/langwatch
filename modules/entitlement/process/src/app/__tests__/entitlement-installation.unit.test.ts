@@ -120,7 +120,7 @@ describe("entitlement app installation", () => {
             listIdsByOrganization: async () => ["project-1"],
           }),
           licensing: createApiFixture<LicensingApi>({
-            resolve: async () => free,
+            resolve: async () => ({ granted: true, plan: free }),
           }),
         })
         .boot();
@@ -186,7 +186,7 @@ describe("entitlement app installation", () => {
           }),
           project: createApiFixture<ProjectApi>({}),
           licensing: createApiFixture<LicensingApi>({
-            resolve: async (input) => (await source.resolve(input)) ?? free,
+            resolve: (input) => source.resolve(input),
           }),
         })
         .boot();

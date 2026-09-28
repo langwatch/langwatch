@@ -36,8 +36,14 @@ export const datasetWeb = defineWebModule("dataset")
         default: (await import("./ui/sections/select-dataset-drawer.tsx")).SelectDatasetDrawer,
       }),
     },
+    uploadCSV: {
+      load: async () => ({
+        default: (await import("./ui/sections/datasets/routed-upload-csv-drawer.tsx"))
+          .RoutedUploadCsvDrawer,
+      }),
+    },
   })
-  /** The create-or-edit drawer, the record sync and the editor table, lent (§3.4 rule 7). */
+  /** The create-or-edit drawer, editor table, picker list and record sync, lent (§3.4 rule 7). */
   .withCapabilities({
     addOrEditDatasetDrawer: {
       load: async () => ({
@@ -49,6 +55,11 @@ export const datasetWeb = defineWebModule("dataset")
       load: async () => ({
         default: (await import("./ui/sections/datasets/lent-dataset-editor-table.tsx"))
           .LentDatasetEditorTable,
+      }),
+    },
+    datasetPickerList: {
+      load: async () => ({
+        default: (await import("./ui/sections/dataset-picker-list.tsx")).DatasetPickerList,
       }),
     },
     datasetRecordSync: {

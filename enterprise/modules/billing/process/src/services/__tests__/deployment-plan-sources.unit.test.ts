@@ -63,10 +63,9 @@ describe("given the plan sources a deployment resolves through", () => {
         subscriptions: subscriptions(subscription()),
       }).sources();
 
-      const plan = await sources.subscription?.resolve({ organizationId: "org-1" });
+      const grant = await sources.subscription?.resolve({ organizationId: "org-1" });
 
-      expect(plan?.type).toBe(PlanTypes.LAUNCH);
-      expect(plan?.free).toBe(false);
+      expect(grant).toMatchObject({ granted: true, plan: { type: PlanTypes.LAUNCH, free: false } });
     });
 
     /** @scenario "A paid source exists only where the subscription rows do" */
@@ -76,9 +75,9 @@ describe("given the plan sources a deployment resolves through", () => {
         subscriptions: subscriptions(null),
       }).sources();
 
-      const plan = await sources.subscription?.resolve({ organizationId: "org-1" });
+      const grant = await sources.subscription?.resolve({ organizationId: "org-1" });
 
-      expect(plan?.free).toBe(true);
+      expect(grant).toMatchObject({ granted: true, plan: { free: true } });
     });
   });
 
@@ -122,9 +121,9 @@ describe("given the plan sources a deployment resolves through", () => {
         subscriptions: subscriptions(subscription()),
       }).sources();
 
-      const plan = await sources.subscription?.resolve({ organizationId: "org-1" });
+      const grant = await sources.subscription?.resolve({ organizationId: "org-1" });
 
-      expect(plan?.free).toBe(true);
+      expect(grant).toMatchObject({ granted: true, plan: { free: true } });
     });
   });
 
@@ -147,12 +146,12 @@ describe("given the plan sources a deployment resolves through", () => {
           subscriptions: subscriptions(subscription({ plan: type })),
         }).sources();
 
-        const plan = await sources.subscription?.resolve({ organizationId: "org-1" });
+        const grant = await sources.subscription?.resolve({ organizationId: "org-1" });
 
-        expect(plan?.type, `${type} is not a plan the subscription source can answer`).toBe(type);
-        for (const [field, value] of Object.entries(entitlements ?? {})) {
-          expect(plan?.[field as keyof typeof plan], `${type}.${field}`).toBe(value);
-        }
+        expect(grant, `${type} is not a plan the subscription source can answer`).toMatchObject({
+          granted: true,
+          plan: { type, ...entitlements },
+        });
       }
     });
 
@@ -184,7 +183,7 @@ const licensedEnterprise: Plan = {
 };
 
 function licence(plan: Plan): EntitlementSource {
-  return { resolve: async () => plan };
+  return { resolve: async () => ({ granted: true, plan }) };
 }
 
 describe("given a deployment that composed a licence source", () => {
@@ -196,8 +195,8 @@ describe("given a deployment that composed a licence source", () => {
     }).sources();
 
     await expect(sources.license?.resolve({ organizationId: "org-1" })).resolves.toMatchObject({
-      type: PlanTypes.ENTERPRISE,
-      free: false,
+      granted: true,
+      plan: { type: PlanTypes.ENTERPRISE, free: false },
     });
   });
 
@@ -245,7 +244,7 @@ describe("given a deployment that composed a licence source", () => {
 
     expect(sources.license).toBeDefined();
     await expect(sources.subscription?.resolve({ organizationId: "org-1" })).resolves.toMatchObject(
-      { type: PlanTypes.LAUNCH },
+      { granted: true, plan: { type: PlanTypes.LAUNCH } },
     );
   });
 });

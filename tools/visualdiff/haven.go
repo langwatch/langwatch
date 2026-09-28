@@ -332,9 +332,11 @@ func havenGaveUp(status havenrun.Status, slug string, from int64) (string, strin
 	}
 	plain := ansiEscape.ReplaceAllString(content, "")
 	for _, line := range strings.Split(plain, "\n") {
-		if at := strings.Index(line, "haven: "); at >= 0 {
-			return strings.TrimSpace(line[at:]), havenrun.LastLines(plain, havenrun.DefaultFailureLogLines)
+		at := strings.Index(line, "haven: ")
+		if at < 0 || havenBanner.MatchString(line[at:]) {
+			continue
 		}
+		return strings.TrimSpace(line[at:]), havenrun.LastLines(plain, havenrun.DefaultFailureLogLines)
 	}
 	return "", ""
 }
@@ -343,6 +345,9 @@ func dirExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
 }
+
+// havenBanner matches the stack banner haven prints on every start, which is not a failure.
+var havenBanner = regexp.MustCompile(`^haven: stack "[^"]+"`)
 
 // ansiEscape matches the terminal control sequences haven's log viewer writes.
 var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)

@@ -153,3 +153,9 @@ Feature: visualdiff catches regressions and reports its own coverage
       Given the candidate is HEAD and tracked files have uncommitted changes
       When a run starts
       Then stderr warns that the candidate renders the last commit without them
+
+    @unit
+    Scenario: A runner that cannot launch its browser stops the run before any stack boots
+      Given Playwright's browser is not installed for the runner
+      When a run starts
+      Then it fails before any worktree is checked out or stack started, naming the install command

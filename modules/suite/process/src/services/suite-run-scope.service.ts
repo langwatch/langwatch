@@ -12,6 +12,7 @@ import {
   normalizePlanScope,
   sortSuiteTargets,
   targetLabels,
+  type ConnectedTargetAgent,
   type Suite,
   type SuiteScope,
   type SuiteTarget,
@@ -19,7 +20,6 @@ import {
 } from "@langwatch/suite-contract";
 
 import { isAgentTarget, isAgentUnseen } from "../rules/suite-target.rules.ts";
-import type { ConnectedTargetAgent } from "./connected-target.service.ts";
 import type { SuiteServiceOptions } from "./suite.service.ts";
 
 export class SuiteRunScopeService {

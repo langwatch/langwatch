@@ -3,7 +3,7 @@ Feature: LLM-as-judge evaluators on content longer than the token budget
   I want a verdict on the content even when it is longer than the judge can read
   So that long conversations are judged instead of silently skipped
 
-  # The judge benchmark (langwatch/tasks#905) found 4.9% of real LLM-judge
+  # The judge benchmark found 4.9% of real LLM-judge
   # cases over the 128k-token budget, and langevals skipped all of them. The
   # content is now cut to the budget keeping its opening and its ending, the
   # same rule as cutToEstimatedTokensKeepingEnds in @langwatch/trace-contract.

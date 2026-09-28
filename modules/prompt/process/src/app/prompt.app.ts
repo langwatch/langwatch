@@ -294,6 +294,10 @@ export class PromptApp implements PromptApi {
     return this.#dependencies.prompts.countUsage(input);
   }
 
+  countVersionedPrompts(input: { projectId: string }): Promise<number> {
+    return this.#dependencies.prompts.countVersionedPrompts(input);
+  }
+
   seedTagsForOrganization(input: { organizationId: string }): Promise<void> {
     return this.#dependencies.prompts.seedTagsForOrganization(input);
   }

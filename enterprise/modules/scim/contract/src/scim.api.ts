@@ -43,13 +43,13 @@ export type ScimDirectoryScope = Readonly<{
   connectionId: string | null;
 }>;
 
-/** What one directory delivery is answered with, before anything is provisioned. */
-export type ScimDeliveryAdmission =
-  | Readonly<{ status: "not-configured" }>
-  | Readonly<{ status: "unauthorized" }>
-  | Readonly<{ status: "forbidden" }>
-  | Readonly<{ status: "invalid-json" }>
-  | Readonly<{ status: "admitted"; organizationId: string; events: unknown[] }>;
+/**
+ * What one directory delivery is answered with: received once provisioned, or the
+ * refusal Auth0's log stream reads, in the words it has always read.
+ */
+export type ScimDeliveryReceipt =
+  | Readonly<{ status: 200 }>
+  | Readonly<{ status: 400 | 401 | 403 | 404; error: string }>;
 
 /** One management-API write on a token, as the organization's audit reads it. */
 export type ScimTokenAuditEntry = Readonly<{
@@ -255,21 +255,15 @@ export interface ScimApi {
   // ── The directory's log stream ───────────────────────────────────────────
 
   /**
-   * Whether one Auth0 delivery provisions anything, and whose directory it
-   * provisions. Answered rather than thrown: the intake owns its own bodies,
-   * including the 404 an install that configured no secret gives so that a
-   * probe cannot learn the path is served here.
+   * One Auth0 delivery, admitted and then provisioned into the directory its credential names,
+   * never one the payload implies. Answered rather than thrown: the intake owns its bodies,
+   * including the 404 an install with no secret gives so a probe cannot learn the path is served.
    */
-  admitDirectoryDelivery(delivery: {
+  receiveDirectoryDelivery(delivery: {
     body: string;
     signature: string | null;
     authorization: string | null;
-  }): Promise<ScimDeliveryAdmission>;
-  /**
-   * Walks one admitted delivery's events into provisioning calls. The tenant is
-   * the one the credential named, never one the payload implies.
-   */
-  relayDirectoryEvents(input: { organizationId: string; events: unknown[] }): Promise<void>;
+  }): Promise<ScimDeliveryReceipt>;
 }
 
 export const ScimApi = moduleApi<ScimApi>()("scim");

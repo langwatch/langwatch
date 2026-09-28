@@ -6,9 +6,6 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   GroupRow,
-  makeBatchRun,
-  makeScenarioRunData,
-  makeSummary,
   type RunGroup,
   type RunGroupSummary,
   RunHistoryFilters,
@@ -18,6 +15,8 @@ import {
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "./run-history-fixtures.ts";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),

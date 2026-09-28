@@ -29,6 +29,11 @@ export const traceWeb = defineWebModule("trace")
   })
   /** Trace UI that reads trace's own data, lent to the modules that show it (§3.4 rule 7). */
   .withCapabilities({
+    agentActionsMenu: {
+      load: async () => ({
+        default: (await import("./ui/sections/setup-with-agent-button.tsx")).AgentActionsMenu,
+      }),
+    },
     annotationQueueConversation: {
       load: async () => ({
         default: (await import("./ui/sections/annotation-queue/annotation-queue-conversation.tsx"))

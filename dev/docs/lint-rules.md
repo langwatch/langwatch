@@ -103,10 +103,17 @@ Messages:
 - `swallowingTry`
   - what: `{{name}}` hedges: its catch turns a failure into null or undefined, so the caller cannot tell absence from breakage.
   - fix: Delete the catch that answers null or undefined so the failure reaches the caller, then drop `try` and name it for what it answers. A lookup of one thing becomes `get<Noun>` — or `getBy<Key>` when the key is what distinguishes it — and throws the domain error instead of answering null. None or many becomes `find<Noun>` returning an array, whose empty case is the absence. A derivation (`parse`, `extract`, `derive` and the other ADR-146 derivation verbs) may answer undefined when its input carried none. Never rename it to a `find*` that still answers null — `find` promises a list.
+- `swallowingTryOneValue`
+  - what: `{{name}}` hedges: its catch turns a failure into null or undefined, so the caller cannot tell absence from breakage.
+  - fix: Delete the catch that answers null or undefined so the failure reaches the caller, then drop `try` and name it for what it answers. It answers one value, so name it `get<Noun>` — or `getBy<Key>` when the key is what distinguishes it — and throw the domain error instead of answering null. If absence means something other than not-found, return an explicit result union naming that outcome instead. Do not rename it `find*`: `find` answers an array.
 - `tryPrefix`
   - what: `{{name}}` is named for how it behaves on failure, not for what it answers.
   - fix: Drop `try` and name it for what it answers. A lookup of one thing becomes `get<Noun>` — or `getBy<Key>` when the key is what distinguishes it — and throws the domain error instead of answering null. None or many becomes `find<Noun>` returning an array, whose empty case is the absence. A derivation (`parse`, `extract`, `derive` and the other ADR-146 derivation verbs) may answer undefined when its input carried none. Never rename it to a `find*` that still answers null — `find` promises a list.
   - why: A caller reading the call site cannot tell a lookup from a hedge, and the two need different handling.
+- `tryPrefixOneValue`
+  - what: `{{name}}` is named for how it behaves on failure, not for the one value it answers.
+  - fix: Drop `try` and name it for what it answers. It answers one value, so name it `get<Noun>` — or `getBy<Key>` when the key is what distinguishes it — and throw the domain error instead of answering null. If absence means something other than not-found, return an explicit result union naming that outcome instead. Do not rename it `find*`: `find` answers an array.
+  - why: `find` states cardinality, and this answers one value, not an array.
 
 ## `langwatch/clickhouse-no-version-order-limit`
 
@@ -150,9 +157,9 @@ Messages:
 - Spec: `specs/tooling/lint-cognitive-complexity.feature`
 - Enforced: yes, at `error`
 
-| Option | Type    | Default | Description |
-| ------ | ------- | ------- | ----------- |
-| `max`  | integer | `15`    | —           |
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `max` | integer | `15` | — |
 
 Messages:
 
@@ -192,11 +199,11 @@ Messages:
 - Spec: `specs/tooling/lint-condition-shape.feature`
 - Enforced: yes, at `error`
 
-| Option         | Type    | Default | Description |
-| -------------- | ------- | ------- | ----------- |
-| `maxCalls`     | integer | `1`     | —           |
-| `maxHops`      | integer | `2`     | —           |
-| `maxOperators` | integer | `2`     | —           |
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `maxCalls` | integer | `1` | — |
+| `maxHops` | integer | `2` | — |
+| `maxOperators` | integer | `2` | — |
 
 Messages:
 
@@ -324,10 +331,22 @@ Options: none.
 
 Messages:
 
+- `findAnswersPage`
+  - what: `{{name}}` answers a page, and `find` answers an array.
+  - fix: Rename it `list{{rest}}` here, in the interface it implements and at every caller: a page is `list*` in a service or a repository. If it really answers every match, drop the cursor or total and return the array under `find{{rest}}`.
+  - why: A page carries a position in a larger whole; `find` promises the whole answer, empty when there is none.
+- `nullableOneValue`
+  - what: `{{name}}` answers one value or null or undefined, which is not a shape new code writes.
+  - fix: Make it one-or-throw: name it `get<Noun>` — or `getBy<Key>` when the key is what distinguishes it — throw the domain error when the value does not exist, and drop null and undefined from the return type. If absence means something other than not-found, return an explicit result union naming that outcome instead. Do not rename it `find*`: `find` answers an array.
+  - why: `find` states cardinality: it answers an array, and this answers one value.
 - `nullableWithoutFind`
   - what: `{{name}}` answers null or undefined, which is not a shape new code writes.
   - fix: Decide what the absence means. If it is one thing that may not exist, name it `get<Noun>` — or `getBy<Key>` when the key is what distinguishes it — and throw the domain error, dropping null and undefined from the return type, so the caller gets the answer or the reason there is none. If it is really none or many, return an array and name it `find<Noun>`: the empty array is the absence. If it is a write whose target may normally be absent, return an explicit result union. Do not answer this by adding a nullable `find*` — `find` states cardinality, and the existing nullable ones are left as they are rather than joined by new ones.
   - why: A caller cannot tell whether absence here is an ordinary answer or a failure.
+- `repositoryOneValue`
+  - what: Repository method `{{name}}` answers one value, which a repository names `get*` and answers or throws.
+  - fix: Name it `get{{rest}}`, throw the module's not-found error when the value does not exist and drop null and undefined from the return type, here and in the repository interface this class implements. If absence means something other than not-found, return an explicit result union naming that outcome instead. Do not rename it `find{{rest}}`.
+  - why: `find` answers an array, so renaming a one-value read to `find*` misstates its cardinality.
 - `repositoryServiceVocabulary`
   - what: Repository method `{{name}}` uses service vocabulary; repositories answer `find*`, services answer `get*`.
   - fix: Rename it `find{{rest}}` here and in the repository interface this class implements.

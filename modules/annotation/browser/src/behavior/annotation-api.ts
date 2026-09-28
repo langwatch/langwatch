@@ -1,10 +1,11 @@
 /**
- * The procedures this package calls. The annotation namespaces are derived from
- * the contract; the borrowed three belong to features that have not split yet.
+ * The procedures this package calls. The annotation and personal-workspace-features namespaces
+ * are derived from their owners' contracts; the borrowed three belong to features not split yet.
  */
 
 import type { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
+import type { personalWorkspaceFeaturesTrpc } from "@langwatch/organization-contract";
 
 import type { AnnotationTrace } from "../model/annotation-row.ts";
 
@@ -77,9 +78,10 @@ type BorrowedProcedures = {
   };
 };
 
-/** Everything this family calls: the two declared namespaces plus the borrowed three. */
+/** Everything this family calls: the three derived namespaces plus the borrowed three. */
 type AnnotationProcedures = ContractApiMap<typeof annotationTrpc> &
   ContractApiMap<typeof annotationScoreTrpc> &
+  ContractApiMap<typeof personalWorkspaceFeaturesTrpc> &
   BorrowedProcedures;
 
 /** The annotations family's typed tRPC hooks; the screen mounts its Provider. */

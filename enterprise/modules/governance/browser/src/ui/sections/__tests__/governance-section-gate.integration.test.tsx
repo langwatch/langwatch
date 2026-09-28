@@ -46,9 +46,9 @@ vi.mock("../../elements/loading-screen.tsx", () => ({
 
 import AgentsScreen from "../governance/agents.tsx";
 import AnalyticsScreen from "../governance/analytics.tsx";
-import AnomalyRulesScreen from "../governance/governance-anomaly-rules.screen.tsx";
 import BilledScreen from "../governance/governance-billed.screen.tsx";
 import CostsScreen from "../governance/governance-costs.screen.tsx";
+import InventoryScreen from "../governance/governance-inventory.screen.tsx";
 import OverviewScreen from "../governance/governance-overview.screen.tsx";
 import InsightsScreen from "../governance/insights.tsx";
 import SignalsScreen from "../governance/signals.tsx";
@@ -96,7 +96,7 @@ describe("the governance section flag", () => {
     });
 
     it("hides every other governance page the same way", () => {
-      renderGated(<AnomalyRulesScreen />, { flags: [BILLED_COST_FLAG] });
+      renderGated(<InventoryScreen />, { flags: [BILLED_COST_FLAG] });
 
       expect(screen.getByText(NOT_FOUND)).toBeInTheDocument();
       expect(harness.requested).toEqual([]);
@@ -105,7 +105,7 @@ describe("the governance section flag", () => {
 
   describe("when release_ui_ai_governance_enabled is on", () => {
     it("opens the page and issues its reads", () => {
-      renderGated(<AnomalyRulesScreen />, { flags: [SECTION_FLAG], permissions: ORG_ADMIN });
+      renderGated(<InventoryScreen />, { flags: [SECTION_FLAG], permissions: ORG_ADMIN });
 
       expect(screen.queryByText(NOT_FOUND)).toBeNull();
       expect(harness.requested).not.toEqual([]);
@@ -127,7 +127,7 @@ describe("the governance:view grant", () => {
 
   describe("when the reader holds it", () => {
     it("opens the page and issues its reads", () => {
-      renderGated(<AnomalyRulesScreen />, { permissions: ORG_ADMIN });
+      renderGated(<InventoryScreen />, { permissions: ORG_ADMIN });
 
       expect(screen.queryByText(/Missing permission/)).toBeNull();
       expect(harness.requested).not.toEqual([]);

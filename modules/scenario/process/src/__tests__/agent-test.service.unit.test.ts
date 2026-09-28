@@ -8,6 +8,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import { AGENT_TEST_SCENARIO_ID } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { AgentTestTurnChild } from "../app/scenario.app.ts";
 import { AgentTestService } from "../services/agent-test.service.ts";
 
 const prefetchAgentTestData = vi.fn();
@@ -17,8 +18,8 @@ vi.mock("../services/agent-test-prefetch.service.ts", () => ({
   },
 }));
 
-/** The adapter registry, handed to the service the way the process hands it. */
-const buildAdapter = vi.fn();
+/** The turn's child, handed to the service the way the process hands it. */
+const runTurn = vi.fn<AgentTestTurnChild["run"]>();
 
 const now = new Date("2026-08-30T10:00:00Z");
 
@@ -85,7 +86,8 @@ function serviceFor(options: {
     prompts: {} as never,
     secrets: {} as never,
     modelProviders: {} as never,
-    agentAdapters: { build: (...args: never[]) => buildAdapter(...args) } as never,
+    turns: { run: runTurn },
+    nlpTimeouts: { engineCodeBlockTimeoutSeconds: Number.NaN, maxTimeoutMs: 90_000 },
     simulations: { queueRun } as never,
     config: {
       langwatchEndpoint: "http://app:5560",
@@ -103,8 +105,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   prefetchAgentTestData.mockResolvedValue({
     success: true,
-    data: { adapterData: {}, nlpServiceUrl: "http://langwatch_nlp:5561" },
-    telemetry: { apiKey: "sk-lw-project" },
+    data: {
+      adapterData: {},
+      nlpServiceUrl: "http://langwatch_nlp:5561",
+      scenario: { labels: ["agent-test"] },
+    },
+    telemetry: { endpoint: "http://app:5560", apiKey: "sk-lw-project" },
   });
 });
 
@@ -145,8 +151,7 @@ describe("AgentTestService.sendTurn", () => {
   describe("given an HTTP agent that never answers", () => {
     /** @scenario "A turn that outlives the call deadline is failed" */
     it("fails with agent_call_timeout at the platform cap", async () => {
-      vi.useFakeTimers();
-      buildAdapter.mockReturnValue({ call: () => new Promise(() => undefined) });
+      runTurn.mockResolvedValue({ success: false, error: "no answer", timeoutMs: 300_000 });
       const { service } = serviceFor({});
 
       const pending = service.sendTurn({
@@ -155,17 +160,19 @@ describe("AgentTestService.sendTurn", () => {
         message: "ping",
         actor,
       });
-      pending.catch(() => undefined);
-      await vi.advanceTimersByTimeAsync(300_010);
-      await expect(pending).rejects.toMatchObject({ code: "agent_call_timeout" });
 
-      vi.useRealTimers();
+      await expect(pending).rejects.toMatchObject({ code: "agent_call_timeout" });
+      expect(runTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          job: expect.objectContaining({ kind: "agent-test-turn", timeoutMs: 300_000 }),
+        }),
+      );
     });
   });
 
   describe("given an HTTP agent that answers inside the deadline", () => {
-    it("answers what the adapter returned", async () => {
-      buildAdapter.mockReturnValue({ call: () => Promise.resolve("pong") });
+    it("answers what the child's adapter returned", async () => {
+      runTurn.mockResolvedValue({ success: true, output: "pong", durationMs: 12 });
       const { service } = serviceFor({});
 
       const result = await service.sendTurn({
@@ -175,8 +182,42 @@ describe("AgentTestService.sendTurn", () => {
         actor,
       });
 
-      expect(result.output).toBe("pong");
-      expect(result.instance).toBeNull();
+      expect(result).toEqual({ output: "pong", durationMs: 12, instance: null });
+    });
+
+    it("runs the turn in a child with the project's telemetry and only usable deadlines", async () => {
+      runTurn.mockResolvedValue({ success: true, output: "pong", durationMs: 12 });
+      const { service } = serviceFor({});
+
+      await service.sendTurn({ projectId: "proj_1", agent: httpAgent(), message: "ping", actor });
+
+      expect(runTurn).toHaveBeenCalledWith({
+        job: {
+          kind: "agent-test-turn",
+          adapterData: {},
+          nlpServiceUrl: "http://langwatch_nlp:5561",
+          parameters: {},
+          message: "ping",
+          timeoutMs: 300_000,
+          nlpTimeouts: { maxTimeoutMs: 90_000 },
+        },
+        environment: {
+          labels: ["agent-test"],
+          telemetry: { endpoint: "http://app:5560", apiKey: "sk-lw-project" },
+        },
+        logContext: { projectId: "proj_1", scenarioId: AGENT_TEST_SCENARIO_ID },
+      });
+    });
+  });
+
+  describe("given an HTTP agent whose turn fails in the child", () => {
+    it("fails with the child's error", async () => {
+      runTurn.mockResolvedValue({ success: false, error: "connection refused" });
+      const { service } = serviceFor({});
+
+      await expect(
+        service.sendTurn({ projectId: "proj_1", agent: httpAgent(), message: "ping", actor }),
+      ).rejects.toThrow("connection refused");
     });
   });
 });
