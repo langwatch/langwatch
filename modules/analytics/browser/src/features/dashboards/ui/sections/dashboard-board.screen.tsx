@@ -1,123 +1,167 @@
 /**
- * One board: the Agent Flight Deck when the address names it, with its
- * panels and period control, otherwise one of the member's own (blocks
- * arrive with their own step; an empty one keeps the blank area).
+ * One board: the Agent Flight Deck when the address names it, read-only with
+ * its panels, otherwise one of the member's own, editable, with its blocks on
+ * the grid or the blank-board state. Both share the header and the picker.
  */
 
-import { Badge, Box, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Spinner, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { nowInstant } from "@langwatch/time";
 import { UiPageLoading, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
-import { useMemo, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
+import { HandledErrorAlert } from "../../../../ui/elements/handled-error-alert.tsx";
+import { useBlockPickerAddress } from "../../behavior/use-block-picker-address.ts";
+import { useBoardBlocks } from "../../behavior/use-board-blocks.ts";
+import { useBoardDescription } from "../../behavior/use-board-description.ts";
+import { useBoardPeriod } from "../../behavior/use-board-period.ts";
+import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { FlightDeckPanels } from "../../blocks/index.ts";
-import {
-  boardPeriodBounds,
-  boardPeriodGranularity,
-  parseBoardPeriodGrain,
-  parseBoardPeriodRange,
-} from "../../model/board-period.ts";
-import { FLIGHT_DECK } from "../../model/boards.ts";
+import { dashboardsPath, FLIGHT_DECK } from "../../model/boards.ts";
+import { AddBlockCard, BlankBoard } from "../blocks/blank-board.tsx";
+import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
+import { BlockPickerDialog } from "./block-picker-dialog.tsx";
+import { BoardBlocksGrid } from "./board-blocks-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
-function BoardFrame({
-  name,
-  description,
-  isDefault,
+function BoardPage({
+  header,
   areaLabel,
-  periodControl,
   children,
 }: {
-  name: string;
-  description?: string;
-  isDefault: boolean;
+  header: ReactNode;
   areaLabel: string;
-  periodControl?: ReactNode;
-  children?: ReactNode;
+  children: ReactNode;
 }) {
   return (
     <VStack align="stretch" gap={0} width="full">
-      <PageLayout.Header>
-        <PageLayout.Heading>{name}</PageLayout.Heading>
-        {isDefault && (
-          <Badge size="sm" variant="subtle" textTransform="uppercase">
-            Default
-          </Badge>
-        )}
-        <Spacer />
-        {periodControl}
-      </PageLayout.Header>
+      {header}
       <PageLayout.Container maxWidth="full" width="full">
-        <VStack align="stretch" gap={4}>
-          {description && <Text color="fg.muted">{description}</Text>}
-          <Box as="section" aria-label={areaLabel} minHeight="240px">
-            {children}
-          </Box>
-        </VStack>
+        <Box as="section" aria-label={areaLabel} minHeight="240px">
+          {children}
+        </Box>
       </PageLayout.Container>
     </VStack>
   );
 }
 
-function SavedBoard({ dashboardId }: { dashboardId: string | undefined }) {
+function usePeriodControl() {
+  const { range, grain, period, setRange, setGrain } = useBoardPeriod();
+  const control = (
+    <BoardPeriodControl
+      range={range}
+      grain={grain}
+      onRangeChange={setRange}
+      onGrainChange={setGrain}
+    />
+  );
+  return { period, control };
+}
+
+function FlightDeckBoard() {
+  const projectId = useAnalyticsHost().project()?.id;
+  const { period, control } = usePeriodControl();
+  const picker = useBlockPickerAddress();
+
+  return (
+    <BoardPage
+      areaLabel="Panels"
+      header={
+        <BoardHeader
+          name={FLIGHT_DECK.name}
+          isDefault={FLIGHT_DECK.isDefault}
+          description={FLIGHT_DECK.description}
+          onAddChart={picker.open}
+          periodControl={control}
+        />
+      }
+    >
+      {projectId && <FlightDeckPanels projectId={projectId} {...period} />}
+      {picker.isOpen && <BlockPickerDialog onClose={picker.close} />}
+    </BoardPage>
+  );
+}
+
+function OwnBoard({ board }: { board: SavedBoard }) {
+  const host = useAnalyticsHost();
+  const projectId = host.project()?.id ?? "";
+  const saved = useSavedDashboards();
+  const boardBlocks = useBoardBlocks();
+  const { description, saveDescription } = useBoardDescription();
+  const { period, control } = usePeriodControl();
+  const picker = useBlockPickerAddress();
+  const blocks = boardBlocks.blocksOn(board.id);
+  const otherBoards = saved.boards.filter(({ id }) => id !== board.id);
+
+  return (
+    <BoardPage
+      areaLabel="Blocks"
+      header={
+        <BoardHeader
+          name={board.name}
+          isDefault={false}
+          description={description}
+          onRename={(name) => saved.renameBoard({ dashboardId: board.id, name })}
+          onDescribe={saveDescription}
+          onAddChart={picker.open}
+          periodControl={control}
+        />
+      }
+    >
+      {boardBlocks.status === "pending" && <Spinner size="sm" />}
+      {boardBlocks.status === "error" && (
+        <HandledErrorAlert
+          error={boardBlocks.error}
+          fallbackTitle="This dashboard could not load its blocks"
+        />
+      )}
+      {boardBlocks.status === "success" && blocks.length === 0 && (
+        <BlankBoard
+          onAddBlock={picker.open}
+          onOpenTemplate={() =>
+            host.navigate(
+              dashboardsPath({ projectSlug: saved.projectSlug, dashboardId: FLIGHT_DECK.id }),
+            )
+          }
+        />
+      )}
+      {boardBlocks.status === "success" && blocks.length > 0 && (
+        <VStack align="stretch" gap={4}>
+          <BoardBlocksGrid
+            projectId={projectId}
+            blocks={blocks}
+            period={period}
+            otherBoards={otherBoards}
+            isWriting={boardBlocks.isWriting}
+            onDuplicate={(boardBlock) =>
+              void boardBlocks.duplicateBlock({ dashboardId: board.id, boardBlock })
+            }
+            onMove={(input) => void boardBlocks.moveBlock(input)}
+            onDelete={(boardBlock) => void boardBlocks.removeBlock({ boardBlock })}
+            onPlacementsCommit={(placements) => void boardBlocks.commitPlacements(placements)}
+          />
+          <AddBlockCard compact onClick={picker.open} />
+        </VStack>
+      )}
+      {picker.isOpen && <BlockPickerDialog targetDashboardId={board.id} onClose={picker.close} />}
+    </BoardPage>
+  );
+}
+
+function SavedBoardScreen({ dashboardId }: { dashboardId: string | undefined }) {
   const { boards, isLoading } = useSavedDashboards();
   if (isLoading) return <UiPageLoading />;
   const board = boards.find(({ id }) => id === dashboardId);
   if (!board) return <UiPageNotFound />;
-  return <BoardFrame name={board.name} isDefault={false} areaLabel="Blocks" />;
-}
-
-function FlightDeckBoard() {
-  const host = useAnalyticsHost();
-  const projectId = host.project()?.id;
-  const query = host.route().query;
-  const range = parseBoardPeriodRange(query.range);
-  const grain = parseBoardPeriodGrain(query.grain);
-
-  // Fixed once per range change, not every render, so panels don't refetch on each rerender.
-  const { periodStart, periodEnd } = useMemo(
-    () => boardPeriodBounds({ range, now: nowInstant().epochMilliseconds }),
-    [range],
-  );
-  const granularitySeconds = useMemo(
-    () => boardPeriodGranularity({ grain, periodStart, periodEnd }),
-    [grain, periodStart, periodEnd],
-  );
-
-  return (
-    <BoardFrame
-      name={FLIGHT_DECK.name}
-      description={FLIGHT_DECK.description}
-      isDefault={FLIGHT_DECK.isDefault}
-      areaLabel="Panels"
-      periodControl={
-        <BoardPeriodControl
-          range={range}
-          grain={grain}
-          onRangeChange={(next) => host.setQuery({ ...query, range: next })}
-          onGrainChange={(next) => host.setQuery({ ...query, grain: next })}
-        />
-      }
-    >
-      {projectId && (
-        <FlightDeckPanels
-          projectId={projectId}
-          periodStart={periodStart}
-          periodEnd={periodEnd}
-          granularitySeconds={granularitySeconds}
-        />
-      )}
-    </BoardFrame>
-  );
+  // Keyed so a board's visit-only state never leaks into the next board.
+  return <OwnBoard key={board.id} board={board} />;
 }
 
 function Board() {
   const dashboardId = useAnalyticsHost().route().params.dashboardId;
   if (dashboardId === FLIGHT_DECK.id) return <FlightDeckBoard />;
-  return <SavedBoard dashboardId={dashboardId} />;
+  return <SavedBoardScreen dashboardId={dashboardId} />;
 }
 
 export default function DashboardBoardScreen() {

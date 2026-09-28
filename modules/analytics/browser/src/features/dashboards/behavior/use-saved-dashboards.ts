@@ -1,5 +1,5 @@
 /**
- * The member's own boards and the three writes the sidebar offers, over the
+ * The member's own boards and the writes the sidebar and board offer, over the
  * existing `dashboards.*` procedures. Failures travel raw to the host, which
  * resolves their words from the code (#5984).
  */
@@ -37,6 +37,21 @@ export function useSavedDashboards() {
         onError: (error) => host.failed({ error, fallbackTitle: "Couldn't create the dashboard" }),
       },
     );
+  };
+
+  /** Creates an untitled board without opening it; undefined when the create failed. */
+  const createUntitledBoard = async (): Promise<SavedBoard | undefined> => {
+    try {
+      const created = await create.mutateAsync({
+        projectId,
+        name: untitledBoardName({ existingCount: boards.length }),
+      });
+      void refresh();
+      return { id: created.id, name: created.name };
+    } catch (error) {
+      host.failed({ error, fallbackTitle: "Couldn't create the dashboard" });
+      return void 0;
+    }
   };
 
   const renameBoard = ({ dashboardId, name }: { dashboardId: string; name: string }) => {
@@ -78,6 +93,7 @@ export function useSavedDashboards() {
     isCreating: create.isPending,
     isDeleting: remove.isPending,
     createBoard,
+    createUntitledBoard,
     renameBoard,
     deleteBoard,
   };
