@@ -187,3 +187,64 @@ Feature: Slack connections
       Given an automation whose stored token cannot be decrypted
       When the Slack connection migration runs with apply
       Then that automation is reported as skipped and left unchanged
+
+    @integration
+    Scenario: A project connection shared with another project widens to the organization
+      Given a project whose Slack integration was set up before this change
+      And an automation in another project with the same token
+      When the Slack connection migration runs with apply
+      Then that connection becomes an organization connection, keeping its name and secret
+      And both automations point at it
+
+    @integration
+    Scenario: An organization connection holding the secret is reused as it is
+      Given an organization connection holding a webhook URL
+      And automations in two projects with that URL
+      When the Slack connection migration runs with apply
+      Then both automations point at that connection
+      And the connection is unchanged and no other is created
+
+    @integration
+    Scenario: Automations the migration must not touch are left unchanged
+      Given a deleted automation, an automation in an archived project and an automation already pointing at a connection
+      When the Slack connection migration runs with apply
+      Then none of them changes
+      And no connection is created for them
+
+    @integration
+    Scenario: The migration runs dry unless told to apply, and refuses any other option
+      When the Slack connection migration task runs with no option
+      Then it says it is a dry run, reports what it would do and writes nothing
+      When it runs with apply
+      Then it writes the connections and links
+      When it runs with any other option
+      Then it refuses before printing or writing anything
+
+    @unit
+    Scenario: The migration report never prints a secret
+      Given automations whose tokens and webhook URLs the migration creates, reuses or skips
+      When the Slack connection migration reports a dry run or an apply
+      Then each new connection is named by the last four characters of its secret
+      And no token, webhook URL or stored ciphertext appears anywhere in the output
+
+    @integration
+    Scenario: A concurrent run that stored the secret first is reused, not duplicated
+      Given another run stores a connection for a secret after this run planned to create one
+      When this run writes its plan and the unique secret index refuses the insert
+      Then it re-plans and links its automations to the stored connection
+      And no second connection holds that secret
+
+    @integration
+    Scenario: An automation edited while the migration runs is left as edited
+      Given an automation edited after the migration planned it
+      When the migration links automations
+      Then that automation keeps the edit, is not linked and is reported as changed during migration
+
+    @integration
+    Scenario: One organization's failure does not stop the others
+      Given two organizations with Slack automations to migrate
+      And writing the first organization's connections fails partway
+      When the Slack connection migration runs with apply
+      Then the first organization keeps no connection and no link
+      And the second organization is migrated
+      And the failure is reported by its error code, never its message, and the run exits with an error

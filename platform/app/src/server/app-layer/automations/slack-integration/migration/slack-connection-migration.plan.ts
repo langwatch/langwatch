@@ -240,7 +240,10 @@ function plannedConnectionFor({
     secret: group.secret,
     secretFingerprint: group.fingerprint,
     secretHint,
-    name: defaultSlackConnectionName({ kind: group.kind, secret: group.secret }),
+    name: defaultSlackConnectionName({
+      kind: group.kind,
+      secret: group.secret,
+    }),
     kind: group.kind,
     ...scope,
     members: group.members,

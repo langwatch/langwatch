@@ -31,17 +31,31 @@ import { decrypt, encrypt } from "../utils/encryption";
 
 /** Stands in for a creator when the organization has no admin to name. */
 const MIGRATION_ACTOR_ID = "system:migration";
-const PROJECT_CHUNK = 500;
+const ID_CHUNK = 500;
 const MAX_ATTEMPTS = 2;
 
-/** Every project id, keyed to its organization. */
+/** Every project id keyed to its organization; a project whose team row is gone belongs to none. */
 async function loadProjectOrganizations(): Promise<Map<string, string>> {
   const projects = await prisma.project.findMany({
-    select: { id: true, team: { select: { organizationId: true } } },
+    select: { id: true, teamId: true },
   });
-  return new Map(
-    projects.map((project) => [project.id, project.team.organizationId]),
-  );
+  const teamIds = [...new Set(projects.map((project) => project.teamId))];
+  const teamOrganizations = new Map<string, string>();
+  for (let start = 0; start < teamIds.length; start += ID_CHUNK) {
+    const teams = await prisma.team.findMany({
+      where: { id: { in: teamIds.slice(start, start + ID_CHUNK) } },
+      select: { id: true, organizationId: true },
+    });
+    for (const team of teams) {
+      teamOrganizations.set(team.id, team.organizationId);
+    }
+  }
+  const projectOrganizations = new Map<string, string>();
+  for (const project of projects) {
+    const organizationId = teamOrganizations.get(project.teamId);
+    if (organizationId) projectOrganizations.set(project.id, organizationId);
+  }
+  return projectOrganizations;
 }
 
 function loadSlackAutomations({
@@ -60,17 +74,19 @@ function loadSlackAutomations({
   });
 }
 
-/** The organizations holding at least one Slack automation not yet on a connection. */
+/** The organizations holding a Slack automation not yet on a connection, within `scope` when given. */
 async function findOrganizationsToMigrate({
   projectOrganizations,
+  scope,
 }: {
   projectOrganizations: Map<string, string>;
+  scope?: string[];
 }): Promise<string[]> {
   const projectIds = [...projectOrganizations.keys()];
   const organizationIds = new Set<string>();
-  for (let start = 0; start < projectIds.length; start += PROJECT_CHUNK) {
+  for (let start = 0; start < projectIds.length; start += ID_CHUNK) {
     const automations = await loadSlackAutomations({
-      projectIds: projectIds.slice(start, start + PROJECT_CHUNK),
+      projectIds: projectIds.slice(start, start + ID_CHUNK),
     });
     for (const automation of automations) {
       if (isLinkedToConnection(automation)) continue;
@@ -78,7 +94,8 @@ async function findOrganizationsToMigrate({
       if (organizationId) organizationIds.add(organizationId);
     }
   }
-  return [...organizationIds].sort();
+  const found = [...organizationIds].sort();
+  return scope ? found.filter((id) => scope.includes(id)) : found;
 }
 
 async function planOrganization({
@@ -290,7 +307,18 @@ function projectIdsByOrganization({
   return byOrganization;
 }
 
-export default async function migrateSlackConnections(...args: string[]) {
+/**
+ * The task behind `pnpm run task migrateSlackConnections [--apply]`. The CLI
+ * never passes `organizationIds`; tests do, so an apply stays inside their own
+ * tenants in a database other suites share.
+ */
+export async function runSlackConnectionMigration({
+  args,
+  organizationIds: scope,
+}: {
+  args: string[];
+  organizationIds?: string[];
+}): Promise<void> {
   const unknownArgs = args.filter((arg) => arg !== "--apply");
   if (unknownArgs.length > 0) {
     throw new Error(
@@ -307,6 +335,7 @@ export default async function migrateSlackConnections(...args: string[]) {
   const projectOrganizations = await loadProjectOrganizations();
   const organizationIds = await findOrganizationsToMigrate({
     projectOrganizations,
+    scope,
   });
   const projectIds = projectIdsByOrganization({ projectOrganizations });
   const organizations = await prisma.organization.findMany({
@@ -346,4 +375,10 @@ export default async function migrateSlackConnections(...args: string[]) {
       `Slack connection migration failed for ${failed.length} organization(s): ${failed.join(", ")}`,
     );
   }
+}
+
+export default function migrateSlackConnections(
+  ...args: string[]
+): Promise<void> {
+  return runSlackConnectionMigration({ args });
 }

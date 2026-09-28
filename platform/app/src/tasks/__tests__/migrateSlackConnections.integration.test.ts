@@ -1,159 +1,95 @@
 /**
- * The migration against real rows: one connection per secret, a JSON merge that
- * keeps legacy fields, a second run that writes nothing, and tenancy guards
- * that accept the queries and the raw link update the task issues.
+ * One organization's migration against real rows, scoped to its own tenant:
+ * one connection per secret, legacy fields kept, rows it must not touch, no
+ * second write, and the race with a concurrent run or edit.
  */
 
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
-  type Organization,
-  type Project,
   SlackIntegrationKind,
   SlackIntegrationScopeType,
-  type Team,
-  TriggerAction,
-  TriggerKind,
 } from "~/generated/prisma/client";
 import { slackSecretFingerprint } from "~/server/app-layer/automations/slack-integration/slack-secret-fingerprint";
 import { prisma } from "~/server/db";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { migrateOrganization } from "../migrateSlackConnections";
+import {
+  addOrganizationAdmin,
+  clearSlackMigrationTenant,
+  createSlackMigrationTenant,
+  findConnections,
+  holdTransaction,
+  readAutomation,
+  removeSlackMigrationTenant,
+  type SlackMigrationTenant,
+  storeBotAutomation,
+  storeSlackAutomation,
+  storeSlackConnection,
+  storeWebhookAutomation,
+  waitForLockWait,
+} from "./slackMigrationFixtures";
 
 const TOKEN = "xoxb-migration-test-token-a1b2";
 const WEBHOOK = "https://hooks.slack.com/services/T0/B0/migrationtest9z8y";
 
-describe("migrateSlackConnections", () => {
-  const ns = `slackmig-${nanoid(8)}`;
-  let organization: Organization | undefined;
-  let team: Team | undefined;
-  let projects: Project[] = [];
+const linkedParams = z.object({ slackIntegrationId: z.string() });
 
-  const organizationId = () => organization!.id;
-  const projectA = () => projects[0]!.id;
-  const projectB = () => projects[1]!.id;
+describe("migrateSlackConnections", () => {
+  let tenant: SlackMigrationTenant | undefined;
+
+  const current = () => {
+    if (!tenant) throw new Error("tenant not created");
+    return tenant;
+  };
+  const organizationId = () => current().organization.id;
+  const projectId = (index: number) => {
+    const project = current().projects[index];
+    if (!project) throw new Error(`no project ${index}`);
+    return project.id;
+  };
+  const projectA = () => projectId(0);
+  const projectB = () => projectId(1);
 
   const run = ({ apply }: { apply: boolean }) =>
     migrateOrganization({
       organizationId: organizationId(),
-      projectIds: projects.map((project) => project.id),
+      projectIds: current().projects.map((project) => project.id),
       apply,
     });
-
-  /** Returns the params as written, so assertions compare against them typed. */
-  const storeAutomation = async ({
-    projectId,
-    actionParams,
-  }: {
-    projectId: string;
-    actionParams: Record<string, string>;
-  }) => {
-    const row = await prisma.trigger.create({
-      data: {
-        id: nanoid(),
-        name: `Slack automation ${nanoid(4)}`,
-        projectId,
-        action: TriggerAction.SEND_SLACK_MESSAGE,
-        actionParams,
-        filters: {},
-        triggerKind: TriggerKind.AUTOMATION,
-      },
-    });
-    return { id: row.id, projectId, actionParams };
-  };
-
-  const botWithToken = ({ projectId }: { projectId: string }) =>
-    storeAutomation({
-      projectId,
-      actionParams: {
-        slackDelivery: "bot",
-        slackChannelId: "C0123",
-        slackBotToken: encrypt(TOKEN),
-      },
-    });
-
-  const webhook = ({ projectId }: { projectId: string }) =>
-    storeAutomation({
-      projectId,
-      actionParams: { slackDelivery: "webhook", slackWebhook: WEBHOOK },
-    });
-
   const connections = () =>
-    prisma.slackIntegration.findMany({
-      where: { organizationId: organizationId() },
-    });
-
-  const readParams = async ({
-    id,
-    projectId,
-  }: {
-    id: string;
-    projectId: string;
-  }) =>
-    (await prisma.trigger.findFirstOrThrow({ where: { id, projectId } }))
-      .actionParams;
+    findConnections({ organizationId: organizationId() });
+  const readParams = async (automation: { id: string; projectId: string }) =>
+    (await readAutomation(automation)).actionParams;
 
   beforeAll(async () => {
-    organization = await prisma.organization.create({
-      data: { name: "Slack Migration Org", slug: `--test-org-${ns}` },
+    tenant = await createSlackMigrationTenant({
+      organizationId: `slackmig-${nanoid(8)}`,
+      label: "Org",
+      projectCount: 2,
     });
-    team = await prisma.team.create({
-      data: {
-        name: "Slack Migration Team",
-        slug: `--test-team-${ns}`,
-        organizationId: organization.id,
-      },
-    });
-    projects = await Promise.all(
-      ["a", "b"].map((suffix) =>
-        prisma.project.create({
-          data: {
-            name: `Slack Migration Project ${suffix}`,
-            slug: `--test-project-${ns}-${suffix}`,
-            teamId: team!.id,
-            language: "other",
-            framework: "other",
-            apiKey: `test-api-key-${ns}-${suffix}`,
-          },
-        }),
-      ),
-    );
   });
 
   beforeEach(async () => {
-    await prisma.trigger.deleteMany({
-      where: { projectId: { in: projects.map((project) => project.id) } },
-    });
-    await prisma.slackIntegration.deleteMany({
-      where: { organizationId: organizationId() },
-    });
+    await clearSlackMigrationTenant({ tenant: current() });
   });
 
   afterAll(async () => {
-    if (organization) {
-      await prisma.trigger.deleteMany({
-        where: { projectId: { in: projects.map((project) => project.id) } },
-      });
-      await prisma.slackIntegration.deleteMany({
-        where: { organizationId: organization.id },
-      });
-    }
-    for (const project of projects) {
-      await prisma.project.delete({ where: { id: project.id } });
-    }
-    if (team) await prisma.team.delete({ where: { id: team.id } });
-    if (organization) {
-      await prisma.organization.delete({ where: { id: organization.id } });
-    }
+    if (tenant) await removeSlackMigrationTenant({ tenant });
   });
 
   /** @scenario Automations sharing a secret share one connection */
   it("stores one project connection per secret and points each automation at its own", async () => {
     const bots = await Promise.all(
-      [1, 2, 3].map(() => botWithToken({ projectId: projectA() })),
+      [1, 2, 3].map(() =>
+        storeBotAutomation({ projectId: projectA(), token: TOKEN }),
+      ),
     );
     const hooks = await Promise.all(
-      [1, 2].map(() => webhook({ projectId: projectA() })),
+      [1, 2].map(() =>
+        storeWebhookAutomation({ projectId: projectA(), url: WEBHOOK }),
+      ),
     );
 
     await run({ apply: true });
@@ -173,26 +109,62 @@ describe("migrateSlackConnections", () => {
       webhookUrlEncrypted: null,
       createdById: "system:migration",
     });
-    expect(decrypt(bot!.botTokenEncrypted!)).toBe(TOKEN);
-    expect(decrypt(hook!.webhookUrlEncrypted!)).toBe(WEBHOOK);
+    expect(decrypt(bot?.botTokenEncrypted ?? "")).toBe(TOKEN);
+    expect(decrypt(hook?.webhookUrlEncrypted ?? "")).toBe(WEBHOOK);
     for (const automation of bots) {
       expect(await readParams(automation)).toEqual({
         ...automation.actionParams,
-        slackIntegrationId: bot!.id,
+        slackIntegrationId: bot?.id,
       });
     }
     for (const automation of hooks) {
-      expect(await readParams(automation)).toMatchObject({
-        slackWebhook: WEBHOOK,
-        slackIntegrationId: hook!.id,
+      expect(await readParams(automation)).toEqual({
+        ...automation.actionParams,
+        slackIntegrationId: hook?.id,
       });
     }
   });
 
+  it("encrypts the plaintext webhook URL into the connection and keeps every legacy field on the automation", async () => {
+    const legacy = await storeSlackAutomation({
+      projectId: projectA(),
+      actionParams: {
+        slackWebhook: WEBHOOK,
+        slackTemplateType: "trace_alert_compact",
+        mentions: ["@here"],
+        layout: { compact: true, fields: ["name", "score"] },
+      },
+    });
+
+    await run({ apply: true });
+
+    const [hook, ...rest] = await connections();
+    expect(rest).toEqual([]);
+    expect(hook).toMatchObject({
+      kind: SlackIntegrationKind.INCOMING_WEBHOOK,
+      name: "Slack webhook ••••9z8y",
+      secretHint: "9z8y",
+      secretFingerprint: slackSecretFingerprint({ secret: WEBHOOK }),
+      botTokenEncrypted: null,
+    });
+    expect(hook?.webhookUrlEncrypted).not.toContain("hooks.slack.com");
+    expect(decrypt(hook?.webhookUrlEncrypted ?? "")).toBe(WEBHOOK);
+    expect(await readParams(legacy)).toEqual({
+      ...legacy.actionParams,
+      slackIntegrationId: hook?.id,
+    });
+  });
+
   /** @scenario A secret shared across projects becomes an organization connection */
   it("stores one organization connection for a URL used in two projects", async () => {
-    const first = await webhook({ projectId: projectA() });
-    const second = await webhook({ projectId: projectB() });
+    const first = await storeWebhookAutomation({
+      projectId: projectA(),
+      url: WEBHOOK,
+    });
+    const second = await storeWebhookAutomation({
+      projectId: projectB(),
+      url: WEBHOOK,
+    });
 
     await run({ apply: true });
 
@@ -203,35 +175,28 @@ describe("migrateSlackConnections", () => {
       scopeId: organizationId(),
     });
     expect(await readParams(first)).toMatchObject({
-      slackIntegrationId: only!.id,
+      slackIntegrationId: only?.id,
     });
     expect(await readParams(second)).toMatchObject({
-      slackIntegrationId: only!.id,
+      slackIntegrationId: only?.id,
     });
   });
 
   /** @scenario A project's existing connection absorbs matching automations */
   it("links a matching automation and a tokenless bot to the project's existing connection", async () => {
-    const existing = await prisma.slackIntegration.create({
-      data: {
-        name: "Acme HQ",
-        kind: SlackIntegrationKind.BOT,
-        scopeType: SlackIntegrationScopeType.PROJECT,
-        scopeId: projectA(),
-        organizationId: organizationId(),
-        botTokenEncrypted: encrypt(TOKEN),
-        secretFingerprint: slackSecretFingerprint({ secret: TOKEN }),
-        secretHint: "a1b2",
-        slackTeamName: "Acme HQ",
-        createdById: "user-1",
-        updatedById: "user-1",
-      },
+    const existing = await storeSlackConnection({
+      organizationId: organizationId(),
+      kind: SlackIntegrationKind.BOT,
+      scopeType: SlackIntegrationScopeType.PROJECT,
+      scopeId: projectA(),
+      secret: TOKEN,
+      name: "Acme HQ",
     });
-    const withToken = await botWithToken({ projectId: projectA() });
-    const tokenless = await storeAutomation({
+    const withToken = await storeBotAutomation({
       projectId: projectA(),
-      actionParams: { slackDelivery: "bot", slackChannelId: "C0123" },
+      token: TOKEN,
     });
+    const tokenless = await storeBotAutomation({ projectId: projectA() });
 
     await run({ apply: true });
 
@@ -244,9 +209,173 @@ describe("migrateSlackConnections", () => {
     });
   });
 
+  /** @scenario A project connection shared with another project widens to the organization */
+  it("widens the project connection in place, naming the organization's admin as the actor", async () => {
+    const adminId = await addOrganizationAdmin({ tenant: current() });
+    const existing = await storeSlackConnection({
+      organizationId: organizationId(),
+      kind: SlackIntegrationKind.BOT,
+      scopeType: SlackIntegrationScopeType.PROJECT,
+      scopeId: projectA(),
+      secret: TOKEN,
+      name: "Acme HQ",
+    });
+    const home = await storeBotAutomation({
+      projectId: projectA(),
+      token: TOKEN,
+    });
+    const elsewhere = await storeBotAutomation({
+      projectId: projectB(),
+      token: TOKEN,
+    });
+
+    const outcome = await run({ apply: true });
+
+    const [widened, ...rest] = await connections();
+    expect(rest).toEqual([]);
+    expect(widened).toMatchObject({
+      id: existing.id,
+      name: "Acme HQ",
+      scopeType: SlackIntegrationScopeType.ORGANIZATION,
+      scopeId: organizationId(),
+      botTokenEncrypted: existing.botTokenEncrypted,
+      createdById: "user-settings",
+      updatedById: adminId,
+    });
+    expect(outcome.plan.connections).toEqual([
+      expect.objectContaining({
+        action: "reuse",
+        widenedFromProjectId: projectA(),
+      }),
+    ]);
+    expect(await readParams(home)).toMatchObject({
+      slackIntegrationId: existing.id,
+    });
+    expect(await readParams(elsewhere)).toMatchObject({
+      slackIntegrationId: existing.id,
+    });
+  });
+
+  /** @scenario An organization connection holding the secret is reused as it is */
+  it("links automations in two projects to the organization connection without changing it", async () => {
+    const existing = await storeSlackConnection({
+      organizationId: organizationId(),
+      kind: SlackIntegrationKind.INCOMING_WEBHOOK,
+      scopeType: SlackIntegrationScopeType.ORGANIZATION,
+      scopeId: organizationId(),
+      secret: WEBHOOK,
+      name: "Company alerts",
+    });
+    const first = await storeWebhookAutomation({
+      projectId: projectA(),
+      url: WEBHOOK,
+    });
+    const second = await storeWebhookAutomation({
+      projectId: projectB(),
+      url: WEBHOOK,
+    });
+
+    await run({ apply: true });
+
+    expect(await connections()).toEqual([existing]);
+    expect(await readParams(first)).toMatchObject({
+      slackIntegrationId: existing.id,
+    });
+    expect(await readParams(second)).toMatchObject({
+      slackIntegrationId: existing.id,
+    });
+  });
+
+  it("skips a tokenless bot with no project bot connection, or with two to choose from", async () => {
+    for (const { secret, name } of [
+      { secret: TOKEN, name: "Workspace one" },
+      { secret: "xoxb-second-workspace-5f5f", name: "Workspace two" },
+    ]) {
+      await storeSlackConnection({
+        organizationId: organizationId(),
+        kind: SlackIntegrationKind.BOT,
+        scopeType: SlackIntegrationScopeType.PROJECT,
+        scopeId: projectA(),
+        secret,
+        name,
+      });
+    }
+    const ambiguous = await storeBotAutomation({ projectId: projectA() });
+    const orphaned = await storeBotAutomation({ projectId: projectB() });
+    const before = await connections();
+
+    const outcome = await run({ apply: true });
+
+    expect(outcome.linkedIds).toEqual([]);
+    expect(
+      outcome.skipped.map(({ automation, reason }) => [automation.id, reason]),
+    ).toEqual(
+      expect.arrayContaining([
+        [ambiguous.id, "ambiguous project connection"],
+        [orphaned.id, "no secret"],
+      ]),
+    );
+    expect(outcome.skipped).toHaveLength(2);
+    expect(await connections()).toEqual(before);
+    expect(await readParams(ambiguous)).toEqual(ambiguous.actionParams);
+    expect(await readParams(orphaned)).toEqual(orphaned.actionParams);
+  });
+
+  /** @scenario Automations the migration must not touch are left unchanged */
+  it("leaves deleted automations, archived projects' automations and already-linked automations alone", async () => {
+    const deleted = await storeSlackAutomation({
+      projectId: projectA(),
+      actionParams: { slackDelivery: "webhook", slackWebhook: WEBHOOK },
+      deleted: true,
+    });
+    const linked = await storeSlackAutomation({
+      projectId: projectA(),
+      actionParams: {
+        slackDelivery: "bot",
+        slackChannelId: "C0123",
+        slackBotToken: encrypt(TOKEN),
+        slackIntegrationId: "conn-chosen-by-a-user",
+      },
+    });
+    const archived = await storeWebhookAutomation({
+      projectId: projectB(),
+      url: WEBHOOK,
+    });
+    await prisma.project.update({
+      where: { id: projectB() },
+      data: { archivedAt: new Date() },
+    });
+    const untouched = [deleted, linked, archived];
+    const before = await Promise.all(untouched.map((a) => readAutomation(a)));
+
+    try {
+      const outcome = await run({ apply: true });
+
+      expect(await connections()).toEqual([]);
+      expect(outcome.linkedIds).toEqual([]);
+      expect(outcome.skipped).toEqual([
+        expect.objectContaining({
+          automation: expect.objectContaining({ id: archived.id }),
+          reason: "archived project",
+        }),
+      ]);
+      expect(
+        await Promise.all(untouched.map((a) => readAutomation(a))),
+      ).toEqual(before);
+    } finally {
+      await prisma.project.update({
+        where: { id: projectB() },
+        data: { archivedAt: null },
+      });
+    }
+  });
+
   /** @scenario The migration changes nothing unless applied, and nothing twice */
   it("writes nothing on a dry run and nothing on a second apply", async () => {
-    const automation = await webhook({ projectId: projectA() });
+    const automation = await storeWebhookAutomation({
+      projectId: projectA(),
+      url: WEBHOOK,
+    });
 
     const dryRun = await run({ apply: false });
     expect(dryRun.linkedIds).toEqual([automation.id]);
@@ -256,20 +385,28 @@ describe("migrateSlackConnections", () => {
     const first = await run({ apply: true });
     expect(first.linkedIds).toEqual([automation.id]);
     const afterFirst = await connections();
+    const linkedRow = await readAutomation(automation);
 
     const second = await run({ apply: true });
     expect(second.plan.connections).toEqual([]);
     expect(second.linkedIds).toEqual([]);
     expect(await connections()).toEqual(afterFirst);
+    expect(await readAutomation(automation)).toEqual(linkedRow);
   });
 
   it("keeps inactive automations and leaves an archived project's out of scope", async () => {
-    const inactive = await webhook({ projectId: projectA() });
+    const inactive = await storeWebhookAutomation({
+      projectId: projectA(),
+      url: WEBHOOK,
+    });
     await prisma.trigger.update({
       where: { id: inactive.id, projectId: projectA() },
       data: { active: false },
     });
-    const archived = await webhook({ projectId: projectB() });
+    const archived = await storeWebhookAutomation({
+      projectId: projectB(),
+      url: WEBHOOK,
+    });
     await prisma.project.update({
       where: { id: projectB() },
       data: { archivedAt: new Date() },
@@ -299,7 +436,7 @@ describe("migrateSlackConnections", () => {
 
   /** @scenario A secret that cannot be decrypted is skipped, not guessed */
   it("reports an undecryptable token as skipped and leaves the automation unchanged", async () => {
-    const broken = await storeAutomation({
+    const broken = await storeSlackAutomation({
       projectId: projectA(),
       actionParams: {
         slackDelivery: "bot",
@@ -318,5 +455,112 @@ describe("migrateSlackConnections", () => {
     ]);
     expect(await connections()).toEqual([]);
     expect(await readParams(broken)).toEqual(broken.actionParams);
+  });
+
+  describe("when another writer races the run", () => {
+    /** @scenario A concurrent run that stored the secret first is reused, not duplicated */
+    it("re-plans after the unique index refuses its insert and links to the row stored first", async () => {
+      const automation = await storeBotAutomation({
+        projectId: projectA(),
+        token: TOKEN,
+      });
+      const rival = await holdTransaction({
+        work: (tx) =>
+          tx.slackIntegration.create({
+            data: {
+              name: "Stored by the other run",
+              kind: SlackIntegrationKind.BOT,
+              scopeType: SlackIntegrationScopeType.PROJECT,
+              scopeId: projectA(),
+              organizationId: organizationId(),
+              botTokenEncrypted: encrypt(TOKEN),
+              secretFingerprint: slackSecretFingerprint({ secret: TOKEN }),
+              secretHint: "a1b2",
+              createdById: "system:migration",
+              updatedById: "system:migration",
+            },
+          }),
+      });
+
+      const migrating = run({ apply: true });
+      await waitForLockWait();
+      rival.release();
+      await rival.committed;
+      const outcome = await migrating;
+
+      const [only, ...rest] = await connections();
+      expect(rest).toEqual([]);
+      expect(only?.name).toBe("Stored by the other run");
+      expect(outcome.plan.connections).toEqual([
+        expect.objectContaining({ action: "reuse", connectionId: only?.id }),
+      ]);
+      expect(outcome.linkedIds).toEqual([automation.id]);
+      expect(await readParams(automation)).toMatchObject({
+        slackIntegrationId: only?.id,
+      });
+    });
+
+    /** @scenario A concurrent run that stored the secret first is reused, not duplicated */
+    it("lets two whole runs race to one connection per secret, each automation linked once", async () => {
+      const automations = [
+        await storeBotAutomation({ projectId: projectA(), token: TOKEN }),
+        await storeBotAutomation({ projectId: projectA(), token: TOKEN }),
+        await storeWebhookAutomation({ projectId: projectB(), url: WEBHOOK }),
+      ];
+
+      const outcomes = await Promise.all([
+        run({ apply: true }),
+        run({ apply: true }),
+      ]);
+
+      const stored = await connections();
+      expect(stored.map((c) => c.kind).sort()).toEqual([
+        SlackIntegrationKind.BOT,
+        SlackIntegrationKind.INCOMING_WEBHOOK,
+      ]);
+      expect(outcomes.flatMap((outcome) => outcome.linkedIds).sort()).toEqual(
+        automations.map((a) => a.id).sort(),
+      );
+      for (const automation of automations) {
+        const { slackIntegrationId } = linkedParams.parse(
+          await readParams(automation),
+        );
+        expect(stored.map((c) => c.id)).toContain(slackIntegrationId);
+      }
+    });
+
+    /** @scenario An automation edited while the migration runs is left as edited */
+    it("reports an automation edited after planning as changed and keeps the edit", async () => {
+      const automation = await storeWebhookAutomation({
+        projectId: projectA(),
+        url: WEBHOOK,
+      });
+      const edited = {
+        ...automation.actionParams,
+        slackWebhook: `${WEBHOOK}-rotated`,
+      };
+      const editor = await holdTransaction({
+        work: (tx) =>
+          tx.trigger.update({
+            where: { id: automation.id, projectId: projectA() },
+            data: { actionParams: edited },
+          }),
+      });
+
+      const migrating = run({ apply: true });
+      await waitForLockWait();
+      editor.release();
+      await editor.committed;
+      const outcome = await migrating;
+
+      expect(outcome.linkedIds).toEqual([]);
+      expect(outcome.skipped).toEqual([
+        expect.objectContaining({
+          automation: expect.objectContaining({ id: automation.id }),
+          reason: "changed during migration",
+        }),
+      ]);
+      expect(await readParams(automation)).toEqual(edited);
+    });
   });
 });

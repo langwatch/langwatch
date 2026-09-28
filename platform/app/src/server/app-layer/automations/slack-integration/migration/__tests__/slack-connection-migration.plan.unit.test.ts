@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   SlackIntegrationKind,
   SlackIntegrationScopeType,
@@ -412,6 +412,260 @@ describe("planSlackConnectionMigration", () => {
 
       expect(plan({ automations: [unreadable] }).skipped).toEqual([
         { automation: unreadable, reason: "unreadable settings" },
+      ]);
+    });
+  });
+
+  describe("given webhook automations, whose URL the provider stores in plaintext", () => {
+    it("takes the stored URL as written and never decrypts it", () => {
+      const padded = webhookAutomation({
+        projectId: "p1",
+        url: `  ${WEBHOOK}  `,
+      });
+      const cipherShaped = webhookAutomation({
+        projectId: "p1",
+        url: "enc1:https://hooks.slack.com/services/T0/B0/lookalike0e0e",
+      });
+      const decryptNothing = vi.fn(({ ciphertext }: { ciphertext: string }) => {
+        throw new Error(`decrypt called with ${ciphertext}`);
+      });
+
+      const result = planSlackConnectionMigration({
+        organizationId: ORG,
+        automations: [padded, cipherShaped],
+        archivedProjectIds: [],
+        connections: [],
+        decryptSecret: decryptNothing,
+        fingerprintSecret,
+      });
+
+      expect(decryptNothing).not.toHaveBeenCalled();
+      expect(result.skipped).toEqual([]);
+      expect(result.connections).toEqual([
+        expect.objectContaining({ action: "create", secret: WEBHOOK }),
+        expect.objectContaining({
+          action: "create",
+          secret: "enc1:https://hooks.slack.com/services/T0/B0/lookalike0e0e",
+        }),
+      ]);
+    });
+
+    it("skips a webhook whose URL an existing bot connection already holds, as a kind conflict", () => {
+      const hook = webhookAutomation({ projectId: "p1" });
+      const botHoldingUrl: MigrationConnection = {
+        ...projectBotConnection({ projectId: "p1" }),
+        secretFingerprint: fingerprintSecret({ secret: WEBHOOK }),
+      };
+
+      const result = plan({
+        automations: [hook],
+        connections: [botHoldingUrl],
+      });
+
+      expect(result.connections).toEqual([]);
+      expect(result.skipped).toEqual([
+        { automation: hook, reason: "kind conflict" },
+      ]);
+    });
+  });
+
+  describe("given a bot automation with no token of its own", () => {
+    it("joins nothing but its own project's bot connection", () => {
+      const tokenless = botAutomation({ projectId: "p1" });
+      const projectWebhook: MigrationConnection = {
+        id: "hook-row",
+        name: "Alerts webhook",
+        kind: SlackIntegrationKind.INCOMING_WEBHOOK,
+        scopeType: SlackIntegrationScopeType.PROJECT,
+        scopeId: "p1",
+        secretFingerprint: fingerprintSecret({ secret: WEBHOOK }),
+      };
+      const organizationBot: MigrationConnection = {
+        ...projectBotConnection({ projectId: "p1", id: "org-row" }),
+        scopeType: SlackIntegrationScopeType.ORGANIZATION,
+        scopeId: ORG,
+      };
+
+      const result = plan({
+        automations: [tokenless],
+        connections: [
+          projectWebhook,
+          organizationBot,
+          projectBotConnection({ projectId: "p2", id: "p2-row", token: "b" }),
+        ],
+      });
+
+      expect(result.connections).toEqual([]);
+      expect(result.skipped).toEqual([
+        { automation: tokenless, reason: "no secret" },
+      ]);
+    });
+
+    it("treats a stored token that decrypts to blank as no token", () => {
+      const existing = projectBotConnection({ projectId: "p1" });
+      const blank: MigrationAutomation = {
+        id: "blank",
+        projectId: "p1",
+        name: "Blank token",
+        actionParams: { slackDelivery: "bot", slackBotToken: "enc1:   " },
+      };
+
+      const result = plan({ automations: [blank], connections: [existing] });
+
+      expect(result.skipped).toEqual([]);
+      expect(result.connections).toEqual([
+        expect.objectContaining({
+          action: "reuse",
+          connectionId: existing.id,
+          members: [blank],
+        }),
+      ]);
+    });
+  });
+
+  describe("given an organization connection already holding the secret", () => {
+    it("reuses it for members in several projects without renaming, widening or re-storing it", () => {
+      const existing: MigrationConnection = {
+        id: "org-hook",
+        name: "Company alerts",
+        kind: SlackIntegrationKind.INCOMING_WEBHOOK,
+        scopeType: SlackIntegrationScopeType.ORGANIZATION,
+        scopeId: ORG,
+        secretFingerprint: fingerprintSecret({ secret: WEBHOOK }),
+      };
+      const first = webhookAutomation({ projectId: "p1" });
+      const second = webhookAutomation({ projectId: "p2" });
+
+      const result = plan({
+        automations: [first, second],
+        connections: [existing],
+      });
+
+      expect(result.connections).toEqual([
+        {
+          action: "reuse",
+          connectionId: "org-hook",
+          name: "Company alerts",
+          kind: SlackIntegrationKind.INCOMING_WEBHOOK,
+          scopeType: SlackIntegrationScopeType.ORGANIZATION,
+          scopeId: ORG,
+          members: [first, second],
+        },
+      ]);
+    });
+  });
+
+  describe("given a concurrent run stored the secret after the first plan", () => {
+    /** @scenario A concurrent run that stored the secret first is reused, not duplicated */
+    it("re-plans onto the stored row instead of creating a second", () => {
+      const automation = botAutomation({ projectId: "p1", token: TOKEN });
+
+      const [before] = plan({ automations: [automation] }).connections;
+      const [after] = plan({
+        automations: [automation],
+        connections: [projectBotConnection({ projectId: "p1", id: "raced" })],
+      }).connections;
+
+      expect(before).toMatchObject({ action: "create" });
+      expect(after).toMatchObject({
+        action: "reuse",
+        connectionId: "raced",
+        members: [automation],
+      });
+      expect(after).not.toHaveProperty("secret");
+    });
+  });
+});
+
+describe("formatOrganizationOutcome", () => {
+  describe("given connections created, reused, widened and automations skipped", () => {
+    /** @scenario The migration report never prints a secret */
+    it("names each connection by its hint and prints no token, URL or ciphertext", () => {
+      const bot = botAutomation({ projectId: "p1", token: TOKEN });
+      const hook = webhookAutomation({ projectId: "p1" });
+      const widening = botAutomation({
+        projectId: "p2",
+        token: "xoxb-other-77aa",
+      });
+      const broken: MigrationAutomation = {
+        id: "broken",
+        projectId: "p1",
+        name: "Broken",
+        actionParams: {
+          slackDelivery: "bot",
+          slackBotToken: "garbage-ciphertext-3e3e",
+        },
+      };
+      const result = plan({
+        automations: [bot, hook, widening, broken],
+        connections: [
+          projectBotConnection({
+            projectId: "p3",
+            id: "conn-p3",
+            token: "xoxb-other-77aa",
+          }),
+        ],
+      });
+      const outcome = dryRunOutcome({ plan: result });
+
+      const lines = formatOrganizationOutcome({
+        outcome,
+        organizationName: "Acme",
+      });
+      const tally = formatTally({
+        tally: tallyOutcomes({ outcomes: [outcome] }),
+      });
+      const printed = [...lines, tally].join("\n");
+
+      expect(lines).toContain(
+        '  create  "Slack bot ••••9f3a"  bot  project p1  1 automation',
+      );
+      expect(lines).toContain(
+        '  create  "Slack webhook ••••7c21"  webhook  project p1  1 automation',
+      );
+      expect(lines).toContain(
+        '  reuse   "Acme workspace" (conn-p3)  bot  organization  1 automation  (widened from project p3)',
+      );
+      expect(lines).toContain(
+        '  skip    broken "Broken" (project p1): cannot decrypt',
+      );
+      for (const secret of [
+        TOKEN,
+        "xoxb-other-77aa",
+        WEBHOOK,
+        "hooks.slack.com",
+        "secretpath",
+        "garbage-ciphertext",
+        "enc",
+      ]) {
+        expect(printed).not.toContain(secret);
+      }
+      expect(tally).toBe(
+        "Connections created 2, reused 1, widened 1; automations linked 3, skipped 1 (cannot decrypt: 1)",
+      );
+    });
+  });
+
+  describe("given an apply where one automation changed underneath the run", () => {
+    it("lists only the linked members and reports the changed one as skipped", () => {
+      const kept = webhookAutomation({ projectId: "p1" });
+      const edited = webhookAutomation({ projectId: "p1" });
+      const planned = plan({ automations: [kept, edited] });
+
+      const lines = formatOrganizationOutcome({
+        outcome: {
+          plan: planned,
+          linkedIds: [kept.id],
+          skipped: [{ automation: edited, reason: "changed during migration" }],
+        },
+        organizationName: "Acme",
+      });
+
+      expect(lines).toEqual([
+        `Organization "Acme" (${ORG})`,
+        '  create  "Slack webhook ••••7c21"  webhook  project p1  2 automations',
+        `    link  ${kept.id} "${kept.name}" (project p1)`,
+        `  skip    ${edited.id} "${edited.name}" (project p1): changed during migration`,
       ]);
     });
   });
