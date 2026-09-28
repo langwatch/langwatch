@@ -62,6 +62,10 @@ import {
   CODEX_PROVIDER_KEY,
   isCodexModel,
 } from "~/server/modelProviders/codexRestrictions";
+// Which scopes are codex's is decided in one place, `isCodexScope`: the
+// interactive TUI is `codex_cli_rs` (or `codex-app-server` on newer releases,
+// which follow the TUI's rules here), `codex exec` is `codex_exec`, whose
+// usage rules are explained at its two branches in `apply`.
 import { CODEX_EXEC_SCOPE, isCodexScope } from "../../coding-agent-span-filter";
 import { ATTR_KEYS } from "./_constants";
 import type {
@@ -71,16 +75,7 @@ import type {
 } from "./_types";
 
 const CODEX_EVENT_NAME_PREFIX = "codex.";
-/**
- * Which scopes are codex's is decided in one place, `isCodexScope`: the
- * interactive TUI is `codex_cli_rs` (or `codex-app-server` on newer releases,
- * which follow the TUI's rules here), `codex exec` is `codex_exec`. On the exec wire the
- * `handle_responses` response spans are the authoritative usage record: older
- * codex emits no `session_task.turn` rollup there at all, and when a newer
- * codex does emit one it repeats the response spans' summed totals. So under
- * exec the response-span skip below must never fire, and it is the rollup
- * that defers instead.
- */
+/** codex's per-turn rollup span: the turn's model and summed token usage. */
 export const CODEX_TURN_SPAN_NAME = "session_task.turn";
 
 // codex's per-response model-call span. Its gen_ai.usage.* is already summed
