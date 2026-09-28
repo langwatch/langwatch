@@ -1,25 +1,16 @@
 /**
  * The ask bar at the top of every board, after the reference: a pill with a
- * soft gradient edge, a sparkle, the purple prompt and an "Ask" chip. Pressing
- * Ask or Enter hands the typed question on; an empty bar asks nothing.
+ * soft gradient edge, a sparkle, the purple prompt and an "Ask" chip. It is a
+ * button, never a text field: pressing it opens the question picker.
  */
 
-import { Box, chakra, HStack } from "@chakra-ui/react";
+import { Box, chakra } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
-import { type FormEvent, useState } from "react";
 
 /** The reference's hover ring: purple at a tenth, outside the gradient edge. */
 const HALO = "0 0 0 4px color-mix(in srgb, var(--chakra-colors-purple-500) 10%, transparent)";
 
-export function BoardAskBar({ onAsk }: { onAsk: (question: string) => void }) {
-  const [question, setQuestion] = useState("");
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    if (!question.trim()) return;
-    onAsk(question);
-    setQuestion("");
-  };
-
+export function BoardAskBar({ onOpen }: { onOpen: () => void }) {
   return (
     <Box
       marginX="auto"
@@ -36,54 +27,43 @@ export function BoardAskBar({ onAsk }: { onAsk: (question: string) => void }) {
       _hover={{ boxShadow: HALO }}
       _focusWithin={{ boxShadow: HALO }}
     >
-      <chakra.form aria-label="Ask Langy" onSubmit={submit}>
-        <HStack
-          height="40px"
-          gap={2.5}
-          paddingX={4}
+      <chakra.button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={onOpen}
+        display="flex"
+        alignItems="center"
+        width="full"
+        height="40px"
+        gap={2.5}
+        paddingX={4}
+        borderRadius="full"
+        background="bg.panel"
+        cursor="pointer"
+        outline="none"
+        textAlign="start"
+      >
+        <Box as="span" flexShrink={0} color="purple.600" display="flex">
+          <Sparkles size={15} aria-hidden />
+        </Box>
+        <Box as="span" flex={1} minWidth={0} fontSize="sm" fontWeight="medium" color="purple.600">
+          What would you like to know?
+        </Box>
+        <Box
+          as="span"
+          aria-hidden
+          flexShrink={0}
           borderRadius="full"
-          background="bg.panel"
-          cursor="text"
+          paddingX={2}
+          paddingY={0.5}
+          background="purple.50"
+          color="purple.600"
+          fontSize="11px"
+          fontWeight="medium"
         >
-          <Box as="span" flexShrink={0} color="purple.600" display="flex">
-            <Sparkles size={15} aria-hidden />
-          </Box>
-          <chakra.input
-            aria-label="Ask Langy about this dashboard"
-            placeholder="What would you like to know?"
-            value={question}
-            onChange={(event) => setQuestion(event.currentTarget.value)}
-            flex={1}
-            minWidth={0}
-            height="full"
-            background="transparent"
-            border="none"
-            outline="none"
-            fontSize="sm"
-            fontWeight="medium"
-            color="purple.600"
-            _placeholder={{ color: "purple.600", opacity: 1 }}
-          />
-          <chakra.button
-            type="submit"
-            flexShrink={0}
-            display="flex"
-            alignItems="center"
-            gap={1}
-            borderRadius="full"
-            paddingX={2}
-            paddingY={0.5}
-            background="purple.50"
-            color="purple.600"
-            fontSize="11px"
-            fontWeight="medium"
-            cursor="pointer"
-            _hover={{ background: "purple.100" }}
-          >
-            Ask
-          </chakra.button>
-        </HStack>
-      </chakra.form>
+          Ask
+        </Box>
+      </chakra.button>
     </Box>
   );
 }

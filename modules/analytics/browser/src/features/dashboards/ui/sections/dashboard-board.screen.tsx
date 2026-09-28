@@ -87,7 +87,12 @@ function FlightDeckBoard() {
         />
       }
     >
-      <BoardLangy board={FLIGHT_DECK_SUBJECT} period={period} projectId={projectId ?? ""} />
+      <BoardLangy
+        board={FLIGHT_DECK_SUBJECT}
+        period={period}
+        projectId={projectId ?? ""}
+        onOpenPicker={picker.open}
+      />
       {projectId && <FlightDeckPanels projectId={projectId} {...period} />}
       {picker.isOpen && (
         <BlockPickerDialog board={FLIGHT_DECK_SUBJECT} period={period} onClose={picker.close} />
@@ -141,6 +146,7 @@ function OwnBoard({ board }: { board: SavedBoard }) {
         period={period}
         projectId={projectId}
         watched={{ blocks, settled: boardBlocks.status === "success" }}
+        onOpenPicker={picker.open}
       />
       {boardBlocks.status === "pending" && <Spinner size="sm" />}
       {boardBlocks.status === "error" && (
