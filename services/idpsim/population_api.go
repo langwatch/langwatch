@@ -2,20 +2,14 @@ package idpsim
 
 import (
 	"net/http"
-	"strconv"
-	"strings"
 	"sync"
 )
 
 /**
- * The tenant page's half of the large-directory verbs.
- *
- * The control API answers in JSON for a script; these are the same three acts
- * behind buttons, because the question "what does five thousand people do to
- * the members screen" is one somebody asks while looking at the screen.
- *
- * A form post ends in a redirect, so what the act did has to survive it. That
- * is what `lastScale` is for — the same reason `lastProvisioning` exists.
+ * The tenant page's half of the large-directory verbs: the control API's three
+ * acts behind buttons, refusing in the page's terms. What the last act did is
+ * kept as a note, so a reload still shows it — the reason `lastProvisioning`
+ * exists too.
  */
 
 // scaleNote is the one sentence the tenant page shows about the last generate,
@@ -42,9 +36,9 @@ func (n *scaleNote) Text() string {
 // scaleView is what the panel renders: the sizes its fields should show, and
 // the note under them.
 type scaleView struct {
-	Users  int
-	Groups int
-	Last   string
+	Users  int    `json:"users"`
+	Groups int    `json:"groups"`
+	Last   string `json:"last"`
 }
 
 // scaleViewOf fills the panel in from the tenant's current directory, so the
@@ -66,16 +60,13 @@ func scaleViewOf(t *Tenant) scaleView {
 
 // handlePopulationForm generates the directory from the panel's two fields.
 func (s *Server) handlePopulationForm(w http.ResponseWriter, r *http.Request) {
-	t, ok := s.provisioningForm(w, r)
+	var spec PopulationSpec
+	t, ok := s.apiTenantAndBody(w, r, &spec)
 	if !ok {
 		return
 	}
-	spec := PopulationSpec{
-		Users:  formInt(r, "users"),
-		Groups: formInt(r, "groups"),
-	}
 	if notice, bad := refusePopulation(spec); bad {
-		s.refusalPage(w, t, refusalNotice{
+		writeRefusal(w, refusalNotice{
 			Status: http.StatusBadRequest,
 			Title:  "That is not a directory this simulator will generate",
 			Detail: notice,
@@ -87,25 +78,24 @@ func (s *Server) handlePopulationForm(w http.ResponseWriter, r *http.Request) {
 	summary := countOf(result.Users, "user") + " across " + countOf(result.Groups, "group")
 	t.scaleNote.Set("generated " + summary)
 	s.record(t, Event{Kind: "directory.populate", Outcome: OutcomeOK, Detail: "generated " + summary})
-	http.Redirect(w, r, t.BaseURL+"/", http.StatusSeeOther)
+	writeJSON(w, http.StatusOK, scaleViewOf(t))
 }
 
-// handleChurnForm applies one round of change from the panel's six fields.
+// handleChurnForm applies one round of change from the panel's six fields. A
+// negative count means none, as an empty box did.
 func (s *Server) handleChurnForm(w http.ResponseWriter, r *http.Request) {
-	t, ok := s.provisioningForm(w, r)
+	var typed ChurnSpec
+	t, ok := s.apiTenantAndBody(w, r, &typed)
 	if !ok {
 		return
 	}
 	spec := ChurnSpec{
-		Join:       formInt(r, "join"),
-		Leave:      formInt(r, "leave"),
-		Deactivate: formInt(r, "deactivate"),
-		Reactivate: formInt(r, "reactivate"),
-		Rename:     formInt(r, "rename"),
-		Regroup:    formInt(r, "regroup"),
+		Join: max(typed.Join, 0), Leave: max(typed.Leave, 0),
+		Deactivate: max(typed.Deactivate, 0), Reactivate: max(typed.Reactivate, 0),
+		Rename: max(typed.Rename, 0), Regroup: max(typed.Regroup, 0), Seed: typed.Seed,
 	}
 	if !spec.Any() {
-		s.refusalPage(w, t, refusalNotice{
+		writeRefusal(w, refusalNotice{
 			Status: http.StatusBadRequest,
 			Title:  "Nothing to change",
 			Detail: "A churn round needs at least one of joining, leaving, deactivating, reactivating, renaming or regrouping.",
@@ -116,7 +106,7 @@ func (s *Server) handleChurnForm(w http.ResponseWriter, r *http.Request) {
 	result := t.Churn(spec)
 	t.scaleNote.Set(churnSummary(result))
 	s.record(t, Event{Kind: "directory.churn", Outcome: OutcomeOK, Detail: churnSummary(result)})
-	http.Redirect(w, r, t.BaseURL+"/", http.StatusSeeOther)
+	writeJSON(w, http.StatusOK, scaleViewOf(t))
 }
 
 /**
@@ -133,28 +123,19 @@ func (s *Server) handleSyncProvisioning(w http.ResponseWriter, r *http.Request) 
 	}
 	result := syncDirectory(r.Context(), syncRun{tenant: t, target: target, opts: SyncOptions{Groups: true}})
 	summary := syncSummary(result, target.BaseURL)
-	t.RecordProvisioning(ProvisioningOutcome{
+	outcome := ProvisioningOutcome{
 		Kind:     "sync",
 		At:       s.now(),
 		Summary:  summary,
 		Failures: result.Failures,
 		Refused:  result.FailureCount > 0 && result.Created+result.Updated+result.Deactivated+result.Deleted == 0,
-	})
+	}
+	t.RecordProvisioning(outcome)
 	t.scaleNote.Set(summary)
 	s.record(t, Event{
 		Kind:    "scim.sync",
 		Outcome: outcomeOf(result.FailureCount == 0),
 		Detail:  summary,
 	})
-	http.Redirect(w, r, t.BaseURL+"/", http.StatusSeeOther)
-}
-
-// formInt reads one non-negative number off the posted form, treating blank
-// and unparseable alike as zero: an empty box means "none of these".
-func formInt(r *http.Request, field string) int {
-	value, err := strconv.Atoi(strings.TrimSpace(r.PostForm.Get(field)))
-	if err != nil || value < 0 {
-		return 0
-	}
-	return value
+	writeJSON(w, http.StatusOK, outcome)
 }

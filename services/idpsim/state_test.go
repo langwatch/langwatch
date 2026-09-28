@@ -82,7 +82,7 @@ func TestDeletedStateStaysDeleted(t *testing.T) {
 	registration := stateRequest(t, s, "POST", "/control/t/1/apps", `{"name":"temporary"}`, http.StatusCreated)
 	var app Application
 	require.NoError(t, json.Unmarshal(registration.Body.Bytes(), &app))
-	stateRequest(t, s, "POST", "/t/1/apps/"+app.ClientID+"/delete", "", http.StatusSeeOther)
+	stateRequest(t, s, "DELETE", "/api/t/1/apps/"+app.ClientID, "", http.StatusNoContent)
 	stateRequest(t, s, "DELETE", "/t/1/scim/v2/Users/t1-user-member", "", http.StatusNoContent)
 	stateRequest(t, s, "DELETE", "/control/dns/txt", `{"domain":"acme1.test"}`, http.StatusNoContent)
 	stateRequest(t, s, "DELETE", "/control/verification", `{"domain":"acme1.test"}`, http.StatusNoContent)

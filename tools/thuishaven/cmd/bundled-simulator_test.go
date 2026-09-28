@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/smtp"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -93,11 +92,11 @@ func TestBundledSimulatorsWithoutCheckout(t *testing.T) {
 			"SERVER_ADDR=" + addr, "IDPSIM_BASE_URL=" + baseURL,
 			"IDPSIM_TENANTS=1", "IDPSIM_DNS_ADDR=off",
 		}, baseURL+"/health")
-		var state struct{ Tenants []struct{ ID string } }
+		var state struct{ Tenants []struct{ ID int } }
 		if err := json.Unmarshal(simulatorGET(t, baseURL+"/control/state"), &state); err != nil {
 			t.Fatal(err)
 		}
-		if len(state.Tenants) != 1 || state.Tenants[0].ID != "1" {
+		if len(state.Tenants) != 1 || state.Tenants[0].ID != 1 {
 			t.Fatalf("IdP state does not carry its tenant: %+v", state)
 		}
 		assertConsoleServed(t, baseURL+"/")
@@ -116,16 +115,13 @@ func TestBundledSimulatorsWithoutCheckout(t *testing.T) {
 
 func assertBundledPopulation(t *testing.T, baseURL string) {
 	t.Helper()
-	page := simulatorGET(t, baseURL+"/t/1/")
-	if !bytes.Contains(page, []byte(`id="population"`)) || !bytes.Contains(page, []byte(">Generate</button>")) {
-		t.Fatal("the bundled tenant page lost its directory-generation form")
-	}
+	assertConsoleServed(t, baseURL+"/t/1/")
 	client := &http.Client{Timeout: 5 * time.Second}
 	for _, test := range []struct {
 		users  string
 		status int
 	}{{"500", http.StatusOK}, {"50001", http.StatusBadRequest}} {
-		response, err := client.PostForm(baseURL+"/t/1/population", url.Values{"users": {test.users}, "groups": {"6"}})
+		response, err := client.Post(baseURL+"/api/t/1/population", "application/json", strings.NewReader(`{"users":`+test.users+`,"groups":6}`))
 		if err != nil {
 			t.Fatal(err)
 		}

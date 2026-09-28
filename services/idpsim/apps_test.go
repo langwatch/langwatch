@@ -159,9 +159,17 @@ func TestRegisteredClientRedirectIsEnforced(t *testing.T) {
 	// identity provider must refuse, and a page explaining it is more use.
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	assert.Empty(t, rec.Header().Get("Location"))
-	body := rec.Body.String()
-	assert.Contains(t, body, "LangWatch")
-	assert.Contains(t, body, "https://elsewhere.example/cb")
+	assert.Contains(t, rec.Body.String(), "idpsim console", "the refusal is the console's page")
+
+	// The page reads its reason from the same request.
+	picker := getJSON(t, s, "/api/t/1/sign-in?"+url.Values{
+		"response_type": {"code"}, "client_id": {clientID},
+		"redirect_uri": {"https://elsewhere.example/cb"},
+	}.Encode())
+	refusal := picker["refusal"].(map[string]any)
+	assert.Contains(t, refusal["detail"], "LangWatch")
+	assert.Contains(t, refusal["detail"], "https://elsewhere.example/cb")
+	assert.Empty(t, picker["users"], "nobody is offered for a refused request")
 }
 
 // @scenario "A client the tenant does not know still works"
@@ -303,18 +311,20 @@ func TestTenantPageCarriesTheSetupValues(t *testing.T) {
 	s := newTestServer(t, 1)
 	app := registerApp(t, s, 1, `{"name":"LangWatch","redirectUris":["https://app.example/cb"]}`)
 
-	rec := do(s, httptest.NewRequest(http.MethodGet, testBase+"/t/1/", nil))
+	page := do(s, httptest.NewRequest(http.MethodGet, testBase+"/t/1/", nil))
+	require.Equal(t, http.StatusOK, page.Code)
+	assert.Contains(t, page.Body.String(), "idpsim console")
+
+	rec := do(s, httptest.NewRequest(http.MethodGet, testBase+"/api/t/1", nil))
 	require.Equal(t, http.StatusOK, rec.Code)
 	body := rec.Body.String()
-
 	for _, want := range []string{
-		"Issuer address", testBase + "/t/1", // OIDC
-		"Sign-in address", testBase + "/t/1/saml/sso", // SAML
-		"Entity id", "Signing certificate",
+		`"baseUrl":"` + testBase + `/t/1"`,                // the OIDC issuer
+		`"signInUrl":"` + testBase + `/t/1/saml/sso"`,     // SAML
+		`"entityId":"` + testBase + `/t/1/saml/metadata"`, // SAML
+		"BEGIN CERTIFICATE",                               // the signing certificate
 		app["clientId"].(string), app["clientSecret"].(string),
 		"admin@acme1.test", // its users
-		"Activity",         // the live feed
-		"{connection}",     // the placeholder explanation
 	} {
 		assert.Contains(t, body, want)
 	}

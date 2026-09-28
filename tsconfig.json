@@ -370,6 +370,9 @@
       "path": "packages/handled-error/tsconfig.json"
     },
     {
+      "path": "apps/haven-web/tsconfig.json"
+    },
+    {
       "path": "modules/hosted-mcp/contract/tsconfig.json"
     },
     {
@@ -380,6 +383,9 @@
     },
     {
       "path": "modules/identity/process/tsconfig.test.json"
+    },
+    {
+      "path": "apps/idpsim-web/tsconfig.json"
     },
     {
       "path": "packages/installed-server-modules/tsconfig.json"
@@ -428,9 +434,6 @@
     },
     {
       "path": "packages/mail/tsconfig.json"
-    },
-    {
-      "path": "apps/haven-web/tsconfig.json"
     },
     {
       "path": "apps/mailsim-web/tsconfig.json"
