@@ -188,6 +188,12 @@ Feature: The checkup page of a self-hosted install
     And the Langy row reads not checked
 
   @unit
+  Scenario: The Langy canary honours an email-domain rollout rule
+    Given Langy is open only to users of the administrator's email domain
+    When the explicit Langy canary runs as that administrator
+    Then one Langy turn is sent
+
+  @unit
   Scenario: The model provider test reads the provider's stored key
     Given an OpenAI provider whose key is stored encrypted
     When the checkup reads the organization's providers

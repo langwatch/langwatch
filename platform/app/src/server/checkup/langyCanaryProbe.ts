@@ -53,16 +53,17 @@ export async function probeLangyCanary({
     };
   }
 
+  const session = await resolveActor(actorUserId);
+  if (!session) return { kind: "no_actor" };
+
+  // The email matters: a release_langy_enabled rule can target an email domain.
   const allowed = await hasLangyAccess({
-    user: { id: actorUserId },
+    user: { id: session.user.id, email: session.user.email },
     projectId: target.id,
     organizationId,
     ...(flags ? { flags } : {}),
   });
   if (!allowed) return { kind: "no_access" };
-
-  const session = await resolveActor(actorUserId);
-  if (!session) return { kind: "no_actor" };
 
   const result = await run({ projectId: target.id, session });
   if ("busy" in result) {

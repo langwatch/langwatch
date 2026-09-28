@@ -83,6 +83,29 @@ describe("probeLangyCanary", () => {
     });
   });
 
+  describe("given Langy is open only to the administrator's email domain", () => {
+    describe("when the canary runs", () => {
+      /** @scenario "The Langy canary honours an email-domain rollout rule" */
+      it("asks the gate with the administrator's email and sends the turn", async () => {
+        const flags = {
+          isEnabled: vi.fn(
+            async (_flag: string, ctx: { userEmail?: string | null }) =>
+              ctx.userEmail?.endsWith("@acme.com") === true,
+          ),
+        };
+        const run = vi.fn(async () => ({
+          healthy: true as const,
+          durationMs: 1200,
+        }));
+
+        const probe = await probeLangyCanary(input({ flags, run }));
+
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(probe).toMatchObject({ kind: "answered" });
+      });
+    });
+  });
+
   describe("given no person asked for the checkup", () => {
     describe("when the canary runs", () => {
       it("sends no turn and answers no actor", async () => {
