@@ -8,6 +8,7 @@ import {
   type ConversationMarkdownChunk,
   joinConversationMarkdown,
 } from "./conversation-markdown.ts";
+import { CONVERSATION_DETAIL_LEVELS } from "./conversation-steps.ts";
 import type { ConversationTurnSource, ParsedTurn } from "./parsed-turns.ts";
 
 /**
@@ -39,9 +40,9 @@ export interface RenderedConversationMarkdown {
 }
 
 /**
- * A parsed conversation as one markdown string, optionally under a budget. The
- * preamble always survives, turns are kept from both ends, and the gap carries
- * a marker: a cut conversation must never read as a short one.
+ * A parsed conversation as one markdown string, optionally under a budget.
+ * Every turn is shortened level by level first, since a judge's evidence sits
+ * anywhere; only then are middle turns dropped, under a marker.
  */
 export function renderConversationMarkdown({
   conversationId = "",
@@ -59,6 +60,46 @@ export function renderConversationMarkdown({
     return { text: full, isTruncated: false, estimatedTokens: fullTokens, omittedTurns: 0 };
   }
 
+  const shortened = shortenEveryTurn({ conversationId, turns, maxTokens });
+  if (shortened.fits) {
+    return {
+      text: shortened.text,
+      isTruncated: true,
+      estimatedTokens: estimateTokensFromBytes(shortened.text),
+      omittedTurns: 0,
+    };
+  }
+  return dropMiddleTurns({ chunks: shortened.chunks, maxTokens });
+}
+
+/** The lower detail levels in order, stopping at the first that fits. */
+function shortenEveryTurn({
+  conversationId,
+  turns,
+  maxTokens,
+}: {
+  conversationId: string;
+  turns: ParsedTurn<ConversationTurnSource>[];
+  maxTokens: number;
+}): { fits: boolean; text: string; chunks: ConversationMarkdownChunk[] } {
+  let chunks: ConversationMarkdownChunk[] = [];
+  let text = "";
+  for (const detail of CONVERSATION_DETAIL_LEVELS.slice(1)) {
+    chunks = buildConversationMarkdownChunks({ conversationId, turns, detail });
+    text = joinConversationMarkdown(chunks);
+    if (estimateTokensFromBytes(text) <= maxTokens) return { fits: true, text, chunks };
+  }
+  return { fits: false, text, chunks };
+}
+
+/** The last resort: keep turns from both ends at the lowest detail level. */
+function dropMiddleTurns({
+  chunks,
+  maxTokens,
+}: {
+  chunks: ConversationMarkdownChunk[];
+  maxTokens: number;
+}): RenderedConversationMarkdown {
   const preamble = chunks.filter((chunk) => chunk.turnNumber === undefined);
   const turnGroups = groupByTurn(chunks);
   // Reserved up front at the length it takes for every turn being dropped, so
@@ -179,7 +220,7 @@ function keepWithinBudget({
 /**
  * Turns taken from the start, and what they cost. The share is not a cap: one
  * turn bigger than it would otherwise starve the opening entirely, so the
- * first turn is kept whenever the budget as a whole can afford it.
+ * first turn is kept whenever the budget can afford it beside the last one.
  */
 function takeFromHead({
   turnGroups,
@@ -200,7 +241,9 @@ function takeFromHead({
   if (kept.size > 0) return spent;
 
   const first = turnGroups[0];
-  if (first && first.tokens <= available) {
+  const last = turnGroups[turnGroups.length - 1];
+  const alongsideLast = turnGroups.length > 1 && last ? last.tokens : 0;
+  if (first && first.tokens + alongsideLast <= available) {
     kept.add(0);
     return first.tokens;
   }

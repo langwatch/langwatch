@@ -88,14 +88,16 @@ describe("renderConversationMarkdown", () => {
       const oneTurn = renderConversationMarkdown({
         turns: [turns[3]!],
       }).estimatedTokens;
-      // Room for the preamble and most of a turn, but not a whole one.
+      // Room for the preamble and part of a turn, but not a whole one even
+      // once every turn is shortened.
+      const budget = Math.floor(oneTurn / 2);
       const result = renderConversationMarkdown({
         conversationId: "conv-1",
         turns,
-        maxTokens: oneTurn,
+        maxTokens: budget,
       });
       expect(result.isTruncated).toBe(true);
-      expect(result.estimatedTokens).toBeLessThanOrEqual(oneTurn);
+      expect(result.estimatedTokens).toBeLessThanOrEqual(budget);
       // The heading survives, and so does part of the final turn: a budget
       // that only buys a heading buys nothing worth reading.
       expect(result.text).toContain("# Conversation `conv-1`");
@@ -134,7 +136,7 @@ describe("renderConversationMarkdown", () => {
       const result = renderConversationMarkdown({
         conversationId: "conv-1",
         turns,
-        maxTokens: oneTurn,
+        maxTokens: Math.floor(oneTurn / 2),
       });
       // The final turn is on the page, cut mid-turn; the three before it are
       // the ones that went missing.

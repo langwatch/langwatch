@@ -86,13 +86,21 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     And the verdict records that the text was cut
 
   # Judged text measured 2.0 to 3.3 bytes per input token against the live
-  # API (JSON-heavy traces densest). Cut at four, or at the 2.7 average used
-  # for pricing, a dense transcript is refused as too large and never judged.
+  # API (JSON-heavy traces densest, markdown transcripts 2.4 to 2.7). Cut at
+  # four, or at the 2.7 average used for pricing, a dense text is refused as
+  # too large; cut at 2.0, a transcript loses a fifth of the window it fits.
   @unit
   Scenario: A text is cut at the densest ratio judged text has shown
-    Given a text longer than its budget
+    Given a JSON-heavy text longer than its budget
     When it is prepared for the classifier
     Then its length in bytes is at most the budget times the densest measured bytes per token
+
+  @unit
+  Scenario: A transcript is fitted at the ratio transcripts measure
+    Given a markdown transcript that fits the window at the transcript ratio but not at the densest one
+    When it is prepared for the classifier
+    Then it is sent whole and not marked truncated
+    And a transcript longer than that is cut at the transcript ratio
 
   @unit @regression
   Scenario: A long transcript that tokenises densely is judged on the first send

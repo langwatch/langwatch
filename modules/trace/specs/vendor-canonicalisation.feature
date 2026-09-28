@@ -124,3 +124,12 @@ Feature: Vendor span canonicalisation
 
     @unimplemented
     Scenario: A span emitted by Copilot instrumentation canonicalises to the shared shape
+
+  Rule: Claude Code tool calls are tool spans
+
+    @unit
+    Scenario: A Claude Code tool span is typed as a tool
+      Given a span named claude_code.tool that carries no span type
+      When it is canonicalised
+      Then its span type is tool
+      And its execution and blocked-on-user children keep their own type

@@ -112,8 +112,48 @@ function buildAttributes(span: Span): Attributes {
   if ("contexts" in span && span.contexts) {
     attrs["retrieval.documents"] = JSON.stringify(span.contexts);
   }
+  dropAliasedCounts(attrs);
 
   return attrs;
+}
+
+/**
+ * Keys that name the same count, most canonical first. A vendor that reports
+ * both families would otherwise print every count twice.
+ */
+const ALIASED_KEYS: readonly (readonly string[])[] = [
+  ["gen_ai.usage.input_tokens", "gen_ai.usage.prompt_tokens", "input_tokens", "prompt_tokens"],
+  [
+    "gen_ai.usage.output_tokens",
+    "gen_ai.usage.completion_tokens",
+    "output_tokens",
+    "completion_tokens",
+  ],
+  [
+    "gen_ai.usage.cache_read.input_tokens",
+    "gen_ai.usage.cache_read_input_tokens",
+    "cache_read_tokens",
+    "cache_read_input_tokens",
+  ],
+  [
+    "gen_ai.usage.cache_creation.input_tokens",
+    "gen_ai.usage.cache_creation_input_tokens",
+    "cache_creation_tokens",
+    "cache_creation_input_tokens",
+  ],
+  ["gen_ai.request.model", "model"],
+  ["gen_ai.response.id", "request_id"],
+];
+
+/** Each aliased count once, under the first key of its family the span carries. */
+function dropAliasedCounts(attrs: Attributes): void {
+  for (const family of ALIASED_KEYS) {
+    const kept = family.find((key) => attrs[key] !== undefined);
+    if (kept === undefined) continue;
+    for (const key of family) {
+      if (key !== kept && attrs[key] === attrs[kept]) delete attrs[key];
+    }
+  }
 }
 
 /** One side of the conversation, under the messages key for a chat, `input`/`output` otherwise. */
@@ -232,9 +272,88 @@ function buildStatus(span: Span): SpanStatus {
  * have to be the same text — a second renderer would grade one thing and display another.
  */
 export function formatSpansDigest(spans: Span[]): Promise<string> {
-  const readableSpans = spans.map((span) => langwatchSpanToReadableSpan(span));
+  const { readableSpans, shared } = readableSpansForDigest(spans);
 
-  return Promise.resolve(judgeSpanDigestFormatter.format(readableSpans));
+  return Promise.resolve(
+    withSharedAttributes({ digest: judgeSpanDigestFormatter.format(readableSpans), shared }),
+  );
+}
+
+/** Never hoisted: what a span is, and what it read and wrote. */
+const PER_SPAN_KEYS = new Set([
+  "langwatch.span.type",
+  "input",
+  "output",
+  "gen_ai.input.messages",
+  "gen_ai.output.messages",
+]);
+
+/** Printed as its parent's, since an execution phase restates its tool call. */
+const REPEATED_IO_KEYS = ["input", "output", "gen_ai.input.messages", "gen_ai.output.messages"];
+
+/**
+ * The trace's spans as the digest reads them: attributes every span carries
+ * with one value are lifted out to print once, and a child that restates its
+ * parent's input and output prints only what differs, naming what it repeats.
+ * @see modules/trace/specs/trace-span-digest.feature
+ */
+function readableSpansForDigest(spans: Span[]): {
+  readableSpans: ReadableSpan[];
+  shared: [string, Attributes[string]][];
+} {
+  const readableSpans = spans.map((span) => langwatchSpanToReadableSpan(span));
+  const shared = sharedAttributes(readableSpans);
+  for (const span of readableSpans) {
+    for (const [key] of shared) delete span.attributes[key];
+  }
+  const byId = new Map(readableSpans.map((span) => [span.spanContext().spanId, span]));
+  const parentAttributes = new Map(
+    readableSpans.map((span) => [span.spanContext().spanId, { ...span.attributes }]),
+  );
+  for (const span of readableSpans) {
+    const parentId = span.parentSpanContext?.spanId;
+    const parent = parentId && byId.has(parentId) ? parentAttributes.get(parentId) : undefined;
+    if (parent) foldRepeatOfParent({ attrs: span.attributes, parent });
+  }
+  return { readableSpans, shared };
+}
+
+function foldRepeatOfParent({ attrs, parent }: { attrs: Attributes; parent: Attributes }): void {
+  const hasIo = REPEATED_IO_KEYS.some((key) => attrs[key] !== undefined);
+  const repeatsIo = REPEATED_IO_KEYS.every((key) => attrs[key] === parent[key]);
+  if (!hasIo || !repeatsIo) return;
+  const repeated = Object.keys(attrs).filter(
+    (key) => key !== "langwatch.span.type" && attrs[key] === parent[key],
+  );
+  for (const key of repeated) delete attrs[key];
+  attrs.same_as_parent = repeated.join(", ");
+}
+
+function sharedAttributes(spans: ReadableSpan[]): [string, Attributes[string]][] {
+  const [first, ...rest] = spans;
+  if (!first || rest.length === 0) return [];
+  return Object.entries(first.attributes).filter(
+    ([key, value]) =>
+      !PER_SPAN_KEYS.has(key) && rest.every((span) => span.attributes[key] === value),
+  );
+}
+
+/** The digest with the attributes every span shares printed once, under its first line. */
+function withSharedAttributes({
+  digest,
+  shared,
+}: {
+  digest: string;
+  shared: [string, Attributes[string]][];
+}): string {
+  if (shared.length === 0) return digest;
+  const breakAt = digest.indexOf("\n");
+  const header = [
+    "On every span:",
+    ...shared.map(([key, value]) => `    ${key}: ${String(value)}`),
+  ].join("\n");
+  if (breakAt < 0) return `${digest}\n${header}`;
+  return `${digest.slice(0, breakAt)}\n${header}${digest.slice(breakAt)}`;
 }
 
 /**
@@ -252,15 +371,21 @@ export function formatSpansDigestBounded({
   maxTokens?: number;
 }): BoundedSpansDigest {
   const budget = maxTokens ?? DEFAULT_TOKEN_THRESHOLD;
-  const readableSpans = spans.map((span) => langwatchSpanToReadableSpan(span));
+  const { readableSpans, shared } = readableSpansForDigest(spans);
 
-  const full = judgeSpanDigestFormatter.format(readableSpans);
+  const full = withSharedAttributes({
+    digest: judgeSpanDigestFormatter.format(readableSpans),
+    shared,
+  });
   const fullTokens = estimateTokens(full);
   if (fullTokens <= budget) {
     return { text: full, isTruncated: false, estimatedTokens: fullTokens };
   }
 
-  const structure = judgeSpanDigestFormatter.formatStructureOnly(readableSpans);
+  const structure = withSharedAttributes({
+    digest: judgeSpanDigestFormatter.formatStructureOnly(readableSpans),
+    shared,
+  });
   if (estimateTokens(structure) > budget) {
     // One span per line, so the cut lands on a line break: half a tree line
     // names a span that does not exist.

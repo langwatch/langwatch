@@ -14,7 +14,7 @@ import type {
   SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import type { TraceApi, Span } from "@langwatch/trace-contract";
+import type { TraceApi, Span, Trace } from "@langwatch/trace-contract";
 /**
  * Trace view protections for an evaluation read. Declared in Evaluation vocab
  * rather than imported from trace-server (feature packages may not import).
@@ -26,12 +26,13 @@ export type EvaluationTraceProtections = Readonly<{
 }>;
 
 /**
- * Renders a trace's spans as the digest an evaluator reads for the
- * `formatted_trace` / `formatted_traces` mapping sources. A port rather than
- * a call, since the renderer walks the trace read model in `@langwatch/trace-process`.
+ * Renders what an evaluator reads for the `formatted_trace` (one trace's span
+ * digest) and `formatted_traces` (the whole thread) mapping sources. A port
+ * rather than a call, since the renderers walk the trace read model.
  */
 export interface EvaluationSpanDigest {
   format(spans: Span[]): Promise<string>;
+  formatThread(input: { threadKey: string; traces: readonly Trace[] }): Promise<string>;
 }
 
 export type LangevalsEvaluateParams = Readonly<{

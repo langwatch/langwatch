@@ -61,8 +61,10 @@ export interface InstantEvalClassifierLimits {
   readonly reserveTokens: number;
   /** Transcripts tokenise denser than prose; measured, not the generic four. */
   readonly bytesPerInputToken: number;
-  /** The densest judged text measured; a text is cut to fit at this ratio. */
+  /** The densest judged text measured (JSON-heavy digests); such text is fitted at this ratio. */
   readonly fitBytesPerInputToken: number;
+  /** The densest markdown transcript measured; a transcript is cut to fit at this ratio. */
+  readonly transcriptFitBytesPerInputToken: number;
   /** Below any judged text measured; the too-large retry cuts at this ratio. */
   readonly retryBytesPerInputToken: number;
 }
@@ -76,6 +78,7 @@ export const INSTANT_EVAL_CLASSIFIER_LIMITS: InstantEvalClassifierLimits = {
   reserveTokens: 768,
   bytesPerInputToken: 2.7,
   fitBytesPerInputToken: 2,
+  transcriptFitBytesPerInputToken: 2.4,
   retryBytesPerInputToken: 1.5,
 };
 

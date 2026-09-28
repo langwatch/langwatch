@@ -34,7 +34,10 @@ function run() {
       readEvaluations: unused("traces.readEvaluations"),
       readThreadsTraces: unused("traces.readThreadsTraces"),
     },
-    spanDigest: { format: unused("spanDigest.format") },
+    spanDigest: {
+      format: unused("spanDigest.format"),
+      formatThread: unused("spanDigest.formatThread"),
+    },
     modelEnvResolver: { resolveForEvaluator: unused("modelEnvResolver.resolveForEvaluator") },
     langevalsClient: { evaluate: langevalsEvaluate },
     workflows: createApiFixture<WorkflowApi>({}),

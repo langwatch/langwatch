@@ -10,6 +10,7 @@ import {
   extractReadableText,
   extractReasoningText,
 } from "../transcript/transcript-text-extraction.ts";
+import type { ConversationStep } from "./conversation-steps.ts";
 
 /** Shared empty list so a media-free turn keeps a stable identity per parse. */
 const NO_MEDIA: MediaPartData[] = [];
@@ -34,6 +35,8 @@ export interface ConversationTurnSource {
   inputMediaRefs?: TraceMediaRef[];
   outputMediaRefs?: TraceMediaRef[];
   error?: string;
+  /** What happened between the user message and the reply, when the reader has the spans. */
+  steps?: readonly ConversationStep[];
 }
 
 export interface ParsedTurn<T extends ConversationTurnSource = ConversationTurnSource> {

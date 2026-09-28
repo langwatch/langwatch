@@ -62,3 +62,22 @@ Feature: Oversized span attribute values keep a readable preview
       When the span is ingested
       Then the stored value is a short marker naming the byte size and mime
         type, with no partial image bytes
+
+  Rule: An oversized message history keeps whole messages
+
+    # A long conversation's model call carries the whole history in one
+    # attribute; replacing it with a byte count left the last trace of a
+    # 100k-token session about 300 tokens to read (langwatch/tasks#905).
+    @unit
+    Scenario: An oversized message history drops whole messages from its middle
+      Given an LLM span whose input messages attribute is over the attribute size cap
+      When the span is ingested
+      Then the system prompt, the first user message and the most recent messages are kept whole
+      And a marker message names how many messages were dropped
+      And the value is under the cap and is still a message list
+
+    @unit
+    Scenario: A message history whose latest message alone is over the cap falls back to the placeholder
+      Given an LLM span whose last input message alone is over the attribute size cap
+      When the span is ingested
+      Then the value is replaced by the byte-count placeholder

@@ -84,8 +84,10 @@ async function resolveThreadField({
     // Unknown server-only source: degrade gracefully instead of crashing the evaluation loop
     if (source !== "formatted_traces") return { resolved: true, value: "" };
 
-    const formatted = await Promise.all(threadTraces.map((t) => spanDigest.format(t.spans ?? [])));
-    return { resolved: true, value: formatted.join("\n\n---\n\n") };
+    return {
+      resolved: true,
+      value: await spanDigest.formatThread({ threadKey: threadId, traces: threadTraces }),
+    };
   }
 
   const threadSource = source as keyof typeof THREAD_MAPPINGS;
