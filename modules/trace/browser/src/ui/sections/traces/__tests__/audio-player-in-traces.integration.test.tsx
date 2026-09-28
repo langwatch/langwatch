@@ -1,15 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration coverage for
- * specs/trace-processing/audio-player-in-traces.feature.
- *
- * Renders both trace UIs with audio message content and asserts an inline
- * <audio> player appears (instead of only a raw JSON dump): the legacy
- * `RenderInputOutput` input/output view, and the traces-v2 conversation
- * `BlockStack`. These bind the feature's @integration scenarios via scenario
- * annotations, so the parity check sees real rendering coverage, not just the
- * unit-level parsing tests.
+ * @see specs/trace-processing/audio-player-in-traces.feature
+ * Both trace UIs (RenderInputOutput and the traces-v2 BlockStack) render an inline
+ * <audio> player for audio content instead of a raw JSON dump.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { parseContentBlocks } from "@langwatch/trace-contract/transcript";

@@ -1,20 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for the "Advanced (Gateway)" accordion on
- * EditModelProviderForm.
- *
- * Covers @integration scenarios from
- * specs/ai-gateway/gateway-provider-settings.feature:
- *   - Advanced (Gateway) is hidden when the AI gateway feature flag is off
- *   - Advanced (Gateway) renders as a collapsed accordion when the flag is on
- *   - Single Save persists basic credentials and advanced gateway fields together
- *
- * The drawer renders the gateway fields inside a collapsible "Advanced"
- * accordion, gated on the `release_ui_ai_gateway_menu_enabled` flag for the
- * caller's org. The accordion also holds fields that are not the gateway's,
- * so the flag gates the fields rather than the accordion. There is one Save:
- * it funnels basic + advanced to one `modelProvider.update` mutation.
+ * The "Advanced (Gateway)" accordion on EditModelProviderForm, gated on
+ * release_ui_ai_gateway_menu_enabled, with one Save for basic and advanced fields.
  */
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
