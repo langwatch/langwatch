@@ -23,6 +23,7 @@ import {
   type StorageMeterTenantsInput,
   type UnpinTraceInput,
 } from "@langwatch/data-retention-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -46,13 +47,11 @@ import {
 import { DataRetentionSnapshotService } from "../services/data-retention-snapshot.service.ts";
 import { DataRetentionService } from "../services/data-retention.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
+import { RetentionPlanService } from "../services/retention-plan.service.ts";
 import { StorageMeterScopeService } from "../services/storage-meter-scope.service.ts";
 import { StorageMeterService } from "../services/storage-meter.service.ts";
-import type { DataRetentionPlanResolver } from "./data-retention.members.ts";
 
 const DEFAULT_CACHE_TTL_MS = 60_000;
-
-/** Resolves the ClickHouse the retention rewrites and the meter run on. */
 
 /** A project's place in the organization chain, plus the name it renders under. */
 export type RetentionProjectLineage = Readonly<{
@@ -105,23 +104,14 @@ export interface DataRetentionDirectoryReader {
   }): Promise<readonly { id: string; teamId: string }[]>;
 }
 
-export type DataRetentionInfrastructure = Readonly<{
-  /** Which organization owns a scope, what it is called, what it resolves to. */
-  directory: DataRetentionDirectoryReader;
-  /** What an organization's plan permits of its retention. */
-  plans: DataRetentionPlanResolver;
-  redis: (DataRetentionRedis & StorageMeterRedis) | null;
-  cacheTtlMs?: number;
-}>;
-
 /**
- * Shapes restated rather than imported from `@langwatch/process-stores`: a
- * module depends on contracts. `nodeEnvironment` is the process's own fact
- * (§6) — `dataRetentionConfig` no longer claims `NODE_ENV`.
+ * Shapes restated rather than imported from `@langwatch/process-stores` (§6).
+ * The directory is a repository and the plan a peer, so neither is a member.
  */
 type DataRetentionMembers = Readonly<{
   clickhouse: ClickHouseQueryClient;
   nodeEnvironment: string | undefined;
+  redis: (DataRetentionRedis & StorageMeterRedis) | null;
 }>;
 
 /**
@@ -131,7 +121,7 @@ type DataRetentionMembers = Readonly<{
  */
 type DataRetentionSetup = FeatureSetup<
   typeof DataRetentionApp.dependencies,
-  DataRetentionInfrastructure & DataRetentionMembers,
+  DataRetentionMembers,
   DataRetentionServerConfig,
   DataRetentionRepositories
 >;
@@ -143,10 +133,11 @@ export class DataRetentionApp implements DataRetentionApiContract {
     organizations: OrganizationApi,
     permissions: AuthzApi,
     users: UserApi,
+    entitlement: EntitlementApi,
   };
   static readonly config = dataRetentionConfig;
-  /** Both names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["clickhouse", "nodeEnvironment"] as const;
+  /** Every name is from the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["clickhouse", "nodeEnvironment", "redis"] as const;
 
   readonly #retention: DataRetentionService;
   readonly #policy: DataRetentionPolicyService;
@@ -195,15 +186,15 @@ export class DataRetentionApp implements DataRetentionApiContract {
       }),
       cache: RedisDataRetentionCacheRepository.create({
         redis: members.redis,
-        ttlMs: members.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS,
+        ttlMs: DEFAULT_CACHE_TTL_MS,
       }),
       storageMeter,
     });
     const permissions = RetentionPermissionsService.create({ authz: dependencies.permissions });
     const policy = DataRetentionPolicyService.create({
-      directory: members.directory,
+      directory: repositories.directory,
       permissions,
-      plans: members.plans,
+      plans: RetentionPlanService.create({ entitlement: dependencies.entitlement }),
       administrators: dependencies.users,
     });
 
@@ -212,13 +203,13 @@ export class DataRetentionApp implements DataRetentionApiContract {
       policy,
       snapshots: DataRetentionSnapshotService.create({
         retention,
-        directory: members.directory,
+        directory: repositories.directory,
         permissions,
         policy,
       }),
       scopeMeter: StorageMeterScopeService.create({
         meter: storageMeter,
-        directory: members.directory,
+        directory: repositories.directory,
         permissions,
       }),
       users: dependencies.users,

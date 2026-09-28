@@ -2,6 +2,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
+import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
@@ -14,11 +15,9 @@ import { MemoryDataRetentionRepositories } from "../../repositories/memory/memor
 import {
   DataRetentionApp,
   type DataRetentionDirectoryReader,
-  type DataRetentionInfrastructure,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
 } from "../data-retention.app.ts";
-import type { DataRetentionPlanResolver, DataRetentionPlan } from "../data-retention.members.ts";
 
 /** One organization with one team and one project, which is all a gate needs. */
 export type RetentionTestDirectoryGraph = Readonly<{
@@ -86,19 +85,6 @@ export class MemoryRetentionDirectory implements DataRetentionDirectoryReader {
 
   async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return [{ id: this.graph.projectId, teamId: this.graph.teamId }];
-  }
-}
-
-/** The plan every gate is decided against, stated rather than billed for. */
-export class MemoryRetentionPlans implements DataRetentionPlanResolver {
-  static create(plan: DataRetentionPlan = { free: false, uncapped: true }): MemoryRetentionPlans {
-    return new MemoryRetentionPlans(plan);
-  }
-
-  private constructor(private readonly plan: DataRetentionPlan) {}
-
-  async getPlan(): Promise<DataRetentionPlan> {
-    return this.plan;
   }
 }
 
@@ -239,42 +225,68 @@ function noopClickHouse(): ClickHouseQueryClient {
   });
 }
 
-type DataRetentionTestInfrastructure = DataRetentionInfrastructure &
-  Readonly<{ clickhouse: ClickHouseQueryClient; nodeEnvironment: string | undefined }>;
+/** The plan entitlement answers: an enterprise plan unless a test states otherwise. */
+export function createDataRetentionTestEntitlement(
+  plan: Readonly<{ free: boolean; type: string }> = { free: false, type: "ENTERPRISE" },
+): EntitlementApi {
+  return createApiFixture<EntitlementApi>({
+    getActivePlan: vi.fn(async () => testPlan(plan)),
+  });
+}
 
-export function createDataRetentionTestInfrastructure(
-  overrides: Partial<DataRetentionTestInfrastructure> = {},
-): DataRetentionTestInfrastructure {
+function testPlan(plan: Readonly<{ free: boolean; type: string }>): Plan {
   return {
-    directory: overrides.directory ?? MemoryRetentionDirectory.create(),
-    plans: overrides.plans ?? MemoryRetentionPlans.create(),
-    redis: overrides.redis ?? null,
-    clickhouse: overrides.clickhouse ?? noopClickHouse(),
-    nodeEnvironment: overrides.nodeEnvironment ?? "test",
+    planSource: plan.free ? "free" : "license",
+    type: plan.type,
+    name: plan.type,
+    free: plan.free,
+    maxMembers: 0,
+    maxMembersLite: 0,
+    maxMessagesPerMonth: 0,
+    canPublish: true,
+    prices: { USD: 0, EUR: 0 },
   };
 }
+
+type DataRetentionTestMembers = Readonly<{
+  clickhouse: ClickHouseQueryClient;
+  nodeEnvironment: string | undefined;
+  redis: null;
+}>;
 
 export function createDataRetentionTestApp(
   input: Readonly<{
     repositories?: DataRetentionRepositories;
-    members?: Partial<DataRetentionTestInfrastructure>;
+    directory?: DataRetentionDirectoryReader;
+    clickhouse?: ClickHouseQueryClient;
     dependencies?: Partial<{
       projects: ProjectApi;
       organizations: OrganizationApi;
       permissions: AuthzApi;
       users: UserApi;
+      entitlement: EntitlementApi;
     }>;
     platformDefaultRetentionDays?: number;
   }> = {},
 ): DataRetentionApp {
+  const members: DataRetentionTestMembers = {
+    clickhouse: input.clickhouse ?? noopClickHouse(),
+    nodeEnvironment: "test",
+    redis: null,
+  };
+
   return DataRetentionApp.create({
-    repositories: input.repositories ?? MemoryDataRetentionRepositories.create(),
-    members: createDataRetentionTestInfrastructure(input.members ?? {}),
+    repositories: input.repositories ?? {
+      ...MemoryDataRetentionRepositories.create(),
+      directory: input.directory ?? MemoryRetentionDirectory.create(),
+    },
+    members,
     dependencies: {
       projects: input.dependencies?.projects ?? createDataRetentionTestProjects(),
       organizations: input.dependencies?.organizations ?? createDataRetentionTestOrganizations(),
       permissions: input.dependencies?.permissions ?? createDataRetentionTestAuthz(),
       users: input.dependencies?.users ?? createDataRetentionTestUsers(),
+      entitlement: input.dependencies?.entitlement ?? createDataRetentionTestEntitlement(),
     },
     config: {
       platformDefaultDays: input.platformDefaultRetentionDays?.toString(),

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { NotFoundError } from "@langwatch/api/rest";
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
@@ -37,6 +36,7 @@ import {
 import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
+import { NotFoundError } from "@langwatch/handled-error";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import type { EmailDelivery } from "@langwatch/mail";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
@@ -501,7 +501,9 @@ export class BillingApp
 
   /** The subscription door, or not found where main mounted no subscription router. */
   get #subscriptionDoor(): SubscriptionDoor {
-    if (!this.#subscriptions) throw new NotFoundError("Subscriptions are not served here");
+    if (!this.#subscriptions) {
+      throw new NotFoundError("not_found", "Subscription service", "this deployment");
+    }
     return this.#subscriptions;
   }
 
@@ -629,7 +631,9 @@ export class BillingApp
 
   /** Main mounted currency detection on LangWatch Cloud only; elsewhere the procedure is absent. */
   detectCurrency(request: CurrencyRequest): DetectedCurrency {
-    if (!this.#isSaas) throw new NotFoundError("Currency detection is not served here");
+    if (!this.#isSaas) {
+      throw new NotFoundError("not_found", "Currency detection", "this deployment");
+    }
     return CurrencyService.create().detect(request);
   }
 

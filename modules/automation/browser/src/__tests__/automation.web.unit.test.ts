@@ -41,6 +41,7 @@ describe("given a browser that installs automation", () => {
         "pages/[project]/automations/automations",
         "pages/[project]/automations/alerts",
         "pages/[project]/automations/schedules",
+        "pages/[project]/automations/activity",
       ] as const;
 
       for (const page of pages) {

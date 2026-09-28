@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { dataRetentionServer } from "../../data-retention.server.ts";
 import {
   createDataRetentionTestAuthz,
+  createDataRetentionTestEntitlement,
   createDataRetentionTestOrganizations,
   createDataRetentionTestProjects,
   createDataRetentionTestUsers,
@@ -16,7 +17,7 @@ import {
 } from "./data-retention.fixture.ts";
 
 /**
- * The one member `DataRetentionApp` reads (`reads("clickhouse")`). Memory-tier
+ * The ClickHouse member `DataRetentionApp` reads. Memory-tier
  * installation never reaches a store, so the boot only needs the member to
  * EXIST — a stub that refuses on use proves that without opening a client.
  */
@@ -37,11 +38,13 @@ function process(role: "api" | "worker") {
     })
     .withMember("nodeEnvironment", undefined)
     .withAnalytical(analyticalWithoutStore())
+    .withKeyvalue(null)
     .provide({
       project: createDataRetentionTestProjects(),
       organization: createDataRetentionTestOrganizations(),
       authz: createDataRetentionTestAuthz(),
       user: createDataRetentionTestUsers(),
+      entitlement: createDataRetentionTestEntitlement(),
     });
 }
 
@@ -65,6 +68,11 @@ describe("data retention app installation", () => {
       await expect(app.listByProject({ projectId: retentionTestGraph.projectId })).resolves.toEqual(
         [],
       );
+
+      // The settings page's read: its directory comes from the registry, not a member.
+      await expect(
+        app.getPolicySnapshot({ projectId: retentionTestGraph.projectId, userId: "user-1" }),
+      ).resolves.toMatchObject({ projectId: retentionTestGraph.projectId, rules: [] });
     } finally {
       await runtime.stop();
     }

@@ -5,6 +5,19 @@
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
+import { createElement } from "react";
+
+import type { CustomGraphScreenMode } from "./ui/sections/analytics/custom-graph.screen.tsx";
+
+/** The chart builder serves both its addresses; the mode is the route's own key. */
+function customGraph(mode: CustomGraphScreenMode) {
+  return async () => {
+    const { default: CustomGraphScreen } =
+      await import("./ui/sections/analytics/custom-graph.screen.tsx");
+
+    return { default: () => createElement(CustomGraphScreen, { mode }) };
+  };
+}
 
 export const analyticsWeb = defineWebModule("analytics")
   .withHosts({
@@ -36,8 +49,11 @@ export const analyticsWeb = defineWebModule("analytics")
     "pages/[project]/analytics/query": {
       load: () => import("./ui/sections/analytics/analytics-query.screen.tsx"),
     },
+    "pages/[project]/analytics/custom/index": {
+      load: customGraph("new"),
+    },
     "pages/[project]/analytics/custom/[id]": {
-      load: () => import("./ui/sections/analytics/custom-graph.screen.tsx"),
+      load: customGraph("edit"),
     },
   })
   .withDrawers({

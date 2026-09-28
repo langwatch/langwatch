@@ -321,7 +321,7 @@ describe("the currency BillingApp detects", () => {
       const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
 
       expect(() => app.detectCurrency({ headers: {} })).toThrow(
-        expect.objectContaining({ status: 404 }),
+        expect.objectContaining({ code: "not_found", httpStatus: 404 }),
       );
     });
   });
@@ -333,7 +333,8 @@ describe("the subscription door BillingApp serves", () => {
       const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
 
       await expect(app.listInvoices({ organizationId: ACME })).rejects.toMatchObject({
-        status: 404,
+        code: "not_found",
+        httpStatus: 404,
       });
     });
   });

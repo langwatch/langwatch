@@ -584,10 +584,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           },
 
           {
-            // The declared "overview", "automations", "alerts" and
-            // "schedules" screens now come from @langwatch/automation-browser
-            // (automation.web.ts); this row has no matching AutomationSection
-            // and no screen renders it — see the batch-a handoff.
             path: "/:project/automations/activity",
             page: "pages/[project]/automations/activity",
           },

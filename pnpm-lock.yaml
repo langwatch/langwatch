@@ -6384,6 +6384,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel

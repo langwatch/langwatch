@@ -54,6 +54,12 @@ export const automationWeb = defineWebModule("automation")
       within: "project",
       load: automationTab("schedules"),
     },
+    /** Main's activity address re-rendered the overview, whose recent activity it links to. */
+    "pages/[project]/automations/activity": {
+      path: "/:project/automations/activity",
+      within: "project",
+      load: automationTab("overview"),
+    },
     /** Reached from an email link, outside the project chrome. */
     "pages/unsubscribe": {
       load: () => import("./ui/sections/unsubscribe-screen.tsx"),
