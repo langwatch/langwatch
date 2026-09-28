@@ -25,6 +25,10 @@ export type CaptureScreensInput = {
   outDir: string;
   widths?: number[];
   schemes?: ColourScheme[];
+  /** `load` for a page holding a long poll, which never reaches network idle. */
+  waitUntil?: "load" | "networkidle";
+  /** A selector each page waits for (visible) before `prepare`, e.g. its heading or first row. */
+  ready?: string;
 };
 
 const HEIGHT = 900;
@@ -87,6 +91,8 @@ export const captureScreens = async ({
   outDir,
   widths = [1280, 390],
   schemes = ["light", "dark"],
+  waitUntil = "networkidle",
+  ready,
 }: CaptureScreensInput): Promise<string[]> => {
   await mkdir(outDir, { recursive: true });
   const browser = await chromium.launch();
@@ -101,7 +107,8 @@ export const captureScreens = async ({
         });
         const page = await context.newPage();
         for (const view of views) {
-          await page.goto(new URL(view.path, baseUrl).toString(), { waitUntil: "networkidle" });
+          await page.goto(new URL(view.path, baseUrl).toString(), { waitUntil });
+          if (ready !== undefined) await page.locator(ready).first().waitFor();
           await page.evaluate(async () => {
             await document.fonts.ready;
           });

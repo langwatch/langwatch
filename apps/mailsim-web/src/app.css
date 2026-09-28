@@ -21,11 +21,6 @@
   margin-left: auto;
 }
 
-/* The open message; the kit's ListItem has no current state yet (handoff, shared-file request). */
-.ds-list-row:has([data-open]) {
-  background: var(--brand-soft);
-}
-
 .mail-preview {
   display: block;
   width: 100%;

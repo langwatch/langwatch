@@ -1,5 +1,7 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+import { tokens } from "../tokens.ts";
+import { flag } from "./class-names.ts";
 import { ThemeToggle } from "./theme-toggle.tsx";
 
 export type ConsoleLink = { label: string; href: string; current?: boolean };
@@ -37,6 +39,67 @@ const Brand = ({ name, slug, homeHref }: Pick<TopBarProps, "name" | "slug" | "ho
   );
 };
 
+type Edges = { start: boolean; end: boolean };
+
+const edgesOf = ({ element }: { element: HTMLElement }): Edges => ({
+  start: element.scrollLeft > 1,
+  end: element.scrollLeft + element.clientWidth < element.scrollWidth - 1,
+});
+
+/** The width of an edge's fade (`--space-8` in styles.css). */
+const FADE = Number.parseFloat(tokens.space[8]);
+
+/** Scrolls the nav, never the page, so the current link sits clear of both fades. */
+const revealCurrent = ({ nav }: { nav: HTMLElement }) => {
+  const current = nav.querySelector('[aria-current="page"]');
+  if (current === null) return;
+  const outer = nav.getBoundingClientRect();
+  const inner = current.getBoundingClientRect();
+  if (inner.right > outer.right - FADE) nav.scrollLeft += inner.right - outer.right + FADE;
+  if (inner.left < outer.left + FADE) nav.scrollLeft -= outer.left + FADE - inner.left;
+};
+
+/** Scrolls sideways when the links outgrow the bar; a faded edge says there is more. */
+const ConsoleNav = ({ links }: { links: ConsoleLink[] }) => {
+  const ref = useRef<HTMLElement>(null);
+  const [edges, setEdges] = useState<Edges>({ start: false, end: false });
+  useLayoutEffect(() => {
+    const nav = ref.current;
+    if (nav === null) return;
+    const measure = () => setEdges(edgesOf({ element: nav }));
+    revealCurrent({ nav });
+    measure();
+    nav.addEventListener("scroll", measure, { passive: true });
+    const observer =
+      typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
+    observer?.observe(nav);
+    return () => {
+      nav.removeEventListener("scroll", measure);
+      observer?.disconnect();
+    };
+  }, [links]);
+  return (
+    <nav
+      ref={ref}
+      className="ds-topbar-nav"
+      aria-label="Consoles"
+      data-more-start={flag({ on: edges.start })}
+      data-more-end={flag({ on: edges.end })}
+    >
+      {links.map((link) => (
+        <a
+          key={link.href}
+          className="ds-topbar-link"
+          href={link.href}
+          aria-current={link.current ? "page" : undefined}
+        >
+          {link.label}
+        </a>
+      ))}
+    </nav>
+  );
+};
+
 export const TopBar = ({
   name,
   slug,
@@ -48,20 +111,7 @@ export const TopBar = ({
   <header className="ds-topbar">
     <div className="ds-topbar-inner">
       <Brand name={name} slug={slug} homeHref={homeHref} />
-      {links.length > 0 && (
-        <nav className="ds-topbar-nav" aria-label="Consoles">
-          {links.map((link) => (
-            <a
-              key={link.href}
-              className="ds-topbar-link"
-              href={link.href}
-              aria-current={link.current ? "page" : undefined}
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-      )}
+      {links.length > 0 && <ConsoleNav links={links} />}
       <div className="ds-topbar-end">
         {actions}
         {themeToggle && <ThemeToggle />}

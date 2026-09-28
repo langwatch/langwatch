@@ -17,7 +17,11 @@
 
 :root {
   color-scheme: light dark;
+}
 
+/* Declared again on every [data-theme], so a forced subtree resolves its own set. */
+:root,
+[data-theme] {
   --paper: light-dark(#ffffff, #0a0a0c);
   --paper-soft: light-dark(#f4f3ef, #141416);
   --paper-deep: light-dark(#e8e7e1, #1f1f23);
@@ -367,6 +371,25 @@ a.ds-topbar-brand {
 
 .ds-topbar-nav .ds-topbar-link:focus-visible {
   outline-offset: -2px;
+}
+
+/* More links past an edge: that edge fades, so no label ends mid-word with no hint. */
+.ds-topbar-nav[data-more-end] {
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--space-8)), transparent);
+}
+
+.ds-topbar-nav[data-more-start] {
+  mask-image: linear-gradient(to left, #000 calc(100% - var(--space-8)), transparent);
+}
+
+.ds-topbar-nav[data-more-start][data-more-end] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--space-8),
+    #000 calc(100% - var(--space-8)),
+    transparent
+  );
 }
 
 .ds-topbar-end {
@@ -875,12 +898,25 @@ a.ds-topbar-brand {
   text-decoration: none;
 }
 
-a.ds-list-row:hover {
+button.ds-list-row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+:is(a, button).ds-list-row:hover {
   background: var(--paper-soft);
 }
 
-a.ds-list-row:focus-visible {
+:is(a, button).ds-list-row:focus-visible {
   outline-offset: -2px;
+}
+
+.ds-list-row[aria-current]:not([aria-current="false"]) {
+  background: var(--brand-soft);
 }
 
 .ds-list-main {
@@ -1047,6 +1083,12 @@ a.ds-list-row:focus-visible {
 .ds-log-window .ds-log-text {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.ds-log-mark {
+  background: var(--brand-soft);
+  color: inherit;
+  border-radius: var(--radius-sm);
 }
 
 .ds-log-line[data-level="debug"] .ds-log-text {
@@ -1329,6 +1371,13 @@ a.ds-list-row:focus-visible {
 .ds-button[data-armed]:hover:not(:disabled) {
   background: var(--rust);
   filter: brightness(0.94);
+}
+
+.ds-button[aria-pressed="true"],
+.ds-button[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--paper-deep);
+  border-color: var(--line-strong);
+  color: var(--ink-900);
 }
 
 .ds-button:disabled {

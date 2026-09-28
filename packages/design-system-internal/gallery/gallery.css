@@ -16,6 +16,16 @@
   border-radius: var(--radius-md);
 }
 
+.gallery-nest {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
 .gallery-menu-room {
   min-height: 190px;
 }

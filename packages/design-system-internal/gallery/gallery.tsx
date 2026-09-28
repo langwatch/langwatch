@@ -206,6 +206,7 @@ const StatusCase = () => (
 const ButtonsCase = () => {
   const [size, setSize] = useState<"all" | "live">("all");
   const [service, setService] = useState("api");
+  const [notify, setNotify] = useState(true);
   return (
     <Case id="buttons" title="Buttons and a mixed row">
       <Stack gap={4}>
@@ -232,6 +233,12 @@ const ButtonsCase = () => {
           <Button disabled>Disabled</Button>
           <CopyButton value="haven up" label="Copy command" showLabel />
           <ConfirmButton label="Stop" onConfirm={() => undefined} />
+          <Button size="sm" pressed={notify} onClick={() => setNotify(!notify)}>
+            Notify
+          </Button>
+          <Button size="sm" pressed={false}>
+            Follow
+          </Button>
         </Inline>
         <Inline gap={2} wrap>
           <Input label="Filter" hideLabel placeholder="Filter services" />
@@ -424,6 +431,9 @@ const CodeCase = () => (
       >
         <LogView lines={logLines} height="sm" />
       </Panel>
+      <Panel title="Filtered log" meta='highlight="API"'>
+        <LogView lines={logLines} height="sm" highlight="API" />
+      </Panel>
     </Stack>
   </Case>
 );
@@ -539,6 +549,95 @@ const TopBarCase = () => (
         ]}
       />
     </div>
+    <div className="gallery-frame">
+      <TopBar
+        name="haven"
+        slug={slug}
+        homeHref="#topbar"
+        links={[
+          { label: "Home", href: "#home" },
+          { label: "Hub", href: "#hub" },
+          { label: "App", href: "#app" },
+          { label: "Mail", href: "#mail" },
+          { label: "IdP", href: "#idp" },
+          { label: "Design system", href: "#design-system" },
+          { label: "Mail room", href: "#mail-room", current: true },
+          { label: "Grafana", href: "#grafana" },
+        ]}
+      />
+    </div>
+  </Case>
+);
+
+const messages = [
+  { id: "m1", subject: "You are invited to Acme", to: "dev@feat-x.mail.langwatch.localhost" },
+  { id: "m2", subject: "Your sign-in link", to: "dev@feat-x.mail.langwatch.localhost" },
+  { id: "m3", subject: "Evaluation finished", to: "ops@feat-x.mail.langwatch.localhost" },
+];
+
+const SelectableList = () => {
+  const [open, setOpen] = useState("m1");
+  return (
+    <Panel title="Messages" meta="current row, click or Enter to select">
+      <List label="Messages">
+        {messages.map((message) => (
+          <ListItem
+            key={message.id}
+            href={`#${message.id}`}
+            onSelect={() => setOpen(message.id)}
+            current={message.id === open}
+            title={message.subject}
+            description={message.to}
+            meta="21:04"
+          />
+        ))}
+      </List>
+    </Panel>
+  );
+};
+
+const Forced = ({ theme, children }: { theme: "light" | "dark"; children: ReactNode }) => (
+  <div className="gallery-nest" data-theme={theme}>
+    <Text size="sm" tone="muted">
+      data-theme="{theme}"
+    </Text>
+    {children}
+  </div>
+);
+
+const NestedSample = () => (
+  <Panel title="Forced pane" meta={<Badge tone="brand">brand</Badge>}>
+    <Inline gap={2} wrap>
+      <Button variant="primary" size="sm">
+        Open
+      </Button>
+      <Button size="sm" pressed>
+        Notify
+      </Button>
+      <StatusDot state="live" />
+    </Inline>
+  </Panel>
+);
+
+const SelectionCase = () => (
+  <Case id="selection" title="Selection, toggles and forced themes">
+    <Stack gap={4}>
+      <SelectableList />
+      <Grid columns={2} gap={4}>
+        <Forced theme="dark">
+          <NestedSample />
+          <Forced theme="light">
+            <NestedSample />
+          </Forced>
+        </Forced>
+        <Forced theme="light">
+          <NestedSample />
+          <Forced theme="dark">
+            <NestedSample />
+          </Forced>
+        </Forced>
+      </Grid>
+    </Stack>
   </Case>
 );
 
@@ -550,6 +649,7 @@ const Cases = () => (
     <ButtonsCase />
     <FormsCase />
     <PanelsCase />
+    <SelectionCase />
     <TableCase />
     <CodeCase />
     <CalloutCase />

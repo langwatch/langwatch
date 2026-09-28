@@ -33,6 +33,12 @@ describe("tokens", () => {
     });
   });
 
+  describe("given a subtree forced with [data-theme]", () => {
+    it("declares the tokens on it again, so it resolves its own set", () => {
+      expect(css).toMatch(/:root,\s*\[data-theme\]\s*\{\s*--paper:/u);
+    });
+  });
+
   describe("given the font, type, space, radius and control tokens", () => {
     it("declares the same value as styles.css", () => {
       const mismatches = scalarGroups.flatMap((group) =>

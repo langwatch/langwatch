@@ -12,6 +12,10 @@
       "default": "./src/index.ts"
     },
     "./styles.css": "./src/styles.css",
+    "./tokens": {
+      "types": "./dist/tokens.d.ts",
+      "default": "./src/tokens.ts"
+    },
     "./screenshot": "./gallery/capture.ts"
   },
   "scripts": {

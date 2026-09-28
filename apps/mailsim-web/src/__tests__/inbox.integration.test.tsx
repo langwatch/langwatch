@@ -103,6 +103,11 @@ describe("the browser inbox", () => {
       const preview = await screen.findByTitle("Email preview");
       expect(preview.getAttribute("src")).toBe("/api/messages/01B/html");
       expect(window.location.pathname).toBe("/messages/01B");
+      expect(
+        within(list)
+          .getByRole("link", { name: /You are invited/u })
+          .getAttribute("aria-current"),
+      ).toBe("page");
     });
 
     /** @scenario "The inbox is served in the browser at the stack's mail hostname" */
@@ -149,7 +154,7 @@ describe("the browser inbox", () => {
 
       fireEvent.click(toggle);
 
-      await screen.findByRole("button", { name: "Notifying" });
+      await screen.findByRole("button", { name: "Notify me", pressed: true });
       expect(requestPermission).toHaveBeenCalledTimes(1);
     });
   });

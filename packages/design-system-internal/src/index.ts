@@ -8,6 +8,7 @@ export {
   type ThemeChoice,
 } from "./theme.ts";
 export { writeClipboardText } from "./clipboard.ts";
+export { consoleLinks, type ConsoleLinks, type ConsoleLocation } from "./console-links.ts";
 
 export { Page, type PageProps } from "./components/page.tsx";
 export { TopBar, type ConsoleLink, type TopBarProps } from "./components/top-bar.tsx";

@@ -22,6 +22,8 @@ export type ButtonProps = {
   href?: string;
   title?: string;
   form?: string;
+  /** Makes it a toggle: `aria-pressed` and a pressed look while true. */
+  pressed?: boolean;
 };
 
 export const Button = ({
@@ -36,6 +38,7 @@ export const Button = ({
   href,
   title,
   form,
+  pressed,
 }: ButtonProps) => {
   const label = (
     <span className="ds-button-label">
@@ -58,6 +61,7 @@ export const Button = ({
       data-size={size}
       data-loading={flag({ on: loading })}
       aria-busy={loading || undefined}
+      aria-pressed={pressed}
       disabled={disabled || loading}
       onClick={onClick}
       title={title}

@@ -1,6 +1,7 @@
 import {
   Button,
   ConfirmButton,
+  consoleLinks,
   EmptyState,
   IconButton,
   IconRefresh,
@@ -17,7 +18,6 @@ import {
 } from "@langwatch/design-system-internal";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { consoleLinks } from "./console-links.ts";
 import { InboxDetails } from "./inbox-details.tsx";
 import { filterMessages, recipientCounts } from "./inbox-filter.ts";
 import { mailApi, type Inbox as InboxInfo, type Message } from "./mail-api.ts";
@@ -190,6 +190,7 @@ export const Inbox = () => {
         <>
           <Button
             onClick={() => void toggleNotify()}
+            pressed={notify.on}
             disabled={!notify.supported}
             title={
               notify.supported
@@ -197,7 +198,7 @@ export const Inbox = () => {
                 : "This browser does not offer desktop notifications."
             }
           >
-            {notify.on ? "Notifying" : "Notify me"}
+            Notify me
           </Button>
           <ConfirmButton
             label="Clear inbox"
