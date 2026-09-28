@@ -27,12 +27,12 @@ import { z } from "zod";
 import { EvaluationAnalyticsFoldProjection } from "../eventing/evaluation-analytics-fold.projection.ts";
 import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-row.projection.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
-import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
-import { EvaluationCommandService } from "../services/evaluation-command.service.ts";
 import {
   createEvaluationProcessingPipeline,
   type EvaluationAutomationReactions,
-} from "../services/evaluation-processing.service.ts";
+} from "../eventing/evaluation-processing-definition.pipeline.ts";
+import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
+import { EvaluationCommandService } from "../services/evaluation-command.service.ts";
 
 const tenantId = createTenantId("project-1");
 

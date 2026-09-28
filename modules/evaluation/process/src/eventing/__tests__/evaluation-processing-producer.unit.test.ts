@@ -1,13 +1,13 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import { ExecuteEvaluationCommand } from "../../eventing/evaluation-execution.intent.ts";
-import { EvaluationProcessingProducerService } from "../evaluation-processing-producer.service.ts";
-import { createEvaluationProcessingPipeline } from "../evaluation-processing.service.ts";
+import { ExecuteEvaluationCommand } from "../evaluation-execution.intent.ts";
+import { createEvaluationProcessingPipeline } from "../evaluation-processing-definition.pipeline.ts";
+import { EvaluationProcessingProducerAdapter } from "../evaluation-processing-producer.pipeline.ts";
 
 /** The producer's definition, as a host receives it. */
 const producer = () =>
-  EvaluationProcessingProducerService.create({ processName: "langwatch-api" }).build();
+  EvaluationProcessingProducerAdapter.create({ processName: "langwatch-api" }).build();
 
 /** The consumer's, built from stores and handlers a caller would supply. */
 const consumer = () =>
