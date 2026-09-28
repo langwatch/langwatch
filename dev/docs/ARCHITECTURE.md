@@ -172,7 +172,9 @@ document, is the authority on filenames):
   service = behaviour over both.
 - `eventing/` — one folder: the pipeline and everything it names (§9).
 - `transport/` — declarations only (§8).
-- `rules/` — pure functions and constants; no clock, no I/O.
+- `rules/` — pure functions and constants; no clock, no I/O. Value types (data
+  bags and the pure functions over them) live here too, not as `*Service`
+  classes and not in a new slot (Alex, 2026-09-28).
 - Ids: a new record's id is a KSUID with its resource prefix; ids minted before (nanoid, uuid) keep
   their format and stay accepted, since clients hold them as opaque strings (Alex, 2026-09-27).
 - No `utils/`, `ports/`, `adapters/`, `composition/`, `lib/`, `helpers/`,
