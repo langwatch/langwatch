@@ -903,6 +903,9 @@ a config object a module reads. Every refusal in both packages is a
    the night it landed).
    A shared secret follows the same rule: one exported `Secret.load` handle, and a double claim
    passes only when every claimant holds that same handle (Alex, 2026-09-25).
+   A fallback between secrets is declared, not configured: the owner declares each handle and nests
+   `into`, first answer wins. The API-key pepper is `API_KEY_PEPPER ?? CREDENTIALS_SECRET ??
+   NEXTAUTH_SECRET`, and the boot refuses when none answers (Alex, 2026-09-28).
 
 **Config is drilled, never ambient.** There is no async context and no
 dependency-injection container. The process config is one object composed of

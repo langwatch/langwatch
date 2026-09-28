@@ -51,6 +51,8 @@ const SYNTHETIC_ENVIRONMENT: Readonly<Record<string, string>> = {
   // No quick tunnel from a test process: it would open a real one where cloudflared is on PATH.
   VOICE_TUNNEL: "false",
   BASE_HOST: "http://langwatch.test",
+  // The API-key pepper chain refuses a boot where none of its secrets is set.
+  API_KEY_PEPPER: "synthetic-api-key-pepper",
 };
 
 function unreachable<Client extends object>(name: string): Client {

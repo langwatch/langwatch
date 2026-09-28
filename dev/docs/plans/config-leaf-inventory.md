@@ -92,9 +92,9 @@ Notes: declares nothing; nothing to port.
 
 Config leaves:
 | field | env spelling | schema | default | source |
-| pepper | API_KEY_PEPPER | z.string().optional() | — | contract |
+| ~~pepper~~ | ~~API_KEY_PEPPER~~ | retired 2026-09-28 | — | — |
 
-Secrets: none declared directly, but see note.
+Secrets: `ApiKeyApp.secrets` declares `API_KEY_PEPPER` plus the shared `credentialsSecret` and `sessionSecret`, first set wins (ruling above).
 
 Supplied by the deleted app config: **not present in `slices` at all.** `apiKeyPepper` is instead a top-level `apiConfigDefinition` field (`apiKeyServerConfigDefinition.pepper` referenced directly, line 193 of `apps/api/src/config.ts`), and the api's `resolveApiConfig` synthesizes its actual source value as `firstDefined(source, API_KEY_PEPPER_ENV_PRECEDENCE)` where `API_KEY_PEPPER_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]` is _itself_ pre-substituted (`CREDENTIALS_SECRET` is synthesized first as `firstDefined(source, ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"])`). So the real precedence, unwound, is: `API_KEY_PEPPER` → `CREDENTIALS_SECRET` → `NEXTAUTH_SECRET`.
 
@@ -853,7 +853,7 @@ Notes: (1) the JSON blob's `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` fields ar
 
 ### Config-claims-secret collisions (boot-refusing under the new wall)
 
-- **`CREDENTIALS_SECRET`** (the manifest's named collision, confirmed): read as a raw secret handle by `github.app.ts` (`signingKey`), used as the fallback source for `secret`'s stored-object cipher key (`storedSecretEncryptionKey`, via `STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]`), AND as the second fallback for `api-key`'s pepper (`API_KEY_PEPPER_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]`, itself applied after `CREDENTIALS_SECRET`'s own fallback). Three different semantic purposes (GitHub App signing, stored-secret cipher key, API-key pepper) resolve from the same raw material through a layered fallback chain — `Secret.load(id)` has no fallback-chain primitive, so this cannot be a mechanical three-way rename. **Needs a decision**: either the fallback chain gets a new primitive, or each purpose gets its own env var and a migration note for deployments still relying on the shared default.
+- **`CREDENTIALS_SECRET`** (the manifest's named collision, confirmed): read as a raw secret handle by `github.app.ts` (`signingKey`), used as the fallback source for `secret`'s stored-object cipher key (`storedSecretEncryptionKey`, via `STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]`), AND as the second fallback for `api-key`'s pepper (`API_KEY_PEPPER_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]`, itself applied after `CREDENTIALS_SECRET`'s own fallback). Three different semantic purposes (GitHub App signing, stored-secret cipher key, API-key pepper) resolve from the same raw material through a layered fallback chain — `Secret.load(id)` has no fallback-chain primitive, so this cannot be a mechanical three-way rename. **Needs a decision**: either the fallback chain gets a new primitive, or each purpose gets its own env var and a migration note for deployments still relying on the shared default. **Ruled for the API-key pepper (Alex, 2026-09-28): main's chain.** The pepper resolves `API_KEY_PEPPER ?? CREDENTIALS_SECRET ?? NEXTAUTH_SECRET` through `@langwatch/secrets` (ADR-132), with no new primitive: `ApiKeyApp` declares the three handles (`API_KEY_PEPPER` plus the shared `credentialsSecret` and `sessionSecret`) and nests `into`, as `ScimApp` and `ScenarioApp` already do. When none resolves, the process refuses to boot with a named configuration error, never an empty-string pepper. The storage seed hashes its two Local Dev keys under the same chain, and the `API_KEY_PEPPER` config leaf in the api-key section below is retired (ARCHITECTURE.md §6).
 
 ### Env spellings read by two-or-more modules with the SAME meaning (shared-leaf candidates per §6 layer 3)
 

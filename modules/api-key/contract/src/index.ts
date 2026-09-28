@@ -12,6 +12,5 @@ export * from "./api-key.rest.ts";
 export * from "./api-key-rest.schemas.ts";
 export * from "./api-key.trpc.ts";
 export * from "./api-key-trpc.schemas.ts";
-export * from "./api-key.config.ts";
 export * from "./api-key.device-label.ts";
 export * from "./api-key.session-ceiling.ts";

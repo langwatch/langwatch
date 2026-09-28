@@ -1,11 +1,14 @@
 import { SecretsChain } from "@langwatch/secrets";
 
 /**
- * The pepper seeded API-key hashes are keyed under, the same name api-key.config.ts declares, or
- * seeds never verify. `dev: optional`: absent is valid, and never minted here (random rows would
- * not verify).
+ * The pepper chain `ApiKeyApp.secrets` resolves, in its order (first set wins), or seeds never
+ * verify. Absent is valid here, and never minted (random rows would not verify).
  */
-export const API_KEY_PEPPER_KEYS = ["API_KEY_PEPPER"] as const;
+export const API_KEY_PEPPER_KEYS = [
+  "API_KEY_PEPPER",
+  "CREDENTIALS_SECRET",
+  "NEXTAUTH_SECRET",
+] as const;
 
 /** The pepper, or the keys that were absent when there was none. */
 export type ApiKeyPepperResolution = Readonly<

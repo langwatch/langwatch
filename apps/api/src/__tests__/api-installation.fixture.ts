@@ -33,6 +33,8 @@ const ROLE = "api";
 const SYNTHETIC_ENVIRONMENT: Readonly<Record<string, string>> = {
   NODE_ENV: "test",
   BASE_HOST: "http://langwatch.test",
+  // The API-key pepper chain refuses a boot where none of its secrets is set.
+  API_KEY_PEPPER: "synthetic-api-key-pepper",
 };
 
 function unreachable<Client extends object>(name: string): Client {
