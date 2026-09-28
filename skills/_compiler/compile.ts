@@ -18,7 +18,7 @@ const skillsRoot = path.resolve(__dirname, "..");
 
 type CompileMode = "platform" | "docs";
 
-interface CompileOptions {
+export interface CompileOptions {
   skills: string[];
   mode: CompileMode;
   apiKey?: string;
@@ -67,7 +67,7 @@ function compileSkill(
   return { body: inlined.trim(), userPrompt };
 }
 
-function compile(options: CompileOptions): string {
+export function compile(options: CompileOptions): string {
   const { skills, mode, apiKey } = options;
 
   const expanded = skills.flatMap(expandSkill);

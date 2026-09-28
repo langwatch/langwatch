@@ -4,12 +4,12 @@ import { fileURLToPath } from "url";
 
 import { describe, expect, it } from "vitest";
 
+import { compile } from "../_compiler/compile.ts";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillsRoot = path.resolve(__dirname, "..");
 const readSkill = (name: string) =>
   fs.readFileSync(path.join(skillsRoot, name, "SKILL.mdx"), "utf8");
-const readCompiledSkill = (name: string) =>
-  fs.readFileSync(path.join(skillsRoot, "_compiled", `${name}.docs.txt`), "utf8");
 
 describe("evaluation skill boundaries", () => {
   /** @scenario Use the experiments skill for batch testing */
@@ -68,7 +68,7 @@ describe("evaluation skill boundaries", () => {
   });
 
   it("keeps both focused evaluation workflows in the full level-up skill", () => {
-    const compiled = readCompiledSkill("level-up");
+    const compiled = compile({ skills: ["level-up"], mode: "docs" });
 
     expect(compiled).toContain("# Run Experiments for Your Agent");
     expect(compiled).toContain("# Set Up Online Evaluations and Guardrails");
