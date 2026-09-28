@@ -30,6 +30,7 @@
     "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/organization-browser": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
