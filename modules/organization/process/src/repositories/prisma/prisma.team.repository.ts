@@ -11,6 +11,9 @@ import { toDate, type Instant } from "@langwatch/time";
 
 import { TeamRepository } from "../team.repository.ts";
 
+/** `change` crosses into the authz ledger while the lock is held. */
+const MEMBERSHIP_FENCE_TRANSACTION = { maxWait: 10_000, timeout: 20_000 } as const;
+
 const teamSelect = {
   id: true,
   name: true,
@@ -250,12 +253,11 @@ export class PrismaTeamRepository extends TeamRepository {
     expectedUpdatedAt: Instant;
     name?: string;
     removeLegacyUserId?: string;
+    change: () => Promise<void>;
   }): Promise<OrganizationTeam> {
     return this.database.$transaction(async (transaction) => {
-      // Take the team row before comparing against it. Without the lock two
-      // concurrent membership changes can both read the same `updatedAt` and
-      // both pass the compare-and-swap, which is how a team with two admins
-      // lost both of them at once.
+      // The row lock is held until `change` has committed its writes, so the
+      // next membership change reads bindings only after this one's landed.
       await transaction.$queryRaw`SELECT id FROM "Team" WHERE id = ${input.teamId} AND "organizationId" = ${input.organizationId} FOR UPDATE`;
       const result = await transaction.team.updateMany({
         where: {
@@ -289,7 +291,8 @@ export class PrismaTeamRepository extends TeamRepository {
         select: teamSelect,
       });
       if (!team) throw new TeamNotFoundError(input.teamId);
+      await input.change();
       return team;
-    });
+    }, MEMBERSHIP_FENCE_TRANSACTION);
   }
 }

@@ -110,42 +110,43 @@ export class OrganizationTeamMembersService {
       throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
     }
 
-    const bindings = await this.teamBindings(parsed.organizationId, parsed.teamId);
-    const memberBindings = bindings.filter((binding) => binding.userId === parsed.userId);
-    if (memberBindings.length === 0) {
-      throw new TeamMembershipNotFoundError(parsed.userId);
-    }
-
-    // The guard refuses a removal that TAKES the last admin away. A team a seat
-    // correction already left with none has none to lose, and staying editable
-    // is how somebody gets promoted back — so it is not refused here.
-    const administratorsBefore = await this.effectiveAdminUserIds({
-      organizationId: parsed.organizationId,
-      bindings,
-    });
-    const administratorsAfter = await this.effectiveAdminUserIds({
-      organizationId: parsed.organizationId,
-      bindings: bindings.filter((binding) => binding.userId !== parsed.userId),
-    });
-    if (administratorsBefore.size > 0 && administratorsAfter.size === 0) {
-      if (parsed.actor.type === "user" && parsed.actor.id === parsed.userId) {
-        throw new CannotRemoveSelfAsLastAdminError(team.name);
-      }
-
-      throw new TeamLastAdminRequiredError(team.name);
-    }
-
     await this.deps.teams.fenceMembershipChange({
       teamId: team.id,
       organizationId: team.organizationId,
       expectedUpdatedAt: fromDate(team.updatedAt),
       removeLegacyUserId: parsed.userId,
-    });
-    await this.deps.grants.revokeBindings({
-      organizationId: parsed.organizationId,
-      bindingIds: memberBindings.map(({ id }) => id),
-      actor: parsed.actor,
-      reason: "removed from team",
+      change: async () => {
+        const bindings = await this.teamBindings(parsed.organizationId, parsed.teamId);
+        const memberBindings = bindings.filter((binding) => binding.userId === parsed.userId);
+        if (memberBindings.length === 0) {
+          throw new TeamMembershipNotFoundError(parsed.userId);
+        }
+
+        // Refuses a removal that TAKES the last admin away. A team a seat
+        // correction already left with none stays editable, so it can be repaired.
+        const administratorsBefore = await this.effectiveAdminUserIds({
+          organizationId: parsed.organizationId,
+          bindings,
+        });
+        const administratorsAfter = await this.effectiveAdminUserIds({
+          organizationId: parsed.organizationId,
+          bindings: bindings.filter((binding) => binding.userId !== parsed.userId),
+        });
+        if (administratorsBefore.size > 0 && administratorsAfter.size === 0) {
+          if (parsed.actor.type === "user" && parsed.actor.id === parsed.userId) {
+            throw new CannotRemoveSelfAsLastAdminError(team.name);
+          }
+
+          throw new TeamLastAdminRequiredError(team.name);
+        }
+
+        await this.deps.grants.revokeBindings({
+          organizationId: parsed.organizationId,
+          bindingIds: memberBindings.map(({ id }) => id),
+          actor: parsed.actor,
+          reason: "removed from team",
+        });
+      },
     });
   }
 
@@ -244,33 +245,35 @@ export class OrganizationTeamMembersService {
       return;
     }
 
-    const bindings = await this.teamBindings(team.organizationId, team.id);
-    const directBindings = bindings.filter(({ userId }) => userId !== null);
-    const plan = planTeamMembership(directBindings, parsed.members);
-    const administratorsAfter = await this.effectiveAdminUserIds({
-      organizationId: team.organizationId,
-      bindings,
-      directAdminUserIds: directAdminIdsAfterPlan(directBindings, plan),
-    });
-    const administratorsBefore = await this.effectiveAdminUserIds({
-      organizationId: team.organizationId,
-      bindings,
-    });
-    if (administratorsBefore.size > 0 && administratorsAfter.size === 0) {
-      throw new TeamLastAdminRequiredError(team.name);
-    }
-
     await this.deps.teams.fenceMembershipChange({
       teamId: team.id,
       organizationId: team.organizationId,
       expectedUpdatedAt: fromDate(team.updatedAt),
       name: parsed.name,
-    });
-    await this.emitTeamMembershipPlan({
-      organizationId: team.organizationId,
-      teamId: team.id,
-      actor: parsed.actor,
-      plan,
+      change: async () => {
+        const bindings = await this.teamBindings(team.organizationId, team.id);
+        const directBindings = bindings.filter(({ userId }) => userId !== null);
+        const plan = planTeamMembership(directBindings, parsed.members);
+        const administratorsAfter = await this.effectiveAdminUserIds({
+          organizationId: team.organizationId,
+          bindings,
+          directAdminUserIds: directAdminIdsAfterPlan(directBindings, plan),
+        });
+        const administratorsBefore = await this.effectiveAdminUserIds({
+          organizationId: team.organizationId,
+          bindings,
+        });
+        if (administratorsBefore.size > 0 && administratorsAfter.size === 0) {
+          throw new TeamLastAdminRequiredError(team.name);
+        }
+
+        await this.emitTeamMembershipPlan({
+          organizationId: team.organizationId,
+          teamId: team.id,
+          actor: parsed.actor,
+          plan,
+        });
+      },
     });
   }
 

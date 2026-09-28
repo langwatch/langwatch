@@ -120,9 +120,10 @@ class MemoryTeams extends TeamRepository {
   getOrganizationMembers = (input: { userIds: string[] }): Promise<string[]> => {
     return Promise.resolve(input.userIds);
   };
-  fenceMembershipChange(input: unknown): Promise<OrganizationTeam> {
+  async fenceMembershipChange(input: { change: () => Promise<void> }): Promise<OrganizationTeam> {
+    await input.change();
     this.fenced.push(input);
-    return Promise.resolve(team);
+    return team;
   }
 }
 

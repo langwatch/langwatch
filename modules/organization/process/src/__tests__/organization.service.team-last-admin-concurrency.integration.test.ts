@@ -82,13 +82,14 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
     },
   };
 
+  let revocationStarted: () => void = () => undefined;
+  let revocationDelayMs = 0;
   const grants = {
     attachBindings: async () => ({ attached: [], duplicates: [] }),
     revokeBindings: async (input: { bindingIds: string[] }) => {
-      const { count } = await prisma.roleBinding.deleteMany({
-        where: { id: { in: input.bindingIds } },
-      });
-      void count;
+      revocationStarted();
+      await new Promise((resolve) => setTimeout(resolve, revocationDelayMs));
+      await prisma.roleBinding.deleteMany({ where: { id: { in: input.bindingIds } } });
     },
     revokeBindingsWhere: async () => 0,
   };
@@ -108,7 +109,6 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
 
   const ns = `team-last-admin-${nanoid(8)}`;
   let organizationId = "";
-  let teamId = "";
   let firstAdminId = "";
   let secondAdminId = "";
 
@@ -117,11 +117,6 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
       data: { name: "Team Last Admin Org", slug: `--test-org-${ns}` },
     });
     organizationId = organization.id;
-    const team = await prisma.team.create({
-      data: { name: "Shared Team", slug: `--test-team-${ns}`, organizationId },
-    });
-    teamId = team.id;
-
     const first = await prisma.user.create({
       data: { email: `tadmin1-${ns}@example.com`, name: "First Admin" },
     });
@@ -138,22 +133,73 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
         role: OrganizationUserRole.ADMIN,
       })),
     });
+  });
+
+  async function seedTeamWithTwoAdmins(): Promise<string> {
+    const team = await prisma.team.create({
+      data: { name: "Shared Team", slug: `--test-team-${ns}-${nanoid(6)}`, organizationId },
+    });
     await prisma.roleBinding.createMany({
       data: [firstAdminId, secondAdminId].map((userId) => ({
         organizationId,
         userId,
         role: TeamUserRole.ADMIN,
         scopeType: RoleBindingScopeType.TEAM,
-        scopeId: teamId,
+        scopeId: team.id,
       })),
     });
-  });
+    return team.id;
+  }
+
+  function removeEachOther(teamId: string) {
+    return [
+      () =>
+        organizations.removeTeamMember({
+          organizationId,
+          teamId,
+          userId: firstAdminId,
+          actor: { type: "user", id: secondAdminId },
+        }),
+      () =>
+        organizations.removeTeamMember({
+          organizationId,
+          teamId,
+          userId: secondAdminId,
+          actor: { type: "user", id: firstAdminId },
+        }),
+    ] as const;
+  }
+
+  async function expectExactlyOneRefusedAndOneAdminLeft(
+    teamId: string,
+    outcomes: PromiseSettledResult<void>[],
+  ): Promise<void> {
+    const refused = outcomes.filter(
+      (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
+    );
+    expect(refused).toHaveLength(1);
+    // The code, not merely a rejection: an unrelated failure must not pass. The
+    // fence refuses a removal holding a stale read; the guard one that read after.
+    expect(["team_membership_changed", "team_last_admin_required"]).toContain(
+      (refused[0]!.reason as { code?: string }).code,
+    );
+    const adminsLeft = await prisma.roleBinding.count({
+      where: {
+        organizationId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: teamId,
+        role: TeamUserRole.ADMIN,
+      },
+    });
+    // Exactly one: "at least one" also passes if the winner removed nobody.
+    expect(adminsLeft).toBe(1);
+  }
 
   afterAll(async () => {
     if (!organizationId) return;
     await cleanupTestRows(prisma, [
       ["roleBinding", { organizationId }],
-      ["teamUser", { teamId }],
+      ["teamUser", { team: { organizationId } }],
       ["organizationUser", { organizationId }],
       ["team", { organizationId }],
       ["user", { id: { in: [firstAdminId, secondAdminId] } }],
@@ -165,44 +211,32 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
   describe("when both are removed at the same time", () => {
     /** @scenario Two team admins removed at the same time cannot both succeed */
     it("refuses one of the two and leaves the team with an admin", async () => {
-      const outcomes = await Promise.allSettled([
-        organizations.removeTeamMember({
-          organizationId,
-          teamId,
-          userId: firstAdminId,
-          actor: { type: "user", id: secondAdminId },
-        }),
-        organizations.removeTeamMember({
-          organizationId,
-          teamId,
-          userId: secondAdminId,
-          actor: { type: "user", id: firstAdminId },
-        }),
-      ]);
+      const teamId = await seedTeamWithTwoAdmins();
+      revocationDelayMs = 0;
+      const [removeFirst, removeSecond] = removeEachOther(teamId);
 
-      const refused = outcomes.filter(
-        (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
-      );
-      expect(refused).toHaveLength(1);
-      // Asserting the code, not merely that something rejected, is what catches
-      // a regression that lets an unrelated failure pass this test for the
-      // wrong reason. The fence refuses a removal that raced the other one; the
-      // guard refuses one that started after the other had already committed.
-      expect(["team_membership_changed", "team_last_admin_required"]).toContain(
-        (refused[0]!.reason as { code?: string }).code,
-      );
+      const outcomes = await Promise.allSettled([removeFirst(), removeSecond()]);
 
-      const adminsLeft = await prisma.roleBinding.count({
-        where: {
-          organizationId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-          role: TeamUserRole.ADMIN,
-        },
+      await expectExactlyOneRefusedAndOneAdminLeft(teamId, outcomes);
+    });
+  });
+
+  describe("when one removal starts while the other is still revoking", () => {
+    /** @scenario A team admin removal that starts while another is being written is refused */
+    it("refuses the later one and leaves the team with an admin", async () => {
+      const teamId = await seedTeamWithTwoAdmins();
+      revocationDelayMs = 300;
+      const [removeFirst, removeSecond] = removeEachOther(teamId);
+      const firstIsRevoking = new Promise<void>((resolve) => {
+        revocationStarted = resolve;
       });
-      // Exactly one, not merely "at least one": that also passes if the
-      // "winning" removal silently removed nobody.
-      expect(adminsLeft).toBe(1);
+
+      const first = removeFirst();
+      await firstIsRevoking;
+      revocationStarted = () => undefined;
+      const outcomes = await Promise.allSettled([first, removeSecond()]);
+
+      await expectExactlyOneRefusedAndOneAdminLeft(teamId, outcomes);
     });
   });
 });

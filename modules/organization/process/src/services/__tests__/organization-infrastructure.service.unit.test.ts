@@ -431,9 +431,13 @@ class MemoryTeams extends TeamRepository {
   findActive(): Promise<OrganizationTeam[]> {
     return Promise.resolve([this.team]);
   }
-  fenceMembershipChange(input: { name?: string }): Promise<OrganizationTeam> {
+  async fenceMembershipChange(input: {
+    name?: string;
+    change: () => Promise<void>;
+  }): Promise<OrganizationTeam> {
+    await input.change();
     this.team = { ...this.team, name: input.name ?? this.team.name };
-    return Promise.resolve(this.team);
+    return this.team;
   }
 }
 
