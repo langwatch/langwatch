@@ -99,3 +99,23 @@ Feature: Projection replay from the operator console
     When they open one aggregate's history
     Then the read names that aggregate's tenant
     And a search across tenants names none and states why, so it reads the shared server
+
+  # A rebuilt row keeps its tenant's retention, as main's replay read the policy cache: ops asks
+  # data retention through its Api, and a tenant is a project.
+  @unit @replay
+  Scenario: Rebuilt rows take each tenant's retention
+    Given two tenants whose retention policies differ
+    When a replay rebuilds rows for both
+    Then each tenant's rows are stamped with that tenant's own retention
+
+  @unit @replay
+  Scenario: A tenant with no retention policy of its own takes the platform default
+    Given a tenant data retention cannot place in a policy cascade
+    When a replay rebuilds its rows
+    Then they are stamped with the platform default retention, never an indefinite one
+
+  @unit @replay
+  Scenario: A replay whose tenant retention cannot be read fails rather than guessing
+    Given data retention refuses to answer a tenant's retention
+    When a replay rebuilds that tenant's rows
+    Then the refusal fails the run rather than stamping a default

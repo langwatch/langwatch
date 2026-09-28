@@ -14,6 +14,7 @@ import type { AutomationApi } from "@langwatch/automation-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -103,6 +104,7 @@ function process(
       auth: createApiFixture<AuthApi>(),
       identity,
       authz,
+      "data-retention": createApiFixture<DataRetentionApi>(),
       project: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
       "audit-log": createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),

@@ -72,6 +72,7 @@ import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.servi
 import { OpsService } from "../services/ops.service.ts";
 import { QueueAuditService } from "../services/queue-audit.service.ts";
 import { QueueService } from "../services/queue.service.ts";
+import { ReplayRetentionService } from "../services/replay-retention.service.ts";
 import { ReplayService } from "../services/replay.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import type {
@@ -117,11 +118,14 @@ export type OpsProcessMembers = Readonly<{
  */
 class OpsReplayRuntimes implements OpsReplayRuntimeFactory {
   constructor(
-    private readonly members: Pick<OpsProcessMembers, "redis" | "clickhouse" | "eventing">,
+    private readonly input: Readonly<{
+      members: Pick<OpsProcessMembers, "redis" | "clickhouse" | "eventing">;
+      retention: OpsAppDependencies["retention"];
+    }>,
   ) {}
 
   create(): OpsReplayRuntime {
-    const { redis, clickhouse, eventing } = this.members;
+    const { redis, clickhouse, eventing } = this.input.members;
     if (redis.isCluster) {
       throw new Error(
         "Replay requires a standalone Redis: a Cluster refuses its multi-key operations.",
@@ -135,6 +139,7 @@ class OpsReplayRuntimes implements OpsReplayRuntimeFactory {
         lean: replayLeanOf(definitions),
       }),
       redis: connection,
+      retentionPolicyResolver: ReplayRetentionService.create(this.input.retention),
     });
     return {
       service,
@@ -303,7 +308,10 @@ export function buildOpsInfrastructure(input: {
           // `ops_projection_replay` builds a runtime and executes.
           replay: ReplayService.create({
             repo: ReplayRedisRepository.create({ redis: members.redis }),
-            runtimeFactory: new OpsReplayRuntimes(members),
+            runtimeFactory: new OpsReplayRuntimes({
+              members,
+              retention: dependencies.retention,
+            }),
           }),
           // Read-only here: the worker holds the lease and writes the
           // artifact; a second writer would publish a second answer.

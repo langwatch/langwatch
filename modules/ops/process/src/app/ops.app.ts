@@ -13,6 +13,10 @@ import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-co
 import { AutomationApi } from "@langwatch/automation-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DashboardApi } from "@langwatch/dashboard-contract";
+import {
+  DataRetentionApi,
+  type DataRetentionApi as DataRetentionApiContract,
+} from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type {
@@ -459,6 +463,8 @@ export interface OpsAppDependencies {
   identity: IdentityApiContract;
   /** The authorization engine, answering the migrations it registers. */
   authz: AuthzApiContract;
+  /** Each tenant's retention, which a replay stamps on the rows it rebuilds. */
+  retention: DataRetentionApiContract;
   projects: ProjectApiContract;
   auditLog: AuditLogApi;
   /** The report schedules the operator scheduler lists and controls. */
@@ -659,6 +665,7 @@ export class OpsApp implements OpsApi {
     auth: AuthApi,
     identity: IdentityApi,
     authz: AuthzApi,
+    retention: DataRetentionApi,
     // The same identity app, asked through its lookup surface for proved domains (D12).
     projects: ProjectApi,
     auditLog: AuditLogApi,
