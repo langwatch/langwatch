@@ -161,10 +161,9 @@ export interface TraceApi extends TraceOtlpIngestApi {
    */
   renderReadableTrace(input: { trace: Trace; maxTokens: number }): Promise<string>;
   /**
-   * A thread as one markdown transcript, the traces already ordered and cut by
-   * the caller: `conversation` reads like the chat view, `steps` lists each turn's
-   * tool calls and results. Under `maxTokens` every turn is shortened before
-   * one is dropped, and a marker names what was dropped.
+   * A thread as one markdown transcript, traces already ordered and cut:
+   * `conversation` reads like the chat view, `steps` lists each turn's tool
+   * calls and results. Under `maxTokens` turns shorten before any drops.
    */
   renderThreadTranscript(input: {
     threadKey: string;
