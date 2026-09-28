@@ -288,6 +288,7 @@ function useNavigationHostReading({
           pathname,
           search,
           projectParam: routeReading.projectParam,
+          projectSlugFromAddress: scopeCapability.projectSlugAddressedBy(routeReading.projectParam),
           catchAllPath: routeReading.pathname.replace(/^\/@project\/?/, ""),
           routePattern,
           deployment,

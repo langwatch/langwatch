@@ -111,6 +111,7 @@ const crowdedOrg = {
 };
 
 const navigateMock = vi.fn();
+const replaceMock = vi.fn();
 const rememberScopeMock = vi.fn();
 
 const BASE_READINGS: StubNavigationReadings = {
@@ -141,7 +142,7 @@ function renderShell({
     <ChakraProvider value={defaultSystem}>
       <WithStubNavigationHost
         readings={{ ...BASE_READINGS, ...readings }}
-        actions={{ navigate: navigateMock, rememberScope: rememberScopeMock }}
+        actions={{ navigate: navigateMock, replace: replaceMock, rememberScope: rememberScopeMock }}
       >
         <NavigationShell personalScope={personalScope}>
           <div data-testid="page-body" />
@@ -190,6 +191,34 @@ describe("the front door at /", () => {
 
     expect(screen.queryByText(/not part of any team/i)).toBeNull();
     expect(screen.getByTestId("page-body")).toBeTruthy();
+  });
+});
+
+describe("an address naming a project the reader does not have", () => {
+  afterEach(() => {
+    cleanup();
+    replaceMock.mockReset();
+  });
+
+  /** @scenario "The shell sends a wrong project address to the reader's project" */
+  it("replaces it with the same page in the project the workspace resolved", () => {
+    renderShell({
+      readings: {
+        projectParam: "@project",
+        pathname: "/@project/traces",
+        search: "?view=table",
+      },
+    });
+
+    expect(replaceMock).toHaveBeenCalledTimes(1);
+    expect(replaceMock).toHaveBeenCalledWith("/demo/traces?view=table");
+  });
+
+  /** @scenario "The shell sends a wrong project address to the reader's project" */
+  it("leaves an address that already names the reader's project alone", () => {
+    renderShell({ readings: { projectParam: "demo", pathname: "/demo/traces" } });
+
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 });
 

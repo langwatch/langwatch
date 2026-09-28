@@ -39,6 +39,8 @@ export type StubNavigationReadings = {
   pathname?: string;
   search?: string;
   projectParam?: string;
+  /** Defaults to `projectParam`; name it explicitly, even as undefined, for a reserved word. */
+  projectSlugFromAddress?: string | undefined;
   catchAllPath?: string;
   deployment?: Partial<NavigationDeployment>;
   plan?: Partial<NavigationPlanReading>;
@@ -158,6 +160,12 @@ export class StubNavigationHost extends NavigationHost {
 
   projectParam(): string | undefined {
     return this.readings.projectParam;
+  }
+
+  projectSlugFromAddress(): string | undefined {
+    return "projectSlugFromAddress" in this.readings
+      ? this.readings.projectSlugFromAddress
+      : this.readings.projectParam;
   }
 
   catchAllPath(): string {

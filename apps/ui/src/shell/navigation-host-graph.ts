@@ -21,6 +21,7 @@ export type NavigationTeamRules = Pick<
 export type NavigationGraphRead = readonly {
   id: string;
   name: string;
+  primaryIntent?: string | null;
   /** The organization-wide presence kill switch; absent means never read. */
   presenceEnabled?: boolean;
   members?: { role: string }[];
@@ -52,6 +53,7 @@ export function toNavigationOrganizations(read: NavigationGraphRead): Navigation
   return read.map((organization) => ({
     id: organization.id,
     name: organization.name,
+    primaryIntent: organization.primaryIntent,
     teams: organization.teams.map((team) => ({
       id: team.id,
       name: team.name,
