@@ -73,6 +73,9 @@ import {
 import { webImportsServerShapedValueRule } from "./rules/web-imports-server-shaped-value.rule.mjs";
 import { zodInternalsRule } from "./rules/zod-internals.rule.mjs";
 import { zodObjectCompositionRule } from "./rules/zod-object-composition.rule.mjs";
+import { zodObjectIntersectionRule } from "./rules/zod-object-intersection.rule.mjs";
+import { zodSchemaPerCallRule } from "./rules/zod-schema-per-call.rule.mjs";
+import { zodValidateForBooleanRule } from "./rules/zod-validate-for-boolean.rule.mjs";
 
 const RULES = [
   enterpriseLicenseHeaderRule,
@@ -132,6 +135,9 @@ const RULES = [
   webImportsServerShapedValueRule,
   zodInternalsRule,
   zodObjectCompositionRule,
+  zodObjectIntersectionRule,
+  zodSchemaPerCallRule,
+  zodValidateForBooleanRule,
 ];
 
 /** Every registered rule, keyed by the name its own `defineRule` declaration carries. */
@@ -209,4 +215,7 @@ export {
   webImportsServerShapedValueRule,
   zodInternalsRule,
   zodObjectCompositionRule,
+  zodObjectIntersectionRule,
+  zodSchemaPerCallRule,
+  zodValidateForBooleanRule,
 };

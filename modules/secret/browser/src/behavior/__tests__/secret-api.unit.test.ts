@@ -21,8 +21,8 @@ describe("given the shape every read of this feature answers", () => {
   describe("when a row carries a value", () => {
     /** @scenario A secret's value is never readable after it is stored */
     it("is refused by the schema rather than passed through", () => {
-      expect(secretSchema.safeParse({ ...ROW, value: "sk-real" }).success).toBe(false);
-      expect(secretSchema.safeParse({ ...ROW, encryptedValue: "…" }).success).toBe(false);
+      expect(secretSchema.validate({ ...ROW, value: "sk-real" })).toBe(false);
+      expect(secretSchema.validate({ ...ROW, encryptedValue: "…" })).toBe(false);
     });
   });
 
