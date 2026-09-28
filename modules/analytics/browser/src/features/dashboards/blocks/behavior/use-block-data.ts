@@ -1,7 +1,7 @@
 /**
- * A block's two reads through `analytics.lwql.query`: has its source ever
- * recorded a row, and its statements over the period. Separate queries, so
- * one panel retries alone (AC23).
+ * A block's two reads: whether its source has ever recorded a row, answered
+ * for every source at once by `dashboards.sourcePresence`, and its statements
+ * over the period through `analytics.lwql.query`, one query per block (AC23).
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -15,11 +15,10 @@ import {
   type BlockSource,
   fitGranularity,
   type RequestStatus,
-  SOURCE_EXISTENCE_SQL,
 } from "../model/block-definition.ts";
 import type { BlockPeriod, BlockRows } from "../model/block-format.ts";
 
-/** Existence is about the project, not the period, so it is cached for a while. */
+/** Presence is about the project, not the period, so it is cached for a while. */
 const SOURCE_STALE_MS = 5 * 60 * 1000;
 
 function useExecute(projectId: string): LangWatchQLExecute {
@@ -43,7 +42,11 @@ export interface SourceConnection {
   readonly retry: () => void;
 }
 
-/** Whether the source has ever recorded a row for this project. */
+/**
+ * Whether the source has ever recorded a row. Every block reads the same one
+ * call, so a board asks once; a source the server could not check is an
+ * error with a retry, never the call to action (AC7, AC25).
+ */
 export function useSourceConnection({
   projectId,
   source,
@@ -51,19 +54,17 @@ export function useSourceConnection({
   projectId: string;
   source: BlockSource;
 }): SourceConnection {
-  const execute = useExecute(projectId);
-  const query = useQuery({
-    queryKey: ["dashboard-blocks", "source", projectId, source],
-    queryFn: ({ signal }) => execute({ sql: SOURCE_EXISTENCE_SQL[source] }, { signal }),
-    staleTime: SOURCE_STALE_MS,
-    retry: false,
-  });
-  return {
-    status: query.status,
-    connected: (query.data?.rows.length ?? 0) > 0,
-    error: query.error,
-    retry: () => void query.refetch(),
-  };
+  const presence = analyticsApi.dashboards.sourcePresence.useQuery(
+    { projectId },
+    { enabled: !!projectId, staleTime: SOURCE_STALE_MS, retry: false },
+  );
+  const retry = () => void presence.refetch();
+  if (presence.status !== "success") {
+    return { status: presence.status, connected: false, error: presence.error, retry };
+  }
+  const state = presence.data[source];
+  if (state === "failed") return { status: "error", connected: false, error: null, retry };
+  return { status: "success", connected: state === "present", error: null, retry };
 }
 
 export interface BlockData {

@@ -22,6 +22,8 @@ import {
 export type StubAnalyticsHostOptions = {
   project?: AnalyticsHostProject | undefined;
   organizationId?: string | undefined;
+  /** The signed-in member; "user-1" unless a test says otherwise. */
+  userId?: string | undefined;
   permissions?: readonly string[];
   /** Whether the grants have arrived; settled unless a test says otherwise. */
   settled?: boolean;
@@ -55,6 +57,10 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
 
   organizationId(): string | undefined {
     return "organizationId" in this.options ? this.options.organizationId : "org-1";
+  }
+
+  userId(): string | undefined {
+    return "userId" in this.options ? this.options.userId : "user-1";
   }
 
   hasPermission(permission: string): boolean {

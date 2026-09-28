@@ -131,7 +131,15 @@ describe("the Dashboards screens", () => {
           host: hostOpening({ dashboardId: "board-1", flags: FLAG_ON }),
           answer: (call) =>
             call.path === "dashboards.getAll"
-              ? Promise.resolve([{ id: "board-1", name: "Weekly review" }])
+              ? Promise.resolve([
+                  {
+                    id: "board-1",
+                    name: "Weekly review",
+                    description: null,
+                    visibility: "only_me",
+                    createdById: "user-1",
+                  },
+                ])
               : NO_PROCEDURES(call),
         });
 

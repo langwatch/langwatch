@@ -4,6 +4,7 @@
  * stored as `Dashboard` rows. Addresses are built here and nowhere else.
  */
 
+import { FLIGHT_DECK_DASHBOARD_ID } from "@langwatch/dashboard-contract";
 import { z } from "zod";
 
 /** A board shipped in code rather than stored. */
@@ -18,7 +19,7 @@ export const codeDefinedBoardSchema = z.object({
 export type CodeDefinedBoard = z.infer<typeof codeDefinedBoardSchema>;
 
 export const FLIGHT_DECK: CodeDefinedBoard = {
-  id: "agent-flight-deck",
+  id: FLIGHT_DECK_DASHBOARD_ID,
   name: "Agent Flight Deck",
   description: "Traffic, quality, latency and cost on one timeline.",
   isDefault: true,

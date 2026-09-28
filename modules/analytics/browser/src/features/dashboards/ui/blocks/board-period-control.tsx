@@ -7,7 +7,6 @@ import { Clock } from "lucide-react";
 import {
   BOARD_PERIOD_GRAINS,
   BOARD_PERIOD_RANGES,
-  boardPeriodGrainIsSupported,
   boardPeriodLabel,
   type BoardPeriodGrain,
   type BoardPeriodRange,
@@ -41,21 +40,12 @@ export function BoardPeriodControl({
           ))}
         </Menu.ItemGroup>
         <Menu.ItemGroup title="Grain">
-          {BOARD_PERIOD_GRAINS.map((option) => {
-            const disabled = option !== "auto" && !boardPeriodGrainIsSupported(option);
-            return (
-              <Menu.Item
-                key={option}
-                value={`grain-${option}`}
-                disabled={disabled}
-                title={disabled ? "Coming soon" : void 0}
-                onClick={() => !disabled && onGrainChange(option)}
-              >
-                {option}
-                {option === grain && " ✓"}
-              </Menu.Item>
-            );
-          })}
+          {BOARD_PERIOD_GRAINS.map((option) => (
+            <Menu.Item key={option} value={`grain-${option}`} onClick={() => onGrainChange(option)}>
+              {option}
+              {option === grain && " ✓"}
+            </Menu.Item>
+          ))}
         </Menu.ItemGroup>
       </Menu.Content>
     </Menu.Root>

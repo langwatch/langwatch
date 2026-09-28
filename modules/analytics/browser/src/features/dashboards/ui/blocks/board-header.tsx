@@ -1,7 +1,7 @@
 /**
- * A board's header, after the reference: the title with its rename pencil and
- * "Add chart" on the first row, the description and the period control on the
- * second. Without `onRename`/`onDescribe` the board is read-only (the Flight Deck).
+ * A board's header, after the reference: the title with its rename pencil, the
+ * share control and "Add chart" on the first row, the description and period
+ * on the second. Without `onRename`/`onDescribe` the board is read-only.
  */
 
 import { Badge, Box, Button, HStack, IconButton, Spacer, Text, VStack } from "@chakra-ui/react";
@@ -19,6 +19,7 @@ export function BoardHeader({
   onDescribe,
   onAddChart,
   periodControl,
+  visibilityControl,
 }: {
   name: string;
   isDefault: boolean;
@@ -27,6 +28,8 @@ export function BoardHeader({
   onDescribe?: (description: string) => void;
   onAddChart: () => void;
   periodControl: ReactNode;
+  /** The share control; the Flight Deck has none. */
+  visibilityControl?: ReactNode;
 }) {
   return (
     <VStack align="stretch" gap={2} paddingX={6} paddingTop={5} paddingBottom={2}>
@@ -42,6 +45,7 @@ export function BoardHeader({
             </Badge>
           )}
         </HStack>
+        {visibilityControl}
         <Button variant="outline" size="sm" flexShrink={0} onClick={onAddChart}>
           <Plus size={14} /> Add chart
         </Button>

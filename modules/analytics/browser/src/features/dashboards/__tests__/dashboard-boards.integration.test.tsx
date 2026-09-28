@@ -5,22 +5,34 @@
  * menu. @see modules/dashboard/specs/dashboards-v1.feature
  */
 
-import type { UiProcedureCall } from "@langwatch/browser-host/testing-transport";
+import {
+  type UiProcedureCall,
+  UiProcedureRefusal,
+} from "@langwatch/browser-host/testing-transport";
+import type { DashboardVisibility } from "@langwatch/dashboard-contract";
+import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
-import { findBlock, SOURCE_EXISTENCE_SQL } from "../blocks/index.ts";
+import { findBlock } from "../blocks/index.ts";
 import { TRACE_COUNT_SQL } from "../blocks/model/block-queries.ts";
 import { BLOCK_QUESTION_SECTIONS } from "../model/block-questions.ts";
 import { blockWidgetDefinition } from "../model/board-blocks.ts";
+import { BOARD_VISIBILITY_LOCKED_REASON } from "../model/board-visibility.ts";
 import { FLIGHT_DECK } from "../model/boards.ts";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
-type Board = { id: string; name: string };
+type Board = {
+  id: string;
+  name: string;
+  description: string | null;
+  visibility: DashboardVisibility;
+  createdById: string | null;
+};
 type Widget = {
   id: string;
   dashboardId: string | null;
@@ -58,10 +70,24 @@ function storedBlock({
 }
 
 /** The dashboards, widgets and LangWatchQL procedures, answered from memory across reloads. */
-function inMemoryServer({ boards, widgets = [] }: { boards: Board[]; widgets?: Widget[] }) {
-  const state = { boards: [...boards], widgets: [...widgets], calls: [] as UiProcedureCall[] };
+function inMemoryServer({
+  boards,
+  widgets = [],
+  refuseVisibility = false,
+}: {
+  boards: Board[];
+  widgets?: Widget[];
+  /** Answers `setVisibility` as the server does for a member who is neither creator nor admin. */
+  refuseVisibility?: boolean;
+}) {
+  const state = {
+    boards: boards.map((board) => ({ ...board })),
+    widgets: [...widgets],
+    calls: [] as UiProcedureCall[],
+  };
   let minted = 0;
   const find = (id: unknown) => state.widgets.find((widget) => widget.id === id)!;
+  const board = (id: unknown) => state.boards.find((each) => each.id === id)!;
 
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     state.calls.push(call);
@@ -70,10 +96,32 @@ function inMemoryServer({ boards, widgets = [] }: { boards: Board[]; widgets?: W
       case "dashboards.getAll":
         return Promise.resolve(state.boards.map((board) => ({ ...board })));
       case "dashboards.rename": {
-        const board = state.boards.find(({ id }) => id === input.dashboardId)!;
-        board.name = String(input.name);
-        return Promise.resolve({ ...board });
+        const renamed = board(input.dashboardId);
+        renamed.name = String(input.name);
+        return Promise.resolve({ ...renamed });
       }
+      case "dashboards.updateDetails": {
+        const described = board(input.dashboardId);
+        described.description = input.description as string | null;
+        return Promise.resolve({ ...described });
+      }
+      case "dashboards.setVisibility": {
+        if (refuseVisibility) {
+          return Promise.reject(new UiProcedureRefusal("dashboard_owner_only", 403));
+        }
+        const shared = board(input.dashboardId);
+        shared.visibility = input.visibility as DashboardVisibility;
+        return Promise.resolve({ ...shared });
+      }
+      case "dashboards.sourcePresence":
+        return Promise.resolve({
+          traces: "present",
+          scenarios: "absent",
+          judges: "absent",
+          feedback: "absent",
+          gateway: "absent",
+          codingAgents: "absent",
+        });
       case "dashboardWidgets.list":
         return Promise.resolve(state.widgets.map((widget) => ({ ...widget })));
       case "dashboardWidgets.create": {
@@ -115,9 +163,8 @@ function inMemoryServer({ boards, widgets = [] }: { boards: Board[]; widgets?: W
   return { state, answer };
 }
 
-/** Traces are connected and the trace count has one bucket; everything else is empty. */
+/** The trace count has one bucket; everything else is empty. */
 function lwqlRows(sql: string): Record<string, unknown>[] {
-  if (sql === SOURCE_EXISTENCE_SQL.traces) return [{ present: 1 }];
   if (sql === TRACE_COUNT_SQL) return [{ bucket: "2026-09-01 00:00:00", traces: 7 }];
   return [];
 }
@@ -126,8 +173,20 @@ const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const FLAG_ON = { release_dashboards: true };
 const OWN_BOARDS: Board[] = [
-  { id: "board-1", name: "Weekly review" },
-  { id: "board-2", name: "Latency" },
+  {
+    id: "board-1",
+    name: "Weekly review",
+    description: null,
+    visibility: "only_me",
+    createdById: "user-1",
+  },
+  {
+    id: "board-2",
+    name: "Latency",
+    description: null,
+    visibility: "only_me",
+    createdById: "user-1",
+  },
 ];
 
 function openBoard({
@@ -135,13 +194,22 @@ function openBoard({
   dashboardId = "board-1",
   query = {},
   withSidebar = false,
+  userId = "user-1",
+  permissions,
 }: {
   server: ReturnType<typeof inMemoryServer>;
   dashboardId?: string;
   query?: Record<string, string>;
   withSidebar?: boolean;
+  userId?: string;
+  permissions?: string[];
 }) {
-  const host = new StubAnalyticsHost({ flags: FLAG_ON, route: { params: { dashboardId }, query } });
+  const host = new StubAnalyticsHost({
+    flags: FLAG_ON,
+    userId,
+    permissions,
+    route: { params: { dashboardId }, query },
+  });
   const view = renderDashboards({
     element: (
       <>
@@ -303,12 +371,36 @@ describe("a member's own board", () => {
 
     describe("when the member changes the grain", () => {
       /** @scenario "AC13 Grain choices update every block" */
-      it("reads every block at the chosen grain", async () => {
+      it.each([
+        ["1h", "24h", 3600],
+        ["1d", "30d", 86_400],
+        ["1w", "90d", 604_800],
+      ])("reads every block at %s buckets", async (grain, range, seconds) => {
         const server = boardWithTwoBlocks();
-        openBoard({ server, query: { range: "24h", grain: "1h" } });
+        openBoard({ server, query: { range, grain } });
 
         const asked = await periodsAsked(server);
-        expect(asked.map(({ granularitySeconds }) => granularitySeconds)).toEqual([3600, 3600]);
+        expect(asked.map(({ granularitySeconds }) => granularitySeconds)).toEqual([
+          seconds,
+          seconds,
+        ]);
+      });
+
+      /** @scenario "AC13 Grain choices update every block" */
+      it("offers auto, 1h, 1d and 1w, none of them held back", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const { host } = openBoard({ server: boardWithTwoBlocks() });
+
+        await user.click(await screen.findByRole("button", { name: "Period" }));
+        const grains = within(await screen.findByRole("group", { name: "Grain" }));
+        for (const grain of ["auto", "1h", "1d", "1w"]) {
+          expect(
+            grains.getByRole("menuitem", { name: new RegExp(`^${grain}`) }),
+          ).not.toHaveAttribute("aria-disabled", "true");
+        }
+        await user.click(grains.getByRole("menuitem", { name: /^1w/ }));
+
+        expect(host.lastQuery).toEqual({ grain: "1w" });
       });
     });
   });
@@ -342,9 +434,10 @@ describe("a member's own board", () => {
 
     describe("when they describe it inline", () => {
       /** @scenario "AC14 Rename and describe" */
-      it("shows the description in place of the prompt", async () => {
+      it("saves the description, shows it in place of the prompt, and keeps it after reload", async () => {
         const user = userEvent.setup();
-        openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        openBoard({ server });
 
         await user.click(await screen.findByText("Add a description"));
         await user.type(
@@ -354,7 +447,91 @@ describe("a member's own board", () => {
 
         expect(screen.getByText("What we check every Monday")).toBeInTheDocument();
         expect(screen.queryByText("Add a description")).toBeNull();
+        await waitFor(() =>
+          expect(callsTo(server, "dashboards.updateDetails")[0]?.input).toEqual({
+            projectId: "proj-1",
+            dashboardId: "board-1",
+            description: "What we check every Monday",
+          }),
+        );
+
+        cleanup();
+        openBoard({ server });
+        expect(await screen.findByText("What we check every Monday")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("given a member on a board they created", () => {
+    const chooseVisibility = async ({ from, to }: { from: string; to: RegExp }) => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      await user.click(await screen.findByRole("button", { name: `Visibility: ${from}` }));
+      await user.click(await screen.findByRole("menuitem", { name: to }));
+    };
+
+    describe("when they share it with their team", () => {
+      /** @scenario "AC18 Visibility hides a board from members outside its audience" */
+      it("saves the visibility and lists the board under Team in the sidebar", async () => {
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        openBoard({ server, withSidebar: true });
+
+        await chooseVisibility({ from: "Only me", to: /^Team/ });
+
+        expect(callsTo(server, "dashboards.setVisibility")[0]?.input).toEqual({
+          projectId: "proj-1",
+          dashboardId: "board-1",
+          visibility: "team",
+        });
+        expect(await screen.findByRole("button", { name: "Visibility: Team" })).toBeEnabled();
+        const team = await screen.findByRole("list", { name: "Team" });
+        expect(within(team).getByRole("link", { name: /Weekly review/ })).toBeInTheDocument();
+        expect(
+          within(screen.getByRole("list", { name: "Mine" })).queryByRole("link", {
+            name: /Weekly review/,
+          }),
+        ).toBeNull();
+      });
+    });
+
+    describe("when the server refuses the change", () => {
+      /** @scenario "AC26 Only the creator or an admin can change visibility or delete the board" */
+      it("says why beside the control, in the words for the refusal's code", async () => {
+        const server = inMemoryServer({ boards: OWN_BOARDS, refuseVisibility: true });
+        openBoard({ server });
+
+        await chooseVisibility({ from: "Only me", to: /^Organisation/ });
+
+        const expected = explainAnyError({
+          data: { error: { code: "dashboard_owner_only", httpStatus: 403, meta: {} } },
+        });
+        expect(await screen.findByRole("alert")).toHaveTextContent(expected.title);
+        expect(screen.getByRole("button", { name: "Visibility: Only me" })).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a shared board someone else created", () => {
+    const sharedBoard = (): Board[] => [
+      { ...OWN_BOARDS[0]!, visibility: "organisation", createdById: "user-2" },
+    ];
+
+    /** @scenario "AC26 Only the creator or an admin can change visibility or delete the board" */
+    it("shows the control disabled, with the reason, to a member who is not an admin", async () => {
+      openBoard({ server: inMemoryServer({ boards: sharedBoard() }) });
+
+      const control = await screen.findByRole("button", { name: "Visibility: Organisation" });
+      expect(control).toBeDisabled();
+      expect(control).toHaveAttribute("title", BOARD_VISIBILITY_LOCKED_REASON);
+    });
+
+    /** @scenario "AC26 Only the creator or an admin can change visibility or delete the board" */
+    it("lets an admin change it", async () => {
+      openBoard({
+        server: inMemoryServer({ boards: sharedBoard() }),
+        permissions: ["analytics:view", "project:manage"],
+      });
+
+      expect(await screen.findByRole("button", { name: "Visibility: Organisation" })).toBeEnabled();
     });
   });
 
@@ -461,6 +638,7 @@ describe("the Agent Flight Deck", () => {
       expect(screen.queryByRole("button", { name: "Rename dashboard" })).toBeNull();
       expect(screen.queryByText("Add a description")).toBeNull();
       expect(screen.queryByRole("button", { name: /^Actions for/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Visibility/ })).toBeNull();
     });
   });
 

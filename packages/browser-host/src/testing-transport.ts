@@ -32,7 +32,13 @@ async function settle(answer: UiProcedureAnswer, call: UiProcedureCall): Promise
       error: {
         message: error.code,
         code: -32603,
-        data: { code: error.code, httpStatus: error.httpStatus, path: call.path },
+        data: {
+          code: error.code,
+          httpStatus: error.httpStatus,
+          path: call.path,
+          // The handled payload production's error formatter adds, which `readHandledError` reads.
+          error: { code: error.code, httpStatus: error.httpStatus, meta: {} },
+        },
       },
     };
   }

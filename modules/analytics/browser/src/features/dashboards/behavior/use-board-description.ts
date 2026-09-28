@@ -1,15 +1,36 @@
 /**
- * SEAM: a board's description. `Dashboard` has no description field and no
- * procedure takes one, so this keeps it for the visit only. Once the server
- * carries it, read and write it here; callers keep this shape.
+ * A board's description, stored on the board through `dashboards.updateDetails`
+ * (AC14). While a save is in flight the board shows what was typed; after it,
+ * the re-read list. Failures travel raw to the host (#5984).
  */
 
-import { useState } from "react";
+import { analyticsApi } from "../../../behavior/analytics-api.ts";
+import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 
-export function useBoardDescription() {
-  const [description, setDescription] = useState("");
+export function useBoardDescription({
+  dashboardId,
+  stored,
+}: {
+  dashboardId: string;
+  stored: string | null;
+}) {
+  const host = useAnalyticsHost();
+  const projectId = host.project()?.id ?? "";
+  const utils = analyticsApi.useUtils();
+  const update = analyticsApi.dashboards.updateDetails.useMutation({
+    // Returned, so the save stays pending until the list holds the new value.
+    onSuccess: () => utils.dashboards.getAll.invalidate({ projectId }),
+    onError: (error) => host.failed({ error, fallbackTitle: "Couldn't save the description" }),
+  });
+
+  const current = stored ?? "";
+
   return {
-    description,
-    saveDescription: (next: string) => setDescription(next.trim()),
+    description: update.isPending ? (update.variables.description ?? "") : current,
+    saveDescription: (next: string) => {
+      const trimmed = next.trim();
+      if (trimmed === current) return;
+      update.mutate({ projectId, dashboardId, description: trimmed === "" ? null : trimmed });
+    },
   };
 }

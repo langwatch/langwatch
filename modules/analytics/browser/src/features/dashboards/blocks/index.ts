@@ -10,7 +10,6 @@ export {
   fitGranularity,
   periodDelta,
   SOURCE_CALLS_TO_ACTION,
-  SOURCE_EXISTENCE_SQL,
 } from "./model/block-definition.ts";
 export type { BlockPeriod } from "./model/block-format.ts";
 export {

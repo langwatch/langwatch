@@ -11,26 +11,39 @@ import { StubAnalyticsHost } from "../../../testing.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
+const board = ({
+  id,
+  name,
+  visibility = "only_me",
+}: {
+  id: string;
+  name: string;
+  visibility?: string;
+}) => ({ id, name, description: null, visibility, createdById: "user-1" });
+
 const OWN_BOARDS = [
-  { id: "board-1", name: "Weekly review" },
-  { id: "board-2", name: "Latency" },
+  board({ id: "board-1", name: "Weekly review" }),
+  board({ id: "board-2", name: "Latency" }),
 ];
 
 /** Answers the list and a create, and keeps every call so a test can read what was sent. */
-function projectWithBoards() {
+function projectWithBoards(boards = OWN_BOARDS) {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall) => {
     calls.push(call);
-    if (call.path === "dashboards.getAll") return Promise.resolve(OWN_BOARDS);
+    if (call.path === "dashboards.getAll") return Promise.resolve(boards);
     if (call.path === "dashboards.create") return Promise.resolve({ id: "board-3" });
     return NO_PROCEDURES(call);
   };
   return { calls, answer };
 }
 
-function renderSection({ activeDashboardId }: { activeDashboardId?: string } = {}) {
+function renderSection({
+  activeDashboardId,
+  boards,
+}: { activeDashboardId?: string; boards?: typeof OWN_BOARDS } = {}) {
   const host = new StubAnalyticsHost({ flags: { release_dashboards: true } });
-  const project = projectWithBoards();
+  const project = projectWithBoards(boards);
   renderDashboards({
     element: <SavedDashboardsSection activeDashboardId={activeDashboardId} />,
     host,
@@ -76,6 +89,31 @@ describe("the saved-dashboards list in the sidebar", () => {
         ).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Actions for Latency" })).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "Actions for Agent Flight Deck" })).toBeNull();
+      });
+    });
+
+    describe("when boards are shared with the team or the organisation", () => {
+      /** @scenario "AC3 Sidebar matches the reference" */
+      it("groups them Mine, Team and Organisation, the Flight Deck leading Mine", async () => {
+        renderSection({
+          boards: [
+            board({ id: "board-1", name: "Weekly review", visibility: "organisation" }),
+            board({ id: "board-2", name: "Latency", visibility: "team" }),
+            board({ id: "board-3", name: "Scratch" }),
+          ],
+        });
+
+        const hrefsIn = (list: string) =>
+          within(screen.getByRole("list", { name: list }))
+            .getAllByRole("link")
+            .map((link) => link.getAttribute("href"));
+        await screen.findByRole("list", { name: "Team" });
+        expect(hrefsIn("Mine")).toEqual([
+          "/test-project/dashboards/agent-flight-deck",
+          "/test-project/dashboards/board-3",
+        ]);
+        expect(hrefsIn("Team")).toEqual(["/test-project/dashboards/board-2"]);
+        expect(hrefsIn("Organisation")).toEqual(["/test-project/dashboards/board-1"]);
       });
     });
 

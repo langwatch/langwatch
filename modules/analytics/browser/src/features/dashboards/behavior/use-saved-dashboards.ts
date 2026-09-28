@@ -4,12 +4,26 @@
  * resolves their words from the code (#5984).
  */
 
+import type { DashboardVisibility } from "@langwatch/dashboard-contract";
+
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { dashboardsPath, untitledBoardName } from "../model/boards.ts";
 
 /** One stored board, as the list answers it. */
-export type SavedBoard = { id: string; name: string };
+export type SavedBoard = {
+  id: string;
+  name: string;
+  description: string | null;
+  visibility: DashboardVisibility;
+  /** Null for a board older than creators. */
+  createdById: string | null;
+};
+
+/** The fields a board reads off a stored row, whichever procedure answered it. */
+function savedBoardOf({ id, name, description, visibility, createdById }: SavedBoard): SavedBoard {
+  return { id, name, description, visibility, createdById };
+}
 
 export function useSavedDashboards() {
   const host = useAnalyticsHost();
@@ -23,7 +37,7 @@ export function useSavedDashboards() {
   const rename = analyticsApi.dashboards.rename.useMutation();
   const remove = analyticsApi.dashboards.delete.useMutation();
 
-  const boards: SavedBoard[] = (list.data ?? []).map(({ id, name }) => ({ id, name }));
+  const boards: SavedBoard[] = (list.data ?? []).map(savedBoardOf);
   const refresh = () => utils.dashboards.getAll.invalidate({ projectId });
 
   const createBoard = () => {
@@ -47,7 +61,7 @@ export function useSavedDashboards() {
         name: untitledBoardName({ existingCount: boards.length }),
       });
       void refresh();
-      return { id: created.id, name: created.name };
+      return savedBoardOf(created);
     } catch (error) {
       host.failed({ error, fallbackTitle: "Couldn't create the dashboard" });
       return void 0;

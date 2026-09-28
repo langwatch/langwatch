@@ -4,13 +4,16 @@
  */
 
 import {
+  LWQL_ACCEPTED_GRANULARITY_STEPS,
   LWQL_GRANULARITY_MAX_BUCKETS,
-  LWQL_GRANULARITY_STEPS,
-  type LangWatchQLGranularityStep,
+  type LangWatchQLAcceptedGranularityStep,
 } from "@langwatch/analytics-contract";
 import { z } from "zod";
 
-/** The integrations a block can depend on; each lights up when it has ever recorded a row. */
+/**
+ * The integrations a block can depend on; each lights up once it has ever
+ * recorded a row, as `dashboards.sourcePresence` answers for the whole board.
+ */
 export const blockSourceSchema = z.enum([
   "traces",
   "scenarios",
@@ -62,16 +65,6 @@ export const blockDefinitionSchema = z.object({
   queries: z.array(blockQuerySchema).min(1),
 });
 export type BlockDefinition = z.infer<typeof blockDefinitionSchema>;
-
-/** One cheap "any row ever" statement per source: no period, so a quiet week is not "never". */
-export const SOURCE_EXISTENCE_SQL: Readonly<Record<BlockSource, string>> = {
-  traces: "SELECT 1 AS present FROM trace_metrics LIMIT 1",
-  scenarios: "SELECT 1 AS present FROM simulations LIMIT 1",
-  judges: "SELECT 1 AS present FROM evaluation_metrics LIMIT 1",
-  feedback: "SELECT 1 AS present FROM annotations LIMIT 1",
-  gateway: "SELECT 1 AS present FROM gateway_request_spend LIMIT 1",
-  codingAgents: "SELECT 1 AS present FROM coding_sessions LIMIT 1",
-};
 
 /** What an unconnected source invites the member to do, and where the button goes. */
 export interface SourceCallToAction {
@@ -126,8 +119,8 @@ export function periodDelta({ current, previous }: { current: number; previous: 
 }
 
 /**
- * The finest offered step at or above the request that keeps the period
- * within the bucket budget.
+ * The finest accepted step, up to a week, at or above the request that keeps
+ * the period within the bucket budget.
  */
 export function fitGranularity({
   periodStart,
@@ -137,12 +130,12 @@ export function fitGranularity({
   periodStart: number;
   periodEnd: number;
   requested: number;
-}): LangWatchQLGranularityStep {
+}): LangWatchQLAcceptedGranularityStep {
   const seconds = Math.max(1, (periodEnd - periodStart) / 1000);
-  const fitting = LWQL_GRANULARITY_STEPS.find(
+  const fitting = LWQL_ACCEPTED_GRANULARITY_STEPS.find(
     (step) => step >= requested && seconds / step <= LWQL_GRANULARITY_MAX_BUCKETS,
   );
-  return fitting ?? LWQL_GRANULARITY_STEPS[LWQL_GRANULARITY_STEPS.length - 1]!;
+  return fitting ?? LWQL_ACCEPTED_GRANULARITY_STEPS[LWQL_ACCEPTED_GRANULARITY_STEPS.length - 1]!;
 }
 
 /** Where a request stands, as a panel needs to know it. */
