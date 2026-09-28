@@ -20,6 +20,8 @@ type Extras struct {
 	// StackRSS is each live stack's whole-tree resident set by launcher pid —
 	// the accurate per-card number (group RSS sees only the launcher itself).
 	StackRSS map[int]uint64
+	// StackUptime is each live stack's launcher age by launcher pid.
+	StackUptime map[int]time.Duration
 }
 
 // SummaryView is the machine header: every process attributed once.
@@ -396,10 +398,9 @@ func worktreeRows(worktrees []WorktreeView, canStart bool) []wtRow {
 }
 
 func eventRows(events []EventView) []eventRow {
-	const maxEvents = 12
 	var rows []eventRow
 	for _, ev := range events {
-		if len(rows) == maxEvents {
+		if len(rows) == maxHubEvents {
 			break
 		}
 		age := "now"

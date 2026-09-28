@@ -51,6 +51,10 @@ Shared, machine-wide (one daemon serves all worktrees):
 | `observability.langwatch.localhost` | The local Grafana LGTM stack (:3000)    |
 | `telemetry.langwatch.localhost`     | OTLP fan-out to **every** running stack |
 
+Every worktree also gets a **home** at `<slug>.langwatch.localhost`, served by
+the daemon rather than the stack, so it answers while the stack is down (see
+[The stack home](#the-stack-home)).
+
 ## Setup
 
 There is none. The first `haven up` bootstraps the machine itself: installs
@@ -452,6 +456,37 @@ The monolith layout is `origin/main`, and it exists here so `apidiff` and
 - The two developer-tool lanes (`design-system`, `mail-room`) have no packages
   there. They are off by default; selecting one on a monolith stack starts a lane
   that fails.
+
+## The stack home
+
+`<slug>.langwatch.localhost` is one worktree's page: every surface (app, API,
+worker, the Go services, the IdP simulator, the mail sink, the design system,
+the mail room, Grafana) with its hostname, port and status (`live`,
+`starting`, `down`, or `not-selected` with the `haven up +<name>` that turns
+it on), the stack's facts (branch, worktree, layout, uptime, memory, its
+Postgres, ClickHouse and Redis databases), each lane's latest errors linking
+into the hub's log view, and the credentials a developer signs in with (the
+seeded login, this stack's inbox address, the IdP tenants, the local API key
+masked). It is `apps/haven-web`, built by `make haven-web` into
+`adapters/dashboard/web/dist` and embedded in the haven binary (ADR-160);
+`make haven install` builds it first, and a binary built without it answers
+with a page naming that target.
+
+The route is registered at `haven up`, pointed at the daemon, and re-pointed
+whenever the daemon restarts. `down` and the reaper leave it in place; only
+pruning the worktree (destroying it from the hub or `haven clean`, the daily
+reclaim, `DestroyStack`) takes it away. A slug that spells a machine-wide name
+(`hub`, `idp`, `observability`, `telemetry`) gets no home.
+
+The daemon's JSON, which the console reads:
+
+| Route                               | What                                                  |
+| ----------------------------------- | ----------------------------------------------------- |
+| `GET /api/hub`                      | the machine: memory, stacks, idle worktrees, reaping  |
+| `GET /api/stacks/<slug>`            | one stack home; 404 with a hub link for unknown slugs |
+| `POST /api/stacks/<slug>/api-key`   | reveals the local API key (same-origin only)          |
+| `POST /api/stacks/<slug>/restart`   | bounces a live stack                                  |
+| `POST /api/worktrees/start`         | brings a stopped worktree up                          |
 
 ## More of what haven does
 

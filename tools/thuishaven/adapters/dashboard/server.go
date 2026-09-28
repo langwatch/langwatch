@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -23,7 +24,8 @@ import (
 // Server renders live state pulled through the callbacks it is built with, so it
 // never imports the app core.
 type Server struct {
-	config Config
+	config  Config
+	console http.Handler
 }
 
 // Probes are the optional OS checks the page uses to show live health. A nil
@@ -48,11 +50,20 @@ type Config struct {
 	// Actions are the lifecycle operations the page may take. Zero-valued means
 	// a dashboard you can only read, which is what it was before.
 	Actions Actions
+	// Naming reads a Host header as a stack's home and names a stopped
+	// stack's hosts; StackURL builds a routed URL through the live proxy.
+	Naming   domain.Naming
+	StackURL func(service, slug string) string
+	// IdPTenants lists the tenants of the IdP simulator on a loopback port,
+	// or none. Nil leaves a stack home's credentials without them.
+	IdPTenants func(ctx context.Context, port int) []IdPTenant
+	// Console is the haven-web bundle; nil serves the one embedded at build.
+	Console fs.FS
 }
 
 // New builds a Server.
 func New(config Config) *Server {
-	return &Server{config: config}
+	return &Server{config: config, console: newConsole(config.Console)}
 }
 
 // routes is the whole HTTP surface, built apart from Serve so a test can drive
@@ -64,6 +75,9 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/registry", s.handleRegistry)
 	mux.HandleFunc("GET /api/logs", s.handleLogs)
 	mux.HandleFunc("GET /assets/logs.js", serveLogsScript)
+	mux.HandleFunc("GET /api/hub", s.handleHub)
+	mux.HandleFunc("GET /api/stacks/{slug}", s.handleStackHome)
+	mux.HandleFunc("POST /api/stacks/{slug}/api-key", s.handleRevealAPIKey)
 	mux.HandleFunc("/api/stacks/{slug}/restart", s.handleRestart)
 	mux.HandleFunc("/api/worktrees/start", s.handleStart)
 	mux.HandleFunc("/v1/", s.handleTelemetry) // OTLP: /v1/traces, /v1/metrics, /v1/logs
@@ -129,19 +143,17 @@ func (s *Server) hostAllowed(host string) bool {
 	return h == base || strings.HasSuffix(h, "."+base)
 }
 
+// handleIndex serves the console bundle, except the hub's own root, which the
+// server-rendered page keeps until apps/haven-web draws the hub too.
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
+	if r.URL.Path != "/" || s.isStackHome(r) {
+		s.console.ServeHTTP(w, r)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	var extras Extras
-	if s.config.Extras != nil {
-		extras = s.config.Extras()
-	}
 	_, _ = io.WriteString(w, renderHTML(s.config.Stacks(), renderInputs{
-		sharedURL: s.config.SharedURL, probes: s.config.Probes, extras: extras,
+		sharedURL: s.config.SharedURL, probes: s.config.Probes, extras: s.extras(),
 		canRestart: s.config.Actions.Restart != nil, canStart: s.config.Actions.Start != nil,
 	}))
 }

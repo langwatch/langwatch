@@ -26,6 +26,11 @@ quickwit-*
 /metadata/
 __pycache__
 dist/
+# The haven console bundle is built, never committed; the keep file lets
+# go:embed resolve its directory in a checkout that has not built it (ADR-160).
+!/tools/thuishaven/adapters/dashboard/web/dist/
+/tools/thuishaven/adapters/dashboard/web/dist/*
+!/tools/thuishaven/adapters/dashboard/web/dist/.gitkeep
 /dev/.cache/
 
 langwatch_server/

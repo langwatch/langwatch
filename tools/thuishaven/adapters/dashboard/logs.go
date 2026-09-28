@@ -87,24 +87,30 @@ func (s *Server) knownLogStack(slug string) bool {
 }
 
 func (s *Server) readStackLogs(slug, selected string) ([]logLine, []string, error) {
-	home, err := os.OpenRoot(s.config.LogDir)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer func() { _ = home.Close() }()
-	info, err := home.Lstat(slug)
-	if err != nil {
-		return nil, nil, err
-	}
-	if !info.IsDir() {
-		return nil, nil, errLogDirectory
-	}
-	root, err := home.OpenRoot(slug)
+	root, err := openStackLogs(s.config.LogDir, slug)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer func() { _ = root.Close() }()
 	return readLogTail(root, selected)
+}
+
+// openStackLogs opens one stack's capture directory, refusing a symlink or a
+// file in its place. The caller closes the root.
+func openStackLogs(logDir, slug string) (*os.Root, error) {
+	home, err := os.OpenRoot(logDir)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = home.Close() }()
+	info, err := home.Lstat(slug)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, errLogDirectory
+	}
+	return home.OpenRoot(slug)
 }
 
 func captureNames(root *os.Root) ([]string, error) {

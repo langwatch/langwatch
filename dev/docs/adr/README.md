@@ -89,6 +89,7 @@ Reusable framework decisions live with their packages:
 | [157](./157-lwql-postgres-catalog-derived-opt-out.md)                  | The PostgreSQL half of the LangWatchQL catalog is derived from the Prisma manifest, opt-out                                | Accepted                  |
 | [158](./158-purpose-scoped-uploads.md)                                 | Purpose-scoped uploads: a file is uploaded to a signed URL, confirmed, and attached by reference                           | Accepted                  |
 | [159](./159-the-app-owns-the-lwql-access-model.md)                     | The app owns the LangWatchQL access model — one definition, two emitters, delivered to every pod                           | Accepted                  |
+| [160](./160-internal-consoles-are-go-served-react.md)                  | Internal consoles are Vite-built React, served by their Go owner, on one internal design kit                               | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)
