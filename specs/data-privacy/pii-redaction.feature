@@ -362,6 +362,13 @@ Feature: Redacting personal data from traces
     When a trace is ingested with a model name attribute whose value is a phone number
     Then the analysis service received that value
 
+  @unit
+  Scenario: Without a native pass a model name attribute is still sent for analysis
+    Given the resolved PII level for "web-app" is custom with only analysis-service identifiers
+    And secrets redaction is off
+    When a trace is ingested with a model name attribute
+    Then the analysis service received that value
+
   # The reserved names are not a namespace anyone owns. Attributes arrive on the
   # ingestion endpoint spelled exactly as the sender wrote them, so a sender can
   # put an email address under a trace identifier name - by mistake or on

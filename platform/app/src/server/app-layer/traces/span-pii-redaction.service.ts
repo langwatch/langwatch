@@ -501,7 +501,7 @@ export class OtlpSpanPiiRedactionService {
         const ran = await this.lambdaRedactSpan(span, resource, "STRICT", {
           entities: lambda.entities,
           exceptPatterns: lambda.exceptPatterns,
-          hasNativePassRun: true,
+          hasNativePassRun: this.nativePassActive(native.policy),
         });
         // Mark the span only when strict could not run because the analysis
         // service is genuinely unavailable (not configured in dev): the native
@@ -693,7 +693,7 @@ export class OtlpSpanPiiRedactionService {
       await this.lambdaRedactLog(log, "STRICT", {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
-        hasNativePassRun: true,
+        hasNativePassRun: this.nativePassActive(native.policy),
       });
     }
   }
@@ -781,7 +781,7 @@ export class OtlpSpanPiiRedactionService {
       await this.lambdaRedactMetricAttributes(metric, "STRICT", {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
-        hasNativePassRun: true,
+        hasNativePassRun: this.nativePassActive(native.policy),
       });
     }
   }

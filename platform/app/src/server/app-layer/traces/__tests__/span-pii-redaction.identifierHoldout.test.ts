@@ -308,6 +308,23 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
 
       expect(submitted()).toContain("+1-234-567-8901");
     });
+
+    // A resolved policy is not enough: a custom level that selects only
+    // analysis-service identifiers, with secrets off, leaves the native pass
+    // nothing to do, and it returns before scanning anything.
+    /** @scenario "Without a native pass a model name attribute is still sent for analysis" */
+    it("still submits a model name attribute when the policy gives the native pass nothing to do", async () => {
+      const { service, submitted } = makeService({
+        ...STRICT_POLICY,
+        pii: { level: "custom", entities: ["PERSON"], exceptPatterns: [] },
+        secrets: { enabled: false, customPatterns: [] },
+      });
+      const span = spanWith({ "ai.model.id": "claude-sonnet-4-6" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submitted()).toContain("claude-sonnet-4-6");
+    });
   });
 
   // Custom metadata does not reach redaction spelled the way the caller wrote
