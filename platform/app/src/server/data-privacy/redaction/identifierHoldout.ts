@@ -11,7 +11,7 @@
  * identifiers back has to be one rule consulted twice, because a rule that only
  * one engine knows about is a rule the other engine will undo.
  *
- * Three questions are asked, in this order.
+ * Two questions are asked, in this order.
  *
  *   1. Does the attribute NAME reserve it, AND does the value look like the
  *      address that name promises? A short list of trace and span identifier
@@ -19,16 +19,17 @@
  *      are not a protected namespace — the OTLP endpoint takes attributes as the
  *      caller wrote them — so the value still has to be hex or decimal before
  *      the name is allowed to turn the personal-data pass off.
- *   2. Does the attribute NAME mark a model, provider or tool name, AND is the
- *      value one token shaped like one? Asked by the analysis path only, and
- *      only after the native pass has run: it spares these values the name
- *      detector, which reads `claude-sonnet-4-6` as a person, not the pattern
- *      recognizers. See {@link reservesModelOrToolName}.
- *   3. Is the VALUE exclusively one opaque identifier token? A uuid, a hex
+ *   2. Is the VALUE exclusively one opaque identifier token? A uuid, a hex
  *      digest, a ULID, a `prefix_<random>` record id. Nothing in such a value
  *      is personal data, so there is nothing for either engine to find.
  *      Exclusively: a value that merely CONTAINS one is prose, and prose is
  *      analysed.
+ *
+ * MODEL AND TOOL NAMES ARE NOT HELD BACK. They get a narrower answer from
+ * {@link reservesModelOrToolName}: spared name and place detection, which reads
+ * `claude-sonnet-4-6` as a person, and scanned for everything else. Holding
+ * them back altogether would leave a phone or national id under one of those
+ * names scanned by nothing wherever the native pass does not cover it.
  *
  * WHY THERE ARE TWO VALUE RULES. The engines pay different prices for a wrong
  * answer, so they get different rules and the difference is the whole point.
@@ -43,7 +44,7 @@
  * fills in themselves — user, customer, thread and conversation identifiers.
  * Customers routinely put an email address or a full name in them, and a name on
  * the reserved list would mean storing that in the clear. They are covered by
- * question 3 like every other attribute: an opaque value is held back, personal
+ * question 2 like every other attribute: an opaque value is held back, personal
  * data is still redacted.
  */
 
@@ -323,7 +324,7 @@ export function reservesTraceAddress({
  * the strict level every call to that provider stored `[PERSON]` in place of
  * the model, and tool names written as words went the same way. None of them is
  * opaque — they split into short readable runs — so the value rule above never
- * holds them back; only the name can.
+ * holds them back; only the name can mark them, and only for that one pass.
  *
  * Compared lower-cased. Like the trace list, the names are not a namespace
  * anyone owns, so the value is gated too ({@link MODEL_OR_TOOL_NAME_VALUE}).
@@ -360,9 +361,8 @@ const RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set([
  * `openai.chat`), which is the exact value this rule exists for. The trace
  * rule can refuse "jane.doe" because an address is hex or decimal; a model name
  * is words. That is the residual, and it is accepted: those attributes are set
- * by code, and the rule is only consulted after the native pass has run on
- * them (see {@link isHeldOutIdentifierAttribute}), so card numbers, phone
- * numbers and secrets in them are redacted either way.
+ * by code, and only name and place detection is skipped, so card numbers,
+ * phone numbers, national ids and secrets in them are redacted either way.
  */
 const MODEL_OR_TOOL_NAME_VALUE = /^[A-Za-z0-9._:/+-]+$/;
 
@@ -380,7 +380,8 @@ const URL_SHAPED = /:\/\/|^[^/]*\.[^/]*\//;
 
 /**
  * Whether this attribute is a model, provider or tool name carrying a value
- * shaped like one.
+ * shaped like one. Such a value is spared name and place detection only: the
+ * analysis call still scans it for every other entity it was asked for.
  */
 export function reservesModelOrToolName({
   key,
@@ -399,14 +400,12 @@ export function reservesModelOrToolName({
 
 /**
  * Whether one attribute is held back from PII analysis altogether: reserved by
- * name (a trace address, or a model or tool name), or a value that is
- * exclusively one opaque identifier token.
+ * name as a trace address, or a value that is exclusively one opaque
+ * identifier token.
  *
- * The model or tool name rule applies only when `hasNativePassRun` is set. Its
- * residual is safe only because the native pass has already redacted cards,
- * phones and secrets in those values; on the no-policy path (no tenant, the
- * kill switch, a failed policy lookup) the analysis batch is the only pass, and
- * holding a value back there would store whatever it holds in the clear.
+ * A model or tool name is NOT held back here. It is still analysed for
+ * everything except names and places ({@link reservesModelOrToolName}), so a
+ * phone, card or national id written under one is found on every path.
  *
  * Attribute values only. Free text — a log body, a status message, the chat
  * content itself — is content by definition and always analysed.
@@ -414,15 +413,9 @@ export function reservesModelOrToolName({
 export function isHeldOutIdentifierAttribute({
   key,
   value,
-  hasNativePassRun,
 }: {
   key: string;
   value: string;
-  hasNativePassRun: boolean;
 }): boolean {
-  return (
-    reservesTraceAddress({ key, value }) ||
-    (hasNativePassRun && reservesModelOrToolName({ key, value })) ||
-    isOpaqueIdentifierValue(value)
-  );
+  return reservesTraceAddress({ key, value }) || isOpaqueIdentifierValue(value);
 }

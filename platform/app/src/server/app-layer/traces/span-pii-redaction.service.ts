@@ -13,13 +13,17 @@ import {
   redactStringNative,
 } from "~/server/data-privacy/redaction/applyContentRedaction";
 import { ESSENTIAL_PII_ENTITIES } from "~/server/data-privacy/redaction/essentialPii";
-import { isHeldOutIdentifierAttribute } from "~/server/data-privacy/redaction/identifierHoldout";
+import {
+  isHeldOutIdentifierAttribute,
+  reservesModelOrToolName,
+} from "~/server/data-privacy/redaction/identifierHoldout";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   batchPresidioClearPII as defaultBatchPresidioClearPII,
   googleDLPClearPII,
   type PIICheckOptions,
   PRESIDIO_STRICT_ENTITIES,
+  presidioDefaultEntities,
 } from "~/server/tracer/collector/piiCheck";
 
 /**
@@ -181,7 +185,12 @@ type StringEntry = {
   field: "stringValue" | "message";
   /** The original text value */
   text: string;
+  /** A model, provider or tool name: analysed without name/place detection */
+  isNameExempt: boolean;
 };
+
+/** One text to analyse, and whether it is spared name/place detection. */
+type AnalysisItem = { text: string; isNameExempt: boolean };
 
 /**
  * Accumulator used by the record-shaped redaction paths (logs, metrics).
@@ -189,10 +198,25 @@ type StringEntry = {
  * length budget enforced by `tryPush`.
  */
 type RedactionBatch = {
-  texts: string[];
+  items: AnalysisItem[];
   refs: { obj: Record<string, string>; key: string }[];
-  tryPush: (obj: Record<string, string>, key: string, value: string) => void;
+  tryPush: (entry: {
+    obj: Record<string, string>;
+    key: string;
+    value: string;
+    isNameExempt: boolean;
+  }) => void;
 };
+
+/**
+ * What the name/place model finds, and so what it gets wrong on a model id
+ * (`claude-sonnet-4-6` read as a person). Model, provider and tool names are
+ * analysed without these and only these (see reservesModelOrToolName).
+ */
+const NAME_AND_PLACE_ENTITIES: ReadonlySet<string> = new Set([
+  "PERSON",
+  "LOCATION",
+]);
 
 /**
  * Service responsible for redacting PII from OTLP span data.
@@ -501,7 +525,6 @@ export class OtlpSpanPiiRedactionService {
         const ran = await this.lambdaRedactSpan(span, resource, "STRICT", {
           entities: lambda.entities,
           exceptPatterns: lambda.exceptPatterns,
-          hasNativePassRun: this.nativePassActive(native.policy),
         });
         // Mark the span only when strict could not run because the analysis
         // service is genuinely unavailable (not configured in dev): the native
@@ -557,8 +580,6 @@ export class OtlpSpanPiiRedactionService {
     lambda?: {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
-      /** The native pass already ran over these values (see collect*Entries). */
-      hasNativePassRun?: boolean;
     },
   ): Promise<boolean> {
     const options = await this.buildOptions(
@@ -571,19 +592,13 @@ export class OtlpSpanPiiRedactionService {
     // caller can mark a requested strict pass as incomplete.
     if (!options) return false;
 
-    const hasNativePassRun = lambda?.hasNativePassRun ?? false;
     const entries: StringEntry[] = [];
     let anySkipped = false;
     let anyRedacted = false;
     let totalLength = 0;
 
     for (const attrs of this.collectAllAttributeSets(span)) {
-      const result = this.collectStringEntries({
-        attributes: attrs,
-        entries,
-        currentTotalLength: totalLength,
-        hasNativePassRun,
-      });
+      const result = this.collectStringEntries(attrs, entries, totalLength);
       anySkipped ||= result.skipped;
       anyRedacted ||= result.collected;
       totalLength = result.totalLength;
@@ -604,6 +619,7 @@ export class OtlpSpanPiiRedactionService {
           owner: span.status,
           field: "message",
           text: span.status.message,
+          isNameExempt: false,
         });
         totalLength += span.status.message.length;
         anyRedacted = true;
@@ -611,12 +627,11 @@ export class OtlpSpanPiiRedactionService {
     }
 
     if (resource?.attributes) {
-      const result = this.collectStringEntries({
-        attributes: resource.attributes,
+      const result = this.collectStringEntries(
+        resource.attributes,
         entries,
-        currentTotalLength: totalLength,
-        hasNativePassRun,
-      });
+        totalLength,
+      );
       anySkipped ||= result.skipped;
       anyRedacted ||= result.collected;
     }
@@ -640,16 +655,7 @@ export class OtlpSpanPiiRedactionService {
       return true;
     }
 
-    const results = await this.deps.batchClearPII(
-      entries.map((e) => e.text),
-      options,
-    );
-
-    if (results.length !== entries.length) {
-      throw new Error(
-        `Incomplete PII batch: got ${results.length} results for ${entries.length} inputs`,
-      );
-    }
+    const results = await this.analyseBatch(entries, options);
 
     for (let i = 0; i < entries.length; i++) {
       const redacted = results[i];
@@ -693,7 +699,6 @@ export class OtlpSpanPiiRedactionService {
       await this.lambdaRedactLog(log, "STRICT", {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
-        hasNativePassRun: this.nativePassActive(native.policy),
       });
     }
   }
@@ -709,8 +714,6 @@ export class OtlpSpanPiiRedactionService {
     lambda?: {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
-      /** The native pass already ran over these values (see collect*Entries). */
-      hasNativePassRun?: boolean;
     },
   ): Promise<void> {
     const options = await this.buildOptions(
@@ -725,20 +728,15 @@ export class OtlpSpanPiiRedactionService {
     // an identifier written in a sentence sits next to content that may well
     // hold personal data.
     if (log.body) {
-      batch.tryPush(log as unknown as Record<string, string>, "body", log.body);
+      batch.tryPush({
+        obj: log as unknown as Record<string, string>,
+        key: "body",
+        value: log.body,
+        isNameExempt: false,
+      });
     }
-    const hasNativePassRun = lambda?.hasNativePassRun ?? false;
-    this.collectRecordEntries({
-      batch,
-      record: log.attributes,
-      attributeNames: log.attributeNames,
-      hasNativePassRun,
-    });
-    this.collectRecordEntries({
-      batch,
-      record: log.resourceAttributes,
-      hasNativePassRun,
-    });
+    this.collectRecordEntries(batch, log.attributes, log.attributeNames);
+    this.collectRecordEntries(batch, log.resourceAttributes);
 
     await this.applyRedactionBatch(batch, options);
   }
@@ -781,7 +779,6 @@ export class OtlpSpanPiiRedactionService {
       await this.lambdaRedactMetricAttributes(metric, "STRICT", {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
-        hasNativePassRun: this.nativePassActive(native.policy),
       });
     }
   }
@@ -796,8 +793,6 @@ export class OtlpSpanPiiRedactionService {
     lambda?: {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
-      /** The native pass already ran over these values (see collect*Entries). */
-      hasNativePassRun?: boolean;
     },
   ): Promise<void> {
     const options = await this.buildOptions(
@@ -808,18 +803,8 @@ export class OtlpSpanPiiRedactionService {
     if (!options) return;
 
     const batch = this.createRedactionBatch();
-    const hasNativePassRun = lambda?.hasNativePassRun ?? false;
-    this.collectRecordEntries({
-      batch,
-      record: metric.attributes,
-      attributeNames: metric.attributeNames,
-      hasNativePassRun,
-    });
-    this.collectRecordEntries({
-      batch,
-      record: metric.resourceAttributes,
-      hasNativePassRun,
-    });
+    this.collectRecordEntries(batch, metric.attributes, metric.attributeNames);
+    this.collectRecordEntries(batch, metric.resourceAttributes);
 
     await this.applyRedactionBatch(batch, options);
   }
@@ -870,16 +855,16 @@ export class OtlpSpanPiiRedactionService {
   }
 
   private createRedactionBatch(): RedactionBatch {
-    const texts: string[] = [];
+    const items: AnalysisItem[] = [];
     const refs: { obj: Record<string, string>; key: string }[] = [];
     const maxLen = this.deps.piiRedactionMaxAttributeLength;
     const logger = this.logger;
     const state = { totalLength: 0 };
 
     return {
-      texts,
+      items,
       refs,
-      tryPush(obj, key, value) {
+      tryPush({ obj, key, value, isNameExempt }) {
         if (state.totalLength + value.length > maxLen) {
           logger.warn(
             {
@@ -892,7 +877,7 @@ export class OtlpSpanPiiRedactionService {
           );
           return;
         }
-        texts.push(value);
+        items.push({ text: value, isNameExempt });
         refs.push({ obj, key });
         state.totalLength += value.length;
       },
@@ -915,30 +900,22 @@ export class OtlpSpanPiiRedactionService {
    * If one is ever needed, it has to be a SEPARATE field — reusing this one is
    * the bug this note exists to prevent.
    */
-  private collectRecordEntries({
-    batch,
-    record,
-    attributeNames,
-    hasNativePassRun,
-  }: {
-    batch: RedactionBatch;
-    record: Record<string, string>;
-    attributeNames?: Record<string, string>;
-    hasNativePassRun: boolean;
-  }): void {
+  private collectRecordEntries(
+    batch: RedactionBatch,
+    record: Record<string, string>,
+    attributeNames?: Record<string, string>,
+  ): void {
     for (const key of Object.keys(record)) {
       const value = record[key];
       if (!value) continue;
-      if (
-        isHeldOutIdentifierAttribute({
-          key: attributeNames?.[key] ?? key,
-          value,
-          hasNativePassRun,
-        })
-      ) {
-        continue;
-      }
-      batch.tryPush(record, key, value);
+      const name = attributeNames?.[key] ?? key;
+      if (isHeldOutIdentifierAttribute({ key: name, value })) continue;
+      batch.tryPush({
+        obj: record,
+        key,
+        value,
+        isNameExempt: reservesModelOrToolName({ key: name, value }),
+      });
     }
   }
 
@@ -946,15 +923,9 @@ export class OtlpSpanPiiRedactionService {
     batch: RedactionBatch,
     options: PIICheckOptions,
   ): Promise<void> {
-    if (batch.texts.length === 0) return;
+    if (batch.items.length === 0) return;
 
-    const results = await this.deps.batchClearPII(batch.texts, options);
-
-    if (results.length !== batch.refs.length) {
-      throw new Error(
-        `Incomplete PII batch: got ${results.length} results for ${batch.refs.length} inputs`,
-      );
-    }
+    const results = await this.analyseBatch(batch.items, options);
 
     for (let i = 0; i < batch.refs.length; i++) {
       const redacted = results[i];
@@ -962,6 +933,61 @@ export class OtlpSpanPiiRedactionService {
         batch.refs[i]!.obj[batch.refs[i]!.key] = redacted;
       }
     }
+  }
+
+  /**
+   * Runs the analysis batch and returns one result per item, in order.
+   *
+   * Model, provider and tool names go in a second call with name and place
+   * detection left out, so they are still scanned for every other entity the
+   * first call asks for. That holds on every path — with or without a native
+   * pass, at any level — because the entity list is derived from the very
+   * options the first call uses. When nothing is left once names and places
+   * are removed (a custom level that selected only those), the second call is
+   * skipped and those values are left as the native pass left them.
+   */
+  private async analyseBatch(
+    items: readonly AnalysisItem[],
+    options: PIICheckOptions,
+  ): Promise<(string | null)[]> {
+    const results: (string | null)[] = items.map(() => null);
+    // The two calls are independent, so they run side by side: a span that
+    // carries a model name costs one more call, not twice the wait.
+    await Promise.all(
+      [false, true].map(async (isNameExempt) => {
+        const indexes = items.flatMap((item, i) =>
+          item.isNameExempt === isNameExempt ? [i] : [],
+        );
+        if (indexes.length === 0) return;
+        const laneOptions = isNameExempt
+          ? this.withoutNameAndPlace(options)
+          : options;
+        if (!laneOptions) return;
+        const laneResults = await this.deps.batchClearPII(
+          indexes.map((i) => items[i]!.text),
+          laneOptions,
+        );
+        if (laneResults.length !== indexes.length) {
+          throw new Error(
+            `Incomplete PII batch: got ${laneResults.length} results for ${indexes.length} inputs`,
+          );
+        }
+        indexes.forEach((itemIndex, j) => {
+          results[itemIndex] = laneResults[j] ?? null;
+        });
+      }),
+    );
+    return results;
+  }
+
+  /** The same analysis call with name and place detection left out. */
+  private withoutNameAndPlace(
+    options: PIICheckOptions,
+  ): PIICheckOptions | null {
+    const entities = (
+      options.entities ?? presidioDefaultEntities(options.piiRedactionLevel)
+    ).filter((entity) => !NAME_AND_PLACE_ENTITIES.has(entity));
+    return entities.length > 0 ? { ...options, entities } : null;
   }
 
   private collectAllAttributeSets(span: OtlpSpan): OtlpKeyValue[][] {
@@ -983,17 +1009,11 @@ export class OtlpSpanPiiRedactionService {
    * which is what marks the span as partially redacted, and an opaque address
    * holds none. So a held-out attribute sets neither flag.
    */
-  private collectStringEntries({
-    attributes,
-    entries,
-    currentTotalLength,
-    hasNativePassRun,
-  }: {
-    attributes: OtlpKeyValue[];
-    entries: StringEntry[];
-    currentTotalLength: number;
-    hasNativePassRun: boolean;
-  }): { skipped: boolean; collected: boolean; totalLength: number } {
+  private collectStringEntries(
+    attributes: OtlpKeyValue[],
+    entries: StringEntry[],
+    currentTotalLength: number,
+  ): { skipped: boolean; collected: boolean; totalLength: number } {
     let skipped = false;
     let collected = false;
     let totalLength = currentTotalLength;
@@ -1008,7 +1028,6 @@ export class OtlpSpanPiiRedactionService {
           isHeldOutIdentifierAttribute({
             key: attr.key,
             value: attr.value.stringValue,
-            hasNativePassRun,
           })
         ) {
           continue;
@@ -1033,6 +1052,10 @@ export class OtlpSpanPiiRedactionService {
           owner: attr.value,
           field: "stringValue",
           text: attr.value.stringValue,
+          isNameExempt: reservesModelOrToolName({
+            key: attr.key,
+            value: attr.value.stringValue,
+          }),
         });
         totalLength += attr.value.stringValue.length;
         collected = true;

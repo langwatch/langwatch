@@ -152,7 +152,6 @@ describe("given the identifier hold-out rules", () => {
         isHeldOutIdentifierAttribute({
           key: "metadata.trace_id",
           value: "17575001234540000091234567890123",
-          hasNativePassRun: false,
         }),
       ).toBe(true);
     });
@@ -169,11 +168,7 @@ describe("given the identifier hold-out rules", () => {
     ])("does not hold a reserved name back over %s", (_case, value) => {
       expect(isReservedIdentifierAttributeKey("metadata.trace_id")).toBe(true);
       expect(
-        isHeldOutIdentifierAttribute({
-          key: "metadata.trace_id",
-          value,
-          hasNativePassRun: true,
-        }),
+        isHeldOutIdentifierAttribute({ key: "metadata.trace_id", value }),
       ).toBe(false);
     });
 
@@ -199,13 +194,9 @@ describe("given the identifier hold-out rules", () => {
       "gen_ai.conversation.id",
     ])("does not reserve %s, which customers fill in themselves", (key) => {
       expect(isReservedIdentifierAttributeKey(key)).toBe(false);
-      expect(
-        isHeldOutIdentifierAttribute({
-          key,
-          value: "Jane Doe",
-          hasNativePassRun: true,
-        }),
-      ).toBe(false);
+      expect(isHeldOutIdentifierAttribute({ key, value: "Jane Doe" })).toBe(
+        false,
+      );
     });
 
     /**
@@ -227,7 +218,6 @@ describe("given the identifier hold-out rules", () => {
         isHeldOutIdentifierAttribute({
           key: `${prefix}trace_id`,
           value: DECIMAL_TRACE_ADDRESS,
-          hasNativePassRun: false,
         }),
       ).toBe(true);
     });
@@ -248,43 +238,32 @@ describe("given the identifier hold-out rules", () => {
       ],
       ["gen_ai.tool.name", "getWeatherForecast"],
       ["ai.toolCall.name", "search_documents"],
-    ])("holds %s back over %s", (key, value) => {
+    ])("spares %s = %s from name detection", (key, value) => {
       expect(reservesModelOrToolName({ key, value })).toBe(true);
-      expect(
-        isHeldOutIdentifierAttribute({ key, value, hasNativePassRun: true }),
-      ).toBe(true);
     });
 
     /**
-     * Without the native pass the analysis batch is the only redaction there
-     * is, so a phone or card number under a model name would be stored in the
-     * clear. The rule is not consulted on that path at all.
+     * Sparing a value name detection is not holding it back. It is still
+     * analysed for everything else, so a phone or national id written under a
+     * model name is found wherever the native pass does not reach.
      */
-    it("does not hold a model name back when the native pass did not run", () => {
-      expect(
-        isHeldOutIdentifierAttribute({
-          key: "ai.model.id",
-          value: "+1-234-567-8901",
-          hasNativePassRun: false,
-        }),
-      ).toBe(false);
+    it("does not hold a model name back from analysis altogether", () => {
       expect(
         isHeldOutIdentifierAttribute({
           key: "gen_ai.request.model",
           value: "claude-sonnet-4-6",
-          hasNativePassRun: false,
         }),
       ).toBe(false);
     });
 
-    it("holds a name back at the length cap", () => {
+    it("spares a name at the length cap", () => {
       const value = "m".repeat(MAX_MODEL_OR_TOOL_NAME_LENGTH);
       expect(
         reservesModelOrToolName({ key: "gen_ai.request.model", value }),
       ).toBe(true);
     });
 
-    it("sends a value one character over the length cap on", () => {
+    it("does not spare a value one character over the length cap", () => {
       const value = "m".repeat(MAX_MODEL_OR_TOOL_NAME_LENGTH + 1);
       expect(
         reservesModelOrToolName({ key: "gen_ai.request.model", value }),
@@ -293,7 +272,8 @@ describe("given the identifier hold-out rules", () => {
 
     /**
      * Like the trace list, the name is not enough on its own: a sender can
-     * write anything under `gen_ai.request.model`, so these still go on.
+     * write anything under `gen_ai.request.model`, so these still get name
+     * detection.
      */
     it.each([
       ["a person name", "Jane Doe"],
@@ -304,7 +284,7 @@ describe("given the identifier hold-out rules", () => {
       ],
       ["a scheme-less URL", "www.acme.example/u/Jane-Doe"],
       ["an empty value", ""],
-    ])("does not hold a model name back over %s", (_case, value) => {
+    ])("does not spare %s under a model name", (_case, value) => {
       expect(
         reservesModelOrToolName({ key: "gen_ai.request.model", value }),
       ).toBe(false);
@@ -312,15 +292,14 @@ describe("given the identifier hold-out rules", () => {
 
     /**
      * The residual the rule accepts, pinned so that narrowing or widening the
-     * gate is a visible change. Unlike under a trace name, "jane.doe" is held
-     * back here: providers write their own ids the same way
-     * (`anthropic.messages`), so shape cannot separate the two. The native
-     * pass still runs on it.
+     * gate is a visible change. "jane.doe" is spared name detection here:
+     * providers write their own ids the same way (`anthropic.messages`), so
+     * shape cannot separate the two. Every other entity is still looked for.
      */
     it.each([
       "jane.doe",
       "jane_doe",
-    ])("knowingly holds back the single-token name %s", (value) => {
+    ])("knowingly spares the single-token name %s", (value) => {
       expect(
         reservesModelOrToolName({ key: "gen_ai.request.model", value }),
       ).toBe(true);

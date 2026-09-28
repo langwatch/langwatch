@@ -66,7 +66,13 @@ export function makeService(policy: ResolvedDataPrivacy = STRICT_POLICY) {
   });
   const submitted = (): string[] =>
     batchSpy.mock.calls.flatMap((call) => call[0] as string[]);
-  return { service, batchSpy, submitted };
+  // Only the strings sent to a call that looks for people. A call with no
+  // entity list uses the strict default, which does.
+  const submittedForNames = (): string[] =>
+    batchSpy.mock.calls.flatMap(([texts, options]) =>
+      (options.entities ?? ["PERSON"]).includes("PERSON") ? texts : [],
+    );
+  return { service, batchSpy, submitted, submittedForNames };
 }
 
 export function spanWith(attributes: Record<string, string>): OtlpSpan {

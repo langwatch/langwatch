@@ -335,11 +335,17 @@ function presidioEntitiesSetting(
   piiRedactionLevel: PIIRedactionLevel,
   entities?: readonly string[],
 ): Record<string, boolean> {
-  const names =
-    entities ??
-    (piiRedactionLevel === "ESSENTIAL" ? essentialInfoTypes : strictInfoTypes)
-      .presidio;
+  const names = entities ?? presidioDefaultEntities(piiRedactionLevel);
   return Object.fromEntries(names.map((name) => [name.toLowerCase(), true]));
+}
+
+/** The Presidio entities a level scans for when no explicit list is given. */
+export function presidioDefaultEntities(
+  piiRedactionLevel: PIIRedactionLevel,
+): readonly string[] {
+  return (
+    piiRedactionLevel === "ESSENTIAL" ? essentialInfoTypes : strictInfoTypes
+  ).presidio;
 }
 
 /**

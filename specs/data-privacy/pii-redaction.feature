@@ -324,14 +324,16 @@ Feature: Redacting personal data from traces
 
   # Model, provider and tool names are set by code, never typed by the end user,
   # and the name detector misreads them: a bare model id such as
-  # "claude-sonnet-4-6" reads to it as a first name. They are held back by name,
-  # but only while the value is one token, so prose or an email address written
-  # under one of those names is still analysed.
+  # "claude-sonnet-4-6" reads to it as a first name. They are spared name and
+  # place detection by attribute name, but only while the value is one token,
+  # so prose or an email address written under one of those names is still
+  # analysed. Every other identifier is still looked for in them.
   @unit
-  Scenario: A model or tool name attribute is never sent for analysis
+  Scenario: A model or tool name attribute is never sent for name detection
     Given the resolved PII level for "web-app" is strict
     When a trace is ingested with a model name attribute whose value reads like a first name
-    Then the analysis service never received that value
+    Then the analysis service never looked for names in that value
+    And the analysis service still looked for other identifiers in it
     And the stored attribute still reads as it was sent
 
   @unit
@@ -353,21 +355,21 @@ Feature: Redacting personal data from traces
     When a trace is ingested with a model name attribute whose value is a phone number
     Then the stored attribute has the phone number redacted
 
-  # The hold-out is safe only because the native pass has already redacted
-  # phones, cards and secrets in these values. Without a resolved policy the
-  # analysis service is the only redaction, so nothing is held back from it.
+  # Only name and place detection is skipped, so the native pass is never
+  # relied on for the rest: where it does not run, or does not cover an
+  # identifier, the analysis service still looks for it.
   @unit
-  Scenario: Without a resolved policy a model name attribute is still sent for analysis
+  Scenario: Without a resolved policy a model name attribute is still scanned for other identifiers
     Given no PII policy can be resolved for the project
     When a trace is ingested with a model name attribute whose value is a phone number
-    Then the analysis service received that value
+    Then the analysis service looked for phone numbers in that value
 
   @unit
-  Scenario: Without a native pass a model name attribute is still sent for analysis
-    Given the resolved PII level for "web-app" is custom with only analysis-service identifiers
+  Scenario: A model name attribute is still scanned for the non-name identifiers a custom level selects
+    Given the resolved PII level for "web-app" is custom with a name and a national id selected
     And secrets redaction is off
     When a trace is ingested with a model name attribute
-    Then the analysis service received that value
+    Then the analysis service looked for the national id in that value, and not for names
 
   # The reserved names are not a namespace anyone owns. Attributes arrive on the
   # ingestion endpoint spelled exactly as the sender wrote them, so a sender can
