@@ -78,6 +78,33 @@ describe("poison-guard timing invariants", () => {
   });
 });
 
+/** The beacon's state is private to the processor; these read it without widening its API. */
+function livenessInternalsOf(processor: GroupQueueProcessor<TestPayload>): {
+  readonly workerId: string;
+  readonly livenessReady: Promise<void>;
+  readonly livenessTimer: ReturnType<typeof setInterval> | undefined;
+  readonly scripts: GroupStagingScripts;
+} {
+  return {
+    get workerId(): string {
+      return Reflect.get(processor, "workerId");
+    },
+    get livenessReady(): Promise<void> {
+      return Reflect.get(processor, "livenessReady");
+    },
+    get livenessTimer(): ReturnType<typeof setInterval> | undefined {
+      return Reflect.get(processor, "livenessTimer");
+    },
+    get scripts(): GroupStagingScripts {
+      return Reflect.get(processor, "scripts");
+    },
+  };
+}
+
+function skipDrain(processor: GroupQueueProcessor<TestPayload>): void {
+  Reflect.set(processor, "drainAndDisconnect", async () => {});
+}
+
 describe("GroupQueueProcessor worker liveness beacon", () => {
   const connections: IORedis[] = [];
 
@@ -95,18 +122,9 @@ describe("GroupQueueProcessor worker liveness beacon", () => {
     const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
       consumerEnabled: true,
     });
-    const internals = processor as unknown as {
-      workerId: string;
-      livenessReady: Promise<void>;
-      livenessTimer: ReturnType<typeof setInterval> | undefined;
-      scripts: {
-        recordWorkerAlive: (workerId: string) => Promise<void>;
-        retireWorker: (workerId: string) => Promise<void>;
-      };
-      drainAndDisconnect: () => Promise<void>;
-    };
+    const internals = livenessInternalsOf(processor);
     // The real drain talks to Redis; the beacon ordering is decided before it.
-    internals.drainAndDisconnect = async () => {};
+    skipDrain(processor);
     return { processor, internals };
   }
 
@@ -120,9 +138,11 @@ describe("GroupQueueProcessor worker liveness beacon", () => {
         vi.spyOn(internals.scripts, "recordWorkerAlive").mockImplementation(async () => {
           order.push("alive");
         });
-        vi.spyOn(internals.scripts, "retireWorker").mockImplementation(async () => {
-          order.push("retired");
-        });
+        const retireWorker = vi
+          .spyOn(internals.scripts, "retireWorker")
+          .mockImplementation(async () => {
+            order.push("retired");
+          });
 
         await internals.livenessReady;
         expect(internals.livenessTimer).toBeDefined();
@@ -131,7 +151,7 @@ describe("GroupQueueProcessor worker liveness beacon", () => {
 
         // The timer is cleared, so no refresh can follow the tombstone.
         expect(internals.livenessTimer).toBeUndefined();
-        expect(internals.scripts.retireWorker).toHaveBeenCalledWith(internals.workerId);
+        expect(retireWorker).toHaveBeenCalledWith(internals.workerId);
         expect(order.at(-1)).toBe("retired");
       });
     });
@@ -166,12 +186,8 @@ describe("GroupQueueProcessor worker liveness beacon", () => {
         const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
           consumerEnabled: true,
         });
-        const internals = processor as unknown as {
-          livenessReady: Promise<void>;
-          livenessTimer: ReturnType<typeof setInterval> | undefined;
-          drainAndDisconnect: () => Promise<void>;
-        };
-        internals.drainAndDisconnect = async () => {};
+        const internals = livenessInternalsOf(processor);
+        skipDrain(processor);
 
         await processor.close();
         releasePublish();
@@ -196,10 +212,7 @@ describe("GroupQueueProcessor worker liveness beacon", () => {
         const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
           consumerEnabled: false,
         });
-        const internals = processor as unknown as {
-          livenessReady: Promise<void>;
-          livenessTimer: ReturnType<typeof setInterval> | undefined;
-        };
+        const internals = livenessInternalsOf(processor);
 
         await internals.livenessReady;
         expect(internals.livenessTimer).toBeUndefined();

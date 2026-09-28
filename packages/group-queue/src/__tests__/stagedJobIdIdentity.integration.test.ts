@@ -35,6 +35,13 @@ const STORAGE_DESTINATION = async () => ({
 /** > the 256 KiB s3 threshold once gzipped (see groupQueue.gq2.integration.test.ts). */
 const OFFLOADABLE_S3_VALUE = () => incompressible(768 * 1024);
 
+/** Read before `vi.spyOn` replaces it, so a stub can still call through to the real script. */
+function unspiedScriptsMethod<Name extends "refreshActiveKey" | "retryRestage">(
+  name: Name,
+): GroupStagingScripts[Name] {
+  return Reflect.get(GroupStagingScripts.prototype, name);
+}
+
 describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-080)", () => {
   let redis: Redis;
   let queues: GroupQueueProcessor<TestPayload>[];
@@ -216,7 +223,9 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
 
     return {
       fireArmed: () => {
-        for (const tick of [...armed.values()]) tick();
+        // A snapshot: a tick may arm or clear intervals while this loop runs.
+        const ticks = Array.from(armed.values());
+        for (const tick of ticks) tick();
       },
       restore: () => {
         globalThis.setInterval = realSetInterval;
@@ -235,7 +244,7 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
     const refreshed: string[] = [];
     const settling: Promise<unknown>[] = [];
 
-    const realRefresh = GroupStagingScripts.prototype.refreshActiveKey;
+    const realRefresh = unspiedScriptsMethod("refreshActiveKey");
     vi.spyOn(GroupStagingScripts.prototype, "refreshActiveKey").mockImplementation(function (
       this: GroupStagingScripts,
       args: Parameters<typeof realRefresh>[0],
@@ -246,7 +255,7 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
       return running;
     });
 
-    const realRestage = GroupStagingScripts.prototype.retryRestage;
+    const realRestage = unspiedScriptsMethod("retryRestage");
     const beats = { beforeTick: 0, afterRestage: 0 };
     vi.spyOn(GroupStagingScripts.prototype, "retryRestage").mockImplementation(async function (
       this: GroupStagingScripts,
@@ -936,7 +945,7 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
         // Every re-stage the ladder issues, with the attempt its message
         // carries and the attempt its group chain held at that moment.
         const rungs: { onMessage: number | null; onChain: string | null }[] = [];
-        const realRestage = GroupStagingScripts.prototype.retryRestage;
+        const realRestage = unspiedScriptsMethod("retryRestage");
         vi.spyOn(GroupStagingScripts.prototype, "retryRestage").mockImplementation(async function (
           this: GroupStagingScripts,
           args: Parameters<typeof realRestage>[0],

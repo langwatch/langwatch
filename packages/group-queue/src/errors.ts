@@ -4,28 +4,36 @@ export class GroupQueueError extends Error {
   readonly retryable: boolean;
   readonly retryAfterMs?: number;
 
-  constructor(
-    queueName: string,
-    operation: string,
-    message: string,
-    options: {
-      cause?: unknown;
-      retryable?: boolean;
-      retryAfterMs?: number;
-    } = {},
-  ) {
-    super(message, { cause: options.cause });
+  constructor({
+    queueName,
+    operation,
+    message,
+    cause,
+    retryable = true,
+    retryAfterMs,
+  }: {
+    queueName: string;
+    operation: string;
+    message: string;
+    cause?: unknown;
+    retryable?: boolean;
+    retryAfterMs?: number;
+  }) {
+    super(message, { cause });
     this.name = "GroupQueueError";
     this.queueName = queueName;
     this.operation = operation;
-    this.retryable = options.retryable ?? true;
-    this.retryAfterMs = options.retryAfterMs;
+    this.retryable = retryable;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
 export class GroupQueueConfigurationError extends GroupQueueError {
   constructor(component: string, details: string) {
-    super(component, "configure", `Configuration error in ${component}: ${details}`, {
+    super({
+      queueName: component,
+      operation: "configure",
+      message: `Configuration error in ${component}: ${details}`,
       retryable: false,
     });
     this.name = "GroupQueueConfigurationError";

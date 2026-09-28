@@ -1,3 +1,5 @@
+import type { Logger } from "@langwatch/observability";
+import { createTestLogger } from "@langwatch/test-harness";
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -47,7 +49,7 @@ describe("GroupQueueProcessor - preflight drain barrier", () => {
     return `${queueName}:gq:preflight`;
   }
 
-  function createQueue(): GroupQueueProcessor<TestPayload> {
+  function createQueue(logger?: Logger): GroupQueueProcessor<TestPayload> {
     const definition: GroupQueueRuntimeDefinition<TestPayload> = {
       name: queueName,
       process: async () => {},
@@ -61,6 +63,7 @@ describe("GroupQueueProcessor - preflight drain barrier", () => {
       // check runs first, so a barrier with nothing draining it reads its
       // targets once, finds work outstanding and gives up immediately.
       preflightDrainTimeoutMs: 0,
+      logger,
     });
     queues.push(queue);
     return queue;
@@ -71,24 +74,16 @@ describe("GroupQueueProcessor - preflight drain barrier", () => {
     await redis.zadd(`${queueName}:gq:group:${groupId}:jobs`, 1, `job-${groupId}`);
   }
 
-  /** The logger is a private field; the spy sees the log object as written. */
-  function spyOnWarn(queue: GroupQueueProcessor<TestPayload>) {
-    const logger: { warn: (fields: Record<string, unknown>, message: string) => void } =
-      Reflect.get(queue, "logger");
-    return vi.spyOn(logger, "warn");
-  }
-
   describe("given preflight work that has not drained by the deadline", () => {
     /** @scenario "Work that never drains leaves its tenants held rather than refusing startup" */
     it("starts rather than refusing, and logs what it stopped waiting for", async () => {
-      const queue = createQueue();
-      const warnSpy = spyOnWarn(queue);
+      const { logger, lines } = createTestLogger();
+      const queue = createQueue(logger);
       await targetGroupWithPendingWork("held-group");
 
       await expect(queue.waitUntilPreflightIdle()).resolves.toBeUndefined();
 
-      const call = warnSpy.mock.calls.find(([, message]) => message === WARNING);
-      expect(call?.[0]).toMatchObject({
+      expect(lines.findLine("warn", WARNING)).toMatchObject({
         queueName,
         pending: 1,
         stillWorking: "held-group",
