@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { PixelDiff } from "./diff";
+import type { DiffFiles, PixelDiff } from "./diff";
 import type { CaptureMessage, DiffMessage, Plan } from "./protocol";
+
+/** SIGN_IN_FLOW is the flow key of the one capture sign-in takes: the passkey offer. */
+export const SIGN_IN_FLOW = "sign-in";
 
 export const safeName = (value: string): string =>
   value === "/" ? "_root" : value.replace(/^\//, "").replace(/[/?=&{}]/g, "_");
@@ -10,7 +13,7 @@ export const safeName = (value: string): string =>
 const identity = (capture: CaptureMessage): string =>
   `${capture.kind}|${capture.key}|${capture.index}`;
 
-type Differ = (files: { base: string; candidate: string; out: string }) => PixelDiff | null;
+type Differ = (files: DiffFiles) => Promise<PixelDiff | null>;
 
 /**
  * Pairing diffs each screen the moment both sides of it exist, so diffs
@@ -24,7 +27,7 @@ export class Pairing {
     private readonly differ: Differ,
   ) {}
 
-  add(capture: CaptureMessage): DiffMessage | null {
+  async add(capture: CaptureMessage): Promise<DiffMessage | null> {
     const own = this.bySide.get(capture.side) ?? new Map<string, CaptureMessage>();
     own.set(identity(capture), capture);
     this.bySide.set(capture.side, own);
@@ -37,7 +40,11 @@ export class Pairing {
       "diff",
       `${safeName(candidate.kind)}_${safeName(candidate.key)}_${candidate.index}.png`,
     );
-    const diff = this.differ({ base: base.screenshot, candidate: candidate.screenshot, out: file });
+    const diff = await this.differ({
+      base: base.screenshot,
+      candidate: candidate.screenshot,
+      out: file,
+    });
     if (diff === null) return null;
     return {
       type: "diff",
@@ -64,7 +71,7 @@ export const readReplay = ({
   side: string;
 }): CaptureMessage[] => {
   const routes = new Set(plan.routes);
-  const flows = new Set(plan.flows.map((flow) => flow.id));
+  const flows = new Set([SIGN_IN_FLOW, ...plan.flows.map((flow) => flow.id)]);
   return readFileSync(file, "utf8")
     .split("\n")
     .filter((line) => line.trim() !== "")

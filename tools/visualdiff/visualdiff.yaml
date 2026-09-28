@@ -8,11 +8,31 @@
 viewport: 1440x900
 
 settle:
-  # The runner waits for the in-flight request count to sit at zero for
+  # The runner waits for its in-flight requests to finish and stay finished for
   # quietMillis, and gives up at deadlineMillis rather than hanging on a page
-  # that polls forever.
+  # that polls forever. A request older than eight seconds counts as a poll.
   quietMillis: 500
-  deadlineMillis: 20000
+  deadlineMillis: 8000
+
+# Pages each side captures on at once. Routes spread over `routes` pages in one
+# signed-in session; flows run `flows` at a time, and a flow that edits the
+# project runs last, alone, so it cannot change another flow's screens.
+concurrency:
+  routes: 4
+  flows: 3
+
+# After a run, the screens its branch's pull request shows, in one comment
+# edited in place: the largest changes, then new failures, then these key
+# pages; each scaled to `width` and cut at `maxHeight`. -no-publish skips it.
+publish:
+  screens: 12
+  width: 1000
+  maxHeight: 2000
+  keyPages:
+    - /{slug}
+    - /{slug}/traces
+    - /settings
+    - /governance
 
 # Ids the run seeds deterministically (seed.go), filling a route's {name}.
 # team and actor are the seeded identity's, the same on main and the branch.

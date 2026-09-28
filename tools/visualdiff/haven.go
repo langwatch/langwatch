@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -82,15 +83,51 @@ func (run *session) bringUpHaven(ctx context.Context) error {
 			return err
 		}
 	}
+	if run.stagger && len(stacks) == 2 {
+		arrival := make(chan baseArrival, 1)
+		base := run.plan.Base
+		go func() { arrival <- run.awaitBase(ctx, base) }()
+		run.baseArrival = arrival
+		return run.awaitStack(ctx, &run.plan.Candidate)
+	}
 	for _, stack := range stacks {
-		if err := run.havenWaitReady(ctx, stack); err != nil {
-			return err
-		}
-		if err := run.waitForAPI(ctx, *stack); err != nil {
+		if err := run.awaitStack(ctx, stack); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// awaitStack waits until haven reports the stack ready and its API answers.
+func (run *session) awaitStack(ctx context.Context, stack *Stack) error {
+	if err := run.havenWaitReady(ctx, stack); err != nil {
+		return err
+	}
+	return run.waitForAPI(ctx, *stack)
+}
+
+// baseArrival is a staggered base once it is ready and seeded, or why it never was.
+type baseArrival struct {
+	stack    Stack
+	fixtures map[string]string
+	err      error
+}
+
+// awaitBase boots and seeds the base while the candidate already captures:
+// the base is the slower boot, and nothing about the candidate waits on it.
+func (run *session) awaitBase(ctx context.Context, stack Stack) baseArrival {
+	if err := run.awaitStack(ctx, &stack); err != nil {
+		return baseArrival{stack: stack, err: err}
+	}
+	options := run.request.Options
+	result, err := run.request.Deps.Seed(ctx, SeedRequest{APIURL: stack.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount})
+	if err != nil {
+		return baseArrival{stack: stack, err: fmt.Errorf("seed %s: %w", stack.Name, err)}
+	}
+	for _, warning := range result.Warnings {
+		fmt.Fprintf(run.streams.Err, "seed %s: %s\n", stack.Name, warning)
+	}
+	return baseArrival{stack: stack, fixtures: result.Fixtures}
 }
 
 // waitForAPI waits for the API through the routed origin. A monolith's one
@@ -172,11 +209,17 @@ func (run *session) adoptHaven(ctx context.Context, stack *Stack) (bool, bool, e
 // both then "migrations failed - nothing was dropped". havenPrepare below is
 // what closes that gap.
 func (run *session) checkoutForHaven(ctx context.Context, stack *Stack) error {
-	steps := &executor{run: run.request.Deps.Run, root: run.request.Options.Root, stderr: run.streams.Err}
-	if err := steps.addWorktree(ctx, *stack); err != nil {
-		return err
+	if stack.Persistent {
+		if err := run.checkoutPersistent(ctx, *stack); err != nil {
+			return err
+		}
+	} else {
+		steps := &executor{run: run.request.Deps.Run, root: run.request.Options.Root, stderr: run.streams.Err}
+		if err := steps.addWorktree(ctx, *stack); err != nil {
+			return err
+		}
+		run.created = append(run.created, stack.Dir)
 	}
-	run.created = append(run.created, stack.Dir)
 	layout, err := run.request.Deps.Layout(stack.Dir)
 	if err != nil {
 		return err
@@ -186,11 +229,42 @@ func (run *session) checkoutForHaven(ctx context.Context, stack *Stack) error {
 	return run.havenPrepare(ctx, *stack)
 }
 
+// checkoutPersistent moves a side's persistent worktree to the commit its ref
+// names now, adding the worktree the first time.
+func (run *session) checkoutPersistent(ctx context.Context, stack Stack) error {
+	root := run.request.Options.Root
+	commit, err := resolveCommit(ctx, gitRef{run: run.request.Deps.Run, root: root, ref: stack.Ref})
+	if err != nil {
+		return err
+	}
+	for _, spec := range PersistentCheckoutCommands(stack.Dir, commit, isWorktree(stack.Dir)) {
+		if spec.dir == "" {
+			spec.dir = root
+		}
+		fmt.Fprintf(run.streams.Err, "%s: %s %s\n", stack.Name, spec.name, strings.Join(spec.args, " "))
+		if err := run.request.Deps.Run(ctx, spec, run.streams.Err); err != nil {
+			return fmt.Errorf("check out %s at %s: %w", stack.Name, commit, err)
+		}
+	}
+	return nil
+}
+
+// monolithPrepareCommands are what a monolith worktree needs before haven:
+// the install and the Prisma client its migrate and seed load. haven's app
+// lane runs dev:app, whose own start:prepare:files builds everything else,
+// so running that here too only did the same fifty seconds twice.
+var monolithPrepareCommands = []commandSpec{
+	{name: "env", args: []string{"-u", "CI", "pnpm", "install", "--frozen-lockfile"}},
+	{name: "pnpm", args: []string{"--dir", "platform/app", "exec", "prisma", "generate"}},
+}
+
 // HavenPrepareCommands are the steps a fresh worktree needs before `haven up`
-// can succeed on it. apidiff needs the exact same steps, so the command list
-// itself lives in havenrun.PrepareCommands; this only renders it as this
-// package's own commandSpec.
+// can succeed on it. apidiff needs the modular steps too, so that list lives
+// in havenrun.PrepareCommands; the monolith's is visualdiff's own.
 func HavenPrepareCommands(layout Layout) []commandSpec {
+	if layout == LayoutMonolith {
+		return append([]commandSpec(nil), monolithPrepareCommands...)
+	}
 	steps := havenrun.PrepareCommands(havenrun.Layout(layout))
 	commands := make([]commandSpec, 0, len(steps))
 	for _, step := range steps {
@@ -226,7 +300,44 @@ func (run *session) havenPrepare(ctx context.Context, stack Stack) error {
 				"A gateway failure on this stack is therefore NOT evidence of a missing credential.\n",
 			stack.Name, strings.Join(substituted, ", "), MinGatewaySecretLength)
 	}
-	for _, spec := range HavenPrepareCommands(stack.Layout) {
+	commands := HavenPrepareCommands(stack.Layout)
+	key, cached := run.preparedAlready(ctx, stack, commands)
+	if cached {
+		fmt.Fprintf(run.streams.Err, "%s: prepare: cached, the worktree already holds this tree's install and generated files\n", stack.Name)
+		return nil
+	}
+	if err := run.runPrepare(ctx, stack, commands); err != nil {
+		return err
+	}
+	if key == "" {
+		return nil
+	}
+	return recordPrepared(stack.Dir, key)
+}
+
+// preparedAlready reports a persistent worktree whose last finished prepare
+// had this key, and the key to record once this prepare finishes.
+func (run *session) preparedAlready(ctx context.Context, stack Stack, commands []commandSpec) (string, bool) {
+	if !stack.Persistent {
+		return "", false
+	}
+	tree, err := resolveTree(ctx, gitRef{run: run.request.Deps.Run, root: stack.Dir, ref: "HEAD"})
+	if err != nil || tree == "" {
+		return "", false
+	}
+	key := PrepareKey(stack.Layout, tree, commands)
+	if preparedKey(stack.Dir) == key {
+		return key, true
+	}
+	if err := recordPrepared(stack.Dir, ""); err != nil {
+		fmt.Fprintf(run.streams.Err, "%s: prepare: could not clear the old key: %v\n", stack.Name, err)
+	}
+	return key, false
+}
+
+// runPrepare runs each prepare command in the worktree, logging its exit.
+func (run *session) runPrepare(ctx context.Context, stack Stack, commands []commandSpec) error {
+	for _, spec := range commands {
 		spec.dir = stack.Dir
 		fmt.Fprintf(run.streams.Err, "%s: prepare: %s %s\n", stack.Name, spec.name, strings.Join(spec.args, " "))
 		err := run.request.Deps.Run(ctx, spec, run.streams.Err)
@@ -426,6 +537,10 @@ func (run *session) teardownHaven(ctx context.Context) error {
 			strings.Join(run.havenSlugs, "` and `haven destroy "))
 		return nil
 	}
+	run.releaseWorktrees()
+	if len(run.created) == 0 && run.request.Deps.Detach != nil {
+		return run.detachDestroy()
+	}
 	var problems []string
 	for _, slug := range run.havenSlugs {
 		fmt.Fprintf(run.streams.Err, "teardown: haven destroy %s\n", slug)
@@ -439,6 +554,34 @@ func (run *session) teardownHaven(ctx context.Context) error {
 		remove.dir = run.request.Options.Root
 		if err := run.request.Deps.Run(ctx, remove, run.streams.Err); err != nil {
 			problems = append(problems, fmt.Sprintf("worktree remove %s: %v", dir, err))
+		}
+	}
+	if len(problems) == 0 {
+		return nil
+	}
+	return fmt.Errorf("teardown: %s", strings.Join(problems, "; "))
+}
+
+// releaseWorktrees lets the next run take the persistent worktrees this run held.
+func (run *session) releaseWorktrees() {
+	for _, stack := range []*Stack{&run.plan.Base, &run.plan.Candidate} {
+		if stack.Persistent {
+			releaseWorktree(stack.Dir, run.request.Options.RunDir)
+		}
+	}
+}
+
+// detachDestroy hands each stack's destroy to a process of its own and
+// returns: with no worktree to remove after it, nothing has to wait on it,
+// and the next run's gc takes any stack a destroy left behind.
+func (run *session) detachDestroy() error {
+	log := filepath.Join(run.request.Options.RunDir, "teardown.log")
+	var problems []string
+	for _, slug := range run.havenSlugs {
+		fmt.Fprintf(run.streams.Err, "teardown: haven destroy %s in the background (log %s)\n", slug, log)
+		spec := commandSpec{name: havenrun.Command, args: havenrun.DestroyArgs(slug), dir: run.request.Options.Root, env: havenEnv(run.request.Deps.Environ(), slug)}
+		if err := run.request.Deps.Detach(spec, log); err != nil {
+			problems = append(problems, fmt.Sprintf("haven destroy %s: %v", slug, err))
 		}
 	}
 	if len(problems) == 0 {

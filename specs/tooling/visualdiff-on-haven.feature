@@ -102,11 +102,11 @@ Feature: visualdiff boots its stacks through haven
       And every step's name and exit status are written to the run log, never a byte of .env's contents
 
     @unit
-    Scenario: A monolith worktree's own generated-files step already builds the SDK
+    Scenario: A monolith worktree runs only the Prisma client before haven
       Given a checkout on the monolith layout
       When the worktree is prepared
-      Then it runs the same generated-files command as the modular layout, "pnpm run start:prepare:files"
-      And it runs no separate build step for the langwatch SDK or the MCP server, because that checkout's own generated-files step already builds them
+      Then it runs the install and "pnpm --dir platform/app exec prisma generate"
+      And it does not run "pnpm run start:prepare:files", because haven's own dev:app runs it before the app starts
 
     @unit
     Scenario: A tracked dotenv file is never overwritten

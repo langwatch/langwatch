@@ -18,7 +18,7 @@ const usage = `visualdiff — render every route and every flow on two refs and 
                  [-base-port N] [-run-dir DIR] [-boot-timeout DUR]
                  [-dry-run] [-keep] [-agent] [-no-haven]
                  [-editions enterprise,free] [-no-baseline] [-refresh-baseline]
-                 [-no-fail-fast] [-resume RUNID]
+                 [-no-fail-fast] [-resume RUNID] [-no-publish]
 
   visualdiff recapture -run RUNID [-routes a,b] [-flows x,y] [-edition E] [-root DIR]
   visualdiff coverage [-base REF] [-candidate REF] [-config FILE] [-root DIR]
@@ -44,12 +44,15 @@ intended-restore and noise are reported and never fail it.
 Every screen is captured once per edition - enterprise (the seeded license)
 by default, and free (no license) with -editions enterprise,free - on the
 same stacks. The base's captures are cached
-under .visualdiff/baselines per base commit, edition, configuration and day:
+under .visualdiff/baselines per base commit, edition and capture settings:
 a later run against the same base replays them and never boots the base.
 The candidate is captured first, and a candidate whose shell does not render
 stops the run within its first three routes (-no-fail-fast to carry on).
 -resume RUNID continues a -keep run after a fix: its prepared worktrees and
 running stacks are reused, so nothing is checked out or installed again.
+A finished run shows its largest changes, new failures and key pages on the
+open pull request of the checked-out branch, in one comment it edits in place;
+-no-publish skips that, as does a missing PR or a gh that is not signed in.
 
 recapture re-renders only the named routes against a run's own stacks - which
 stay up when that run was started with -keep - and appends to the same
@@ -108,7 +111,31 @@ func runCommand(ctx context.Context, args []string, streams Streams) int {
 	if err != nil {
 		fmt.Fprintln(streams.Err, "visualdiff:", err)
 	}
+	if err == nil {
+		parsed.publish(ctx, result, streams)
+	}
 	return ExitCode(result, err)
+}
+
+// publish shows a finished run's screens on its branch's pull request. A
+// publish that fails is reported and never changes the run's exit code.
+func (parsed *runFlags) publish(ctx context.Context, result Result, streams Streams) {
+	options := parsed.options
+	switch {
+	case options.NoPublish:
+		fmt.Fprintln(streams.Err, "publish: skipped, -no-publish")
+		return
+	case options.DryRun || len(result.Rows) == 0:
+		return
+	}
+	_, err := Publish(ctx, PublishRequest{
+		Run: execRunner, Root: options.Root, RunDir: result.Plan.RunDir, BaseRef: options.BaseRef,
+		CandidateRef: options.CandidateRef, Rows: result.Rows, Findings: result.Findings,
+		Config: parsed.config.Publish, Stderr: streams.Err,
+	})
+	if err != nil {
+		fmt.Fprintln(streams.Err, err)
+	}
 }
 
 // errFlagsReported says the flag package already printed what was wrong, so
@@ -142,6 +169,7 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	refreshBaseline := flags.Bool("refresh-baseline", false, "render the base and replace its cached baseline")
 	noFailFast := flags.Bool("no-fail-fast", false, "keep capturing even when the candidate's shell does not render")
 	resume := flags.String("resume", "", "continue a -keep run by id: reuse its worktrees and running stacks")
+	noPublish := flags.Bool("no-publish", false, "do not show the run's screens on the branch's pull request")
 	if err := flags.Parse(args); err != nil {
 		return nil, errFlagsReported
 	}
@@ -169,12 +197,17 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 			ProjectKey: *projectKey, Slug: *slug, Email: *email, Password: *password,
 		},
 		Editions: editions, Baseline: !*noBaseline, RefreshBaseline: *refreshBaseline,
-		FailFast: !*noFailFast,
+		FailFast: !*noFailFast, NoPublish: *noPublish,
 	}
-	if *resume != "" {
-		options.Resume, options.RunDir = true, filepath.Join(absoluteRoot, ".visualdiff", *resume)
-	}
+	resumeRun(&options, *resume)
 	return &runFlags{options: options, config: config}, nil
+}
+
+// resumeRun points a run at the -keep run it continues, when one is named.
+func resumeRun(options *Options, runID string) {
+	if runID != "" {
+		options.Resume, options.RunDir = true, filepath.Join(options.Root, ".visualdiff", runID)
+	}
 }
 
 // runEditions defaults to both editions, except on -no-haven, whose stacks

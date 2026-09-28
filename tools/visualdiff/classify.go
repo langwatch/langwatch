@@ -3,7 +3,9 @@ package visualdiff
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
+	"unicode"
 )
 
 // Classification is the verdict on one row. It is the only vocabulary: the
@@ -139,6 +141,9 @@ func classifyFailure(row Row) (Classification, string) {
 		return ClassRegression, "candidate console error the base does not have: " + head(newErrors[0])
 	}
 	if basePath, candidatePath := finalPath(base.URL), finalPath(candidate.URL); basePath != candidatePath {
+		if reason := expectedRedirect(basePath, candidatePath); reason != "" {
+			return ClassIntendedRestore, reason
+		}
 		return ClassRedirect, fmt.Sprintf("ends on %s where the base ends on %s", candidatePath, basePath)
 	}
 	if hits := NewAPIFailures(base.FailedRequests, candidate.FailedRequests); len(hits) > 0 {
@@ -154,6 +159,24 @@ func blankWhy(baseBlank bool) string {
 	return "the candidate renders a blank page"
 }
 
+// expectedRedirects are the base's own redirects away from a screen the
+// candidate serves: main sends /ops/* to /governance, where the branch renders
+// the operator screens. They are restores, not the candidate's defect.
+var expectedRedirects = []struct{ candidatePrefix, basePath string }{
+	{candidatePrefix: "/ops", basePath: "/governance"},
+}
+
+// expectedRedirect is why a base redirect is expected, or "".
+func expectedRedirect(basePath, candidatePath string) string {
+	for _, expected := range expectedRedirects {
+		if basePath == expected.basePath && (candidatePath == expected.candidatePrefix ||
+			strings.HasPrefix(candidatePath, expected.candidatePrefix+"/")) {
+			return fmt.Sprintf("the base redirects %s/* to %s; the candidate renders %s", expected.candidatePrefix, basePath, candidatePath)
+		}
+	}
+	return ""
+}
+
 // finalPath is a capture's URL path with ids masked, so two refs that each
 // created their own entity still end on the same path.
 func finalPath(raw string) string {
@@ -161,8 +184,28 @@ func finalPath(raw string) string {
 	if err != nil || raw == "" {
 		return raw
 	}
-	return MaskVolatile(strings.TrimSuffix(parsed.Path, "/"))
+	segments := strings.Split(strings.TrimSuffix(parsed.Path, "/"), "/")
+	for index, segment := range segments {
+		if randomID(segment) {
+			segments[index] = "<id>"
+		}
+	}
+	return MaskVolatile(strings.Join(segments, "/"))
 }
+
+// randomID reports a path segment that is a generated id rather than a word:
+// six or more id characters mixing case, or mixing letters and digits.
+func randomID(segment string) bool {
+	if !idSegment.MatchString(segment) {
+		return false
+	}
+	upper := strings.IndexFunc(segment, unicode.IsUpper) >= 0
+	lower := strings.IndexFunc(segment, unicode.IsLower) >= 0
+	digit := strings.IndexFunc(segment, unicode.IsDigit) >= 0
+	return (upper && lower) || (digit && (upper || lower))
+}
+
+var idSegment = regexp.MustCompile(`^[A-Za-z0-9_-]{6,}$`)
 
 // NewAPIFailures are the candidate's failed /api/ requests (tRPC included)
 // the base does not fail: any 4xx or 5xx and any transport failure but a

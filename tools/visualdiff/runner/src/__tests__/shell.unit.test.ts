@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { Pairing, readReplay } from "../pairing";
+import { Pairing, readReplay, SIGN_IN_FLOW } from "../pairing";
 import type { CaptureMessage, Plan } from "../protocol";
 import { shellBroken } from "../shell";
 
@@ -74,14 +74,14 @@ describe("Feature: visualdiff fails fast on a broken candidate", () => {
 describe("Feature: visualdiff reuses a cached baseline", () => {
   describe("given a replayed base and a live candidate", () => {
     /** @scenario Each screen is diffed the moment both sides of it exist */
-    it("diffs a screen as soon as its second side arrives", () => {
+    it("diffs a screen as soon as its second side arrives", async () => {
       const seen: string[] = [];
-      const pairing = new Pairing(plan({}), ({ base, candidate }) => {
+      const pairing = new Pairing(plan({}), async ({ base, candidate }) => {
         seen.push(`${base}|${candidate}`);
         return { ratio: 0.5, pixels: 1, width: 1, height: 1, sizeMismatch: false };
       });
-      expect(pairing.add(capture({ side: "base", screenshot: "/b.png" }))).toBeNull();
-      const diff = pairing.add(capture({ side: "candidate", screenshot: "/c.png" }));
+      expect(await pairing.add(capture({ side: "base", screenshot: "/b.png" }))).toBeNull();
+      const diff = await pairing.add(capture({ side: "candidate", screenshot: "/c.png" }));
       expect(diff?.ratio).toBe(0.5);
       expect(seen).toEqual(["/b.png|/c.png"]);
     });
@@ -104,6 +104,18 @@ describe("Feature: visualdiff reuses a cached baseline", () => {
         side: "base",
       });
       expect(replayed.map((entry) => entry.key)).toEqual(["/b", "prompt-create"]);
+    });
+  });
+
+  describe("given a baseline that holds the sign-in's passkey offer", () => {
+    /** @scenario The passkey offer is declined before every screenshot and photographed once at sign-in */
+    it("replays the sign-in capture whatever flows the plan names", () => {
+      const dir = mkdtempSync(join(tmpdir(), "vd-replay-"));
+      const file = join(dir, "captures.jsonl");
+      const lines = [capture({ kind: "flow", key: SIGN_IN_FLOW, side: "base" })];
+      writeFileSync(file, lines.map((line) => JSON.stringify(line)).join("\n"));
+      const replayed = readReplay({ file, plan: plan({ routes: [], flows: [] }), side: "base" });
+      expect(replayed.map((entry) => entry.key)).toEqual([SIGN_IN_FLOW]);
     });
   });
 });

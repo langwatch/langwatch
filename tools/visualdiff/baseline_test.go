@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -14,6 +15,7 @@ import (
 // address and the seeded license.
 type cachingFake struct {
 	haven    fakeHavenRunner
+	mutex    sync.Mutex
 	commands []string
 }
 
@@ -21,7 +23,9 @@ const testBaseCommit = "0123456789abcdef0123456789abcdef01234567"
 
 func (fake *cachingFake) run(ctx context.Context, spec commandSpec, log io.Writer) error {
 	line := spec.name + " " + strings.Join(spec.args, " ")
+	fake.mutex.Lock()
 	fake.commands = append(fake.commands, line)
+	fake.mutex.Unlock()
 	switch {
 	case spec.name == "git" && len(spec.args) > 0 && spec.args[0] == "rev-parse":
 		_, err := io.WriteString(log, testBaseCommit+"\n")
@@ -37,6 +41,8 @@ func (fake *cachingFake) run(ctx context.Context, spec commandSpec, log io.Write
 }
 
 func (fake *cachingFake) matching(fragment string) []string {
+	fake.mutex.Lock()
+	defer fake.mutex.Unlock()
 	var out []string
 	for _, line := range fake.commands {
 		if strings.Contains(line, fragment) {
@@ -92,7 +98,7 @@ func TestARunReplaysACachedBaselineAndNeverBootsTheBase(t *testing.T) {
 		if _, err := Execute(context.Background(), Request{Options: options, Config: testConfig(), Deps: deps}, Streams{Out: io.Discard, Err: io.Discard}); err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
-		if len(fake.matching("worktree add --detach "+filepath.Join(options.RunDir, "base"))) != 1 {
+		if len(fake.matching("worktree add --force --detach "+PersistentWorktree(options.Root, "base"))) != 1 {
 			t.Fatalf("the base was not checked out on the first run: %v", fake.commands)
 		}
 		for _, plan := range handed {
@@ -181,4 +187,68 @@ func TestTheFreeEditionIsRefusedWithoutHaven(t *testing.T) {
 	if editions, _ := runEditions("", true); len(editions) != 1 || editions[0] != EditionEnterprise {
 		t.Errorf("-no-haven defaults to %v, want enterprise alone", editions)
 	}
+}
+
+// @scenario "A baseline is keyed on what changes a capture, and replays only what it covers"
+func TestABaselineIsKeyedOnWhatChangesACapture(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, runnerSourceDir)
+	if err := os.MkdirAll(filepath.Join(source, "flows"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	write := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(source, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("settle.ts", "settle()")
+	write("main.ts", "main()")
+	key := func(config *Config) string {
+		t.Helper()
+		got, err := BaselineKey(baselineKeyInputs{commit: testBaseCommit, edition: EditionEnterprise, config: config, viewport: Viewport{Width: 1440, Height: 900}, root: root})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	first := key(testConfig())
+
+	t.Run("a new route, a scheduling change and a new day keep the key", func(t *testing.T) {
+		more := testConfig()
+		more.Routes = append(more.Routes, "/me")
+		more.Concurrency = Concurrency{Routes: 4}
+		write("main.ts", "main({ pages: 4 })")
+		if key(more) != first {
+			t.Error("the key moved on something that does not change a capture")
+		}
+	})
+
+	t.Run("a settle source or the settle config moves it", func(t *testing.T) {
+		slower := testConfig()
+		slower.Settle.DeadlineMillis = 20000
+		if key(slower) == first {
+			t.Error("a different settle deadline kept the key")
+		}
+		write("settle.ts", "settle({ longLived: 8000 })")
+		if key(testConfig()) == first {
+			t.Error("a settle source change kept the key")
+		}
+	})
+
+	t.Run("a baseline answers only the routes and flow steps it recorded", func(t *testing.T) {
+		config := testConfig()
+		meta := BaselineMeta{Routes: config.Routes, Flows: flowHashes(config.Flows)}
+		if !meta.Covers(config.Routes, flowHashes(config.Flows)) {
+			t.Error("a baseline does not cover the plan it was recorded for")
+		}
+		if meta.Covers(append(config.Routes, "/me"), nil) {
+			t.Error("a baseline covered a route it never recorded")
+		}
+		edited := testConfig()
+		edited.Flows[0].Steps = append(edited.Flows[0].Steps, Step{Action: "go"})
+		if meta.Covers(config.Routes, flowHashes(edited.Flows)) {
+			t.Error("a baseline covered a flow whose steps changed")
+		}
+	})
 }

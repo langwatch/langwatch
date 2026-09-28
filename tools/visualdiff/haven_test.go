@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,14 +24,20 @@ import (
 // slugs whose ui and backend lanes are listening, mapped to the app hostname
 // haven allocated for them.
 type fakeHavenRunner struct {
+	mutex       sync.Mutex
 	commands    []commandSpec
 	readyStacks map[string]string // slug -> app service URL
 	backendLog  string
 }
 
 func (fake *fakeHavenRunner) run(_ context.Context, spec commandSpec, log io.Writer) error {
+	fake.mutex.Lock()
+	defer fake.mutex.Unlock()
 	fake.commands = append(fake.commands, spec)
 	switch {
+	case spec.name == "git" && len(spec.args) > 0 && spec.args[0] == "rev-parse":
+		_, err := io.WriteString(log, testBaseCommit+"\n")
+		return err
 	case len(spec.args) > 0 && spec.args[0] == "status":
 		_, err := io.WriteString(log, fake.statusJSON())
 		return err

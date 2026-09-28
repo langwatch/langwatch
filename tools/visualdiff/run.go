@@ -47,6 +47,8 @@ type Options struct {
 	// Resume continues a -keep run in RunDir: its prepared worktrees and
 	// running stacks are reused, and its fixtures are not seeded twice.
 	Resume bool
+	// NoPublish keeps the run's screens off its branch's pull request.
+	NoPublish bool
 }
 
 // Streams are where a run writes: the summary on Out, everything a person
@@ -83,6 +85,9 @@ type Deps struct {
 	// prepare steps run - see CopyEnvFiles in haven.go. Tests supply their
 	// own so a fake root path never has to exist on disk.
 	CopyEnv func(ctx context.Context, root, dir string) (int, error)
+	// Detach starts a command that outlives the run, its output appended to
+	// log: the haven path's teardown, which nothing has to wait on.
+	Detach func(spec commandSpec, log string) error
 }
 
 // Request is everything Execute needs: what to run, what to render, and what
@@ -190,6 +195,9 @@ func (deps *Deps) fillHaven() {
 	if deps.CopyEnv == nil {
 		deps.CopyEnv = CopyEnvFiles
 	}
+	if deps.Detach == nil {
+		deps.Detach = detachCommand
+	}
 }
 
 func (options *Options) fill(now func() time.Time) {
@@ -244,7 +252,13 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 	}
 	result.Plan = plan
 
-	run := &session{request: request, streams: streams, plan: plan, runID: plan.RunID}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	if err := claimWorktrees(&plan, options); err != nil {
+		return result, err
+	}
+	result.Plan = plan
+	run := &session{request: request, streams: streams, plan: plan, runID: plan.RunID, stagger: staggers(plan, options)}
 	// Registered first, so it runs last: the lanes (or the haven stacks) are
 	// stopped, and only then are the worktrees removed.
 	defer func() {
@@ -377,6 +391,10 @@ type session struct {
 	// logOffsets are each started stack's log size at its `haven up`, so a
 	// fatal line an earlier up of the same slug wrote is never read as this one's.
 	logOffsets map[string]int64
+	// stagger lets the candidate capture while the base still boots; the
+	// base arrives on baseArrival, ready and seeded, once it can (haven.go).
+	stagger     bool
+	baseArrival <-chan baseArrival
 }
 
 func (run *session) stopAll() {
@@ -496,7 +514,7 @@ func (run *session) seed(ctx context.Context) error {
 // candidate's.
 func (run *session) seedStacks(ctx context.Context, options Options, deps Deps) (map[string]map[string]string, error) {
 	stacks := []*Stack{&run.plan.Candidate}
-	if options.UseHaven {
+	if options.UseHaven && run.baseArrival == nil {
 		stacks = run.liveStacks()
 	}
 	fixtures := map[string]map[string]string{}
@@ -548,6 +566,7 @@ func (run *session) captureEditions(ctx context.Context, baselines map[Edition]B
 		total.Rows = append(total.Rows, rows...)
 		total.Findings += CountFindings(rows)
 	}
+	total.Plan = run.plan
 	return total, nil
 }
 
@@ -600,21 +619,28 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 		fmt.Fprintf(run.streams.Err, "%s: base replayed from %s\n", edition, baseline.Dir)
 	}
 	runnerPlan := RunnerPlan{
-		Viewport:   options.Viewport,
-		Settle:     config.Settle,
-		Sides:      []RunnerSide{base, {Name: "candidate", BaseURL: plan.Candidate.URL(), Fixtures: run.sideFixtures[plan.Candidate.Name]}},
-		OutDir:     filepath.Join(options.RunDir, "shots", string(edition)),
-		Slug:       options.Identity.Slug,
-		Routes:     config.Routes,
-		Credential: options.Identity,
-		FailFast:   options.FailFast,
-		FrozenTime: deps.Now().UnixMilli(),
-		Fixtures:   config.Fixtures,
-		Edition:    edition,
-		Stacks:     run.editionStacks(),
+		Viewport:    options.Viewport,
+		Settle:      config.Settle,
+		Sides:       []RunnerSide{base, {Name: "candidate", BaseURL: plan.Candidate.URL(), Fixtures: run.sideFixtures[plan.Candidate.Name]}},
+		OutDir:      filepath.Join(options.RunDir, "shots", string(edition)),
+		Slug:        options.Identity.Slug,
+		Routes:      config.Routes,
+		Credential:  options.Identity,
+		FailFast:    options.FailFast,
+		FrozenTime:  deps.Now().UnixMilli(),
+		Fixtures:    config.Fixtures,
+		Concurrency: config.Concurrency,
+		Edition:     edition,
+		Stacks:      run.editionStacks(),
 	}
 	if !options.RoutesOnly {
 		runnerPlan.Flows = config.Flows
+	}
+	var arrived <-chan baseArrival
+	if run.baseArrival != nil && !baseline.Cached {
+		pending := filepath.Join(options.RunDir, PendingBaseFile)
+		runnerPlan.Sides[0] = RunnerSide{Name: "base", Pending: pending}
+		arrived = run.forwardBase(ctx, pending)
 	}
 	findingsPath := filepath.Join(options.RunDir, FindingsFile)
 	stream, err := runWithFindings(ctx, findingsRunInputs{
@@ -623,6 +649,11 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 	})
 	if err != nil {
 		return stream, fmt.Errorf("capture %s: %w", edition, err)
+	}
+	if arrived != nil {
+		if err := run.adoptBase(ctx, arrived); err != nil {
+			return stream, err
+		}
 	}
 	return stream, nil
 }

@@ -1,0 +1,205 @@
+package visualdiff
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+)
+
+// PublishDir is where a run stages the images and body its PR comment posts.
+const PublishDir = "publish"
+
+// PublishRequest is one run's publish: its rows, its refs and where it ran.
+type PublishRequest struct {
+	Run          runner
+	Root         string
+	RunDir       string
+	BaseRef      string
+	CandidateRef string
+	Rows         []Row
+	Findings     int
+	Config       PublishConfig
+	Stderr       io.Writer
+}
+
+// Publish shows a run's selected screens on the pull request of the branch
+// checked out at Root, editing the one comment marked PublishMarker in place.
+// It returns the comment's address, or "" when it skipped, having said why.
+func Publish(ctx context.Context, request PublishRequest) (string, error) {
+	gh := ghClient{run: request.Run, root: request.Root}
+	pr, skip := gh.pullRequest(ctx)
+	if skip != "" {
+		fmt.Fprintf(request.Stderr, "publish: skipped, %s\n", skip)
+		return "", nil
+	}
+	picks := SelectScreens(request.Rows, request.Config)
+	if len(picks) == 0 {
+		fmt.Fprintln(request.Stderr, "publish: skipped, no screen passed the selection and the secret guard")
+		return "", nil
+	}
+	dir := filepath.Join(request.RunDir, PublishDir)
+	images, err := request.stage(ctx, picks)
+	if err != nil {
+		return "", err
+	}
+	url, err := gh.upsertComment(ctx, stagedComment{pr: pr, dir: dir, images: images})
+	if err != nil {
+		return "", err
+	}
+	fmt.Fprintf(request.Stderr, "publish: %d screens on PR #%s: %s\n", len(picks), pr, url)
+	return url, nil
+}
+
+// stage scales each picked screen into the run's publish directory and
+// writes the body beside them.
+func (request PublishRequest) stage(ctx context.Context, picks []ScreenPick) ([]PublishedImage, error) {
+	dir := filepath.Join(request.RunDir, PublishDir)
+	_ = os.RemoveAll(dir)
+	headline := headlineFor(request.Rows, request.Findings)
+	headline.RunID = filepath.Base(request.RunDir)
+	headline.BaseCommit, _ = resolveCommit(ctx, gitRef{run: request.Run, root: request.Root, ref: request.BaseRef})
+	headline.CandidateCommit, _ = resolveCommit(ctx, gitRef{run: request.Run, root: request.Root, ref: request.CandidateRef})
+	body, images := RenderComment(headline, picks)
+	config := request.Config.filled()
+	for index := range picks {
+		pick := &picks[index]
+		if err := shrinkImage(pick.Row.Candidate.Screenshot, filepath.Join(dir, fmt.Sprintf("%02d-candidate.png", index)), config); err != nil {
+			return nil, fmt.Errorf("publish: scale %s: %w", pick.Row.Key, err)
+		}
+		if !pick.Paired {
+			continue
+		}
+		if err := shrinkImage(pick.Row.Base.Screenshot, filepath.Join(dir, fmt.Sprintf("%02d-base.png", index)), config); err != nil {
+			return nil, fmt.Errorf("publish: scale %s: %w", pick.Row.Key, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "body.md"), []byte(body), 0o600); err != nil {
+		return nil, err
+	}
+	return images, nil
+}
+
+// ghClient runs gh from the repository root, where `{owner}/{repo}` resolves.
+type ghClient struct {
+	run  runner
+	root string
+}
+
+func (gh ghClient) output(ctx context.Context, spec commandSpec) (string, error) {
+	var out bytes.Buffer
+	if spec.dir == "" {
+		spec.dir = gh.root
+	}
+	err := gh.run(ctx, spec, &out)
+	return strings.TrimSpace(out.String()), err
+}
+
+// pullRequest is the open PR of the branch at root, or why there is none to publish to.
+func (gh ghClient) pullRequest(ctx context.Context) (string, string) {
+	branch, err := gh.output(ctx, commandSpec{name: "git", args: []string{"rev-parse", "--abbrev-ref", "HEAD"}})
+	if err != nil || branch == "" || branch == "HEAD" {
+		return "", "the checkout is on no branch"
+	}
+	if _, err := gh.output(ctx, commandSpec{name: "gh", args: []string{"auth", "status"}}); err != nil {
+		return "", "gh is not signed in"
+	}
+	number, err := gh.output(ctx, commandSpec{name: "gh", args: []string{"pr", "list", "--head", branch, "--state", "open", "--json", "number", "--jq", ".[0].number"}})
+	if err != nil || number == "" || number == "null" {
+		return "", "no open pull request for " + branch
+	}
+	return number, ""
+}
+
+// stagedComment is a comment ready to post: its PR, the directory holding its
+// body and images, and the images its body references.
+type stagedComment struct {
+	pr     string
+	dir    string
+	images []PublishedImage
+}
+
+// upsertComment posts the staged comment, then, when the PR already carries
+// the marked comment, moves the posted body into it and deletes the post:
+// gh uploads attachments only by posting, and the PR keeps one comment.
+func (gh ghClient) upsertComment(ctx context.Context, comment stagedComment) (string, error) {
+	marker, err := gh.markerComment(ctx, comment.pr)
+	if err != nil {
+		return "", err
+	}
+	args := []string{"pr", "comment", comment.pr, "--body-file", "body.md"}
+	for _, image := range comment.images {
+		args = append(args, "--attach", image.Path+"#"+image.Alt)
+	}
+	posted, err := gh.output(ctx, commandSpec{name: "gh", args: args, dir: comment.dir})
+	if err != nil {
+		return "", fmt.Errorf("publish: gh pr comment: %w", err)
+	}
+	match := commentID.FindStringSubmatch(posted)
+	if match == nil {
+		return "", fmt.Errorf("publish: gh pr comment answered no comment address: %q", posted)
+	}
+	if marker == "" || marker == match[1] {
+		return posted, nil
+	}
+	return gh.moveComment(ctx, commentMove{posted: match[1], marker: marker, dir: comment.dir})
+}
+
+// commentMove is a posted comment whose body replaces the marked one's.
+type commentMove struct {
+	posted string
+	marker string
+	dir    string
+}
+
+var commentID = regexp.MustCompile(`#issuecomment-(\d+)`)
+
+// markerComment is the id of the PR's comment carrying PublishMarker, the
+// newest when there are several, or "".
+func (gh ghClient) markerComment(ctx context.Context, pr string) (string, error) {
+	ids, err := gh.output(ctx, commandSpec{name: "gh", args: []string{
+		"api", "--paginate", "repos/{owner}/{repo}/issues/" + pr + "/comments",
+		"--jq", `.[] | select(.body | contains("` + PublishMarker + `")) | .id`,
+	}})
+	if err != nil {
+		return "", fmt.Errorf("publish: read the PR's comments: %w", err)
+	}
+	lines := strings.Fields(ids)
+	if len(lines) == 0 {
+		return "", nil
+	}
+	return lines[len(lines)-1], nil
+}
+
+// moveComment copies the posted comment's body, its attachments already
+// rewritten to uploaded assets, over the marked comment, then deletes the post.
+func (gh ghClient) moveComment(ctx context.Context, move commentMove) (string, error) {
+	posted, marker := move.posted, move.marker
+	body, err := gh.output(ctx, commandSpec{name: "gh", args: []string{"api", "repos/{owner}/{repo}/issues/comments/" + posted, "--jq", ".body"}})
+	if err != nil {
+		return "", fmt.Errorf("publish: read the posted comment: %w", err)
+	}
+	encoded, err := json.Marshal(map[string]string{"body": body})
+	if err != nil {
+		return "", err
+	}
+	patch := filepath.Join(move.dir, "patch.json")
+	if err := os.WriteFile(patch, encoded, 0o600); err != nil {
+		return "", err
+	}
+	url, err := gh.output(ctx, commandSpec{name: "gh", args: []string{
+		"api", "-X", "PATCH", "repos/{owner}/{repo}/issues/comments/" + marker, "--input", patch, "--jq", ".html_url",
+	}})
+	if err != nil {
+		return "", fmt.Errorf("publish: update the marked comment %s: %w", marker, err)
+	}
+	if _, err := gh.output(ctx, commandSpec{name: "gh", args: []string{"api", "-X", "DELETE", "repos/{owner}/{repo}/issues/comments/" + posted}}); err != nil {
+		return url, fmt.Errorf("publish: delete the staging comment %s: %w", posted, err)
+	}
+	return url, nil
+}

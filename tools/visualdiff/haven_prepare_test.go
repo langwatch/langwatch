@@ -76,39 +76,20 @@ func TestAFreshWorktreeIsPreparedBeforeItsStackBoots(t *testing.T) {
 	})
 }
 
-// @scenario "A monolith worktree's own generated-files step already builds the SDK"
-func TestAMonolithWorktreesOwnGeneratedFilesStepAlreadyBuildsTheSDK(t *testing.T) {
-	t.Run("given a checkout on the monolith layout", func(t *testing.T) {
-		t.Run("when the worktree is prepared", func(t *testing.T) {
-			modular := HavenPrepareCommands(LayoutModular)
-			monolith := HavenPrepareCommands(LayoutMonolith)
+// @scenario "A monolith worktree runs only the Prisma client before haven"
+func TestAMonolithWorktreeRunsOnlyThePrismaClientBeforeHaven(t *testing.T) {
+	monolith := HavenPrepareCommands(LayoutMonolith)
 
-			t.Run("then it runs the same generated-files command as the modular layout", func(t *testing.T) {
-				modularGenerate := findCommand(t, modular, "pnpm", "run", "start:prepare:files")
-				monolithGenerate := findCommand(t, monolith, "pnpm", "run", "start:prepare:files")
-				if argv(modularGenerate) != argv(monolithGenerate) {
-					t.Errorf("generated-files command differs: modular %q, monolith %q", argv(modularGenerate), argv(monolithGenerate))
-				}
-			})
-
-			t.Run("and it runs no separate build step for the langwatch SDK or the MCP server", func(t *testing.T) {
-				for _, spec := range monolith {
-					if spec.name == "node" {
-						t.Errorf("monolith prepare must not run ensure-built.mjs (its own start:prepare:files already builds the SDK): %q", argv(spec))
-					}
-				}
-				found := false
-				for _, spec := range modular {
-					if spec.name == "node" && len(spec.args) > 0 && spec.args[0] == "dev/scripts/ensure-built.mjs" {
-						found = true
-					}
-				}
-				if !found {
-					t.Error("modular prepare must run dev/scripts/ensure-built.mjs")
-				}
-			})
-		})
-	})
+	findCommand(t, monolith, "env", "-u", "CI", "pnpm", "install", "--frozen-lockfile")
+	findCommand(t, monolith, "pnpm", "--dir", "platform/app", "exec", "prisma", "generate")
+	for _, spec := range monolith {
+		if strings.Contains(argv(spec), "start:prepare:files") || spec.name == "node" {
+			t.Errorf("haven's own dev:app runs the generated-files step; the monolith prepare ran %q", argv(spec))
+		}
+	}
+	modular := HavenPrepareCommands(LayoutModular)
+	findCommand(t, modular, "pnpm", "run", "start:prepare:files")
+	findCommand(t, modular, "node", "dev/scripts/ensure-built.mjs")
 }
 
 // @scenario "A tracked dotenv file is never overwritten"

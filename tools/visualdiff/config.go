@@ -72,16 +72,27 @@ type Settle struct {
 	DeadlineMillis int `json:"deadlineMillis" yaml:"deadlineMillis"`
 }
 
+// Concurrency is how many pages each side captures on at once: routes spread
+// over Routes pages, flows over Flows (a flow editing the project runs last,
+// alone). Absent or zero is one page, the serial capture.
+type Concurrency struct {
+	Routes int `json:"routes,omitempty" yaml:"routes"`
+	Flows  int `json:"flows,omitempty"  yaml:"flows"`
+}
+
 // Config is visualdiff.yaml.
 type Config struct {
-	Viewport string   `yaml:"viewport"`
-	Settle   Settle   `yaml:"settle"`
-	Routes   []string `yaml:"routes"`
-	Flows    []Flow   `yaml:"flows"`
+	Viewport    string      `yaml:"viewport"`
+	Settle      Settle      `yaml:"settle"`
+	Concurrency Concurrency `yaml:"concurrency"`
+	Routes      []string    `yaml:"routes"`
+	Flows       []Flow      `yaml:"flows"`
 	// Fixtures fill a route's {name} placeholders with the ids the run seeds
 	// deterministically, so a dynamic screen renders a real entity.
 	Fixtures map[string]string `yaml:"fixtures"`
 	Coverage CoverageConfig    `yaml:"coverage"`
+	// Publish is what a run shows on its branch's pull request (publish.go).
+	Publish PublishConfig `yaml:"publish"`
 }
 
 // RunnerActions are the actions tools/visualdiff/runner implements. A flow
