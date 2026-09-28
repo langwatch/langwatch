@@ -36,27 +36,15 @@ export { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 export { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 export { ExperimentWorkbenchUpdates } from "./services/experiment-workbench.service.ts";
 
-/**
- * The workbench run loop, moved WHOLE out of the retired application.
- */
-export { createSemaphore } from "./eventing/experiment-run-semaphore.process.ts";
 export {
   buildStripScoreEvaluatorIds,
   shouldStripScore,
 } from "./eventing/experiment-evaluator-score-filter.process.ts";
 
-export type {
-  ExperimentRunProgressFailure,
-  ExperimentRunProgressState,
-  ExperimentRunProgressSummary,
-} from "./repositories/experiment-run-progress.repository.ts";
+export type { ExperimentRunProgressState } from "./repositories/experiment-run-fold.repository.ts";
 export { ExperimentSandboxCredential } from "./services/experiment-run-sandbox-key.service.ts";
 
-export type {
-  ExperimentRunCollaborators,
-  OrchestratorInput,
-} from "./rules/experiment-run-input.rules.ts";
-export type { StartPollingRunInput } from "./services/experiment-polling-run.service.ts";
+export type { ExperimentRunCollaborators } from "./rules/experiment-run-input.rules.ts";
 export type {
   RunResultsPersistence,
   RunResultsWriter,
@@ -71,7 +59,6 @@ export type {
   LoadedExecutionData,
   LoadedWorkflow,
 } from "./services/experiment-execution-data.service.ts";
-export type { RunStateMirror } from "./services/experiment-run-state-mirror.service.ts";
 export {
   extractTargetOutput,
   mapNlpEvent,
@@ -88,11 +75,7 @@ export {
   type ExperimentV3RestApi,
   experimentWorkbenchCredential,
 } from "./transport/experiment-v3.rest.ts";
-export type {
-  ExperimentV3RunLoop,
-  ExperimentV3StartRunInput,
-  ExperimentWorkbenchObserver,
-} from "./app/experiment-workbench.members.ts";
+export type { ExperimentWorkbenchObserver } from "./app/experiment-workbench.members.ts";
 export { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run.rest.ts";
 export type { ExperimentFindOrCreateInput } from "./services/experiment-find-or-create.service.ts";
 export { experimentInitRest, experimentInitCaller } from "./transport/experiment-init.rest.ts";

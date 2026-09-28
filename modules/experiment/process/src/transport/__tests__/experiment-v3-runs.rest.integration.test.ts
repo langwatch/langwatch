@@ -15,10 +15,10 @@ import {
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ExecutionSummary, Experiment, ExperimentRun } from "@langwatch/experiment-contract";
 import { NotFoundError } from "@langwatch/handled-error";
+import type { SuiteApi } from "@langwatch/suite-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ExperimentV3RunLoop } from "../../app/experiment-workbench.members.ts";
 import { ExperimentApp, type ExperimentAppDependencies } from "../../app/experiment.app.ts";
 import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
 import type { ExperimentRunStreamMessage } from "../../channels/experiment-run-event-stream.channel.ts";
@@ -26,11 +26,13 @@ import type { ExperimentRunProcessingPipeline } from "../../eventing/experiment-
 import { experimentServer } from "../../experiment.server.ts";
 import type { ExperimentIdLookupRepository } from "../../repositories/experiment-id-lookup.repository.ts";
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
-import type { ExperimentRunProgressRepository } from "../../repositories/experiment-run-progress.repository.ts";
 import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment-run-abort.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
-import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
-import type { ExperimentWorkflowDsl } from "../../services/experiment-execution-data.service.ts";
+import { runRefusalsOf } from "../../rules/experiment-run-availability.rules.ts";
+import type {
+  ExecutionDataServices,
+  ExperimentWorkflowDsl,
+} from "../../services/experiment-execution-data.service.ts";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
 import { ExperimentRunCommandDispatcherService } from "../../services/experiment-run-command-dispatcher.service.ts";
 import type { WorkflowEvaluationService } from "../../services/experiment-workflow-evaluation.service.ts";
@@ -97,17 +99,42 @@ const storedRun: ExperimentRun = {
 
 type Harness = {
   experiments?: Partial<ExperimentService>;
-  /** The old loop's progress store; only its presence opens the gate, and it is never read. */
-  progress?: Partial<ExperimentRunProgressRepository> | null;
-  ports?: ExperimentRunCollaborators | null;
+  /** A process with the deployment's Redis and public address; without, runs are refused. */
+  redis?: boolean;
+  /** The personal-agent rule a run's start is checked against; runnable unless given. */
+  ownership?: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
   /** What the run pipeline's worker publishes on the run's channel once a start is sent. */
   worker?: (start: { runId: string }) => ExperimentRunStreamMessage[];
+  /** Whether the worker's progress fold registers a started run; it does unless told not to. */
+  registers?: boolean;
   /** Runs the progress fold already holds. */
   folded?: ExperimentRunProgressState[];
 };
 
+const processServices: ExecutionDataServices = {
+  datasets: createApiFixture<DatasetApi>(),
+  prompts: createApiFixture<ExecutionDataServices["prompts"]>(),
+  agents: createApiFixture<ExecutionDataServices["agents"]>(),
+  workflows: createApiFixture<ExperimentWorkflowDsl>(),
+  entitlements: { requestBound: async () => 10_000 },
+  projects: { getOrganizationId: async () => "organization-1" },
+};
+
 /** The run pipeline as the api process holds it: its senders, folds, stop signal and channel. */
-function runPipeline(worker: NonNullable<Harness["worker"]>) {
+function runPipeline({
+  worker,
+  redis,
+  ownership,
+  registers,
+}: Required<Pick<Harness, "worker" | "redis" | "ownership" | "registers">>) {
+  const folds = MemoryExperimentRunFoldRepository.create();
+  // The worker folding a run's start, or its refusal, onto the key a poll reads.
+  const register = async (run: { tenantId: string; runId: string; experimentId: string }) => {
+    if (!registers) return;
+    await folds.writeProgress({
+      state: folded({ ...run, projectId: run.tenantId, status: "running", progress: 0 }),
+    });
+  };
   const stream = experimentRunEventStreamChannels.memory.create();
   const commands = ExperimentRunCommandDispatcherService.create();
   const sent: { starts: unknown[]; completions: unknown[]; aborts: unknown[] } = {
@@ -117,18 +144,21 @@ function runPipeline(worker: NonNullable<Harness["worker"]>) {
   };
   commands.connect({
     startExperimentRun: {
-      send: async (start: { runId: string }) => {
+      send: async (start: { tenantId: string; runId: string; experimentId: string }) => {
         sent.starts.push(start);
+        await register(start);
         for (const message of worker(start))
           await stream.publish({ runId: start.runId, ...message });
       },
     },
     completeExperimentRun: {
-      send: async (completion: unknown) => sent.completions.push(completion),
+      send: async (completion: { tenantId: string; runId: string; experimentId: string }) => {
+        sent.completions.push(completion);
+        await register(completion);
+      },
     },
     abortExperimentRun: { send: async (abort: unknown) => sent.aborts.push(abort) },
   });
-  const folds = MemoryExperimentRunFoldRepository.create();
   const abort = MemoryExperimentRunAbortRepository.create();
   return {
     sent,
@@ -142,41 +172,31 @@ function runPipeline(worker: NonNullable<Harness["worker"]>) {
       folds,
       abort,
       publicBaseUrl: "https://app.test",
+      services: processServices,
+      ownership,
+      concurrency: 10,
+      refusals: redis
+        ? {}
+        : runRefusalsOf({
+            sharedStore: false,
+            publicBaseUrl: undefined,
+            processName: "langwatch-test",
+          }),
     },
   };
 }
 
 async function harness({
   experiments = {},
-  progress = null,
-  ports = null,
+  redis = false,
+  ownership = runnable,
   worker = () => [],
-  folded = [],
+  registers = true,
+  folded: held = [],
 }: Harness = {}) {
-  const pipeline = runPipeline(worker);
-  for (const state of folded) await pipeline.folds.writeProgress({ state });
+  const pipeline = runPipeline({ worker, redis, ownership, registers });
+  for (const state of held) await pipeline.folds.writeProgress({ state });
   const experimentService = createApiFixture<ExperimentService>(experiments, "ExperimentService");
-  const startRun = vi.fn(async () => {
-    throw new Error("the old run loop is unwired");
-  });
-  const runLoop: ExperimentV3RunLoop = {
-    ports,
-    progress:
-      progress === null
-        ? null
-        : createApiFixture<ExperimentRunProgressRepository>(progress, "progress"),
-    services: {
-      datasets: createApiFixture<DatasetApi>(),
-      prompts: createApiFixture(),
-      agents: createApiFixture(),
-      workflows: createApiFixture<ExperimentWorkflowDsl>(),
-      entitlements: { requestBound: async () => 10_000 },
-      projects: { getOrganizationId: async () => "organization-1" },
-    },
-    workflows: createApiFixture<WorkflowApi>(),
-    defaultConcurrency: 10,
-    startRun,
-  };
   const dependencies: ExperimentAppDependencies = {
     experiments: experimentService,
     runLookup: ExperimentFindOrCreateService.create(experimentService),
@@ -190,7 +210,6 @@ async function harness({
     modelCosts: createApiFixture(),
     slugify: (value) => value,
     workbenchTargetNames: async () => ({}),
-    runLoop,
     workbenchObserver: { recordExperimentRan: vi.fn(), reportError: vi.fn() },
     workflowEvaluations: createApiFixture<WorkflowEvaluationService>({}, "workflowEvaluations"),
     runProcessing: pipeline.runProcessing,
@@ -257,9 +276,9 @@ async function harness({
   }
 
   return {
-    startRun,
     ...pipeline.sent,
     abort: pipeline.abort,
+    folds: pipeline.folds,
     request: (path: string, init?: RequestInit) =>
       keyed.fetch(new Request(`http://api.test/api/experiments${path}`, init)),
     mounted: (path: string) =>
@@ -338,20 +357,22 @@ const folded = (
   ...overrides,
 });
 
-/** A run loop whose ownership rule refuses someone else's personal development agent. */
-const refusedOwnership = () =>
-  createApiFixture<ExperimentRunCollaborators>({
-    connectedAgentOwnership: {
-      assertConnectedAgentsRunnable: async () => {
-        throw new AgentOwnerOnlyError({
-          agentId: "agent-1",
-          agentName: "Laptop agent",
-          ownerUserId: "user-2",
-          ownerName: "Someone else",
-        });
-      },
-    },
-  });
+/** An ownership rule that lets every run start. */
+const runnable: Pick<SuiteApi, "assertConnectedAgentsRunnable"> = {
+  assertConnectedAgentsRunnable: async () => undefined,
+};
+
+/** An ownership rule that refuses someone else's personal development agent. */
+const refusedOwnership = (): Pick<SuiteApi, "assertConnectedAgentsRunnable"> => ({
+  assertConnectedAgentsRunnable: async () => {
+    throw new AgentOwnerOnlyError({
+      agentId: "agent-1",
+      agentName: "Laptop agent",
+      ownerUserId: "user-2",
+      ownerName: "Someone else",
+    });
+  },
+});
 
 describe("POST /api/experiments/:slug/run", () => {
   const found = (state: Experiment["workbenchState"]) => ({
@@ -402,17 +423,12 @@ describe("POST /api/experiments/:slug/run", () => {
     });
   });
 
-  const runnable = createApiFixture<ExperimentRunCollaborators>({
-    connectedAgentOwnership: { assertConnectedAgentsRunnable: async () => {} },
-  });
-
   describe("when the caller asks for JSON", () => {
     /** @scenario "A polled saved run starts on the run's pipeline and answers at once" */
     it("starts the run on its pipeline and answers main's body with its id, total and link", async () => {
-      const { request, starts, startRun } = await harness({
+      const { request, starts } = await harness({
         experiments: found(savedState()),
-        ports: runnable,
-        progress: {},
+        redis: true,
       });
 
       const response = await request("/checkout-eval/run", runOf(""));
@@ -440,15 +456,14 @@ describe("POST /api/experiments/:slug/run", () => {
           },
         },
       ]);
-      expect(startRun).not.toHaveBeenCalled();
     });
 
     /** @scenario "A polled saved run against someone else's personal agent is stored failed" */
     it("answers started, sends no start, and completes the run failed with the refusal", async () => {
       const { request, starts, completions } = await harness({
         experiments: found(savedState()),
-        ports: refusedOwnership(),
-        progress: {},
+        redis: true,
+        ownership: refusedOwnership(),
       });
 
       const response = await request("/checkout-eval/run", runOf(""));
@@ -457,8 +472,49 @@ describe("POST /api/experiments/:slug/run", () => {
       const { runId } = await response.json();
       expect(starts).toEqual([]);
       expect(completions).toMatchObject([
-        { tenantId: PROJECT, runId, outcome: "failed", error: { code: "agent_owner_only" } },
+        {
+          tenantId: PROJECT,
+          runId,
+          outcome: "failed",
+          total: 0,
+          error: { code: "agent_owner_only" },
+        },
       ]);
+    });
+
+    /** @scenario "A polled saved run answers once its poller can read it" */
+    it("answers only once the run is readable, so a poll right after it finds the run", async () => {
+      const { request } = await harness({
+        experiments: { ...found(savedState()), isActive: async () => true },
+        redis: true,
+      });
+
+      const { runId } = await (await request("/checkout-eval/run", runOf(""))).json();
+      const poll = await request(`/runs/${runId}`);
+
+      expect(poll.status).toBe(200);
+      expect(await poll.json()).toMatchObject({ runId, status: "running" });
+    });
+
+    /** @scenario "A started run the worker does not register in time is refused as unavailable" */
+    it("answers 503 once the bounded wait for the worker runs out", async () => {
+      vi.useFakeTimers();
+      try {
+        const { request, starts } = await harness({
+          experiments: found(savedState()),
+          redis: true,
+          registers: false,
+        });
+
+        const answered = request("/checkout-eval/run", runOf(""));
+        await vi.advanceTimersByTimeAsync(5_000);
+        const response = await answered;
+
+        expect(response.status).toBe(503);
+        expect(starts).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("refuses with the run-loop refusal where no run loop was composed", async () => {
@@ -484,8 +540,7 @@ describe("POST /api/experiments/:slug/run", () => {
     it("streams the run's frames under the framework's event-stream headers until done", async () => {
       const { request, starts } = await harness({
         experiments: found(savedState()),
-        ports: runnable,
-        progress: {},
+        redis: true,
         worker: ({ runId }) => [
           { seq: 1, frame: { type: "execution_started", runId, total: 0 } },
           { seq: 2, frame: { type: "done", summary: doneSummary(runId) } },
@@ -594,7 +649,7 @@ describe("GET /api/experiments/runs/:runId", () => {
 
   /** @scenario "A poll answers main's poller body from the run's progress fold" */
   it("answers 404 for a run the progress fold does not hold", async () => {
-    const { request } = await harness({ progress: {} });
+    const { request } = await harness({ redis: true });
 
     const response = await request("/runs/run-1");
 
@@ -605,7 +660,7 @@ describe("GET /api/experiments/runs/:runId", () => {
   /** @scenario "A poll answers main's poller body from the run's progress fold" */
   it("answers 404 for a run another project owns", async () => {
     const { request } = await harness({
-      progress: {},
+      redis: true,
       folded: [folded({ projectId: "other", status: "running" })],
     });
 
@@ -618,7 +673,7 @@ describe("GET /api/experiments/runs/:runId", () => {
   it("answers 404 for a run whose experiment was archived", async () => {
     const { request } = await harness({
       experiments: { isActive: async () => false },
-      progress: {},
+      redis: true,
       folded: [folded({ status: "running" })],
     });
 
@@ -629,7 +684,7 @@ describe("GET /api/experiments/runs/:runId", () => {
   it("answers progress only while the run is going", async () => {
     const { request } = await harness({
       experiments: { isActive: async () => true },
-      progress: {},
+      redis: true,
       folded: [folded({ status: "running", finishedAt: 99 })],
     });
 
@@ -647,7 +702,7 @@ describe("GET /api/experiments/runs/:runId", () => {
     const summary = { ...doneSummary("run-1"), runUrl: "https://app.test/acme/run-1" };
     const { request } = await harness({
       experiments: { isActive: async () => true },
-      progress: {},
+      redis: true,
       folded: [folded({ status: "completed", finishedAt: 20, summary })],
     });
 
@@ -665,7 +720,7 @@ describe("GET /api/experiments/runs/:runId", () => {
   it("answers the failure's code and trace for a failed run", async () => {
     const { request } = await harness({
       experiments: { isActive: async () => true },
-      progress: {},
+      redis: true,
       folded: [
         folded({ status: "failed", finishedAt: 20, error: "boom_code", traceId: "trace-1" }),
       ],
@@ -686,7 +741,7 @@ describe("GET /api/experiments/runs/:runId", () => {
   it("answers finishedAt without a summary for a stopped run", async () => {
     const { request } = await harness({
       experiments: { isActive: async () => true },
-      progress: {},
+      redis: true,
       folded: [folded({ status: "stopped", finishedAt: 20 })],
     });
 
@@ -703,7 +758,7 @@ describe("GET /api/experiments/runs/:runId", () => {
 
 describe("GET /api/experiments/runs/:runId/results", () => {
   it("answers 404 when neither the fold nor the slug names an experiment", async () => {
-    const { request } = await harness({ progress: {} });
+    const { request } = await harness({ redis: true });
 
     const response = await request("/runs/run-1/results");
 
@@ -715,7 +770,7 @@ describe("GET /api/experiments/runs/:runId/results", () => {
     const findRun = vi.fn(async () => null);
     const { request } = await harness({
       experiments: { findIdBySlug: async () => ({ id: "experiment-1", slug: "s" }), findRun },
-      progress: {},
+      redis: true,
     });
 
     const response = await request("/runs/run-1/results?experimentSlug=s");
@@ -739,7 +794,7 @@ describe("GET /api/experiments/runs/:runId/results", () => {
     }));
     const { request } = await harness({
       experiments: { isActive: async () => true, findRun },
-      progress: {},
+      redis: true,
       folded: [folded({ status: "completed", finishedAt: 20 })],
     });
 
@@ -756,7 +811,7 @@ describe("POST /api/experiments/abort", () => {
   /** @scenario "Aborting a run reads its progress fold and refuses another project's run" */
   it("answers 404 for a run another project owns, and stops nothing", async () => {
     const { abortRun, abort, aborts } = await harness({
-      progress: {},
+      redis: true,
       folded: [folded({ projectId: "other", status: "running" })],
     });
 
@@ -771,7 +826,7 @@ describe("POST /api/experiments/abort", () => {
   /** @scenario "Aborting a run reads its progress fold and refuses another project's run" */
   it("sets the run's stop flag and sends the abort under the fold's experiment", async () => {
     const { abortRun, abort, aborts } = await harness({
-      progress: {},
+      redis: true,
       folded: [folded({ status: "running" })],
     });
 
@@ -801,9 +856,6 @@ describe("POST /api/experiments/execute", () => {
     scope: { type: "full" },
   };
 
-  const runnable = createApiFixture<ExperimentRunCollaborators>({
-    connectedAgentOwnership: { assertConnectedAgentsRunnable: async () => {} },
-  });
   const worker = ({ runId }: { runId: string }): ExperimentRunStreamMessage[] => [
     { seq: 1, frame: { type: "execution_started", runId, total: 0 } },
     { seq: 1, frame: { type: "execution_started", runId, total: 0 } },
@@ -813,7 +865,7 @@ describe("POST /api/experiments/execute", () => {
 
   /** @scenario "A streamed workbench run subscribes to its frames, then starts on the run's pipeline" */
   it("streams the run's frames under the framework's event-stream headers until done", async () => {
-    const { execute } = await harness({ ports: runnable, progress: {}, worker });
+    const { execute } = await harness({ redis: true, worker });
 
     const response = await execute(request);
 
@@ -831,7 +883,7 @@ describe("POST /api/experiments/execute", () => {
 
   /** @scenario "A streamed workbench run subscribes to its frames, then starts on the run's pipeline" */
   it("starts the run with its plan, credited to the person who started it", async () => {
-    const { execute, starts } = await harness({ ports: runnable, progress: {}, worker });
+    const { execute, starts } = await harness({ redis: true, worker });
 
     await (await execute(request)).text();
 
@@ -848,7 +900,7 @@ describe("POST /api/experiments/execute", () => {
   /** @scenario "A workbench run against someone else's personal agent streams its refusal and starts nothing" */
   it("streams the ownership refusal as main's error frame and sends no start", async () => {
     const refused = refusedOwnership();
-    const { execute, starts } = await harness({ ports: refused, progress: {}, worker });
+    const { execute, starts } = await harness({ redis: true, ownership: refused, worker });
 
     const frames = await framesOf(await execute(request));
 
@@ -859,8 +911,7 @@ describe("POST /api/experiments/execute", () => {
   /** @scenario "A streamed run passes a cell's start through without deduplicating it" */
   it("passes a cell's start through, though it repeats the last folded seq", async () => {
     const { execute } = await harness({
-      ports: runnable,
-      progress: {},
+      redis: true,
       worker: ({ runId }) => [
         { seq: 1, frame: { type: "execution_started", runId, total: 1 } },
         { seq: 1, frame: { type: "cell_started", rowIndex: 0, targetId: "target-1" } },
@@ -914,10 +965,7 @@ describe("/api/evaluations/v3/*, the SDKs' older name for the workbench doors", 
     updatedAt: new Date("2026-09-02T00:00:00.000Z"),
   };
   const setup: Harness = {
-    ports: createApiFixture<ExperimentRunCollaborators>({
-      connectedAgentOwnership: { assertConnectedAgentsRunnable: async () => {} },
-    }),
-    progress: {},
+    redis: true,
     experiments: {
       findBySlugAndType: async () => savedExperiment(savedState()),
       getWorkbenchState: async () => workbench,
@@ -943,7 +991,7 @@ describe("/api/evaluations/v3/*, the SDKs' older name for the workbench doors", 
     ],
     ["a run list without its slug", {}, "/runs", undefined, 400],
     ["a run with no progress store", {}, "/runs/run-1", undefined, 503],
-    ["results nothing names", { progress: {} }, "/runs/r/results", undefined, 404],
+    ["results nothing names", { redis: true }, "/runs/r/results", undefined, 404],
     ["a setup read", setup, "/checkout-eval/workbench-state?fields=version", undefined, 200],
     ["a setup save", setup, "/checkout-eval/workbench-state", save, 200],
     ["a version page", setup, "/checkout-eval/versions?limit=5", undefined, 200],

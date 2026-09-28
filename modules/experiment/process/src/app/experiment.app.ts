@@ -99,10 +99,7 @@ import {
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 
-import type {
-  ExperimentV3RunLoop,
-  ExperimentWorkbenchObserver,
-} from "#app/experiment-workbench.members";
+import type { ExperimentWorkbenchObserver } from "#app/experiment-workbench.members";
 
 import type { ExperimentRunEventStream } from "../channels/experiment-run-event-stream.channel.ts";
 import type { ExperimentRunProcessingPipeline } from "../eventing/experiment-run-processing.pipeline.ts";
@@ -110,8 +107,10 @@ import type { ExperimentIdLookupRepository } from "../repositories/experiment-id
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
 import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
+import type { ExperimentRunRefusals } from "../rules/experiment-run-availability.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 import { ExperimentCopyService } from "../services/experiment-copy.service.ts";
+import type { ExecutionDataServices } from "../services/experiment-execution-data.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
 import { ExperimentListingService } from "../services/experiment-listing.service.ts";
 import { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
@@ -126,7 +125,6 @@ import type { ExperimentService } from "../services/experiment.service.ts";
 import {
   buildExperimentIdLookup,
   buildExperimentInfrastructure,
-  buildExperimentRunCells,
   buildExperimentRunProcessing,
 } from "./experiment-composition.build.ts";
 
@@ -228,8 +226,6 @@ export interface ExperimentAppDependencies {
     projectId: string;
     targets: TargetConfig[];
   }): Promise<Record<string, string>>;
-  /** The workbench run loop this deployment composed, or the holes where it did not. */
-  runLoop: ExperimentV3RunLoop;
   /** Where a run is recorded and an unnamed failure reported. Both best-effort. */
   workbenchObserver: ExperimentWorkbenchObserver;
   /** Starts a workflow's evaluation here and runs it where the pipeline is drained. */
@@ -247,6 +243,14 @@ export interface ExperimentAppDependencies {
     abort: ExperimentRunAbortRepository;
     /** This deployment's public origin, for the link a polled run answers with. */
     publicBaseUrl: string | undefined;
+    /** The peers a run's execution data is loaded through before it is planned. */
+    services: ExecutionDataServices;
+    /** Refuses a run against someone else's personal development agent before it starts. */
+    ownership: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
+    /** Cells in flight at once when a run names no limit of its own. */
+    concurrency: number;
+    /** What this process refuses of a run, for want of Redis or a public address. */
+    refusals: ExperimentRunRefusals;
   }>;
 }
 
@@ -315,14 +319,9 @@ export class ExperimentApp implements ExperimentApi {
       attachmentEgress,
       dependencies,
     });
-    const runCells = buildExperimentRunCells({
-      redis: members.redis,
-      experiments: built.experiments,
-      attachmentEgress,
-      dependencies,
-    });
+    const { runCells, ...app } = built;
     return new ExperimentApp({
-      ...built,
+      ...app,
       runLookup: ExperimentFindOrCreateService.create(built.experiments),
       runProcessing: {
         pipeline: buildExperimentRunProcessing({
@@ -339,6 +338,10 @@ export class ExperimentApp implements ExperimentApi {
         folds: runCells.folds,
         abort: runCells.abort,
         publicBaseUrl: members.publicBaseUrl,
+        services: runCells.services,
+        ownership: runCells.ownership,
+        concurrency: runCells.concurrency,
+        refusals: runCells.refusals,
       },
     });
   }
@@ -363,7 +366,6 @@ export class ExperimentApp implements ExperimentApi {
     this.#dependencies = dependencies;
     this.#workbenchRuns = ExperimentWorkbenchRunService.create({
       experiments: dependencies.experiments,
-      runLoop: dependencies.runLoop,
       observer: dependencies.workbenchObserver,
       ...(dependencies.runProcessing ? { runs: dependencies.runProcessing } : {}),
     });
@@ -994,11 +996,6 @@ export class ExperimentApp implements ExperimentApi {
    */
   experiments(): ExperimentApp {
     return this;
-  }
-
-  /** The run loop the workbench's run doors drive. */
-  run(): ExperimentV3RunLoop {
-    return this.#dependencies.runLoop;
   }
 
   /** Records that a person ran an experiment. Best-effort. */

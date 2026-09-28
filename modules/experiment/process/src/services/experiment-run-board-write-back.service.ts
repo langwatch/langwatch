@@ -13,16 +13,19 @@ import { createLogger } from "@langwatch/observability";
 
 import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
 import { hasExperiment, makeExperimentRunKey } from "../rules/experiment-run-key.rules.ts";
-import {
-  ExperimentRunResultsWriterService,
-  type RunResultsPersistence,
-} from "./experiment-run-results-writer.service.ts";
+import { ExperimentRunResultsWriterService } from "./experiment-run-results-writer.service.ts";
+import type { ExperimentService } from "./experiment.service.ts";
 
 const logger = createLogger("langwatch:experiment:run-board-write-back");
 
+type BoardWriteExperiments = Pick<
+  ExperimentService,
+  "getWorkbenchState" | "recordWorkbenchRunResults" | "hasWorkbenchVersionOfRun"
+>;
+
 type ExperimentRunBoardWriteBackDeps = {
   folds: ExperimentRunFoldRepository;
-  experiments: RunResultsPersistence["experiments"];
+  experiments: BoardWriteExperiments;
 };
 
 export class ExperimentRunBoardWriteBackService {
@@ -31,7 +34,7 @@ export class ExperimentRunBoardWriteBackService {
   }
 
   private readonly folds: ExperimentRunFoldRepository;
-  private readonly experiments: RunResultsPersistence["experiments"];
+  private readonly experiments: BoardWriteExperiments;
 
   private constructor(deps: ExperimentRunBoardWriteBackDeps) {
     this.folds = deps.folds;
@@ -78,12 +81,17 @@ export class ExperimentRunBoardWriteBackService {
       );
     }
     if (!progress) return;
-    if (await this.#holdsRun({ projectId: progress.projectId, experimentId, runId })) {
-      logger.info({ runId, experimentId }, "The board already holds this run's cells");
+    const written = await this.experiments.hasWorkbenchVersionOfRun({
+      projectId: progress.projectId,
+      experimentId,
+      runId,
+    });
+    if (written) {
+      logger.info({ runId, experimentId }, "The board's history already holds this run's write");
       return;
     }
 
-    // Named for the run, as main's draft was, so a redelivered completion finds it written.
+    // Named for the run, as main's draft was; the write names the run in the version history.
     const draft = { ...emptyRunResultsDraft(), runId };
     for (const frame of Object.values(progress.resultFrames))
       applyRunEvent({ draft, event: frame });
@@ -96,21 +104,6 @@ export class ExperimentRunBoardWriteBackService {
       scope: plan.scope,
       draft,
     });
-  }
-
-  /** Whether the saved board's cells are already this run's, so a redelivery writes nothing. */
-  async #holdsRun({
-    projectId,
-    experimentId,
-    runId,
-  }: {
-    projectId: string;
-    experimentId: string;
-    runId: string;
-  }): Promise<boolean> {
-    const current = await this.experiments.getWorkbenchState({ projectId, id: experimentId });
-
-    return current.state?.results?.runId === runId;
   }
 }
 

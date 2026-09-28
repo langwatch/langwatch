@@ -420,6 +420,33 @@ Feature: An experiment run executes on its pipeline
     And the run is completed failed carrying the refusal's code for the poller
 
   @integration
+  Scenario: A polled saved run answers once its poller can read it
+    Given a saved workbench and a worker that folds the run's start
+    When the run is started by slug without accepting events
+    Then it answers only once the run's progress fold holds it
+    And a poll straight after the answer reads the run running
+
+  @integration
+  Scenario: A started run the worker does not register in time is refused as unavailable
+    Given a saved workbench and a worker that does not fold the start within the bounded wait
+    When the run is started by slug without accepting events
+    Then the start is sent once
+    And it answers 503 as main did for an unavailable backend, the error coded service_unavailable
+
+  @unit
+  Scenario: A polled run refused before its start polls failed with its planned total
+    Given a run refused before its start whose refusal carries the planned total
+    When its completion is folded
+    Then the poller reads it failed with the refusal's code and that total
+
+  @unit
+  Scenario: A run refused before its start leaves no run row
+    Given a run that folded only its failed completion
+    When its run state is stored
+    Then no ClickHouse run row is written, as main wrote none
+    And a run that started and then failed still writes its row
+
+  @integration
   Scenario: A streamed saved run starts on the run's pipeline and streams its frames
     Given a saved workbench and a caller that accepts events
     When the run is started by slug
@@ -441,9 +468,10 @@ Feature: An experiment run executes on its pipeline
 
   @unit
   Scenario: A redelivered completion writes the run's cells to the board once
-    Given a run whose board write already landed
+    Given a run whose board write already landed, and a later run that wrote the board since
     When its completion is delivered again
-    Then the board is not written again and its version is bumped once, naming the run
+    Then the board's version history holds the run, so the board is not written again
+    And the later run's results stay on the board
 
   # The run's plan, built in the request before StartExperimentRun (spec sections 2, 4 and 8, D4, D5).
   @unit

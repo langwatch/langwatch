@@ -1,26 +1,24 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type {
-  EvaluationV3Event,
-  FindOrCreateWorkflowExperimentInput,
-} from "@langwatch/experiment-contract";
+import { createTenantId, EventUtils } from "@langwatch/eventing";
+import type { FindOrCreateWorkflowExperimentInput } from "@langwatch/experiment-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import type {
   ExperimentRunCompletedEventData,
   ExperimentRunStartedEventData,
+  WorkflowEvaluationRequestedEvent,
   WorkflowEvaluationRequestedEventData,
 } from "../../eventing/experiment-run-events.process.ts";
-import {
-  ExperimentRunProgressRepository,
-  type ExperimentRunProgressFailure,
-  type ExperimentRunProgressState,
-} from "../../repositories/experiment-run-progress.repository.ts";
+import { ExperimentRunProgressFoldProjection } from "../../eventing/experiment-run-progress.projection.ts";
+import { ExperimentRunProgressStore } from "../../eventing/experiment-run-progress.store.ts";
+import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
+import { EXPERIMENT_RUN_EVENT_TYPES } from "../../rules/experiment-run-event-types.rules.ts";
+import { makeExperimentRunKey } from "../../rules/experiment-run-key.rules.ts";
 import type { ExperimentWorkflowDsl } from "../experiment-execution-data.service.ts";
 import { WorkflowEvaluationService } from "../experiment-workflow-evaluation.service.ts";
 
@@ -114,37 +112,33 @@ function buildWorkflowSource(workflows: Record<string, FakeWorkflow>): Experimen
   };
 }
 
-/** The run records a poll reads, kept in memory. */
-class RecordedRunProgress extends ExperimentRunProgressRepository {
-  readonly runs = new Map<string, ExperimentRunProgressState>();
-  readonly failures = new Map<string, ExperimentRunProgressFailure>();
-
-  async createRun(input: {
-    runId: string;
-    projectId: string;
-    experimentId?: string;
-    experimentSlug: string;
-    total: number;
-  }): Promise<void> {
-    this.runs.set(input.runId, {
-      ...input,
-      status: "running",
-      progress: 0,
-      startedAt: 0,
-      recentEvents: [],
-    });
-  }
-  async updateProgress(): Promise<void> {}
-  async addEvent(_runId: string, _event: EvaluationV3Event): Promise<void> {}
-  async completeRun(): Promise<void> {}
-  async failRun(runId: string, failure: ExperimentRunProgressFailure): Promise<void> {
-    this.failures.set(runId, failure);
-  }
-  async stopRun(): Promise<void> {}
-  async findRunState(runId: string): Promise<ExperimentRunProgressState | null> {
-    return this.runs.get(runId) ?? null;
-  }
-  async deleteRun(): Promise<void> {}
+/** The worker's progress fold, folding a sent request with the real projection. */
+function workerFold() {
+  const folds = MemoryExperimentRunFoldRepository.create();
+  const store = ExperimentRunProgressStore.create({ repository: folds });
+  const projection = ExperimentRunProgressFoldProjection.create({ store });
+  return {
+    folds,
+    fold: async (request: WorkflowEvaluationRequestedEventData & { tenantId: string }) => {
+      const { tenantId, ...data } = request;
+      const aggregateId = makeExperimentRunKey(data.experimentId, data.runId);
+      const event = EventUtils.createEvent<WorkflowEvaluationRequestedEvent>({
+        aggregateType: "experiment_run",
+        aggregateId,
+        tenantId: createTenantId(tenantId),
+        type: EXPERIMENT_RUN_EVENT_TYPES.WORKFLOW_EVALUATION_REQUESTED,
+        version: "2026-09-25",
+        data,
+        occurredAt: 500,
+      });
+      const read = await store.get(aggregateId);
+      const state = read.kind === "folded" ? read.state : projection.init();
+      await store.store(projection.apply(state, event), {
+        aggregateId,
+        tenantId: createTenantId(tenantId),
+      });
+    },
+  };
 }
 
 const persistedTargetsSchema = z.object({
@@ -157,7 +151,12 @@ const persistedTargetsSchema = z.object({
 });
 
 function buildService(
-  overrides: { workflows?: Record<string, FakeWorkflow>; rowBound?: number } = {},
+  overrides: {
+    workflows?: Record<string, FakeWorkflow>;
+    rowBound?: number;
+    /** A worker that never folds the request, so the api's wait for it runs out. */
+    workerIdle?: boolean;
+  } = {},
 ) {
   const workflows =
     overrides.workflows ??
@@ -176,7 +175,7 @@ function buildService(
   const sent: SentRequest[] = [];
   const startsSent: unknown[] = [];
   const completionsSent: unknown[] = [];
-  const progress = new RecordedRunProgress();
+  const worker = workerFold();
   const services = {
     datasets: createApiFixture<DatasetApi>({}),
     prompts: createApiFixture<PromptApi>({}),
@@ -200,17 +199,13 @@ function buildService(
     },
     workflowSource,
     services,
-    runLoop: {
-      ports: null,
-      progress,
-      services,
-      workflows: createApiFixture<WorkflowApi>({}),
-      defaultConcurrency: 1,
-      startRun: () => Promise.reject(new Error("Not used by workflow evaluation tests.")),
-    },
+    concurrency: 1,
+    folds: worker.folds,
+    refusals: {},
     requests: {
       requestWorkflowEvaluation: async (input) => {
         sent.push(input);
+        if (!overrides.workerIdle) await worker.fold(input);
       },
       startExperimentRun: async (input) => {
         startsSent.push(input);
@@ -226,7 +221,8 @@ function buildService(
     service,
     experimentsAsked,
     sent,
-    progress,
+    folds: worker.folds,
+    fold: worker.fold,
     starts: () => z.array(startSchema).parse(startsSent),
     completions: () => z.array(completionSchema).parse(completionsSent),
   };
@@ -311,8 +307,8 @@ describe("WorkflowEvaluationService.request", () => {
     });
 
     /** @scenario The evaluation runs on the worker under the run id it answered with */
-    it("registers the run for polling and sends it under the same id", async () => {
-      const { service, sent, progress } = buildService();
+    it("sends it under the same id, and answers once the poller reads it running", async () => {
+      const { service, sent, folds } = buildService();
 
       const started = await service.request(baseInput);
 
@@ -323,7 +319,30 @@ describe("WorkflowEvaluationService.request", () => {
         experimentId: "experiment_1",
         workflowId: WORKFLOW_ID,
       });
-      expect(progress.runs.get(started.runId)?.status).toBe("running");
+      const read = await folds.readRunProgress({ runId: started.runId });
+      expect(read.kind === "folded" ? read.state : undefined).toMatchObject({
+        status: "running",
+        progress: 0,
+        total: 3,
+      });
+    });
+  });
+
+  describe("given a worker that does not fold the request in time", () => {
+    /** @scenario "A requested evaluation the worker does not register in time is refused as unavailable" */
+    it("refuses with service_unavailable once the bounded wait runs out", async () => {
+      vi.useFakeTimers();
+      try {
+        const { service, sent } = buildService({ workerIdle: true });
+
+        const answered = service.request(baseInput).catch((error: unknown) => error);
+        await vi.advanceTimersByTimeAsync(5_000);
+
+        expect(await answered).toMatchObject({ code: "service_unavailable", httpStatus: 503 });
+        expect(sent).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -371,15 +390,28 @@ describe("WorkflowEvaluationService.run", () => {
   describe("given a request whose run already moved on", () => {
     /** @scenario A redelivered evaluation request does not run twice */
     it("skips it without starting or failing the run", async () => {
-      const { service, progress, starts, completions } = buildService();
+      const { service, folds, starts, completions } = buildService();
       const started = await service.request(baseInput);
-      const registered = progress.runs.get(started.runId);
-      if (registered) progress.runs.set(started.runId, { ...registered, status: "completed" });
+      const read = await folds.readRunProgress({ runId: started.runId });
+      if (read.kind === "folded") {
+        await folds.writeProgress({ state: { ...read.state, status: "completed", seq: 2 } });
+      }
 
       await service.run(requestFor(started.runId));
 
       expect(starts()).toEqual([]);
       expect(completions()).toEqual([]);
+    });
+  });
+
+  describe("given a request whose start the fold has not caught up with", () => {
+    /** @scenario A redelivered evaluation request does not run twice */
+    it("starts it, leaving a second start to the start's idempotency key", async () => {
+      const { service, starts } = buildService();
+
+      await service.run(requestFor("run_unfolded"));
+
+      expect(starts()).toMatchObject([{ runId: "run_unfolded" }]);
     });
   });
 
@@ -413,22 +445,22 @@ describe("WorkflowEvaluationService.run", () => {
   describe("given a request the worker cannot prepare", () => {
     /** @scenario A requested evaluation the worker cannot prepare completes failed with its code */
     it("completes the run failed with the refusal, and starts nothing", async () => {
-      const { service, progress, starts, completions } = buildService({
+      const { service, fold, starts, completions } = buildService({
         workflows: { [WORKFLOW_ID]: { id: WORKFLOW_ID, name: "Evaluate me", versions: [] } },
       });
-      await progress.createRun({
-        runId: "run_1",
-        projectId: PROJECT_ID,
-        experimentId: "experiment_1",
-        experimentSlug: "evaluate-me",
-        total: 3,
-      });
+      await fold(requestFor("run_1"));
 
       await service.run(requestFor("run_1"));
 
       expect(starts()).toEqual([]);
       expect(completions()).toMatchObject([
-        { tenantId: PROJECT_ID, runId: "run_1", experimentId: "experiment_1", outcome: "failed" },
+        {
+          tenantId: PROJECT_ID,
+          runId: "run_1",
+          experimentId: "experiment_1",
+          outcome: "failed",
+          total: 3,
+        },
       ]);
       expect(completions()[0]?.error?.code).toBe("workflow_version_required");
     });

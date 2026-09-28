@@ -31,12 +31,9 @@ import { deriveRunActor } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 
-import type {
-  ExperimentV3RunLoop,
-  ExperimentWorkbenchObserver,
-} from "../app/experiment-workbench.members.ts";
+import type { ExperimentWorkbenchObserver } from "../app/experiment-workbench.members.ts";
 import type { ExperimentRunProgressState } from "../repositories/experiment-run-fold.repository.ts";
-import { runLoopOf, runProgressOf } from "../rules/experiment-run-loop.rules.ts";
+import type { ExperimentRunRefusal } from "../rules/experiment-run-availability.rules.ts";
 import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 import {
@@ -58,7 +55,6 @@ export type WorkbenchExecutionRequest = z.infer<typeof executionRequestSchema>;
 
 type WorkbenchRunDeps = {
   experiments: ExperimentService;
-  runLoop: ExperimentV3RunLoop;
   observer: ExperimentWorkbenchObserver;
   /** Absent where a suite builds no run pipeline; a pipeline run is then refused by name. */
   runs?: WorkbenchRunPipeline;
@@ -66,13 +62,11 @@ type WorkbenchRunDeps = {
 
 export class ExperimentWorkbenchRunService {
   private readonly experiments: ExperimentService;
-  private readonly runLoop: ExperimentV3RunLoop;
   private readonly observer: ExperimentWorkbenchObserver;
   private readonly runs: WorkbenchRunPipeline | undefined;
 
   private constructor(deps: WorkbenchRunDeps) {
     this.experiments = deps.experiments;
-    this.runLoop = deps.runLoop;
     this.observer = deps.observer;
     this.runs = deps.runs;
   }
@@ -92,13 +86,13 @@ export class ExperimentWorkbenchRunService {
     );
 
     // The refusal a process without Redis or a public address owes, as before the pipeline.
-    const { ports } = runLoopOf(this.runLoop);
+    const runs = this.#startable();
     const runId = generateHumanReadableId();
     const savedRun = (options: { persistResults: boolean; runUrl?: string }): PipelineRunStart => {
       const plan = ExperimentRunPlanService.create().buildPlan({
         request: { state: saved.state, scope: saved.scope },
         data: saved.data,
-        concurrency: this.runLoop.defaultConcurrency,
+        concurrency: runs.concurrency,
         origin: "saved",
         actor: workbenchActorFrom({ credential: input.credential }),
         experimentSlug: slug,
@@ -113,7 +107,6 @@ export class ExperimentWorkbenchRunService {
           state: saved.state,
           data: saved.data,
         }),
-        ownership: ports.connectedAgentOwnership,
         // The person behind a key; a personal agent refuses a key that names nobody, as main did.
         actor: deriveRunActor({
           userId: input.credential.kind === "apiKey" ? input.credential.userId : null,
@@ -143,6 +136,7 @@ export class ExperimentWorkbenchRunService {
   /** The saved workbench, the body's run inputs and the data they load, or main's refusals. */
   async #prepareSavedRun(input: SavedRunRequest) {
     const { projectId, slug } = input;
+    const runs = this.#pipeline();
     const savedExperiment = await this.experiments.findBySlugAndType({
       projectId,
       slug,
@@ -162,7 +156,7 @@ export class ExperimentWorkbenchRunService {
     const runInputs = savedState.parseRunInputs({ body: input.body });
     const prepared = await savedState.prepareSavedStateExecution({
       experiments: this.experiments,
-      services: this.runLoop.services,
+      services: runs.services,
       projectId,
       slug,
       runInputs: {
@@ -206,14 +200,14 @@ export class ExperimentWorkbenchRunService {
     logger.info({ projectId, scope: input.scope }, "Starting experiment execution");
 
     // The refusal a process without Redis or a public address owes, as before the pipeline.
-    const { ports } = runLoopOf(this.runLoop);
+    const runs = this.#startable();
 
     const dataResult = await ExperimentExecutionDataService.create().loadExecutionData({
       projectId,
       dataset: input.dataset,
       targets: input.targets,
       evaluators: input.evaluators,
-      services: this.runLoop.services,
+      services: runs.services,
       inputs: { data: input.data, datasetId: input.dataset_id, parameters: input.parameters },
     });
     if ("error" in dataResult) {
@@ -250,7 +244,7 @@ export class ExperimentWorkbenchRunService {
         ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
       },
       data: dataResult,
-      concurrency: input.concurrency ?? this.runLoop.defaultConcurrency,
+      concurrency: input.concurrency ?? runs.concurrency,
       origin: "workbench",
       // The page saves these cells too; the server writes them so the board outlives the tab.
       persistResults:
@@ -275,7 +269,6 @@ export class ExperimentWorkbenchRunService {
           state,
           data: dataResult,
         }),
-        ownership: ports.connectedAgentOwnership,
         actor: { id: by.id, label: "user" },
         data: dataResult,
         state,
@@ -441,9 +434,10 @@ export class ExperimentWorkbenchRunService {
 
   /** The run's progress fold, by runId alone as main's poller keyed it. */
   async #progressOf(runId: string): Promise<ExperimentRunProgressState | undefined> {
-    // The refusal a process without Redis owes; 5c re-homes it off the old loop.
-    runProgressOf(this.runLoop);
-    const read = await this.#pipeline().folds.readRunProgress({ runId });
+    const runs = this.#pipeline();
+    // The refusal a process without Redis owes: its runs could never be read back.
+    refuse(runs.refusals.read);
+    const read = await runs.folds.readRunProgress({ runId });
 
     return read.kind === "folded" ? read.state : undefined;
   }
@@ -466,6 +460,14 @@ export class ExperimentWorkbenchRunService {
     return getRunUrl({ baseUrl, projectSlug, experimentSlug: slug, runId });
   }
 
+  /** The run pipeline, once this process may start a run on it. */
+  #startable(): WorkbenchRunPipeline {
+    const runs = this.#pipeline();
+    refuse(runs.refusals.start);
+
+    return runs;
+  }
+
   #runsOn(): ExperimentWorkbenchPipelineRunService {
     return ExperimentWorkbenchPipelineRunService.create({
       experiments: this.experiments,
@@ -481,6 +483,11 @@ export class ExperimentWorkbenchRunService {
 
     return this.runs;
   }
+}
+
+/** Refuses by the capability this process lacks, as the retired run loop did. */
+function refuse(refusal: ExperimentRunRefusal | undefined): void {
+  if (refusal) throw new ExperimentRunLoopUnavailableError(refusal);
 }
 
 /** The page size a list asks for: 50 unless given, never above 200. */

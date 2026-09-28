@@ -1,10 +1,14 @@
+import type { AgentOverview } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import {
   COMPARISON_EVALUATOR_TYPE,
   type EvaluatorConfig,
   type ExperimentRunPlan,
 } from "@langwatch/experiment-contract";
+import type { ModelCost, ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contract";
 /**
  * One cell of a pipeline-driven run: what it reads from the run's folds, and what it appends.
@@ -25,6 +29,8 @@ import {
   type ExperimentCellRequest,
   ExperimentRunCellService,
 } from "../experiment-run-cell.service.ts";
+import { ExperimentRunModelCostService } from "../experiment-run-model-cost.service.ts";
+import { ExperimentRunSandboxCredentialService } from "../experiment-run-sandbox-credential.service.ts";
 import { createNoAttachmentsFixture } from "./experiment-attachments.fixture.ts";
 
 const runKey = "experiment_1:run_1";
@@ -117,10 +123,15 @@ function planWith({
   };
 }
 
-/** What the engine answers per node it is sent, and every node it was sent. */
-const engine: { answers: Map<string, StudioServerEvent>; dispatched: string[] } = {
+/** What the engine answers per node it is sent, every node it was sent, and each sandbox key. */
+const engine: {
+  answers: Map<string, StudioServerEvent>;
+  dispatched: string[];
+  sandboxKeys: unknown[];
+} = {
   answers: new Map(),
   dispatched: [],
+  sandboxKeys: [],
 };
 
 function succeeds(nodeId: string, outputs: Record<string, unknown>, cost?: number): void {
@@ -142,11 +153,20 @@ function fails(nodeId: string, error: string): void {
 
 const reported: string[] = [];
 
-function compose() {
+function compose({
+  collaborating = {},
+  agents = [],
+}: {
+  /** Real collaborators in place of the scripted ones. */
+  collaborating?: Partial<Pick<ExperimentRunCollaborators, "cost" | "sandboxCredentials">>;
+  /** The saved agents a target may name. */
+  agents?: AgentOverview[];
+} = {}) {
   const folds = MemoryExperimentRunFoldRepository.create();
   const abort = MemoryExperimentRunAbortRepository.create();
   const collaborators = createApiFixture<ExperimentRunCollaborators>(
     {
+      ...collaborating,
       abort,
       attachments: createNoAttachmentsFixture(),
       evaluationReporting: createApiFixture<Pick<EvaluationApi, "reportEvaluation">>({
@@ -158,6 +178,9 @@ function compose() {
         postStudioEvent: async ({ event, onEvent }) => {
           const nodeId = "node_id" in event.payload ? String(event.payload.node_id) : "";
           engine.dispatched.push(nodeId);
+          if ("workflow" in event.payload) {
+            engine.sandboxKeys.push(event.payload.workflow.sandbox_api_key);
+          }
           const answer = engine.answers.get(nodeId);
           if (answer) onEvent(answer);
         },
@@ -174,6 +197,13 @@ function compose() {
       {
         prompts: createApiFixture<ExecutionDataServices["prompts"]>({
           findByIdOrHandle: async () => null,
+        }),
+        agents: createApiFixture<ExecutionDataServices["agents"]>({
+          getById: async ({ id }) => {
+            const agent = agents.find((candidate) => candidate.id === id);
+            if (!agent) throw new Error(`no agent ${id}`);
+            return agent;
+          },
         }),
       },
       "services",
@@ -248,6 +278,7 @@ const request = (ordinal: number, phase: 1 | 2): ExperimentCellRequest => ({
 beforeEach(() => {
   engine.answers.clear();
   engine.dispatched = [];
+  engine.sandboxKeys = [];
   reported.length = 0;
 });
 
@@ -474,5 +505,180 @@ describe("ExperimentRunCellService", () => {
         expect(engine.dispatched).toEqual([]);
       });
     });
+  });
+});
+
+const projectRule: ModelCost = {
+  id: "cost_1",
+  organizationId: "organization_1",
+  projectId: "project_alpha",
+  scopeType: "PROJECT",
+  scopeId: "project_alpha",
+  model: "my-fine-tune",
+  regex: "^my-fine-tune$",
+  inputCostPerToken: 0.001,
+  outputCostPerToken: 0.002,
+  cacheReadCostPerToken: null,
+  cacheCreationCostPerToken: null,
+  cacheCreation1hCostPerToken: null,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+};
+
+describe("given a cell whose engine reports tokens but no cost", () => {
+  /** @scenario "A cell is priced at the project's own cost rule before the catalogue" */
+  it("prices the target at the project's matching rule as the custom rate", async () => {
+    const priced: Record<string, unknown>[] = [];
+    const { folds, cells } = compose({
+      collaborating: {
+        cost: ExperimentRunModelCostService.create({
+          modelProviders: createApiFixture<ModelProviderApi>({
+            listCosts: async () => [projectRule],
+            estimateCost: ({ attrs }) => {
+              priced.push(attrs);
+              return 0.5;
+            },
+          }),
+        }),
+      },
+    });
+    await planned(folds);
+    engine.answers.set("target_a", {
+      type: "component_state_change",
+      payload: {
+        component_id: "target_a",
+        execution_state: {
+          status: "success",
+          outputs: { output: "4" },
+          metrics: { model: "my-fine-tune", prompt_tokens: 10, completion_tokens: 5 },
+        },
+      },
+    });
+    succeeds("target_a.exact", { passed: true, score: 1 });
+
+    const executed = await cells.execute(request(0, 1));
+
+    expect(executed.results[0]?.data).toMatchObject({ targetId: "target_a", cost: 0.5 });
+    expect(priced).toEqual([
+      {
+        "langwatch.model.inputCostPerToken": 0.001,
+        "langwatch.model.outputCostPerToken": 0.002,
+      },
+    ]);
+  });
+});
+
+const codeAgent: AgentOverview = {
+  id: "agent_code",
+  name: "Uppercase",
+  projectId: "project_alpha",
+  type: "code",
+  config: {
+    inputs: [{ identifier: "input", type: "str" }],
+    outputs: [{ identifier: "result", type: "str" }],
+    parameters: [{ identifier: "code", type: "code", value: "return input.upper()" }],
+  },
+  workflowId: null,
+  copiedFromAgentId: null,
+  environment: null,
+  ownerUserId: null,
+  hostLabel: null,
+  identityKey: null,
+  lastSeenAt: null,
+  archivedAt: null,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  inputFields: [],
+  outputFields: [],
+  fieldsResolved: true,
+  parameters: [],
+  owner: null,
+  status: "offline",
+  instances: [],
+  selectable: true,
+  notSelectableReason: null,
+};
+
+const codePlan = (): ExperimentRunPlan => ({
+  ...planWith({
+    evaluators: [],
+    targets: [
+      {
+        id: "target_code",
+        type: "agent",
+        dbAgentId: "agent_code",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "result", type: "str" }],
+        mappings: {
+          dataset_1: {
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset_1",
+              sourceField: "question",
+            },
+          },
+        },
+      },
+    ],
+  }),
+  cells: [{ ordinal: 0, phase: 1, rowIndex: 0, targetId: "target_code", evaluatorIds: [] }],
+});
+
+/** A cell of a code target, lent whatever key the project's credential answers with. */
+async function codeCell(credential: {
+  findOrganizationId: ProjectApi["findOrganizationId"];
+  mint: ApiKeyApi["getOrMintAgentSandboxKey"];
+}) {
+  const { folds, cells } = compose({
+    agents: [codeAgent],
+    collaborating: {
+      sandboxCredentials: ExperimentRunSandboxCredentialService.create({
+        projects: createApiFixture<ProjectApi>({
+          findOrganizationId: credential.findOrganizationId,
+        }),
+        apiKeys: createApiFixture<ApiKeyApi>({ getOrMintAgentSandboxKey: credential.mint }),
+      }),
+    },
+  });
+  await planned(folds, codePlan());
+  succeeds("target_code", { result: "WHAT IS 2 + 2?" });
+
+  return cells.execute(request(0, 1));
+}
+
+describe("given a cell whose target executes code", () => {
+  /** @scenario "A run lends the project's shared sandbox key to the code it executes" */
+  it("lends the project's sandbox key to the dispatched workflow", async () => {
+    const executed = await codeCell({
+      findOrganizationId: async () => "organization_1",
+      mint: async () => "sandbox-key",
+    });
+
+    expect(executed.outcome).toBe("succeeded");
+    expect(engine.sandboxKeys).toEqual(["sandbox-key"]);
+  });
+
+  /** @scenario "A run whose sandbox key cannot be minted still runs without one" */
+  it("runs without a key when the mint refuses", async () => {
+    const executed = await codeCell({
+      findOrganizationId: async () => "organization_1",
+      mint: async () => {
+        throw new Error("mint refused");
+      },
+    });
+
+    expect(executed.outcome).toBe("succeeded");
+    expect(engine.sandboxKeys).toEqual([undefined]);
+  });
+
+  it("runs without a key for a project with no organization", async () => {
+    const executed = await codeCell({
+      findOrganizationId: async () => undefined,
+      mint: async () => "sandbox-key",
+    });
+
+    expect(executed.outcome).toBe("succeeded");
+    expect(engine.sandboxKeys).toEqual([undefined]);
   });
 });

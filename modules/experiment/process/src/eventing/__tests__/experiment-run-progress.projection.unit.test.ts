@@ -394,8 +394,11 @@ describe("the run's progress fold as main's poller JSON", () => {
       });
       expect((await folds.readRunProgress({ runId: "run_1" })).kind).toBe("folded");
     });
+  });
 
-    it("stores nothing for a request whose run has not started or failed", async () => {
+  describe("when a workflow evaluation is requested and not yet started", () => {
+    /** @scenario "A requested evaluation is polled running before the worker starts it" */
+    it("is stored running with the requested total, as main registered it", async () => {
       const folds = MemoryExperimentRunFoldRepository.create();
       const state = progressAfter([workflowEvaluationRequested()]);
       await ExperimentRunProgressStore.create({ repository: folds }).store(state, {
@@ -403,8 +406,38 @@ describe("the run's progress fold as main's poller JSON", () => {
         tenantId,
       });
 
-      expect(state.status).toBe("pending");
-      expect((await folds.readRunProgress({ runId: "run_1" })).kind).toBe("empty");
+      const read = await folds.readRunProgress({ runId: "run_1" });
+      expect(read).toMatchObject({
+        kind: "folded",
+        state: { status: "running", total: 3, progress: 0, experimentSlug: "evaluate-me" },
+      });
+    });
+
+    it("folds the start that follows it", () => {
+      const state = progressAfter([workflowEvaluationRequested(), started(plan)]);
+
+      expect(state).toMatchObject({ status: "running", total: plan.cells.length });
+      expect(state.seq).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when a workbench run is refused before its start", () => {
+    /** @scenario "A polled run refused before its start polls failed with its planned total" */
+    it("is stored failed with the total its refusal carried", async () => {
+      const folds = MemoryExperimentRunFoldRepository.create();
+      const refusal = new WorkflowVersionRequiredError().serialize();
+      const state = progressAfter([completed({ outcome: "failed", total: 5, error: refusal })]);
+      await ExperimentRunProgressStore.create({ repository: folds }).store(state, {
+        aggregateId,
+        tenantId,
+      });
+
+      expect(state).toMatchObject({
+        status: "failed",
+        total: 5,
+        error: "workflow_version_required",
+      });
+      expect((await folds.readRunProgress({ runId: "run_1" })).kind).toBe("folded");
     });
   });
 

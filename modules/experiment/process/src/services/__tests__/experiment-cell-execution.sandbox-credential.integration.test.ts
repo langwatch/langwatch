@@ -8,7 +8,7 @@ import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contrac
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
-import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
+import { ExperimentCellExecutionService } from "../experiment-cell-execution.service.ts";
 import { createNoAttachmentsFixture } from "./experiment-attachments.fixture.ts";
 
 const datasetColumns = [{ id: "input", name: "input", type: "string" }];
@@ -73,14 +73,10 @@ describe("given a run that minted a sandbox credential", () => {
     it("carries the credential on the dispatched workflow", async () => {
       const loadedData = { sandboxApiKey: "sandbox-key-123" };
 
-      for await (const _event of ExperimentRunOrchestratorService.create().executeCell({
-        cell: makeCell(),
-        projectId: "p1",
+      for await (const _event of ExperimentCellExecutionService.create({
         ports,
-        datasetColumns,
-        loadedData,
         workflows,
-      })) {
+      }).executeCell({ cell: makeCell(), projectId: "p1", datasetColumns, loadedData })) {
         // draining the generator is what triggers the dispatch
       }
 
@@ -97,14 +93,10 @@ describe("given a run that minted a sandbox credential", () => {
     it("dispatches the workflow with no sandbox_api_key field", async () => {
       const loadedData = { sandboxApiKey: undefined };
 
-      for await (const _event of ExperimentRunOrchestratorService.create().executeCell({
-        cell: makeCell(),
-        projectId: "p1",
+      for await (const _event of ExperimentCellExecutionService.create({
         ports,
-        datasetColumns,
-        loadedData,
         workflows,
-      })) {
+      }).executeCell({ cell: makeCell(), projectId: "p1", datasetColumns, loadedData })) {
         // draining the generator is what triggers the dispatch
       }
 

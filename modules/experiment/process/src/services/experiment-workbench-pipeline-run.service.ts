@@ -11,6 +11,7 @@ import type {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { RunActor } from "@langwatch/scenario-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { ExperimentWorkbenchObserver } from "../app/experiment-workbench.members.ts";
@@ -22,16 +23,20 @@ import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.proce
 import type { ExperimentRunStartedEventData } from "../eventing/experiment-run-events.process.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
 import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
-import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
+import type { ExperimentRunRefusals } from "../rules/experiment-run-availability.rules.ts";
 import { ExperimentCarriedBoardService } from "./experiment-carried-board.service.ts";
-import type { LoadedExecutionData } from "./experiment-execution-data.service.ts";
+import type {
+  ExecutionDataServices,
+  LoadedExecutionData,
+} from "./experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "./experiment-run-command-dispatcher.service.ts";
+import { ExperimentRunRegistrationService } from "./experiment-run-registration.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
 
-/** The run pipeline's senders, its progress fold and stop signal, and its frames' channel. */
+/** The run pipeline's senders, folds, stop signal and frames' channel, and what a start reads. */
 export type WorkbenchRunPipeline = Readonly<{
   commands: Pick<
     ExperimentRunCommandDispatcherService,
@@ -42,12 +47,19 @@ export type WorkbenchRunPipeline = Readonly<{
   abort: ExperimentRunAbortRepository;
   /** This deployment's public origin, for the link a polled run answers with. */
   publicBaseUrl: string | undefined;
+  /** The peers a run's execution data is loaded through before it is planned. */
+  services: ExecutionDataServices;
+  /** Refuses a run against someone else's personal development agent before it starts. */
+  ownership: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
+  /** Cells in flight at once when a run names no limit of its own. */
+  concurrency: number;
+  /** What this process refuses of a run, for want of Redis or a public address. */
+  refusals: ExperimentRunRefusals;
 }>;
 
 /** What one pipeline run starts from: its start, and what is checked and carried beside it. */
 export type PipelineRunStart = {
   start: ExperimentRunStartedEventData & { tenantId: string; occurredAt: number };
-  ownership: ExperimentRunCollaborators["connectedAgentOwnership"];
   /** Whom a personal development agent is checked against; nobody is refused by its rule. */
   actor: RunActor | undefined;
   data: LoadedExecutionData;
@@ -122,7 +134,7 @@ export class ExperimentWorkbenchPipelineRunService {
   async *streamRun(run: PipelineRunStart): AsyncGenerator<EvaluationV3Event> {
     try {
       // A personal development agent runs on one person's machine; only they may send it a turn.
-      await run.ownership.assertConnectedAgentsRunnable({
+      await this.runs.ownership.assertConnectedAgentsRunnable({
         agents: [...run.data.loadedAgents.values()],
         actor: run.actor,
       });
@@ -140,22 +152,25 @@ export class ExperimentWorkbenchPipelineRunService {
   }
 
   /**
-   * A polled run: started and left to the worker. A refusal is recorded as the run's failure, so
-   * the poller reads its code, as main's background run did (spec section 9, wire note 6).
+   * A polled run: started, left to the worker, and answered once its poller can read it, as main
+   * registered it first. A refusal is the run's failure, whose code the poller reads (wire note 6).
    */
   async startRun(run: PipelineRunStart): Promise<void> {
+    const { runId, experimentId } = run.start;
     try {
-      await run.ownership.assertConnectedAgentsRunnable({
+      await this.runs.ownership.assertConnectedAgentsRunnable({
         agents: [...run.data.loadedAgents.values()],
         actor: run.actor,
       });
     } catch (error) {
       await this.#failBeforeStart({ run, error });
+      await this.#registration().awaitRegistered({ runId, experimentId });
       return;
     }
 
     await this.runs.commands.startExperimentRun(run.start);
     await this.#carryBoard({ run });
+    await this.#registration().awaitRegistered({ runId, experimentId });
   }
 
   /** The run's frames in `seq` order, a redelivered one dropped, until the run ends. */
@@ -213,8 +228,13 @@ export class ExperimentWorkbenchPipelineRunService {
       runId,
       experimentId,
       outcome: "failed",
+      total: run.start.total,
       ...(HandledError.isHandled(error) ? { error: error.serialize() } : {}),
     });
+  }
+
+  #registration(): ExperimentRunRegistrationService {
+    return ExperimentRunRegistrationService.create({ folds: this.runs.folds });
   }
 
   /** The board cells the page carried into the run, recorded as the run's and never streamed. */

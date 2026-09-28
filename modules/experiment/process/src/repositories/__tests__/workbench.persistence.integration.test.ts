@@ -366,6 +366,48 @@ describe.skipIf(!databaseUrl)("Experiment workbench persistence", () => {
     });
   });
 
+  describe("given a run that wrote its results to the board", () => {
+    /** @scenario "A redelivered completion writes the run's cells to the board once" */
+    it("finds the run in the version history, even after the person saved on top", async () => {
+      const experiments = service();
+      const created = await experiments.createEvaluationsV3({
+        projectId,
+        state: state("Original"),
+        actor: { label: "user" },
+      });
+      const written = await experiments.recordWorkbenchRunResults({
+        projectId,
+        id: created.experimentId,
+        results: {
+          runId: "bold-jolly-bee",
+          targetOutputs: {},
+          targetMetadata: {},
+          evaluatorResults: {},
+          errors: {},
+        },
+        expectedVersion: created.version,
+        actor: { label: "user", runId: "bold-jolly-bee" },
+        commitMessage: "Results from run bold-jolly-bee",
+      });
+      await experiments.saveWorkbenchState({
+        projectId,
+        id: created.experimentId,
+        state: state("Typed after the run"),
+        expectedVersion: written.version,
+        actor: { label: "user" },
+      });
+
+      const holds = (runId: string) =>
+        experiments.hasWorkbenchVersionOfRun({
+          projectId,
+          experimentId: created.experimentId,
+          runId,
+        });
+      expect(await holds("bold-jolly-bee")).toBe(true);
+      expect(await holds("another-run")).toBe(false);
+    });
+  });
+
   describe("given a save that names no expected version", () => {
     describe("when it is accepted", () => {
       /** @scenario A save with no expected version advances the counter */

@@ -23,11 +23,12 @@ import {
   WorkflowVersionRequiredError,
 } from "@langwatch/workflow-contract";
 
-import type { ExperimentV3RunLoop } from "../app/experiment-workbench.members.ts";
 import type { WorkflowEvaluationRequestedEventData } from "../eventing/experiment-run-events.process.ts";
-import { runProgressOf } from "../rules/experiment-run-loop.rules.ts";
+import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
+import type { ExperimentRunRefusals } from "../rules/experiment-run-availability.rules.ts";
 import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
 import { requestedRunIsUntouched } from "../rules/experiment-workflow-evaluation.rules.ts";
+import { ExperimentCellPlanService } from "./experiment-cell-plan.service.ts";
 import type {
   ExperimentWorkflowDsl,
   ExecutionDataServices,
@@ -36,8 +37,8 @@ import type {
 import { ExperimentExecutionDataService } from "./experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "./experiment-run-command-dispatcher.service.ts";
-import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service.ts";
 import { ExperimentRunPlanService } from "./experiment-run-plan.service.ts";
+import { ExperimentRunRegistrationService } from "./experiment-run-registration.service.ts";
 import type { ExperimentRunErrorReporting } from "./experiment-run-results-writer.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
@@ -59,8 +60,12 @@ export type WorkflowEvaluationDependencies = {
   workflowSource: ExperimentWorkflowDsl;
   /** The datasets, prompts, agents and evaluators the load reads through. */
   services: ExecutionDataServices;
-  /** The progress store a request registers its run in, and the run's default concurrency. */
-  runLoop: ExperimentV3RunLoop;
+  /** Cells in flight at once for a run (`EVAL_V3_CONCURRENCY`). */
+  concurrency: number;
+  /** The run's progress fold: a start answers once it holds the run, and a redelivery reads it. */
+  folds: ExperimentRunFoldRepository;
+  /** What this process refuses of a run, for want of Redis or a public address. */
+  refusals: ExperimentRunRefusals;
   /** Where the request is sent for the worker, and where the worker starts or fails the run. */
   requests: Pick<
     ExperimentRunCommandDispatcherService,
@@ -91,10 +96,10 @@ export class WorkflowEvaluationService {
     return new WorkflowEvaluationService(dependencies);
   }
 
-  /** Refuses what it can, registers the run and sends it to the worker. */
+  /** Refuses what it can, sends the run to the worker, and answers once its poller can read it. */
   async request(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted> {
+    this.#refuseRead();
     const baseUrl = this.#baseUrl();
-    const progress = runProgressOf(this.dependencies.runLoop);
     const { workflow, version, state, dataResult } = await this.prepare(input);
     const experiment = await this.findOrCreateExperiment({
       projectId: input.projectId,
@@ -102,19 +107,12 @@ export class WorkflowEvaluationService {
       state,
     });
     const runId = generateHumanReadableId();
-    const total = ExperimentRunOrchestratorService.create().countScopedCells({
+    const total = ExperimentCellPlanService.create().countScopedCells({
       state,
       datasetRows: dataResult.datasetRows,
       scope: input.rowIndices ? { type: "rows", rowIndices: input.rowIndices } : { type: "full" },
     });
 
-    await progress.createRun({
-      runId,
-      projectId: input.projectId,
-      experimentId: experiment.id,
-      experimentSlug: experiment.slug,
-      total,
-    });
     await this.dependencies.requests.requestWorkflowEvaluation({
       tenantId: input.projectId,
       occurredAt: nowInstant().epochMilliseconds,
@@ -130,6 +128,9 @@ export class WorkflowEvaluationService {
       ...(input.parameters ? { parameters: input.parameters } : {}),
       ...(input.rowIndices ? { rowIndices: input.rowIndices } : {}),
     });
+    await ExperimentRunRegistrationService.create({
+      folds: this.dependencies.folds,
+    }).awaitRegistered({ runId, experimentId: experiment.id });
 
     return {
       runId,
@@ -146,8 +147,10 @@ export class WorkflowEvaluationService {
 
   /** Plans a requested evaluation and starts it on the run's pipeline, once; a refusal fails it. */
   async run(request: WorkflowEvaluationRequestedEventData & { tenantId: string }): Promise<void> {
-    const progress = runProgressOf(this.dependencies.runLoop);
-    if (!requestedRunIsUntouched(await progress.findRunState(request.runId))) {
+    this.#refuseRead();
+    const read = await this.dependencies.folds.readRunProgress({ runId: request.runId });
+    const folded = read.kind === "folded" ? read.state : undefined;
+    if (!requestedRunIsUntouched({ state: folded, experimentId: request.experimentId })) {
       logger.info({ runId: request.runId }, "Requested evaluation already ran; skipping");
       return;
     }
@@ -184,7 +187,7 @@ export class WorkflowEvaluationService {
           : { type: "full" },
       },
       data: dataResult,
-      concurrency: this.dependencies.runLoop.defaultConcurrency,
+      concurrency: this.dependencies.concurrency,
       origin: "workflow",
       persistResults: false,
       experimentSlug: request.experimentSlug,
@@ -229,6 +232,7 @@ export class WorkflowEvaluationService {
       runId,
       experimentId: request.experimentId,
       outcome: "failed",
+      total: request.total,
       ...(HandledError.isHandled(error) ? { error: error.serialize() } : {}),
     });
   }
@@ -318,6 +322,12 @@ export class WorkflowEvaluationService {
         state,
       ) as FindOrCreateWorkflowExperimentInput["workbenchState"],
     });
+  }
+
+  /** A process without Redis could never read its runs back, as the retired run loop refused. */
+  #refuseRead(): void {
+    const refusal = this.dependencies.refusals.read;
+    if (refusal) throw new ExperimentRunLoopUnavailableError(refusal);
   }
 
   #baseUrl(): string {

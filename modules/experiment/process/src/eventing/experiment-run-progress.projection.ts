@@ -10,6 +10,7 @@ import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-even
 import { appendRunFrames, findRunEventFrames } from "../rules/experiment-run-frames.rules.ts";
 import { foldEvaluatorsOf, runCellKey } from "../rules/experiment-run-plan.rules.ts";
 import { hasFinished, markFinished } from "../rules/experiment-run-window.rules.ts";
+import { runAwaitsStart } from "../rules/experiment-workflow-evaluation.rules.ts";
 import {
   type CellFinishedEvent,
   cellFinishedEventSchema,
@@ -90,12 +91,12 @@ export class ExperimentRunProgressFoldProjection
     };
   }
 
-  /** A workflow evaluation before its start: what a failure to prepare it reports, never stored. */
+  /** A workflow evaluation before its start, stored running with its total, as main stored it. */
   handleExperimentRunWorkflowEvaluationRequested(
     event: WorkflowEvaluationRequestedEvent,
     state: ExperimentRunProgressState,
   ): ExperimentRunProgressState {
-    if (state.status !== "pending") return state;
+    if (!runAwaitsStart(state)) return state;
 
     const { data } = event;
     return {
@@ -104,8 +105,10 @@ export class ExperimentRunProgressFoldProjection
       runId: data.runId,
       experimentId: data.experimentId,
       experimentSlug: data.experimentSlug,
+      status: "running",
       total: data.total,
       startedAt: event.occurredAt,
+      planned: true,
     };
   }
 
@@ -114,7 +117,7 @@ export class ExperimentRunProgressFoldProjection
     event: ExperimentRunStartedEvent,
     state: ExperimentRunProgressState,
   ): ExperimentRunProgressState {
-    if (state.status !== "pending") return state;
+    if (!runAwaitsStart(state)) return state;
 
     const plan = event.data.plan;
     return this.streamed({
@@ -127,7 +130,7 @@ export class ExperimentRunProgressFoldProjection
         planned: plan !== undefined,
         phaseOneCells: plan?.cells.filter((cell) => cell.phase === 1).length ?? 0,
         evaluators: plan ? foldEvaluatorsOf(plan) : {},
-        experimentSlug: plan?.experimentSlug ?? "",
+        experimentSlug: plan?.experimentSlug ?? state.experimentSlug,
         status: "running",
         total: event.data.total,
         startedAt: event.occurredAt,
@@ -231,8 +234,8 @@ export class ExperimentRunProgressFoldProjection
     event: ExperimentRunCompletedEvent,
     state: ExperimentRunProgressState,
   ): ExperimentRunProgressState {
-    const { outcome, error } = event.data;
-    const refusedBeforeStart = state.status === "pending" && outcome === "failed";
+    const { outcome, error, total } = event.data;
+    const refusedBeforeStart = runAwaitsStart(state) && outcome === "failed";
     if (state.status !== "running" && !refusedBeforeStart) return state;
 
     const finishedAt = event.data.finishedAt ?? event.data.stoppedAt ?? event.occurredAt;
@@ -248,6 +251,7 @@ export class ExperimentRunProgressFoldProjection
               projectId: String(event.tenantId),
               runId: event.data.runId,
               experimentId: event.data.experimentId,
+              total: total ?? state.total,
               startedAt: state.startedAt || event.occurredAt,
               planned: true,
             }

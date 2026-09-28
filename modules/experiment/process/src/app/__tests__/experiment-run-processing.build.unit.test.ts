@@ -5,12 +5,14 @@ import {
   type QueryDriver,
   type QueryResult,
 } from "@langwatch/clickhouse-client";
+import type { SuiteApi } from "@langwatch/suite-contract";
 import { describe, expect, it } from "vitest";
 
 import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
 import type { WorkflowEvaluationRunner } from "../../eventing/experiment-workflow-evaluation.subscriber.ts";
 import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment-run-abort.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
+import type { ExecutionDataServices } from "../../services/experiment-execution-data.service.ts";
 import type { ExperimentRunBoardWriteBackService } from "../../services/experiment-run-board-write-back.service.ts";
 import type { ExperimentRunCellService } from "../../services/experiment-run-cell.service.ts";
 import { ExperimentRunCommandDispatcherService } from "../../services/experiment-run-command-dispatcher.service.ts";
@@ -49,6 +51,10 @@ function build() {
       cells: createApiFixture<ExperimentRunCellService>({}, "cells"),
       stream: experimentRunEventStreamChannels.memory.create(),
       boardWriteBack: createApiFixture<ExperimentRunBoardWriteBackService>({}, "boardWriteBack"),
+      services: createApiFixture<ExecutionDataServices>({}, "services"),
+      ownership: createApiFixture<Pick<SuiteApi, "assertConnectedAgentsRunnable">>({}, "ownership"),
+      concurrency: 1,
+      refusals: {},
     },
     commands: ExperimentRunCommandDispatcherService.create(),
   });

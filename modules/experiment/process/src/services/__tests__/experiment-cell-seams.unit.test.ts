@@ -2,15 +2,20 @@ import type { CallOutcome } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluationsV3State } from "@langwatch/experiment-contract";
 /**
- * Facade-level seams: behaviour that crosses two collaborators, or proves
- * the facade's delegation is wired rather than merely present.
+ * Seams a cell crosses: behaviour that spans two collaborators, or proves
+ * an injected dependency is wired rather than merely present.
  * @see specs/experiments-v3/evaluation-execution.feature
  */
 import { describe, expect, it, vi } from "vitest";
 
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
-import type { ConnectedDispatch } from "../experiment-connected-cell.service.ts";
-import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
+import { ExperimentCellExecutionService } from "../experiment-cell-execution.service.ts";
+import { ExperimentCellPlanService } from "../experiment-cell-plan.service.ts";
+import {
+  type ConnectedDispatch,
+  ExperimentConnectedCellService,
+} from "../experiment-connected-cell.service.ts";
+import { ExperimentEvaluatorInputService } from "../experiment-evaluator-input.service.ts";
 import { createNoAttachmentsFixture } from "./experiment-attachments.fixture.ts";
 
 const createTestDataset = (rowCount = 3) =>
@@ -80,7 +85,7 @@ describe("given two datasets where the active one is not the first", () => {
   describe("when the run builds its cells", () => {
     /** @scenario "The run reads its mappings from the dataset the rows come from" */
     it("reads the mapping bucket of the active dataset", () => {
-      const cells = ExperimentRunOrchestratorService.create().generateCells({
+      const cells = ExperimentCellPlanService.create().generateCells({
         state: twoDatasetState(),
         datasetRows: createTestDataset(1),
         scope: {
@@ -94,7 +99,7 @@ describe("given two datasets where the active one is not the first", () => {
 
     /** @scenario "The run reads its mappings from the dataset the rows come from" */
     it("resolves the evaluator's inputs instead of dispatching an empty payload", () => {
-      const cells = ExperimentRunOrchestratorService.create().generateCells({
+      const cells = ExperimentCellPlanService.create().generateCells({
         state: twoDatasetState(),
         datasetRows: createTestDataset(1),
         scope: {
@@ -103,8 +108,10 @@ describe("given two datasets where the active one is not the first", () => {
       });
 
       expect(
-        ExperimentRunOrchestratorService.create().buildEvaluatorInputs(cells[0]!, "eval-1", {
-          output: "Answer 0",
+        ExperimentEvaluatorInputService.create({}).buildEvaluatorInputs({
+          cell: cells[0]!,
+          evaluatorId: "eval-1",
+          targetOutput: { output: "Answer 0" },
         }),
       ).toEqual({
         output: "Answer 0",
@@ -115,12 +122,8 @@ describe("given two datasets where the active one is not the first", () => {
 });
 
 describe("given a run whose target is a connected agent", () => {
-  /**
-   * S6 moved `dispatch`/`sleep`/`now` from a per-call argument to a
-   * `create` dependency. This proves the facade still forwards the
-   * caller's injected versions rather than the service's own defaults.
-   */
-  it("forwards the injected dispatcher, clock and sleep into the connected cell service", async () => {
+  /** Proves the service runs on the injected dispatcher, clock and sleep, not its own defaults. */
+  it("runs the connected cell on the injected dispatcher, clock and sleep", async () => {
     const agent = {
       id: "agent-1",
       name: "support-agent",
@@ -162,16 +165,15 @@ describe("given a run whose target is a connected agent", () => {
     const now = vi.fn(() => 42);
 
     const events = [];
-    for await (const event of ExperimentRunOrchestratorService.create().executeConnectedCell({
-      cell,
-      projectId: "p1",
-      agent,
+    const connected = ExperimentConnectedCellService.create({
+      ports,
+      workflows,
+      cells: ExperimentCellExecutionService.create({ ports, workflows }),
       dispatch,
       sleep,
       now,
-      ports,
-      workflows,
-    })) {
+    });
+    for await (const event of connected.executeConnectedCell({ cell, projectId: "p1", agent })) {
       events.push(event);
     }
 

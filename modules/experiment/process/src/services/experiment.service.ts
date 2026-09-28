@@ -461,6 +461,15 @@ export class ExperimentService {
     return this.workbench.recordWorkbenchRunResults(input);
   }
 
+  /** Whether a run already wrote a version of the workbench, so its write lands once. */
+  hasWorkbenchVersionOfRun(input: {
+    projectId: string;
+    experimentId: string;
+    runId: string;
+  }): Promise<boolean> {
+    return this.options.repository.hasWorkbenchVersionOfRun(input);
+  }
+
   listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {
     return this.options.runRepository.findAll(experimentRunListInputSchema.parse(input));
   }

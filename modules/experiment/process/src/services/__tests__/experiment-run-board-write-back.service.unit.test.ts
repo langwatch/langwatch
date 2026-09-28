@@ -10,7 +10,10 @@ import type { ExperimentRunProgressState } from "../../repositories/experiment-r
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
 import { createBlankWorkbenchState } from "../../rules/experiment-blank-workbench-state.rules.ts";
 import { ExperimentRunBoardWriteBackService } from "../experiment-run-board-write-back.service.ts";
-import type { RunResultsPersistence } from "../experiment-run-results-writer.service.ts";
+
+type BoardExperiments = Parameters<
+  typeof ExperimentRunBoardWriteBackService.create
+>[0]["experiments"];
 
 const run = { runId: "run_1", experimentId: "experiment_1" };
 
@@ -68,9 +71,11 @@ function board() {
     updatedAt: new Date("2026-09-28T10:00:00.000Z"),
   };
   const writers: WorkbenchActor[] = [];
-  const experiments = createApiFixture<RunResultsPersistence["experiments"]>(
+  const experiments = createApiFixture<BoardExperiments>(
     {
       getWorkbenchState: async () => view,
+      hasWorkbenchVersionOfRun: async ({ runId }) =>
+        writers.some((writer) => writer.runId === runId),
       recordWorkbenchRunResults: async ({ results, actor }) => {
         writers.push(actor);
         view = {
@@ -89,16 +94,19 @@ function board() {
 async function foldsWith({
   planned = plan,
   folded = progress,
+  runId = run.runId,
 }: {
   planned?: ExperimentRunPlan;
   folded?: ExperimentRunProgressState | null;
+  runId?: string;
 } = {}) {
   const folds = MemoryExperimentRunFoldRepository.create();
   await folds.writePlan({
-    runKey: "experiment_1:run_1",
+    runKey: `experiment_1:${runId}`,
     state: {
       projectId: "project_alpha",
       ...run,
+      runId,
       plan: planned,
       CreatedAt: 0,
       UpdatedAt: 0,
@@ -141,6 +149,26 @@ describe("ExperimentRunBoardWriteBackService.writeBack", () => {
       expect(writers).toHaveLength(1);
       expect(results()?.runId).toBe("run_1");
       expect(version()).toBe(2);
+    });
+
+    /** @scenario "A redelivered completion writes the run's cells to the board once" */
+    it("writes nothing even when a later run wrote the board in between", async () => {
+      const { experiments, writers, results } = board();
+      const first = ExperimentRunBoardWriteBackService.create({
+        folds: await foldsWith(),
+        experiments,
+      });
+      const later = ExperimentRunBoardWriteBackService.create({
+        folds: await foldsWith({ runId: "run_2", folded: { ...progress, runId: "run_2" } }),
+        experiments,
+      });
+
+      await first.writeBack({ ...run, finishedCells: 1, lastAttempt: false });
+      await later.writeBack({ ...run, runId: "run_2", finishedCells: 1, lastAttempt: false });
+      await first.writeBack({ ...run, finishedCells: 1, lastAttempt: false });
+
+      expect(writers.map((writer) => writer.runId)).toEqual(["run_1", "run_2"]);
+      expect(results()?.runId).toBe("run_2");
     });
   });
 

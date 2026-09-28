@@ -162,6 +162,8 @@ export const experimentRunCompletedEventDataSchema = z.object({
   outcome: z.enum(["finished", "stopped", "failed"]).optional(),
   /** Why a run failed before any cell ran: a workflow evaluation the worker couldn't prepare. */
   error: serializedHandledErrorSchema.optional(),
+  /** A run refused before its start: its planned cell count, which its poller keeps reading. */
+  total: z.number().int().nonnegative().optional(),
 });
 
 export const experimentRunCompletedEventSchema = z.object({

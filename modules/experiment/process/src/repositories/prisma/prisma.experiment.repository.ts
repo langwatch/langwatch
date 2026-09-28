@@ -542,6 +542,18 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     });
   }
 
+  async hasWorkbenchVersionOfRun(input: {
+    projectId: string;
+    experimentId: string;
+    runId: string;
+  }): Promise<boolean> {
+    const found = await this.database.experimentVersion.findFirst({
+      where: { projectId: input.projectId, experimentId: input.experimentId, runId: input.runId },
+      select: { id: true },
+    });
+    return found !== null;
+  }
+
   async findWorkbenchVersion(input: {
     projectId: string;
     experimentId: string;

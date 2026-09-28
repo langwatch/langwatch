@@ -326,7 +326,7 @@ export class ExperimentCellPlanService {
   /**
    * How many cells a scope will dispatch, before the run starts — the plan
    * itself (comparison deps included), not rows times targets. Phase 1
-   * only; `runOrchestrator` adds the comparison count once known.
+   * only; the run's plan adds its comparison cells.
    */
   countScopedCells({
     state,
