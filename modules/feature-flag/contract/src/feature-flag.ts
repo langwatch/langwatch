@@ -293,7 +293,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Opens the Dashboards area (/[project]/dashboards): the Agent Flight Deck and the member's own boards, with its sidebar entry and saved-dashboards list (spec: modules/dashboard/specs/dashboards-v1.feature). Default off; while off the area answers not-found and the sidebar shows no entry. Legacy analytics is untouched either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards.",
+      "Opens the Dashboards area (/[project]/dashboards): the Agent Flight Deck and the member's own boards, as a product in the product switcher and saved-dashboards list (spec: modules/dashboard/specs/dashboards-v1.feature). Default off; while off the area answers not-found and the sidebar shows no entry. Legacy analytics is untouched either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards.",
   },
   {
     key: "release_ui_home_signal_focused_enabled",
