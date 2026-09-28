@@ -4800,6 +4800,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
@@ -4824,6 +4827,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
