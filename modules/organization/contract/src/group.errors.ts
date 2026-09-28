@@ -4,7 +4,11 @@ export class GroupNotFoundError extends NotFoundError {
   declare readonly code: "group_not_found";
 
   constructor(groupId?: string) {
-    super("group_not_found", "Group", groupId ?? "", groupId ? { meta: { groupId } } : {});
+    super(
+      "group_not_found",
+      { resource: "Group", id: groupId ?? "" },
+      groupId ? { meta: { groupId } } : {},
+    );
     this.name = "GroupNotFoundError";
   }
 }
@@ -28,8 +32,7 @@ export class GroupBindingNotFoundError extends NotFoundError {
   constructor(bindingId?: string) {
     super(
       "role_binding_not_found",
-      "Role binding",
-      bindingId ?? "",
+      { resource: "Role binding", id: bindingId ?? "" },
       bindingId ? { meta: { bindingId } } : {},
     );
     this.name = "GroupBindingNotFoundError";
@@ -54,8 +57,7 @@ export class GroupMembershipNotFoundError extends NotFoundError {
   constructor(userId?: string) {
     super(
       "group_membership_not_found",
-      "Group membership",
-      userId ?? "",
+      { resource: "Group membership", id: userId ?? "" },
       userId ? { meta: { userId } } : {},
     );
     this.name = "GroupMembershipNotFoundError";

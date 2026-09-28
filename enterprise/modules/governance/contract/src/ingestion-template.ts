@@ -121,7 +121,7 @@ export class PlatformTemplateImmutableError extends HandledError {
 
 export class TemplateNotFoundError extends NotFoundError {
   constructor(templateId: string) {
-    super("template_not_found", "Ingestion template", templateId);
+    super("template_not_found", { resource: "Ingestion template", id: templateId });
     this.name = "TemplateNotFoundError";
   }
 }

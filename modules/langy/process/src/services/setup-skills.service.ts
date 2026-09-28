@@ -23,7 +23,7 @@ export class SetupSkillsService {
   /** The prompt the menu copies; an unknown skill is the handled 404 `not_found`. */
   async getPrompt({ skill }: { skill: string }): Promise<{ body: string }> {
     if (!this.isSetupSkillId(skill)) {
-      throw new NotFoundError("not_found", "Setup guide", skill);
+      throw new NotFoundError("not_found", { resource: "Setup guide", id: skill });
     }
     return { body: this.body(skill) };
   }

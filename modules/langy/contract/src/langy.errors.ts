@@ -44,11 +44,15 @@ export class LangyConversationNotFoundError extends NotFoundError {
   declare readonly code: "langy_conversation_not_found";
 
   constructor(conversationId: string, options: { reasons?: readonly Error[] } = {}) {
-    super("langy_conversation_not_found", "Langy conversation", conversationId, {
-      meta: { conversationId },
-      ...remediation("langy_conversation_not_found"),
-      ...options,
-    });
+    super(
+      "langy_conversation_not_found",
+      { resource: "Langy conversation", id: conversationId },
+      {
+        meta: { conversationId },
+        ...remediation("langy_conversation_not_found"),
+        ...options,
+      },
+    );
     this.name = "LangyConversationNotFoundError";
   }
 }

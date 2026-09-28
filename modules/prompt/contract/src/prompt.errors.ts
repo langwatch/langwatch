@@ -299,7 +299,7 @@ export class PromptTagMissingError extends NotFoundError {
   declare readonly code: "prompt_tag_not_found";
 
   constructor(name: string) {
-    super("prompt_tag_not_found", "Tag", name, { meta: { name } });
+    super("prompt_tag_not_found", { resource: "Tag", id: name }, { meta: { name } });
     this.name = "PromptTagMissingError";
   }
 }

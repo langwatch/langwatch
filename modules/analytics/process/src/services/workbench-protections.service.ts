@@ -86,7 +86,7 @@ export class WorkbenchProtectionsService {
   }): Promise<LangWatchQLRunCaller> {
     const project = await this.dependencies.projects.findById(input.projectId);
     if (!project) {
-      throw new NotFoundError("project_not_found", "Project", input.projectId);
+      throw new NotFoundError("project_not_found", { resource: "Project", id: input.projectId });
     }
     const protections = await this.resolveMemberProtections(input);
     return { project: { id: project.id, lwqlKey: project.lwqlKey }, protections };

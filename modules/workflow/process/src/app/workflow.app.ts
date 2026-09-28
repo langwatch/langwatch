@@ -761,7 +761,10 @@ export class WorkflowApp implements WorkflowApi {
       return await this.#members.workflows.run(input);
     } catch (error) {
       if (error instanceof WorkflowNotFoundError) {
-        throw new NotFoundError("workflow_not_found", "Workflow", input.workflowId);
+        throw new NotFoundError("workflow_not_found", {
+          resource: "Workflow",
+          id: input.workflowId,
+        });
       }
       if (error instanceof WorkflowNotPublishedError) {
         throw new ValidationError("Workflow not published", {
@@ -769,11 +772,10 @@ export class WorkflowApp implements WorkflowApi {
         });
       }
       if (error instanceof WorkflowVersionNotFoundError) {
-        throw new NotFoundError(
-          "published_workflow_version_not_found",
-          "Published workflow version",
-          error.versionId,
-        );
+        throw new NotFoundError("published_workflow_version_not_found", {
+          resource: "Published workflow version",
+          id: error.versionId,
+        });
       }
 
       throw error;

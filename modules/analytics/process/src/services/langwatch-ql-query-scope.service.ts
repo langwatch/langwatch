@@ -91,7 +91,8 @@ export class LangWatchQLQueryScopeService {
   /** A legacy project key reaches exactly its own project, with no RBAC fan-out. */
   private async ownProject(projectId: string): Promise<ReadableProject> {
     const project = await this.dependencies.projects.findById(projectId);
-    if (!project) throw new NotFoundError("project_not_found", "Project", projectId);
+    if (!project)
+      throw new NotFoundError("project_not_found", { resource: "Project", id: projectId });
 
     return { project, credential: { kind: "legacyProjectKey" } };
   }

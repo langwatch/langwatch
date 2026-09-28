@@ -4,12 +4,16 @@ export class ApiKeyNotFoundError extends NotFoundError {
   declare readonly code: "api_key_not_found";
 
   constructor(id: string, options: { reasons?: readonly Error[] } = {}) {
-    super("api_key_not_found", "API Key", id, {
-      meta: { apiKeyId: id },
-      fault: "customer",
-      ...remediation("api_key_not_found"),
-      reasons: options.reasons,
-    });
+    super(
+      "api_key_not_found",
+      { resource: "API Key", id: id },
+      {
+        meta: { apiKeyId: id },
+        fault: "customer",
+        ...remediation("api_key_not_found"),
+        reasons: options.reasons,
+      },
+    );
     this.name = "ApiKeyNotFoundError";
   }
 }

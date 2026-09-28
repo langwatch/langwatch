@@ -4,10 +4,14 @@ export class OrganizationNotFoundForTeamError extends NotFoundError {
   declare readonly code: "organization_not_found_for_team";
 
   constructor(teamId: string, options: { reasons?: readonly Error[] } = {}) {
-    super("organization_not_found_for_team", "Organization for team", teamId, {
-      meta: { teamId },
-      ...options,
-    });
+    super(
+      "organization_not_found_for_team",
+      { resource: "Organization for team", id: teamId },
+      {
+        meta: { teamId },
+        ...options,
+      },
+    );
     this.name = "OrganizationNotFoundForTeamError";
   }
 }
@@ -33,9 +37,13 @@ export class MemberNotFoundError extends NotFoundError {
   declare readonly code: "member_not_found";
 
   constructor(userId: string) {
-    super("member_not_found", "Organization member", userId, {
-      meta: { userId },
-    });
+    super(
+      "member_not_found",
+      { resource: "Organization member", id: userId },
+      {
+        meta: { userId },
+      },
+    );
     this.name = "MemberNotFoundError";
   }
 }

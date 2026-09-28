@@ -77,9 +77,13 @@ export class ScenarioVersionNotFoundError extends NotFoundError {
   declare readonly code: "scenario_version_not_found";
 
   constructor(scenarioId: string, version: number) {
-    super("scenario_version_not_found", "Scenario version", String(version), {
-      meta: { scenarioId, version },
-    });
+    super(
+      "scenario_version_not_found",
+      { resource: "Scenario version", id: String(version) },
+      {
+        meta: { scenarioId, version },
+      },
+    );
     this.name = "ScenarioVersionNotFoundError";
   }
 }
@@ -93,9 +97,13 @@ export class SimulationRunNotFoundError extends NotFoundError {
   declare readonly code: "simulation_run_not_found";
 
   constructor(scenarioRunId: string) {
-    super("simulation_run_not_found", "Simulation run", scenarioRunId, {
-      meta: { scenarioRunId },
-    });
+    super(
+      "simulation_run_not_found",
+      { resource: "Simulation run", id: scenarioRunId },
+      {
+        meta: { scenarioRunId },
+      },
+    );
     this.name = "SimulationRunNotFoundError";
   }
 }
@@ -104,9 +112,13 @@ export class ScenarioTargetNotFoundError extends NotFoundError {
   declare readonly code: "scenario_target_not_found";
 
   constructor(input: { targetType: string; referenceId: string }) {
-    super("scenario_target_not_found", "Scenario target", input.referenceId, {
-      meta: { targetType: input.targetType, referenceId: input.referenceId },
-    });
+    super(
+      "scenario_target_not_found",
+      { resource: "Scenario target", id: input.referenceId },
+      {
+        meta: { targetType: input.targetType, referenceId: input.referenceId },
+      },
+    );
     this.name = "ScenarioTargetNotFoundError";
   }
 }
@@ -133,7 +145,11 @@ export class BatchRunNotFoundError extends NotFoundError {
   declare readonly code: "batch_run_not_found";
 
   constructor(batchRunId: string) {
-    super("batch_run_not_found", "Batch run", batchRunId, { meta: { batchRunId } });
+    super(
+      "batch_run_not_found",
+      { resource: "Batch run", id: batchRunId },
+      { meta: { batchRunId } },
+    );
     this.name = "BatchRunNotFoundError";
   }
 }
@@ -258,9 +274,13 @@ export class VoiceAgentNotFoundError extends HandledError {
 export class VoiceCallRecordNotReadyError extends NotFoundError {
   declare readonly code: "voice_call_record_not_ready";
   constructor({ conversationId }: { conversationId: string }) {
-    super("voice_call_record_not_ready", "Call record", conversationId, {
-      meta: { conversationId },
-    });
+    super(
+      "voice_call_record_not_ready",
+      { resource: "Call record", id: conversationId },
+      {
+        meta: { conversationId },
+      },
+    );
     this.name = "VoiceCallRecordNotReadyError";
   }
 }

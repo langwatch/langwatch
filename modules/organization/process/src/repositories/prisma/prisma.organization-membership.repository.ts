@@ -334,11 +334,10 @@ async function assertTeamRoleUpdateAllowed({
       select: { organizationId: true, kind: true },
     });
     if (customRole?.kind !== "custom" || customRole.organizationId !== organizationId) {
-      throw new NotFoundError(
-        "custom_role_not_found",
-        "CustomRole",
-        teamRoleUpdate.customRoleId ?? "unknown",
-      );
+      throw new NotFoundError("custom_role_not_found", {
+        resource: "CustomRole",
+        id: teamRoleUpdate.customRoleId ?? "unknown",
+      });
     }
   }
 }
@@ -364,7 +363,7 @@ async function planTeamRoleUpdate({
   teamsLeftWithoutAdmin: { id: string; name: string }[];
 }): Promise<ScopeBindingPlan[]> {
   if (!currentMembership) {
-    throw new NotFoundError("team_membership_not_found", "TeamMember", userId);
+    throw new NotFoundError("team_membership_not_found", { resource: "TeamMember", id: userId });
   }
   await assertTeamRoleUpdateAllowed({ tx, organizationId, role, teamId, teamRoleUpdate });
   const updateIsCustomRole = isCustomRole(teamRoleUpdate.role);

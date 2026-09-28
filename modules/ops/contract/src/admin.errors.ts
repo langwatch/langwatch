@@ -54,7 +54,7 @@ export class CannotReimpersonateWhileImpersonatingError extends HandledError {
 
 export class UserToImpersonateNotFoundError extends NotFoundError {
   constructor(userId: string) {
-    super("user_to_impersonate_not_found", "User to impersonate", userId);
+    super("user_to_impersonate_not_found", { resource: "User to impersonate", id: userId });
     this.name = "UserToImpersonateNotFoundError";
   }
 }

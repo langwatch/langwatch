@@ -4,7 +4,7 @@ export class SuiteNotFoundError extends NotFoundError {
   declare readonly code: "suite_not_found";
 
   constructor(id: string) {
-    super("suite_not_found", "Suite", id);
+    super("suite_not_found", { resource: "Suite", id: id });
     this.name = "SuiteNotFoundError";
   }
 }

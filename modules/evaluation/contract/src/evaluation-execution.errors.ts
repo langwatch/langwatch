@@ -83,11 +83,15 @@ export class EvaluatorNotFoundError extends NotFoundError {
   declare readonly code: "evaluator_not_found";
 
   constructor(evaluatorType: string, options: { reasons?: readonly Error[] } = {}) {
-    super("evaluator_not_found", "Evaluator", evaluatorType, {
-      meta: { evaluatorType },
-      ...remediation("evaluator_not_found"),
-      ...options,
-    });
+    super(
+      "evaluator_not_found",
+      { resource: "Evaluator", id: evaluatorType },
+      {
+        meta: { evaluatorType },
+        ...remediation("evaluator_not_found"),
+        ...options,
+      },
+    );
     this.name = "EvaluatorNotFoundError";
   }
 }

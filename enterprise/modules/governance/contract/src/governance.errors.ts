@@ -30,7 +30,7 @@ export const unsupportedValue = unsupportedGovernanceValue;
 
 export class IngestionSourceNotFoundError extends NotFoundError {
   constructor(sourceId: string) {
-    super("ingestion_source_not_found", "Ingestion source", sourceId);
+    super("ingestion_source_not_found", { resource: "Ingestion source", id: sourceId });
     this.name = "IngestionSourceNotFoundError";
   }
 }
@@ -222,7 +222,10 @@ export class IdentityMatchSuggestionNotFoundError extends NotFoundError {
   declare readonly code: "identity_match_suggestion_not_found";
 
   constructor(suggestionId: string) {
-    super("identity_match_suggestion_not_found", "Match suggestion", suggestionId);
+    super("identity_match_suggestion_not_found", {
+      resource: "Match suggestion",
+      id: suggestionId,
+    });
     this.name = "IdentityMatchSuggestionNotFoundError";
   }
 }
