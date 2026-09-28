@@ -14,6 +14,7 @@ import {
   type AnalyticsAlertAuthoring,
   type AnalyticsFailureNotice,
   type AnalyticsHostProject,
+  type AnalyticsLangyAskRequest,
   type AnalyticsRouteReading,
   type AnalyticsSuccessNotice,
 } from "./model/analytics-host.ts";
@@ -38,6 +39,7 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
   readonly navigations: string[] = [];
   readonly queries: Readonly<Record<string, string | undefined>>[] = [];
   readonly alertAuthorings: AnalyticsAlertAuthoring[] = [];
+  readonly langyAsks: AnalyticsLangyAskRequest[] = [];
 
   constructor(private readonly options: StubAnalyticsHostOptions = {}) {
     super();
@@ -99,6 +101,10 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
 
   failed(failure: AnalyticsFailureNotice): void {
     this.failures.push(failure);
+  }
+
+  askLangy(request: AnalyticsLangyAskRequest): void {
+    this.langyAsks.push(request);
   }
 
   /** The last query write, which is what an address assertion is about. */

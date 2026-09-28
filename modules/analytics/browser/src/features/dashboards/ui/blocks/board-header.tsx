@@ -4,17 +4,28 @@
  * on the second. Without `onRename`/`onDescribe` the board is read-only.
  */
 
-import { Badge, Box, Button, HStack, IconButton, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, IconButton, Spacer, Text, VStack } from "@chakra-ui/react";
+import type { DashboardVisibility } from "@langwatch/dashboard-contract";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Gauge, Pencil, Plus, Star } from "lucide-react";
+import { Building2, Gauge, type LucideIcon, Pencil, Plus, Star, Users } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
+import { boardVisibilityLabel } from "../../model/board-visibility.ts";
 import { InlineTextField } from "../elements/inline-text-field.tsx";
+
+/** The prototype's tinted chip beside the title for a board shown beyond its creator. */
+const SHARED_CHIPS: Partial<
+  Readonly<Record<DashboardVisibility, { icon: LucideIcon; palette: string }>>
+> = {
+  team: { icon: Users, palette: "blue" },
+  organisation: { icon: Building2, palette: "orange" },
+};
 
 export function BoardHeader({
   name,
   isDefault,
   description,
+  visibility,
   onRename,
   onDescribe,
   onAddChart,
@@ -24,6 +35,8 @@ export function BoardHeader({
   name: string;
   isDefault: boolean;
   description: string;
+  /** Who the board is shown to; the Flight Deck has none. */
+  visibility?: DashboardVisibility;
   onRename?: (name: string) => void;
   onDescribe?: (description: string) => void;
   onAddChart: () => void;
@@ -32,30 +45,77 @@ export function BoardHeader({
   visibilityControl?: ReactNode;
 }) {
   return (
-    <VStack align="stretch" gap={2} paddingX={6} paddingTop={5} paddingBottom={2}>
+    <VStack align="stretch" gap={2} marginBottom={5}>
       <HStack gap={3}>
         <HStack gap={2.5} flex={1} minWidth={0}>
-          <Box color="teal.fg" flexShrink={0}>
+          <Box color="teal.solid" flexShrink={0}>
             {isDefault ? <Gauge size={16} aria-hidden /> : <Star size={16} aria-hidden />}
           </Box>
           <BoardTitle name={name} onRename={onRename} />
           {isDefault && (
-            <Badge size="sm" variant="subtle" flexShrink={0}>
+            <Box
+              as="span"
+              flexShrink={0}
+              borderRadius="md"
+              background="bg.muted"
+              color="fg.subtle"
+              paddingX={1.5}
+              paddingY={0.5}
+              fontSize="11px"
+              fontWeight="medium"
+              whiteSpace="nowrap"
+            >
               Default
-            </Badge>
+            </Box>
           )}
+          {visibility && <SharedChip visibility={visibility} />}
         </HStack>
-        {visibilityControl}
-        <Button variant="outline" size="sm" flexShrink={0} onClick={onAddChart}>
-          <Plus size={14} /> Add chart
-        </Button>
+        <HStack gap={2} flexShrink={0}>
+          {visibilityControl}
+          <Button
+            variant="outline"
+            height={8}
+            paddingX={3}
+            gap={1.5}
+            borderRadius="lg"
+            borderColor="border"
+            fontSize="13px"
+            fontWeight="medium"
+            _hover={{ borderColor: "border.emphasized", background: "bg.muted" }}
+            onClick={onAddChart}
+          >
+            <Plus size={15} strokeWidth={2} /> Add chart
+          </Button>
+        </HStack>
       </HStack>
-      <HStack gap={4} flexWrap="wrap">
+      <HStack columnGap={4} rowGap={2} flexWrap="wrap">
         <BoardDescription description={description} onDescribe={onDescribe} />
         <Spacer />
         {periodControl}
       </HStack>
     </VStack>
+  );
+}
+
+function SharedChip({ visibility }: { visibility: DashboardVisibility }) {
+  const chip = SHARED_CHIPS[visibility];
+  if (!chip) return null;
+  const Icon = chip.icon;
+  return (
+    <HStack
+      as="span"
+      gap={1}
+      flexShrink={0}
+      borderRadius="sm"
+      background={`${chip.palette}.50`}
+      color={`${chip.palette}.600`}
+      paddingX={1.5}
+      paddingY={0.5}
+      fontSize="10px"
+      fontWeight="medium"
+    >
+      <Icon size={11} aria-hidden /> {boardVisibilityLabel(visibility)}
+    </HStack>
   );
 }
 
@@ -83,14 +143,20 @@ function BoardTitle({ name, onRename }: { name: string; onRename?: (name: string
 
   return (
     <>
-      <PageLayout.Heading truncate>{name}</PageLayout.Heading>
+      <PageLayout.Heading truncate fontWeight="semibold" letterSpacing="tight">
+        {name}
+      </PageLayout.Heading>
       {onRename && (
         <IconButton
           aria-label="Rename dashboard"
           title="Rename dashboard"
           variant="ghost"
-          size="xs"
-          color="fg.subtle"
+          size="2xs"
+          minWidth={0}
+          padding={1}
+          borderRadius="md"
+          color="gray.400"
+          _hover={{ background: "bg.muted", color: "fg" }}
           flexShrink={0}
           onClick={() => setRenaming(true)}
         >
@@ -100,6 +166,15 @@ function BoardTitle({ name, onRename }: { name: string; onRename?: (name: string
     </>
   );
 }
+
+const DESCRIPTION_TEXT = {
+  variant: "plain",
+  size: "sm",
+  height: "auto",
+  paddingX: 0,
+  fontWeight: "normal",
+  fontSize: "12.5px",
+} as const;
 
 function BoardDescription({
   description,
@@ -112,7 +187,7 @@ function BoardDescription({
 
   if (!onDescribe) {
     return (
-      <Text fontSize="13px" color="fg.muted">
+      <Text fontSize="12.5px" color="fg.subtle">
         {description}
       </Text>
     );
@@ -138,12 +213,9 @@ function BoardDescription({
   if (description) {
     return (
       <Button
-        variant="plain"
-        size="sm"
-        paddingX={0}
-        fontWeight="normal"
-        fontSize="13px"
-        color="fg.muted"
+        {...DESCRIPTION_TEXT}
+        color="fg.subtle"
+        _hover={{ color: "fg" }}
         title="Edit description"
         onClick={() => setEditing(true)}
       >
@@ -154,13 +226,10 @@ function BoardDescription({
 
   return (
     <Button
-      variant="plain"
-      size="sm"
-      paddingX={0}
-      fontWeight="normal"
-      fontSize="13px"
+      {...DESCRIPTION_TEXT}
       fontStyle="italic"
-      color="fg.subtle"
+      color="gray.400"
+      _hover={{ color: "fg.subtle" }}
       onClick={() => setEditing(true)}
     >
       Add a description

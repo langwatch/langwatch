@@ -4,15 +4,20 @@
  * Grouped Mine, Team, Organisation; the Flight Deck always leads Mine.
  */
 
-import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, IconButton, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { UiSavedDashboardsProps } from "@langwatch/browser-host/declarations";
+import type { DashboardVisibility } from "@langwatch/dashboard-contract";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Gauge, Plus, Star } from "lucide-react";
+import { Building2, Gauge, type LucideIcon, Plus, Star, Users } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useSavedDashboards, type SavedBoard } from "../../behavior/use-saved-dashboards.ts";
-import { boardVisibilityGroups } from "../../model/board-visibility.ts";
+import {
+  BOARD_ADMIN_PERMISSION,
+  boardVisibilityGroups,
+  canManageBoard,
+} from "../../model/board-visibility.ts";
 import { dashboardsPath, FLIGHT_DECK } from "../../model/boards.ts";
 import { SavedDashboardRow } from "../blocks/saved-dashboard-row.tsx";
 
@@ -21,8 +26,23 @@ const GROUP_LABEL_STYLE = {
   fontWeight: "semibold",
   letterSpacing: "0.09em",
   textTransform: "uppercase",
-  color: "fg.subtle",
+  color: "gray.400",
 } as const;
+
+/** The prototype tints a shared board's icon by who it is shown to. */
+const ROW_ICONS: Readonly<Record<DashboardVisibility, { icon: LucideIcon; color?: string }>> = {
+  only_me: { icon: Star },
+  team: { icon: Users, color: "blue.600" },
+  organisation: { icon: Building2, color: "orange.600" },
+};
+
+function RowIcon({ icon: Icon, color }: { icon: LucideIcon; color?: string }) {
+  return (
+    <Box as="span" display="flex" color={color}>
+      <Icon size={15} strokeWidth={1.9} aria-hidden />
+    </Box>
+  );
+}
 
 export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsProps) {
   const host = useAnalyticsHost();
@@ -30,6 +50,8 @@ export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsP
   const [renamingId, setRenamingId] = useState<string | undefined>();
   const [pendingDelete, setPendingDelete] = useState<SavedBoard | undefined>();
   const { projectSlug } = saved;
+  const userId = host.userId();
+  const isAdmin = host.hasPermission(BOARD_ADMIN_PERMISSION);
 
   const confirmDelete = () => {
     if (!pendingDelete) return;
@@ -45,19 +67,23 @@ export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsP
   };
 
   return (
-    <VStack align="stretch" gap={0.5} width="full" marginTop={3}>
-      <HStack paddingX={2} gap={1}>
+    <VStack align="stretch" gap={0.5} width="full" marginTop={3.5}>
+      <HStack paddingX={2} gap={1} marginBottom={0.5}>
         <Text {...GROUP_LABEL_STYLE}>Saved dashboards</Text>
         <Spacer />
-        <Button
-          size="2xs"
+        <IconButton
           variant="ghost"
+          boxSize={4}
+          minWidth={4}
+          borderRadius="sm"
+          color="gray.400"
+          _hover={{ background: "border/60", color: "fg" }}
           aria-label="New dashboard"
           loading={saved.isCreating}
           onClick={saved.createBoard}
         >
           <Plus size={12} />
-        </Button>
+        </IconButton>
       </HStack>
       {boardVisibilityGroups(saved.boards).map((group) => (
         <BoardGroup key={group.key} label={group.label}>
@@ -65,7 +91,7 @@ export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsP
             <SavedDashboardRow
               name={FLIGHT_DECK.name}
               href={dashboardsPath({ projectSlug, dashboardId: FLIGHT_DECK.id })}
-              icon={<Gauge size={15} />}
+              icon={<RowIcon icon={Gauge} />}
               isActive={activeDashboardId === FLIGHT_DECK.id}
               tag="Default"
             />
@@ -75,7 +101,7 @@ export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsP
               key={board.id}
               name={board.name}
               href={dashboardsPath({ projectSlug, dashboardId: board.id })}
-              icon={<Star size={15} />}
+              icon={<RowIcon {...ROW_ICONS[board.visibility]} />}
               isActive={activeDashboardId === board.id}
               actions={{
                 isRenaming: renamingId === board.id,
@@ -85,7 +111,9 @@ export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsP
                   saved.renameBoard({ dashboardId: board.id, name });
                 },
                 onRenameCancel: () => setRenamingId(void 0),
-                onDelete: () => setPendingDelete(board),
+                onDelete: canManageBoard({ createdById: board.createdById, userId, isAdmin })
+                  ? () => setPendingDelete(board)
+                  : void 0,
               }}
             />
           ))}
@@ -111,7 +139,15 @@ function BoardGroup({ label, children }: { label: string; children: ReactNode })
   const labelId = useId();
   return (
     <>
-      <Text id={labelId} paddingX={2} marginTop={1} {...GROUP_LABEL_STYLE} fontSize="9px">
+      <Text
+        id={labelId}
+        paddingX={2}
+        marginTop={1}
+        marginBottom={0.5}
+        {...GROUP_LABEL_STYLE}
+        fontSize="9px"
+        color="gray.400/80"
+      >
         {label}
       </Text>
       <VStack as="ul" aria-labelledby={labelId} align="stretch" gap={0.5} margin={0} padding={0}>

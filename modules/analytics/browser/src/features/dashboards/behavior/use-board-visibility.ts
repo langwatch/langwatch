@@ -8,7 +8,7 @@ import type { DashboardVisibility } from "@langwatch/dashboard-contract";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import { BOARD_ADMIN_PERMISSION, canChangeBoardVisibility } from "../model/board-visibility.ts";
+import { BOARD_ADMIN_PERMISSION, canManageBoard } from "../model/board-visibility.ts";
 import type { SavedBoard } from "./use-saved-dashboards.ts";
 
 export function useBoardVisibility({ board }: { board: SavedBoard }) {
@@ -21,7 +21,7 @@ export function useBoardVisibility({ board }: { board: SavedBoard }) {
 
   return {
     visibility: change.isPending ? change.variables.visibility : board.visibility,
-    canChange: canChangeBoardVisibility({
+    canChange: canManageBoard({
       createdById: board.createdById,
       userId: host.userId(),
       isAdmin: host.hasPermission(BOARD_ADMIN_PERMISSION),

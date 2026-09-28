@@ -1,14 +1,14 @@
 /**
- * The board header's share control, after the prototype's Share menu: Only me,
- * Team or Organisation. Disabled, with the reason, for a member who may not
- * change it; a server refusal is said beside it in the registry's words.
+ * The board header's share control, after the prototype's icon-only Share
+ * menu: Only me, Team or Organisation. Disabled, with the reason, for a member
+ * who may not change it; a server refusal is said beside it in the registry's words.
  */
 
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { DASHBOARD_VISIBILITIES, type DashboardVisibility } from "@langwatch/dashboard-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import { explainAnyError } from "@langwatch/error-presentation/presentation";
-import { Building2, Lock, type LucideIcon, Users } from "lucide-react";
+import { Building2, Check, Lock, type LucideIcon, Share2, Users } from "lucide-react";
 
 import {
   BOARD_VISIBILITY_LOCKED_REASON,
@@ -32,17 +32,22 @@ export function BoardVisibilityControl({
   readonly refusal: unknown;
   readonly onChange: (visibility: DashboardVisibility) => void;
 }) {
-  const Icon = VISIBILITY_ICONS[visibility];
+  const label = `Visibility: ${boardVisibilityLabel(visibility)}`;
   const trigger = (
-    <Button
-      variant="outline"
-      size="sm"
-      aria-label={`Visibility: ${boardVisibilityLabel(visibility)}`}
-      title={canChange ? void 0 : BOARD_VISIBILITY_LOCKED_REASON}
+    <IconButton
+      variant="ghost"
+      height={8}
+      minWidth={0}
+      paddingX={2}
+      borderRadius="lg"
+      color="fg.subtle"
+      _hover={{ background: "bg.muted", color: "fg" }}
+      aria-label={label}
+      title={canChange ? label : BOARD_VISIBILITY_LOCKED_REASON}
       disabled={!canChange}
     >
-      <Icon size={14} /> {boardVisibilityLabel(visibility)}
-    </Button>
+      <Share2 size={15} strokeWidth={2} />
+    </IconButton>
   );
 
   return (
@@ -60,10 +65,14 @@ export function BoardVisibilityControl({
                     value={`visibility-${option}`}
                     onClick={() => onChange(option)}
                   >
-                    <HStack gap={2}>
-                      <OptionIcon size={14} />
+                    <HStack width="full" gap={2} fontSize="12.5px">
+                      <OptionIcon size={13} />
                       {boardVisibilityLabel(option)}
-                      {option === visibility && " ✓"}
+                      {option === visibility && (
+                        <Box as="span" marginLeft="auto">
+                          <Check size={13} aria-label="selected" />
+                        </Box>
+                      )}
                     </HStack>
                   </Menu.Item>
                 );

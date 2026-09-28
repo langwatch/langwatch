@@ -5,9 +5,9 @@
 
 import { describe, expect, it } from "vitest";
 
-import { boardVisibilityGroups, canChangeBoardVisibility } from "../model/board-visibility.ts";
+import { boardVisibilityGroups, canManageBoard } from "../model/board-visibility.ts";
 
-describe("canChangeBoardVisibility", () => {
+describe("canManageBoard", () => {
   /** @scenario "AC26 Only the creator or an admin can change visibility or delete the board" */
   it.each([
     ["the creator", { createdById: "user-1", userId: "user-1", isAdmin: false }, true],
@@ -19,7 +19,7 @@ describe("canChangeBoardVisibility", () => {
       true,
     ],
   ] as const)("answers %s", (_who, input, allowed) => {
-    expect(canChangeBoardVisibility(input)).toBe(allowed);
+    expect(canManageBoard(input)).toBe(allowed);
   });
 });
 

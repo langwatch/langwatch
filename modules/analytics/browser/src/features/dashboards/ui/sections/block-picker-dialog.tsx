@@ -101,12 +101,14 @@ export function BlockPickerDialog({
 
   return (
     <Dialog.Root open size="lg" onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content maxHeight="76vh">
-        <Dialog.Header borderBottomWidth="1px">
-          <Dialog.Title fontSize="14px">Add a block</Dialog.Title>
+      <Dialog.Content maxHeight="76vh" maxWidth="720px" borderRadius="xl">
+        <Dialog.Header borderBottomWidth="1px" paddingX={5} paddingY={3.5}>
+          <Dialog.Title fontSize="14px" fontWeight="semibold">
+            Add a block
+          </Dialog.Title>
           <Dialog.CloseTrigger />
         </Dialog.Header>
-        <VStack align="stretch" gap={3} paddingX={5} paddingY={4} borderBottomWidth="1px">
+        <VStack align="stretch" gap={3} paddingX={5} paddingY={5} borderBottomWidth="1px">
           {!targetDashboardId && (
             <HStack gap={2}>
               <Text fontSize="13px" color="fg.muted" flexShrink={0}>
@@ -132,6 +134,10 @@ export function BlockPickerDialog({
           <SearchInput
             aria-label="Search questions"
             placeholder="What do you need to know?"
+            height="54px"
+            borderRadius="2xl"
+            fontSize="15px"
+            boxShadow="0 1px 4px rgb(16 16 32 / 0.06)"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -179,7 +185,7 @@ function QuestionSection({
         >
           {section.title}
         </Text>
-        <Text fontSize="12px" color="fg.muted">
+        <Text fontSize="12px" lineHeight="relaxed" color="fg.subtle">
           {section.why}
         </Text>
       </VStack>
@@ -217,24 +223,35 @@ function QuestionRow({
       paddingX={4}
       paddingY={3}
       borderRadius="xl"
+      borderColor="border"
+      background="bg.panel"
+      boxShadow="0 1px 2px rgb(16 16 32 / 0.03)"
       fontWeight="normal"
+      _hover={{
+        borderColor: "teal.solid/50",
+        background: "bg.panel",
+        boxShadow: "0 2px 8px rgb(16 16 32 / 0.06)",
+      }}
       disabled={disabled}
       onClick={onClick}
     >
       <Box
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        boxSize={8}
         borderRadius="md"
-        padding={2}
         background={`${palette}.subtle`}
         color={`${palette}.fg`}
         flexShrink={0}
       >
-        <Icon size={16} aria-hidden />
+        <Icon size={16} strokeWidth={2.1} aria-hidden />
       </Box>
       <VStack align="start" gap={0} minWidth={0}>
-        <Text fontSize="13px" fontWeight="medium" truncate>
+        <Text fontSize="13px" lineHeight="snug" fontWeight="medium" color="fg" truncate>
           {question.question}
         </Text>
-        <Text fontSize="12px" color="fg.muted" truncate>
+        <Text fontSize="12px" lineHeight="relaxed" color="fg.subtle" truncate>
           {question.why}
         </Text>
       </VStack>

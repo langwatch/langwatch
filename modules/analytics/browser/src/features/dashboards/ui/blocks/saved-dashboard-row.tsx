@@ -1,22 +1,24 @@
 /**
- * One board in the saved-dashboards list: a link, an optional tag, and for a
- * board the member owns a "⋮" menu with rename and delete. Renaming swaps the
- * link for an inline field; Enter or leaving it saves, Escape cancels.
+ * One board in the saved-dashboards list, after the prototype's sidebar row:
+ * one truncated line, an optional tag, and for a board the member owns a "⋮"
+ * menu. Rename swaps in an inline field; Enter or blur saves, Escape cancels.
  */
 
-import { Badge, Box, Button, Input } from "@chakra-ui/react";
+import { Box, Button, Input, Link as ChakraLink, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { MoreVertical } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { MenuLink } from "../../../../ui/elements/analytics-menu-link.tsx";
+import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
 
 export type SavedDashboardRowActions = {
   isRenaming: boolean;
   onRenameStart: () => void;
   onRenameCommit: (name: string) => void;
   onRenameCancel: () => void;
-  onDelete: () => void;
+  /** Absent for a member who may not delete the board (AC26). */
+  onDelete?: () => void;
 };
 
 export function SavedDashboardRow({
@@ -34,6 +36,7 @@ export function SavedDashboardRow({
   tag?: string;
   actions?: SavedDashboardRowActions;
 }) {
+  const host = useAnalyticsHost();
   if (actions?.isRenaming) {
     return <RenameField name={name} actions={actions} />;
   }
@@ -47,30 +50,61 @@ export function SavedDashboardRow({
       _hover={{ "& .row-menu": { opacity: 1 } }}
       _focusWithin={{ "& .row-menu": { opacity: 1 } }}
     >
-      <MenuLink
+      <ChakraLink
         href={href}
+        display="flex"
+        alignItems="center"
+        gap={2.5}
+        width="full"
+        borderRadius="lg"
         paddingX={2}
-        icon={icon}
-        isSelected={isActive}
-        menuEnd={renderMenuEnd(tag, actions)}
+        paddingY="5px"
+        fontSize="13px"
+        fontWeight={isActive ? "medium" : "normal"}
+        color={isActive ? "fg" : "fg.subtle"}
+        background={isActive ? "border" : "transparent"}
+        textDecoration="none"
+        _hover={{ color: "fg", background: isActive ? "border" : "border/50" }}
+        aria-current={isActive ? "page" : void 0}
+        onClick={(event) => {
+          if (opensElsewhere(event)) return;
+          event.preventDefault();
+          host.navigate(href);
+        }}
       >
-        {name}
-      </MenuLink>
+        <Box as="span" display="flex" flexShrink={0}>
+          {icon}
+        </Box>
+        <Text as="span" truncate minWidth={0}>
+          {name}
+        </Text>
+        {tag && <RowTag>{tag}</RowTag>}
+        {!tag && actions && <Box width="20px" flexShrink={0} marginLeft="auto" />}
+      </ChakraLink>
       {actions && <RowMenu name={name} isActive={isActive} actions={actions} />}
     </Box>
   );
 }
 
-function renderMenuEnd(tag: string | undefined, actions: SavedDashboardRowActions | undefined) {
-  if (tag) {
-    return (
-      <Badge size="xs" variant="plain" color="fg.subtle" textTransform="uppercase">
-        {tag}
-      </Badge>
-    );
-  }
-  if (actions) return <Box width="20px" />;
-  return void 0;
+function RowTag({ children }: { children: string }) {
+  return (
+    <Box
+      as="span"
+      marginLeft="auto"
+      flexShrink={0}
+      borderRadius="sm"
+      background="bg.muted"
+      paddingX={1.5}
+      paddingY={0.5}
+      fontSize="9px"
+      fontWeight="semibold"
+      letterSpacing="wide"
+      textTransform="uppercase"
+      color="gray.400"
+    >
+      {children}
+    </Box>
+  );
 }
 
 function RowMenu({
@@ -94,7 +128,7 @@ function RowMenu({
     >
       <Menu.Root>
         <Menu.Trigger asChild>
-          <Button size="2xs" variant="ghost" aria-label={`Actions for ${name}`}>
+          <Button size="2xs" variant="ghost" color="gray.400" aria-label={`Actions for ${name}`}>
             <MoreVertical size={14} />
           </Button>
         </Menu.Trigger>
@@ -102,9 +136,11 @@ function RowMenu({
           <Menu.Item value="rename" onClick={actions.onRenameStart}>
             Rename
           </Menu.Item>
-          <Menu.Item value="delete" color="red.500" onClick={actions.onDelete}>
-            Delete
-          </Menu.Item>
+          {actions.onDelete && (
+            <Menu.Item value="delete" color="red.500" onClick={actions.onDelete}>
+              Delete
+            </Menu.Item>
+          )}
         </Menu.Content>
       </Menu.Root>
     </Box>
@@ -132,6 +168,7 @@ function RenameField({ name, actions }: { name: string; actions: SavedDashboardR
       <Input
         ref={inputRef}
         size="xs"
+        fontSize="13px"
         aria-label="Dashboard name"
         value={draft}
         onChange={(event) => setDraft(event.target.value)}

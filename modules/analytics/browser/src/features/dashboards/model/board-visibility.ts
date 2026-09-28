@@ -22,8 +22,11 @@ export function boardVisibilityLabel(visibility: DashboardVisibility): string {
   return VISIBILITY_LABELS[visibility];
 }
 
-/** A board with no recorded creator predates the rule and stays open to anyone who may edit. */
-export function canChangeBoardVisibility({
+/**
+ * Who may change a board's visibility or delete it. A board with no recorded
+ * creator predates the rule and stays open to anyone who may edit.
+ */
+export function canManageBoard({
   createdById,
   userId,
   isAdmin,
