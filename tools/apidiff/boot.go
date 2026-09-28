@@ -19,6 +19,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // Boot orchestration constants, verified against dev/compose.dev.yml and
@@ -95,6 +97,9 @@ type BootConfig struct {
 	// DryRun prints the plan (refs, worktree paths, slugs, commands) and runs
 	// nothing at all — no worktree, no haven command, no install.
 	DryRun bool
+	// ParityOnly stops the run after the parity phase, so it starts no
+	// infrastructure for a boot that will not follow.
+	ParityOnly bool
 }
 
 // Instance is one booted API copy.
@@ -400,13 +405,6 @@ type commandSpec struct {
 // runner executes external commands; tests swap it out.
 type runner func(ctx context.Context, spec commandSpec, log io.Writer) error
 
-// Boot brings up both instances and returns them with a teardown hook. On
-// any failure the resources created so far are torn down before returning.
-func Boot(ctx context.Context, cfg BootConfig, stderr io.Writer) (*Booted, error) {
-	state := &bootState{cfg: cfg, stderr: stderr, run: execRunner}
-	return state.boot(ctx)
-}
-
 // DryRunPlan is what `-dry-run` prints: the worktrees, slugs and commands a
 // run would use, computed without creating a worktree, starting anything, or
 // running any command at all.
@@ -521,6 +519,16 @@ type bootState struct {
 	// langyStub stands in for the Langy agent manager on both sides (compose
 	// and external-infra paths only), started before the first migrate.
 	langyStub *langyAgentStub
+	// started is when the run began; timing lines are measured from it.
+	started time.Time
+	// prepared says the parity phase installed and generated both trees, so
+	// boot runs no install or prepare of its own.
+	prepared bool
+	// infraDone closes when the infrastructure startInfraEarly began is up;
+	// infraErr is what bringing it up returned.
+	infraDone    chan struct{}
+	infraErr     error
+	teardownOnce sync.Once
 }
 
 // environ is the environment child commands inherit.
@@ -554,16 +562,13 @@ func (state *bootState) boot(ctx context.Context) (booted *Booted, err error) {
 		}
 	}()
 
-	if err := state.prepareLayout(); err != nil {
-		return nil, err
-	}
-	if err := state.setupWorktree(ctx); err != nil {
+	if err := state.layOut(ctx); err != nil {
 		return nil, err
 	}
 
 	booted = &Booted{
 		WorkRoot: state.workRoot,
-		A:        Instance{Name: "branch", Dir: state.cfg.BranchDir},
+		A:        Instance{Name: "branch", Dir: state.branchTree()},
 		B:        Instance{Name: "main", Dir: state.mainDir},
 	}
 	booted.Teardown = state.teardown
@@ -578,7 +583,29 @@ func (state *bootState) boot(ctx context.Context) (booted *Booted, err error) {
 		return booted, err
 	}
 	booted.ActivateEntitlement = state.buildEntitlementActivator()
+	state.timing("both instances healthy")
 	return booted, nil
+}
+
+// layOut creates the work root and checks the trees out, unless the parity
+// phase already did both on this state.
+func (state *bootState) layOut(ctx context.Context) error {
+	if state.workRoot != "" {
+		return nil
+	}
+	if err := state.prepareLayout(); err != nil {
+		return err
+	}
+	return state.setupWorktree(ctx)
+}
+
+// branchTree is the tree the branch side runs from: its own HEAD worktree on
+// the haven path, -branch-dir itself on the -no-haven path.
+func (state *bootState) branchTree() string {
+	if state.branchDir != "" {
+		return state.branchDir
+	}
+	return state.cfg.BranchDir
 }
 
 // buildEntitlementActivator reads the license the entitled pass activates
@@ -623,6 +650,9 @@ func (state *bootState) prepareLayout() error {
 		return err
 	}
 	state.cfg.BranchDir = branchDir
+	if state.started.IsZero() {
+		state.started = time.Now()
+	}
 	state.workRoot = state.cfg.WorkRoot
 	if state.workRoot == "" {
 		state.workRoot = filepath.Join(branchDir, ".apidiff", time.Now().Format("20060102-150405"))
@@ -673,38 +703,94 @@ func (state *bootState) prepareInstances(booted *Booted) error {
 	return nil
 }
 
-// bootInstances runs the per-instance bring-up stages in order.
+// bootInstances brings both sides up at once: each side migrates, seeds,
+// provisions and starts its API and worker beside the other, on the
+// infrastructure startInfraEarly began while the trees were being prepared.
 func (state *bootState) bootInstances(ctx context.Context, booted *Booted) error {
-	stages := []func() error{
-		func() error { return state.startLangyStub() },
-		func() error { return state.resolveInfra() },
-		func() error { return state.preflight(ctx) },
-		func() error { return state.install(ctx, booted.A) },
-		func() error { return state.install(ctx, booted.B) },
-		func() error { return state.startInfra(ctx) },
-		func() error { return state.waitPostgres(ctx) },
-		func() error { return state.prepareDatabases(ctx) },
-		func() error { return state.writeOverlay(booted.A) },
-		func() error { return state.writeOverlay(booted.B) },
-		func() error { return state.migrateAndSeed(ctx, booted.A) },
-		func() error { return state.verifyMigrationTarget(ctx, booted.A) },
-		func() error { return state.provision(ctx, booted.A) },
-		func() error { return state.migrateAndSeed(ctx, booted.B) },
-		func() error { return state.verifyMigrationTarget(ctx, booted.B) },
-		func() error { return state.provision(ctx, booted.B) },
-		func() error { return state.provisionLwql(ctx, booted.A) },
-		func() error { return state.provisionLwql(ctx, booted.B) },
-		func() error { return state.startAPI(ctx, &booted.A) },
-		func() error { return state.startAPI(ctx, &booted.B) },
-		func() error { return state.startWorker(ctx, &booted.A) },
-		func() error { return state.startWorker(ctx, &booted.B) },
+	if err := state.startLangyStub(); err != nil {
+		return err
 	}
-	for _, stage := range stages {
-		if err := stage(); err != nil {
+	if !state.prepared {
+		if err := bothSides(ctx, func(sideCtx context.Context, instance *Instance) error {
+			return state.install(sideCtx, *instance)
+		}, &booted.A, &booted.B); err != nil {
 			return err
 		}
 	}
-	return nil
+	if err := state.infraReady(ctx); err != nil {
+		return err
+	}
+	state.timing("infrastructure ready")
+	// Both sides provision LangWatchQL's server-wide ClickHouse identity, so
+	// main's provisioning still follows the branch's, in the order it always ran.
+	lwqlTurn := make(chan struct{})
+	stepCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var group errgroup.Group
+	for _, side := range []sidePipeline{{instance: &booted.A, lwqlDone: lwqlTurn}, {instance: &booted.B, lwqlAfter: lwqlTurn}} {
+		group.Go(func() error { return cancelOnError(cancel, state.bringUp(ctx, stepCtx, side)) })
+	}
+	return group.Wait()
+}
+
+// sidePipeline is one side's bring-up and its place in the LangWatchQL
+// order: the side it provisions after, and the side waiting on it.
+type sidePipeline struct {
+	instance  *Instance
+	lwqlAfter <-chan struct{}
+	lwqlDone  chan<- struct{}
+}
+
+// bringUp is one side's pipeline from an empty database to a healthy API and
+// its worker. Steps run under stepCtx, which the other side's failure cancels;
+// the processes run under ctx, which lives as long as the run.
+func (state *bootState) bringUp(ctx, stepCtx context.Context, side sidePipeline) error {
+	instance := side.instance
+	steps := []func() error{
+		func() error { return state.writeOverlay(*instance) },
+		func() error { return state.migrateAndSeed(stepCtx, *instance) },
+		func() error { return state.verifyMigrationTarget(stepCtx, *instance) },
+		func() error { return state.provision(stepCtx, *instance) },
+	}
+	for _, step := range steps {
+		if err := step(); err != nil {
+			return err
+		}
+	}
+	if side.lwqlAfter != nil {
+		select {
+		case <-side.lwqlAfter:
+		case <-stepCtx.Done():
+			return stepCtx.Err()
+		}
+	}
+	if err := state.provisionLwql(stepCtx, *instance); err != nil {
+		return err
+	}
+	if side.lwqlDone != nil {
+		close(side.lwqlDone)
+	}
+	state.timing("%s migrated, seeded and provisioned", instance.Name)
+	return state.startProcesses(ctx, stepCtx, instance)
+}
+
+// bothSides runs one step on both instances at once and returns the first
+// error; the first failure cancels the other side's step.
+func bothSides(ctx context.Context, step func(context.Context, *Instance) error, instances ...*Instance) error {
+	group, groupCtx := errgroup.WithContext(ctx)
+	for _, instance := range instances {
+		group.Go(func() error { return step(groupCtx, instance) })
+	}
+	return group.Wait()
+}
+
+// cancelOnError cancels the shared steps when one side fails, so the other
+// side stops waiting on a run that is already lost.
+func cancelOnError(cancel context.CancelFunc, err error) error {
+	if err != nil {
+		cancel()
+	}
+	return err
 }
 
 // setupWorktree prepares the base-ref worktree everywhere, and — for the
@@ -776,18 +862,18 @@ func (state *bootState) compose() composeCmd {
 }
 
 func (state *bootState) install(ctx context.Context, instance Instance) error {
-	if state.cfg.SkipInstall || (instance.Name == "main" && state.cfg.ReuseWorktrees) {
+	if state.cfg.SkipInstall || state.prepared {
 		state.logf("install %s: skipped", instance.Name)
 		return nil
 	}
 	state.logf("install %s: pnpm install --frozen-lockfile (this is the slow step)", instance.Name)
 	install := commandSpec{name: "pnpm", args: []string{"install", "--frozen-lockfile"}, dir: instance.Dir}
-	if err := state.run(ctx, install, state.stderr); err != nil {
+	if err := state.run(ctx, install, state.sideLog(instance.Name)); err != nil {
 		return fmt.Errorf("install %s: %w", instance.Name, err)
 	}
 	for _, argv := range instance.Profile.prepareArgvs {
 		prepare := commandSpec{name: "pnpm", args: argv, dir: instance.Dir}
-		if err := state.run(ctx, prepare, state.stderr); err != nil {
+		if err := state.run(ctx, prepare, state.sideLog(instance.Name)); err != nil {
 			return fmt.Errorf("prepare %s (%s): %w", instance.Name, strings.Join(argv, " "), err)
 		}
 	}
@@ -1155,7 +1241,7 @@ func (state *bootState) migrateAndSeed(ctx context.Context, instance Instance) e
 	}
 	for _, step := range steps {
 		spec := commandSpec{name: "pnpm", args: step.args, dir: instance.Dir, env: env}
-		if err := state.run(ctx, spec, state.stderr); err != nil {
+		if err := state.run(ctx, spec, state.sideLog(instance.Name)); err != nil {
 			return fmt.Errorf("%s %s: %w", step.name, instance.Name, err)
 		}
 	}
@@ -1187,7 +1273,7 @@ func (state *bootState) provisionLwql(ctx context.Context, instance Instance) er
 	}
 	state.logf("lwql %s: provision the access model", instance.Name)
 	spec := commandSpec{name: "pnpm", args: instance.Profile.lwqlProvisionArgv, dir: instance.Dir, env: env}
-	if err := state.run(ctx, spec, state.stderr); err != nil {
+	if err := state.run(ctx, spec, state.sideLog(instance.Name)); err != nil {
 		state.logf("lwql %s: provisioning failed (%v); LangWatchQL stays refused on this side", instance.Name, err)
 	}
 	return nil
@@ -1284,16 +1370,23 @@ func (state *bootState) verifyMigrationTarget(ctx context.Context, instance Inst
 	return nil
 }
 
-// startAPI spawns the API process for one instance and waits for health.
-func (state *bootState) startAPI(ctx context.Context, instance *Instance) error {
+// startProcesses spawns one instance's API and worker together, then waits
+// for the API's health. The worker starts with the API rather than after both
+// are healthy, so what the first probes ingest is projected without delay.
+func (state *bootState) startProcesses(ctx, waitCtx context.Context, instance *Instance) error {
 	command, logPath, err := state.spawn(ctx, instanceProcess{instance: *instance, argv: instance.Profile.startArgv, logName: instance.Name})
 	if err != nil {
 		return err
 	}
-	state.logf("start %s on :%d (pid %d, log %s); waiting for health", instance.Name, instance.Port, command.Process.Pid, logPath)
-	if err := state.waitHealthy(ctx, instance.URL, instance.Profile.healthPath); err != nil {
+	state.logf("start %s on :%d (pid %d, log %s)", instance.Name, instance.Port, command.Process.Pid, logPath)
+	if err := state.startWorker(ctx, instance); err != nil {
+		return err
+	}
+	state.logf("%s: waiting for health", instance.Name)
+	if err := state.waitHealthy(waitCtx, instance.URL, instance.Profile.healthPath); err != nil {
 		return fmt.Errorf("health %s: %w (see %s)", instance.Name, err, logPath)
 	}
+	state.timing("%s healthy", instance.Name)
 	return nil
 }
 
@@ -1420,6 +1513,15 @@ func healthy(ctx context.Context, client *http.Client, healthURL string) bool {
 // inspection); without it the whole process groups are killed here, before
 // the caller's cancel.
 func (state *bootState) teardown() {
+	state.teardownOnce.Do(state.teardownOnceOnly)
+}
+
+// teardownOnceOnly is teardown's body: the parity phase's cleanup and the
+// booted instances share one state, and whichever runs second finds it done.
+func (state *bootState) teardownOnceOnly() {
+	if state.infraDone != nil {
+		<-state.infraDone
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	if state.langyStub != nil {
@@ -1440,21 +1542,28 @@ func (state *bootState) teardown() {
 		return
 	}
 	state.killAPIProcesses()
-	if state.override != "" {
+	state.teardownInfra(ctx)
+	state.removeOwnedWorktrees(ctx)
+}
+
+// teardownInfra takes the compose stack down, or on external servers drops
+// exactly the run-scoped databases and empties its two Redis logical DBs.
+func (state *bootState) teardownInfra(ctx context.Context) {
+	switch {
+	case state.infra.pgServer == "":
+		// Nothing was provisioned: the run stopped before its infrastructure.
+	case state.override != "":
 		state.logf("teardown: docker compose down -v")
 		args := composeArgs(state.compose(), "down", "-v")
 		if err := state.runHost(ctx, "docker", args...); err != nil {
 			state.logf("teardown: compose down: %v", err)
 		}
-	} else {
-		// External infra has no compose down; drop exactly the run-scoped
-		// databases this run created and empty its two Redis logical DBs.
+	default:
 		state.dropDatabases(ctx)
 		if err := state.flushRedis(ctx); err != nil {
 			state.logf("teardown: flush redis: %v", err)
 		}
 	}
-	state.removeOwnedWorktrees(ctx)
 }
 
 // removeOwnedWorktrees removes every worktree this run added — the base-ref

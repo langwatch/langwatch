@@ -13,10 +13,11 @@ name: apidiff
 # `apidiff` compose project) — GitHub-hosted ubuntu-latest runners ship
 # Docker + the compose plugin, so this needs no extra setup step.
 #
-# -no-haven boots the BASE side (`origin/main`) in a fresh git worktree it
-# creates itself, but boots the CANDIDATE side directly from `-branch-dir`
-# (default `.`, i.e. this checkout) rather than a second worktree. That is
-# only safe on a clean tree — which a fresh `actions/checkout` always is.
+# -no-haven checks the BASE side (`origin/main`) out into a fresh git
+# worktree, and uses `-branch-dir` (`.`, this checkout) as the CANDIDATE
+# tree for both the parity inventories and the boot: each tree is installed
+# and prepared once, both at the same time, while compose comes up. That is
+# only safe on a clean tree, which a fresh `actions/checkout` always is.
 # Never point `-branch-dir` at a working copy that might carry local edits.
 #
 # Sticky comment: one comment per PR, identified by an HTML marker and
@@ -25,7 +26,7 @@ name: apidiff
 # Issues API; no external sticky-comment action).
 #
 # Concurrency: a push cancels whatever apidiff run is still going for the
-# same PR — only the latest commit's result is worth the 15-25 minutes.
+# same PR — only the latest commit's result is worth the run.
 #
 # Exit codes (tools/apidiff/README.md): 0 no behavioral differences, 1
 # differences found, 2 operational/usage error (the run itself broke, not a
@@ -86,7 +87,7 @@ jobs:
     needs: changes
     # Fork PRs get a read-only GITHUB_TOKEN, so the comment POST below would
     # 403 regardless of what the run finds — skip the whole (expensive) run
-    # rather than spend 15-25 minutes on a result nobody can see posted.
+    # rather than spend the run on a result nobody can see posted.
     if: >-
       needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
       && github.event.pull_request.head.repo.full_name == github.repository
@@ -101,23 +102,22 @@ jobs:
           # go-ci.yaml's lint job uses for its own merge-base diff.
           fetch-depth: 0
 
+      # Pulled in the background while Go, pnpm and goose set up; compose up
+      # inside apidiff then finds the images already local.
+      - name: Pull the compose images in the background
+        run: nohup docker compose -f dev/compose.dev.yml pull --quiet postgres redis clickhouse > "$RUNNER_TEMP/compose-pull.log" 2>&1 &
+
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      # apidiff's own `run` does `pnpm install --frozen-lockfile` (plus
-      # prisma generate and the SDK/MCP-server builds) in BOTH instances it
-      # boots — including THIS checkout for the candidate side, since
-      # -no-haven boots the candidate from -branch-dir itself rather than a
-      # fresh worktree. This step doesn't replace that install; it warms the
-      # pnpm store and fixes the two node-gyp issues setup-pnpm-node exists
-      # for (missing global binary, wrong permission bit on pnpm's vendored
-      # copy), so apidiff's own installs — here and in the origin/main
-      # worktree it creates — hit a warm cache instead of a cold one.
+      # apidiff installs and prepares each tree itself, once: this checkout
+      # (-branch-dir) and the origin/main worktree it creates. This step only
+      # sets up pnpm and Node and restores the pnpm store cache, so those two
+      # installs hit a warm store; installing here as well would install the
+      # candidate twice.
       - uses: ./.github/actions/setup-pnpm-node
-        with:
-          install: all
 
       # Both sides' clickhouse-migrate runs goose, which the runner lacks.
       - name: Install goose

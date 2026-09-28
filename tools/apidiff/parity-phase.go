@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/langwatch/langwatch/tools/havenrun"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/langwatch/langwatch/tools/openapidiff"
 )
 
@@ -31,25 +32,29 @@ type ParityReport struct {
 	Notes       []string       `json:"notes,omitempty"`
 }
 
-// parityPhase is phase one of `apidiff run`: both worktrees prepared the way
-// Boot prepares them, both tRPC surfaces inventoried, and the packets written,
-// before any stack boots.
+// parityPhase is phase one of `apidiff run`: both trees prepared once, the
+// way Boot then boots them, and both surfaces inventoried in the background
+// while the instances migrate and seed.
 type parityPhase struct {
 	state  *bootState
 	dir    string
 	report ParityReport
 	// modules memoizes the catalog lookups, which read the tree each call.
 	modules map[string]string
+	// inventoried closes once the background inventories have finished and
+	// inventoryErr holds what they returned; cancelInventory stops them.
+	inventoried     chan struct{}
+	inventoryErr    error
+	cancelInventory context.CancelFunc
 }
 
-// runParityPhase prepares both worktrees and writes the tRPC parity. It never
-// boots a stack; the caller decides whether a run continues past it.
+// runParityPhase prepares both trees and starts the inventories in the
+// background; finish waits for them. Unless the run stops after parity, the
+// managed infrastructure starts at once and is up when the trees are ready.
 func runParityPhase(ctx context.Context, boot BootConfig, stderr io.Writer) (*parityPhase, error) {
-	cfg := boot
-	cfg.UseHaven = true
-	state := &bootState{cfg: cfg, stderr: stderr, run: execRunner}
+	state := &bootState{cfg: boot, stderr: &lockedWriter{out: stderr}, run: execRunner}
 	phase := &parityPhase{state: state, modules: map[string]string{}}
-	if err := phase.prepare(ctx); err != nil {
+	if err := phase.prepare(ctx, !boot.ParityOnly); err != nil {
 		phase.cleanup()
 		return nil, err
 	}
@@ -60,85 +65,127 @@ func runParityPhase(ctx context.Context, boot BootConfig, stderr io.Writer) (*pa
 	}
 	phase.report = ParityReport{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
-		MainRef:     boot.MainRef, MainDir: state.mainDir, BranchDir: state.branchDir,
+		MainRef:     boot.MainRef, MainDir: state.mainDir, BranchDir: state.branchTree(),
 	}
-	if err := phase.inventoryTrpc(ctx); err != nil {
-		phase.cleanup()
-		return nil, err
-	}
-	document := phase.readMainRest()
-	if err := phase.inventoryRoutes(ctx, document); err != nil {
-		phase.cleanup()
-		return nil, err
-	}
-	err := phase.write()
-	return phase, err
+	inventoryCtx, cancel := context.WithCancel(ctx)
+	phase.cancelInventory = cancel
+	phase.inventoried = make(chan struct{})
+	go func() {
+		defer close(phase.inventoried)
+		phase.inventoryErr = phase.inventory(inventoryCtx)
+	}()
+	return phase, nil
 }
 
-func (phase *parityPhase) prepare(ctx context.Context) error {
-	if err := phase.state.prepareLayout(); err != nil {
+// prepare lays out the run, checks out main (and, on the haven path, the
+// branch's own HEAD) and prepares both trees at once.
+func (phase *parityPhase) prepare(ctx context.Context, bootsAfter bool) error {
+	state := phase.state
+	if err := state.prepareLayout(); err != nil {
 		return err
 	}
-	if err := phase.state.setupWorktree(ctx); err != nil {
+	if err := state.setupWorktree(ctx); err != nil {
 		return err
 	}
-	for _, dir := range []string{phase.state.mainDir, phase.state.branchDir} {
-		if err := phase.installForInventory(ctx, dir); err != nil {
+	state.timing("worktrees ready")
+	if bootsAfter && !state.cfg.UseHaven {
+		if err := state.startInfraEarly(ctx); err != nil {
 			return err
 		}
 	}
-	return nil
+	return state.prepareTrees(ctx)
 }
 
-// installForInventory runs the shared prepare steps minus the workspace build:
-// the inventories import TypeScript source, so a branch whose build is red
-// still gets its parity. Boot runs the full list before any stack starts.
-func (phase *parityPhase) installForInventory(ctx context.Context, dir string) error {
-	for _, step := range havenrun.PrepareCommands(havenrun.LayoutMonolith) {
-		argv := step.Name + " " + strings.Join(step.Args, " ")
-		phase.state.logf("parity prepare %s: %s", dir, argv)
-		if err := phase.state.run(ctx, commandSpec{name: step.Name, args: step.Args, dir: dir}, phase.state.stderr); err != nil {
-			return fmt.Errorf("parity prepare %s (%s): %w", dir, argv, err)
-		}
-	}
-	return nil
+// finish waits for the background inventories and answers their error.
+func (phase *parityPhase) finish() error {
+	<-phase.inventoried
+	return phase.inventoryErr
 }
 
-// cleanup removes the worktrees this phase added unless -keep asked for them.
+// boot brings both instances up on the trees this phase prepared, sharing its
+// state: one layout, one infrastructure, one teardown.
+func (phase *parityPhase) boot(ctx context.Context) (*Booted, error) {
+	return phase.state.boot(ctx)
+}
+
+// cleanup stops the inventories and tears the run down unless -keep asked
+// for it to stay; the booted instances' teardown is this same call.
 func (phase *parityPhase) cleanup() {
-	if phase.state.cfg.Keep {
-		return
+	if phase.inventoried != nil {
+		phase.cancelInventory()
+		<-phase.inventoried
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	phase.state.removeOwnedWorktrees(ctx)
+	phase.state.teardown()
 }
 
-// continueInto hands the prepared worktrees to Boot, so the behavioral phase
-// reuses them instead of checking both refs out a second time.
-func (phase *parityPhase) continueInto(boot *BootConfig) {
-	boot.WorkRoot = phase.state.workRoot
-	boot.ReuseWorktrees = true
+// sideInventory is what one side's inventories read.
+type sideInventory struct {
+	procedures ProcedureManifest
+	routes     RouteManifest
 }
 
-func (phase *parityPhase) inventoryTrpc(ctx context.Context) error {
-	sides := map[string]string{"main": phase.state.mainDir, "branch": phase.state.branchDir}
-	manifests := map[string]ProcedureManifest{}
-	for _, side := range []string{"main", "branch"} {
-		out := filepath.Join(phase.dir, "trpc-"+side+".json")
-		phase.state.logf("parity: inventory %s tRPC procedures (%s)", side, sides[side])
-		inventory := trpcInventory{run: phase.state.run, inherit: phase.state.environ(), log: phase.state.stderr}
-		manifest, err := inventory.collect(ctx, sides[side], out)
-		if err != nil {
+// inventory reads both sides' tRPC procedures and served routes at once and
+// writes parity.json and the packets.
+func (phase *parityPhase) inventory(ctx context.Context) error {
+	sides := phase.state.sides()
+	read := make([]sideInventory, len(sides))
+	group, groupCtx := errgroup.WithContext(ctx)
+	for index, side := range sides {
+		group.Go(func() (err error) {
+			read[index], err = phase.inventorySide(groupCtx, side)
 			return err
-		}
-		for _, failure := range manifest.Failures {
-			phase.report.Notes = append(phase.report.Notes, fmt.Sprintf("%s contract %s not imported: %s", side, failure.Source, failure.Error))
-		}
-		manifests[side] = manifest
+		})
 	}
-	phase.report.Trpc = DiffProcedures(manifests["main"].Procedures, manifests["branch"].Procedures, phase.procedureModule)
+	if err := group.Wait(); err != nil {
+		return err
+	}
+	branch, main := read[0], read[1]
+	phase.noteFailures(main, branch, false)
+	phase.report.Trpc = DiffProcedures(main.procedures.Procedures, branch.procedures.Procedures, phase.procedureModule)
+	document := phase.readMainRest()
+	phase.noteFailures(main, branch, true)
+	comparison := ServedComparison{Documented: DocumentedRoutes(document), ModuleOf: phase.restModule}
+	served := DiffServedRoutes(main.routes.Routes, branch.routes.Routes, comparison)
+	phase.report.ServedOnly = &served
+	if err := phase.write(); err != nil {
+		return err
+	}
+	phase.state.timing("parity inventories written")
 	return nil
+}
+
+// inventorySide reads one side's tRPC procedures, then its served routes.
+func (phase *parityPhase) inventorySide(ctx context.Context, side runSide) (sideInventory, error) {
+	log := phase.state.sideLog("parity " + side.name)
+	phase.state.logf("parity: inventory %s tRPC procedures and served routes (%s)", side.name, side.dir)
+	procedures, err := trpcInventory{run: phase.state.run, inherit: phase.state.environ(), log: log}.
+		collect(ctx, side.dir, filepath.Join(phase.dir, "trpc-"+side.name+".json"))
+	if err != nil {
+		return sideInventory{}, err
+	}
+	routes, err := routeInventory{run: phase.state.run, inherit: phase.state.environ(), log: log}.
+		collect(ctx, side.dir, filepath.Join(phase.dir, "routes-"+side.name+".json"))
+	if err != nil {
+		return sideInventory{}, err
+	}
+	return sideInventory{procedures: procedures, routes: routes}, nil
+}
+
+// noteFailures records every source a side could not read, main before
+// branch: the contracts on the first call, the route sources on the second.
+func (phase *parityPhase) noteFailures(main, branch sideInventory, routes bool) {
+	names := []string{"main", "branch"}
+	for index, read := range []*sideInventory{&main, &branch} {
+		if routes {
+			for _, failure := range read.routes.Failures {
+				phase.report.Notes = append(phase.report.Notes, fmt.Sprintf("%s routes of %s not read: %s", names[index], failure.Source, failure.Error))
+			}
+			continue
+		}
+		for _, failure := range read.procedures.Failures {
+			phase.report.Notes = append(phase.report.Notes, fmt.Sprintf("%s contract %s not imported: %s", names[index], failure.Source, failure.Error))
+		}
+	}
 }
 
 // procedureModule names the owning module: the branch contract that declares
@@ -150,7 +197,7 @@ func (phase *parityPhase) procedureModule(procedure Procedure) string {
 	namespace, _ := splitProcedurePath(procedure.Path)
 	return phase.memo("trpc "+namespace, func() string {
 		for _, candidate := range []string{namespace, leadingWord(namespace), enterpriseSegment(procedure.Source)} {
-			if module := namespaceModule(phase.state.branchDir, candidate); module != "" {
+			if module := namespaceModule(phase.state.branchTree(), candidate); module != "" {
 				return module
 			}
 		}
@@ -191,7 +238,7 @@ func enterpriseSegment(source string) string {
 }
 
 func (phase *parityPhase) restModule(method, path string) string {
-	return phase.memo(method+" "+path, func() string { return ModuleFor(phase.state.branchDir, method, path) })
+	return phase.memo(method+" "+path, func() string { return ModuleFor(phase.state.branchTree(), method, path) })
 }
 
 func (phase *parityPhase) memo(key string, lookup func() string) string {
@@ -237,51 +284,6 @@ func (phase *parityPhase) readMainRest() map[string]any {
 		"REST: main serves %d operations; the branch document is generated from its mounted routes, so REST parity is completed once the branch serves (a full run)",
 		countOperations(document)))
 	return document
-}
-
-// inventoryRoutes compares every route each side serves, documented or not,
-// before either stack boots. mainDocument is main's served OpenAPI document:
-// a route it describes is left to REST parity rather than counted twice.
-func (phase *parityPhase) inventoryRoutes(ctx context.Context, mainDocument map[string]any) error {
-	sides := map[string]string{"main": phase.state.mainDir, "branch": phase.state.branchDir}
-	manifests := map[string]RouteManifest{}
-	for _, side := range []string{"main", "branch"} {
-		out := filepath.Join(phase.dir, "routes-"+side+".json")
-		phase.state.logf("parity: inventory %s served routes (%s)", side, sides[side])
-		if err := phase.buildSdkForRoutes(ctx, sides[side]); err != nil {
-			return err
-		}
-		inventory := routeInventory{run: phase.state.run, inherit: phase.state.environ(), log: phase.state.stderr}
-		manifest, err := inventory.collect(ctx, sides[side], out)
-		if err != nil {
-			return err
-		}
-		for _, failure := range manifest.Failures {
-			phase.report.Notes = append(phase.report.Notes, fmt.Sprintf("%s routes of %s not read: %s", side, failure.Source, failure.Error))
-		}
-		manifests[side] = manifest
-	}
-	comparison := ServedComparison{Documented: DocumentedRoutes(mainDocument), ModuleOf: phase.restModule}
-	served := DiffServedRoutes(manifests["main"].Routes, manifests["branch"].Routes, comparison)
-	phase.report.ServedOnly = &served
-	return nil
-}
-
-// routeInventoryBuilds are the built entries the route inventory loads: served
-// routes are read from the composed application, whose packages import these
-// packages' dist, and the parity prepare deliberately skips the build.
-var routeInventoryBuilds = []string{"langwatch", "@langwatch/ksuid", "@langwatch/mail", "@langwatch/mcp-server"}
-
-// buildSdkForRoutes builds each package the route inventory imports built.
-func (phase *parityPhase) buildSdkForRoutes(ctx context.Context, dir string) error {
-	for _, name := range routeInventoryBuilds {
-		phase.state.logf("parity prepare %s: pnpm --filter %s build", dir, name)
-		build := commandSpec{name: "pnpm", args: []string{"--filter", name, "build"}, dir: dir}
-		if err := phase.state.run(ctx, build, phase.state.stderr); err != nil {
-			return fmt.Errorf("parity prepare %s (pnpm --filter %s build): %w", dir, name, err)
-		}
-	}
-	return nil
 }
 
 // completeWithRest adds REST parity from both served documents, rewrites the

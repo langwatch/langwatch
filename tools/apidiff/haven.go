@@ -226,11 +226,11 @@ func (state *bootState) havenPrepareInstance(ctx context.Context, instance Insta
 		return fmt.Errorf("prepare %s: copy env: %w", instance.Name, err)
 	}
 	state.logf("prepare %s: copy .env files exit=ok (copied %d)", instance.Name, copied)
-	layout := havenrun.LayoutModular
-	if instance.Profile.name == profileMonolith {
-		layout = havenrun.LayoutMonolith
+	if state.prepared {
+		state.logf("prepare %s: the parity phase prepared this worktree", instance.Name)
+		return nil
 	}
-	for _, step := range havenrun.PrepareCommands(layout) {
+	for _, step := range havenrun.PrepareCommands(instance.Profile.layout()) {
 		spec := commandSpec{name: step.Name, args: step.Args, dir: instance.Dir}
 		argv := step.Name + " " + strings.Join(step.Args, " ")
 		state.logf("prepare %s: %s", instance.Name, argv)

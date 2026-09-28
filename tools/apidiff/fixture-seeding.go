@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -34,7 +36,8 @@ var fixtureSymbols = map[string]string{
 }
 
 // seedFixtures files the fixture ids and ingests the fixture trace on both
-// sides, then waits until each side can read it back.
+// sides. The wait for each side to read it back runs in the background; only
+// an operation that reads traces waits for it (awaitFixtureTraceFor).
 func (engine *probeEngine) seedFixtures() {
 	buckets := make([]string, 0, len(fixtureSymbols))
 	for bucket := range fixtureSymbols {
@@ -45,13 +48,21 @@ func (engine *probeEngine) seedFixtures() {
 		engine.symbolsA.file(bucket, fixtureSymbols[bucket])
 		engine.symbolsB.file(bucket, fixtureSymbols[bucket])
 	}
-	engine.ingestFixtureTrace()
+	accepted := engine.ingestFixtureTrace()
+	done := make(chan struct{})
+	engine.fixtureTrace = done
+	go func() {
+		defer close(done)
+		engine.awaitFixtureTrace(accepted)
+	}()
 	engine.ingestCodingAgentLog()
-	engine.mintCLISession(engine.options.A, engine.credsA)
+	var group sync.WaitGroup
+	group.Go(func() { engine.mintCLISession(engine.options.A, engine.credsA) })
 	engine.mintCLISession(engine.options.B, engine.credsB)
+	group.Wait()
 }
 
-func (engine *probeEngine) ingestFixtureTrace() {
+func (engine *probeEngine) ingestFixtureTrace() []string {
 	body := fixtureTraceBody(time.Now().Truncate(time.Hour))
 	accepted := make([]string, 0, 2)
 	for _, baseURL := range []string{engine.options.A, engine.options.B} {
@@ -64,20 +75,64 @@ func (engine *probeEngine) ingestFixtureTrace() {
 			accepted = append(accepted, baseURL)
 		}
 	}
-	engine.awaitFixtureTrace(accepted)
+	return accepted
 }
 
 // awaitFixtureTrace polls each side that accepted the trace until it reads
-// back, so the trace routes compare a real trace rather than two 404s.
+// back, both sides at once, so the trace routes compare a real trace rather
+// than two 404s. A side that never reads it back is said so loudly.
 func (engine *probeEngine) awaitFixtureTrace(baseURLs []string) {
-	deadline := time.Now().Add(fixtureTraceWait)
+	started := time.Now()
+	deadline := started.Add(fixtureTraceWait)
+	var group sync.WaitGroup
 	for _, baseURL := range baseURLs {
-		status := engine.readFixtureTrace(baseURL)
-		for status != http.StatusOK && time.Now().Before(deadline) && engine.backoff(1) {
-			status = engine.readFixtureTrace(baseURL)
-		}
-		engine.progress("fixture trace readable on %s: %d\n", baseURL, status)
+		group.Go(func() {
+			status := engine.readFixtureTrace(baseURL)
+			for status != http.StatusOK && time.Now().Before(deadline) && engine.backoff(1) {
+				status = engine.readFixtureTrace(baseURL)
+			}
+			if status != http.StatusOK {
+				engine.progress("WARNING fixture trace never readable on %s (last %d after %s): its trace routes compare without the trace; is its worker projecting?\n",
+					baseURL, status, time.Since(started).Round(time.Second))
+				return
+			}
+			engine.progress("fixture trace readable on %s: %d after %s\n", baseURL, status, time.Since(started).Round(time.Second))
+		})
 	}
+	group.Wait()
+}
+
+// traceReadingPaths mark the operations whose answer depends on the fixture
+// trace having landed: the trace routes and the analytics that count it.
+var traceReadingPaths = []string{"trace", "span", "analytics"}
+
+// awaitFixtureTraceFor holds the first trace-reading operation until the
+// background fixture-trace wait is over; every later one then proceeds.
+func (engine *probeEngine) awaitFixtureTraceFor(operation Operation) {
+	if engine.fixtureTrace == nil || engine.traceAwaited || !readsTraces(operation.Path) {
+		return
+	}
+	engine.traceAwaited = true
+	started := time.Now()
+	<-engine.fixtureTrace
+	engine.progress("fixture trace: %s %s waited %s for it\n", operation.Method, operation.Path, time.Since(started).Round(time.Millisecond))
+}
+
+// fixtureTraceSettled waits out the background wait before the run returns.
+func (engine *probeEngine) fixtureTraceSettled() {
+	if engine.fixtureTrace != nil {
+		<-engine.fixtureTrace
+	}
+}
+
+func readsTraces(path string) bool {
+	lower := strings.ToLower(path)
+	for _, marker := range traceReadingPaths {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func (engine *probeEngine) readFixtureTrace(baseURL string) int {

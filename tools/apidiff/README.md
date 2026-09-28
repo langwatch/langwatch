@@ -27,8 +27,10 @@ apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
 (default `main`), and, wherever haven is selected, a second worktree checking
 out `-branch-dir`'s own HEAD — with isolated Postgres/ClickHouse databases
 (run-scoped: `apidiff_<runid>_branch` / `apidiff_<runid>_main`, where the run
-id derives from the work-root name) and Redis logical DBs (14/15), migrates
-and seeds each, waits for health, probes, and tears everything down. `probe`
+id derives from the work-root name) and two Redis logical DBs derived from the
+run id, migrates and seeds each, waits for health, probes, and tears
+everything down. Under `-no-haven` the branch side is `-branch-dir` itself,
+for the parity inventories and the boot alike. `probe`
 compares two already-running instances.
 
 **Neither haven stack ever boots inside the invoking checkout.** haven
@@ -543,6 +545,30 @@ and packets" above), empty only for the handful of paths no module declares. `de
 changed field pointers, or the skip/failure reason. The stream closes with one
 `{"kind":"run-complete","counts":{...}}` line totalling every kind emitted.
 
+## Run phases
+
+A full `-no-haven` run overlaps everything that does not depend on
+something else. Every boundary is logged as `timing +<elapsed>: <phase>`.
+
+1. Worktrees, then the infrastructure: compose (or the external servers) is
+   resolved and preflighted, then brought up and its databases recreated in
+   the background.
+2. Both trees are prepared at once (see "Parity phase").
+3. The tRPC and route inventories of both sides run in the background, beside
+   migrate and seed; the probes start only after they are written.
+4. Each side then runs its own pipeline beside the other: migrate, seed,
+   fixtures, LangWatchQL provisioning (main's still after the branch's, since
+   both provision one server-wide ClickHouse identity), then its API and
+   worker spawned together and its health waited on.
+5. Probing: each case is sent to both sides at once, and the next case starts
+   only when both answered, so each side keeps its own order. The fixture
+   trace is waited on in the background; only the first trace or analytics
+   operation waits for it, and a side that never reads it back is logged as a
+   `WARNING`. The collection checks and the permission probes run in a pool
+   of six and are filed in probe order afterwards.
+6. Teardown, once, whichever of the parity cleanup and the boot's teardown
+   runs first.
+
 ## Parity phase
 
 Every `apidiff run` opens with a static surface comparison, before either
@@ -550,13 +576,14 @@ stack boots, so missing work is found in bulk and handed out per module
 before a single request is probed. `-parity-only` stops after it: no haven,
 no database, no stack — only the two worktrees.
 
-1. **Worktrees.** Both refs are checked out under the work root exactly as the
-   boot does (`<work-root>/main`, `<work-root>/branch`), and each gets the
-   shared prepare steps minus the workspace build (`pnpm install`, then
-   `start:prepare:files`). The inventories import TypeScript source, so a
-   branch whose build is red still gets its parity. A full run hands the same
-   worktrees to the boot (`-reuse-worktrees` semantics), which then runs the
-   full prepare list.
+1. **Trees, prepared once.** main is checked out into `<work-root>/main`; the
+   branch side is `<work-root>/branch` (its HEAD) on the haven path and
+   `-branch-dir` itself under `-no-haven`, so parity always reads the tree the
+   probes boot. Both trees are prepared at the same time, with havenrun's
+   steps for each tree's own layout (`pnpm install`, `start:prepare:files`,
+   and `ensure-built` on the modular layout). A full run boots those same
+   trees and runs no install or build of its own; `-skip-install` takes both
+   trees as they are. See "Run phases" below for what overlaps with what.
 2. **tRPC inventory, both sides.** A script embedded in the binary
    (`inventory/*.mjs`) is written into the worktree as
    `.apidiff-trpc-inventory.mjs`, run, and removed again — it is never committed and never written into the invoking
