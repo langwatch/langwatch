@@ -205,6 +205,24 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     When the span is ingested
     Then the span is filtered out and not stored
 
+  # Newer codex releases report their spans under the app-server's scope name
+  # instead of the originator's. Same emitter, same span names and attributes,
+  # so the same filter applies.
+
+  @unit
+  Scenario: Codex app-server sessions get the same noise filter as the TUI
+    Given a codex Path B infrastructure span (auth, rollout persistence, file read) under the codex-app-server scope
+    When the span is ingested
+    Then the span is filtered out and not stored
+    And a session_task.turn span or a gen_ai usage span under the same scope is kept
+
+  @unit
+  Scenario: A codex app-server turn carries its model and tokens
+    Given a codex session_task.turn span under the codex-app-server scope carrying model and codex.turn.token_usage
+    When the span is canonicalised
+    Then the model and token counts are lifted onto gen_ai attributes
+    And the turn's handle_responses span is flagged so its usage is not counted twice
+
   @unit
   Scenario: Codex tool spans are filtered so a tool call never mints its own trace
     Given a codex Path B tool span whose parent span lives in another trace

@@ -2,7 +2,8 @@
  * Codex Extractor
  *
  * Handles: OpenAI Codex's native OpenTelemetry log records AND its
- * Rust-CLI native spans (scope `codex_cli_rs`), plus the bundled-cost
+ * Rust-CLI native spans (scopes `codex_cli_rs`, `codex-app-server`,
+ * `codex_exec`), plus the bundled-cost
  * classification of codex account-provider spans from any emitter (the
  * gateway's `gen_ai.provider.name = openai_codex` spans, or spans whose
  * model id carries the `openai_codex/` vendor prefix).
@@ -61,6 +62,10 @@ import {
   CODEX_PROVIDER_KEY,
   isCodexModel,
 } from "~/server/modelProviders/codexRestrictions";
+import {
+  CODEX_EXEC_SCOPE,
+  isCodexScope,
+} from "../../coding-agent-span-filter";
 import { ATTR_KEYS } from "./_constants";
 import type {
   CanonicalAttributesExtractor,
@@ -69,21 +74,17 @@ import type {
 } from "./_types";
 
 const CODEX_EVENT_NAME_PREFIX = "codex.";
-const CODEX_RUST_SCOPE_NAME = "codex_cli_rs";
 /**
- * codex sets its instrumentation scope to the originator: the interactive TUI
- * is `codex_cli_rs`, `codex exec` is `codex_exec`. On the exec wire the
+ * Which scopes are codex's is decided in one place, `isCodexScope`: the
+ * interactive TUI is `codex_cli_rs` (or `codex-app-server` on newer releases,
+ * which follow the TUI's rules here), `codex exec` is `codex_exec`. On the exec wire the
  * `handle_responses` response spans are the authoritative usage record: older
  * codex emits no `session_task.turn` rollup there at all, and when a newer
  * codex does emit one it repeats the response spans' summed totals. So under
  * exec the response-span skip below must never fire, and it is the rollup
  * that defers instead.
  */
-const CODEX_EXEC_SCOPE_NAME = "codex_exec";
-const CODEX_SCOPE_NAMES: ReadonlySet<string> = new Set([
-  CODEX_RUST_SCOPE_NAME,
-  CODEX_EXEC_SCOPE_NAME,
-]);
+const CODEX_EXEC_SCOPE_NAME = CODEX_EXEC_SCOPE;
 export const CODEX_TURN_SPAN_NAME = "session_task.turn";
 
 // codex's per-response model-call span. Its gen_ai.usage.* is already summed
@@ -206,7 +207,7 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // Path A codex traffic flows through the gateway as gen_ai.*
     // spans; GenAIExtractor handles that side and emits canonical
     // attributes. This branch covers Path B native spans from the
-    // Rust CLI (scope `codex_cli_rs`), where the per-turn
+    // Rust CLI (any scope `isCodexScope` accepts), where the per-turn
     // `session_task.turn` span carries codex-namespaced attributes
     // that won't match GenAIExtractor's gen_ai.* gates.
     //
@@ -219,7 +220,7 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // span path's. Mastra + Vercel + the rest of the extractors all
     // target gen_ai.* on the span side.
     const scopeName = ctx.span.instrumentationScope?.name ?? "";
-    if (!CODEX_SCOPE_NAMES.has(scopeName)) return;
+    if (!isCodexScope(scopeName)) return;
 
     // codex emits ONE authoritative per-turn rollup span
     // (`session_task.turn`) carrying codex.turn.token_usage.*, AND a
