@@ -25,6 +25,12 @@
  *      Exclusively: a value that merely CONTAINS one is prose, and prose is
  *      analysed.
  *
+ * MODEL AND TOOL NAMES ARE NOT HELD BACK. They get a narrower answer from
+ * {@link reservesModelOrToolName}: spared name and place detection, which reads
+ * `claude-sonnet-4-6` as a person, and scanned for everything else. Holding
+ * them back altogether would leave a phone or national id under one of those
+ * names scanned by nothing wherever the native pass does not cover it.
+ *
  * WHY THERE ARE TWO VALUE RULES. The engines pay different prices for a wrong
  * answer, so they get different rules and the difference is the whole point.
  * `isIdentifierShapedValue` gates shape-only recognizers, which know nothing
@@ -310,8 +316,96 @@ export function reservesTraceAddress({
 }
 
 /**
+ * Attribute names whose value is a model, provider or tool name: chosen by the
+ * developer or reported by the provider, never typed by the end user.
+ *
+ * These are the values the name/place pass gets most visibly wrong. A bare
+ * Anthropic model id (`claude-sonnet-4-6`) reads to it as a first name, so under
+ * the strict level every call to that provider stored `[PERSON]` in place of
+ * the model, and tool names written as words went the same way. None of them is
+ * opaque — they split into short readable runs — so the value rule above never
+ * holds them back; only the name can mark them, and only for that one pass.
+ *
+ * Compared lower-cased. Like the trace list, the names are not a namespace
+ * anyone owns, so the value is gated too ({@link MODEL_OR_TOOL_NAME_VALUE}).
+ */
+const RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set([
+  "ai.model.id",
+  "ai.model.provider",
+  "ai.response.model",
+  "ai.toolcall.name",
+  "gen_ai.request.model",
+  "gen_ai.response.model",
+  "gen_ai.system",
+  "gen_ai.provider.name",
+  "gen_ai.tool.name",
+  "llm.model_name",
+]);
+
+/**
+ * What a model, provider or tool name is written as: one token of letters,
+ * digits and the separators vendors use (`us.anthropic.claude-opus-4-1`,
+ * `anthropic/claude-sonnet-4`, `gpt-5:latest`, `lookup_profile`).
+ *
+ * No whitespace, so prose written under one of these names is still analysed;
+ * no `@`, so an email address is still analysed; and a URL is sent on too
+ * (see {@link reservesModelOrToolName}), since it can carry a person in its
+ * path. Model ids use `/` themselves (`anthropic/claude-sonnet-4`,
+ * `bedrock/us.anthropic.claude-opus-4-1`), so a URL is told apart by what
+ * comes before the first `/`: a scheme, or a dotted host (`www.acme.example/`).
+ * A vendor namespace before the slash never carries a dot.
+ *
+ * What this knowingly lets through is a lone single-token name written under a
+ * model or tool attribute ("jane.doe", "jane_doe"). It cannot be told apart by
+ * shape: providers write their own ids as dotted words (`anthropic.messages`,
+ * `openai.chat`), which is the exact value this rule exists for. The trace
+ * rule can refuse "jane.doe" because an address is hex or decimal; a model name
+ * is words. That is the residual, and it is accepted: those attributes are set
+ * by code, and only name and place detection is skipped, so card numbers,
+ * phone numbers, national ids and secrets in them are redacted either way.
+ */
+const MODEL_OR_TOOL_NAME_VALUE = /^[A-Za-z0-9._:/+-]+$/;
+
+/**
+ * How long a model, provider or tool name may be. Real ones fit, including a
+ * full Bedrock inference-profile ARN (about 100 characters); this sits below
+ * {@link MAX_IDENTIFIER_LENGTH} because the rule is exempting readable words,
+ * not opaque runs, so the longer the value the less it looks like a name
+ * picked from a list.
+ */
+export const MAX_MODEL_OR_TOOL_NAME_LENGTH = 128;
+
+/** A scheme (`https://`), or a dotted host before the first `/`. */
+const URL_SHAPED = /:\/\/|^[^/]*\.[^/]*\//;
+
+/**
+ * Whether this attribute is a model, provider or tool name carrying a value
+ * shaped like one. Such a value is spared name and place detection only: the
+ * analysis call still scans it for every other entity it was asked for.
+ */
+export function reservesModelOrToolName({
+  key,
+  value,
+}: {
+  key: string;
+  value: string;
+}): boolean {
+  return (
+    RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS.has(key.toLowerCase()) &&
+    value.length <= MAX_MODEL_OR_TOOL_NAME_LENGTH &&
+    MODEL_OR_TOOL_NAME_VALUE.test(value) &&
+    !URL_SHAPED.test(value)
+  );
+}
+
+/**
  * Whether one attribute is held back from PII analysis altogether: reserved by
- * name, or a value that is exclusively one opaque identifier token.
+ * name as a trace address, or a value that is exclusively one opaque
+ * identifier token.
+ *
+ * A model or tool name is NOT held back here. It is still analysed for
+ * everything except names and places ({@link reservesModelOrToolName}), so a
+ * phone, card or national id written under one is found on every path.
  *
  * Attribute values only. Free text — a log body, a status message, the chat
  * content itself — is content by definition and always analysed.

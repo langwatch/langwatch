@@ -322,6 +322,102 @@ Feature: Redacting personal data from traces
     When a trace is ingested with a reserved trace identifier attribute
     Then the analysis service never received that value
 
+  # Model, provider and tool names are set by code, never typed by the end user,
+  # and the name detector misreads them: a bare model id such as
+  # "claude-sonnet-4-6" reads to it as a first name. They go to the analysis
+  # service in the same request as everything else, and only the name and place
+  # findings on them are dropped, by attribute name and only while the value is
+  # one token, so prose or an email address written under one of those names is
+  # still analysed in full. Every other finding is still redacted.
+  @unit
+  Scenario: A model or tool name attribute is never redacted as a name
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a model name attribute whose value reads like a first name
+    Then any name found in that value is dropped
+    And the analysis service still looked for other identifiers in it
+    And the stored attribute still reads as it was sent
+
+  @unit
+  Scenario: A model name attribute costs no extra analysis request
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a model name attribute and a free text attribute
+    Then both values go to the analysis service in one request
+
+  @unit
+  Scenario: A name found in a model name is dropped while a phone number beside it is redacted
+    Given the analysis service finds a person and a phone number in a model name value
+    When the value is redacted
+    Then only the phone number is replaced by its marker
+
+  @unit
+  Scenario: Overlapping findings in a model name are redacted as one span
+    Given the analysis service finds two overlapping identifiers in a model name value
+    When the value is redacted
+    Then the whole overlapping span is replaced by one marker
+
+  @unit
+  Scenario: A model name whose findings cannot be placed keeps the full redaction
+    Given an older analysis service that returns no finding positions for a model name value
+    When the value is redacted
+    Then the analysis service's own redaction is kept, names included
+
+  @unit
+  Scenario: The fallback detector also keeps a model name's name findings
+    Given the resolved PII level for "web-app" is strict
+    And the analysis service is unavailable
+    When a trace is ingested with a model name attribute and a free text attribute
+    Then the fallback detector keeps name findings on the model name only
+
+  @unit
+  Scenario: A spared name an exception keeps still blocks an overlapping finding on the fallback detector
+    Given the fallback detector finds a name the policy's exceptions keep and a phone number that overlaps it in a model name value
+    When the value is redacted
+    Then the name stays readable and only the phone number beyond it is masked
+
+  @unit
+  Scenario: Prose written under a model name attribute is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a model name attribute whose value is a person name with a space
+    Then the analysis service received that value
+
+  @unit
+  Scenario: An email address written under a model name attribute is still redacted
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a model name attribute whose value is an email address
+    Then the stored attribute has the email address redacted
+    And the analysis service never received the email address in the clear
+
+  @unit
+  Scenario: A phone number written under a model name attribute is still redacted
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a model name attribute whose value is a phone number
+    Then the stored attribute has the phone number redacted
+
+  # Only name and place detection is skipped, so the native pass is never
+  # relied on for the rest: where it does not run, or does not cover an
+  # identifier, the analysis service still looks for it.
+  @unit
+  Scenario: Without a resolved policy a model name attribute is still scanned for other identifiers
+    Given no PII policy can be resolved for the project
+    When a trace is ingested with a model name attribute whose value is a phone number
+    Then the analysis service looked for phone numbers in that value
+
+  @unit
+  Scenario: A model name attribute is still scanned for the non-name identifiers a custom level selects
+    Given the resolved PII level for "web-app" is custom with a name and a national id selected
+    And secrets redaction is off
+    When a trace is ingested with a model name attribute
+    Then the analysis service looked for the national id in that value
+    And any name found in that value is dropped
+
+  @unit
+  Scenario: A model name attribute is not submitted when only names are selected
+    Given the resolved PII level for "web-app" is custom with only a name selected
+    And secrets redaction is off
+    When a trace is ingested with a model name attribute
+    Then the analysis service never received that value
+    And the stored attribute still reads as it was sent
+
   # The reserved names are not a namespace anyone owns. Attributes arrive on the
   # ingestion endpoint spelled exactly as the sender wrote them, so a sender can
   # put an email address under a trace identifier name - by mistake or on

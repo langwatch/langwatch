@@ -14,6 +14,7 @@ import {
 
 vi.mock("~/server/tracer/collector/piiCheck", () => ({
   batchPresidioClearPII: vi.fn(),
+  NAME_AND_PLACE_ENTITIES: new Set(["PERSON", "LOCATION"]),
   googleDLPClearPII: vi.fn(),
   PRESIDIO_STRICT_ENTITIES: ["PERSON", "LOCATION", "EMAIL_ADDRESS"],
 }));
