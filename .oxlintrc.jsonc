@@ -9,13 +9,15 @@
   // A suppression that suppresses nothing is a lie about the code.
   "options": { "reportUnusedDisableDirectives": "error" },
 
-  // Generated files are fixed in their generator; `session-context.mjs` is a
-  // vendored minified bundle the plugin ships and builds elsewhere.
+  // Generated files are fixed in their generator; `session-context.mjs` and
+  // `session-guidance.mjs` are vendored minified bundles the plugin ships and
+  // builds elsewhere.
   "ignorePatterns": [
     "**/*.generated.ts",
     "**/*.generated.tsx",
     "**/*.generated.js",
     "plugins/langwatch/scripts/session-context.mjs",
+    "plugins/langwatch/scripts/session-guidance.mjs",
     "tools/apidiff/inventory/**",
   ],
 
