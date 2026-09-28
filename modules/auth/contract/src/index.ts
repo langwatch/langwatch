@@ -15,6 +15,7 @@ export * from "./front-door.responses.ts";
 export * from "./front-door.schemas.ts";
 export { authTrpc } from "./auth.trpc.ts";
 export * from "./sign-in-security.ts";
+export * from "./sign-in-error-codes.ts";
 export { signInSecurityTrpc } from "./sign-in-security.trpc.ts";
 export * from "./session-bound.ts";
 export * from "./sso-matching.ts";

@@ -10,11 +10,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import { WithTestAuthHost } from "../../../testing.tsx";
 import { FEDERATED_LOGOUT_PATH, SignInError } from "../sign-in-error-screen.tsx";
 
-function renderError(error: string) {
+function renderError(error: string, extra: Record<string, string> = {}) {
   return render(
     <MemoryRouter initialEntries={[`/auth/error?error=${error}`]}>
       <ChakraProvider value={defaultSystem}>
-        <WithTestAuthHost route={{ pathname: "/auth/error", query: { error } }}>
+        <WithTestAuthHost route={{ pathname: "/auth/error", query: { error, ...extra } }}>
           <SignInError error={error} />
         </WithTestAuthHost>
       </ChakraProvider>
@@ -72,5 +72,61 @@ describe("<SignInError/>", () => {
       const back = screen.getByRole("link", { name: /back to settings/i });
       expect(back.getAttribute("href")).toBe("/settings/authentication");
     });
+  });
+});
+
+describe("given somebody opens the sign-in error screen with a description of their own", () => {
+  /** @scenario "A description supplied by the caller is never echoed" */
+  it("shows neither the supplied description nor a supplied code", () => {
+    const planted = "Your account was suspended. Call +1-555-0100 to restore it.";
+    renderError("ACCOUNT_SEIZED_CONTACT_SUPPORT", { error_description: planted });
+
+    expect(document.body.textContent).not.toContain("555-0100");
+    expect(document.body.textContent).not.toContain("ACCOUNT_SEIZED_CONTACT_SUPPORT");
+    expect(screen.getAllByText(/Something went wrong signing you in/i).length).toBeGreaterThan(0);
+  });
+});
+
+describe("given a failure whose cause was withheld", () => {
+  /** @scenario "An unhandled failure crosses as one generic code" */
+  /** @scenario "The cause is written down where we can read it" */
+  it("says something went wrong and shows the trace id to quote", () => {
+    renderError("sign_in_failed", { trace: "trace_abc123" });
+
+    expect(screen.getAllByText(/Something went wrong signing you in/i).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("sign-in-error-trace").textContent).toContain("trace_abc123");
+  });
+
+  it("shows no reference when there is none to show", () => {
+    renderError("sign_in_failed");
+
+    expect(screen.queryByTestId("sign-in-error-trace")).toBeNull();
+  });
+});
+
+describe("given one of the assertion refusals the boundary admits", () => {
+  /** @scenario "A handled refusal crosses with its own code" */
+  it("renders the words the registry holds for it, not the generic line", () => {
+    renderError("sso_setup_address_mismatch");
+
+    expect(screen.getByText("That sign-in came from a different address")).toBeTruthy();
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
+  });
+
+  it.each([
+    "sso_sign_in_refused",
+    "sso_assertion_without_address",
+    "sso_domain_not_verified",
+    "sso_domain_proof_lapsed",
+  ])("gives %s its own words", (code) => {
+    renderError(code);
+
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
+  });
+
+  it("still refuses a registered code the boundary would not admit", () => {
+    renderError("validation_error");
+
+    expect(screen.getAllByText(/Something went wrong signing you in/i).length).toBeGreaterThan(0);
   });
 });

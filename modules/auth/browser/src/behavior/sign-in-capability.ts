@@ -4,7 +4,8 @@
  * imports this closed package (ARCHITECTURE.md §10.1).
  */
 
-import { normalizeSignInErrorCode } from "../model/sign-in-error-code.ts";
+import { normalizeSignInErrorCode } from "@langwatch/auth-contract";
+
 import {
   signInRefusalOf,
   signInStartFailureOf,

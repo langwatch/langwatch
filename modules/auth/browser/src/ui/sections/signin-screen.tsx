@@ -11,6 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { isStableAuthError, normalizeSignInErrorCode } from "@langwatch/auth-contract";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -23,12 +24,11 @@ import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts"
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { authFailureMessage } from "../../model/auth-failure-message.ts";
-import { normalizeSignInErrorCode } from "../../model/sign-in-error-code.ts";
 import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
 import Link from "../../ui/elements/router-link.tsx";
 import { FrontDoorShell } from "../../ui/sections/front-door-shell.tsx";
 import { IdentifierFirstSignIn } from "../../ui/sections/identifier-first-sign-in.tsx";
-import { isStableAuthError, SignInError } from "./sign-in-error-screen.tsx";
+import { SignInError } from "./sign-in-error-screen.tsx";
 
 /**
  * Which sign-in screen this deployment has (ADR-117 §7). The legacy screen

@@ -1,33 +1,15 @@
 import { Alert, Button, Card, Container, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { isStableAuthError, normalizeSignInErrorCode } from "@langwatch/auth-contract";
+import { explainHandledError } from "@langwatch/error-presentation/presentation";
 import { useEffect } from "react";
 
 import { isSameOrigin, useSession } from "../../behavior/auth-client.tsx";
 import { hardNavigate } from "../../behavior/browser-navigation.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
-import {
-  CUTOVER_SIGN_IN_ERRORS,
-  cutoverSignInRefusal,
-  normalizeSignInErrorCode,
-} from "../../model/sign-in-error-code.ts";
+import { cutoverSignInRefusal } from "../../model/sign-in-error-code.ts";
 import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
 import Link from "../../ui/elements/router-link.tsx";
-
-/**
- * Auth errors that represent a *stable* failure the user has to act on (wrong sign-in method /
- * account collision), not a transient glitch we can silently retry.
- */
-export const STABLE_AUTH_ERRORS = [
-  "OAuthAccountNotLinked",
-  "DIFFERENT_EMAIL_NOT_ALLOWED",
-  "SSO_PROVIDER_NOT_ALLOWED",
-  // A refusal the organization's move decided: sending them back to the same
-  // button five seconds later would loop them through it.
-  ...Object.keys(CUTOVER_SIGN_IN_ERRORS),
-] as const;
-
-export const isStableAuthError = (error: string | null | undefined): boolean =>
-  !!error && (STABLE_AUTH_ERRORS as readonly string[]).includes(error);
 
 /**
  * Server route that clears the app session and, on Auth0 deployments, federates to Auth0
@@ -35,6 +17,28 @@ export const isStableAuthError = (error: string | null | undefined): boolean =>
  * server/routes/auth.ts). Other providers just clear the app session and return to sign-in.
  */
 export const FEDERATED_LOGOUT_PATH = "/api/auth/logout";
+
+/**
+ * The registry's words for a code the boundary admits, when it holds any. Gated on the admitted
+ * set, not the registry alone: `?error=` is caller-controlled, so any code could otherwise pull
+ * one of our sentences under a LangWatch heading.
+ */
+function admittedCopyFor(code: string): { title: string; description: string } | undefined {
+  if (!isStableAuthError(code)) return undefined;
+  const explained = explainHandledError({
+    code,
+    meta: {},
+    httpStatus: 400,
+    fault: "customer",
+    retryable: false,
+    tips: [],
+    docsUrl: undefined,
+    traceId: undefined,
+    reasons: [],
+  });
+  if (!explained.isRegistered || !explained.description) return undefined;
+  return { title: explained.title, description: explained.description };
+}
 
 /**
  * Friendly heading for known error codes. An unknown code gets generic copy,
@@ -50,7 +54,11 @@ const errorTitle = (error: string): string => {
     case "SSO_PROVIDER_NOT_ALLOWED":
       return "Use your organization's sign-in";
     default:
-      return cutoverSignInRefusal(error)?.title ?? "Something went wrong signing you in";
+      return (
+        cutoverSignInRefusal(error)?.title ??
+        admittedCopyFor(error)?.title ??
+        "Something went wrong signing you in"
+      );
   }
 };
 
@@ -181,6 +189,21 @@ function SignInErrorDescription({
     );
   }
 
+  // Every admitted refusal is stable: the provider still holds a live session, so sign out first.
+  const admitted = admittedCopyFor(error);
+  if (admitted) {
+    return (
+      <Alert.Description>
+        <VStack gap={1} align="start">
+          <Text>{admitted.description}</Text>
+          <Button asChild marginTop={4} color="white">
+            <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
+          </Button>
+        </VStack>
+      </Alert.Description>
+    );
+  }
+
   return (
     <Alert.Description>
       Redirecting back to sign in, please try again...
@@ -200,6 +223,8 @@ export function SignInError({ error: rawError }: { error: string }) {
   const query = useSearchParams();
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
   const error = normalizeSignInErrorCode(rawError) ?? rawError;
+  // The handle on a cause we deliberately did not name, so the person has something to quote.
+  const trace = query?.get("trace") ?? null;
 
   return (
     <Container maxW="container.md" paddingTop="calc(40vh - 164px)">
@@ -220,6 +245,17 @@ export function SignInError({ error: rawError }: { error: string }) {
               <SignInErrorDescription error={error} callbackUrl={callbackUrl} />
             </Alert.Content>
           </Alert.Root>
+          {trace && (
+            <Text
+              marginTop={3}
+              fontSize="11.5px"
+              color="fg.subtle"
+              fontFamily="mono"
+              data-testid="sign-in-error-trace"
+            >
+              Reference: {trace}
+            </Text>
+          )}
         </Card.Body>
       </Card.Root>
     </Container>

@@ -1,13 +1,14 @@
 /**
  * @vitest-environment node
  */
+import {
+  isStableAuthError,
+  normalizeSignInErrorCode,
+  STABLE_AUTH_ERRORS,
+} from "@langwatch/auth-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  cutoverSignInRefusal,
-  normalizeSignInErrorCode,
-} from "../../../model/sign-in-error-code.ts";
-import { isStableAuthError, STABLE_AUTH_ERRORS } from "../sign-in-error-screen.tsx";
+import { cutoverSignInRefusal } from "../../../model/sign-in-error-code.ts";
 
 describe("normalizeSignInErrorCode", () => {
   describe("when given null or undefined", () => {
