@@ -8,7 +8,7 @@
 // capability was dead in production for months.
 //
 // The TS side now replays bytes recorded from a real engine
-// (modules/scenario/process/src/__tests__/fixtures/nlpgo-recorded-responses.json). A recording only helps while it
+// (apps/scenario-child/src/__tests__/fixtures/nlpgo-recorded-responses.json). A recording only helps while it
 // stays true, so this test re-derives it from the live engine and fails when
 // the shape the adapter depends on changes. If it fails, the adapter needs
 // updating and the fixture re-recording — in that order.
@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const tsFixtureRelPath = "../../../../modules/scenario/process/src/__tests__/fixtures/" +
+const tsFixtureRelPath = "../../../../apps/scenario-child/src/__tests__/fixtures/" +
 	"nlpgo-recorded-responses.json"
 
 type tsRecordedResponse struct {
