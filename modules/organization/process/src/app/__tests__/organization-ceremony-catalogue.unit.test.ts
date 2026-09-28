@@ -1,28 +1,28 @@
 /**
  * @vitest-environment node
  *
- * The SCIM gate behind `group.listAll` reads the organization's plan, as main did.
- * @see specs/features/scim-group-mapping.feature
+ * The sign-up ceremony seeds the standard AI-tool catalogue through governance,
+ * as main's onboarding did.
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
-import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { InviteAssignableRoles } from "../../rules/invite-contracts.rules.ts";
 import { buildOrganizationInfrastructure } from "../organization-composition.build.ts";
 
-function planGateFor({ planType }: { planType: string }) {
-  const entitlement = createApiFixture<Pick<EntitlementApi, "getActivePlan" | "requestBound">>({
-    getActivePlan: async () => createApiFixture<Plan>({ type: planType }),
-  });
-
+function ceremonyOver({
+  governance,
+}: {
+  governance: Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">;
+}) {
   return buildOrganizationInfrastructure({
     prisma: createApiFixture<ProcessMembers["prisma"]>(),
     encryption: { encrypt: (value) => value, decrypt: (value) => value },
@@ -34,27 +34,37 @@ function planGateFor({ planType }: { planType: string }) {
     dependencies: {
       projects: createApiFixture<ProjectApi>(),
       identity: createApiFixture<Pick<IdentityApi, "verifiedEmailsOf" | "joinRequests">>(),
-      entitlement,
+      entitlement: createApiFixture<Pick<EntitlementApi, "getActivePlan" | "requestBound">>(),
       permissions: createApiFixture<AuthzApi>(),
       roles: createApiFixture<InviteAssignableRoles>(),
-      governance: createApiFixture<Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">>(),
+      governance,
     },
-  }).plans;
+  }).ceremony;
 }
 
-describe("the SCIM plan gate", () => {
-  it("admits an organization on an Enterprise plan", async () => {
-    const plans = planGateFor({ planType: "ENTERPRISE" });
+describe("the sign-up ceremony's catalogue seed", () => {
+  it("asks governance to seed the new organization's default catalogue", async () => {
+    const aiToolEnsureDefaultCatalog = vi.fn(async () => ({ hasSeeded: true, created: 3 }));
 
-    await expect(plans.assertScimAllowed({ organizationId: "org-1" })).resolves.toBeUndefined();
+    await ceremonyOver({ governance: { aiToolEnsureDefaultCatalog } }).ensureDefaultAiToolCatalog({
+      organizationId: "org-new",
+    });
+
+    expect(aiToolEnsureDefaultCatalog).toHaveBeenCalledWith({ organizationId: "org-new" });
   });
 
-  /** @scenario "Non-enterprise org cannot access group management endpoints" */
-  it("refuses an organization whose plan is not Enterprise", async () => {
-    const plans = planGateFor({ planType: "FREE" });
-
-    await expect(plans.assertScimAllowed({ organizationId: "org-1" })).rejects.toMatchObject({
-      code: "enterprise_plan_required",
+  it("passes a governance refusal on for the initialization service to report", async () => {
+    const refusal = new Error("governance unavailable");
+    const ceremony = ceremonyOver({
+      governance: {
+        aiToolEnsureDefaultCatalog: vi.fn(async () => {
+          throw refusal;
+        }),
+      },
     });
+
+    await expect(ceremony.ensureDefaultAiToolCatalog({ organizationId: "org-new" })).rejects.toBe(
+      refusal,
+    );
   });
 });

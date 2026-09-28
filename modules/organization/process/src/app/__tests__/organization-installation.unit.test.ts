@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
@@ -37,6 +38,7 @@ function process(role: "api" | "worker") {
       "api-key": createApiFixture<ApiKeyApi>(),
       authz: createApiFixture<AuthzApi>(),
       entitlement: createApiFixture<EntitlementApi>(),
+      governance: createApiFixture<GovernanceRestApi>(),
       identity: createApiFixture<IdentityApi>(),
       project: createApiFixture<ProjectApi>(),
       role: createApiFixture<RoleApi>(),

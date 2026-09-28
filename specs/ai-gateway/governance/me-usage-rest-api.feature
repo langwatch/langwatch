@@ -18,6 +18,7 @@ Feature: Personal usage REST API
     Then the response status is 200
     And the rollups cover only usage that falls inside the requested window
 
+  @unit
   Scenario: Ingestion-source spend is included and scoped to this organization
     Given my account has ingestion-source spend (e.g. Claude Code) in this organization
     And my account also has ingestion-source spend in another organization

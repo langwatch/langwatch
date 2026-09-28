@@ -1,5 +1,6 @@
 /** Builds OrganizationInfrastructure from prisma, encryption, logger, redis, and config. */
 import type { AuthzApi, OrganizationUserRole } from "@langwatch/authz-contract";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -14,10 +15,9 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
-import {
-  OrganizationCapabilityUnavailableError,
-  type OrganizationInvite,
-  type OrganizationPendingInviteApplied,
+import type {
+  OrganizationInvite,
+  OrganizationPendingInviteApplied,
 } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -471,19 +471,15 @@ function organizationSignals(logger: Logger): OrganizationSignals {
  * project goes through the project application rather than a second creation
  * path, so it writes the same rows the project surface writes.
  */
-function organizationCeremony(options: { projects: ProjectApi }): OrganizationCeremony {
+function organizationCeremony(options: {
+  projects: ProjectApi;
+  governance: Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">;
+}): OrganizationCeremony {
   return {
-    /**
-     * The standard AI-tool catalogue is an Enterprise governance capability.
-     * Non-fatal at the call site — the portal's own read provisions the same
-     * set — so this refuses by name and the ceremony carries on.
-     */
-    ensureDefaultAiToolCatalog: () =>
-      Promise.reject(
-        new OrganizationCapabilityUnavailableError(
-          "Enterprise governance service, so it seeded no standard AI tool catalogue",
-        ),
-      ),
+    /** Main's onboarding seeded it; non-fatal at the call site. */
+    ensureDefaultAiToolCatalog: async ({ organizationId }) => {
+      await options.governance.aiToolEnsureDefaultCatalog({ organizationId });
+    },
     createProject: async (input) => {
       const project = await options.projects.create(
         {
@@ -609,6 +605,7 @@ export function buildOrganizationInfrastructure(input: {
     entitlement: Pick<EntitlementApi, "getActivePlan" | "requestBound">;
     permissions: AuthzApi;
     roles: InviteAssignableRoles;
+    governance: Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">;
   };
 }): OrganizationInfrastructure {
   const { prisma, logger, dependencies } = input;
@@ -649,7 +646,10 @@ export function buildOrganizationInfrastructure(input: {
     joinRequests: identityJoinRequests(dependencies.identity),
     plans: organizationPlanGate({ plans: dependencies.entitlement }),
     signals: organizationSignals(logger),
-    ceremony: organizationCeremony({ projects: dependencies.projects }),
+    ceremony: organizationCeremony({
+      projects: dependencies.projects,
+      governance: dependencies.governance,
+    }),
     directory: organizationDirectory({
       identity: dependencies.identity,
       userDirectory: PrismaOrganizationUserDirectoryRepository.create(prisma),

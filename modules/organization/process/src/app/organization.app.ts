@@ -6,6 +6,7 @@ import {
   type AuthzAccessBreakdownOutput,
   type GrantsLedgerActor,
 } from "@langwatch/authz-contract";
+import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -285,6 +286,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     entitlement: EntitlementApi,
     /** Where custom-role assignability is defined, for the invitation door. */
     roles: RoleApi,
+    /** Seeds the standard AI-tool catalogue during the sign-up ceremony. */
+    governance: GovernanceRestApi,
   };
   /** Named raw: the process answers these two, no store carries them. */
   static readonly reads = [
@@ -316,6 +319,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
         projects: setup.dependencies.projects,
         identity: setup.dependencies.identity,
         entitlement: setup.dependencies.entitlement,
+        governance: setup.dependencies.governance,
         permissions: setup.dependencies.permissions,
         roles: setup.dependencies.roles,
       },
