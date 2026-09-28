@@ -286,6 +286,7 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
       expect(submitted()).not.toContain("jane@example.com");
     });
 
+    /** @scenario "A phone number written under a model name attribute is still redacted" */
     it("still redacts a phone number written under a model name", async () => {
       const { service } = makeService();
       const span = spanWith({ "ai.model.id": "+1-234-567-8901" });

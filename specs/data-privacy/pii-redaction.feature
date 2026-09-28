@@ -347,6 +347,12 @@ Feature: Redacting personal data from traces
     Then the stored attribute has the email address redacted
     And the analysis service never received the email address in the clear
 
+  @unit
+  Scenario: A phone number written under a model name attribute is still redacted
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a model name attribute whose value is a phone number
+    Then the stored attribute has the phone number redacted
+
   # The reserved names are not a namespace anyone owns. Attributes arrive on the
   # ingestion endpoint spelled exactly as the sender wrote them, so a sender can
   # put an email address under a trace identifier name - by mistake or on
