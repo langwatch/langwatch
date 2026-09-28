@@ -13,6 +13,7 @@ vi.mock("~/server/featureFlag", () => ({
 
 vi.mock("~/server/tracer/collector/piiCheck", () => ({
   batchPresidioClearPII: vi.fn(),
+  NAME_AND_PLACE_ENTITIES: new Set(["PERSON", "LOCATION"]),
   googleDLPClearPII: vi.fn(),
   PRESIDIO_STRICT_ENTITIES: [
     "PERSON",
@@ -236,7 +237,7 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
   // developer and the provider, never typed by the end user, so the names
   // below spare them that pass -- and only that pass.
   describe("given a model or tool name attribute", () => {
-    /** @scenario "A model or tool name attribute is never sent for name detection" */
+    /** @scenario "A model or tool name attribute is never redacted as a name" */
     it.each([
       ["ai.model.id", "claude-sonnet-4-6"],
       ["ai.response.model", "claude-sonnet-4-6"],
@@ -248,9 +249,14 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
       ["llm.model_name", "anthropic/claude-sonnet-4"],
       ["ai.toolCall.name", "getWeatherForecast"],
       ["gen_ai.tool.name", "search_documents"],
-    ])("never submits %s = %s for name detection, and stores it unchanged", async (key, value) => {
-      const { service, batchSpy, submittedForNames, namesEverything } =
-        makeService();
+    ])("drops name findings on %s = %s and stores it unchanged", async (key, value) => {
+      const {
+        service,
+        batchSpy,
+        submittedForNames,
+        sparedNames,
+        namesEverything,
+      } = makeService();
       namesEverything();
       const span = spanWith({
         [key]: value,
@@ -261,8 +267,9 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
 
       expect(submittedForNames()).toContain(PROSE_THAT_MUST_BE_ANALYSED);
       expect(submittedForNames()).not.toContain(value);
-      const call = batchSpy.mock.calls.find(([texts]) => texts.includes(value));
-      expect(call?.[1].entities).toEqual(["EMAIL_ADDRESS", "PHONE_NUMBER"]);
+      expect(sparedNames(value)).toBe(true);
+      // One call carries both: the model name is still scanned for everything.
+      expect(batchSpy).toHaveBeenCalledTimes(1);
       expect(attr(span, key)).toBe(value);
       expect(attr(span, "app.support_note")).toBe("[PERSON]");
     });
@@ -330,7 +337,7 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
       ["no tenant", undefined],
       ["a failed policy lookup", TENANT],
     ] as const)("still scans a model name attribute for a phone number when the native pass did not run (%s)", async (_why, tenant) => {
-      const { service, batchSpy } = makeService(STRICT_POLICY, {
+      const { service, batchSpy, sparedNames } = makeService(STRICT_POLICY, {
         getResolvedForProject: async () => {
           throw new Error("policy store unavailable");
         },
@@ -342,8 +349,8 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
       const call = batchSpy.mock.calls.find(([texts]) =>
         texts.includes("+1-234-567-8901"),
       );
-      expect(call?.[1].entities).toContain("PHONE_NUMBER");
-      expect(call?.[1].entities).not.toContain("PERSON");
+      expect(call?.[1].entities ?? ["PHONE_NUMBER"]).toContain("PHONE_NUMBER");
+      expect(sparedNames("+1-234-567-8901")).toBe(true);
     });
 
     // Logs and metrics batch through their own record path; it applies the
@@ -368,15 +375,17 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
     // The model name is still scanned for the non-name identifier selected.
     /** @scenario "A model name attribute is still scanned for the non-name identifiers a custom level selects" */
     it("still scans a model name attribute for an analysis-only identifier under a custom level", async () => {
-      const { service, batchSpy, submittedForNames } = makeService({
-        ...STRICT_POLICY,
-        pii: {
-          level: "custom",
-          entities: ["PERSON", "AU_MEDICARE"],
-          exceptPatterns: [],
+      const { service, batchSpy, submittedForNames, sparedNames } = makeService(
+        {
+          ...STRICT_POLICY,
+          pii: {
+            level: "custom",
+            entities: ["PERSON", "AU_MEDICARE"],
+            exceptPatterns: [],
+          },
+          secrets: { enabled: false, customPatterns: [] },
         },
-        secrets: { enabled: false, customPatterns: [] },
-      });
+      );
       const span = spanWith({ "ai.model.id": "claude-sonnet-4-6" });
 
       await service.redactSpan(span, null, "STRICT", TENANT);
@@ -384,7 +393,8 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
       const call = batchSpy.mock.calls.find(([texts]) =>
         texts.includes("claude-sonnet-4-6"),
       );
-      expect(call?.[1].entities).toEqual(["AU_MEDICARE"]);
+      expect(call?.[1].entities).toContain("AU_MEDICARE");
+      expect(sparedNames("claude-sonnet-4-6")).toBe(true);
       expect(submittedForNames()).not.toContain("claude-sonnet-4-6");
     });
 
@@ -406,14 +416,11 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
       expect(attr(span, "ai.model.id")).toBe("claude-sonnet-4-6");
     });
 
-    // A call that does not look for names or places has nothing to spare, so
-    // there is no second call.
-    it("makes one call when the level does not look for names", async () => {
-      const { service, batchSpy } = makeService({
-        ...STRICT_POLICY,
-        pii: { level: "custom", entities: ["AU_MEDICARE"], exceptPatterns: [] },
-        secrets: { enabled: false, customPatterns: [] },
-      });
+    // The model name rides in the same call as everything else: sparing it
+    // costs no extra request.
+    /** @scenario "A model name attribute costs no extra analysis request" */
+    it("sends a model name and the rest of the span in one call", async () => {
+      const { service, batchSpy } = makeService();
       const span = spanWith({
         "ai.model.id": "claude-sonnet-4-6",
         "app.support_note": PROSE_THAT_MUST_BE_ANALYSED,

@@ -1,7 +1,11 @@
 import type { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 import { createLogger } from "@langwatch/observability";
-import { normalizePresidioMarkers } from "@langwatch/redaction";
+import {
+  formatPiiMarker,
+  normalizePresidioMarkers,
+} from "@langwatch/redaction";
+import { z } from "zod";
 import {
   compilePiiExceptPatterns,
   matchesPiiException,
@@ -348,16 +352,102 @@ export function presidioDefaultEntities(
   ).presidio;
 }
 
+/** What the name/place model finds, and so what it misreads on a model id. */
+export const NAME_AND_PLACE_ENTITIES: ReadonlySet<string> = new Set<
+  (typeof PRESIDIO_STRICT_ENTITIES)[number]
+>(["PERSON", "LOCATION"]);
+
+/** Presidio's findings as the analysis service serializes them. */
+const presidioFindingsSchema = z.array(
+  z.object({
+    entity_type: z.string(),
+    start: z.number().int(),
+    end: z.number().int(),
+    score: z.number(),
+  }),
+);
+
+type PresidioFinding = z.infer<typeof presidioFindingsSchema>[number];
+
+/**
+ * Redact `text` from Presidio's findings, leaving name and place findings out.
+ *
+ * Findings index the text Presidio analysed, which is the input trimmed and,
+ * when it parses as JSON, with its escapes unfolded. Only a text that neither
+ * step changes, and that has no characters outside the BMP (Presidio counts
+ * codepoints), can be indexed directly; anything else returns `undefined` so
+ * the caller keeps Presidio's own full redaction.
+ *
+ * @returns the redacted text, null when nothing is left to redact, or
+ *   undefined when the findings cannot be applied to this text.
+ */
+export const redactSparingNamesAndPlaces = (
+  text: string,
+  findings: unknown,
+): string | null | undefined => {
+  const parsed = presidioFindingsSchema.safeParse(findings);
+  if (!parsed.success) return undefined;
+  if (text !== text.trim() || /[\\\uD800-\uDFFF]/.test(text)) {
+    return undefined;
+  }
+  const kept = parsed.data
+    .filter((f) => !NAME_AND_PLACE_ENTITIES.has(f.entity_type))
+    .filter((f) => f.start >= 0 && f.end <= text.length && f.start < f.end);
+  if (kept.length === 0) return null;
+
+  let redacted = "";
+  let cursor = 0;
+  for (const { entity_type, start, end } of mergeOverlapping(kept)) {
+    redacted += text.substring(cursor, start) + formatPiiMarker(entity_type);
+    cursor = end;
+  }
+  return redacted + text.substring(cursor);
+};
+
+/**
+ * Merge overlapping findings into one span each, labelled by the finding with
+ * the higher score, so a partial overlap never leaves part of a match readable.
+ */
+const mergeOverlapping = (
+  findings: readonly PresidioFinding[],
+): PresidioFinding[] => {
+  const merged: PresidioFinding[] = [];
+  for (const finding of [...findings].sort((a, b) => a.start - b.start)) {
+    const last = merged[merged.length - 1];
+    if (!last || finding.start >= last.end) {
+      merged.push(finding);
+      continue;
+    }
+    merged[merged.length - 1] = {
+      ...(finding.score > last.score ? finding : last),
+      start: last.start,
+      end: Math.max(last.end, finding.end),
+    };
+  }
+  return merged;
+};
+
 /**
  * Presidio PII redaction that sends multiple texts in a single batch
  * HTTP request, reducing the number of lambda invocations.
+ *
+ * A text flagged in `spareNamesAndPlaces` (a model, provider or tool name) is
+ * scanned in the same request, and its redaction is rebuilt from Presidio's
+ * findings without the name and place ones, so `claude-sonnet-4-6` is not
+ * stored as a person while a phone number under the same key still is.
  *
  * @returns Array of anonymized strings (null when text was unchanged).
  */
 export const batchPresidioClearPII = async (
   texts: string[],
   piiRedactionLevel: PIIRedactionLevel,
-  entities?: readonly string[],
+  {
+    entities,
+    spareNamesAndPlaces,
+  }: {
+    entities?: readonly string[];
+    spareNamesAndPlaces?: readonly boolean[];
+  } = {},
 ): Promise<(string | null)[]> => {
   if (texts.length === 0) return [];
 
@@ -424,14 +514,37 @@ export const batchPresidioClearPII = async (
     if (result.status === "error") {
       throw new Error(result.details);
     }
-    if (result.status === "processed" && result.raw_response?.anonymized) {
-      return (
-        normalizePresidioMarkers(result.raw_response.anonymized) +
-        entry.remaining
-      );
-    }
-    return null;
+    if (result.status !== "processed") return null;
+    const redacted = redactedInput({
+      input: entry.input,
+      rawResponse: result.raw_response,
+      spareNamesAndPlaces: spareNamesAndPlaces?.[i] ?? false,
+    });
+    return redacted === null ? null : redacted + entry.remaining;
   });
+};
+
+/**
+ * The redacted form of one analysed input, or null when nothing changed. A
+ * flagged input whose findings cannot be placed keeps Presidio's own full
+ * redaction rather than going unredacted.
+ */
+const redactedInput = ({
+  input,
+  rawResponse,
+  spareNamesAndPlaces,
+}: {
+  input: string;
+  rawResponse: { anonymized?: string; results?: unknown } | undefined;
+  spareNamesAndPlaces: boolean;
+}): string | null => {
+  if (spareNamesAndPlaces) {
+    const spared = redactSparingNamesAndPlaces(input, rawResponse?.results);
+    if (spared !== undefined) return spared;
+  }
+  return rawResponse?.anonymized
+    ? normalizePresidioMarkers(rawResponse.anonymized)
+    : null;
 };
 
 export type PIICheckOptions = {

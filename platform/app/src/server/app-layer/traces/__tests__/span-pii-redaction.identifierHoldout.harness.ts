@@ -69,21 +69,41 @@ export function makeService(
   });
   const submitted = (): string[] =>
     batchSpy.mock.calls.flatMap((call) => call[0] as string[]);
-  // Only the strings sent to a call that looks for people. A call with no
-  // entity list uses the strict default, which does.
+  // Only the strings a person finding would be kept on: sent to a call that
+  // looks for people, and not flagged to have name findings dropped. A call
+  // with no entity list uses the strict default, which looks for people.
   const submittedForNames = (): string[] =>
-    batchSpy.mock.calls.flatMap(([texts, options]) =>
-      (options.entities ?? ["PERSON"]).includes("PERSON") ? texts : [],
+    batchSpy.mock.calls.flatMap(([texts, options, spared]) =>
+      (options.entities ?? ["PERSON"]).includes("PERSON")
+        ? texts.filter((_, i) => !spared?.[i])
+        : [],
     );
+  // Whether `text` was sent flagged to have its name findings dropped.
+  const sparedNames = (text: string): boolean | undefined => {
+    for (const [texts, , spared] of batchSpy.mock.calls) {
+      const i = texts.indexOf(text);
+      if (i >= 0) return spared?.[i] ?? false;
+    }
+    return undefined;
+  };
   // Make the name detector read every string as a person, the way it reads a
-  // bare model id. A stored value that survives this was never offered to it.
+  // bare model id. A stored value that survives this had its finding dropped.
   const namesEverything = () =>
-    batchSpy.mockImplementation(async (texts, options) =>
-      texts.map(() =>
-        (options.entities ?? ["PERSON"]).includes("PERSON") ? "[PERSON]" : null,
+    batchSpy.mockImplementation(async (texts, options, spared) =>
+      texts.map((_, i) =>
+        (options.entities ?? ["PERSON"]).includes("PERSON") && !spared?.[i]
+          ? "[PERSON]"
+          : null,
       ),
     );
-  return { service, batchSpy, submitted, submittedForNames, namesEverything };
+  return {
+    service,
+    batchSpy,
+    submitted,
+    submittedForNames,
+    sparedNames,
+    namesEverything,
+  };
 }
 
 export function spanWith(attributes: Record<string, string>): OtlpSpan {

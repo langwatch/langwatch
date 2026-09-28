@@ -21,6 +21,7 @@ import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   batchPresidioClearPII as defaultBatchPresidioClearPII,
   googleDLPClearPII,
+  NAME_AND_PLACE_ENTITIES,
   type PIICheckOptions,
   PRESIDIO_STRICT_ENTITIES,
   presidioDefaultEntities,
@@ -63,6 +64,8 @@ export const DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 export type BatchClearPIIFunction = (
   texts: string[],
   options: PIICheckOptions,
+  /** Per text: a model, provider or tool name, spared name/place findings. */
+  spareNamesAndPlaces?: readonly boolean[],
 ) => Promise<(string | null)[]>;
 
 /**
@@ -116,7 +119,11 @@ const runGoogleDlpBatch = (
     }),
   );
 
-const defaultBatchClearPII: BatchClearPIIFunction = async (texts, options) => {
+const defaultBatchClearPII: BatchClearPIIFunction = async (
+  texts,
+  options,
+  spareNamesAndPlaces,
+) => {
   const { piiRedactionLevel, mainMethod, entities, exceptPatterns } = options;
 
   if (mainMethod === "google_dlp") {
@@ -124,11 +131,10 @@ const defaultBatchClearPII: BatchClearPIIFunction = async (texts, options) => {
   }
 
   try {
-    return await defaultBatchPresidioClearPII(
-      texts,
-      piiRedactionLevel,
+    return await defaultBatchPresidioClearPII(texts, piiRedactionLevel, {
       entities,
-    );
+      spareNamesAndPlaces,
+    });
   } catch {
     // The DLP fallback redacts by level, not by the custom entity subset; the
     // native pass already handled the pattern-based selections, so this only
@@ -185,11 +191,11 @@ type StringEntry = {
   field: "stringValue" | "message";
   /** The original text value */
   text: string;
-  /** A model, provider or tool name: analysed without name/place detection */
+  /** A model, provider or tool name: its name/place findings are dropped */
   isNameExempt: boolean;
 };
 
-/** One text to analyse, and whether it is spared name/place detection. */
+/** One text to analyse, and whether its name/place findings are dropped. */
 type AnalysisItem = { text: string; isNameExempt: boolean };
 
 /**
@@ -207,16 +213,6 @@ type RedactionBatch = {
     isNameExempt: boolean;
   }) => void;
 };
-
-/**
- * What the name/place model finds, and so what it gets wrong on a model id
- * (`claude-sonnet-4-6` read as a person). Model, provider and tool names are
- * analysed without these and only these (see reservesModelOrToolName).
- */
-const NAME_AND_PLACE_ENTITIES: ReadonlySet<string> = new Set([
-  "PERSON",
-  "LOCATION",
-]);
 
 /**
  * Service responsible for redacting PII from OTLP span data.
@@ -938,77 +934,45 @@ export class OtlpSpanPiiRedactionService {
   /**
    * Runs the analysis batch and returns one result per item, in order.
    *
-   * Model, provider and tool names go in a second call with name and place
-   * detection left out, so they are still scanned for every other entity the
-   * first call asks for. That holds on every path — with or without a native
-   * pass, at any level — because the entity list is derived from the very
-   * options the first call uses. When nothing is left once names and places
-   * are removed (a custom level that selected only those), the second call is
-   * skipped and those values are left as the native pass left them. When the
-   * call does not look for names or places in the first place (the essential
-   * level, or a custom level without them), there is nothing to spare and
-   * everything goes in one call.
+   * Everything goes in one call. Model, provider and tool names are flagged,
+   * and the analysis step drops only the name and place findings on those
+   * (see batchPresidioClearPII), so they are still redacted for every other
+   * entity the call looks for, on every path and at every level. When the
+   * call looks for nothing but names and places (a custom level that selected
+   * only those), a flagged value is left out and stays as the native pass left
+   * it.
    */
   private async analyseBatch(
     items: readonly AnalysisItem[],
     options: PIICheckOptions,
   ): Promise<(string | null)[]> {
     const results: (string | null)[] = items.map(() => null);
-    const isSplit =
+    // A spared value has nothing to be scanned for when the call looks only
+    // for names and places, so it stays out of the request altogether.
+    const onlyNamesAndPlaces =
       items.some((item) => item.isNameExempt) &&
-      this.effectiveEntities(options).some((entity) =>
-        NAME_AND_PLACE_ENTITIES.has(entity),
-      );
-    const indexesWhere = (isNameExempt: boolean) =>
-      items.flatMap((item, i) =>
-        item.isNameExempt === isNameExempt ? [i] : [],
-      );
-    const lanes = isSplit
-      ? [
-          { indexes: indexesWhere(false), options },
-          {
-            indexes: indexesWhere(true),
-            options: this.withoutNameAndPlace(options),
-          },
-        ]
-      : [{ indexes: items.map((_, i) => i), options }];
-    // The two calls are independent, so they run side by side: a span that
-    // carries a model name costs one more call, not twice the wait.
-    await Promise.all(
-      lanes.map(async ({ indexes, options: laneOptions }) => {
-        if (indexes.length === 0 || !laneOptions) return;
-        const laneResults = await this.deps.batchClearPII(
-          indexes.map((i) => items[i]!.text),
-          laneOptions,
-        );
-        if (laneResults.length !== indexes.length) {
-          throw new Error(
-            `Incomplete PII batch: got ${laneResults.length} results for ${indexes.length} inputs`,
-          );
-        }
-        indexes.forEach((itemIndex, j) => {
-          results[itemIndex] = laneResults[j] ?? null;
-        });
-      }),
+      (
+        options.entities ?? presidioDefaultEntities(options.piiRedactionLevel)
+      ).every((entity) => NAME_AND_PLACE_ENTITIES.has(entity));
+    const indexes = items.flatMap((item, i) =>
+      item.isNameExempt && onlyNamesAndPlaces ? [] : [i],
     );
+    if (indexes.length === 0) return results;
+
+    const batchResults = await this.deps.batchClearPII(
+      indexes.map((i) => items[i]!.text),
+      options,
+      indexes.map((i) => items[i]!.isNameExempt),
+    );
+    if (batchResults.length !== indexes.length) {
+      throw new Error(
+        `Incomplete PII batch: got ${batchResults.length} results for ${indexes.length} inputs`,
+      );
+    }
+    indexes.forEach((itemIndex, j) => {
+      results[itemIndex] = batchResults[j] ?? null;
+    });
     return results;
-  }
-
-  /** The same analysis call with name and place detection left out. */
-  private withoutNameAndPlace(
-    options: PIICheckOptions,
-  ): PIICheckOptions | null {
-    const entities = this.effectiveEntities(options).filter(
-      (entity) => !NAME_AND_PLACE_ENTITIES.has(entity),
-    );
-    return entities.length > 0 ? { ...options, entities } : null;
-  }
-
-  /** What an analysis call looks for: its own list, or the level's default. */
-  private effectiveEntities(options: PIICheckOptions): readonly string[] {
-    return (
-      options.entities ?? presidioDefaultEntities(options.piiRedactionLevel)
-    );
   }
 
   private collectAllAttributeSets(span: OtlpSpan): OtlpKeyValue[][] {
