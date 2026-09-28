@@ -1,12 +1,9 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { isAppPath, toRelativeSameOriginHref } from "@langwatch/langy-contract";
+import { type CapabilityIconName, type CapabilitySurface } from "@langwatch/langy-contract";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
-import {
-  type CapabilityIconName,
-  type CapabilitySurface,
-} from "../../../../../model/langy-capability-catalog.ts";
 import {
   CapabilityRowSkeletons,
   LangyCapabilityCard as LangyCapabilityCardPresentation,

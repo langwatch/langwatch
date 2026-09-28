@@ -183,6 +183,15 @@ export class OrganizationMembershipService {
     return this.repo.findUserOrgRoleByTeamId(params);
   }
 
+  /** Refuses a Lite Member's team-role change the organization has no seat for. */
+  assertTeamRoleChangeWithinSeatLimits(params: {
+    organizationId: string;
+    teamId: string;
+    userId: string;
+  }): Promise<void> {
+    return this.roles.assertTeamRoleChangeWithinSeatLimits(params);
+  }
+
   /**
    * The org's declared primary intent (ADR-038); null = intent unset
    * (legacy org). Consumed by the home resolver to pin the "/" landing.

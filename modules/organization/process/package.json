@@ -36,6 +36,7 @@
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

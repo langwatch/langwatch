@@ -2,7 +2,7 @@
  * The capability catalog — one declarative row per CLI resource.
  * @see specs/langy/langy-capability-cards.feature
  */
-import type { DigestStrategy } from "@langwatch/langy-contract";
+import type { DigestStrategy } from "./digest.ts";
 
 /**
  * Every platform surface a card can point at. The label, path, icon and deep-link rules

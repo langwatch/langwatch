@@ -2,28 +2,27 @@
  * The navigate fallback's page half, under the asking project's own slug.
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
-import { ProjectNotFoundError } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
-import type {
-  LangyNavigateProject,
-  LangyNavigateResourceLocation,
-  LangyNavigateResourceLocator,
-} from "../../app/langy.members.ts";
 import type { LangyNavigateResourceKind } from "../../rules/langy-navigate-resources.rules.ts";
 import { LangyNavigateFallbackService } from "../langy-navigate-fallback.service.ts";
+import type {
+  LangyNavigateResourceLocation,
+  LangyNavigateResourceLocatorService,
+} from "../langy-navigate-resource-locator.service.ts";
 
-class FakeProjects implements LangyNavigateProject {
-  constructor(private readonly slugs: Record<string, string>) {}
-  async getSlug(projectId: string): Promise<string> {
-    const slug = this.slugs[projectId];
-    if (slug === undefined)
-      throw new ProjectNotFoundError("Project not found", { meta: { projectId } });
-    return slug;
-  }
+function projectsWith(slugs: Record<string, string>) {
+  return createApiFixture<ProjectApi>({
+    findSummaryById: async (projectId: string) => {
+      const slug = slugs[projectId];
+      return slug === undefined ? null : { name: slug, slug };
+    },
+  });
 }
 
-class FakeResources implements LangyNavigateResourceLocator {
+class FakeResources implements Pick<LangyNavigateResourceLocatorService, "locate"> {
   readonly lookups: { kind: LangyNavigateResourceKind; resourceId: string }[] = [];
 
   constructor(private readonly answer: (kind: LangyNavigateResourceKind) => string | null) {}
@@ -35,19 +34,24 @@ class FakeResources implements LangyNavigateResourceLocator {
   }): Promise<LangyNavigateResourceLocation> {
     this.lookups.push({ kind: input.kind, resourceId: input.resourceId });
     const path = this.answer(input.kind);
-    return path === null ? { outcome: "unknown" } : { outcome: "located", path };
+    return path === null
+      ? { outcome: "unknown" }
+      : {
+          outcome: "located",
+          address: (projectSlug) =>
+            Promise.resolve(`https://app.langwatch.test/${projectSlug}${path}`),
+        };
   }
 }
 
 const service = (
   slugs: Record<string, string> = { "project-1": "acme" },
-  resources?: LangyNavigateResourceLocator,
+  resources: Pick<LangyNavigateResourceLocatorService, "locate"> = new FakeResources(() => null),
 ) =>
   LangyNavigateFallbackService.create({
-    projects: new FakeProjects(slugs),
-    platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
-    organizationUrl: ({ path }) => `https://app.langwatch.test${path}`,
-    ...(resources ? { resources } : {}),
+    projects: projectsWith(slugs),
+    resources,
+    publicBaseUrl: "https://app.langwatch.test/",
   });
 
 describe("LangyNavigateFallbackService", () => {
@@ -167,11 +171,13 @@ describe("LangyNavigateFallbackService", () => {
       ).toEqual({ outcome: "dropped" });
     });
 
-    it("lets a project read failure other than a missing project through", async () => {
+    it("lets a project read failure through", async () => {
       const failing = LangyNavigateFallbackService.create({
-        projects: { getSlug: () => Promise.reject(new Error("postgres down")) },
-        platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
-        organizationUrl: ({ path }) => `https://app.langwatch.test${path}`,
+        projects: createApiFixture<ProjectApi>({
+          findSummaryById: () => Promise.reject(new Error("postgres down")),
+        }),
+        resources: new FakeResources(() => null),
+        publicBaseUrl: "https://app.langwatch.test",
       });
 
       await expect(

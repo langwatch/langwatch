@@ -87,6 +87,21 @@ Feature: Canonical user lifecycle
     Then the personal project's API key is blank
     And the blank key is a valid personal context on the wire
 
+  # main's user.personalContext and user.personalBudget read the gateway's
+  # default routing policy, the caller's personal key and the budget check.
+  @unit
+  Scenario: The personal context names the default routing policy the gateway resolves
+    Given a member whose personal team inherits a default routing policy
+    When they read their personal context in that organization
+    Then the personal context names that routing policy
+
+  @unit
+  Scenario: The personal budget warns at the gateway's soft warning on the caller's own key
+    Given a member holding a personal gateway key whose budget is at a soft warning
+    When they read their personal budget in that organization
+    Then the gateway checks the budget against that key at no projected cost
+    And the personal budget answers a warning with the spend and the limit
+
   # main's user.personalUsage, budgetOverview and cliBootstrap, served from
   # Enterprise governance. personalUsage checked membership before reading.
   @unit

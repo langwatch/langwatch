@@ -1836,7 +1836,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       throw new LiteMemberViewerOnlyError();
     }
 
-    await this.#members.plans.assertTeamRoleChangeWithinSeatLimits({
+    await this.#dependencies.membership.assertTeamRoleChangeWithinSeatLimits({
       organizationId,
       teamId: input.teamId,
       userId: input.userId,

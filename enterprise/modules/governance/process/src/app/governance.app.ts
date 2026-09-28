@@ -1730,6 +1730,13 @@ export class GovernanceApp implements GovernanceRestApi {
     return this.aiTools.seedStarterPack(input);
   }
 
+  /** Organization creation seeds the starter set, as main's onboarding did; ungated like main. */
+  aiToolEnsureDefaultCatalog(
+    input: AiToolOrganizationInput,
+  ): Promise<{ hasSeeded: boolean; created: number }> {
+    return this.aiTools.ensureDefaultCatalog(input);
+  }
+
   aiToolStarterPackCatalog(): AiToolStarterTileChoice[] {
     return DefaultGovernanceAiToolCatalogService.listStarterPackTiles();
   }

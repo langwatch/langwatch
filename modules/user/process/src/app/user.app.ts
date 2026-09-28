@@ -1,12 +1,14 @@
 /** The User application: one object behind every user door this product opens. */
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
   type CliBootstrapResult,
   type GovernanceBudgetOverviewForUser,
   GovernanceRestApi,
   type PersonalUsageRollup,
 } from "@langwatch/enterprise-governance-contract";
+import { GatewayApi } from "@langwatch/gateway-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   IdentityVerificationExpiredError,
@@ -167,6 +169,8 @@ export class UserApp implements UserApi {
   static readonly dependencies: {
     auth: typeof AuthApi;
     authz: typeof AuthzApi;
+    enterpriseGateway: typeof EnterpriseGatewayApi;
+    gateway: typeof GatewayApi;
     governance: typeof GovernanceRestApi;
     organizations: typeof OrganizationApi;
     ops: typeof OpsApi;
@@ -174,6 +178,8 @@ export class UserApp implements UserApi {
   } = {
     auth: AuthApi,
     authz: AuthzApi,
+    enterpriseGateway: EnterpriseGatewayApi,
+    gateway: GatewayApi,
     governance: GovernanceRestApi,
     organizations: OrganizationApi,
     ops: OpsApi,
@@ -185,6 +191,11 @@ export class UserApp implements UserApi {
       prisma: setup.members.prisma,
       redis: setup.members.redis,
       organizations: setup.dependencies.organizations,
+      enterpriseGateway: setup.dependencies.enterpriseGateway,
+      gateway: setup.dependencies.gateway,
+      auth: setup.dependencies.auth,
+      projects: setup.dependencies.projects,
+      governance: setup.dependencies.governance,
     });
 
     return UserApp.#build({

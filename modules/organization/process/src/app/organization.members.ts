@@ -388,13 +388,6 @@ export interface OrganizationPlanGate {
   assertCustomRolesAllowed: (input: Readonly<{ organizationId: string }>) => Promise<void>;
   assertAuditLogsAllowed(input: Readonly<{ organizationId: string }>): Promise<void>;
   assertScimAllowed(input: Readonly<{ organizationId: string }>): Promise<void>;
-  /**
-   * Refuses a built-in team-role change that would push the organization past
-   * the member seats its licence covers. Throws.
-   */
-  assertTeamRoleChangeWithinSeatLimits(
-    input: Readonly<{ organizationId: string; teamId: string; userId: string }>,
-  ): Promise<void>;
 }
 
 /**

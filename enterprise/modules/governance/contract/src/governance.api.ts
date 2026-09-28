@@ -117,7 +117,11 @@ import type { GovernanceOcsfExportInput, GovernanceOcsfExportPage } from "./ocsf
 import type { OttlValidationResult } from "./ottl.ts";
 import type { PersonaResolution } from "./persona-home.ts";
 import type { GovernanceBudgetOverviewForUser } from "./personal-budget-overview.ts";
-import type { PersonalUsageRollup, PersonalUsageWindow } from "./personal-usage.ts";
+import type {
+  PersonalUsageQueryInput,
+  PersonalUsageRollup,
+  PersonalUsageWindow,
+} from "./personal-usage.ts";
 import type { QuarantineFillInput, QuarantineFillStats } from "./quarantine-fill.ts";
 import type { OrganizationSessionPolicyShape, SessionCeilingApplied } from "./session-policy.ts";
 
@@ -278,6 +282,10 @@ export interface GovernanceRestApi {
   aiToolSeedStarterPack(
     input: SeedAiToolStarterPackInput,
   ): Promise<{ created: number; updated: number; skipped: number }>;
+  /** Main's `ensureDefaultCatalog`: the starter set, only for an organization with no entries. */
+  aiToolEnsureDefaultCatalog(
+    input: AiToolOrganizationInput,
+  ): Promise<{ hasSeeded: boolean; created: number }>;
   aiToolStarterPackCatalog(): AiToolStarterTileChoice[];
   aiToolListProviderOptionsForAdmin(
     input: AiToolOrganizationInput,
@@ -418,6 +426,8 @@ export interface GovernanceRestApi {
     projectId: string;
     departmentId: string | null;
   }): Promise<void>;
+  /** One person's own usage against a tenant the caller resolved, as main's `/api/me/usage`. */
+  personalUsage(input: PersonalUsageQueryInput): Promise<PersonalUsageRollup>;
   personalUsageDashboard(
     input: { organizationId: string; window?: PersonalUsageWindow },
     by: GovernanceCaller,

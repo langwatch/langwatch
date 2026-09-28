@@ -59,6 +59,13 @@ async function buildApp(options: { workspace: PersonalWorkspace | null }) {
     completionTokens: 0,
   }));
   const budgetOverviewForUser = vi.fn(async () => noGatewayAccess);
+  const getPrincipalSpendSummary = vi.fn<GatewayApi["getPrincipalSpendSummary"]>(async () => ({
+    totalCost: 0,
+    requestCount: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    topModel: null,
+  }));
   const app = await GovernanceApp.create({
     config: void 0,
     repositories: MemoryGovernanceRepositories.create(),
@@ -83,7 +90,7 @@ async function buildApp(options: { workspace: PersonalWorkspace | null }) {
         findModelSpend: async () => [],
       }),
       apiKeys: createApiFixture<ApiKeyApi>(),
-      gateway: createApiFixture<GatewayApi>({ budgetOverviewForUser }),
+      gateway: createApiFixture<GatewayApi>({ budgetOverviewForUser, getPrincipalSpendSummary }),
       enterpriseGateway: createApiFixture<EnterpriseGatewayApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>(),
@@ -100,7 +107,7 @@ async function buildApp(options: { workspace: PersonalWorkspace | null }) {
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
-  return { app, traceSpend, budgetOverviewForUser };
+  return { app, traceSpend, budgetOverviewForUser, getPrincipalSpendSummary };
 }
 
 describe("GovernanceApp personal surface", () => {
@@ -131,6 +138,37 @@ describe("GovernanceApp personal surface", () => {
 
       expect(rollup.summary.spentUsd).toBe(2.5);
       expect(rollup.summary.promptTokens).toBe(100);
+    });
+  });
+
+  describe("given a tenant the caller already resolved, as /api/me/usage does", () => {
+    it("adds the caller's ledger spend in that tenant to their personal project", async () => {
+      const { app, traceSpend, getPrincipalSpendSummary } = await buildApp({ workspace });
+      traceSpend.mockImplementation(async () => ({
+        totalCost: 1,
+        billedCost: 1,
+        requestCount: 1,
+        promptTokens: 10,
+        completionTokens: 5,
+      }));
+      getPrincipalSpendSummary.mockImplementation(async () => ({
+        totalCost: 4,
+        requestCount: 2,
+        promptTokens: 20,
+        completionTokens: 10,
+        topModel: { name: "claude-opus", requests: 2 },
+      }));
+
+      const rollup = await app.personalUsage({
+        personalProjectId: workspace.project.id,
+        userId: CALLER.id,
+        ingestionTenantId: "project-governance-1",
+      });
+
+      expect(rollup.summary).toMatchObject({ spentUsd: 5, requests: 3, promptTokens: 30 });
+      expect(getPrincipalSpendSummary).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: "project-governance-1", userId: CALLER.id }),
+      );
     });
   });
 

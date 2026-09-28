@@ -34,7 +34,13 @@
       "path": "../../data-retention/contract/tsconfig.build.json"
     },
     {
+      "path": "../../dataset/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/eventing/tsconfig.build.json"
@@ -67,6 +73,9 @@
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../monitor/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
@@ -88,7 +97,13 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
+      "path": "../../prompt/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/redis-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../scenario/contract/tsconfig.build.json"
     },
     {
       "path": "../../secret/contract/tsconfig.build.json"
@@ -104,6 +119,9 @@
     },
     {
       "path": "../../user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api-fixture/tsconfig.build.json"

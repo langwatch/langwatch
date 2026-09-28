@@ -3,6 +3,7 @@
  */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useReducedMotion } from "@langwatch/langy-browser-kit";
+import type { CapabilityIconName, CapabilitySurface } from "@langwatch/langy-contract";
 import {
   BarChart3,
   Bot,
@@ -34,10 +35,6 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type {
-  CapabilityIconName,
-  CapabilitySurface,
-} from "../../model/langy-capability-catalog.ts";
 import { langyThinkingShimmerStyles } from "../../model/values/langy-shimmer.ts";
 
 export type LangyCapabilityTone = "read" | "created" | "updated" | "removed";

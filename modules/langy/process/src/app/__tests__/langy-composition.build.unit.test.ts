@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import { UnavailableLangyWorkerChannel } from "../../channels/unavailable.langy-worker.channel.ts";
 import type { LangySessionKeyRepository } from "../../repositories/langy-session-key.repository.ts";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
+import type { LangyNavigateFallbackService } from "../../services/langy-navigate-fallback.service.ts";
 import { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
 import { LangyVirtualKeyGatewayService } from "../../services/langy-virtual-key-gateway.service.ts";
 import { LangyWorkerMetricsNullService } from "../../services/langy-worker-metrics-null.service.ts";
@@ -61,6 +62,7 @@ function build(input: { config?: Partial<LangyServerConfig>; publicBaseUrl?: str
         }),
         gateway: createApiFixture<GatewayApi>(),
       }),
+      navigateFallback: createApiFixture<LangyNavigateFallbackService>(),
     }),
   };
 }

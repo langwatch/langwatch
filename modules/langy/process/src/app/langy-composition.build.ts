@@ -18,6 +18,7 @@ import {
   LangyGithubPrQuotaService,
   LANGY_GITHUB_PRS_PER_DAY,
 } from "../services/langy-github-pr-quota.service.ts";
+import type { LangyNavigateFallbackService } from "../services/langy-navigate-fallback.service.ts";
 import type {
   LangyCredentialComposition,
   LangyServiceCompositionOptions,
@@ -72,6 +73,8 @@ export function buildLangyInfrastructure(input: {
   virtualKeys: LangyVirtualKeyService;
   /** Whether a turn may advertise the page channel; absent holds it closed. */
   uiActionSurface?: LangyUiActionSurface;
+  /** Where a navigate the conversation remembered no link for opens. */
+  navigateFallback: LangyNavigateFallbackService;
 }): LangyBuiltInfrastructure {
   const { redis, repositories, worker, models, sessionKeys, virtualKeys } = input;
   const tokenBuffer = redis ? LangyTokenBufferRedisRepository.create({ redis }) : null;
@@ -123,6 +126,7 @@ export function buildLangyInfrastructure(input: {
             redis,
             repositories,
             baseHost: input.publicBaseUrl ?? "",
+            navigateFallback: input.navigateFallback,
           }),
         }
       : {}),
@@ -133,15 +137,16 @@ const relayLogger = createLogger("langwatch:langy:relay");
 
 /**
  * One relay per pushed connection, as main's relay route built it: frames are
- * authenticated against the turn's project-scoped handoff first, deduplicated
- * on the turn's nonce set, and fanned to the connection's own live buffer.
+ * authenticated against the project-scoped handoff, deduplicated on the turn's
+ * nonce set, fanned to the live buffer; an unremembered navigate falls back.
  */
 function relayOpener(input: {
   redis: RedisConnection;
   repositories: LangyRepositories;
   baseHost: string;
+  navigateFallback: LangyNavigateFallbackService;
 }): OpenLangyRelay {
-  const { redis, repositories, baseHost } = input;
+  const { redis, repositories, baseHost, navigateFallback } = input;
   return (conversations) =>
     RedisLangyTurnRelayRepository.create({
       conversations,
@@ -149,6 +154,10 @@ function relayOpener(input: {
       frameDedup: repositories.frameDedup,
       handoff: repositories.turnHandoff,
       resourceLinks: repositories.resourceLinks,
+      resolveResourceUrl: async (navigate) => {
+        const resolution = await navigateFallback.resolveUrl(navigate);
+        return resolution.outcome === "resolved" ? resolution.url : null;
+      },
       baseHost,
       logger: relayLogger,
     });

@@ -3,98 +3,81 @@
  * address is STILL platform-computed, never agent-authored; an unknown id, a missing
  * project or a failed resource lookup drops the navigate, not the relay stream.
  */
-import { HandledError } from "@langwatch/handled-error";
+import type { ProjectApi } from "@langwatch/project-contract";
 
-import {
-  type LangyNavigateProject,
-  type LangyNavigateResourceLocation,
-  type LangyNavigateResourceLocator,
-} from "../app/langy.members.ts";
 import { pickNavigatePage } from "../rules/langy-navigate-pages.rules.ts";
 import { detectNavigateResourceKind } from "../rules/langy-navigate-resources.rules.ts";
-
-/** Builds a deep link into the product from a project slug and a path. */
-export type LangyNavigatePlatformUrl = (input: { projectSlug: string; path: string }) => string;
-
-/** Builds a deep link to an organization page, which sits at the top level. */
-export type LangyNavigateOrganizationUrl = (input: { path: string }) => string;
+import {
+  langyOrganizationPlatformUrl,
+  langyProjectPlatformUrl,
+} from "../rules/langy-platform-url.rules.ts";
+import type {
+  LangyNavigateResourceLocation,
+  LangyNavigateResourceLocatorService,
+} from "./langy-navigate-resource-locator.service.ts";
 
 /** The platform address a navigate opens, or `dropped` when nothing answers to the id. */
 export type LangyNavigateResolution = { outcome: "resolved"; url: string } | { outcome: "dropped" };
 
 const DROPPED: LangyNavigateResolution = { outcome: "dropped" };
 
-export class LangyNavigateFallbackService {
-  private readonly projects: LangyNavigateProject;
-  private readonly platformUrl: LangyNavigatePlatformUrl;
-  private readonly organizationUrl: LangyNavigateOrganizationUrl;
-  private readonly resources: LangyNavigateResourceLocator | undefined;
+type LangyNavigateFallbackDeps = {
+  projects: Pick<ProjectApi, "findSummaryById">;
+  resources: Pick<LangyNavigateResourceLocatorService, "locate">;
+  publicBaseUrl: string | undefined;
+};
 
-  private constructor({
-    projects,
-    platformUrl,
-    organizationUrl,
-    resources,
-  }: {
-    projects: LangyNavigateProject;
-    platformUrl: LangyNavigatePlatformUrl;
-    organizationUrl: LangyNavigateOrganizationUrl;
-    resources: LangyNavigateResourceLocator | undefined;
-  }) {
-    this.projects = projects;
-    this.platformUrl = platformUrl;
-    this.organizationUrl = organizationUrl;
-    this.resources = resources;
+export class LangyNavigateFallbackService {
+  static create(deps: LangyNavigateFallbackDeps): LangyNavigateFallbackService {
+    return new LangyNavigateFallbackService(deps);
   }
 
-  static create(deps: {
-    projects: LangyNavigateProject;
-    platformUrl: LangyNavigatePlatformUrl;
-    organizationUrl: LangyNavigateOrganizationUrl;
-    /**
-     * Absent where a process composed none of the eight features a resource id
-     * names; only page names resolve then.
-     */
-    resources?: LangyNavigateResourceLocator;
-  }): LangyNavigateFallbackService {
-    return new LangyNavigateFallbackService({
-      projects: deps.projects,
-      platformUrl: deps.platformUrl,
-      organizationUrl: deps.organizationUrl,
-      resources: deps.resources,
-    });
+  readonly #projects: LangyNavigateFallbackDeps["projects"];
+  readonly #resources: LangyNavigateFallbackDeps["resources"];
+  readonly #publicBaseUrl: string | undefined;
+
+  private constructor(deps: LangyNavigateFallbackDeps) {
+    this.#projects = deps.projects;
+    this.#resources = deps.resources;
+    this.#publicBaseUrl = deps.publicBaseUrl;
   }
 
   async resolveUrl(input: {
     projectId: string;
     resourceId: string;
   }): Promise<LangyNavigateResolution> {
+    const publicBaseUrl = this.#publicBaseUrl;
     const page = pickNavigatePage(input.resourceId);
     if (page?.scope === "organization") {
-      return { outcome: "resolved", url: this.organizationUrl({ path: page.path }) };
+      return {
+        outcome: "resolved",
+        url: langyOrganizationPlatformUrl({ publicBaseUrl, path: page.path }),
+      };
     }
 
-    const location = page
-      ? { outcome: "located" as const, path: page.path }
-      : await this.locateResource(input);
+    const location: LangyNavigateResourceLocation = page
+      ? {
+          outcome: "located",
+          address: (projectSlug) =>
+            Promise.resolve(
+              langyProjectPlatformUrl({ publicBaseUrl, projectSlug, path: page.path }),
+            ),
+        }
+      : await this.#locateResource(input);
     if (location.outcome === "unknown") {
       return DROPPED;
     }
 
     // The slug is fetched once, and only after the destination is confirmed:
     // an id that resolves to nothing never costs a project read.
-    try {
-      const projectSlug = await this.projects.getSlug(input.projectId);
-      return { outcome: "resolved", url: this.platformUrl({ projectSlug, path: location.path }) };
-    } catch (error) {
-      if (HandledError.isHandled(error) && error.code === "project_not_found") {
-        return DROPPED;
-      }
-      throw error;
+    const project = await this.#projects.findSummaryById(input.projectId);
+    if (!project?.slug) {
+      return DROPPED;
     }
+    return { outcome: "resolved", url: await location.address(project.slug) };
   }
 
-  private async locateResource({
+  async #locateResource({
     projectId,
     resourceId,
   }: {
@@ -102,12 +85,12 @@ export class LangyNavigateFallbackService {
     resourceId: string;
   }): Promise<LangyNavigateResourceLocation> {
     const kind = detectNavigateResourceKind(resourceId);
-    if (!kind || !this.resources) {
+    if (!kind) {
       return { outcome: "unknown" };
     }
 
     // A failed lookup drops the navigate rather than the relay stream (see the header).
-    return this.resources
+    return this.#resources
       .locate({ projectId, kind, resourceId })
       .catch((): LangyNavigateResourceLocation => ({ outcome: "unknown" }));
   }

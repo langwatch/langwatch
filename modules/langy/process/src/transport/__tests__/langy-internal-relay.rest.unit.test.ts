@@ -5,6 +5,7 @@
  */
 import { EventEmitter } from "node:events";
 
+import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
@@ -59,6 +60,7 @@ async function relayRoute() {
       gateway: createApiFixture<GatewayApi>(),
       secrets: createApiFixture<SecretApi>(),
       experiments: createApiFixture<ExperimentApi>(),
+      agents: createApiFixture<AgentApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       authz: createApiFixture<AuthzApi>(),

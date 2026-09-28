@@ -32,3 +32,18 @@ Feature: The Langy relay takes the worker's frame stream
       When a frame claiming the same conversation and turn arrives for a different project
       Then the frame is rejected as carrying no run token
       And nothing reaches the live buffer
+
+  Rule: The relay carries main's navigate fallback and capability progress
+
+    @unit
+    Scenario: A navigate with no remembered link opens the resource's page
+      Given the conversation remembered no link for a resource the project holds
+      When the worker relays Langy's navigate to that resource
+      Then the live buffer carries a navigate to the resource's own page under the project slug
+
+    @unit
+    Scenario: A running capability call shows its progress label
+      Given a turn running a LangWatch capability
+      When the worker relays the call's start
+      Then the live status reads the capability's present-tense label
+      And the label clears once the call settles

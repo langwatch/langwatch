@@ -1,3 +1,4 @@
+import { type CliCommand, parseCliToolName } from "@langwatch/langy-contract";
 import { z } from "zod";
 
 /**
@@ -12,12 +13,6 @@ export interface FeatureNode {
   consumes: string[];
   /** The CLI commands this feature owns, e.g. `["trace search", "trace get"]`. */
   cli: string[];
-}
-
-/** A `langwatch <resource> <verb>` invocation, as the CLI envelope decodes it. */
-export interface CliCommand {
-  resource: string;
-  verb: string;
 }
 
 export interface LangyFeatureMapSource {
@@ -81,19 +76,6 @@ function flatten(features: RawFeature[]): RawFeature[] {
 function commandKey(command: string): string | null {
   const [resource, verb] = command.trim().split(/\s+/);
   return resource && verb ? `${resource}.${verb}` : null;
-}
-
-/**
- * Decode the typed tool name the CLI envelope records
- * (`langwatch.<resource>.<verb>`) back into its command pair. Null for anything
- * else — a raw `bash`, a shell command that wasn't ours.
- */
-export function parseCliToolName(name: string): CliCommand | null {
-  const parts = name.trim().split(".");
-  if (parts.length !== 3 || parts[0] !== "langwatch") return null;
-  const [, resource, verb] = parts;
-  if (!resource || !verb) return null;
-  return { resource, verb };
 }
 
 export function createLangyFeatureMap(source: unknown): LangyFeatureMap {

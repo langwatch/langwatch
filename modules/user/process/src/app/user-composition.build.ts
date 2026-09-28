@@ -4,8 +4,13 @@
  * unanswered capability belongs to.
  */
 
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
+import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
 import { UserCapabilityUnavailableError } from "@langwatch/user-contract";
@@ -19,8 +24,17 @@ export function buildUserInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
   redis: RedisConnection;
   organizations: OrganizationApi;
+  enterpriseGateway: Pick<
+    EnterpriseGatewayApi,
+    "findDefaultRoutingPolicies" | "personalVirtualKeyList"
+  >;
+  gateway: Pick<GatewayApi, "checkBudget">;
+  auth: Pick<AuthApi, "revokeCliTokens">;
+  projects: Pick<ProjectApi, "findInternal">;
+  governance: Pick<GovernanceRestApi, "personalUsage">;
 }): UserInfrastructure {
-  const { prisma, redis, organizations } = input;
+  const { prisma, redis, organizations, enterpriseGateway, gateway } = input;
+  const { auth, projects, governance } = input;
 
   return {
     avatarStorage: {
@@ -57,39 +71,27 @@ export function buildUserInfrastructure(input: {
           unavailable("Auth0 tenant credentials, so it cannot change an Auth0 password"),
         ),
     },
-    // CLI tokens are an Enterprise governance capability. It refuses rather
-    // than returning: a deactivation that silently left the person's CLI
-    // credentials live would be the failure this call exists to prevent.
+    // Main's CliTokenRevocationService.revokeForUser: auth owns the CLI tokens.
     cliCredentials: {
-      revokeForUser: () =>
-        Promise.reject(
-          unavailable("Enterprise governance service, so it cannot revoke this user's CLI tokens"),
-        ),
+      revokeForUser: async ({ userId }) => {
+        await auth.revokeCliTokens({ userId });
+      },
     },
     organizations: organizationDirectory({
       directory: PrismaUserOrganizationDirectoryRepository.create(prisma),
       organizations,
     }),
+    // Main's findHiddenGovernanceProject: read-only, never provisioned on a read.
     governanceProjects: {
-      // The organization's hidden governance project is minted by Enterprise
-      // governance, which this process does not compose. Absent is the
-      // honest answer and the one the module already handles.
-      findGovernanceProject: () => Promise.resolve(null),
+      findGovernanceProject: ({ organizationId }) =>
+        projects.findInternal({ organizationId, kind: PROJECT_KIND.INTERNAL_GOVERNANCE }),
     },
-    // The gateway's own stores. All three are Enterprise, and all three
-    // refuse rather than answering: a budget pre-check that answered
-    // "allowed" without a store would let spend through unmetered.
+    // Main's resolveDefaultForUser, personal virtual keys and budget check.
     gateway: {
-      findDefaultRoutingPolicy: () =>
-        Promise.reject(
-          unavailable("Enterprise gateway governance, so it holds no default routing policy"),
-        ),
-      listPersonalVirtualKeys: () =>
-        Promise.reject(
-          unavailable("Enterprise gateway governance, so it holds no personal gateway keys"),
-        ),
-      checkBudget: () =>
-        Promise.reject(unavailable("Enterprise gateway budget store, so it cannot check a budget")),
+      findDefaultRoutingPolicy: async (policyInput) =>
+        (await enterpriseGateway.findDefaultRoutingPolicies(policyInput))[0] ?? null,
+      listPersonalVirtualKeys: (keysInput) => enterpriseGateway.personalVirtualKeyList(keysInput),
+      checkBudget: (budgetInput) => gateway.checkBudget(budgetInput),
     },
     budgetRequests: {
       sendBudgetIncreaseRequest: () =>
@@ -99,14 +101,9 @@ export function buildUserInfrastructure(input: {
           ),
         ),
     },
-    // The spend rollup behind `/api/me/usage`. Enterprise governance owns
-    // the ledger, so a deployment without it refuses by name rather than
-    // reporting a zero somebody would read as "you spent nothing".
+    // The spend rollup behind `/api/me/usage`, main's PersonalUsageService.
     personalUsage: {
-      personalUsage: () =>
-        Promise.reject(
-          unavailable("spend ledger, so it cannot roll up this person's own AI usage"),
-        ),
+      personalUsage: (usageInput) => governance.personalUsage(usageInput),
     },
   };
 }

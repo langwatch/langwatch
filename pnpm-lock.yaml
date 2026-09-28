@@ -9140,9 +9140,15 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
@@ -9173,6 +9179,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/monitor-contract':
+        specifier: workspace:*
+        version: link:../../monitor/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -9194,9 +9203,15 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/prompt-contract':
+        specifier: workspace:*
+        version: link:../../prompt/contract
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
       '@langwatch/secret-contract':
         specifier: workspace:*
         version: link:../../secret/contract
@@ -9212,6 +9227,9 @@ importers:
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
+      '@langwatch/workflow-contract':
+        specifier: workspace:*
+        version: link:../../workflow/contract
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1
@@ -9928,6 +9946,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/workflow-contract':
+        specifier: workspace:*
+        version: link:../../workflow/contract
       nanoid:
         specifier: 'catalog:'
         version: 5.1.16
@@ -10995,6 +11016,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
+      '@langwatch/enterprise-governance-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/governance/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract

@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 
+import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -209,6 +210,7 @@ async function createApp({
       gateway: createApiFixture<GatewayApi>(),
       secrets: createApiFixture<SecretApi>(),
       experiments: createApiFixture<ExperimentApi>(),
+      agents: createApiFixture<AgentApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       authz: createApiFixture<AuthzApi>({ isDemoProject: () => false }),

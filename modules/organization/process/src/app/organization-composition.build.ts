@@ -420,8 +420,7 @@ class LoggedOrganizationPromptSeed implements OrganizationPromptSeed {
 
 /**
  * The Enterprise plan gates, over the ONE plan application this process
- * resolves every allowance through. The seat guard for a team-role change is
- * not ported yet, so it refuses by name.
+ * resolves every allowance through.
  */
 function organizationPlanGate(options: {
   plans: Pick<EntitlementApi, "getActivePlan">;
@@ -438,12 +437,6 @@ function organizationPlanGate(options: {
       assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS),
     assertScimAllowed: ({ organizationId }) =>
       assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.SCIM),
-    assertTeamRoleChangeWithinSeatLimits: () =>
-      Promise.reject(
-        new OrganizationCapabilityUnavailableError(
-          "Enterprise seat licence, so it cannot authorize a member role change",
-        ),
-      ),
   };
 }
 

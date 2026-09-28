@@ -1,4 +1,4 @@
-import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
+import { AgentApi, INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import type { ProtocolConnection } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
@@ -133,6 +133,8 @@ import { LangyLocalWorkerService } from "../services/langy-local-worker.service.
 import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
 import { LangyMaintenanceService } from "../services/langy-maintenance.service.ts";
 import { LangyModelService } from "../services/langy-model.service.ts";
+import { LangyNavigateFallbackService } from "../services/langy-navigate-fallback.service.ts";
+import { LangyNavigateResourceLocatorService } from "../services/langy-navigate-resource-locator.service.ts";
 import { LangyPanelAccessService } from "../services/langy-panel-access.service.ts";
 import { LangyPanelConversationService } from "../services/langy-panel-conversation.service.ts";
 import { LangyPanelEgressService } from "../services/langy-panel-egress.service.ts";
@@ -248,8 +250,10 @@ export class LangyApp implements LangyApiContract {
     /** Langy's own gateway key: minted by the gateway, kept under a reserved project secret. */
     gateway: GatewayApi,
     secrets: SecretApi,
-    /** The saved workbench an away page's UI action is applied to. */
+    /** The saved workbench an away page's UI action is applied to, and a navigate's experiment. */
     experiments: ExperimentApi,
+    /** The agent a navigate with no remembered link opens, at the agent's own address. */
+    agents: AgentApi,
     /** Whether a failed turn belonged to guided onboarding, and where that failure is tracked. */
     onboarding: OnboardingApi,
     /** The platform default retention the analytics grain is written on. */
@@ -296,6 +300,15 @@ export class LangyApp implements LangyApiContract {
         gateway: setup.dependencies.gateway,
       }),
       uiActionSurface: LangyUiActionSurfaceService.create(setup.dependencies.featureFlags),
+      navigateFallback: LangyNavigateFallbackService.create({
+        projects: setup.dependencies.projects,
+        resources: LangyNavigateResourceLocatorService.create({
+          experiments: setup.dependencies.experiments,
+          agents: setup.dependencies.agents,
+          publicBaseUrl: setup.members.publicBaseUrl,
+        }),
+        publicBaseUrl: setup.members.publicBaseUrl,
+      }),
     });
     const commands = LangyConversationCommandSenders.create();
     const langy = adapter.build({

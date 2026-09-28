@@ -265,6 +265,28 @@ describe("GovernanceApp ingestion templates", () => {
   });
 });
 
+describe("GovernanceApp default AI tool catalogue", () => {
+  describe("given an organization whose catalogue never had an entry", () => {
+    /** @scenario "A fresh organization gets the full standard catalog with no admin action" */
+    it("seeds every starter tile once, and nothing on a second ask", async () => {
+      const { app } = await buildApp();
+      const tiles = app.aiToolStarterPackCatalog();
+
+      await expect(
+        app.aiToolEnsureDefaultCatalog({ organizationId: ORGANIZATION_ID }),
+      ).resolves.toEqual({ hasSeeded: true, created: tiles.length });
+      await expect(
+        app.aiToolEnsureDefaultCatalog({ organizationId: ORGANIZATION_ID }),
+      ).resolves.toEqual({ hasSeeded: false, created: 0 });
+
+      const entries = await app.aiToolListForAdmin({ organizationId: ORGANIZATION_ID });
+      expect(entries.map(({ slug }) => slug).toSorted()).toEqual(
+        tiles.map(({ slug }) => slug).toSorted(),
+      );
+    });
+  });
+});
+
 describe("GovernanceApp as the module a process installs", () => {
   describe("given the one REST declaration the module mounts", () => {
     it("answers every capability the declarations name from the one app", async () => {

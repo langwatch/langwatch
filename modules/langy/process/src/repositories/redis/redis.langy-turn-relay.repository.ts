@@ -12,6 +12,7 @@ import {
   parseLangwatchCommand,
   toRelativeSameOriginHref,
   LangyTurnErrors,
+  wordCapabilityProgress,
 } from "@langwatch/langy-contract";
 
 import {
@@ -32,8 +33,6 @@ import type {
   LangyResourceLinksRepository,
   LangyTurnHandoffRepository,
 } from "../langy-live-turn.repository.ts";
-
-type PlatformProgress = { headline: string };
 
 /** The CLI grammar the agent uses to say WHICH resource to open — never an
  * address. `langwatch navigate open <resourceId>`; the platform resolves
@@ -267,8 +266,6 @@ export interface LangyTurnRelayDeps {
   };
   /** The deployment origin used to turn platform URLs into safe app hrefs. */
   baseHost: string;
-  /** Optional app-owned capability label registry. */
-  resolveCapabilityProgress?: (name: string) => PlatformProgress | null;
 }
 
 export type LangyRelayRejection =
@@ -335,7 +332,6 @@ export class RedisLangyTurnRelayRepository {
     readHandoffRunToken?: LangyTurnRelayDeps["readHandoffRunToken"];
     refreshHandoffTtl?: LangyTurnRelayDeps["refreshHandoffTtl"];
     resolveResourceUrl?: LangyTurnRelayDeps["resolveResourceUrl"];
-    resolveCapabilityProgress?: (name: string) => PlatformProgress | null;
     logger?: LangyTurnRelayDeps["logger"];
   }): RedisLangyTurnRelayRepository {
     const { buffer, resourceLinks, frameDedup } = options;
@@ -359,9 +355,6 @@ export class RedisLangyTurnRelayRepository {
       ...(options.resolveResourceUrl ? { resolveResourceUrl: options.resolveResourceUrl } : {}),
       ...(options.logger ? { logger: options.logger } : {}),
       baseHost: options.baseHost,
-      ...(options.resolveCapabilityProgress
-        ? { resolveCapabilityProgress: options.resolveCapabilityProgress }
-        : {}),
     });
   }
 
@@ -736,8 +729,8 @@ export class RedisLangyTurnRelayRepository {
     // fires on the tool entry, once per turn) cannot wipe it, and cleared with an
     // empty status when the call settles, so it shows only between the step's
     // start and its output. Non-capability calls (a raw bash) carry no label.
-    const progress = this.deps.resolveCapabilityProgress?.(call.name);
-    if (progress) {
+    const progress = wordCapabilityProgress(call.name);
+    if (progress.outcome === "worded") {
       await this.deps.buffer.appendStatus({
         ...at,
         status: frame.phase === "start" ? `${progress.headline}…` : "",

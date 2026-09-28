@@ -143,6 +143,35 @@ export class OrganizationMemberRoleService {
   }
 
   /**
+   * Main's seat guard on a Lite Member's team-role change (organization.ts:699-730): moving
+   * them off a custom role that granted more than viewing costs a Lite Member seat.
+   */
+  async assertTeamRoleChangeWithinSeatLimits(params: {
+    organizationId: string;
+    teamId: string;
+    userId: string;
+  }): Promise<void> {
+    const { organizationId, teamId, userId } = params;
+    const currentTeamBindings = await this.repo.findTeamRoleBindings({
+      organizationId,
+      userId,
+      teamIds: [teamId],
+    });
+    const grantedPermissions = await findCustomRolePermissionGrants({
+      repository: this.repo,
+      organizationId,
+      currentTeamBindings,
+    });
+
+    await this.dependencies.seats.assertRoleChangeAllowed({
+      organizationId,
+      currentRole: "EXTERNAL",
+      userPermissions: grantedPermissions.length > 0 ? grantedPermissions : undefined,
+      role: "EXTERNAL",
+    });
+  }
+
+  /**
    * The full member-role-change orchestration: personal-workspace assertion, shared-team scoping,
    * seat classification, the Enterprise gate for custom roles, then the cascading role update.
    */

@@ -46,3 +46,19 @@ const RESOURCE_PREFIXES: readonly (readonly [string, LangyNavigateResourceKind])
 export function detectNavigateResourceKind(resourceId: string): LangyNavigateResourceKind | null {
   return RESOURCE_PREFIXES.find(([prefix]) => resourceId.startsWith(prefix))?.[1] ?? null;
 }
+
+/**
+ * The address the product's own links open for a resource Langy builds itself;
+ * agents, scenarios and scenario runs are addressed by their owners instead.
+ * A prompt opens in the playground as a tab, not as a drawer over its empty state.
+ */
+export const NAVIGATE_RESOURCE_PATHS = {
+  prompt: (id: string) => `/prompts?promptId=${encodeURIComponent(id)}`,
+  dataset: (id: string) => `/datasets/${encodeURIComponent(id)}`,
+  workflow: (id: string) => `/studio/${encodeURIComponent(id)}`,
+  experiment: (slugOrId: string) => `/experiments/${encodeURIComponent(slugOrId)}`,
+  monitor: (id: string) =>
+    `/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${encodeURIComponent(id)}`,
+  evaluator: (id: string) =>
+    `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${encodeURIComponent(id)}`,
+} as const satisfies Partial<Record<LangyNavigateResourceKind, (id: string) => string>>;

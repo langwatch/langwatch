@@ -159,8 +159,6 @@ function makeRelay(
     resourceLinks,
     ...(over.resolveResourceUrl ? { resolveResourceUrl: over.resolveResourceUrl } : {}),
     baseHost: "https://app.langwatch.ai",
-    resolveCapabilityProgress: (name) =>
-      name === "langwatch.trace.search" ? { headline: "Searching traces" } : null,
   });
   return {
     relay,
@@ -319,6 +317,7 @@ describe("LangyTurnRelayAdapter", () => {
 
 describe("LangyTurnRelayAdapter", () => {
   describe("given a LangWatch capability tool call", () => {
+    /** @scenario "A capability's sub-status shows while a step runs" */
     it("emits a present-continuous sub-status on start and clears it on end", async () => {
       const { relay, buffer } = makeRelay();
       await relay.handle(
