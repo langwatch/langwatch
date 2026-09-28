@@ -385,6 +385,10 @@ export class LangyApp implements LangyApiContract {
         sink: setup.repositories.analyticsEvents,
         defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
       }),
+      retention: {
+        resolve: (tenantId) =>
+          setup.dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+      },
       broadcast: LangyConversationUpdateService.create({ presence: setup.dependencies.presence }),
       admissions: persistence.langyTurnAdmission,
       buffer,

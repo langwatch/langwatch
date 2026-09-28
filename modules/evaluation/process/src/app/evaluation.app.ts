@@ -471,6 +471,10 @@ export class EvaluationApp implements EvaluationApiContract {
         analytics: dependencies.analytics,
         analyticsFoldCache: repositories.analyticsFoldCache,
         defaultRetentionDays: () => dependencies.retention.getPlatformDefaultRetentionDays(),
+        tenantRetention: {
+          resolve: (tenantId) =>
+            dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+        },
       }),
     });
   }

@@ -1090,7 +1090,11 @@ never thinks about resolution at all. The per-module resolver adapters
 
 **The `clickhouse` member exposes its routing table** (Alex, 2026-09-28):
 `privateRoutes()` answers the organizations it routes to a private endpoint, parsed once at boot
-from the `CLICKHOUSE_URL__*` family. A module needing that deployment fact (ops' cohort exclusion,
+from main's `CLICKHOUSE_URL__<label>__<orgId>=<url>` family, unchanged for a deployment. The URLs
+carry credentials, so the stores declare the family as secrets and resolve it through the chain,
+never by reading the environment or printing a route (ruled 2026-09-28, landing: the secrets
+package has no family handle yet). `CLICKHOUSE_PRIVATE_ROUTES` is not read.
+A module needing that deployment fact (ops' cohort exclusion,
 read through `RoutingTableOrganizationDataplaneService`) reads the member, never a second
 declaration of the env family in its own config.
 
@@ -1262,6 +1266,12 @@ A replay reads its projections off the pipelines the process registered: `replay
 unwraps a `RedisCachedFoldStore` to its durable tier, and a map projection's owner declares the
 `targetTable` a rebuild optimizes on its definition. No list outside the owning module names a
 store or a table (Alex, 2026-09-28).
+A pipeline whose projections write tenant rows declares each tenant's retention itself (Alex,
+2026-09-28): `.withRetention(resolver)`, built from its module's own `DataRetentionApi` dependency
+(`getResolvedForProject`, a tenant being a project), and registration prefers it to the runtime's.
+The eventing member is built before any module, so it holds no late-bound resolver; a pipeline
+declaring none leaves each store to stamp the platform default.
+Spec: `packages/eventing/specs/pipeline-retention.feature`.
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and

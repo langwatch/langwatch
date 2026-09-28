@@ -17,9 +17,9 @@ export interface DatabaseConfig {
 }
 
 /**
- * One organization on its own ClickHouse server. The whole family is one
- * variable, `CLICKHOUSE_PRIVATE_ROUTES` (JSON array) — it used to be a
- * per-customer var no classifier could name, leaking it past `haven env`.
+ * One organization on its own ClickHouse server, from main's family
+ * `CLICKHOUSE_URL__<label>__<orgId>=<url>`: a secret, resolved once at boot
+ * and never printed (ARCHITECTURE §7).
  */
 export interface ClickHousePrivateRoute {
   readonly organizationId: string;
@@ -31,7 +31,7 @@ export interface ClickHousePrivateRoute {
 export interface ClickHouseConfig {
   /** `CLICKHOUSE_URL` — the shared server. Absent where every tenant is private. */
   readonly url?: string;
-  /** `CLICKHOUSE_PRIVATE_ROUTES` — one entry per organization on its own server. */
+  /** `CLICKHOUSE_URL__<label>__<orgId>` — one entry per organization on its own server. */
   readonly privateRoutes?: readonly ClickHousePrivateRoute[];
   /** What sizes the per-endpoint pool, as main's `CLICKHOUSE_*` pool variables state it. */
   readonly poolSizing?: PoolSizingInput;

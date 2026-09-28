@@ -208,6 +208,10 @@ export class CodingAgentApp implements CodingAgentApi {
       projects: dependencies.projects,
       clock: SystemCodingAgentClockService.create(),
       defaultRetentionDays: () => dependencies.retention.getPlatformDefaultRetentionDays(),
+      retention: {
+        resolve: (tenantId) =>
+          dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+      },
       sessionContextMemo: repositories.sessionContextMemo,
       sessionFoldCache: repositories.sessionFoldCache,
       github: dependencies.github,

@@ -248,6 +248,7 @@ export function createEvaluationTestApp(
       analytics: createApiFixture<AnalyticsApi>(),
       analyticsFoldCache: repositories.analyticsFoldCache,
       defaultRetentionDays: () => 30,
+      tenantRetention: { resolve: async () => null },
     }),
   });
 }

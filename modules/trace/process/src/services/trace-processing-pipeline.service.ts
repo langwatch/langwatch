@@ -60,7 +60,10 @@ import { TraceSpanNormalizationAdapterService } from "./trace-span-normalization
 export interface TraceProcessingPeers {
   codingAgents: Pick<CodingAgentApi, "contributeReceivedSpan">;
   dataPrivacy: Pick<DataPrivacyApi, "redactSpan" | "dropSpanContent">;
-  dataRetention: Pick<DataRetentionApi, "getPlatformDefaultRetentionDays">;
+  dataRetention: Pick<
+    DataRetentionApi,
+    "getPlatformDefaultRetentionDays" | "getResolvedForProject"
+  >;
   automations: Pick<
     AutomationApi,
     "handleTraceTriggerMatch" | "handleEvaluationGraphTriggerActivity"
@@ -152,7 +155,11 @@ export class TraceProcessingPipelineService {
         costEnrichment: this.#costEnrichment(),
         tokenEstimation: this.#tokenEstimation(),
       }),
-    }).build();
+    })
+      .build()
+      .withRetention({
+        resolve: (tenantId) => peers.dataRetention.getResolvedForProject({ projectId: tenantId }),
+      });
   }
 
   #tokenEstimation(): TraceSpanTokenEstimation {

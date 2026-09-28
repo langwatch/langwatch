@@ -7,7 +7,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { EventSourcing } from "@langwatch/eventing";
+import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
@@ -56,15 +56,39 @@ function process(role: "api" | "worker") {
       project: createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
       "data-retention": createApiFixture<DataRetentionApi>({
         getPlatformDefaultRetentionDays: () => 49,
+        getResolvedForProject: async () => RETAINED,
       }),
       "feature-flag": createApiFixture<FeatureFlagApi>({}),
       "model-provider": createApiFixture<ModelProviderApi>({}),
     });
 }
 
+const RETAINED = { traces: 30, scenarios: 365, experiments: 30 };
+
 const plan = { projectId: "project-1", name: "Nightly", scenarioIds: ["scenario-1"] };
 
 describe("suite app installation", () => {
+  /** @scenario "A module's pipeline declares each tenant's retention from data retention" */
+  it("declares each tenant's retention on its pipeline as data retention resolves it", async () => {
+    const eventing = new EventSourcing({
+      enabled: false,
+      processStore: InMemoryProcessStore.createForTesting(),
+    });
+    const runtime = await process("worker").withEventing(eventing).boot();
+
+    try {
+      const pipeline = eventing.definitions.find(
+        (definition) => definition.metadata.name === "suite_run_processing",
+      );
+
+      await expect(
+        pipeline?.open((definition) => definition.retentionPolicyResolver?.resolve("project-1")),
+      ).resolves.toEqual(RETAINED);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
     const runtime = await process(role).boot();
 

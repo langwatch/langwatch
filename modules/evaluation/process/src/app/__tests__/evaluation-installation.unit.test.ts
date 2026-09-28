@@ -10,6 +10,7 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
  */
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/kernel";
@@ -43,11 +44,37 @@ function process(role: "api" | "worker") {
       analytics: createApiFixture<AnalyticsApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({
         getPlatformDefaultRetentionDays: () => 30,
+        getResolvedForProject: async () => RETAINED,
       }),
     });
 }
 
+const RETAINED = { traces: 365, scenarios: 30, experiments: 30 };
+
 describe("given a process that installs the evaluation feature", () => {
+  describe("when its pipeline is built on the worker", () => {
+    /** @scenario "A module's pipeline declares each tenant's retention from data retention" */
+    it("declares each tenant's retention as data retention resolves it", async () => {
+      const eventing = new EventSourcing({
+        enabled: false,
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
+      const runtime = await process("worker").withEventing(eventing).boot();
+
+      try {
+        const pipeline = eventing.definitions.find(
+          (definition) => definition.metadata.name === "evaluation_processing",
+        );
+
+        await expect(
+          pipeline?.open((definition) => definition.retentionPolicyResolver?.resolve("project-1")),
+        ).resolves.toEqual(RETAINED);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
   describe("when it boots", () => {
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
       const runtime = await process(role).boot();

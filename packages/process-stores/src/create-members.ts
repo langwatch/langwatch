@@ -107,7 +107,7 @@ function clickhouseMember({
   if (!clickhouse || !configured) {
     throw new MemberNotConfiguredError(
       "clickhouse",
-      "set CLICKHOUSE_URL or CLICKHOUSE_PRIVATE_ROUTES",
+      "set CLICKHOUSE_URL or a CLICKHOUSE_URL__<label>__<orgId> route",
     );
   }
   return buildClickHouse({ config: clickhouse, directory: tenantDirectory() });

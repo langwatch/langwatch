@@ -38,6 +38,7 @@ import {
   sealStateProjection,
 } from "../projections/sealedProjection.ts";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
+import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import { ConfigurationError, ValidationError } from "../services/errorHandling.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type {
@@ -103,6 +104,7 @@ export class PipelineBuilder<
   private processManagers = new Map<string, ProcessManagerDefinition>();
   private eventSubscribers = new Map<string, EventSubscriberDefinition<EventType>>();
   private prepareEventForProjection?: (event: EventType) => EventType;
+  private retentionPolicyResolver?: RetentionPolicyResolver;
   private readonly globalProjections: GlobalProjection[] = [];
   constructor(
     private readonly name: string,
@@ -121,6 +123,16 @@ export class PipelineBuilder<
     prepareEventForProjection: (event: EventType) => EventType,
   ): this {
     this.prepareEventForProjection = prepareEventForProjection;
+    return this;
+  }
+
+  /**
+   * Each tenant's retention for the rows this pipeline's projections write, asked of the owning
+   * module's data-retention dependency. Absent, the runtime's resolver or the store default
+   * applies.
+   */
+  withRetention(resolver: RetentionPolicyResolver): this {
+    this.retentionPolicyResolver = resolver;
     return this;
   }
 
@@ -561,6 +573,9 @@ export class PipelineBuilder<
       parseEvent: this.events.parseEvent,
       metadata,
       prepareEventForProjection: this.prepareEventForProjection,
+      ...(this.retentionPolicyResolver === undefined
+        ? {}
+        : { retentionPolicyResolver: this.retentionPolicyResolver }),
       foldProjections: this.foldProjections,
       stateProjections: this.stateProjections,
       mapProjections: this.mapProjections,

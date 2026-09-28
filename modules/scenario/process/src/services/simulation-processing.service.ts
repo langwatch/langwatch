@@ -76,7 +76,10 @@ export class SimulationProcessingService {
       runs: SimulationRunProcessingRepository;
       cancellations: CancellationPublisher;
       traces: SimulationTraceReads;
-      retention: Pick<DataRetentionApi, "getPlatformDefaultRetentionDays">;
+      retention: Pick<
+        DataRetentionApi,
+        "getPlatformDefaultRetentionDays" | "getResolvedForProject"
+      >;
       commands: SimulationCommandDispatcherService;
       simulations: SimulationService;
       suiteRuns: SuiteRunSyncSubscriberDeps;
@@ -90,7 +93,7 @@ export class SimulationProcessingService {
     runs: SimulationRunProcessingRepository;
     cancellations: CancellationPublisher;
     traces: SimulationTraceReads;
-    retention: Pick<DataRetentionApi, "getPlatformDefaultRetentionDays">;
+    retention: Pick<DataRetentionApi, "getPlatformDefaultRetentionDays" | "getResolvedForProject">;
     commands: SimulationCommandDispatcherService;
     simulations: SimulationService;
     suiteRuns: SuiteRunSyncSubscriberDeps;
@@ -158,6 +161,9 @@ export class SimulationProcessingService {
       snapshotUpdateBroadcast: this.input.snapshotUpdates,
       suiteRunSync: this.input.suiteRuns,
       traceMetricsSync: { computeRunMetrics: (data) => commands.computeRunMetrics(data) },
+      retention: {
+        resolve: (tenantId) => retention.getResolvedForProject({ projectId: tenantId }),
+      },
     });
   }
 

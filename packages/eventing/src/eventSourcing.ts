@@ -454,7 +454,7 @@ export class EventSourcing {
       globalRegistry: this.projectionRegistry,
       executionTarget: this._executionTarget,
       replayMarkerChecker: this._replayMarkerChecker,
-      retentionPolicyResolver: this._retentionPolicyResolver,
+      retentionPolicyResolver: definition.retentionPolicyResolver ?? this._retentionPolicyResolver,
       killSwitch: this._killSwitch,
       warnWhenProjectionsRunInline: this._warnWhenProjectionsRunInline,
       prepareEventForProjection: definition.prepareEventForProjection,

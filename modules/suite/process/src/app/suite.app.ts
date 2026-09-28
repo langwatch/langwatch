@@ -13,6 +13,7 @@ import {
   RepositoryFoldStore,
   type EventingCommands,
   type FoldProjectionStore,
+  type RetentionPolicyResolver,
 } from "@langwatch/eventing";
 import {
   FeatureFlagApi,
@@ -186,6 +187,10 @@ export class SuiteApp implements SuiteApi {
         clickhouse: members.clickhouse,
         redis: members.redis,
         defaultRetentionDays,
+        retention: {
+          resolve: (tenantId) =>
+            dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+        },
       }),
     });
   }
@@ -199,6 +204,7 @@ export class SuiteApp implements SuiteApi {
     clickhouse: ClickHouseQueryClient;
     redis: Redis | Cluster | null;
     defaultRetentionDays: () => number;
+    retention: RetentionPolicyResolver;
   }) {
     const suiteRunStateFoldStore: FoldProjectionStore<SuiteRunStateData> = options.redis
       ? RedisSuiteRunProcessingRepository.create({
@@ -214,7 +220,10 @@ export class SuiteApp implements SuiteApi {
           SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
         );
 
-    return buildSuiteRunProcessingPipeline({ suiteRunStateFoldStore });
+    return buildSuiteRunProcessingPipeline({
+      suiteRunStateFoldStore,
+      retention: options.retention,
+    });
   }
 
   private static buildRunPlans(input: {

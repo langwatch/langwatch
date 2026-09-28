@@ -8,6 +8,7 @@ import {
   definePipeline,
   type EventingSetup,
   type FoldProjectionStore,
+  type RetentionPolicyResolver,
 } from "@langwatch/eventing";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import {
@@ -29,6 +30,8 @@ import {
 
 export interface SuiteRunProcessingPipelineDeps {
   suiteRunStateFoldStore: FoldProjectionStore<SuiteRunStateData>;
+  /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
+  retention?: RetentionPolicyResolver;
 }
 
 /**
@@ -62,54 +65,52 @@ const defineSuiteRunProcessingPipeline = (deps: SuiteRunProcessingPipelineDeps) 
     regradeSuiteRunItem: RegradeSuiteRunItemCommand,
   };
 
-  return (
-    definePipeline({
-      name: "suite_run_processing",
-      aggregate: defineAggregate({
-        type: "suite_run",
+  const pipeline = definePipeline({
+    name: "suite_run_processing",
+    aggregate: defineAggregate({
+      type: "suite_run",
+    }),
+  })
+    .withEvents([
+      SuiteRunStartedEventSchema,
+      SuiteRunItemStartedEventSchema,
+      SuiteRunItemCompletedEventSchema,
+      SuiteRunItemRegradedEventSchema,
+    ])
+    .withClickHouseFoldProjection(
+      SuiteRunStateFoldProjection.create({
+        store: deps.suiteRunStateFoldStore,
       }),
+    )
+    // These fold by addition (Started/Completed/FailedCount + 1),
+    // deduped by `event.id` — `withCommand` only reads dedup from
+    // `makeJobId` in these options; omit it and a redelivery double-counts,
+    // flipping status to SUCCESS/FAILURE before the run has finished.
+    .withCommand("startSuiteRun", commands.startSuiteRun, {
+      deduplication: {
+        makeId: jobId("startSuiteRun", commands.startSuiteRun.makeJobId),
+        ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+      },
     })
-      .withEvents([
-        SuiteRunStartedEventSchema,
-        SuiteRunItemStartedEventSchema,
-        SuiteRunItemCompletedEventSchema,
-        SuiteRunItemRegradedEventSchema,
-      ])
-      .withClickHouseFoldProjection(
-        SuiteRunStateFoldProjection.create({
-          store: deps.suiteRunStateFoldStore,
-        }),
-      )
-      // These fold by addition (Started/Completed/FailedCount + 1),
-      // deduped by `event.id` — `withCommand` only reads dedup from
-      // `makeJobId` in these options; omit it and a redelivery double-counts,
-      // flipping status to SUCCESS/FAILURE before the run has finished.
-      .withCommand("startSuiteRun", commands.startSuiteRun, {
-        deduplication: {
-          makeId: jobId("startSuiteRun", commands.startSuiteRun.makeJobId),
-          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-        },
-      })
-      .withCommand("recordSuiteRunItemStarted", commands.recordSuiteRunItemStarted, {
-        deduplication: {
-          makeId: jobId("recordSuiteRunItemStarted", commands.recordSuiteRunItemStarted.makeJobId),
-          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-        },
-      })
-      .withCommand("completeSuiteRunItem", commands.completeSuiteRunItem, {
-        deduplication: {
-          makeId: jobId("completeSuiteRunItem", commands.completeSuiteRunItem.makeJobId),
-          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-        },
-      })
-      .withCommand("regradeSuiteRunItem", commands.regradeSuiteRunItem, {
-        deduplication: {
-          makeId: jobId("regradeSuiteRunItem", commands.regradeSuiteRunItem.makeJobId),
-          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-        },
-      })
-      .build()
-  );
+    .withCommand("recordSuiteRunItemStarted", commands.recordSuiteRunItemStarted, {
+      deduplication: {
+        makeId: jobId("recordSuiteRunItemStarted", commands.recordSuiteRunItemStarted.makeJobId),
+        ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+      },
+    })
+    .withCommand("completeSuiteRunItem", commands.completeSuiteRunItem, {
+      deduplication: {
+        makeId: jobId("completeSuiteRunItem", commands.completeSuiteRunItem.makeJobId),
+        ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+      },
+    })
+    .withCommand("regradeSuiteRunItem", commands.regradeSuiteRunItem, {
+      deduplication: {
+        makeId: jobId("regradeSuiteRunItem", commands.regradeSuiteRunItem.makeJobId),
+        ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+      },
+    });
+  return (deps.retention ? pipeline.withRetention(deps.retention) : pipeline).build();
 };
 
 /**
