@@ -5,7 +5,7 @@
  */
 import "@testing-library/jest-dom/vitest";
 import type { UiAuthenticationOverviewCardProps } from "@langwatch/browser-host/declarations";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../../../testing.tsx";
@@ -106,6 +106,28 @@ describe("given an administrator on the Authentication page", () => {
       expect(screen.getByText("Sign-in and provisioning")).toBeInTheDocument();
       expect(screen.getByTestId("declared-card")).toHaveTextContent("org-1:false");
       expect(screen.queryByTestId("organization-policy")).toBeNull();
+    });
+  });
+
+  describe("when the page renders", () => {
+    /** @scenario "The Authentication pages share main's rail" */
+    it("frames it in main's Authentication rail with Overview as the current entry", () => {
+      renderWithOrganizationHost(
+        <AuthenticationSettingsScreen />,
+        hostWith({ grants: ["sso:view", "organization:manage"] }),
+      );
+
+      const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
+      const links = within(rail).getAllByRole("link");
+      expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+        ["Overview", "/settings/authentication"],
+        ["Identity provider", "/settings/authentication/provider"],
+        ["Connectors", "/settings/authentication/connectors"],
+      ]);
+      expect(within(rail).getByRole("link", { name: "Overview" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
     });
   });
 

@@ -1303,6 +1303,18 @@ over a workspace graph that had already arrived. The hazard is the re-entry,
 not the shared key; a `queryFn` calling the transport under a `trpcQueryKey`
 is the normal shape. specs/ui/by-path-dispatch.feature.
 
+**A rail shared by pages of different modules is a design-system frame**
+(Alex, 2026-09-28). `@langwatch/design-system/section-navigation-frame` takes
+the links and the active one and holds no data; each owning page renders it
+with the same entries. The case: main's Authentication rail (Overview,
+Identity provider, Connectors) spans organization, sso and scim pages.
+
+**A switcher a page borrows is lent by the module that owns the choice**
+(Alex, 2026-09-28): project lends `projectSwitcher` through `withCapabilities`
+(§10.1), and a host mount answers `projectSwitcher()` from that declaration,
+never null. The case: settings/secrets lost main's project selector beside
+Add Secret because no module lent one.
+
 ### 10.1 Shared browser machinery (ruled 2026-09-18)
 
 The browser mirrors the process grammar, adapted rather than copied — when a

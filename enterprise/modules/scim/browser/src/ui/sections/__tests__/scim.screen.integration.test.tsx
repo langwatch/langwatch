@@ -77,6 +77,7 @@ vi.mock("../../../behavior/scim-api.ts", () => ({
 }));
 
 import { FakeScimHost, renderWithScimHost } from "../../../testing.tsx";
+import ConnectorsScreen from "../connectors.screen.tsx";
 import ScimScreen from "../scim.screen.tsx";
 
 const token = (overrides: Record<string, unknown> = {}) => ({
@@ -132,6 +133,24 @@ describe("given no organization is in scope", () => {
     );
 
     expect(container.textContent).toBe("");
+  });
+});
+
+describe("given the connectors page inside the Authentication section", () => {
+  /** @scenario "The Authentication pages share main's rail" */
+  it("frames it in main's rail with Connectors as the current entry", () => {
+    renderWithScimHost(<ConnectorsScreen />);
+
+    const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
+    const links = within(rail).getAllByRole("link");
+    expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+      ["Overview", "/settings/authentication"],
+      ["Identity provider", "/settings/authentication/provider"],
+      ["Connectors", "/settings/authentication/connectors"],
+    ]);
+    expect(
+      within(rail).getByRole("link", { name: "Connectors" }).getAttribute("aria-current"),
+    ).toBe("page");
   });
 });
 

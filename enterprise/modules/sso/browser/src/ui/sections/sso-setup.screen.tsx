@@ -5,7 +5,12 @@
  * a control that cannot do anything reads as a broken one (handoff §10).
  */
 import { Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  SectionNavigationFrame,
+  type SectionNavigationLink,
+} from "@langwatch/design-system/section-navigation-frame";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
+import { KeyRound, Plug, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ssoApi } from "../../behavior/sso-api.ts";
@@ -42,21 +47,38 @@ import { TestSignInSection } from "./test-sign-in.section.tsx";
 
 type SetupConnection = NonNullable<SsoSetupPageView["connection"]>;
 
+/** Main's rail across the three Authentication pages (ARCHITECTURE.md §10). */
+const AUTHENTICATION_LINKS: readonly SectionNavigationLink[] = [
+  { label: "Overview", href: "/settings/authentication", icon: <ShieldCheck size={14} /> },
+  {
+    label: "Identity provider",
+    href: "/settings/authentication/provider",
+    icon: <KeyRound size={14} />,
+  },
+  { label: "Connectors", href: "/settings/authentication/connectors", icon: <Plug size={14} /> },
+];
+
 export default function SsoSetupScreen() {
   const organizationId = useSsoHost().organizationId();
 
   if (!organizationId) return null;
 
   return (
-    <VStack align="stretch" gap={6} width="full">
-      <VStack align="start" gap={1}>
-        <Heading as="h2">Identity provider</Heading>
-        <Text color="fg.muted">
-          Where your people sign in, and everything it takes to put it in front of them.
-        </Text>
+    <SectionNavigationFrame
+      label="Authentication"
+      links={AUTHENTICATION_LINKS}
+      activeHref="/settings/authentication/provider"
+    >
+      <VStack align="stretch" gap={6} width="full">
+        <VStack align="start" gap={1}>
+          <Heading as="h2">Identity provider</Heading>
+          <Text color="fg.muted">
+            Where your people sign in, and everything it takes to put it in front of them.
+          </Text>
+        </VStack>
+        <SsoSetupPage organizationId={organizationId} />
       </VStack>
-      <SsoSetupPage organizationId={organizationId} />
-    </VStack>
+    </SectionNavigationFrame>
   );
 }
 
