@@ -14,15 +14,13 @@ import { customAlphabet } from "nanoid";
 export const TEST_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:25.10.2.65";
 
 /**
- * Test container tuning: memory cap, caches off, pools for container, as haven
- * applies (tools/thuishaven/domain/clickhouse.go). The cap reads the server's
- * own heap: a Linux runner's cgroup usage reached 1 GiB before the first insert.
+ * Test container tuning: memory cap, caches off, pools for container. Same
+ * as haven applies (tools/thuishaven/domain/clickhouse.go).
  */
 export const TEST_CLICKHOUSE_TUNING = {
   target: "/etc/clickhouse-server/config.d/zz-langwatch-test-tuning.xml",
   content: `<clickhouse>
     <max_server_memory_usage>1073741824</max_server_memory_usage>
-    <memory_worker_use_cgroup>0</memory_worker_use_cgroup>
     <mark_cache_size>67108864</mark_cache_size>
     <uncompressed_cache_size>0</uncompressed_cache_size>
     <mmap_cache_size>0</mmap_cache_size>
@@ -60,7 +58,7 @@ export const TEST_CLICKHOUSE_TUNING = {
  * the hash — so bumping this value is what forces new containers when tuning changes.
  */
 export const TEST_CLICKHOUSE_TUNING_LABEL = {
-  "langwatch.test.clickhouse-tuning": "v2",
+  "langwatch.test.clickhouse-tuning": "v1",
 };
 
 export interface TestClickHouseEndpoint {
