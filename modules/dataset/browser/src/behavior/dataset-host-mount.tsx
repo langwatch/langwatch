@@ -6,7 +6,9 @@
 
 import {
   useUiCapabilities,
+  useUiCopyTargets,
   useUiScope,
+  type UiCopyTargets,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
@@ -28,6 +30,7 @@ import {
 class CapabilityDatasetHost extends DatasetHostApi {
   private readonly scopeHost: UiScopeHost | undefined;
   private readonly session: UiSession;
+  private readonly lent: UiCopyTargets;
   private readonly uiRoute: UiRoute;
   private readonly navigation: UiNavigation;
   private readonly feedback: UiFeedback;
@@ -35,12 +38,14 @@ class CapabilityDatasetHost extends DatasetHostApi {
   constructor({
     scopeHost,
     session,
+    lent,
     uiRoute,
     navigation,
     feedback,
   }: {
     scopeHost: UiScopeHost | undefined;
     session: UiSession;
+    lent: UiCopyTargets;
     uiRoute: UiRoute;
     navigation: UiNavigation;
     feedback: UiFeedback;
@@ -48,6 +53,7 @@ class CapabilityDatasetHost extends DatasetHostApi {
     super();
     this.scopeHost = scopeHost;
     this.session = session;
+    this.lent = lent;
     this.uiRoute = uiRoute;
     this.navigation = navigation;
     this.feedback = feedback;
@@ -66,9 +72,11 @@ class CapabilityDatasetHost extends DatasetHostApi {
     return this.scopeHost?.organizationRole() === "EXTERNAL";
   }
 
-  /** No org-graph capability exists yet; recorded gap, see the handoff. */
+  /** Main filtered to the projects the reader may create datasets in. */
   copyTargets(): readonly DatasetCopyTarget[] {
-    return [];
+    return (this.lent.targets("datasets:create") ?? [])
+      .filter((target) => target.mayCreate)
+      .map((target) => ({ label: target.label, value: target.projectId }));
   }
 
   route(): DatasetRouteReading {
@@ -108,11 +116,13 @@ class CapabilityDatasetHost extends DatasetHostApi {
  */
 export default function DatasetHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
+  const lent = useUiCopyTargets();
   const scopeHost = useUiScope().scopeHost();
 
   const host = useMemo(
-    () => new CapabilityDatasetHost({ scopeHost, session, uiRoute: route, navigation, feedback }),
-    [scopeHost, session, route, navigation, feedback],
+    () =>
+      new CapabilityDatasetHost({ scopeHost, session, lent, uiRoute: route, navigation, feedback }),
+    [scopeHost, session, lent, route, navigation, feedback],
   );
 
   return <DatasetHostProvider value={host}>{children}</DatasetHostProvider>;

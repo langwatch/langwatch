@@ -92,7 +92,11 @@ function UiBootPageError() {
  * Where the two capabilities meet, and the only place they do — in the order
  * record 10.1 rules. `auth` and `organization` never import each other.
  */
-function browserUiCapabilitiesHook({ session: auth, scope: organization }: UiRootCapabilities) {
+function browserUiCapabilitiesHook({
+  session: auth,
+  scope: organization,
+  copyTargets: lending,
+}: UiRootCapabilities) {
   return function useBrowserUiCapabilities({
     transport,
     feedback,
@@ -112,9 +116,16 @@ function browserUiCapabilitiesHook({ session: auth, scope: organization }: UiRoo
       scope: scopeReading.scope,
     });
 
+    const copyTargets = lending.useUiCopyTargetsReading({
+      transport,
+      organizations: scopeReading.organizations,
+      userId: sessionReading.user?.id,
+    });
+
     return {
       session,
       scope: organization.createBrowserUiScope({ reading: scopeReading, session }),
+      copyTargets: lending.createBrowserUiCopyTargets({ reading: copyTargets }),
     };
   };
 }

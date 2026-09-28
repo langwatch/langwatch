@@ -126,6 +126,7 @@ export function createUiFeatureShell({
           route,
           rpc,
           scope: live.scope,
+          copyTargets: live.copyTargets,
           session: live.session,
         }),
       [documentTitle, navigation, route, rpc, live],

@@ -53,6 +53,15 @@ Feature: A module mounts the host its screens read
     # Settings > General hit its own `if (!organization) return null` on every
     # load: a framed, empty pane, no console error and no failed request.
 
+  @integration
+  Scenario: Every Replicate dialog lists the targets organization lends
+    Given organization lends the projects I could replicate into
+    When I open a Replicate dialog on a screen whose host mount answers copy targets
+    Then the dialog lists each target as "Organization / Team / Project"
+    And a target I may not create in is listed but cannot be chosen
+    # Six mounts (workflow, dataset, evaluator, monitor, prompt, agent) answered
+    # an empty list, so every Replicate dialog offered nothing. ARCHITECTURE.md 10.1.
+
   @unit
   Scenario: A mount with nothing to render is refused by name
     Given an installed module whose host mount resolves to no component

@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
 /**
- * The workflows list threw "No workflow host is mounted" until workflow declared its mount.
+ * Workflow's declared mount: the list threw, and Replicate listed nothing, without it.
  * Spec: specs/ui/module-host-mounting.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   UiCapabilityContextProvider,
+  UiCopyTargets,
   UiScope,
   type UiActiveScope,
   type UiCapabilities,
+  type UiCopyTarget,
 } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import {
@@ -18,17 +20,25 @@ import {
 import { installedModuleHostMounts } from "@langwatch/ui-kernel/module-hosts";
 import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ComponentType, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const listed = vi.fn((_input: { projectId: string }) => ({ data: [], isLoading: false }));
 vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: { workflow: { getAll: { useQuery: (input: { projectId: string }) => listed(input) } } },
+  api: {
+    useUtils: () => ({ workflow: { getAll: { invalidate: () => Promise.resolve() } } }),
+    workflow: {
+      getAll: { useQuery: (input: { projectId: string }) => listed(input) },
+      copy: { useMutation: () => ({ mutateAsync: () => Promise.resolve(), isPending: false }) },
+    },
+  },
 }));
 vi.mock("../../ui/sections/workflow-create-dialog-host.tsx", () => ({
   WorkflowCreateDialogHost: () => null,
 }));
 
+import { WorkflowReplicateDialog } from "../../ui/sections/workflow-replicate-dialog.tsx";
 import WorkflowsScreen from "../../ui/sections/workflows/workflows-screen.tsx";
 import { workflowWeb } from "../../workflow.web.ts";
 
@@ -43,6 +53,29 @@ class TestScope extends UiScope {
 
   scopeHost(): UiScopeHost {
     return this.host;
+  }
+}
+
+/** Stands in for organization's lent capability: one open project, one closed. */
+class LentCopyTargets extends UiCopyTargets {
+  readonly asked: string[] = [];
+
+  targets(permission: string): readonly UiCopyTarget[] {
+    this.asked.push(permission);
+    return [
+      {
+        projectId: "proj-2",
+        projectSlug: "web-app",
+        label: "Acme / Engineering / Web App",
+        mayCreate: true,
+      },
+      {
+        projectId: "proj-3",
+        projectSlug: "batch",
+        label: "Acme / Engineering / Batch",
+        mayCreate: false,
+      },
+    ];
   }
 }
 
@@ -65,7 +98,10 @@ function isProviderModule(
   return typeof value.default === "function";
 }
 
-async function renderUnderMount(children: ReactNode) {
+async function renderUnderMount(
+  children: ReactNode,
+  { copyTargets }: { copyTargets?: UiCopyTargets } = {},
+) {
   const Mount = await declaredMount();
   const scopeHost = createUiScopeHost({
     project: () => ({ id: "proj-1", slug: "demo", name: "Demo" }),
@@ -79,6 +115,7 @@ async function renderUnderMount(children: ReactNode) {
       navigate: navigated,
     }),
     scope: new TestScope(scopeHost),
+    copyTargets,
   };
 
   render(
@@ -96,7 +133,8 @@ function PeerReader() {
   const scope = host.scope();
   return (
     <span>
-      {scope.projectSlug}/{scope.teamId}/{String(scope.isResolved)}/{host.copyTargets().length}
+      {scope.projectSlug}/{scope.teamId}/{String(scope.isResolved)}/
+      {host.copyTargets({ permission: "evaluations:manage" }).length}
     </span>
   );
 }
@@ -123,6 +161,36 @@ describe("given the workflow module's declared host mount", () => {
       await renderUnderMount(<PeerReader />);
 
       expect(await screen.findByText("demo/team-1/true/0")).toBeTruthy();
+    });
+  });
+
+  describe("when a customer opens the Replicate dialog under it", () => {
+    /** @scenario "Every Replicate dialog lists the targets organization lends" */
+    it("lists organization's targets by name and refuses the closed one", async () => {
+      const lent = new LentCopyTargets();
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      await renderUnderMount(
+        <WorkflowReplicateDialog open onClose={vi.fn()} workflowId="wf-1" workflowName="Bot" />,
+        { copyTargets: lent },
+      );
+
+      await user.click(await screen.findByRole("combobox"));
+      const open = await screen.findAllByRole("option", {
+        name: /Acme \/ Engineering \/ Web App/,
+        hidden: true,
+      });
+      const closed = await screen.findAllByRole("option", {
+        name: /Acme \/ Engineering \/ Batch/,
+        hidden: true,
+      });
+      const closedItem = closed.find((option) => option.tagName === "DIV");
+      if (!closedItem) throw new Error("the closed target renders no option");
+      await user.click(closedItem);
+
+      expect(open.length).toBeGreaterThan(0);
+      expect(screen.getByText("(no permission)")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Replicate" })).toHaveProperty("disabled", true);
+      expect(lent.asked).toContain("workflows:create");
     });
   });
 });

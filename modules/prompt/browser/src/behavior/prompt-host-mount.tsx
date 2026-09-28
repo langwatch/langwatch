@@ -1,12 +1,14 @@
 /**
  * Prompt's answer to the port its screen declares: every method projects a
- * `@langwatch/browser-host` capability. `copyTargets`/`projectApiKey` read
- * honestly empty: no org-graph/key capability exists yet. §10.1.
+ * `@langwatch/browser-host` capability. `projectApiKey` reads honestly empty:
+ * no key capability exists yet; organization lends `copyTargets`. §10.1.
  */
 
 import {
   useUiCapabilities,
+  useUiCopyTargets,
   useUiScope,
+  type UiCopyTargets,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
@@ -73,6 +75,7 @@ const PLAYGROUND_CHAT_AVAILABILITY: PromptPlaygroundChatAvailability = { availab
 class CapabilityPromptHost extends PromptHostApi {
   private readonly hostScope: PromptHostScope;
   private readonly session: UiSession;
+  private readonly lent: UiCopyTargets;
   private readonly navigation: UiNavigation;
   private readonly uiRoute: UiRoute;
   private readonly feedback: UiFeedback;
@@ -80,12 +83,14 @@ class CapabilityPromptHost extends PromptHostApi {
   constructor({
     hostScope,
     session,
+    lent,
     navigation,
     uiRoute,
     feedback,
   }: {
     hostScope: PromptHostScope;
     session: UiSession;
+    lent: UiCopyTargets;
     navigation: UiNavigation;
     uiRoute: UiRoute;
     feedback: UiFeedback;
@@ -93,6 +98,7 @@ class CapabilityPromptHost extends PromptHostApi {
     super();
     this.hostScope = hostScope;
     this.session = session;
+    this.lent = lent;
     this.navigation = navigation;
     this.uiRoute = uiRoute;
     this.feedback = feedback;
@@ -139,9 +145,14 @@ class CapabilityPromptHost extends PromptHostApi {
     return false;
   }
 
-  /** No org-graph capability exists yet; recorded gap, see the handoff. */
+  /** Organization's lent targets; the label carries the team, as main's select did. */
   copyTargets(): readonly PromptCopyTarget[] {
-    return [];
+    return (this.lent.targets("prompts:create") ?? []).map((target) => ({
+      id: target.projectId,
+      name: target.label,
+      slug: target.projectSlug,
+      canCreate: target.mayCreate,
+    }));
   }
 
   playgroundChat(): PromptPlaygroundChatAvailability {
@@ -172,6 +183,7 @@ class CapabilityPromptHost extends PromptHostApi {
  */
 export default function PromptHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
+  const lent = useUiCopyTargets();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost: UiScopeHost | undefined = useUiScope().scopeHost();
 
@@ -187,8 +199,9 @@ export default function PromptHostMount({ children }: { children?: ReactNode }) 
   );
 
   const host = useMemo(
-    () => new CapabilityPromptHost({ hostScope, session, navigation, uiRoute: route, feedback }),
-    [hostScope, session, navigation, route, feedback],
+    () =>
+      new CapabilityPromptHost({ hostScope, session, lent, navigation, uiRoute: route, feedback }),
+    [hostScope, session, lent, navigation, route, feedback],
   );
 
   return <PromptHostProvider value={host}>{children}</PromptHostProvider>;

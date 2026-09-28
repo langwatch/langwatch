@@ -1507,6 +1507,17 @@ invented:
   the consumer, not the purity: **many consumers → kit; the composition root
   → the slot.**
 
+  **Replicate targets are one capability organization lends** (Alex,
+  2026-09-28). The projects a reader could replicate a thing into, each graded
+  by the reader's own `authz.effectivePermissions` in that project (main's
+  `useProjectsForCopy`), are organization's `copyTargets` capability. The
+  shell loads it with `scope` and installs it as `UiCapabilities.copyTargets`
+  over the same organization graph; every host's `copyTargets()` projects
+  `useUiCopyTargets().targets(permission)` into its own port shape. No answer
+  yet is `undefined` on the capability, and `[]` only on an array port. The
+  case that forced it: six mounts (workflow, dataset, evaluator, monitor,
+  prompt, agent) answered `[]`, so every Replicate dialog offered nothing.
+
 - **One Analytics capability** wraps every instrumentation destination
   (posthog, gtag, browser tracing). Modules emit named events through it —
   the browser twin of a channel.

@@ -87,7 +87,7 @@ export function useOrganizationTeamProject(
       hasPermission: (permission: string) => host.hasPermission(permission),
       hasAnyPermission: (permissions: string[]) =>
         permissions.some((permission) => host.hasPermission(permission)),
-      copyTargets: host.copyTargets(),
+      copyTargets: host.copyTargets({ permission: "workflows:create" }),
       modelProviders: modelProviders.data,
       isResolved: scope.isResolved ?? !!scope.projectId,
       isLoading: !(scope.isResolved ?? !!scope.projectId),

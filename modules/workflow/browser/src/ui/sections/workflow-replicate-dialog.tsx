@@ -30,7 +30,7 @@ export function WorkflowReplicateDialog({
   const [selected, setSelected] = useState<string[]>([]);
   const [copyDatasets, setCopyDatasets] = useState(false);
 
-  const targets = host.copyTargets();
+  const targets = host.copyTargets({ permission: "workflows:create" });
   const collection = createListCollection({
     items: targets.map((target) => ({ label: target.name, value: target.id })),
   });

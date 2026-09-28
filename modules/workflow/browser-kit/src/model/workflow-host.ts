@@ -20,6 +20,9 @@ export type WorkflowScope = {
 };
 
 /** One project the reader may replicate a workflow into. */
+/** What a replicate dialog asks of a target: main graded workflows and experiments apart. */
+export type WorkflowCopyPermission = "workflows:create" | "evaluations:manage";
+
 export type WorkflowCopyTarget = {
   id: string;
   /** "Organization / Team / Project", as the select renders it. */
@@ -77,7 +80,9 @@ export abstract class WorkflowHostApi {
   abstract hasPermission(permission: string): boolean;
 
   /** Every project the reader could replicate a workflow into. */
-  abstract copyTargets(): readonly WorkflowCopyTarget[];
+  abstract copyTargets(input: {
+    permission: WorkflowCopyPermission;
+  }): readonly WorkflowCopyTarget[];
 
   abstract route(): WorkflowRouteReading;
 

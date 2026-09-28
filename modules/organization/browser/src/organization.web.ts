@@ -86,6 +86,8 @@ export const organizationWeb = defineWebModule("organization")
   .withCapabilities({
     /** Where they are standing: the composition root awaits this before it renders. */
     scope: { load: () => import("./behavior/scope-capability.ts") },
+    /** Where the reader could replicate a thing to, graded per project (§10.1). */
+    copyTargets: { load: () => import("./behavior/copy-targets-capability.ts") },
     /** The organization graph the chrome draws its switchers from. */
     organizationFacts: { load: () => import("./behavior/ui-organization-facts.ts") },
     joinOffer: {

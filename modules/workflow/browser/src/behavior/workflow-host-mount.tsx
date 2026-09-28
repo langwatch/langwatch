@@ -6,7 +6,9 @@
 
 import {
   useUiCapabilities,
+  useUiCopyTargets,
   useUiScope,
+  type UiCopyTargets,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
@@ -16,6 +18,7 @@ import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-
 import {
   WorkflowHostApi,
   WorkflowHostProvider,
+  type WorkflowCopyPermission,
   type WorkflowCopyTarget,
   type WorkflowFailureNotice,
   type WorkflowRouteReading,
@@ -27,6 +30,7 @@ import { useMemo, type ReactNode } from "react";
 class CapabilityWorkflowHost extends WorkflowHostApi {
   private readonly scopeHost: UiScopeHost | undefined;
   private readonly session: UiSession;
+  private readonly lent: UiCopyTargets;
   private readonly uiRoute: UiRoute;
   private readonly navigation: UiNavigation;
   private readonly feedback: UiFeedback;
@@ -34,12 +38,14 @@ class CapabilityWorkflowHost extends WorkflowHostApi {
   constructor({
     scopeHost,
     session,
+    lent,
     uiRoute,
     navigation,
     feedback,
   }: {
     scopeHost: UiScopeHost | undefined;
     session: UiSession;
+    lent: UiCopyTargets;
     uiRoute: UiRoute;
     navigation: UiNavigation;
     feedback: UiFeedback;
@@ -47,6 +53,7 @@ class CapabilityWorkflowHost extends WorkflowHostApi {
     super();
     this.scopeHost = scopeHost;
     this.session = session;
+    this.lent = lent;
     this.uiRoute = uiRoute;
     this.navigation = navigation;
     this.feedback = feedback;
@@ -68,9 +75,17 @@ class CapabilityWorkflowHost extends WorkflowHostApi {
     return this.session.hasPermission(permission);
   }
 
-  /** No org-graph capability exists yet; `[]` is the honest reading (§10.1). */
-  copyTargets(): readonly WorkflowCopyTarget[] {
-    return [];
+  /** Organization's lent targets; no answer yet is no target (§10.1, array port). */
+  copyTargets({
+    permission,
+  }: {
+    permission: WorkflowCopyPermission;
+  }): readonly WorkflowCopyTarget[] {
+    return (this.lent.targets(permission) ?? []).map((target) => ({
+      id: target.projectId,
+      name: target.label,
+      canCreate: target.mayCreate,
+    }));
   }
 
   route(): WorkflowRouteReading {
@@ -110,11 +125,20 @@ class CapabilityWorkflowHost extends WorkflowHostApi {
  */
 export default function WorkflowHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
+  const lent = useUiCopyTargets();
   const scopeHost = useUiScope().scopeHost();
 
   const host = useMemo(
-    () => new CapabilityWorkflowHost({ scopeHost, session, uiRoute: route, navigation, feedback }),
-    [scopeHost, session, route, navigation, feedback],
+    () =>
+      new CapabilityWorkflowHost({
+        scopeHost,
+        session,
+        lent,
+        uiRoute: route,
+        navigation,
+        feedback,
+      }),
+    [scopeHost, session, lent, route, navigation, feedback],
   );
 
   return <WorkflowHostProvider value={host}>{children}</WorkflowHostProvider>;

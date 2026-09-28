@@ -20,7 +20,11 @@ import {
   parsePublicConfigSlice,
   PUBLIC_APP_CONFIG_META_NAME,
 } from "@langwatch/config/public-app-config";
-import type { UiResolvedScope, UiScopeProject } from "@langwatch/organization-contract";
+import type {
+  UiResolvedScope,
+  UiScopeOrganization,
+  UiScopeProject,
+} from "@langwatch/organization-contract";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
@@ -43,6 +47,8 @@ export type UiScopeReading = {
   readonly organizationRole: string | undefined;
   /** Whether the address bar names the deployment's shared demo project. */
   readonly isDemo: boolean;
+  /** The graph this render resolved against, undefined until it lands; copy targets read it. */
+  readonly organizations: readonly UiScopeOrganization[] | undefined;
 };
 
 /**
@@ -144,6 +150,7 @@ export function useUiScopeReading({
     }),
     organizationRole: resolved.organizationRole,
     isDemo,
+    organizations: organizations.data,
   };
 }
 

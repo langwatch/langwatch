@@ -6,7 +6,9 @@
 
 import {
   useUiCapabilities,
+  useUiCopyTargets,
   useUiScope,
+  type UiCopyTargets,
   type UiFeedback,
   type UiRoute,
   type UiSession,
@@ -27,23 +29,27 @@ import {
 class CapabilityEvaluatorHost extends EvaluatorHostApi {
   private readonly hostScope: EvaluatorScope;
   private readonly session: UiSession;
+  private readonly lent: UiCopyTargets;
   private readonly uiRoute: UiRoute;
   private readonly feedback: UiFeedback;
 
   constructor({
     hostScope,
     session,
+    lent,
     uiRoute,
     feedback,
   }: {
     hostScope: EvaluatorScope;
     session: UiSession;
+    lent: UiCopyTargets;
     uiRoute: UiRoute;
     feedback: UiFeedback;
   }) {
     super();
     this.hostScope = hostScope;
     this.session = session;
+    this.lent = lent;
     this.uiRoute = uiRoute;
     this.feedback = feedback;
   }
@@ -56,9 +62,13 @@ class CapabilityEvaluatorHost extends EvaluatorHostApi {
     return this.session.hasPermission(permission);
   }
 
-  /** No org-graph capability exists yet; recorded gap, see the handoff. */
+  /** Organization's lent targets; no answer yet is no target (§10.1, array port). */
   copyTargets(): readonly EvaluatorCopyTarget[] {
-    return [];
+    return (this.lent.targets("evaluations:manage") ?? []).map((target) => ({
+      id: target.projectId,
+      name: target.label,
+      canCreate: target.mayCreate,
+    }));
   }
 
   route(): EvaluatorRouteReading {
@@ -99,6 +109,7 @@ class CapabilityEvaluatorHost extends EvaluatorHostApi {
  */
 export default function EvaluatorHostMount({ children }: { children?: ReactNode }) {
   const { session, route, feedback } = useUiCapabilities();
+  const lent = useUiCopyTargets();
   const { projectId } = useUiScope().activeScope();
   const scopeHost = useUiScope().scopeHost();
 
@@ -108,8 +119,8 @@ export default function EvaluatorHostMount({ children }: { children?: ReactNode 
   );
 
   const host = useMemo(
-    () => new CapabilityEvaluatorHost({ hostScope, session, uiRoute: route, feedback }),
-    [hostScope, session, route, feedback],
+    () => new CapabilityEvaluatorHost({ hostScope, session, lent, uiRoute: route, feedback }),
+    [hostScope, session, lent, route, feedback],
   );
 
   return <EvaluatorHostProvider value={host}>{children}</EvaluatorHostProvider>;
