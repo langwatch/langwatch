@@ -494,19 +494,6 @@ jobs:
             ${{ runner.os }}-pkg-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-pkg-tsbuildinfo-
 
-      # The restore writes every output after the checkout wrote the sources,
-      # so tsc -b's timestamp check calls a stale restored dist up to date and
-      # typechecks against old declarations. Backdated, the outputs are older
-      # than every source and tsc -b falls through to the build info's hashes,
-      # rebuilding only what changed.
-      - name: Backdate the restored build outputs
-        run: |
-          shopt -s nullglob
-          dirs=(packages/*/dist modules/*/*/dist enterprise/modules/*/*/dist apps/*/dist)
-          if [ "${#dirs[@]}" -gt 0 ]; then
-            find "${dirs[@]}" -exec touch -h -t 200001010000 {} +
-          fi
-
       # Every declared REST fact must have a binding, or the process that
       # mounts the declaring family refuses at boot. This static pass replaces
       # discovering them one full boot at a time (2026-09-13: 29 accumulated
@@ -516,8 +503,15 @@ jobs:
 
       # Not --no-bail: one package's failure should not hide the rest, and a
       # migration in flight tends to break several at once. The job still fails.
+      # Two passes. When a restored upstream dist is stale, tsc 7's build
+      # rebuilds that project but checks its dependants against the old
+      # declarations it already read, and reports errors a fresh run does not
+      # have. The first pass brings every dist up to date; the second is the
+      # verdict, and only re-checks the projects the first one failed.
       - name: Run typecheck (every workspace package)
-        run: pnpm run typecheck
+        run: |
+          pnpm run typecheck > /dev/null 2>&1 || echo "First pass failed; re-checking against the rebuilt declarations."
+          pnpm run typecheck
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
