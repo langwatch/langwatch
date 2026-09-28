@@ -57,3 +57,20 @@ func TestRunnerPlanSpellsSettleAndViewportAsTheRunnerReadsThem(t *testing.T) {
 		}
 	}
 }
+
+func TestRunnerPlanSpellsFlowsAsTheRunnerReadsThem(t *testing.T) {
+	encoded, err := json.Marshal(RunnerPlan{Flows: []Flow{{
+		ID:    "open-trace",
+		Title: "Open a trace",
+		Steps: []Step{{Action: "click", Label: "row", Optional: true, With: map[string]string{"text": "x"}}},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, key := range []string{`"id":"open-trace"`, `"title":"Open a trace"`, `"steps":[`, `"action":"click"`, `"label":"row"`, `"optional":true`, `"with":{`} {
+		if !strings.Contains(string(encoded), key) {
+			t.Fatalf("plan lacks %s, so the runner reads flow.steps as undefined and crashes: %s", key, encoded)
+		}
+	}
+}

@@ -50,17 +50,17 @@ func ParseViewport(value string) (Viewport, error) {
 // Step is one action in a flow. Action names one of the runner's registered
 // actions; With carries that action's arguments verbatim.
 type Step struct {
-	Action   string            `yaml:"action"`
-	Label    string            `yaml:"label,omitempty"`
-	Optional bool              `yaml:"optional,omitempty"`
-	With     map[string]string `yaml:"with,omitempty"`
+	Action   string            `json:"action"             yaml:"action"`
+	Label    string            `json:"label,omitempty"    yaml:"label,omitempty"`
+	Optional bool              `json:"optional,omitempty" yaml:"optional,omitempty"`
+	With     map[string]string `json:"with,omitempty"     yaml:"with,omitempty"`
 }
 
 // Flow is a named sequence of steps captured on both refs.
 type Flow struct {
-	ID    string `yaml:"id"`
-	Title string `yaml:"title"`
-	Steps []Step `yaml:"steps"`
+	ID    string `json:"id"    yaml:"id"`
+	Title string `json:"title" yaml:"title"`
+	Steps []Step `json:"steps" yaml:"steps"`
 }
 
 // Settle carries the runner's event-driven settle knobs: the run waits for
