@@ -222,6 +222,227 @@ describe("Dashboards v1 on the server", () => {
     });
   });
 
+  describe("given blocks on a board set to only me by its creator", () => {
+    const WIDGET = {
+      projectId: PROJECT,
+      name: "Usage",
+      code: "export default () => null;",
+      queries: [{ name: "usage", sql: "SELECT 1" }],
+    };
+    const LAYOUT = { gridColumn: 3, gridRow: 7, colSpan: 2, rowSpan: 2 };
+
+    async function privateBoardWithBlocks() {
+      const repositories = MemoryDashboardRepositories.create();
+      const { app, id } = await boardSetTo("only_me", appWith({ repositories }));
+      const placed = await app.createDashboardWidget({
+        ...WIDGET,
+        dashboardId: id,
+        viewer: CREATOR,
+      });
+      const unplaced = await app.createDashboardWidget({ ...WIDGET, viewer: TEAMMATE });
+      await repositories.dashboards.createSavedWorkbenchChart({
+        id: "chart-placed",
+        projectId: PROJECT,
+        name: "Spend",
+        definition: { version: 1, sql: "SELECT 1", parameters: {} },
+      });
+      await app.placeSavedWorkbenchChart({
+        projectId: PROJECT,
+        chartId: "chart-placed",
+        dashboardId: id,
+        viewer: CREATOR,
+      });
+      return { app, repositories, id, placed, unplaced };
+    }
+
+    /** @scenario "AC18 Blocks on a board follow the board's visibility" */
+    it("lists its blocks only for members who can see the board", async () => {
+      const { app, placed, unplaced } = await privateBoardWithBlocks();
+      const listedFor = async (viewer?: { userId: string }) =>
+        (await app.listDashboardWidgets({ projectId: PROJECT, viewer })).map(({ id }) => id);
+
+      expect(await listedFor(CREATOR)).toEqual(expect.arrayContaining([placed.id, unplaced.id]));
+      expect(await listedFor(TEAMMATE)).toEqual([unplaced.id]);
+      expect(await listedFor(undefined)).toEqual([unplaced.id]);
+    });
+
+    /** @scenario "AC18 Blocks on a board follow the board's visibility" */
+    it("refuses every block read and write from another member as not found", async () => {
+      const { app, id, placed, unplaced } = await privateBoardWithBlocks();
+      const onBoard = { projectId: PROJECT, id: placed.id, viewer: TEAMMATE };
+
+      const widgetCodes = await Promise.all([
+        codeOf(app.getDashboardWidget(onBoard)),
+        codeOf(app.updateDashboardWidget({ ...onBoard, name: "Taken" })),
+        codeOf(app.deleteDashboardWidget(onBoard)),
+        codeOf(app.createDashboardWidget({ ...WIDGET, dashboardId: id, viewer: TEAMMATE })),
+        codeOf(
+          app.assignDashboardWidgetToDashboard({
+            projectId: PROJECT,
+            id: unplaced.id,
+            dashboardId: id,
+            viewer: TEAMMATE,
+          }),
+        ),
+      ]);
+      expect(widgetCodes).toEqual(Array(widgetCodes.length).fill("dashboard_widget_not_found"));
+
+      expect(
+        await codeOf(
+          app.unplaceSavedWorkbenchChart({
+            projectId: PROJECT,
+            chartId: "chart-placed",
+            viewer: TEAMMATE,
+          }),
+        ),
+      ).toBe("saved_workbench_chart_not_found");
+      expect(
+        await codeOf(
+          app.placeSavedWorkbenchChart({
+            projectId: PROJECT,
+            chartId: "chart-placed",
+            dashboardId: id,
+            viewer: TEAMMATE,
+          }),
+        ),
+      ).toBe("saved_workbench_chart_dashboard_not_found");
+    });
+
+    /** @scenario "AC18 Blocks on a board follow the board's visibility" */
+    it("leaves a block where it was when another member moves it", async () => {
+      const { app, placed } = await privateBoardWithBlocks();
+
+      await app.updateDashboardWidgetLayout({
+        projectId: PROJECT,
+        graphId: placed.id,
+        layout: LAYOUT,
+        viewer: TEAMMATE,
+      });
+      await app.batchUpdateDashboardWidgetLayouts({
+        projectId: PROJECT,
+        layouts: [{ graphId: placed.id, layout: LAYOUT }],
+      });
+
+      await expect(
+        app.getDashboardWidget({ projectId: PROJECT, id: placed.id, viewer: CREATOR }),
+      ).resolves.toMatchObject({ gridColumn: placed.gridColumn, gridRow: placed.gridRow });
+    });
+
+    /** @scenario "AC18 Blocks on a board follow the board's visibility" */
+    it("lets the creator move and delete the blocks on their own board", async () => {
+      const { app, placed } = await privateBoardWithBlocks();
+
+      await app.updateDashboardWidgetLayout({
+        projectId: PROJECT,
+        graphId: placed.id,
+        layout: LAYOUT,
+        viewer: CREATOR,
+      });
+      await expect(
+        app.getDashboardWidget({ projectId: PROJECT, id: placed.id, viewer: CREATOR }),
+      ).resolves.toMatchObject(LAYOUT);
+      await expect(
+        app.deleteDashboardWidget({ projectId: PROJECT, id: placed.id, viewer: CREATOR }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("given blocks on a board set to team", () => {
+    /** @scenario "AC18 Blocks on a board follow the board's visibility" */
+    it("shows them to the team and refuses them to a member outside it", async () => {
+      const { app, id } = await boardSetTo("team");
+      const placed = await app.createDashboardWidget({
+        projectId: PROJECT,
+        dashboardId: id,
+        name: "Usage",
+        code: "export default () => null;",
+        queries: [],
+        viewer: CREATOR,
+      });
+
+      await expect(
+        app.listDashboardWidgets({ projectId: PROJECT, viewer: TEAMMATE }),
+      ).resolves.toMatchObject([{ id: placed.id }]);
+      await expect(
+        app.listDashboardWidgets({ projectId: PROJECT, viewer: OUTSIDER }),
+      ).resolves.toEqual([]);
+      expect(
+        await codeOf(
+          app.deleteDashboardWidget({ projectId: PROJECT, id: placed.id, viewer: OUTSIDER }),
+        ),
+      ).toBe("dashboard_widget_not_found");
+    });
+  });
+
+  describe("given a board with no recorded creator", () => {
+    async function creatorlessBoard() {
+      const repositories = MemoryDashboardRepositories.create();
+      const board = await repositories.dashboards.createDashboard({
+        id: "creatorless-board",
+        projectId: PROJECT,
+        name: "Reports",
+        order: 0,
+      });
+      return { app: appWith({ repositories }), id: board.id };
+    }
+
+    /** @scenario "AC26 Narrowing a board with no recorded creator records who narrowed it" */
+    it("records the member who set it to only me, who can still open it", async () => {
+      const { app, id } = await creatorlessBoard();
+
+      await expect(
+        app.setDashboardVisibility({
+          projectId: PROJECT,
+          dashboardId: id,
+          viewer: TEAMMATE,
+          visibility: "only_me",
+        }),
+      ).resolves.toMatchObject({ visibility: "only_me", createdById: TEAMMATE.userId });
+      await expect(
+        app.getById({ projectId: PROJECT, dashboardId: id, viewer: TEAMMATE }),
+      ).resolves.toMatchObject({ id });
+      await expect(
+        app.getAll({ projectId: PROJECT, graphCountScope: "builder", viewer: OUTSIDER }),
+      ).resolves.toEqual([]);
+    });
+
+    it("records no one when it is left organisation-wide", async () => {
+      const { app, id } = await creatorlessBoard();
+
+      await expect(
+        app.setDashboardVisibility({
+          projectId: PROJECT,
+          dashboardId: id,
+          viewer: TEAMMATE,
+          visibility: "organisation",
+        }),
+      ).resolves.toMatchObject({ createdById: null });
+    });
+  });
+
+  describe("given an admin and another member's only-me board", () => {
+    /** @scenario "AC26 An admin can manage a board they cannot see" */
+    it("lets the admin change its visibility and delete it without listing or opening it", async () => {
+      const { app, id } = await boardSetTo("only_me");
+      const board = { projectId: PROJECT, dashboardId: id };
+
+      await expect(
+        app.getAll({ projectId: PROJECT, graphCountScope: "builder", viewer: ADMIN }),
+      ).resolves.toEqual([]);
+      expect(await codeOf(app.getById({ ...board, viewer: ADMIN }))).toBe("dashboard_not_found");
+      expect(
+        await codeOf(
+          app.setDashboardVisibility({ ...board, viewer: TEAMMATE, visibility: "team" }),
+        ),
+      ).toBe("dashboard_not_found");
+
+      await expect(
+        app.setDashboardVisibility({ ...board, viewer: ADMIN, visibility: "only_me" }),
+      ).resolves.toMatchObject({ createdById: CREATOR.userId });
+      await expect(app.delete({ ...board, viewer: ADMIN })).resolves.toMatchObject({ id });
+    });
+  });
+
   describe("given a board created before visibility existed", () => {
     /** @scenario "AC24 Boards created before this change keep working" */
     it("stays organisation-wide, listed, openable and deletable as before", async () => {
@@ -288,7 +509,11 @@ describe("Dashboards v1 on the server", () => {
 
       await expect(
         app.getOrCreateFirst({ projectId: PROJECT, viewer: CREATOR }),
-      ).resolves.toMatchObject({ name: "Reports", visibility: "organisation" });
+      ).resolves.toMatchObject({
+        name: "Reports",
+        visibility: "organisation",
+        createdById: CREATOR.userId,
+      });
     });
   });
 

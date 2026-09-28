@@ -134,6 +134,20 @@ export function createDashboardTestApp(
   });
 }
 
+/** Memory repositories holding one organisation-wide board, for blocks placed on it. */
+export async function createDashboardTestRepositoriesWithBoard(
+  input: Readonly<{ projectId?: string; dashboardId?: string }> = {},
+): Promise<DashboardRepositories> {
+  const repositories = MemoryDashboardRepositories.create();
+  await repositories.dashboards.createDashboard({
+    id: input.dashboardId ?? "dashboard-1",
+    projectId: input.projectId ?? "project-1",
+    name: "Board",
+    order: 0,
+  });
+  return repositories;
+}
+
 /** An audience answered from two fixed lists, for driving the service directly. */
 export class FixedDashboardAudience implements DashboardAudience {
   constructor(

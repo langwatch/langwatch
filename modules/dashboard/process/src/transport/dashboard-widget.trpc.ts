@@ -1,6 +1,7 @@
 /**
  * The server half of `dashboardWidgets.*`: a permission and a handler per
  * procedure. The playground's rollout gate is the widget operations' own.
+ * Every call names the member as viewer: blocks on boards they cannot see read as not found.
  */
 import { DASHBOARD_SRCDOC_CHART_KIND, type DashboardWidget } from "@langwatch/analytics-contract";
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
@@ -33,16 +34,19 @@ export const dashboardWidgetTrpcTransport: TrpcRouterDeclaration<
 > = defineTrpcRouter(DashboardApi, dashboardWidgetTrpc)
   .procedure("list")
   .withPermission("analytics:view")
-  .handle(async ({ app, input }) =>
-    (await app.listDashboardWidgets({ projectId: input.projectId })).map(wireRow),
+  .handle(async ({ app, input, actor }) =>
+    (
+      await app.listDashboardWidgets({ projectId: input.projectId, viewer: { userId: actor.id } })
+    ).map(wireRow),
   )
 
   .procedure("create")
   .withPermission("analytics:create")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     wireWidget(
       await app.createDashboardWidget({
         projectId: input.projectId,
+        viewer: { userId: actor.id },
         ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
         name: input.name,
         code: input.code,
@@ -53,9 +57,10 @@ export const dashboardWidgetTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("update")
   .withPermission("analytics:update")
-  .handle(async ({ app, input }) => {
+  .handle(async ({ app, input, actor }) => {
     await app.updateDashboardWidget({
       projectId: input.projectId,
+      viewer: { userId: actor.id },
       id: input.id,
       ...(input.name === undefined ? {} : { name: input.name }),
       code: input.code,
@@ -67,19 +72,22 @@ export const dashboardWidgetTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("updateLayout")
   .withPermission("analytics:update")
-  .handle(async ({ app, input: { projectId, graphId, gridColumn, gridRow, colSpan, rowSpan } }) =>
-    app.updateDashboardWidgetLayout({
-      projectId,
-      graphId,
-      layout: { gridColumn, gridRow, colSpan, rowSpan },
-    }),
+  .handle(
+    async ({ app, actor, input: { projectId, graphId, gridColumn, gridRow, colSpan, rowSpan } }) =>
+      app.updateDashboardWidgetLayout({
+        projectId,
+        graphId,
+        viewer: { userId: actor.id },
+        layout: { gridColumn, gridRow, colSpan, rowSpan },
+      }),
   )
 
   .procedure("batchUpdateLayouts")
   .withPermission("analytics:update")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     app.batchUpdateDashboardWidgetLayouts({
       projectId: input.projectId,
+      viewer: { userId: actor.id },
       layouts: input.layouts.map(({ graphId, gridColumn, gridRow, colSpan, rowSpan }) => ({
         graphId,
         layout: { gridColumn, gridRow, colSpan, rowSpan },
@@ -89,9 +97,10 @@ export const dashboardWidgetTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("assignDashboard")
   .withPermission("analytics:update")
-  .handle(async ({ app, input }) => {
+  .handle(async ({ app, input, actor }) => {
     await app.assignDashboardWidgetToDashboard({
       projectId: input.projectId,
+      viewer: { userId: actor.id },
       id: input.id,
       dashboardId: input.dashboardId,
     });
@@ -101,8 +110,12 @@ export const dashboardWidgetTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("delete")
   .withPermission("analytics:delete")
-  .handle(async ({ app, input }) => {
-    await app.deleteDashboardWidget({ projectId: input.projectId, id: input.id });
+  .handle(async ({ app, input, actor }) => {
+    await app.deleteDashboardWidget({
+      projectId: input.projectId,
+      id: input.id,
+      viewer: { userId: actor.id },
+    });
 
     return { success: true as const };
   })

@@ -23,6 +23,8 @@ import {
 import {
   DashboardApi,
   DashboardsNotEnabledError,
+  SavedWorkbenchChartDashboardNotFoundError,
+  SavedWorkbenchChartNotFoundError,
   type Dashboard,
   type DashboardGraphCountScope,
   type DashboardSourcePresence,
@@ -233,14 +235,15 @@ export class DashboardApp implements DashboardApi {
     const workbenchAccess = new AnalyticsWorkbenchAccess(analytics);
     const workbenchCaller = new AnalyticsWorkbenchCaller(analytics);
     const { projects, featureFlags, authz, organizations } = setup.dependencies;
+    const dashboards = DashboardService.create({
+      repository: setup.repositories.dashboards,
+      workbenchAccess,
+      audience: new PeerDashboardAudience({ projects, organizations, authz }),
+    });
 
     return new DashboardModule({
       services: {
-        dashboards: DashboardService.create({
-          repository: setup.repositories.dashboards,
-          workbenchAccess,
-          audience: new PeerDashboardAudience({ projects, organizations, authz }),
-        }),
+        dashboards,
         charts: SavedWorkbenchChartService.create({
           repository: setup.repositories.dashboards,
           policy: SavedWorkbenchChartPolicyService.create({ analytics }),
@@ -250,6 +253,7 @@ export class DashboardApp implements DashboardApi {
         widgets: DashboardWidgetService.create({
           repository: setup.repositories.dashboardWidgets,
           analytics,
+          boards: dashboards,
         }),
         sourcePresence: SourcePresenceService.create({ analytics }),
       },
@@ -473,13 +477,20 @@ export class DashboardApp implements DashboardApi {
     return this.#analytics.assertCustomChartPlaygroundEnabled(input);
   }
 
-  /** Every custom chart widget in the project. */
-  listDashboardWidgets(input: { projectId: string }): Promise<DashboardWidget[]> {
+  /** The project's custom chart widgets, less those on boards outside the viewer's audience. */
+  listDashboardWidgets(input: {
+    projectId: string;
+    viewer?: DashboardViewer;
+  }): Promise<DashboardWidget[]> {
     return this.#widgets.getAll(input);
   }
 
   /** One custom chart widget. */
-  getDashboardWidget(input: { projectId: string; id: string }): Promise<DashboardWidget> {
+  getDashboardWidget(input: {
+    projectId: string;
+    id: string;
+    viewer?: DashboardViewer;
+  }): Promise<DashboardWidget> {
     return this.#widgets.getById(input);
   }
 
@@ -489,6 +500,7 @@ export class DashboardApp implements DashboardApi {
       projectId: string;
       dashboardId?: string;
       name: string;
+      viewer?: DashboardViewer;
     } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget> {
     if (input.dashboardId !== undefined) refuseCodeDefinedDashboard(input.dashboardId);
@@ -496,6 +508,7 @@ export class DashboardApp implements DashboardApi {
       projectId: input.projectId,
       ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
       input: { name: input.name, code: input.code, queries: input.queries },
+      viewer: input.viewer,
     });
   }
 
@@ -505,11 +518,13 @@ export class DashboardApp implements DashboardApi {
       projectId: string;
       id: string;
       name?: string;
+      viewer?: DashboardViewer;
     } & Partial<DashboardWidgetDefinitionInput>,
   ): Promise<DashboardWidget> {
     return this.#widgets.updateWidget({
       projectId: input.projectId,
       id: input.id,
+      viewer: input.viewer,
       input: {
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.code === undefined ? {} : { code: input.code }),
@@ -523,13 +538,18 @@ export class DashboardApp implements DashboardApi {
     projectId: string;
     id: string;
     dashboardId: string;
+    viewer?: DashboardViewer;
   }): Promise<DashboardWidget> {
     refuseCodeDefinedDashboard(input.dashboardId);
     return this.#widgets.assignToDashboard(input);
   }
 
   /** Removes one widget. */
-  deleteDashboardWidget(input: { projectId: string; id: string }): Promise<void> {
+  deleteDashboardWidget(input: {
+    projectId: string;
+    id: string;
+    viewer?: DashboardViewer;
+  }): Promise<void> {
     return this.#widgets.deleteWidget(input);
   }
 
@@ -538,10 +558,12 @@ export class DashboardApp implements DashboardApi {
     projectId: string;
     graphId: string;
     layout: GraphLayout;
+    viewer?: DashboardViewer;
   }): Promise<{ success: true }> {
     await this.#widgets.updateLayouts({
       projectId: input.projectId,
       layouts: [{ graphId: input.graphId, layout: input.layout }],
+      viewer: input.viewer,
     });
     return { success: true };
   }
@@ -550,6 +572,7 @@ export class DashboardApp implements DashboardApi {
   async batchUpdateDashboardWidgetLayouts(input: {
     projectId: string;
     layouts: { graphId: string; layout: GraphLayout }[];
+    viewer?: DashboardViewer;
   }): Promise<{ success: true }> {
     await this.#widgets.updateLayouts(input);
     return { success: true };
@@ -708,20 +731,48 @@ export class DashboardApp implements DashboardApi {
     gridRow?: number;
     colSpan?: number;
     rowSpan?: number;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
-    refuseCodeDefinedDashboard(input.dashboardId);
-    return this.#charts.place(input);
+    const { viewer, ...placement } = input;
+    refuseCodeDefinedDashboard(placement.dashboardId);
+    const { projectId, chartId, dashboardId } = placement;
+    if (!(await this.#dashboards.isVisibleTo({ projectId, dashboardId, viewer }))) {
+      throw new SavedWorkbenchChartDashboardNotFoundError();
+    }
+    await this.#assertChartOnVisibleBoard({ projectId, chartId, viewer });
+    return this.#charts.place(placement);
   }
 
   /**
    * Takes one saved chart off whatever dashboard it is on, clearing its grid
    * box with it. The chart itself is untouched.
    */
-  unplaceSavedWorkbenchChart(input: {
+  async unplaceSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
-    return this.#charts.unplace(input);
+    await this.#assertChartOnVisibleBoard(input);
+    return this.#charts.unplace({ projectId: input.projectId, chartId: input.chartId });
+  }
+
+  /** A chart on a board outside the viewer's audience moves as a chart that is not there. */
+  async #assertChartOnVisibleBoard(input: {
+    projectId: string;
+    chartId: string;
+    viewer?: DashboardViewer;
+  }): Promise<void> {
+    const chart = await this.#charts.getById({
+      projectId: input.projectId,
+      chartId: input.chartId,
+    });
+    if (chart.dashboardId === null) return;
+    const visible = await this.#dashboards.isVisibleTo({
+      projectId: input.projectId,
+      dashboardId: chart.dashboardId,
+      viewer: input.viewer,
+    });
+    if (!visible) throw new SavedWorkbenchChartNotFoundError();
   }
 
   /** Runs one saved chart for a member, over the period the surface asks for. */

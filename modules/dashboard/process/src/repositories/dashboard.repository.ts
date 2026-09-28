@@ -19,6 +19,7 @@ export type DashboardUpdate = Readonly<{
   name?: string;
   description?: string | null;
   visibility?: DashboardVisibility;
+  createdById?: string;
 }>;
 export type DashboardSummaryRecord = DashboardSummary;
 export type GraphRecord = Graph;

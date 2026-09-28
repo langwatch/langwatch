@@ -148,14 +148,23 @@ export interface DashboardApi {
    * definition analytics owns and whose placement this feature stores.
    */
   assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
-  listDashboardWidgets(input: { projectId: string }): Promise<DashboardWidget[]>;
-  getDashboardWidget(input: { projectId: string; id: string }): Promise<DashboardWidget>;
+  /** Widgets follow their board's audience, as `getAll` does; unplaced ones reach everyone. */
+  listDashboardWidgets(input: {
+    projectId: string;
+    viewer?: DashboardViewer;
+  }): Promise<DashboardWidget[]>;
+  getDashboardWidget(input: {
+    projectId: string;
+    id: string;
+    viewer?: DashboardViewer;
+  }): Promise<DashboardWidget>;
   /** Placed on `dashboardId` when named, otherwise on the unplaced authoring grid. */
   createDashboardWidget(
     input: {
       projectId: string;
       dashboardId?: string;
       name: string;
+      viewer?: DashboardViewer;
     } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget>;
   updateDashboardWidget(
@@ -163,24 +172,32 @@ export interface DashboardApi {
       projectId: string;
       id: string;
       name?: string;
+      viewer?: DashboardViewer;
     } & Partial<DashboardWidgetDefinitionInput>,
   ): Promise<DashboardWidget>;
   assignDashboardWidgetToDashboard(input: {
     projectId: string;
     id: string;
     dashboardId: string;
+    viewer?: DashboardViewer;
   }): Promise<DashboardWidget>;
-  deleteDashboardWidget(input: { projectId: string; id: string }): Promise<void>;
+  deleteDashboardWidget(input: {
+    projectId: string;
+    id: string;
+    viewer?: DashboardViewer;
+  }): Promise<void>;
   /** Moves or resizes one widget; an id naming no widget here changes nothing. */
   updateDashboardWidgetLayout(input: {
     projectId: string;
     graphId: string;
     layout: GraphLayout;
+    viewer?: DashboardViewer;
   }): Promise<{ success: true }>;
   /** Moves or resizes several widgets together; ids naming no widget here change nothing. */
   batchUpdateDashboardWidgetLayouts(input: {
     projectId: string;
     layouts: { graphId: string; layout: GraphLayout }[];
+    viewer?: DashboardViewer;
   }): Promise<{ success: true }>;
   /** The deep link back to the dashboards list for a playground widget. */
   dashboardWidgetPlatformUrl(input: { projectSlug: string }): string;
@@ -237,10 +254,12 @@ export interface DashboardApi {
     gridRow?: number;
     colSpan?: number;
     rowSpan?: number;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart>;
   unplaceSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart>;
   runSavedWorkbenchChart(input: {
     projectId: string;

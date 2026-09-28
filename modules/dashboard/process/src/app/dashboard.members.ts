@@ -1,4 +1,5 @@
 import type { LangWatchQLCaller, LangWatchQLProtections } from "@langwatch/analytics-contract";
+import type { DashboardViewer } from "@langwatch/dashboard-contract";
 
 /**
  * Whether a project may place workbench cards at all. The gate is LangWatchQL's own — a feature
@@ -32,6 +33,19 @@ export interface DashboardAudience {
   isTeamMember(input: { projectId: string; userId: string }): Promise<boolean>;
   /** Whether the member administers the project (`project:manage`). */
   isAdmin(input: { projectId: string; userId: string }): Promise<boolean>;
+}
+
+/** Which boards a viewer may see, for the blocks placed on them. */
+export interface DashboardBoardAudience {
+  isVisibleTo(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer?: DashboardViewer;
+  }): Promise<boolean>;
+  findVisibleDashboardIds(input: {
+    projectId: string;
+    viewer?: DashboardViewer;
+  }): Promise<string[]>;
 }
 
 /** The `release_dashboards` rollout, resolved for one project. */

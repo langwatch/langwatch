@@ -180,9 +180,19 @@ export class DashboardService {
   }): Promise<Dashboard> {
     const visibility = dashboardVisibilitySchema.parse(input.visibility);
     const ref = dashboardRef(input);
-    await this.#manageable(input);
+    const dashboard = await this.#manageable(input);
+    const narrowsCreatorless = dashboard.createdById === null && visibility !== "organisation";
+    if (!narrowsCreatorless) {
+      return this.#repository.updateDashboard({ ...ref, data: { visibility } });
+    }
 
-    return this.#repository.updateDashboard({ ...ref, data: { visibility } });
+    // Legacy boards have no creator; narrowing one claims it for the caller, so it stays
+    // visible to someone. A project credential has nobody to claim it for.
+    if (input.viewer === undefined) throw new DashboardOwnerOnlyError(dashboard.id);
+    return this.#repository.updateDashboard({
+      ...ref,
+      data: { visibility, createdById: input.viewer.userId },
+    });
   }
 
   async delete(input: {
@@ -240,6 +250,7 @@ export class DashboardService {
       projectId,
       name: "Reports",
       order: (dashboards.at(-1)?.order ?? -1) + 1,
+      createdById: input.viewer?.userId ?? null,
     });
   }
 
@@ -260,17 +271,38 @@ export class DashboardService {
       return this.#repository.findAllGraphs({ projectId, dashboardId });
     }
 
-    const [graphs, dashboards] = await Promise.all([
+    const [graphs, visibleIds] = await Promise.all([
       this.#repository.findAllGraphs({ projectId }),
-      this.#repository.findAllDashboards({ projectId, graphKinds: [] }),
+      this.findVisibleDashboardIds({ projectId, viewer: input.viewer }),
     ]);
-    const visible = new Set(
-      (await this.#visibleOnly({ projectId, viewer: input.viewer, dashboards })).map(
-        (dashboard) => dashboard.id,
-      ),
-    );
+    const visible = new Set(visibleIds);
 
     return graphs.filter((graph) => graph.dashboardId === null || visible.has(graph.dashboardId));
+  }
+
+  /** Whether the board exists and sits inside the viewer's audience. */
+  async isVisibleTo(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer?: DashboardViewer;
+  }): Promise<boolean> {
+    const ref = dashboardRef(input);
+    const dashboard = await this.#repository.findDashboard(ref);
+    if (dashboard === undefined) return false;
+
+    return this.#isVisible({ ...ref, viewer: input.viewer, dashboard });
+  }
+
+  /** The ids of every board inside the viewer's audience. */
+  async findVisibleDashboardIds(input: {
+    projectId: string;
+    viewer?: DashboardViewer;
+  }): Promise<string[]> {
+    const projectId = projectIdSchema.parse(input.projectId);
+    const dashboards = await this.#repository.findAllDashboards({ projectId, graphKinds: [] });
+    const visible = await this.#visibleOnly({ projectId, viewer: input.viewer, dashboards });
+
+    return visible.map((dashboard) => dashboard.id);
   }
 
   /** Refuses as not found when the graph sits on a board outside the viewer's audience. */
@@ -431,20 +463,32 @@ export class DashboardService {
     return this.getById({ ...ref, viewer: input.viewer });
   }
 
-  /** As {@link #writable}, and the viewer may change its visibility or delete it. */
+  /**
+   * Visible and not code-defined, and the viewer may change its visibility or
+   * delete it. An admin passes even when the board is outside their audience,
+   * so a departed member's private boards are never orphaned.
+   */
   async #manageable(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
-    const dashboard = await this.#writable(input);
+    const ref = dashboardRef(input);
+    refuseCodeDefinedDashboard(ref.dashboardId);
     const { viewer } = input;
 
-    if (isDashboardManageable({ dashboard, viewer, isAdmin: false })) return dashboard;
+    const dashboard = await this.#repository.findDashboard(ref);
+    if (!dashboard) throw new DashboardNotFoundError(ref.projectId);
+    const visible = await this.#isVisible({ ...ref, viewer, dashboard });
+
+    // The rule's null-creator branch is the legacy one (boards from before the
+    // column), not the general rule: see isDashboardManageable.
+    if (visible && isDashboardManageable({ dashboard, viewer, isAdmin: false })) return dashboard;
     const isAdmin =
       viewer !== undefined &&
-      (await this.#audience.isAdmin({ projectId: dashboard.projectId, userId: viewer.userId }));
+      (await this.#audience.isAdmin({ projectId: ref.projectId, userId: viewer.userId }));
     if (isAdmin) return dashboard;
+    if (!visible) throw new DashboardNotFoundError(ref.projectId);
 
     throw new DashboardOwnerOnlyError(dashboard.id);
   }
