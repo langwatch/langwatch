@@ -30,6 +30,7 @@ describe("checkupModelProviderRow", () => {
           id: "mp_1",
           provider: "openai",
           customKeys: { OPENAI_API_KEY: "sk-real" },
+          keysUnreadable: false,
         });
       });
     });
@@ -37,7 +38,7 @@ describe("checkupModelProviderRow", () => {
 
   describe("given a row whose keys will not decrypt", () => {
     describe("when the checkup reads the row", () => {
-      it("reads it as holding no keys", () => {
+      it("holds no keys and flags them unreadable", () => {
         const row = checkupModelProviderRow({
           id: "mp_2",
           provider: "openai",
@@ -45,6 +46,21 @@ describe("checkupModelProviderRow", () => {
         });
 
         expect(row.customKeys).toEqual({});
+        expect(row.keysUnreadable).toBe(true);
+      });
+    });
+  });
+
+  describe("given a row with no stored keys", () => {
+    describe("when the checkup reads the row", () => {
+      it("does not flag the keys unreadable", () => {
+        const row = checkupModelProviderRow({
+          id: "mp_3",
+          provider: "openai",
+          customKeys: null,
+        });
+
+        expect(row.keysUnreadable).toBe(false);
       });
     });
   });

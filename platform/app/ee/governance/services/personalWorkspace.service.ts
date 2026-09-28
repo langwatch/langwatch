@@ -219,21 +219,22 @@ export class PersonalWorkspaceService {
       },
     );
 
+    if (createdProject) {
+      // After the commit, so a rolled-back workspace leaves no row behind, and
+      // before the grant, whose failure would otherwise skip it for good.
+      // Never throws. Without an App (a standalone script) the next deploy's
+      // backfill writes the row instead.
+      await (this.lwqlKeyMap ?? tryGetApp()?.projects)?.syncLwqlKeyMapRow(
+        createdProject,
+      );
+    }
+
     if (grantOnTeamId) {
       await this.attachOwnerAdminGrant({
         userId,
         organizationId,
         teamId: grantOnTeamId,
       });
-    }
-
-    if (createdProject) {
-      // After the commit, so a rolled-back workspace leaves no row behind.
-      // Never throws. Without an App (a standalone script) the next deploy's
-      // backfill writes the row instead.
-      await (this.lwqlKeyMap ?? tryGetApp()?.projects)?.syncLwqlKeyMapRow(
-        createdProject,
-      );
     }
 
     return workspace;

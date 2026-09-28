@@ -298,12 +298,22 @@ export function readClickHouseWaitSeconds(
   return seconds;
 }
 
-/** The URL with its credentials removed, safe to log. */
+const CREDENTIAL_QUERY_PARAMS = new Set(["user", "username", "password"]);
+
+/**
+ * The URL with its credentials removed, safe to log. ClickHouse also takes
+ * `?user=` and `?password=` query params, so those go too.
+ */
 export function redactUrl(url: string): string {
   try {
     const parsed = new URL(url);
     parsed.username = "";
     parsed.password = "";
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (CREDENTIAL_QUERY_PARAMS.has(key.toLowerCase())) {
+        parsed.searchParams.delete(key);
+      }
+    }
     return parsed.toString();
   } catch {
     return "<invalid url>";

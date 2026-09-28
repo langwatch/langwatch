@@ -17,6 +17,7 @@ import type { featureFlagService } from "~/server/featureFlag";
 import type { LangyCanaryResult } from "~/server/health-probes/langy-canary.service";
 import type { LangyCanaryProbe } from "./checkup.service";
 
+/** What the canary needs: the acting user, their org, the target project and the turn runner. */
 export interface LangyCanaryProbeInput {
   /** The user the check runs as; null when no person asked for it. */
   readonly actorUserId: string | null;
@@ -30,6 +31,10 @@ export interface LangyCanaryProbeInput {
   readonly flags?: Pick<typeof featureFlagService, "isEnabled">;
 }
 
+/**
+ * Runs the checkup's Langy greeting turn as the requesting user. Runs no turn
+ * when no person asked, the org has no project, or `hasLangyAccess` refuses.
+ */
 export async function probeLangyCanary({
   actorUserId,
   organizationId,

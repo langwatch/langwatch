@@ -9,6 +9,7 @@ import { createContext, useContext } from "react";
  */
 export const LangyChatsImproveLangyContext = createContext(false);
 
+/** Reads whether the composer should say chats help improve Langy. */
 export function useLangyChatsImproveLangy(): boolean {
   return useContext(LangyChatsImproveLangyContext);
 }

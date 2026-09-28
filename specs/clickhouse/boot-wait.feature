@@ -36,3 +36,9 @@ Feature: Migrations wait for a ClickHouse that is still starting
     Given CLICKHOUSE_MIGRATE_WAIT_SECONDS is not set
     When the wait is read
     Then it is 180 seconds
+
+  @unit
+  Scenario: Credentials in the ClickHouse URL never reach the log
+    Given CLICKHOUSE_URL carries the user and password as query params
+    When the migration step logs the server URL
+    Then the logged URL has neither the user nor the password

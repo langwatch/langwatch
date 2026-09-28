@@ -6,7 +6,7 @@
  * @see ../../../../../../specs/clickhouse/boot-wait.feature
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   DEFAULT_CLICKHOUSE_WAIT_SECONDS,
@@ -185,9 +185,20 @@ describe("isConnectionError", () => {
 
 describe("readClickHouseWaitSeconds", () => {
   describe("when the variable is not set", () => {
+    let saved: string | undefined;
+    beforeEach(() => {
+      saved = process.env.CLICKHOUSE_MIGRATE_WAIT_SECONDS;
+      delete process.env.CLICKHOUSE_MIGRATE_WAIT_SECONDS;
+    });
+    afterEach(() => {
+      if (saved === undefined)
+        delete process.env.CLICKHOUSE_MIGRATE_WAIT_SECONDS;
+      else process.env.CLICKHOUSE_MIGRATE_WAIT_SECONDS = saved;
+    });
+
     /** @scenario "An unset wait setting uses the default" */
     it("returns 180 seconds", () => {
-      expect(readClickHouseWaitSeconds(undefined)).toBe(180);
+      expect(readClickHouseWaitSeconds()).toBe(180);
       expect(DEFAULT_CLICKHOUSE_WAIT_SECONDS).toBe(180);
     });
   });
@@ -196,6 +207,24 @@ describe("readClickHouseWaitSeconds", () => {
     it("refuses it in the preflight phase", () => {
       expect(() => readClickHouseWaitSeconds("soon")).toThrow(MigrationError);
       expect(() => readClickHouseWaitSeconds("-5")).toThrow(MigrationError);
+    });
+  });
+});
+
+describe("redactUrl", () => {
+  describe("when the credentials are in query params", () => {
+    /** @scenario "Credentials in the ClickHouse URL never reach the log" */
+    it("drops user and password params and keeps the rest", () => {
+      const redacted = redactUrl(
+        "http://clickhouse:8123/?user=default&Password=s3cret&database=langwatch",
+      );
+      expect(redacted).toBe("http://clickhouse:8123/?database=langwatch");
+    });
+  });
+
+  describe("when the credentials are in the userinfo", () => {
+    it("drops the user and password", () => {
+      expect(redactUrl(SERVER_URL)).toBe("http://clickhouse:8123/");
     });
   });
 });

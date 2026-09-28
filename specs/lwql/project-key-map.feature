@@ -33,6 +33,12 @@ Feature: A new project can query LangWatchQL as soon as it exists
     Then the key map holds a row mapping the personal project's key hash to it
 
   @unit
+  Scenario: A personal workspace whose owner grant fails still gets its key-map row
+    Given the owner's admin grant on a new personal workspace fails
+    When the personal workspace is provisioned
+    Then the key map still holds a row for the personal project
+
+  @unit
   Scenario: A key-map write failure does not block project creation
     Given the key-map write fails
     When a project is created

@@ -160,7 +160,13 @@ export interface CheckupDeps {
     readonly verifySmtp: () => Promise<void>;
   };
   readonly modelProviders: () => Promise<
-    { id: string; provider: string; customKeys: Record<string, string> }[]
+    {
+      id: string;
+      provider: string;
+      customKeys: Record<string, string>;
+      /** The stored keys did not decrypt, e.g. after a CREDENTIALS_SECRET change. */
+      keysUnreadable: boolean;
+    }[]
   >;
   /** Throws `ModelProviderTestRateLimitedError` past the budget. */
   readonly modelProviderBudget: () => Promise<void>;
@@ -648,6 +654,8 @@ export class CheckupService {
         docsPath: CHECKUP_DOCS.modelProviders,
       };
     }
+    const unreadable = unreadableKeysVerdict(providers);
+    if (unreadable) return unreadable;
     const names = [...new Set(providers.map((row) => row.provider))].sort();
     return { outcome: "verified", detail: `Configured: ${names.join(", ")}.` };
   }
@@ -814,6 +822,8 @@ export class CheckupService {
         docsPath: CHECKUP_DOCS.modelProviders,
       };
     }
+    const unreadable = unreadableKeysVerdict(providers);
+    if (unreadable) return unreadable;
     try {
       await this.deps.modelProviderBudget();
     } catch (error) {
@@ -893,6 +903,25 @@ export class CheckupService {
         return canaryVerdict("langy", probe.answer);
     }
   }
+}
+
+/** A failing verdict naming every provider whose stored keys did not decrypt. */
+function unreadableKeysVerdict(
+  providers: { provider: string; keysUnreadable: boolean }[],
+): CheckVerdict | null {
+  const names = [
+    ...new Set(
+      providers.filter((row) => row.keysUnreadable).map((row) => row.provider),
+    ),
+  ].sort();
+  if (names.length === 0) return null;
+  return {
+    outcome: "refused",
+    code: "checkup_model_provider_keys_unreadable",
+    detail: `The stored keys for ${names.join(", ")} could not be decrypted.`,
+    fix: "CREDENTIALS_SECRET differs from the value the keys were saved with. Restore that value, or enter the keys again under Settings, Model providers.",
+    docsPath: CHECKUP_DOCS.modelProviders,
+  };
 }
 
 function canaryVerdict(name: string, answer: CanaryAnswer): CheckVerdict {

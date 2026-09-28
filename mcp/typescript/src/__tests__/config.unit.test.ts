@@ -2,9 +2,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   initConfig,
   getConfig,
+  hasConfig,
   requireApiKey,
   runWithConfig,
 } from "../config.js";
+
+/** Config lives on globalThis, so clearing its keys resets the module. */
+function resetGlobalConfig() {
+  delete (globalThis as Record<string, unknown>).__langwatch_mcp_config;
+  delete (globalThis as Record<string, unknown>).__langwatch_mcp_config_storage;
+}
 
 describe("config", () => {
   let originalApiKey: string | undefined;
@@ -118,31 +125,23 @@ describe("config", () => {
   });
 
   describe("getConfig", () => {
-    it("throws when config has not been initialized", async () => {
-      // globalThis survives vi.resetModules(), so clear it explicitly
-      delete (globalThis as Record<string, unknown>).__langwatch_mcp_config;
-      delete (globalThis as Record<string, unknown>).__langwatch_mcp_config_storage;
-      vi.resetModules();
-      const freshConfig = await import("../config.js");
-      expect(() => freshConfig.getConfig()).toThrow("Config not initialized");
+    it("throws when config has not been initialized", () => {
+      resetGlobalConfig();
+      expect(() => getConfig()).toThrow("Config not initialized");
     });
   });
 
   describe("hasConfig", () => {
-    const freshModule = async () => {
-      delete (globalThis as Record<string, unknown>).__langwatch_mcp_config;
-      delete (globalThis as Record<string, unknown>).__langwatch_mcp_config_storage;
-      vi.resetModules();
-      return import("../config.js");
-    };
+    beforeEach(() => {
+      resetGlobalConfig();
+    });
 
     describe("when config has not been initialized", () => {
       /** @scenario "Checking for a config before it exists logs nothing" */
-      it("returns false without logging", async () => {
-        const fresh = await freshModule();
+      it("returns false without logging", () => {
         const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
         try {
-          expect(fresh.hasConfig()).toBe(false);
+          expect(hasConfig()).toBe(false);
           expect(errorSpy).not.toHaveBeenCalled();
         } finally {
           errorSpy.mockRestore();
@@ -152,17 +151,16 @@ describe("config", () => {
 
     describe("when config was initialized or a scoped config is active", () => {
       /** @scenario "A config counts as present once initialized or scoped" */
-      it("returns true", async () => {
-        const fresh = await freshModule();
-        fresh.runWithConfig(
+      it("returns true", () => {
+        runWithConfig(
           { apiKey: "scoped", endpoint: "https://example.com" },
           () => {
-            expect(fresh.hasConfig()).toBe(true);
+            expect(hasConfig()).toBe(true);
           }
         );
-        expect(fresh.hasConfig()).toBe(false);
-        fresh.initConfig({});
-        expect(fresh.hasConfig()).toBe(true);
+        expect(hasConfig()).toBe(false);
+        initConfig({});
+        expect(hasConfig()).toBe(true);
       });
     });
   });

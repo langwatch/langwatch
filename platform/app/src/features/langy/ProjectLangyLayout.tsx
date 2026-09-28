@@ -42,7 +42,6 @@ import { useLangyStore } from "./stores/langyStore";
  */
 export default function ProjectLangyLayout() {
   const showLangy = useShowLangy();
-  const publicEnv = usePublicEnv();
   const { project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
@@ -54,7 +53,6 @@ export default function ProjectLangyLayout() {
     <ProjectLangySubtree
       projectId={project?.id ?? "no-project"}
       showLangy={showLangy}
-      chatsImproveLangy={publicEnv.data?.IS_SAAS === true}
     />
   );
 }
@@ -75,22 +73,36 @@ export default function ProjectLangyLayout() {
 const ProjectLangySubtree = memo(function ProjectLangySubtree({
   projectId,
   showLangy,
-  chatsImproveLangy,
 }: {
   projectId: string;
   showLangy: boolean;
-  chatsImproveLangy: boolean;
 }) {
   return (
-    <LangyChatsImproveLangyContext.Provider value={chatsImproveLangy}>
+    <LangyChatsImproveLangyProvider>
       <LangyProvider key={projectId}>
         <LangyShiftedRoot showLangy={showLangy}>
           <Outlet />
         </LangyShiftedRoot>
       </LangyProvider>
-    </LangyChatsImproveLangyContext.Provider>
+    </LangyChatsImproveLangyProvider>
   );
 });
+
+/**
+ * Resolves the LangWatch Cloud flag below the memo boundary above, so the
+ * public env query resolving re-renders only the composers that read it, not
+ * the routed page.
+ */
+function LangyChatsImproveLangyProvider({ children }: { children: ReactNode }) {
+  const publicEnv = usePublicEnv();
+  return (
+    <LangyChatsImproveLangyContext.Provider
+      value={publicEnv.data?.IS_SAAS === true}
+    >
+      {children}
+    </LangyChatsImproveLangyContext.Provider>
+  );
+}
 
 /**
  * Wraps the routed page in a box that reserves room on the right while the

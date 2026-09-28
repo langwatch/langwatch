@@ -200,6 +200,13 @@ Feature: The checkup page of a self-hosted install
     Then the model provider row reads not checked
     And the row says the provider has no key stored
 
+  @unit
+  Scenario: A provider whose keys will not decrypt fails the checkup
+    Given a provider whose stored keys will not decrypt, as after a CREDENTIALS_SECRET change
+    When the model provider checks run
+    Then both model provider rows fail and name the decryption failure
+    And no provider test call is made
+
   # ============================================================================
   # What we send
   # ============================================================================

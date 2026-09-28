@@ -93,7 +93,12 @@ function healthyDeps(overrides: Partial<CheckupDeps> = {}): CheckupDeps {
       verifySmtp: async () => undefined,
     },
     modelProviders: async () => [
-      { id: "mp_1", provider: "openai", customKeys: { OPENAI_API_KEY: "sk" } },
+      {
+        id: "mp_1",
+        provider: "openai",
+        customKeys: { OPENAI_API_KEY: "sk" },
+        keysUnreadable: false,
+      },
     ],
     modelProviderBudget: async () => undefined,
     testModelProvider: async () => ({ outcome: "verified" }),
@@ -557,6 +562,41 @@ describe("CheckupService", () => {
 
       expect(verdict.outcome).toBe("unchecked");
       expect(verdict.detail).toContain("openai (no key stored)");
+    });
+  });
+
+  describe("when a provider's stored keys will not decrypt", () => {
+    /** @scenario "A provider whose keys will not decrypt fails the checkup" */
+    it("fails both provider rows naming the decryption failure, and tests nothing", async () => {
+      const testModelProvider = vi.fn();
+      const service = new CheckupService(
+        healthyDeps({
+          modelProviders: async () => [
+            {
+              id: "mp_1",
+              provider: "openai",
+              customKeys: {},
+              keysUnreadable: true,
+            },
+          ],
+          testModelProvider,
+        }),
+      );
+      const [cheap, explicit] = await Promise.all([
+        service.cheap(),
+        service.explicit({ checks: ["model_provider_test"] }),
+      ]);
+
+      for (const verdict of [
+        rowOf(cheap.rows, "model_providers"),
+        rowOf(explicit.rows, "model_provider_test"),
+      ]) {
+        expect(verdict.outcome).toBe("refused");
+        expect(verdict.code).toBe("checkup_model_provider_keys_unreadable");
+        expect(verdict.detail).toContain("openai");
+        expect(verdict.detail).not.toContain("no key stored");
+      }
+      expect(testModelProvider).not.toHaveBeenCalled();
     });
   });
 });

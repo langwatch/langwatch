@@ -105,6 +105,7 @@ export const APP_ERROR_CODES = [
   "checkup_license_expired",
   "checkup_license_invalid",
   "checkup_lwql_not_provisionable",
+  "checkup_model_provider_keys_unreadable",
   "checkup_model_provider_refused",
   "checkup_no_model_provider",
   "checkup_postgres_migration_failed",

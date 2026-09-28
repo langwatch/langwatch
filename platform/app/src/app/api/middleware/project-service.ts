@@ -1,7 +1,5 @@
 import type { MiddlewareHandler } from "hono";
-import { ProjectService } from "~/server/app-layer/projects/project.service";
-import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
-import { prisma } from "~/server/db";
+import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import { appFromContext } from "./app-context";
 
 export type ProjectServiceMiddlewareVariables = {
@@ -9,17 +7,11 @@ export type ProjectServiceMiddlewareVariables = {
 };
 
 /**
- * A Prisma-backed `ProjectService` carrying the App's LangWatchQL key map, so
- * a project created through the REST API gets its key-map row at once rather
- * than reading zero LangWatchQL rows until the next deploy's backfill.
+ * Hands the route the App's `ProjectService`, which carries the LangWatchQL
+ * key map, so a project created through the REST API gets its key-map row at
+ * once.
  */
 export const projectServiceMiddleware: MiddlewareHandler = async (c, next) => {
-  c.set(
-    "projectService",
-    new ProjectService(
-      new PrismaProjectRepository(prisma),
-      appFromContext(c).projects.lwqlKeyMap,
-    ),
-  );
+  c.set("projectService", appFromContext(c).projects);
   await next();
 };

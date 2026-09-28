@@ -240,10 +240,9 @@ export class ProjectService {
     /**
      * Absent only where the caller cannot reach ClickHouse at all. A new
      * project's key-map row is then left to the deploy-time backfill, the
-     * same way a failed write is. Public so a caller that composes its own
-     * `ProjectService` over another repository can hand the same key map on.
+     * same way a failed write is.
      */
-    readonly lwqlKeyMap?: LwqlKeyMapRepository,
+    private readonly lwqlKeyMap?: LwqlKeyMapRepository,
   ) {}
 
   async getById(id: string): Promise<Project | null> {
