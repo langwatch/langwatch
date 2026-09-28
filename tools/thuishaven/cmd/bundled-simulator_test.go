@@ -73,13 +73,14 @@ func TestBundledSimulatorsWithoutCheckout(t *testing.T) {
 		if len(inbox.Messages) != 1 || inbox.Messages[0].Subject != "Bundled mail works" {
 			t.Fatalf("unexpected inbox: %+v", inbox)
 		}
-		page := simulatorGET(t, "http://"+httpAddr+"/messages/"+inbox.Messages[0].ID)
-		if !bytes.Contains(page, []byte("Bundled mail works")) {
-			t.Fatal("message browser page does not show the captured subject")
+		var captured struct{ Subject string }
+		if err := json.Unmarshal(simulatorGET(t, "http://"+httpAddr+"/api/messages/"+inbox.Messages[0].ID), &captured); err != nil {
+			t.Fatal(err)
 		}
-		if len(simulatorGET(t, "http://"+httpAddr+"/assets/ui.js")) == 0 {
-			t.Fatal("inbox browser script is empty")
+		if captured.Subject != "Bundled mail works" {
+			t.Fatalf("message API lost the captured subject: %+v", captured)
 		}
+		assertConsoleServed(t, "http://"+httpAddr+"/messages/"+inbox.Messages[0].ID)
 		stop()
 		assertSimulatorPortClosed(t, httpAddr)
 		assertSimulatorPortClosed(t, smtpAddr)
@@ -92,9 +93,14 @@ func TestBundledSimulatorsWithoutCheckout(t *testing.T) {
 			"SERVER_ADDR=" + addr, "IDPSIM_BASE_URL=" + baseURL,
 			"IDPSIM_TENANTS=1", "IDPSIM_DNS_ADDR=off",
 		}, baseURL+"/health")
-		if !bytes.Contains(simulatorGET(t, baseURL+"/"), []byte("/t/1/")) {
-			t.Fatal("IdP browser page does not link to its tenant")
+		var state struct{ Tenants []struct{ ID string } }
+		if err := json.Unmarshal(simulatorGET(t, baseURL+"/control/state"), &state); err != nil {
+			t.Fatal(err)
 		}
+		if len(state.Tenants) != 1 || state.Tenants[0].ID != "1" {
+			t.Fatalf("IdP state does not carry its tenant: %+v", state)
+		}
+		assertConsoleServed(t, baseURL+"/")
 		var discovery struct{ Issuer string }
 		if err := json.Unmarshal(simulatorGET(t, baseURL+"/t/1/.well-known/openid-configuration"), &discovery); err != nil {
 			t.Fatal(err)
@@ -217,6 +223,23 @@ func startSimulatorBinary(t *testing.T, binary, name string, env []string, healt
 	stop()
 	t.Fatalf("%s never became ready: %s", name, output.String())
 	return nil
+}
+
+// assertConsoleServed accepts the embedded console shell, or, in a binary built
+// before its bundle (ADR-160), the page naming the build command.
+func assertConsoleServed(t *testing.T, url string) {
+	t.Helper()
+	response, err := http.Get(url) //nolint:noctx // a loopback test server
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, _ := io.ReadAll(response.Body)
+	shell := response.StatusCode == http.StatusOK && bytes.Contains(body, []byte(`<div id="root">`))
+	notBuilt := response.StatusCode == http.StatusServiceUnavailable && bytes.Contains(body, []byte("not built"))
+	if !shell && !notBuilt {
+		t.Fatalf("GET %s: status %d is neither the console nor its not-built page", url, response.StatusCode)
+	}
 }
 
 func simulatorGET(t *testing.T, url string) []byte {
