@@ -4,10 +4,10 @@
  */
 
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
-import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type {
   ESBatchEvaluationTarget,
   EvaluationsV3State,
+  EvaluationV3EvaluatorResult,
   EvaluationV3Event,
   RecordEvaluatorResultCommandData,
   RecordTargetResultCommandData,
@@ -227,10 +227,11 @@ export class ExperimentResultDispatchService {
       duration?: number | null;
       inputs?: Record<string, unknown> | null;
     };
-    result: SingleEvaluationResult;
+    result: EvaluationV3EvaluatorResult;
     evaluatorName: string | null;
     occurredAt: number;
   }): RecordEvaluatorResultCommandData {
+    const failed = result.status === "error" ? result : null;
     // Only an evaluation that actually scored has a verdict to report.
     const scored = result.status === "processed" ? result : null;
     // An error measured nothing and spent nothing; the other two statuses may
@@ -253,6 +254,10 @@ export class ExperimentResultDispatchService {
       cost: billed?.cost?.amount ?? null,
       inputs: event.inputs ?? null,
       duration: event.duration ?? null,
+      ...(failed ? { errorType: failed.error_type, traceback: failed.traceback } : {}),
+      ...(result.domainError ? { domainError: result.domainError } : {}),
+      ...(scored?.raw_response !== undefined ? { rawResponse: scored.raw_response } : {}),
+      ...(billed?.cost ? { costCurrency: billed.cost.currency } : {}),
       occurredAt,
     };
   }

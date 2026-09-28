@@ -124,6 +124,80 @@ Feature: An experiment run executes on its pipeline
     When the manager sees its start
     Then it sends no cell and arms no wake
 
+  @unit
+  Scenario: The worker runs an opened cell by its ordinal and phase
+    Given the run manager opened cell 3 of phase 1
+    When its intent is delivered
+    Then the worker's ExecuteExperimentCell command names only the run, the ordinal and the phase
+    And the cell's results and its finish are appended together, results first
+
+  @unit
+  Scenario: A cell reads its row, target and evaluators from the run's plan fold
+    Given a run whose start carried its plan
+    When one of its target cells runs
+    Then it dispatches the planned target on the planned row, then that cell's evaluators
+    And it appends the target's result and each verdict
+
+  @unit
+  Scenario: A cell run twice appends nothing twice
+    Given a cell whose command was delivered twice
+    When both deliveries append their results
+    Then each result and the finish carry the identity their own record command would give them
+
+  @unit
+  Scenario: A run's cells run side by side
+    Given a run with several cells open
+    Then each cell's command queues in its own group and collapses onto one job while queued
+
+  @unit
+  Scenario: A cell whose target fails finishes failed with the target's error
+    Given the engine fails a cell's target
+    Then the cell appends the target's error and runs none of its evaluators
+    And it finishes failed while the run carries on
+
+  @unit
+  Scenario: A cell whose target was removed since the run started fails, not the run
+    Given the saved prompt a target names was deleted after the run started
+    When that target's cell runs
+    Then it finishes failed with code "experiment_evaluation_reference_not_found" and no result
+
+  @unit
+  Scenario: An aborted run's cell stops without running
+    Given a run asked to abort
+    When one of its cells is delivered
+    Then it finishes stopped without dispatching anything
+
+  @unit
+  Scenario: A comparison cell reads its row's variant outputs from the run's fold
+    Given every target cell of a row has finished with an output
+    When the row's comparison cell runs
+    Then it judges the folded outputs without re-running any target
+
+  @unit
+  Scenario: A comparison cell waits until every target cell's results are folded
+    Given a target cell whose finish has not been folded yet
+    When a comparison cell of the run is delivered
+    Then it throws, and the queue retries it once the fold catches up
+
+  @unit
+  Scenario: A comparison cell whose variant has no output finishes skipped with the reason
+    Given a row where one variant produced no output
+    When the row's comparison cell runs
+    Then its verdict column reads why, and the cell finishes skipped
+
+  @unit
+  Scenario: A comparison that cannot be built finishes skipped without waiting
+    Given a comparison with fewer than two variants, known when the run started
+    When its cell runs
+    Then it finishes skipped with the reason, reading no progress
+
+  @unit
+  Scenario: A verdict carries every detail its frame showed
+    Given an evaluator that spends, and one that fails
+    When their cells record the verdicts
+    Then the scored verdict keeps its cost currency
+    And the failed verdict keeps its error type, traceback and code, under its own evaluator
+
   @integration @unimplemented
   Scenario: A streamed workbench run executes on the worker and ends with done
     Given the experiment module installed in an api and a worker sharing one event store

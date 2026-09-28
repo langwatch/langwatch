@@ -41,20 +41,20 @@ export const StartExperimentRunCommand = defineCommand({
  * The identity of one cell result, used both to order the event and to name
  * its queue job.
  */
-const targetResultIdentity = (d: {
+export const targetResultIdentity = (d: {
   tenantId: string;
   runId: string;
   targetId: string;
   index: number;
-}) => `${d.tenantId}:${d.runId}:target:${d.targetId}:${d.index}`;
+}): string => `${d.tenantId}:${d.runId}:target:${d.targetId}:${d.index}`;
 
-const evaluatorResultIdentity = (d: {
+export const evaluatorResultIdentity = (d: {
   tenantId: string;
   runId: string;
   targetId: string;
   evaluatorId: string;
   index: number;
-}) => `${d.tenantId}:${d.runId}:evaluator:${d.targetId}:${d.evaluatorId}:${d.index}`;
+}): string => `${d.tenantId}:${d.runId}:evaluator:${d.targetId}:${d.evaluatorId}:${d.index}`;
 
 export const RecordTargetResultCommand = defineCommand({
   commandType: "lw.experiment_run.record_target_result",
@@ -80,7 +80,7 @@ export const RecordTargetResultCommand = defineCommand({
 export const RecordEvaluatorResultCommand = defineCommand({
   commandType: "lw.experiment_run.record_evaluator_result",
   eventType: "lw.experiment_run.evaluator_result",
-  eventVersion: "2025-02-01",
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.EVALUATOR_RESULT,
   aggregateType: "experiment_run",
   schema: evaluatorResultEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),

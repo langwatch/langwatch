@@ -19,13 +19,15 @@ cell's results and the run's start and completion. So: extend it. No new aggrega
 | Event | Status | Carries |
 | --- | --- | --- |
 | `started` | new version | today's fields plus the **plan** (D4): `concurrency`, `origin: workbench \| saved \| workflow`, `persistResults`, `actor`, `scope`, the snapshot (targets, evaluators, dataset columns, the mapping dataset id, pinned prompt and workflow versions), the scoped rows once each, and the ordered cells: phase 1 (`ordinal, rowIndex, targetId, evaluatorIds`, plus an evaluator re-run's precomputed output and trace), then phase 2 (`ordinal, rowIndex, targetId, evaluatorId`, and a setup skip when the comparison cannot be built for any row) |
-| `target_result`, `evaluator_result` | reused unchanged | appended by the cell command instead of the api's loop |
+| `target_result` | reused unchanged | appended by the cell command instead of the api's loop |
+| `evaluator_result` | new version, additive | as today, plus every detail its frame showed: `errorType`, `traceback`, `domainError`, `rawResponse`, `costCurrency` (ARCHITECTURE §9). An evaluator's error is an `evaluator_result` with status `error`, never a `target_result` error |
 | `cell_finished` | **new** | `ordinal, phase, outcome: succeeded \| failed \| stopped \| skipped`, `error` (serialised HandledError) when failed. The cell failure event: one terminal per cell, whatever happened |
 | `abort_requested` | **new** (RunAborted) | `requestedBy`, `occurredAt` |
 | `completed` | reused, two new fields | `outcome: finished \| stopped \| failed`, and `error` (serialised HandledError) when failed |
 | `trace_metrics_computed`, `workflow_evaluation_requested` | unchanged | |
 
-The old `started` version still parses (no plan: a run started before the cut-over is folded, never
+The plan's schema is the contract's (`experiment-run-plan.ts`), so a repository can parse the fold
+that keeps it. The old `started` version still parses (no plan: a run started before the cut-over is folded, never
 driven). Event ids are deterministic per cell (`<runId>:<ordinal>:<phase>:<kind>[:<evaluatorId>]`), so
 a re-executed cell appends duplicates the store and the fold's applied-id set drop.
 
@@ -35,7 +37,7 @@ a re-executed cell appends duplicates the store and the fold's applied-id set dr
   the request first (load data, row bound, ownership), so every 4xx stays synchronous. Appends `started`.
 - **ExecuteExperimentCell** (worker, sent by the manager's `executeCell` intent handler). Runs one row x
   target: target dispatch, then its evaluators in order, appending `target_result`, `evaluator_result`s
-  and `cell_finished`. A domain failure is an event, never a throw; only infrastructure errors throw,
+  and `cell_finished` as one batch, results first, each under its own record command's identity. A domain failure is an event, never a throw; only infrastructure errors throw,
   and the group queue retries them.
 - **AbortExperimentRun** (api). Authorises against the run's tenant in the progress fold (the Redis
   owner record goes), sets the Redis abort flag (section 6) and appends `abort_requested`.
@@ -103,6 +105,13 @@ the durable record the manager honours, and the flag is the fast signal. The fla
 
 ## 7. Reads
 
+- **Folds the cells read (round 3):** `experimentRunPlan` (the plan `started` carried, written once) and
+  `experimentRunProgress` (finished-cell bitmap, each row's target outputs and traces, and the scored
+  verdicts a comparison folds in). Split so a cell's result never rewrites the plan. Both are stored
+  through `ExperimentRunFoldRepository` in Redis under `eval_v3_run:<runKey>:plan` and `:progress`
+  (24 h TTL); main's poller key `eval_v3_run:<runId>` is untouched until round 4 grows the progress
+  fold into the bullet below. A comparison cell waits (throws, the queue retries) until every target
+  cell's finish is folded, which is exact because a cell appends its results before its finish.
 - **Projection `experimentRunProgress`** (new fold, Redis store under main's key `eval_v3_run:<runId>`,
   24 h TTL). It has the same JSON the pollers read today: `runId, projectId, experimentId,
   experimentSlug, status, progress, total, startedAt, finishedAt, summary, runUrl, error, recentEvents`
@@ -135,8 +144,8 @@ the durable record the manager honours, and the flag is the fast signal. The fla
 
 ## 8. Collaborators per handler, and what is deleted
 
-- **ExecuteExperimentCell:** its cell from the progress fold's plan, and for a comparison its row's
-  variant outputs from the fold's results; studio (`WorkflowApi.postStudioEvent`), cost (`ExperimentRunModelCostService`),
+- **ExecuteExperimentCell:** its cell from the plan fold, and for a comparison its row's variant
+  outputs from the progress fold; studio (`WorkflowApi.postStudioEvent`), cost (`ExperimentRunModelCostService`),
   evaluator reporting (`EvaluationApi.reportEvaluation`), sandbox key (`ExperimentRunSandboxCredentialService`,
   minted per cell and shared through ApiKey's Redis), connected dispatch (`AgentApi.callConnected`),
   attachments (`ExperimentAttachmentInputService`), and the abort flag.
@@ -168,6 +177,10 @@ foreign run, and GET runs' bodies. Differences:
 7. The progress total counts the comparison cells from the start; main's total grew by them after
    phase 1. A skipped comparison row is a cell that finishes `skipped`, still with its
    `evaluator_result` error frame, where main emitted the frame outside the cell count.
+8. A cell's `target_result` frame arrives with its evaluators' frames when the cell ends (one batch),
+   where main streamed the target's frame before dispatching its evaluators.
+9. A target, prompt or evaluator deleted after the run started fails that cell with its load error;
+   main loaded everything once at start and never noticed.
 
 ## 10. Decisions
 
