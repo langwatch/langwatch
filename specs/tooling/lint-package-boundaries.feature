@@ -136,3 +136,10 @@ Feature: The package-boundaries lint rule
     When the package-boundaries rule runs over them
     Then it reports nothing, because migrations run before any module boots
     And apps/tasks' main.ts, its other tasks, another app's migrate file and a nested file still report compositionRoot
+
+  @unit
+  Scenario: The scenario child program may take scenario-process's scenario-child subpath, and nothing more
+    Given apps/scenario-child/src/main.ts imports the voice transports from @langwatch/scenario-process/scenario-child
+    When the package-boundaries rule runs over it
+    Then it reports nothing, because the voice transports stay with the live voice session until it spawns its own child
+    And the same program importing the package root, another scenario-child file, or another app importing that subpath still report compositionRoot

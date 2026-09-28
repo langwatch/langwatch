@@ -21,6 +21,12 @@ const workspace = createFixtureWorkspace({
         "browser-kit": {},
       },
     },
+    scenario: {
+      roles: {
+        contract: {},
+        process: { exports: [".", "./scenario-child"] },
+      },
+    },
   },
   files: {
     "enterprise/modules/governance/process/package.json": JSON.stringify({
@@ -351,6 +357,26 @@ describe("given package-boundaries", () => {
           'import { P } from "@langwatch/project-browser/surfaces/project-picker";',
         ),
       ).toEqual(["browserSideDoor"]);
+    });
+  });
+  describe("when the scenario child program takes the voice transports", () => {
+    /** @scenario "The scenario child program may take scenario-process's scenario-child subpath, and nothing more" */
+    it("reports nothing for apps/scenario-child/src/main.ts", () => {
+      expect(
+        report(
+          "apps/scenario-child/src/main.ts",
+          'import { createVoiceTransportRegistry } from "@langwatch/scenario-process/scenario-child";',
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "The scenario child program may take scenario-process's scenario-child subpath, and nothing more" */
+    it.each([
+      ["apps/scenario-child/src/main.ts", "@langwatch/scenario-process"],
+      ["apps/scenario-child/src/config.ts", "@langwatch/scenario-process/scenario-child"],
+      ["apps/api/src/main.ts", "@langwatch/scenario-process/scenario-child"],
+    ])("still reports compositionRoot for %s importing %s", (file, specifier) => {
+      expect(ids(file, `import { X } from "${specifier}";`)).toEqual(["compositionRoot"]);
     });
   });
 });
