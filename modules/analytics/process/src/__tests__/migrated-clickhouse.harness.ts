@@ -261,6 +261,8 @@ async function insertInBatches({
       format: "JSONEachRow",
       clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
     });
+    // Each part write frees ~200 MB the allocator keeps resident, and the cap counts it.
+    await client.command({ query: "SYSTEM JEMALLOC PURGE" }).catch(ignoreUnsupported);
   }
 }
 
