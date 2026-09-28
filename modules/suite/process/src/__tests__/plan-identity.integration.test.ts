@@ -20,6 +20,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import {
   resolveRunParameters,
   scenarioRunConfigSchema,
+  scenarioSchema,
   ScenarioSecretParameterMissingError,
   type ScenarioApi,
   type ScenarioRunConfig,
@@ -132,9 +133,25 @@ function fakeScenarioService(): ScenarioApi {
       });
       return row ? scenarioTestSuiteSchema.parse(row) : null;
     },
-    listTestSuites: async ({ projectId: pid }: { projectId: string }) => {
+    list: async ({ projectId: pid }: { projectId: string }) => {
+      const rows = await database().scenario.findMany({
+        where: { projectId: pid, archivedAt: null },
+      });
+      return rows.map((row) => scenarioSchema.parse(row));
+    },
+    listTestSuites: async ({
+      projectId: pid,
+      includeArchived,
+    }: {
+      projectId: string;
+      includeArchived?: boolean;
+    }) => {
       const rows = await database().simulationSuite.findMany({
-        where: { projectId: pid, kind: "test_suite", archivedAt: null },
+        where: {
+          projectId: pid,
+          kind: "test_suite",
+          ...(includeArchived ? {} : { archivedAt: null }),
+        },
         select: TEST_SUITE_COLUMNS,
       });
       return rows.map((row) => scenarioTestSuiteSchema.parse(row));
