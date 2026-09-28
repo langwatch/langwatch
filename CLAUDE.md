@@ -132,7 +132,11 @@ them. Module code never reads `process.env`.
   before committing. Don't push or open a PR unless asked.
 - British English in prose; no em dashes; no attribution lines or agent names in
   commits, PRs or specs. Never name a customer: the repo is public.
+- Commit messages are Conventional Commits (`feat(scope): …`, `fix: …`).
 - Branches: `issue123/slug` for issues, `feat/slug` for features.
+- Worktrees go in `.worktrees/<branch-with-slash-as-hyphen>` via
+  `make worktree <issue|name>`; never `.claude/worktrees/`, a sibling checkout
+  or `/tmp`. More in `dev/docs/best_practices/git.md`.
 - `gh pr edit --body` → `gh api repos/OWNER/REPO/pulls/N -X PATCH -f body="…"`.
 - `gh api graphql`: inline values in the query; `-f`/`-F` break on multiline.
 - Don't trust `gh pr checks` alone (it dedups by name); use
