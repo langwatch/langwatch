@@ -16,15 +16,15 @@ cell's results and the run's start and completion. So: extend it. No new aggrega
 
 ## 2. Events (reuse first; new versions are additive)
 
-| Event | Status | Carries |
-| --- | --- | --- |
-| `started` | new version | today's fields plus the **plan** (D4): `concurrency`, `origin: workbench \| saved \| workflow`, `persistResults`, `actor`, `scope`, the snapshot (targets, evaluators, dataset columns, the mapping dataset id, pinned prompt and workflow versions), the scoped rows once each, and the ordered cells: phase 1 (`ordinal, rowIndex, targetId, evaluatorIds`, plus an evaluator re-run's precomputed output and trace), then phase 2 (`ordinal, rowIndex, targetId, evaluatorId`, and a setup skip when the comparison cannot be built for any row) |
-| `target_result` | reused unchanged | appended by the cell command instead of the api's loop |
-| `evaluator_result` | new version, additive | as today, plus every detail its frame showed: `errorType`, `traceback`, `domainError`, `rawResponse`, `costCurrency` (ARCHITECTURE §9). An evaluator's error is an `evaluator_result` with status `error`, never a `target_result` error |
-| `cell_finished` | **new** | `ordinal, phase, outcome: succeeded \| failed \| stopped \| skipped`, `error` (serialised HandledError) when failed. The cell failure event: one terminal per cell, whatever happened |
-| `abort_requested` | **new** (RunAborted) | `requestedBy`, `occurredAt` |
-| `completed` | reused, two new fields | `outcome: finished \| stopped \| failed`, and `error` (serialised HandledError) when failed |
-| `trace_metrics_computed`, `workflow_evaluation_requested` | unchanged | |
+| Event                                                     | Status                 | Carries                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `started`                                                 | new version            | today's fields plus the **plan** (D4): `concurrency`, `origin: workbench \| saved \| workflow`, `persistResults`, `actor`, `scope`, the snapshot (targets, evaluators, dataset columns, the mapping dataset id, pinned prompt and workflow versions), the scoped rows once each, and the ordered cells: phase 1 (`ordinal, rowIndex, targetId, evaluatorIds`, plus an evaluator re-run's precomputed output and trace), then phase 2 (`ordinal, rowIndex, targetId, evaluatorId`, and a setup skip when the comparison cannot be built for any row) |
+| `target_result`                                           | reused unchanged       | appended by the cell command instead of the api's loop                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `evaluator_result`                                        | new version, additive  | as today, plus every detail its frame showed: `errorType`, `traceback`, `domainError`, `rawResponse`, `costCurrency` (ARCHITECTURE §9). An evaluator's error is an `evaluator_result` with status `error`, never a `target_result` error                                                                                                                                                                                                                                                                                                            |
+| `cell_finished`                                           | **new**                | `ordinal, phase, outcome: succeeded \| failed \| stopped \| skipped`, `error` (serialised HandledError) when failed. The cell failure event: one terminal per cell, whatever happened                                                                                                                                                                                                                                                                                                                                                               |
+| `abort_requested`                                         | **new** (RunAborted)   | `requestedBy`, `occurredAt`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `completed`                                               | reused, two new fields | `outcome: finished \| stopped \| failed`, and `error` (serialised HandledError) when failed                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `trace_metrics_computed`, `workflow_evaluation_requested` | unchanged              |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 The plan's schema is the contract's (`experiment-run-plan.ts`), so a repository can parse the fold
 that keeps it. The old `started` version still parses (no plan: a run started before the cut-over is folded, never
@@ -65,9 +65,9 @@ within an experiment, and a run without one is keyed by its runId anyway (D3).
   the plan after phase 1, with any setup skip (too few variants, golden not set, variant not found)
   already on them. The manager sends none until every phase-1 bit is set, then windows them like phase
   1. Each comparison cell reads its row's variant outputs from the fold (D2) and either runs or finishes
-  `skipped`, appending the skip's `evaluator_result` error first. The manager stays pure over counts.
+     `skipped`, appending the skip's `evaluator_result` error first. The manager stays pure over counts.
 - **Completion:** all bits of the last phase set, so emit `complete{finished}`. When aborting, complete
-  once every *started* cell has finished (section 6), with `complete{stopped}`.
+  once every _started_ cell has finished (section 6), with `complete{stopped}`.
 - **A worker dying mid-cell:** the group queue stops seeing its heartbeat. After `activeTtlSec` (300 s)
   the job is redelivered and the cell re-runs; the deterministic event ids make that safe. The only
   unavoidable duplicate is the model spend. Repeated deaths trip the queue's poison guard and block the
@@ -114,7 +114,7 @@ the durable record the manager honours, and the flag is the fast signal. The fla
   cell's finish is folded, which is exact because a cell appends its results before its finish.
 - **Projection `experimentRunProgress`** (new fold, Redis store under main's key `eval_v3_run:<runId>`,
   24 h TTL). It has the same JSON the pollers read today: `runId, projectId, experimentId,
-  experimentSlug, status, progress, total, startedAt, finishedAt, summary, runUrl, error, recentEvents`
+experimentSlug, status, progress, total, startedAt, finishedAt, summary, runUrl, error, recentEvents`
   (last 50). It adds `seq` (per-run frame counter), the run's plan from `started` (D4), which every
   cell reads its inputs from, and the `results` draft (`applyRunEvent` over targetOutputs and
   evaluatorResults), which feeds write-back and the comparison cells (D2, D5). **The imperative Redis
@@ -124,7 +124,7 @@ the durable record the manager honours, and the flag is the fast signal. The fla
   `broadcast:<type>` Redis publish, relayed by the api process to its open streams.
   - A worker event subscriber (not fold-attached, no delay) maps each run event to its
     `EvaluationV3Event` frame (`execution_started, target_result, evaluator_result, progress, stopped,
-    done, error`) and publishes `{seq, frame}` on `experiment_run:<runId>` through a new channel
+done, error`) and publishes `{seq, frame}` on `experiment_run:<runId>` through a new channel
     `ExperimentRunEventStream`, with Redis and memory twins.
   - `cell_started` is published by the cell command straight onto the same channel, not appended.
     It is ephemeral, as main's was.

@@ -40,7 +40,7 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
   ? PrismaConnectionService.create({
       logger: createLogger("share-link-engine-test"),

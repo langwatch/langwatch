@@ -77,23 +77,20 @@ jobs:
             # own; what has none is the seam between a socket and a handler,
             # which only a live request can exercise.
             ingest:
-              # The Hono route modules the SDK posts to, and the shared
-              # middleware the capped ones mount:
+              # The route modules the SDK posts to:
               # /api/otel/v1/{traces,logs,metrics} and /api/collector.
-              - 'modules/trace/process/src/transport/api-rest/**'
+              - 'modules/trace/process/src/transport/otlp-ingest.rest.ts'
+              - 'modules/trace/process/src/transport/collector.rest.ts'
+              # The REST runtime those routes run on, including the request
+              # body ceiling a capped declaration enforces.
               - 'packages/api/src/rest/**'
-              # Mounts those modules and fixes their order. A route that
-              # resolves in the router but not on the wire is a mount bug,
-              # and mount order has silently swallowed API surfaces before.
-              - 'apps/api/src/app-rest/**'
-              # Reads the OTLP request body for those routes and decodes it,
-              # including the byte ceiling they enforce on it.
+              # Mounts those modules and fixes their order, and wires the Node
+              # bridge into Hono. A route that resolves in the router but not
+              # on the wire is a mount bug, and mount order has silently
+              # swallowed API surfaces before.
+              - 'packages/api/src/hosting/**'
+              # Reads the OTLP request body for those routes and decodes it.
               - 'packages/otlp/**'
-              # Wires the Node bridge into Hono and decides whether the
-              # process keeps its own global Request/Response. Behaviour that
-              # depends on that seam is invisible to every test that does not
-              # go over a real socket.
-              - 'apps/api/src/api-http.listener.ts'
               - 'apps/api/src/main.ts'
 
   ci:

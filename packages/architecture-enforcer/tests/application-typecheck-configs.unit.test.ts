@@ -16,7 +16,9 @@ function withApplication(application: string, check: (directory: string) => void
       const parsed = ts.parseConfigFileTextToJson(source, readFileSync(source, "utf8"));
       expect(parsed.error).toBeUndefined();
       const config = parsed.config;
-      if (filename === "tsconfig.json") config.extends = join(root, "tsconfig.base.json");
+      // The applications extend tsconfig.base.json, which is tsconfig.shared.json plus
+      // options only TypeScript 7 reads; this API is TypeScript 6 and refuses them.
+      if (filename === "tsconfig.json") config.extends = join(root, "tsconfig.shared.json");
       writeFileSync(join(directory, filename), JSON.stringify(config));
     }
     mkdirSync(join(directory, "src/__tests__"), { recursive: true });

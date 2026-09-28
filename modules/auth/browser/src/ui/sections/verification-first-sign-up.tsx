@@ -453,6 +453,7 @@ function MethodChoice({
                 key={method.id}
                 email={verifiedEmail}
                 addressProof={addressProof}
+                addressConfirmed={addressConfirmed}
                 callbackUrl={callbackUrl}
                 // This address arrived on a link that has just been spent, so
                 // there is no step behind this one to go back to. Changing it

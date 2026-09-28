@@ -1,5 +1,11 @@
 import { formatDuration, isoTimestamp } from "../trace-time-format.ts";
 import { extractSystemText } from "../transcript/transcript-text-extraction.ts";
+import {
+  clipKeepingEnds,
+  type ConversationDetail,
+  FULL_CONVERSATION_DETAIL,
+  renderConversationSteps,
+} from "./conversation-steps.ts";
 import type { ConversationTurnSource, ParsedTurn } from "./parsed-turns.ts";
 
 export interface ConversationMarkdownChunk {
@@ -23,9 +29,12 @@ export interface ConversationMarkdownChunk {
 export function buildConversationMarkdownChunks({
   conversationId,
   turns,
+  detail = FULL_CONVERSATION_DETAIL,
 }: {
   conversationId: string;
   turns: ParsedTurn<ConversationTurnSource>[];
+  /** How much of each turn's text and steps to keep; a budgeted render lowers it. */
+  detail?: ConversationDetail;
 }): ConversationMarkdownChunk[] {
   const chunks: ConversationMarkdownChunk[] = [
     { id: "header", markdown: conversationHeader({ conversationId, turns }) },
@@ -37,12 +46,18 @@ export function buildConversationMarkdownChunks({
   if (systemPrompt) {
     chunks.push({
       id: "system",
-      markdown: ["## System", "", "```", systemPrompt, "```"].join("\n"),
+      markdown: [
+        "## System",
+        "",
+        "```",
+        clipKeepingEnds({ text: systemPrompt, maxChars: detail.turnTextChars }),
+        "```",
+      ].join("\n"),
     });
   }
 
   for (let i = 0; i < turns.length; i++) {
-    chunks.push(...turnChunks({ parsed: turns[i]!, turnNumber: i + 1 }));
+    chunks.push(...turnChunks({ parsed: turns[i]!, turnNumber: i + 1, detail }));
   }
 
   return chunks;
@@ -82,9 +97,11 @@ function conversationHeader({
 function turnChunks({
   parsed,
   turnNumber,
+  detail,
 }: {
   parsed: ParsedTurn<ConversationTurnSource>;
   turnNumber: number;
+  detail: ConversationDetail;
 }): ConversationMarkdownChunk[] {
   const { turn } = parsed;
   const model = turn.models[0] ? turn.models[0] : "—";
@@ -97,11 +114,15 @@ function turnChunks({
     },
   ];
 
-  const user = renderUserSide(parsed);
+  const user = renderUserSide({ parsed, maxChars: detail.turnTextChars });
   if (user) {
     chunks.push({ id: `turn-${turnNumber}-user`, turnNumber, markdown: user });
   }
-  const reply = renderReplySide(parsed);
+  const steps = renderConversationSteps({ steps: turn.steps ?? [], detail });
+  if (steps) {
+    chunks.push({ id: `turn-${turnNumber}-steps`, turnNumber, markdown: steps });
+  }
+  const reply = renderReplySide({ parsed, maxChars: detail.turnTextChars });
   if (reply) {
     chunks.push({
       id: `turn-${turnNumber}-${reply.kind}`,
@@ -117,8 +138,14 @@ function turnChunks({
  * where the server nulled the text: dropping it silently would make a pasted
  * transcript read as if the turn never happened.
  */
-function renderUserSide({ userText, turn }: ParsedTurn<ConversationTurnSource>): string | null {
-  if (userText) return ["**User:**", "", userText].join("\n");
+function renderUserSide({
+  parsed: { userText, turn },
+  maxChars,
+}: {
+  parsed: ParsedTurn<ConversationTurnSource>;
+  maxChars: number;
+}): string | null {
+  if (userText) return ["**User:**", "", clipKeepingEnds({ text: userText, maxChars })].join("\n");
   if (turn.inputRedacted) return ["**User:**", "", "_[Redacted]_"].join("\n");
   return null;
 }
@@ -128,7 +155,13 @@ function renderUserSide({ userText, turn }: ParsedTurn<ConversationTurnSource>):
  * prose wins, raw output is the fallback for a tool-only turn, and a turn that
  * produced neither reports its redaction or its error instead.
  */
-function renderReplySide({ assistantText, turn }: ParsedTurn<ConversationTurnSource>): {
+function renderReplySide({
+  parsed: { assistantText, turn },
+  maxChars,
+}: {
+  parsed: ParsedTurn<ConversationTurnSource>;
+  maxChars: number;
+}): {
   kind: "assistant" | "error";
   markdown: string;
 } | null {
@@ -136,7 +169,9 @@ function renderReplySide({ assistantText, turn }: ParsedTurn<ConversationTurnSou
   if (assistantMarkdown) {
     return {
       kind: "assistant",
-      markdown: ["**Assistant:**", "", assistantMarkdown].join("\n"),
+      markdown: ["**Assistant:**", "", clipKeepingEnds({ text: assistantMarkdown, maxChars })].join(
+        "\n",
+      ),
     };
   }
   if (turn.outputRedacted) {

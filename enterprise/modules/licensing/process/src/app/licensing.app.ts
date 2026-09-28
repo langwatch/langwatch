@@ -258,15 +258,14 @@ export class LicensingApp implements LicensingApiContract {
     instanceLicenseKey: string | undefined,
   ): LicensingApp {
     const cryptography = NodeLicenseCryptographyService.create({ publicKey: config.publicKey });
-    // Derived from the closed prisma member: the licence reads are live, the seat
-    // counts are entitlement's own membership classification (peer, not owned
-    // here), and the mutation ports refuse by name until a process
-    // composes them.
+    // Derived from the closed prisma member: the licence rows are read and written
+    // live, and the seat counts are organization's own membership classification
+    // (a peer, not owned here).
     const partial = LicensingInfrastructureService.create({ processName: "this process" });
     const infrastructure =
       members.infrastructure !== undefined
         ? members.infrastructure
-        : partial.withoutMutation({
+        : partial.withStorage({
             licenses: PrismaOrganizationLicenseRepository.create(members.prisma),
             ...seatCountsOver(dependencies.organizations),
           });

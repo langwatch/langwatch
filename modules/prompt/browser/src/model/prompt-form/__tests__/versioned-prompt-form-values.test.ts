@@ -176,10 +176,8 @@ describe("versionedPromptToPromptConfigFormValues", () => {
   });
 
   describe("when prompt has runtime parameters", () => {
+    /** @scenario Prompt form values preserve runtime parameters during API mapping */
     it("maps runtime parameters onto form values", () => {
-      /**
-       * @scenario Prompt form values preserve runtime parameters during API mapping
-       */
       const prompt = createMockPrompt("test-prompt");
       prompt.parameters = { mapped: true };
 

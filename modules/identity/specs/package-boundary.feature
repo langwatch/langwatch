@@ -48,7 +48,8 @@ Feature: Identity ships as two packages with one composition root
     But it may import the event-sourcing framework, which is the half it owns
 
   @unit
-  Scenario: The app composes the identity services in exactly one place
-    Given the app's server sources
+  Scenario: Only the identity module's app composes an IdentityService
+    Given the sources of every process, module and package
     When every construction of an IdentityService is located
-    Then it is in app/api-trpc-collaborators.identity.composition.ts and nowhere else
+    Then it is in the identity module's app, once for the running process and once for its migrations
+    And no process composition or other module constructs one

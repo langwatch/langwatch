@@ -132,4 +132,27 @@ describe("the before-session-create hook", () => {
       });
     });
   });
+
+  describe("given a sign-in about to mint a session", () => {
+    type MintContext = NonNullable<Parameters<ReturnType<typeof createBeforeSessionCreateHook>>[1]>;
+    const mintOn = (path: string) =>
+      createBeforeSessionCreateHook({
+        repo: repoAnswering(null).repo,
+        collaborators: CONTINUING,
+      })(sessionFor("user-1"), createApiFixture<MintContext>({ path }));
+
+    it("records what a password, a two-step code or a passkey proved", async () => {
+      await expect(mintOn("/sign-in/email")).resolves.toMatchObject({ data: { amr: ["pwd"] } });
+      await expect(mintOn("/two-factor/verify-totp")).resolves.toMatchObject({
+        data: { amr: ["pwd", "otp"] },
+      });
+      await expect(mintOn("/passkey/verify-authentication")).resolves.toMatchObject({
+        data: { amr: ["phw"] },
+      });
+    });
+
+    it("records nothing for a federated callback, whose factors need a verified token", async () => {
+      await expect(mintOn("/callback/auth0")).resolves.toBeUndefined();
+    });
+  });
 });

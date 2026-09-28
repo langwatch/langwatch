@@ -199,10 +199,13 @@ export class EvaluationDataService {
     if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
       if (source !== "formatted_traces") return { resolved: false };
 
-      const formatted = await Promise.all(
-        threadTraces.map((t) => this.deps.spanDigest.format(t.spans ?? [])),
-      );
-      return { resolved: true, value: formatted.join("\n\n---\n\n") };
+      return {
+        resolved: true,
+        value: await this.deps.spanDigest.formatThread({
+          threadKey: threadId,
+          traces: threadTraces,
+        }),
+      };
     }
 
     const threadSource = source as keyof typeof THREAD_MAPPINGS;

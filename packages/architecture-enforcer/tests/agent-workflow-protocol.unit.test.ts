@@ -71,18 +71,26 @@ describe("every status named anywhere in the protocol is one of the seven", () =
 
   /**
    * Status-shaped tokens, read only from the three structural spots a status
-   * appears — a table cell, a "Lane reports `x`" or "Status: <a | b | c>" line
-   * — never from prose, where "review"/"complete" are ordinary English words.
+   * appears (the column headed "Status" of a table, a "Lane reports `x`" line,
+   * a "Status: <a | b | c>" line), never from prose or other table columns.
    */
   function statusTokensIn(text: string): string[] {
     const found: string[] = [];
+    let statusColumn: number | undefined;
+    let inTable = false;
     for (const line of text.split("\n")) {
       const trimmed = line.trim();
       if (trimmed.startsWith("|")) {
-        for (const match of trimmed.matchAll(/`([a-z]+(?:_[a-z]+)?)`/g)) {
+        const cells = trimmed.split("|").slice(1, -1);
+        if (!inTable) statusColumn = headerIndex(cells);
+        inTable = true;
+        const cell = statusColumn === undefined ? undefined : cells[statusColumn];
+        for (const match of cell?.matchAll(/`([a-z]+(?:_[a-z]+)?)`/g) ?? []) {
           const token = match[1];
           if (token) found.push(token);
         }
+      } else {
+        inTable = false;
       }
       const reported = trimmed.match(/Lane reports `([a-z]+(?:_[a-z]+)?)`/);
       const reportedStatus = reported?.[1];
@@ -94,6 +102,11 @@ describe("every status named anywhere in the protocol is one of the seven", () =
       }
     }
     return found;
+  }
+
+  function headerIndex(cells: string[]): number | undefined {
+    const index = cells.findIndex((cell) => cell.trim() === "Status");
+    return index === -1 ? undefined : index;
   }
 
   /** @scenario "Every status named anywhere in the protocol is one of the seven" */
@@ -173,9 +186,12 @@ describe("every cross-reference in the protocol resolves", () => {
   /** @scenario "Every cross-reference in the protocol resolves" */
   it("finds an existing file for every .claude path the protocol names", () => {
     const pathPattern = /\.claude\/[A-Za-z0-9_.\-/]*\.md/g;
+    // The live-lane roster is runtime state the coordinator creates; it is never committed.
+    const runtimeState = new Set([`${COORDINATOR_DIR}/LANES.md`]);
     let checked = 0;
     for (const file of PROTOCOL_FILES) {
       for (const match of protocolText(file).matchAll(pathPattern)) {
+        if (runtimeState.has(match[0])) continue;
         checked += 1;
         expect(existsSync(join(root, match[0]))).toBe(true);
       }
@@ -229,7 +245,7 @@ describe("the live-lane roster", () => {
     const recordsBeforeSpawning = coordinator.indexOf("LANES.md` **before** the Agent call");
     expect(recordsBeforeSpawning).toBeGreaterThan(-1);
 
-    const spawnCall = coordinator.indexOf("`subagent_type` `lane`");
+    const spawnCall = coordinator.indexOf("`subagent_type` set to the `lane");
     expect(spawnCall).toBeGreaterThan(recordsBeforeSpawning);
 
     expect(coordinator).toContain("no `active` rows");

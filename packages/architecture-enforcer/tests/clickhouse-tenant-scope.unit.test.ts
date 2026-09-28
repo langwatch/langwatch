@@ -287,7 +287,7 @@ function callSitesIn(file: string, source: string): CallSite[] {
     }
     const argumentsStart = calls.lastIndex;
     const argumentsText = source.slice(argumentsStart, cursor - 1);
-    const property = /(?:^|[\s,{])query\s*:\s*/.exec(argumentsText);
+    const property = /(?:^|[\s,{])(?:query|sql)\s*:\s*/.exec(argumentsText);
     if (property === null) continue;
     const line = source.slice(0, call.index).split("\n").length;
     if (/(?:^|[\s,{])unscoped\s*:/.test(argumentsText)) {
@@ -365,6 +365,19 @@ describe("ClickHouse repositories", () => {
       expect(classify('await client.query({ query: "SELECT 1 FROM trace_summaries" });')).toBe(
         "unscoped",
       );
+    });
+
+    it("reads the managed client's `sql` property as well as the vendor client's `query`", () => {
+      expect(
+        classify(
+          'await clickhouse.query<Row>({ tenantId, sql: "SELECT 1 FROM trace_summaries" });',
+        ),
+      ).toBe("unscoped");
+      expect(
+        classify(
+          "await clickhouse.query<Row>({ tenantId, sql: `SELECT 1 FROM t WHERE TenantId = {tenantId:String}` });",
+        ),
+      ).toBe("scoped");
     });
 
     it("passes the same statement once it declares why it spans tenants", () => {

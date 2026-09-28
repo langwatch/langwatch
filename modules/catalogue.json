@@ -328,16 +328,16 @@
       "subjects": ["demo-data"]
     },
     {
-      "id": "enterprise-ops",
-      "root": "enterprise/modules/enterprise-ops",
-      "classification": "enterprise",
-      "subjects": ["enterprise-ops"]
-    },
-    {
       "id": "enterprise-gateway",
       "root": "enterprise/modules/enterprise-gateway",
       "classification": "enterprise",
       "subjects": ["enterprise-gateway", "personal-virtual-key", "routing-policy"]
+    },
+    {
+      "id": "enterprise-ops",
+      "root": "enterprise/modules/enterprise-ops",
+      "classification": "enterprise",
+      "subjects": ["enterprise-ops"]
     },
     {
       "id": "governance",

@@ -1,5 +1,5 @@
-import IORedis, { type Redis } from "ioredis";
 import { createTestLogger, type TestLogLines } from "@langwatch/test-harness";
+import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";

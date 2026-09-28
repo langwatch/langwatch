@@ -7,7 +7,8 @@ Feature: Machine-wide slots for whole-repo checks
   # Optional Haven hooks own agent admission (haven-agent-hooks.feature).
   # Repository scripts and pnpm-generated tool launchers run directly.
   # `haven slot run -- <command>` provides explicit terminal admission;
-  # check-queue.mjs remains a legacy entrypoint with a JS fallback.
+  # The JavaScript check-queue.mjs and its bin shims are retired; postinstall
+  # only restores launchers the old shims replaced.
   # Flock waiters retry every 100 ms without changing capacity or memory limits.
 
   @unit
@@ -305,108 +306,6 @@ Feature: Machine-wide slots for whole-repo checks
     Then the interrupt reaches the command
     And the check still reports how the command ended
 
-  # Explicit legacy shim installation remains available for existing users.
-  # The following scenarios apply after manually running the legacy installer;
-  # postinstall now removes those shims instead of installing them.
-
-  @unit
-  Scenario: A whole-project run counts however it was started
-    When I run "pnpm exec tsc --noEmit -p tsconfig.tsgo.json" instead of "pnpm typecheck"
-    Then the run counts against the limit, exactly as the script would have
-
-  # Before this, naming an existing project file with a build flag ran
-  # unqueued, which was a real hole in the machine-wide serialization: every
-  # package now typechecks by building its own TypeScript project references,
-  # so a build flag naming a project is exactly as common a way to reach the
-  # whole tree as a project flag always was.
-  @unit
-  Scenario: A build flag naming a project counts the same as a project flag
-    When I run "tsc -b tsconfig.json" or "tsc --build tsconfig.json"
-    Then the run counts against the limit, exactly as "-p" or "--project" would
-
-  @unit
-  Scenario: A run over a directory counts
-    When I run a check over a directory rather than a named file
-    Then the run counts against the limit
-
-  @unit
-  Scenario: A run that names no target counts
-    When I run a check with flags only, which walks the project from the cwd
-    Then the run counts against the limit
-
-  # A subcommand and a flag's value are positional too, and reading either as a
-  # file to check is what turns a whole-project run into one nothing waits for.
-  @unit
-  Scenario: A subcommand or a flag's value is not a target
-    When I run a check with a bare subcommand and no paths, or "tsc --pretty false"
-    Then the run counts against the limit, because neither names a file and both walk the project
-
-  @unit
-  Scenario: A run that names files starts immediately
-    When I run "tsc --noEmit src/foo.ts"
-    Then it starts without waiting, so the iterate-fast loop never sits behind a full run
-
-  @unit
-  Scenario: A watch or a language server starts immediately
-    When I start a check with "--watch" or "--lsp"
-    Then it starts without waiting, because it would hold its slot for the whole session
-
-  @unit
-  Scenario: A check does not queue behind itself
-    Given "pnpm typecheck" holds the only slot
-    When the compiler it runs would otherwise ask for a slot of its own
-    Then it starts without waiting
-    And the check does not sit out the maximum wait before starting
-
-  @unit
-  Scenario: The tool behaves the same either way
-    Given one check that counts and one that does not
-    When each runs
-    Then its arguments, output and exit code are what they would be without the queue
-
-  @unit
-  Scenario: Reinstalling leaves the tools working
-    Given the bin entries already route whole-project runs through the queue
-    When the legacy installer runs again
-    Then the tools still run, and still count the same runs
-
-  @unit
-  Scenario: A fresh install restores the counting pnpm overwrote
-    Given "pnpm install" has replaced the bin entries with its own
-    When the legacy installer runs
-    Then whole-project runs count again
-
-  # Otherwise a fix to how runs are classified would never reach a checkout
-  # that had already been installed once, which is every checkout.
-  @unit
-  Scenario: An earlier version of the routing is brought up to date
-    Given the bin entries were routed through the queue by an earlier version of the installer
-    When the legacy installer runs
-    Then they are replaced with the current one, and the tools still run
-
-  @unit
-  Scenario: An install that cannot write leaves the tool working
-    Given the bin directory cannot be written to
-    When the legacy installer runs
-    Then the tool still runs, because losing the count is survivable and losing the tool is not
-
-  # The shims are a laptop concern, and neither environment below is a laptop.
-  # CI turns the queue off anyway, so a shim there only puts a node process in
-  # front of every tsc run to decide nothing, and an install in an image
-  # or on a server has no bin entries worth rewriting.
-
-  @unit
-  Scenario: CI installs are left alone
-    Given CI is set to anything but "0" or "false"
-    When the legacy installer runs
-    Then it changes nothing, and says which environment it stood down for
-
-  @unit
-  Scenario: Production installs are left alone
-    Given NODE_ENV is production
-    When the legacy installer runs
-    Then it changes nothing
-
   # --- The queue lives inside haven ---
 
   # The queue's decisions are Go code in haven: `haven slot run -- <cmd>`
@@ -489,31 +388,6 @@ Feature: Machine-wide slots for whole-repo checks
     When a run is queued behind another
     Then it reports being queued behind 1 run
     And it says nothing about how long the wait might be, exactly as before the estimate existed
-
-  # --- vitest joins the shimmed tools ---
-
-  # A bare `vitest` or `vitest run` with no path spins up every suite in the
-  # workspace member it runs from, at the same cost as a whole-tree
-  # typecheck - and until now it was the one gap the gate's own prediction
-  # could describe but nothing downstream enforced. vitest now takes a slot
-  # through `haven slot run` on its own, the same way tsc/tsgo/oxlint/oxfmt
-  # already do, so the gate's prediction and the enforcement agree for every
-  # heavy command it classifies.
-  #
-  # The mechanism (dev/scripts/install-check-shims.mjs, TOOLS) is shared,
-  # tool-agnostic code already proven for tsc/tsgo/oxlint/oxfmt by
-  # packages/architecture-enforcer/tests/check-shims.test.ts, which is outside
-  # this lane's touched paths for this change. Tagged @unimplemented here
-  # rather than left silently unbound: the code change (vitest added to
-  # TOOLS) shipped in this change, the dedicated test naming vitest did not.
-
-  @unimplemented
-  Scenario: vitest takes a slot on its own, the same way tsc and oxlint do
-    Given the check-shims installer has shimmed vitest beside tsc, tsgo, oxlint and oxfmt
-    When a bare "vitest" or "vitest run" with no path is run
-    Then it counts against the machine-wide check slot
-    And "vitest run src/foo.test.ts" naming a real file stays instant and unqueued
-    And "vitest --watch" starts without waiting, because it holds its slot for the whole session
 
   # --- Priority with ageing ---
 

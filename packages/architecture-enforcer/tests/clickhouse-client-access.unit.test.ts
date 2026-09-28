@@ -60,30 +60,27 @@ const RESOLVES_CLIENT =
  * not, and none reads tenant rows as the application.
  */
 
-// - the two process infrastructures build the managed client itself, and the
-//   task host builds the one its one-shot programs run on.
-// - `goose.migration-runner` and `ttl.reconciler` run per call against a URL
-//   that is not the application's.
-
-// - the LangWatchQL executor and its provisioning task authenticate as the
-//   restricted LangWatchQL identity, whose limits are server-side.
-// - the ops EXPLAIN adapter connects as `langwatch_ops` under a readonly
-//   profile that rejects the client-side settings the managed client sends.
 const MAY_CONSTRUCT = new Set([
-  "apps/api/src/platform/infrastructure/api-clickhouse.infrastructure.ts",
-  "apps/worker/src/platform/infrastructure/worker-clickhouse.infrastructure.ts",
-  "apps/tasks/src/platform/tasks-host.composition.ts",
+  // The managed client itself, and the untenanted admin seam migrations and tasks run on.
+  "packages/process-stores/src/clickhouse-member.ts",
+  "packages/process-stores/src/store-targets.ts",
+  // Per call, against a URL that is not the application's.
   "packages/clickhouse-migrations/src/goose.migration-runner.ts",
   "packages/clickhouse-migrations/src/ttl.reconciler.ts",
-  "modules/analytics/process/src/adapters/clickhouse.langwatch-ql-executor.adapter.ts",
-  "modules/analytics/process/src/tasks/lwql-provision.task.ts",
-  "modules/ops/process/src/adapters/ops-clickhouse-explain.adapter.ts",
+  // The restricted LangWatchQL identity, whose limits are server-side.
+  "modules/analytics/process/src/repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts",
+  "modules/analytics/process/src/repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts",
+  // `langwatch_ops` under a readonly profile that refuses the managed client's settings.
+  "modules/ops/process/src/repositories/clickhouse/clickhouse.ops-explain.repository.ts",
+  // A throwaway container, test endpoints and a never-connected double: no tenant rows.
+  "modules/analytics/process/scripts/generate-lwql-columns-manifest.ts",
   "packages/test-harness/src/clickhouse-test-endpoints.ts",
+  "packages/test-harness/src/client-doubles/clickhouse.double.ts",
 ]);
 
 /**
  * Allowed to hold a resolved client, by shape rather than by name: the
- * ClickHouse client package, repositories, adapters, the port modules that
+ * ClickHouse client package, repositories, adapters, the members records that
  * only DECLARE a resolver's type, event stores, and composition roots.
  */
 function mayResolveByLocation(path: string): boolean {
@@ -94,9 +91,10 @@ function mayResolveByLocation(path: string): boolean {
     path.includes("/stores/") ||
     path.endsWith(".repository.ts") ||
     path.endsWith(".adapter.ts") ||
-    path.endsWith(".port.ts") ||
+    path.endsWith(".store.ts") ||
+    path.endsWith(".members.ts") ||
     path.endsWith(".composition.ts") ||
-    path.endsWith(".mount.ts")
+    path.endsWith("-composition.build.ts")
   );
 }
 

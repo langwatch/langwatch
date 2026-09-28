@@ -71,12 +71,51 @@ export class TraceAttributeCapService {
       return false;
     }
 
-    value.stringValue = this.truncationPlaceholder(
-      byteSize,
-      this.dataUrlMimeType(value.stringValue),
-    );
+    value.stringValue =
+      this.messageHistoryWithinCap(value.stringValue, maxBytes) ??
+      this.truncationPlaceholder(byteSize, this.dataUrlMimeType(value.stringValue));
 
     return true;
+  }
+
+  /**
+   * An oversized message history with whole middle messages dropped, keeping
+   * the system prompt, the first user message and the latest, counted by a
+   * marker. Null for a non-list or a latest message alone over the cap.
+   * @see specs/trace-processing/oversized-attribute-value-preview.feature
+   */
+  private messageHistoryWithinCap(value: string, maxBytes: number): string | null {
+    const first = value.trimStart()[0];
+    if (first !== "[" && first !== "{") return null;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return null;
+    }
+    const located = locateMessages(parsed);
+    if (located.kind === "not-a-message-list") return null;
+    const { messages, rewrap } = located;
+    const headLength = openingLength(messages);
+    const head = messages.slice(0, headLength);
+    const tail = messages.slice(headLength);
+    const fits = (kept: unknown[]) => this.utf8ByteLength(JSON.stringify(rewrap(kept))) <= maxBytes;
+    const build = (prefix: unknown[], keptTail: number) => {
+      const dropped = messages.length - prefix.length - keptTail;
+      return [
+        ...prefix,
+        markerMessage({ like: messages[0], dropped, maxBytes }),
+        ...tail.slice(tail.length - keptTail),
+      ];
+    };
+    for (const prefix of [head, []]) {
+      const keptTail = largestFitting({
+        max: tail.length,
+        fits: (n) => n > 0 && fits(build(prefix, n)),
+      });
+      if (keptTail > 0) return JSON.stringify(rewrap(build(prefix, keptTail)));
+    }
+    return null;
   }
 
   /**
@@ -293,4 +332,72 @@ export class TraceAttributeCapService {
 
     return count;
   }
+}
+
+type Message = Record<string, unknown>;
+
+const isMessage = (item: unknown): item is Message =>
+  typeof item === "object" && item !== null && typeof (item as Message).role === "string";
+
+type LocatedMessages =
+  | { kind: "message-list"; messages: Message[]; rewrap: (kept: unknown[]) => unknown }
+  | { kind: "not-a-message-list" };
+
+const NOT_A_MESSAGE_LIST: LocatedMessages = { kind: "not-a-message-list" };
+
+/** The message list inside a value, bare or under `value`/`messages`, and how to put it back. */
+function locateMessages(parsed: unknown): LocatedMessages {
+  if (Array.isArray(parsed) && parsed.length > 1 && parsed.every(isMessage)) {
+    return { kind: "message-list", messages: parsed, rewrap: (kept) => kept };
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return NOT_A_MESSAGE_LIST;
+  }
+  for (const key of ["value", "messages"]) {
+    const inner = (parsed as Record<string, unknown>)[key];
+    if (Array.isArray(inner) && inner.length > 1 && inner.every(isMessage)) {
+      return {
+        kind: "message-list",
+        messages: inner,
+        rewrap: (kept) => ({ ...parsed, [key]: kept }),
+      };
+    }
+  }
+  return NOT_A_MESSAGE_LIST;
+}
+
+/** The leading system messages and the first message after them. */
+function openingLength(messages: Message[]): number {
+  let index = 0;
+  while (index < messages.length - 1 && messages[index]!.role === "system") index++;
+  return Math.min(index + 1, messages.length - 1);
+}
+
+/** A system message counting the dropped ones, in the shape the list's messages use. */
+function markerMessage({
+  like,
+  dropped,
+  maxBytes,
+}: {
+  like: unknown;
+  dropped: number;
+  maxBytes: number;
+}): Message {
+  const text = `[${dropped} messages omitted to fit the ${maxBytes}-byte attribute cap]`;
+  const usesParts = isMessage(like) && Array.isArray(like.parts) && like.content === undefined;
+  return usesParts
+    ? { role: "system", parts: [{ type: "text", content: text }] }
+    : { role: "system", content: text };
+}
+
+/** The largest n in 1..max for which `fits(n)` holds, 0 when none does; `fits` is monotone. */
+function largestFitting({ max, fits }: { max: number; fits: (n: number) => boolean }): number {
+  let low = 0;
+  let high = max;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (fits(mid)) low = mid;
+    else high = mid - 1;
+  }
+  return low;
 }

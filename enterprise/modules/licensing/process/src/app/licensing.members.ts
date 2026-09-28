@@ -378,6 +378,13 @@ export interface OrganizationLicenseCandidates {
   findOrganizationsWithLicense(): Promise<OrganizationLicenseCandidate[]>;
 }
 
+/** The licence rows read and written, without the seat counts a peer answers. */
+export interface OrganizationLicenseStorage extends OrganizationLicenseReads {
+  organizationExists(organizationId: string): Promise<boolean>;
+  storeLicense(organizationId: string, license: StoredLicense): Promise<void>;
+  removeLicense(organizationId: string): Promise<void>;
+}
+
 /** Both licence reads, which is what a repository over the rows answers. */
 export interface OrganizationLicenseReads
   extends OrganizationLicense, OrganizationLicenseCandidates {}
@@ -387,10 +394,7 @@ export interface OrganizationLicenseReads
  * apps, except the reads, inherited from `OrganizationLicenseReads` so a
  * plan-resolution-only process can compose those alone, without seats.
  */
-export interface LicenseStorage extends OrganizationLicenseReads {
-  organizationExists(organizationId: string): Promise<boolean>;
-  storeLicense(organizationId: string, license: StoredLicense): Promise<void>;
-  removeLicense(organizationId: string): Promise<void>;
+export interface LicenseStorage extends OrganizationLicenseStorage {
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
 }

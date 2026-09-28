@@ -7,9 +7,9 @@
  * Renders both trace UIs with audio message content and asserts an inline
  * <audio> player appears (instead of only a raw JSON dump): the legacy
  * `RenderInputOutput` input/output view, and the traces-v2 conversation
- * `BlockStack`. These bind the feature's @integration scenarios via
- * @scenario annotations, so the parity check sees real rendering coverage —
- * not just the unit-level parsing tests.
+ * `BlockStack`. These bind the feature's @integration scenarios via scenario
+ * annotations, so the parity check sees real rendering coverage, not just the
+ * unit-level parsing tests.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { parseContentBlocks } from "@langwatch/trace-contract/transcript";

@@ -6,11 +6,13 @@ import {
   type AuthzGrantsService,
 } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type {
-  SsoArrivalApi,
-  SsoAuthenticationActivityApi,
-  SsoMigrationAccountLinkDecision,
-  SsoMigrationCallbackApi,
+import {
+  deriveSessionAmr,
+  signInProviderForPath,
+  type SsoArrivalApi,
+  type SsoAuthenticationActivityApi,
+  type SsoMigrationAccountLinkDecision,
+  type SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -594,8 +596,22 @@ export function createBeforeSessionCreateHook({
         message: authentication.code,
       });
     }
-    return undefined;
+    const amr = localSignInAmr({ path });
+    return amr.length > 0 ? { data: { ...session, amr: [...amr] } } : undefined;
   };
+}
+
+/**
+ * What a password, two-step or passkey sign-in proved, recorded on the session it mints
+ * (D06). A federated callback records nothing here: its factors count only from a verified
+ * token. specs/identity/mfa-and-session-shape.feature
+ */
+export function localSignInAmr({ path }: { path: string | undefined }): readonly string[] {
+  if (!path) return [];
+  const reading = signInProviderForPath({ path });
+  if (!reading.recognized) return [];
+  if (reading.provider !== "credential" && reading.provider !== "passkey") return [];
+  return deriveSessionAmr({ path });
 }
 
 /**

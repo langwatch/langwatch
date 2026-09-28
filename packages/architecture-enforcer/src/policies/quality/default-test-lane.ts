@@ -4,6 +4,7 @@ import { join, matchesGlob, relative } from "node:path";
 import ts from "typescript";
 
 import type { ArchitectureViolation } from "../../types.ts";
+import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import { readWorkspaceMembers } from "../../workspace/tsconfig-references.ts";
 
@@ -53,12 +54,7 @@ function stringsOf(node: ts.Expression): string[] {
 
 /** The include, exclude and timeout a vitest config declares, read from its source. */
 function readLane(file: string): Omit<Lane, "config"> {
-  const source = ts.createSourceFile(
-    file,
-    readFileSync(file, "utf8"),
-    ts.ScriptTarget.Latest,
-    true,
-  );
+  const source = sourceFile({ file });
   const lane: Omit<Lane, "config"> = { include: [], exclude: [], timeoutMs: undefined };
   const visit = (node: ts.Node): void => {
     if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name)) {

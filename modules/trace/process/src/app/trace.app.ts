@@ -165,10 +165,6 @@ import {
   type TraceMetadataUpdate,
   type TracePreconditionSampleInput,
 } from "@langwatch/trace-contract";
-import {
-  buildParsedTurns,
-  renderConversationMarkdown,
-} from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
 
 import { tokenCounterChannels } from "../channels/token-counter-channels.registry.ts";
@@ -211,7 +207,7 @@ import { tracePath, tracePlatformUrl } from "../rules/trace-platform-url.rules.t
 import { IO_PREVIEW_BYTES, utf8Preview } from "../rules/trace-projection-lean.rules.ts";
 import { traceMatchesQuery } from "../rules/trace-query-evaluation.rules.ts";
 import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
-import { traceToConversationTurn } from "../rules/trace-thread-conversation.rules.ts";
+import { renderThreadConversation } from "../rules/trace-thread-conversation.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
 import { LegacyFilterMatchingService } from "../services/legacy-filter-matching.service.ts";
@@ -965,13 +961,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   }): Promise<string> {
     // The text alone: the renderer writes its own omitted-turn marker into the
     // transcript, so a cut leaves no second signal for a caller to read.
-    return renderConversationMarkdown({
-      conversationId: input.threadKey,
-      turns: buildParsedTurns({
-        turns: input.traces.map((trace) => traceToConversationTurn({ trace })),
-      }),
-      ...(input.maxTokens === undefined ? {} : { maxTokens: input.maxTokens }),
-    }).text;
+    return renderThreadConversation(input).text;
   }
 
   async renderTraceMessages(input: {

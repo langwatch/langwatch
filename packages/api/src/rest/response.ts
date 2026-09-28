@@ -835,10 +835,7 @@ export function createCanonicalFamilyErrorHandler(options: {
   /** e.g. `Webhooks API Error`, the prefix on the logged sentence. */
   label: string;
   /** Overrides the canonical mapping. A family almost never needs its own. */
-  mapError?: (
-    error: unknown,
-    c: Context,
-  ) => { status: ContentfulStatusCode; body: ApiErrorBody };
+  mapError?: (error: unknown, c: Context) => { status: ContentfulStatusCode; body: ApiErrorBody };
 }): ErrorHandler {
   const logger = createLogger(options.loggerName);
 

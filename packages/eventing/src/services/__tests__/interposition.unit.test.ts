@@ -49,10 +49,8 @@ describe("given EventSourcingService is configured with a map projection", () =>
     vi.restoreAllMocks();
   });
 
-  /**
-   * @scenario leanForProjection is the single source of truth for the lean shape
-   */
   describe("when one SpanReceived event is stored", () => {
+    /** @scenario leanForProjection is the single source of truth for the lean shape */
     it("storeEvents is called with the original (full) event, and router.dispatch is called with the leaned event", async () => {
       const eventStore = createMockEventStore<Event>();
       const mapDef = createMockMapProjectionDefinition("lean-dispatch");

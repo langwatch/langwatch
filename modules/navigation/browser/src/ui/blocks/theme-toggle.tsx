@@ -1,4 +1,4 @@
-import { Box, HStack, VisuallyHidden } from "@chakra-ui/react";
+import { Box, chakra, HStack } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
@@ -102,22 +102,28 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
             position="relative"
             _hover={{ color: theme === option.value ? "fg" : "fg.muted" }}
           >
-            <VisuallyHidden asChild>
-              <input
-                type="radio"
-                name="theme"
-                value={option.value}
-                checked={theme === option.value}
-                aria-label={`Set theme to ${option.value}`}
-                onChange={() => setTheme(option.value)}
-              />
-            </VisuallyHidden>
             <Box
               transition="transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)"
               transform={theme === option.value ? "scale(1.15)" : "scale(1)"}
             >
               {option.icon}
             </Box>
+            {/* Transparent over the whole option, so a click lands on the radio itself. */}
+            <chakra.input
+              type="radio"
+              name="theme"
+              value={option.value}
+              checked={theme === option.value}
+              aria-label={`Set theme to ${option.value}`}
+              onChange={() => setTheme(option.value)}
+              position="absolute"
+              inset={0}
+              width="full"
+              height="full"
+              margin={0}
+              opacity={0}
+              cursor="pointer"
+            />
           </Box>
         ))}
       </HStack>
