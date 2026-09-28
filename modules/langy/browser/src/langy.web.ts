@@ -1,7 +1,7 @@
 /**
- * What a browser installs when it installs langy: the host its dock reads, and
- * the api its hooks run on. No screens — langy draws inside other modules'
- * pages, which is exactly why its host must mount above the routed tree.
+ * What a browser installs when it installs langy: the layout its dock draws
+ * in, the host that dock reads, and the api its hooks run on. Langy draws
+ * inside other modules' pages, which is why its host mounts above the tree.
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
@@ -12,6 +12,13 @@ import { langyGuidedOnboarding } from "./behavior/langy-guided-onboarding.capabi
 
 export const langyWeb = defineWebModule("langy")
   .withApi(langyApi)
+  // Path-less: the route table nests every project and settings page under
+  // it, so the panel and its provider survive navigation between them.
+  .withScreens({
+    "layouts/project-langy": {
+      load: () => import("./features/langy/ui/sections/project-langy-layout.tsx"),
+    },
+  })
   // All another module may do to the panel: dock it with a kickoff and hear
   // the scope it entered, or ask it a question with the view it is about. The
   // shell wires these into the consumer's own `*HostApi`; nothing else
