@@ -55,7 +55,7 @@ function SharedTraceView() {
     >
       {shared?.isSpanDetailTruncated && (
         <Box paddingX={4} paddingTop={3}>
-          <Alert.Root status="info" width="full">
+          <Alert.Root status="info" size="sm" width="full">
             <Alert.Indicator />
             <Alert.Content>
               <Alert.Description>

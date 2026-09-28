@@ -1,15 +1,21 @@
 /**
- * Alerts wear the card material with the status in the hairline and the icon,
- * never in a filled wash, as `HandledErrorAlert` and the dark toast do.
+ * Alerts wear the card material, faintly tinted, with the status in the
+ * hairline and the icon and the text in the ordinary foreground colours.
  * {@link dev/docs/best_practices/alerts-toasts-and-field-errors.md}
  */
 
 import { defineSlotRecipe } from "@chakra-ui/react";
 
-import { statusHairline } from "./status-hairline.ts";
+import { statusHairline, statusTint } from "./status-hairline.ts";
 
 /** The status colour of whichever palette the root carries, as a hairline. */
 const paletteHairline = statusHairline("color-palette-solid");
+
+/** Enough of the status colour that a warning reads orange, in either mode. */
+const paletteTint = {
+  _light: statusTint({ color: "color-palette-solid", ground: "bg-surface", amount: 12 }),
+  _dark: statusTint({ color: "color-palette-solid", ground: "bg-panel", amount: 16 }),
+};
 
 export const alertSlotRecipe = defineSlotRecipe({
   slots: ["root", "indicator", "content", "title", "description"],
@@ -41,7 +47,7 @@ export const alertSlotRecipe = defineSlotRecipe({
     variant: {
       subtle: {
         root: {
-          bg: { _light: "bg.surface", _dark: "bg.panel" },
+          bg: paletteTint,
           color: "fg",
           borderColor: paletteHairline,
         },
@@ -78,13 +84,15 @@ export const alertSlotRecipe = defineSlotRecipe({
     size: {
       sm: {
         root: {
-          "--alert-indicator-size": "sizes.3.5",
+          "--alert-indicator-size": "sizes.3",
           "--alert-line-height": "sizes.4",
+          borderRadius: "lg",
           gap: "2",
-          px: "3",
-          py: "2",
+          px: "2.5",
+          py: "1.5",
           textStyle: "xs",
         },
+        content: { gap: "0" },
       },
       md: {
         root: {

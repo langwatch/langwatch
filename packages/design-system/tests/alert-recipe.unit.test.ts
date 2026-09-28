@@ -44,8 +44,19 @@ function slotIn({ styles, mode }: { styles: unknown; mode: Mode }): Declarations
   return { ...declarations(layered), ...declarations(layered[MODE_SELECTOR[mode]]) };
 }
 
-/** Follows `var()` references through the root's own and the theme's variables. */
+const MIX = /^color-mix\(in srgb, (var\([^)]+\)) (\d+)%, (var\([^)]+\))\)$/;
+
+/** Follows `var()` references, and mixes `color-mix` in sRGB, down to one flat colour. */
 function resolve({ value, mode, root }: { value: string; mode: Mode; root: Declarations }): string {
+  const mix = MIX.exec(value.trim());
+  if (mix?.[1] && mix[2] && mix[3]) {
+    const share = Number(mix[2]) / 100;
+    const into = channels(resolve({ value: mix[3], mode, root }));
+    const mixed = channels(resolve({ value: mix[1], mode, root })).map((channel, at) =>
+      Math.round(channel * share + (into[at] ?? 0) * (1 - share)),
+    );
+    return `#${mixed.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+  }
   const reference = /^var\((--[^,)]+)\)$/.exec(value.trim());
   if (!reference?.[1]) return value.trim();
   const name = reference[1];
@@ -107,13 +118,40 @@ function paint({
 describe("the alert recipe", () => {
   describe("given an alert with the default variant", () => {
     /** @scenario "An alert wears the card material in either colour mode" */
-    it("grounds on the surface in light and on the panel in dark", () => {
+    it("tints the surface in light and the panel in dark", () => {
       const light = paint({ status: "error", variant: "subtle", mode: "light" });
       const dark = paint({ status: "error", variant: "subtle", mode: "dark" });
 
-      expect(light.root.background).toBe("var(--chakra-colors-bg-surface)");
-      expect(dark.root.background).toBe("var(--chakra-colors-bg-panel)");
+      expect(light.root.background).toContain("var(--chakra-colors-bg-surface)");
+      expect(dark.root.background).toContain("var(--chakra-colors-bg-panel)");
       expect(light.ground).not.toBe(dark.ground);
+    });
+
+    /** @scenario "A status tints its alert in either colour mode" */
+    it.each(["light", "dark"] as const)("gives every status its own tint in %s", (mode) => {
+      const plain = resolve({
+        value:
+          mode === "light" ? "var(--chakra-colors-bg-surface)" : "var(--chakra-colors-bg-panel)",
+        mode,
+        root: {},
+      });
+      const tints = STATUSES.filter((status) => status !== "neutral").map(
+        (status) => paint({ status, variant: "subtle", mode }).ground,
+      );
+
+      expect(new Set(tints).size).toBe(tints.length);
+      for (const tint of tints) expect(tint).not.toBe(plain);
+    });
+
+    /** @scenario "A status tints its alert in either colour mode" */
+    it.each(["light", "dark"] as const)("reads a warning as orange in %s", (mode) => {
+      const [red = 0, green = 0, blue = 0] = channels(
+        paint({ status: "warning", variant: "subtle", mode }).ground,
+      );
+
+      expect(red).toBeGreaterThan(green);
+      expect(green).toBeGreaterThan(blue);
+      expect(red - blue).toBeGreaterThanOrEqual(20);
     });
 
     /** @scenario "An alert wears the card material in either colour mode" */
@@ -147,6 +185,22 @@ describe("the alert recipe", () => {
       expect(contrast({ a: painted.title, b: painted.ground })).toBeGreaterThanOrEqual(4.5);
       expect(contrast({ a: painted.description, b: painted.ground })).toBeGreaterThanOrEqual(4.5);
       expect(contrast({ a: painted.indicator, b: painted.ground })).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  describe("given the compact size", () => {
+    /** @scenario "A small alert is compact" */
+    it("sets smaller padding, text and icon than the default", () => {
+      const small = slotIn({ styles: alert({ size: "sm" }).root, mode: "light" });
+      const medium = slotIn({ styles: alert({ size: "md" }).root, mode: "light" });
+
+      expect(small.paddingBlock).toBe("var(--chakra-spacing-1\\.5)");
+      expect(medium.paddingBlock).toBe("var(--chakra-spacing-3)");
+      expect(small.fontSize).toBe("var(--chakra-font-sizes-xs)");
+      expect(medium.fontSize).toBe("var(--chakra-font-sizes-sm)");
+      expect(small["--alert-indicator-size"]).toBe("var(--chakra-sizes-3)");
+      expect(medium["--alert-indicator-size"]).toBe("var(--chakra-sizes-4)");
+      expect(small["--alert-line-height"]).toBe("var(--chakra-sizes-4)");
     });
   });
 });

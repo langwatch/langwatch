@@ -20,7 +20,7 @@ export function PIIRedactionAlert({ children }: { children?: React.ReactNode }) 
   const settingsHref = "/settings/data-privacy";
 
   return (
-    <Alert.Root status="info" width="full">
+    <Alert.Root status="info" size="sm" width="full">
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description>

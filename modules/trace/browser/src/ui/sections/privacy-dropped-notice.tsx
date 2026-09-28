@@ -32,7 +32,7 @@ export function PrivacyDroppedNotice({ categories }: { categories?: string[] | n
   const itTheyWere = single ? "it was" : "they were";
 
   return (
-    <Alert.Root status="info" width="full">
+    <Alert.Root status="info" size="sm" width="full">
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description>

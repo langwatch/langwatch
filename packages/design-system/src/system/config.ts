@@ -65,6 +65,13 @@ export const designSystemConfig = defineConfig({
     },
   },
   theme: {
+    keyframes: {
+      // A toast's remaining lifetime, drained left to right; see toaster.tsx.
+      "toast-drain": {
+        from: { transform: "scaleX(1)" },
+        to: { transform: "scaleX(0)" },
+      },
+    },
     tokens: {
       fonts: {
         heading: {
@@ -1179,6 +1186,12 @@ export const designSystemConfig = defineConfig({
             // lands it as far from the right edge as the icon is from the left.
             paddingInlineStart: "3.5",
             paddingInlineEnd: "3",
+            // Collapsed, the newest card and two behind it show; the rest wait
+            // at zero opacity until a dismissal brings them forward.
+            "&[data-overlap]": {
+              opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
+            },
+            _motionReduce: { transition: "none" },
             // A hairline around a solid fill reads as an outline; the fill is
             // already the edge.
             "&:is([data-type=error], [data-type=warning], [data-type=success])": {

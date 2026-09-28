@@ -95,6 +95,22 @@ export const Sizes: Story = {
   ),
 };
 
+/** The compact size for dense surfaces: a table cell, a canvas node, a popover. */
+export const Compact: Story = {
+  render: () => (
+    <Stack gap="2" maxWidth="md">
+      {STATUSES.map((status) => (
+        <Alert.Root key={status} status={status} size="sm">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>{COPY[status].description}</Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      ))}
+    </Stack>
+  ),
+};
+
 /** A title alone, and a long description with an action, at a narrow width. */
 export const TitleOnlyAndLongText: Story = {
   render: () => (

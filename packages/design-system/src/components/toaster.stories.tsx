@@ -141,3 +141,44 @@ export const WithMeta: Story = {
     </Stack>
   ),
 };
+
+const BURST = [
+  { type: "success", title: "Prompt saved" },
+  {
+    type: "error",
+    title: "Could not run the evaluation",
+    description: "The provider refused the key.",
+  },
+  { type: "warning", title: "The budget is nearly spent" },
+  { type: "info", title: "Two members were invited" },
+  { type: "success", title: "Dataset uploaded", description: "1,204 rows are ready." },
+  { type: "warning", title: "A monitor is paused" },
+] as const;
+
+/**
+ * Raise a burst: one card, then one and two peeking behind it, then a count
+ * for the rest. Hover or focus the stack to fan it out and hold the timers.
+ */
+export const Stacking: Story = {
+  render: (args) => (
+    <Stack gap="3" align="start">
+      <Toaster {...args} />
+      <HStack gap="2" wrap="wrap">
+        {[1, 2, 3, 6].map((count) => (
+          <Button
+            key={count}
+            size="sm"
+            onClick={() => {
+              for (const toast of BURST.slice(0, count)) toaster.create({ ...toast });
+            }}
+          >
+            {count === 1 ? "Raise one" : `Raise ${count}`}
+          </Button>
+        ))}
+        <Button size="sm" variant="outline" onClick={() => toaster.dismiss()}>
+          Dismiss all
+        </Button>
+      </HStack>
+    </Stack>
+  ),
+};

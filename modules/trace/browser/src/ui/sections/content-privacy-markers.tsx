@@ -166,7 +166,7 @@ export const PiiIncompleteNotice: React.FC<{
 }> = ({ incomplete }) => {
   if (!incomplete) return null;
   return (
-    <Alert.Root status="warning" width="full">
+    <Alert.Root status="warning" size="sm" width="full">
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description>
