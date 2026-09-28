@@ -13,7 +13,8 @@ const navPages = (): Set<string> => {
   const walk = (node: unknown): void => {
     if (typeof node === "string") pages.add(node);
     else if (Array.isArray(node)) node.forEach(walk);
-    else if (node && typeof node === "object") Object.values(node).forEach(walk);
+    else if (node && typeof node === "object")
+      Object.values(node).forEach(walk);
   };
   walk(JSON.parse(readFileSync(path.join(DOCS_ROOT, "docs.json"), "utf8")));
   return pages;
