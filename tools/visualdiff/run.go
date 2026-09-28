@@ -49,6 +49,9 @@ type Options struct {
 	Resume bool
 	// NoPublish keeps the run's screens off its branch's pull request.
 	NoPublish bool
+	// DevUI captures both sides from their Vite dev servers instead of a
+	// production build of each side's UI (ui_build.go).
+	DevUI bool
 }
 
 // Streams are where a run writes: the summary on Out, everything a person
@@ -88,6 +91,9 @@ type Deps struct {
 	// Detach starts a command that outlives the run, its output appended to
 	// log: the haven path's teardown, which nothing has to wait on.
 	Detach func(spec commandSpec, log string) error
+	// BuildUI builds one side's UI for production (BuildUIDist). Only the
+	// real runner gets it by default, so a test's fake capture never builds.
+	BuildUI func(ctx context.Context, request UIBuildRequest) (UIBuild, error)
 }
 
 // Request is everything Execute needs: what to run, what to render, and what
@@ -182,6 +188,9 @@ func (deps *Deps) fillPreflight() {
 	deps.Preflight = func(context.Context, string) error { return nil }
 	if deps.Capture == nil {
 		deps.Preflight = RunnerPreflight
+		if deps.BuildUI == nil {
+			deps.BuildUI = BuildUIDist
+		}
 	}
 }
 
@@ -395,6 +404,9 @@ type session struct {
 	// base arrives on baseArrival, ready and seeded, once it can (haven.go).
 	stagger     bool
 	baseArrival <-chan baseArrival
+	// staticDirs are the built UIs by stack name; a live side without one is
+	// captured from its dev server.
+	staticDirs map[string]string
 }
 
 func (run *session) stopAll() {
@@ -601,6 +613,10 @@ func (run *session) cacheBaseline(baseline Baseline, stream RunnerStream) {
 	if baseline.Cached || baseline.Dir == "" {
 		return
 	}
+	if run.request.Deps.BuildUI != nil && !run.request.Options.DevUI && run.staticDirs[run.plan.Base.Name] == "" {
+		fmt.Fprintln(run.streams.Err, "baseline: not cached, the base was captured from its dev server, not its build")
+		return
+	}
 	if unloaded := UnloadedBaseCaptures(stream.Captures); unloaded > 0 {
 		fmt.Fprintf(run.streams.Err, "baseline: not cached, %d base capture(s) did not load their own modules\n", unloaded)
 		return
@@ -617,15 +633,18 @@ func (run *session) cacheBaseline(baseline Baseline, stream RunnerStream) {
 func (run *session) capture(ctx context.Context, edition Edition, baseline Baseline) (RunnerStream, error) {
 	options, config, deps := run.request.Options, run.request.Config, run.request.Deps
 	plan := run.plan
-	base := RunnerSide{Name: "base", BaseURL: plan.Base.URL(), Fixtures: run.sideFixtures[plan.Base.Name]}
+	base := RunnerSide{Name: "base", BaseURL: plan.Base.URL(), Fixtures: run.sideFixtures[plan.Base.Name], StaticDir: run.staticDirs[plan.Base.Name]}
 	if baseline.Cached {
 		base = RunnerSide{Name: "base", Replay: baseline.CapturesPath()}
 		fmt.Fprintf(run.streams.Err, "%s: base replayed from %s\n", edition, baseline.Dir)
 	}
 	runnerPlan := RunnerPlan{
-		Viewport:    options.Viewport,
-		Settle:      config.Settle,
-		Sides:       []RunnerSide{base, {Name: "candidate", BaseURL: plan.Candidate.URL(), Fixtures: run.sideFixtures[plan.Candidate.Name]}},
+		Viewport: options.Viewport,
+		Settle:   config.Settle,
+		Sides: []RunnerSide{base, {
+			Name: "candidate", BaseURL: plan.Candidate.URL(), Fixtures: run.sideFixtures[plan.Candidate.Name],
+			StaticDir: run.staticDirs[plan.Candidate.Name],
+		}},
 		OutDir:      filepath.Join(options.RunDir, "shots", string(edition)),
 		Slug:        options.Identity.Slug,
 		Routes:      config.Routes,

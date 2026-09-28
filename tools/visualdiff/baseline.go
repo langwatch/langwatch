@@ -33,7 +33,7 @@ const (
 
 // captureSources are the runner sources, under runnerSourceDir, whose change
 // changes a capture. Scheduling, pairing and the protocol are left out.
-var captureSources = []string{"capture.ts", "settle.ts", "noise.ts", "diff.ts", "screens.ts", "sign-in.ts", "flows"}
+var captureSources = []string{"capture.ts", "settle.ts", "noise.ts", "diff.ts", "screens.ts", "sign-in.ts", "static-ui.ts", "flows"}
 
 // BaselineMeta is what a baseline records beside its captures: Routes and
 // Flows (flow id to its steps' hash) are what it can answer.
@@ -114,6 +114,9 @@ type baselineKeyInputs struct {
 	config   *Config
 	viewport Viewport
 	root     string
+	// ui is how the sides' UI is served (uiMode): a dev-server base never
+	// replays against a built candidate.
+	ui string
 }
 
 // BaselineKey derives the cache slot name. Any input changing means a new
@@ -121,6 +124,9 @@ type baselineKeyInputs struct {
 func BaselineKey(inputs baselineKeyInputs) (string, error) {
 	digest := sha256.New()
 	fmt.Fprintf(digest, "format=%s\nviewport=%s\n", baselineFormat, inputs.viewport)
+	if inputs.ui != "" {
+		fmt.Fprintf(digest, "ui=%s\n", inputs.ui)
+	}
 	encoded, err := json.Marshal(struct {
 		Settle   Settle            `json:"settle"`
 		Fixtures map[string]string `json:"fixtures"`
@@ -232,7 +238,7 @@ func resolveBaselines(ctx context.Context, inputs baselineInputs) (map[Edition]B
 	for _, edition := range options.Editions {
 		key, err := BaselineKey(baselineKeyInputs{
 			commit: commit, edition: edition, config: inputs.config,
-			viewport: options.Viewport, root: options.Root,
+			viewport: options.Viewport, root: options.Root, ui: uiMode(options),
 		})
 		if err != nil {
 			return nil, err

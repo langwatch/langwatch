@@ -52,7 +52,9 @@ not be completed — the same ladder as `apidiff`.
    commit's tree matches the last prepare that finished
    (`.visualdiff/worktrees/<side>.prepared`) - and only then does it become a `haven up --agent --detach` stack under
    its own run-scoped slug, with haven's own automatic prep doing migrate and
-   seed. With `-no-haven`, visualdiff provisions the old way instead:
+   seed. Each side goes up the moment its own prepare finishes, so the base,
+   the slower boot, migrates while the candidate still prepares. While a
+   stack boots its UI is built for production (see "Capturing a built UI"). With `-no-haven`, visualdiff provisions the old way instead:
    `pnpm install --prefer-offline` and `pnpm run start:prepare:files` in each
    worktree, then each ref's stack starts on its own ports - the base at
    `-base-port` (5670 by default), the candidate ten above it, so the two can
@@ -66,9 +68,11 @@ not be completed — the same ladder as `apidiff`.
    one, the candidate is captured as soon as it is up: the base boots and
    seeds meanwhile, and reaches the runner through `base-side.json`.
 4. Runs `@langwatch/visual-diff-runner` (Playwright) over both stacks: every
-   route across `concurrency.routes` pages of one signed-in session, then the
-   flows `concurrency.flows` at a time (a flow that edits the project runs
-   last, alone), screenshotting as it goes and diffing each pair on worker
+   route across the larger of `concurrency.routes` and `concurrency.flows`
+   pages of one signed-in session. A page takes a read-only flow once no route
+   is left for it; flows that create things wait for every route, then use
+   every page; a flow that filters a view, then one that edits the project,
+   run last, alone. It screenshots as it goes and diffs each pair on worker
    threads -
    appending one line to `findings.jsonl` as each screen's comparison is
    decided (see "Findings stream and recapture" below), not only at the end.
@@ -318,6 +322,20 @@ pool is done; only that retake is kept. A capture whose modules still did not
 load is `capture-failed`, never `blank`, and a live base holding one is not
 cached as a baseline.
 
+## Capturing a built UI
+
+Each live side is captured from a production build of its own UI, not from its
+Vite dev server: `apps/ui`'s `build` on a modular tree, `platform/app`'s
+`build:client` on main's monolith, run while the stack boots and cached per
+tree on a persistent worktree (`.visualdiff/worktrees/<side>.uibuilt`). The
+runner answers every document the side opens with the built shell, carrying
+the public config the dev server would have injected, and every file the
+build holds from memory on the page's own origin; `/api` still reaches the
+stack. A side whose build
+fails is captured from its dev server, the run log says so, and such a base is
+never cached. `-dev-ui` keeps both sides on their dev servers. Dev-only chrome
+(the DEV badge) is absent on both sides alike.
+
 ## Cleaning up
 
 Every run first collects what dead runs left behind (`visualdiff gc` does
@@ -438,10 +456,12 @@ either photographs a half-rendered page or wastes minutes across two hundred
 routes.
 
 The runner holds the requests themselves, not a count. A main-frame navigation
-forgets the previous document's requests, and a request older than eight
-seconds is treated as a poll, so one request that never reports back can no
+forgets the previous document's requests, and a request older than three
+seconds is treated as a poll (the skeleton wait still guards a late screen), so one request that never reports back can no
 longer hold every later capture to the deadline (run 10 lost an hour to it).
-A settle that reaches its deadline logs the requests still in flight, and a
+A settle that reaches its deadline logs the requests still in flight with
+their ages, and each of them, once it ends, logs a `late` line splitting its
+time into queued, server and body from the browser's own timing. A
 side whose first five routes all reach it prints one loud warning. Telemetry
 (`/api/rum/v1/traces`) is ignored, and the join offer's 429 is noise: its
 allowance is a product constant a run's page loads exceed. Main raises the

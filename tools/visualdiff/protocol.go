@@ -152,4 +152,7 @@ type RunnerSide struct {
 	// Fixtures are the ids this side's seed generated; they fill a route's
 	// {name} over the plan's static fixtures.
 	Fixtures map[string]string `json:"fixtures,omitempty"`
+	// StaticDir holds this side's built UI, which the runner serves instead
+	// of the dev server's modules; empty keeps the side on its dev server.
+	StaticDir string `json:"staticDir,omitempty"`
 }

@@ -26,14 +26,16 @@ func openRunLog(options Options, streams *Streams) (func(), error) {
 	if err != nil {
 		return func() {}, fmt.Errorf("run log: %w", err)
 	}
-	streams.Err = io.MultiWriter(streams.Err, file)
+	streams.Err = io.MultiWriter(streams.Err, newStampedWriter(file, time.Now))
 	unmark, err := MarkRun(options.RunDir, options.Keep)
 	if err != nil {
 		_ = file.Close()
 		return func() {}, fmt.Errorf("mark run: %w", err)
 	}
 	fmt.Fprintf(streams.Err, "run: %s (log %s)\n", options.RunDir, logPath)
+	release := holdAwake(streams.Err)
 	return func() {
+		release()
 		unmark()
 		_ = file.Close()
 	}, nil

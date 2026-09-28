@@ -48,6 +48,28 @@ export const signIn: Action = async (context) => {
   await context.snapshot("after sign in");
 };
 
+/** chooseOption picks option in the dialog's first select box, or closes a list without it. */
+const chooseOption = async ({
+  context,
+  option,
+}: {
+  context: Parameters<Action>[0];
+  option: string;
+}): Promise<void> => {
+  const { page } = context.side;
+  const root = await scope(page);
+  await root.locator("[role=combobox]").locator("visible=true").first().click({ timeout: 6000 });
+  const chosen = await page
+    .getByRole("option", { name: option })
+    .first()
+    .click({ timeout: 3000 })
+    .then(
+      () => true,
+      () => false,
+    );
+  if (!chosen) await page.keyboard.press("Escape");
+};
+
 export const createAutomation: Action = async (context) => {
   await goTo({ context, path: "/{slug}/traces" });
   await clickText({ context, text: "Automate" });
@@ -55,20 +77,17 @@ export const createAutomation: Action = async (context) => {
   if (context.args.kind === "alert") {
     await clickText({ context, text: "Watch a metric" });
     await context.snapshot("alert form");
+  } else {
+    // Choosing the type re-renders the form, so it comes before the name.
+    await optionalClick(context, "Act on each matching trace");
   }
   await fillField({
     context,
     target: "Flag failing traces",
     value: argument({ context, name: "name" }),
   });
-  await optionalClick(context, "Act on each matching trace");
-  await optionalClick(context, "Add a condition");
   const cadence = context.args.cadence;
-  if (cadence !== undefined) {
-    const root = await scope(context.side.page);
-    await root.locator("[role=combobox]").locator("visible=true").first().click({ timeout: 6000 });
-    await context.side.page.getByRole("option", { name: cadence }).first().click({ timeout: 6000 });
-  }
+  if (cadence !== undefined) await chooseOption({ context, option: cadence });
   const settleWindow = context.args.settleWindow;
   if (settleWindow !== undefined) {
     const root = await scope(context.side.page);
@@ -107,13 +126,9 @@ export const sendTrace: Action = async (context) => {
   await context.snapshot("trace opened");
 };
 
+/** openTrace opens a trace by its address: the list shows no trace ids to click. */
 export const openTrace: Action = async (context) => {
-  await goTo({ context, path: "/{slug}/traces" });
-  await clickText({
-    context,
-    text: argument({ context, name: "traceId" }),
-    selector: "a, [role=row], tr, td",
-  });
+  await goTo({ context, path: `/{slug}/traces/${argument({ context, name: "traceId" })}` });
   await context.snapshot("trace drawer");
   await optionalClick(context, "/^(Spans|Trace Details|Details)/");
   await context.snapshot("spans tab");
@@ -122,12 +137,7 @@ export const openTrace: Action = async (context) => {
 };
 
 export const annotate: Action = async (context) => {
-  await goTo({ context, path: "/{slug}/traces" });
-  await clickText({
-    context,
-    text: argument({ context, name: "traceId" }),
-    selector: "a, [role=row], tr, td",
-  });
+  await goTo({ context, path: `/{slug}/traces/${argument({ context, name: "traceId" })}` });
   await optionalClick(context, "/^(Annotate|Add annotation|Annotations)/");
   await context.snapshot("annotation form");
   const comment = argument({ context, name: "comment", fallback: "Visual diff note" });
@@ -152,7 +162,8 @@ export const editProjectSettings: Action = async (context) => {
 
 export const createPrompt: Action = async (context) => {
   await goTo({ context, path: "/{slug}/prompts" });
-  await clickText({ context, text: "New Prompt" });
+  // An empty project offers its first prompt instead.
+  await clickText({ context, text: String.raw`/^\s*(New Prompt|Create First Prompt)\s*$/i` });
   await context.snapshot("prompt editor");
   await context.side.page
     .locator("textarea")

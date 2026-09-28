@@ -14,8 +14,11 @@ const STREAM_PATTERN = /\/api\/[^?]*\/(stream|sse|events)\b|text\/event-stream/;
 /** Browser telemetry is fire-and-forget: its POSTs are aborted by every navigation. */
 const TELEMETRY_PATTERN = /\/api\/rum\/v1\/traces\b/;
 
-/** LONG_LIVED_MILLIS is the age past which a request is a poll, not part of the screen's load. */
-export const LONG_LIVED_MILLIS = 8000;
+/**
+ * LONG_LIVED_MILLIS is the age past which a request is a poll, not part of the screen's load.
+ * The skeleton wait after the settle still guards a screen whose data is late.
+ */
+export const LONG_LIVED_MILLIS = 3000;
 
 export const shouldIgnoreRequest = ({
   url,
@@ -34,7 +37,9 @@ export interface SettleDecision {
   expired: boolean;
 }
 
-interface Pending {
+/** Pending is one request the settle waits on, and when it started. */
+export interface Pending<Key> {
+  key: Key;
   url: string;
   startedAt: number;
 }
@@ -45,7 +50,7 @@ interface Pending {
  * document's requests and a request that never reports back ages out.
  */
 export class InFlightTracker<Key> {
-  private readonly pending = new Map<Key, Pending>();
+  private readonly pending = new Map<Key, Pending<Key>>();
   private windowStartedAt: number;
   private lastSettledAt: number;
 
@@ -69,7 +74,7 @@ export class InFlightTracker<Key> {
     now: number;
   }): void {
     if (shouldIgnoreRequest({ url, resourceType })) return;
-    this.pending.set(key, { url, startedAt: now });
+    this.pending.set(key, { key, url, startedAt: now });
   }
 
   settled({ key, now }: { key: Key; now: number }): void {
@@ -89,9 +94,14 @@ export class InFlightTracker<Key> {
 
   /** inFlight lists the requests the settle still waits on. */
   inFlight(now: number): string[] {
-    return [...this.pending.values()]
-      .filter((request) => now - request.startedAt < LONG_LIVED_MILLIS)
-      .map((request) => request.url);
+    return this.waitingOn(now).map((request) => request.url);
+  }
+
+  /** waitingOn is inFlight with each request's key and start, for the deadline's timing log. */
+  waitingOn(now: number): Pending<Key>[] {
+    return [...this.pending.values()].filter(
+      (request) => now - request.startedAt < LONG_LIVED_MILLIS,
+    );
   }
 
   /** longLived lists the requests old enough to be ignored as polls. */

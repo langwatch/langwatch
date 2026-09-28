@@ -35,6 +35,8 @@ export interface PlanSide {
   pending?: string;
   /** fixtures are the ids this side's seed generated; they win over the plan's. */
   fixtures?: Record<string, string>;
+  /** staticDir holds this side's prebuilt UI; absent, the side is captured from its dev server. */
+  staticDir?: string;
 }
 
 export interface Credential {

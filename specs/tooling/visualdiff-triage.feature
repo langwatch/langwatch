@@ -193,9 +193,11 @@ Feature: visualdiff catches regressions and reports its own coverage
     @unit
     Scenario: A request that never reports back does not hold later captures to the deadline
       Given a request that reports neither finished nor failed
-      When the page navigates away, or the request is older than eight seconds
+      When the page navigates away, or the request is older than three seconds
       Then the settle no longer waits on it
-      And a settle that runs to its deadline logs the requests still in flight
+      And a settle that runs to its deadline logs the requests still in flight with their ages
+      And each of them, once it ends, logs how long it queued, waited on the server and downloaded
+      And a page call with no timeout of its own gives up after five seconds rather than hang a page
 
     @unit
     Scenario: A side whose first routes all hit the settle deadline warns loudly
@@ -212,10 +214,41 @@ Feature: visualdiff catches regressions and reports its own coverage
 
     @unit
     Scenario: Flows run side by side, and the one editing the project runs last
-      Given a flow whose steps edit the project settings
+      Given flows that only read, flows that create, one that filters a view and one that edits the project
       When a side captures its flows
-      Then the other flows run concurrency flows at a time
-      And the project-editing flow runs alone once they are done
+      Then a page takes a read-only flow as soon as no route is left for it
+      And the flows that create wait for every route, then use every page, in the configured order
+      And the view-filtering flow, then the project-editing flow, run alone once they are done
+
+    @unit
+    Scenario: A flow step that fails keeps what blocked it
+      Given a flow step whose click timed out
+      When its failure is recorded
+      Then the finding and run.log carry Playwright's call log after the first line
+      And the log keeps what the locator resolved to and what intercepted the click, capped at twenty lines
+
+    @unit
+    Scenario: The base boots the moment it is prepared, while the candidate prepares
+      Given both sides boot live on haven
+      When the run brings them up
+      Then the base's haven up runs as soon as its own prepare finishes, before the candidate's checkout
+      And each side's UI is built while its stack boots
+
+    @unit
+    Scenario: Each side is captured from a production build of its UI, or from its dev server when that fails
+      Given a side whose UI built
+      When the runner opens it
+      Then every document is the built shell carrying the dev shell's public config
+      And its assets are served from the build on its own origin, never through the dev server's module graph
+      And a side whose build failed is captured from its dev server, which the run log says
+      And such a base is never cached as a baseline, and -dev-ui keeps both sides on their dev servers
+
+    @unit
+    Scenario: Every run.log line carries its time, and a machine that may sleep is warned about
+      Given a run on a Mac on battery or in Low Power Mode
+      When the run starts
+      Then stderr warns about each, and the run holds an idle-sleep assertion until it ends
+      And every line of run.log opens with the time it was written
 
   Rule: A run reuses what the last one built
 
@@ -234,7 +267,7 @@ Feature: visualdiff catches regressions and reports its own coverage
       Given a cached baseline for the base commit
       When a route is added, the scheduling changes or a day passes
       Then the key is the same
-      And a settle, fixture, viewport or capture source change moves it
+      And a settle, fixture, viewport, capture source or UI serving change moves it
       And a plan with a route or flow step the baseline never recorded renders the base live
 
     @unit

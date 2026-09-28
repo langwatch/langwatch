@@ -10,16 +10,16 @@ viewport: 1440x900
 settle:
   # The runner waits for its in-flight requests to finish and stay finished for
   # quietMillis, and gives up at deadlineMillis rather than hanging on a page
-  # that polls forever. A request older than eight seconds counts as a poll.
+  # that polls forever. A request older than three seconds counts as a poll; the
+  # skeleton wait after it still keeps a screen whose data is late from a shot.
   quietMillis: 500
   deadlineMillis: 8000
 
-# Pages each side captures on at once. Routes spread over `routes` pages in one
-# signed-in session; flows run `flows` at a time, and a flow that edits the
-# project runs last, alone, so it cannot change another flow's screens.
+# Pages each side opens in one signed-in session, the larger of the two. Routes
+# spread over them, and flows use every one of them (see flows below).
 concurrency:
-  routes: 4
-  flows: 3
+  routes: 6
+  flows: 6
 
 # After a run, the screens its pull request shows, in one comment edited in
 # place: these key pages, then findings and changes, largest first, one per
@@ -239,7 +239,45 @@ routes:
   - /invite/accept
   - /unsubscribe
 
+# Flows are listed longest first, the order each group runs in. A flow of only
+# read actions (go, sendTrace, openTrace, createScenario) takes a page as the
+# routes drain; the rest wait for every route, and a flow that clicks through a
+# view's filters or edits the project runs alone at the end (schedule.ts).
+# Cut: sql-dashboard (the query surface is not served on a local stack) and
+# trace-filters' free-text step (the search box has no placeholder to find).
 flows:
+  - id: automation-alert
+    title: Create an alert through the automation drawer
+    steps:
+      - action: createAutomation
+        with:
+          name: VD Alert
+          kind: alert
+      - action: go
+        with:
+          path: /{slug}/automations/alerts
+
+  - id: annotate-trace
+    title: Add an annotation to a trace
+    steps:
+      - action: annotate
+        with:
+          traceId: trace_visualdiff_1
+          comment: Visual diff note
+      - action: go
+        with:
+          path: /{slug}/annotations
+
+  - id: trace-view
+    title: Open a seeded trace and read its spans
+    steps:
+      - action: sendTrace
+        with:
+          traceId: trace_visualdiff_4
+      - action: openTrace
+        with:
+          traceId: trace_visualdiff_0
+
   - id: automation-create
     title: Create an automation using every part of its form
     steps:
@@ -252,25 +290,6 @@ flows:
         with:
           path: /{slug}/automations/automations
 
-  - id: automation-alert
-    title: Create an alert through the automation drawer
-    steps:
-      - action: createAutomation
-        with:
-          name: VD Alert
-          kind: alert
-      - action: go
-        with:
-          path: /{slug}/automations/alerts
-
-  - id: online-evaluation
-    title: Walk the online-evaluation wizard
-    steps:
-      - action: createEvaluation
-        with:
-          start: /{slug}/online-evaluations
-          steps: "3"
-
   - id: prompt-create
     title: Add a prompt and a version
     steps:
@@ -281,31 +300,39 @@ flows:
         with:
           path: /{slug}/prompts
 
+  - id: agent-testing
+    title: Open agent testing and its scenarios
+    steps:
+      - action: createScenario
+        with:
+          start: /{slug}/agent-testing
+
+  - id: pairwise
+    title: Open a pairwise comparison
+    steps:
+      - action: createPairwise
+        with:
+          start: /{slug}/experiments/workbench
+
   - id: experiment-create
     title: Add an experiment
     steps:
       - action: createExperiment
 
-  - id: trace-view
-    title: Open a seeded trace and read its spans
+  - id: analytics-dashboard
+    title: Build a custom analytics chart
     steps:
-      - action: sendTrace
+      - action: createDashboard
         with:
-          traceId: trace_visualdiff_4
-      - action: openTrace
-        with:
-          traceId: trace_visualdiff_0
+          start: /{slug}/analytics/custom
 
-  - id: annotate-trace
-    title: Add an annotation to a trace
+  - id: online-evaluation
+    title: Walk the online-evaluation wizard
     steps:
-      - action: annotate
+      - action: createEvaluation
         with:
-          traceId: trace_visualdiff_1
-          comment: Visual diff note
-      - action: go
-        with:
-          path: /{slug}/annotations
+          start: /{slug}/online-evaluations
+          steps: "3"
 
   - id: trace-filters
     title: Use the trace explorer filters
@@ -319,11 +346,6 @@ flows:
       - action: click
         with:
           text: Filters
-      - action: type
-        with:
-          placeholder: Search filters, free text
-          text: faithfulness
-          submit: "true"
       - action: click
         with:
           text: Last 30 days
@@ -331,31 +353,6 @@ flows:
         optional: true
         with:
           text: Last 24 hours
-
-  - id: analytics-dashboard
-    title: Build a custom analytics chart
-    steps:
-      - action: createDashboard
-        with:
-          start: /{slug}/analytics/custom
-
-  - id: sql-dashboard
-    title: Run a query and open the reports
-    steps:
-      - action: createRunSet
-        with:
-          start: /{slug}/analytics/query
-          query: SELECT 1
-      - action: go
-        with:
-          path: /{slug}/analytics/reports
-
-  - id: agent-testing
-    title: Open agent testing and its scenarios
-    steps:
-      - action: createScenario
-        with:
-          start: /{slug}/agent-testing
 
   - id: project-settings
     title: Edit project and organization settings
@@ -369,10 +366,3 @@ flows:
       - action: go
         with:
           path: /settings/members
-
-  - id: pairwise
-    title: Open a pairwise comparison
-    steps:
-      - action: createPairwise
-        with:
-          start: /{slug}/experiments/workbench

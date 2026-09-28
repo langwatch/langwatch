@@ -23,6 +23,31 @@ const PASSKEY_CAPTURE_PROBE_MILLIS = 250;
 const firstLine = (thrown: unknown): string =>
   String(thrown instanceof Error ? thrown.message : thrown).split("\n")[0] ?? "";
 
+/** ANSI_ESCAPE matches the terminal colours Playwright writes into its call log. */
+// oxlint-disable-next-line no-control-regex -- the escape character is what this matches.
+const ANSI_ESCAPE = /\u001b\[[0-9;]*m/g;
+
+/** CALL_LOG_LINES caps how much of Playwright's call log a failed step keeps. */
+const CALL_LOG_LINES = 20;
+
+/**
+ * stepError is a failed step's first line plus Playwright's call log (what the locator
+ * resolved to, the element's state, what intercepted the click), repeats dropped, on one line.
+ */
+export const stepError = (thrown: unknown): string => {
+  const text = String(thrown instanceof Error ? thrown.message : thrown);
+  const lines = text.replaceAll(ANSI_ESCAPE, "").split("\n");
+  const start = lines.findIndex((line) => line.trim() === "Call log:");
+  if (start < 0) return lines[0] ?? "";
+  const log: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    const entry = line.trim().replace(/^- /, "");
+    if (entry === "" || log.includes(entry)) continue;
+    log.push(entry);
+  }
+  return [lines[0] ?? "", ...log.slice(0, CALL_LOG_LINES)].join(" | ");
+};
+
 /** photograph declines the passkey offer, which main raises on every screen, then shoots. */
 export const photograph = async ({ side, file }: { side: Side; file: string }): Promise<void> => {
   await declinePasskeyOffer({ page: side.page, probeMillis: PASSKEY_CAPTURE_PROBE_MILLIS });
@@ -71,46 +96,83 @@ const captureRoute = async ({
   });
 };
 
-/**
- * captureRoutes warms the dev server on the first SHELL_PROBE routes, one at a time (the
- * fail-fast probe), then spreads the rest over the side's pages. A capture the concurrency
- * may have spoiled is held back and taken again alone, once, after the pool.
- */
-export const captureRoutes = async ({
+/** probeShell takes the first routes one at a time; a candidate whose shell fails stops. */
+const probeShell = async ({
   plan,
-  pages,
+  capture,
   collect,
+  side,
 }: {
   plan: Plan;
-  pages: Side[];
+  capture: (route: string) => Promise<CaptureMessage>;
   collect: Collect;
+  side: Side;
 }): Promise<void> => {
-  const [first] = pages;
-  if (first === undefined) return;
-  const alarm = new DeadlineAlarm(first.name);
-  const capture = (route: string, side: Side): Promise<CaptureMessage> =>
-    captureRoute({ plan, route, side, alarm });
-  const probing = plan.failFast === true && first.name === "candidate";
+  const probing = plan.failFast === true && side.name === "candidate";
   const probes: ShellProbe[] = [];
   for (const route of plan.routes.slice(0, SHELL_PROBE)) {
-    const taken = await capture(route, first);
-    const message = needsRecapture(taken) ? await capture(route, first) : taken;
+    const taken = await capture(route);
+    const message = needsRecapture(taken) ? await capture(route) : taken;
     collect(message);
     if (!probing) continue;
     probes.push({ capture: message, blank: message.blank });
     const broken = shellBroken({ probes });
     if (broken !== "") throw new Error(`the candidate's shell does not render: ${broken}`);
   }
-  const heldBack = await runPoolWithRecapture({
-    items: plan.routes.slice(SHELL_PROBE),
+};
+
+/** RouteJob is one item of a side's route pool: a route, or a read-only flow once routes drain. */
+type RouteJob = { route: string } | { flow: PlanFlow };
+
+/**
+ * captureRoutes takes the first SHELL_PROBE routes one at a time (the fail-fast probe), then
+ * spreads the rest over the side's pages, each taking an `alongside` flow once no route is
+ * left. A capture the concurrency may have spoiled is taken again alone, after the pool.
+ */
+export const captureRoutes = async ({
+  plan,
+  pages,
+  collect,
+  alongside = [],
+}: {
+  plan: Plan;
+  pages: Side[];
+  collect: Collect;
+  alongside?: PlanFlow[];
+}): Promise<void> => {
+  const [first] = pages;
+  if (first === undefined) return;
+  const alarm = new DeadlineAlarm(first.name);
+  const capture = (route: string, side: Side): Promise<CaptureMessage> =>
+    captureRoute({ plan, route, side, alarm });
+  await probeShell({ plan, capture: (route) => capture(route, first), collect, side: first });
+  const jobs: RouteJob[] = [
+    ...plan.routes.slice(SHELL_PROBE).map((route) => ({ route })),
+    ...alongside.map((flow) => ({ flow })),
+  ];
+  const heldBack = await runPoolWithRecapture<RouteJob, CaptureMessage | undefined>({
+    items: jobs,
     width: pages.length,
-    take: ({ item, lane }) => capture(item, pages[lane] ?? first),
-    spoiled: needsRecapture,
-    keep: collect,
+    take: async ({ item, lane }) => {
+      const side = pages[lane] ?? first;
+      if ("route" in item) return capture(item.route, side);
+      await captureFlow({ plan, flow: item.flow, side, collect });
+      return undefined;
+    },
+    spoiled: (message) => {
+      if (message === undefined || !needsRecapture(message)) return false;
+      const why = message.blank ? "blank" : (message.moduleFailures?.[0] ?? "");
+      note({ text: `${first.name} holds back ${message.key}: ${why}`, err: process.stderr });
+      return true;
+    },
+    keep: (message) => {
+      if (message !== undefined) collect(message);
+    },
   });
   if (heldBack.length > 0) {
+    const routes = heldBack.map((job) => ("route" in job ? job.route : job.flow.id));
     note({
-      text: `${first.name} recaptured ${heldBack.length} route(s) alone: ${heldBack.join(", ")}`,
+      text: `${first.name} recaptured ${heldBack.length} route(s) alone: ${routes.join(", ")}`,
       err: process.stderr,
     });
   }
@@ -171,7 +233,7 @@ export const captureFlow = async ({
         snapshot: async (label: string) => shoot({ label, error: "" }),
       });
     } catch (thrown) {
-      error = step.optional === true ? "" : firstLine(thrown);
+      error = step.optional === true ? "" : stepError(thrown);
     }
     note({
       text: `${side.name} ${flow.id} ${stepIndex} ${step.action} ${error === "" ? "ok" : error}`,

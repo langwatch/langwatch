@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // PublishDir is where a run stages the images and body its PR comment posts.
@@ -71,23 +73,36 @@ func (request PublishRequest) stage(ctx context.Context, picks []ScreenPick) ([]
 	headline.BaseCommit, _ = resolveCommit(ctx, gitRef{run: request.Run, root: request.Root, ref: request.BaseRef})
 	headline.CandidateCommit, _ = resolveCommit(ctx, gitRef{run: request.Run, root: request.Root, ref: request.CandidateRef})
 	body, images := RenderComment(headline, picks)
-	config := request.Config.filled()
-	for index := range picks {
-		pick := &picks[index]
-		if err := shrinkImage(pick.Row.Candidate.Screenshot, filepath.Join(dir, fmt.Sprintf("%02d-candidate.png", index)), config); err != nil {
-			return nil, fmt.Errorf("publish: scale %s: %w", pick.Row.Key, err)
-		}
-		if !pick.Paired {
-			continue
-		}
-		if err := shrinkImage(pick.Row.Base.Screenshot, filepath.Join(dir, fmt.Sprintf("%02d-base.png", index)), config); err != nil {
-			return nil, fmt.Errorf("publish: scale %s: %w", pick.Row.Key, err)
-		}
+	if err := shrinkPicks(picks, dir, request.Config.filled()); err != nil {
+		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(dir, "body.md"), []byte(body), 0o600); err != nil {
 		return nil, err
 	}
 	return images, nil
+}
+
+// shrinkPicks scales every picked screen into dir, all at once: each is one
+// file in and one file out, and one at a time they cost a run twenty seconds.
+func shrinkPicks(picks []ScreenPick, dir string, config PublishConfig) error {
+	var shrinks errgroup.Group
+	for index := range picks {
+		pick := &picks[index]
+		sides := map[string]string{"candidate": pick.Row.Candidate.Screenshot}
+		if pick.Paired {
+			sides["base"] = pick.Row.Base.Screenshot
+		}
+		for side, source := range sides {
+			target := filepath.Join(dir, fmt.Sprintf("%02d-%s.png", index, side))
+			shrinks.Go(func() error {
+				if err := shrinkImage(source, target, config); err != nil {
+					return fmt.Errorf("publish: scale %s: %w", pick.Row.Key, err)
+				}
+				return nil
+			})
+		}
+	}
+	return shrinks.Wait()
 }
 
 // ghClient runs gh from the repository root, where `{owner}/{repo}` resolves.
