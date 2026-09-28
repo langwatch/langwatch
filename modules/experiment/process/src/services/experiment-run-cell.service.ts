@@ -531,8 +531,12 @@ export class ExperimentRunCellService {
   private async getPhaseOneProgress(
     request: ExperimentCellRequest,
   ): Promise<ExperimentRunProgressState> {
-    const read = await this.folds.readProgress({ runKey: runKeyOf(request) });
-    if (read.kind === "empty" || !isPhaseOneFolded(read.state)) {
+    const read = await this.folds.readRunProgress({ runId: request.runId });
+    if (
+      read.kind === "empty" ||
+      read.state.experimentId !== request.experimentId ||
+      !isPhaseOneFolded(read.state)
+    ) {
       throw new Error(`Run ${request.runId} has target cells whose results are not folded yet`);
     }
 

@@ -47,6 +47,7 @@ import {
   experimentRunExecutionProcess,
 } from "./experiment-run-execution.process.ts";
 import { EXPERIMENT_RUN_EXECUTION_PROCESS_NAME } from "./experiment-run-execution.schemas.ts";
+import type { ExperimentRunProgressSubscriber } from "./experiment-run-frames.subscriber.ts";
 import { ExperimentRunPlanFoldProjection } from "./experiment-run-plan.projection.ts";
 import {
   AbortExperimentRunCommand,
@@ -90,6 +91,9 @@ export interface ClickhouseExperimentRunProcessingRepository {
   executeCell: ExecuteExperimentCellCommand;
   /** What the run's execution manager's intents send. */
   runExecution: ExperimentRunExecutionEffects;
+  /** The progress fold's reactions: live frames, and an ended run's board write-back. */
+  runFrames: ExperimentRunProgressSubscriber;
+  runBoardWriteBack: ExperimentRunProgressSubscriber;
 }
 
 export type ExperimentRunProcessingPipeline = StaticPipelineDefinition<
@@ -149,7 +153,9 @@ export function buildExperimentRunProcessingPipeline(
     .withProcessManager(
       EXPERIMENT_RUN_EXECUTION_PROCESS_NAME,
       experimentRunExecutionProcess(deps.runExecution),
-    );
+    )
+    .withProjectionSubscriber(deps.runFrames.name, deps.runFrames.spec)
+    .withProjectionSubscriber(deps.runBoardWriteBack.name, deps.runBoardWriteBack.spec);
 
   return builder
     .withCommand("startExperimentRun", StartExperimentRunCommand)

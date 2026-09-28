@@ -200,7 +200,7 @@ export const listRunsResponseSchema = z.object({
  * `ExecutionSummary` plus the per-target/evaluator breakdown a CI job prints.
  * The Redis run-state object, NOT the ClickHouse aggregate in {@link runAggregateSummarySchema}.
  */
-const executionSummarySchema = z.object({
+export const executionSummarySchema = z.object({
   runId: z.string(),
   totalCells: z.number().describe("Cells the run set out to execute"),
   completedCells: z.number(),

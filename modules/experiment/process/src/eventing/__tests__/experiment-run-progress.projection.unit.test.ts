@@ -13,6 +13,8 @@ import type {
   CellFinishedEventData,
   EvaluatorResultEvent,
   EvaluatorResultEventData,
+  ExperimentRunCompletedEvent,
+  ExperimentRunCompletedEventData,
   ExperimentRunStartedEvent,
   TargetResultEvent,
   TargetResultEventData,
@@ -112,15 +114,29 @@ function evaluatorResult(data: Partial<EvaluatorResultEventData>): EvaluatorResu
   });
 }
 
-function cellFinished(data: Pick<CellFinishedEventData, "ordinal" | "phase">): CellFinishedEvent {
+function cellFinished(
+  data: Pick<CellFinishedEventData, "ordinal" | "phase"> & Partial<CellFinishedEventData>,
+): CellFinishedEvent {
   return EventUtils.createEvent<CellFinishedEvent>({
     aggregateType: "experiment_run",
     aggregateId,
     tenantId,
     type: EXPERIMENT_RUN_EVENT_TYPES.CELL_FINISHED,
     version: EXPERIMENT_RUN_EVENT_VERSIONS.CELL_FINISHED,
-    data: { ...run, ...data, outcome: "succeeded" },
+    data: { ...run, outcome: "succeeded", ...data },
     occurredAt: 3_000,
+  });
+}
+
+function completed(data: Partial<ExperimentRunCompletedEventData>): ExperimentRunCompletedEvent {
+  return EventUtils.createEvent<ExperimentRunCompletedEvent>({
+    aggregateType: "experiment_run",
+    aggregateId,
+    tenantId,
+    type: EXPERIMENT_RUN_EVENT_TYPES.COMPLETED,
+    version: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
+    data: { ...run, finishedAt: 4_000, ...data },
+    occurredAt: 4_000,
   });
 }
 
@@ -242,6 +258,128 @@ describe("the run's progress fold", () => {
       expect(partly.phaseOneCells).toBe(2);
       expect(isPhaseOneFolded(partly)).toBe(false);
       expect(isPhaseOneFolded(whole)).toBe(true);
+    });
+  });
+});
+
+describe("the run's progress fold as main's poller JSON", () => {
+  const finishedRun = () => [
+    started({ ...plan, experimentSlug: "exp-one", runUrl: "https://app/run_1" }),
+    cellFinished({ ordinal: 0, phase: 1 }),
+    cellFinished({ ordinal: 1, phase: 1, outcome: "failed" }),
+    cellFinished({ ordinal: 1, phase: 1, outcome: "failed" }),
+    cellFinished({ ordinal: 2, phase: 2 }),
+  ];
+
+  describe("when a run starts and its cells finish", () => {
+    /** @scenario "A poll reads a pipeline run's status and counts from its progress fold" */
+    it("reports it running with each cell counted once, failures apart", () => {
+      const state = progressAfter(finishedRun());
+
+      expect(state).toMatchObject({
+        status: "running",
+        experimentSlug: "exp-one",
+        total: 3,
+        progress: 3,
+        failed: 1,
+        startedAt: 1_000,
+      });
+    });
+
+    /** @scenario "A run's live frames are published from its progress fold with their seq" */
+    it("numbers each frame in the run's order, and a redelivered finish streams nothing", () => {
+      const state = progressAfter(finishedRun());
+
+      expect(state.recentEvents.map(({ seq, frame }) => [seq, frame.type])).toEqual([
+        [1, "execution_started"],
+        [2, "progress"],
+        [3, "progress"],
+        [4, "progress"],
+      ]);
+      expect(state.seq).toBe(4);
+    });
+  });
+
+  describe("when the run finishes", () => {
+    it("completes with main's summary and link, and streams done", () => {
+      const state = progressAfter([...finishedRun(), completed({ outcome: "finished" })]);
+
+      expect(state.status).toBe("completed");
+      expect(state.finishedAt).toBe(4_000);
+      expect(state.summary).toEqual({
+        runId: "run_1",
+        totalCells: 3,
+        completedCells: 2,
+        failedCells: 1,
+        duration: 3_000,
+        timestamps: { startedAt: 1_000, finishedAt: 4_000 },
+        runUrl: "https://app/run_1",
+      });
+      expect(state.recentEvents.at(-1)?.frame.type).toBe("done");
+    });
+
+    it("stays completed when a start or completion is redelivered", () => {
+      const state = progressAfter([
+        ...finishedRun(),
+        completed({ outcome: "finished" }),
+        started(plan),
+        completed({ outcome: "stopped" }),
+      ]);
+
+      expect(state.status).toBe("completed");
+      expect(state.seq).toBe(5);
+    });
+  });
+
+  describe("when the run stops or fails", () => {
+    it("reports a stop as stopped", () => {
+      const state = progressAfter([started(plan), completed({ outcome: "stopped" })]);
+
+      expect(state).toMatchObject({ status: "stopped", finishedAt: 4_000 });
+    });
+
+    it("reports a failure by its code, never a message", () => {
+      const state = progressAfter([started(plan), completed({ outcome: "failed" })]);
+
+      expect(state).toMatchObject({ status: "failed", error: "lw.unnamed_failure" });
+    });
+  });
+
+  describe("when the run writes its cells back", () => {
+    it("keeps each produced result's frame by its cell", () => {
+      const state = progressAfter([
+        started(plan),
+        targetResult({ predicted: { output: "4" } }),
+        evaluatorResult({ evaluatorId: "exact", score: 1 }),
+        targetResult({ targetId: "target_b", predicted: { output: "x" }, carriedOver: true }),
+      ]);
+
+      expect(Object.keys(state.resultFrames)).toEqual([
+        "target:0:target_a",
+        "evaluator:0:target_a:exact",
+      ]);
+    });
+
+    it("keeps none for a run that does not", () => {
+      const state = progressAfter([
+        started({ ...plan, persistResults: false }),
+        targetResult({ predicted: { output: "4" } }),
+      ]);
+
+      expect(state.resultFrames).toEqual({});
+    });
+  });
+
+  describe("when the fold is stored", () => {
+    /** @scenario "A run's progress is read by its runId alone" */
+    it("is read back by runId; another experiment's run of that id reads as empty", async () => {
+      const folds = MemoryExperimentRunFoldRepository.create();
+      const store = ExperimentRunProgressStore.create({ repository: folds });
+      await store.store(progressAfter([started(plan)]), { aggregateId, tenantId });
+
+      expect((await folds.readRunProgress({ runId: "run_1" })).kind).toBe("folded");
+      expect((await store.get(aggregateId)).kind).toBe("folded");
+      expect((await store.get("experiment_2:run_1")).kind).toBe("empty");
     });
   });
 });

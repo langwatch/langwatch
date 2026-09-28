@@ -216,6 +216,16 @@ function progress(overrides: Partial<ExperimentRunProgressState> = {}): Experime
     },
     traceIds: { "0:target_a": "trace_a" },
     evaluatorScores: {},
+    experimentSlug: "experiment-one",
+    status: "running",
+    progress: 2,
+    total: 3,
+    startedAt: 0,
+    recentEvents: [],
+    seq: 0,
+    failed: 0,
+    persistResults: false,
+    resultFrames: {},
     CreatedAt: 0,
     UpdatedAt: 0,
     LastEventOccurredAt: 0,
@@ -368,7 +378,7 @@ describe("ExperimentRunCellService", () => {
       it("judges the row from the folded outputs without re-running a target", async () => {
         const { folds, cells } = compose();
         await planned(folds);
-        await folds.writeProgress({ runKey, state: progress() });
+        await folds.writeProgress({ state: progress() });
         succeeds("target_a.judge", { label: "target_a" });
 
         const executed = await cells.execute(request(2, 2));
@@ -390,7 +400,6 @@ describe("ExperimentRunCellService", () => {
         const { folds, cells } = compose();
         await planned(folds);
         await folds.writeProgress({
-          runKey,
           state: progress({ targetOutputs: { "0:target_a": { output: { output: "4" } } } }),
         });
 
@@ -434,7 +443,6 @@ describe("ExperimentRunCellService", () => {
         const { folds, cells } = compose();
         await planned(folds);
         await folds.writeProgress({
-          runKey,
           state: progress({ finishedCells: markFinished({ bitmap: "", ordinal: 0 }) }),
         });
 

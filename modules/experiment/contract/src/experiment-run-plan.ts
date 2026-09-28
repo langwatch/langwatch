@@ -76,6 +76,9 @@ export const experimentRunPlanSchema = z.object({
   origin: experimentRunOriginSchema,
   persistResults: z.boolean(),
   actor: runActorSchema.optional(),
+  /** What a poll of the run answers with: its experiment's slug and the link to its results. */
+  experimentSlug: z.string().optional(),
+  runUrl: z.string().optional(),
   scope: executionScopeSchema,
   /** The dataset id a cell reads its mapping buckets from. */
   mappingDatasetId: z.string(),

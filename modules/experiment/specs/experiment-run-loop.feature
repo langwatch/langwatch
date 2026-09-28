@@ -337,6 +337,27 @@ Feature: An experiment run executes on its pipeline
     When frames are published for the first run
     Then the first stream hears them in order and the second hears none
 
+  # The progress fold as main's poller JSON, and the frames it publishes (spec section 7).
+  @unit
+  Scenario: A run's live frames are published from its progress fold with their seq
+    Given a planned run whose progress fold has folded a cell's finish
+    When the fold's frames subscriber handles that event
+    Then it publishes main's progress frame with the run's counts, numbered by the fold's seq
+    And a redelivered finish counts nothing and streams nothing again
+
+  @unit
+  Scenario: A poll reads a pipeline run's status and counts from its progress fold
+    Given a planned run whose cells finish, one of them failed and one finish redelivered
+    When the progress fold folds them
+    Then it reads as running with each cell counted once and the failure counted apart
+    And once the run finishes it reads as completed with main's summary and the run's link
+
+  @unit
+  Scenario: A run's progress is read by its runId alone
+    Given a planned run's progress stored under main's poller key
+    When it is read by the run's id
+    Then it is found, and another experiment's run with the same id reads as empty
+
   # The run's plan, built in the request before StartExperimentRun (spec sections 2, 4 and 8, D4, D5).
   @unit
   Scenario: A run's plan lists its target cells, then its comparison cells, in one ordinal order

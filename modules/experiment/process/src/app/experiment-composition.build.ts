@@ -26,16 +26,20 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import { experimentRunEventStreamChannels } from "../channels/experiment-run-event-stream-channels.registry.ts";
+import type { ExperimentRunEventStream } from "../channels/experiment-run-event-stream.channel.ts";
 import {
   HttpExperimentAttachmentLinkChannel,
   type ExperimentAttachmentEgressPolicy,
 } from "../channels/http/http.experiment-attachment-link.channel.ts";
+import { createExperimentRunBoardWriteBackSubscriber } from "../eventing/experiment-run-board-write-back.subscriber.ts";
 import { ExecuteExperimentCellCommand } from "../eventing/experiment-run-cell.commands.ts";
 import {
   completeRun,
   executeCell,
   failLostCell,
 } from "../eventing/experiment-run-execution.intent.ts";
+import { createExperimentRunFramesSubscriber } from "../eventing/experiment-run-frames.subscriber.ts";
 import { ExperimentRunPlanStore } from "../eventing/experiment-run-plan.store.ts";
 import {
   buildExperimentRunProcessingPipeline,
@@ -64,6 +68,7 @@ import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.r
 import { ExperimentAttachmentInputService } from "../services/experiment-attachment-input.service.ts";
 import type { ExecutionDataServices } from "../services/experiment-execution-data.service.ts";
 import { ExperimentPollingRunService } from "../services/experiment-polling-run.service.ts";
+import { ExperimentRunBoardWriteBackService } from "../services/experiment-run-board-write-back.service.ts";
 import { ExperimentRunCellService } from "../services/experiment-run-cell.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
 import { ExperimentRunModelCostService } from "../services/experiment-run-model-cost.service.ts";
@@ -315,10 +320,12 @@ function attachmentInputs(input: {
   });
 }
 
-/** What the worker runs a run's cells with: the run's folds, and the cell service over them. */
+/** What the worker runs a run's cells with, and what reacts to its progress fold. */
 export type ExperimentRunCells = Readonly<{
   folds: ExperimentRunFoldRepository;
   cells: ExperimentRunCellService;
+  stream: ExperimentRunEventStream;
+  boardWriteBack: ExperimentRunBoardWriteBackService;
 }>;
 
 /**
@@ -370,6 +377,13 @@ export function buildExperimentRunCells(input: {
 
   return {
     folds,
+    stream: redis
+      ? experimentRunEventStreamChannels.live.create({ redis })
+      : experimentRunEventStreamChannels.memory.create(),
+    boardWriteBack: ExperimentRunBoardWriteBackService.create({
+      folds,
+      experiments: input.experiments,
+    }),
     cells: ExperimentRunCellService.create({
       folds,
       collaborators,
@@ -407,6 +421,10 @@ export function buildExperimentRunProcessing(input: {
       failCell: failLostCell(commands),
       complete: completeRun(commands),
     },
+    runFrames: createExperimentRunFramesSubscriber({ stream: runCells.stream }),
+    runBoardWriteBack: createExperimentRunBoardWriteBackSubscriber({
+      boardWriteBack: runCells.boardWriteBack,
+    }),
   };
   if (redis) {
     const cached = RedisExperimentRunProcessingRepository.create({

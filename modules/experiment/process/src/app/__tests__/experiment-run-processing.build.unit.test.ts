@@ -7,8 +7,10 @@ import {
 } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
+import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
 import type { WorkflowEvaluationRunner } from "../../eventing/experiment-workflow-evaluation.subscriber.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
+import type { ExperimentRunBoardWriteBackService } from "../../services/experiment-run-board-write-back.service.ts";
 import type { ExperimentRunCellService } from "../../services/experiment-run-cell.service.ts";
 import { ExperimentRunCommandDispatcherService } from "../../services/experiment-run-command-dispatcher.service.ts";
 import { buildExperimentRunProcessing } from "../experiment-composition.build.ts";
@@ -43,6 +45,8 @@ function build() {
     runCells: {
       folds: MemoryExperimentRunFoldRepository.create(),
       cells: createApiFixture<ExperimentRunCellService>({}, "cells"),
+      stream: experimentRunEventStreamChannels.memory.create(),
+      boardWriteBack: createApiFixture<ExperimentRunBoardWriteBackService>({}, "boardWriteBack"),
     },
     commands: ExperimentRunCommandDispatcherService.create(),
   });
