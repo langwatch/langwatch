@@ -371,6 +371,14 @@ Feature: Redacting personal data from traces
     When a trace is ingested with a model name attribute
     Then the analysis service looked for the national id in that value, and not for names
 
+  @unit
+  Scenario: A model name attribute is not submitted when only names are selected
+    Given the resolved PII level for "web-app" is custom with only a name selected
+    And secrets redaction is off
+    When a trace is ingested with a model name attribute
+    Then the analysis service never received that value
+    And the stored attribute still reads as it was sent
+
   # The reserved names are not a namespace anyone owns. Attributes arrive on the
   # ingestion endpoint spelled exactly as the sender wrote them, so a sender can
   # put an email address under a trace identifier name - by mistake or on

@@ -944,25 +944,39 @@ export class OtlpSpanPiiRedactionService {
    * pass, at any level — because the entity list is derived from the very
    * options the first call uses. When nothing is left once names and places
    * are removed (a custom level that selected only those), the second call is
-   * skipped and those values are left as the native pass left them.
+   * skipped and those values are left as the native pass left them. When the
+   * call does not look for names or places in the first place (the essential
+   * level, or a custom level without them), there is nothing to spare and
+   * everything goes in one call.
    */
   private async analyseBatch(
     items: readonly AnalysisItem[],
     options: PIICheckOptions,
   ): Promise<(string | null)[]> {
     const results: (string | null)[] = items.map(() => null);
+    const isSplit =
+      items.some((item) => item.isNameExempt) &&
+      this.effectiveEntities(options).some((entity) =>
+        NAME_AND_PLACE_ENTITIES.has(entity),
+      );
+    const indexesWhere = (isNameExempt: boolean) =>
+      items.flatMap((item, i) =>
+        item.isNameExempt === isNameExempt ? [i] : [],
+      );
+    const lanes = isSplit
+      ? [
+          { indexes: indexesWhere(false), options },
+          {
+            indexes: indexesWhere(true),
+            options: this.withoutNameAndPlace(options),
+          },
+        ]
+      : [{ indexes: items.map((_, i) => i), options }];
     // The two calls are independent, so they run side by side: a span that
     // carries a model name costs one more call, not twice the wait.
     await Promise.all(
-      [false, true].map(async (isNameExempt) => {
-        const indexes = items.flatMap((item, i) =>
-          item.isNameExempt === isNameExempt ? [i] : [],
-        );
-        if (indexes.length === 0) return;
-        const laneOptions = isNameExempt
-          ? this.withoutNameAndPlace(options)
-          : options;
-        if (!laneOptions) return;
+      lanes.map(async ({ indexes, options: laneOptions }) => {
+        if (indexes.length === 0 || !laneOptions) return;
         const laneResults = await this.deps.batchClearPII(
           indexes.map((i) => items[i]!.text),
           laneOptions,
@@ -984,10 +998,17 @@ export class OtlpSpanPiiRedactionService {
   private withoutNameAndPlace(
     options: PIICheckOptions,
   ): PIICheckOptions | null {
-    const entities = (
-      options.entities ?? presidioDefaultEntities(options.piiRedactionLevel)
-    ).filter((entity) => !NAME_AND_PLACE_ENTITIES.has(entity));
+    const entities = this.effectiveEntities(options).filter(
+      (entity) => !NAME_AND_PLACE_ENTITIES.has(entity),
+    );
     return entities.length > 0 ? { ...options, entities } : null;
+  }
+
+  /** What an analysis call looks for: its own list, or the level's default. */
+  private effectiveEntities(options: PIICheckOptions): readonly string[] {
+    return (
+      options.entities ?? presidioDefaultEntities(options.piiRedactionLevel)
+    );
   }
 
   private collectAllAttributeSets(span: OtlpSpan): OtlpKeyValue[][] {

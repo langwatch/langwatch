@@ -366,6 +366,47 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
       expect(call?.[1].entities).toEqual(["AU_MEDICARE"]);
       expect(submittedForNames()).not.toContain("claude-sonnet-4-6");
     });
+
+    // Nothing is left to look for once names and places are removed, so the
+    // model name is not submitted at all and stays as the native pass left it.
+    /** @scenario "A model name attribute is not submitted when only names are selected" */
+    it("does not submit a model name attribute when a custom level selects only names", async () => {
+      const { service, submitted } = makeService({
+        ...STRICT_POLICY,
+        pii: { level: "custom", entities: ["PERSON"], exceptPatterns: [] },
+        secrets: { enabled: false, customPatterns: [] },
+      });
+      const span = spanWith({ "ai.model.id": "claude-sonnet-4-6" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submitted()).not.toContain("claude-sonnet-4-6");
+      expect(attr(span, "ai.model.id")).toBe("claude-sonnet-4-6");
+    });
+
+    // A call that does not look for names or places has nothing to spare, so
+    // there is no second call.
+    it("makes one call when the level does not look for names", async () => {
+      const { service, batchSpy } = makeService({
+        ...STRICT_POLICY,
+        pii: { level: "custom", entities: ["AU_MEDICARE"], exceptPatterns: [] },
+        secrets: { enabled: false, customPatterns: [] },
+      });
+      const span = spanWith({
+        "ai.model.id": "claude-sonnet-4-6",
+        "app.support_note": PROSE_THAT_MUST_BE_ANALYSED,
+      });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(batchSpy).toHaveBeenCalledTimes(1);
+      expect(batchSpy.mock.calls[0]?.[0]).toEqual(
+        expect.arrayContaining([
+          "claude-sonnet-4-6",
+          PROSE_THAT_MUST_BE_ANALYSED,
+        ]),
+      );
+    });
   });
 
   // Custom metadata does not reach redaction spelled the way the caller wrote
