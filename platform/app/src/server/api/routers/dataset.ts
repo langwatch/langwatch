@@ -2,7 +2,6 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
-import { slugify } from "~/utils/slugify";
 import { DatasetService } from "../../datasets/dataset.service";
 import { attachDatasetRecordCounts } from "../../datasets/dataset-record-counts";
 import { datasetErrorHandler } from "../../datasets/middleware";
@@ -17,8 +16,8 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
  * Dataset Router - Manages dataset CRUD operations
  *
  * SLUG BEHAVIOR:
- * - Slugs are auto-generated from dataset names (kebab-case)
- * - Slugs automatically update when dataset names change
+ * - Slugs are generated from the dataset name once, at creation (kebab-case)
+ * - Renaming keeps the slug: SDK and API callers address datasets by it
  * - Unique constraint: (projectId, slug) at database level
  * - External APIs can use either slug OR id for retrieval
  *
@@ -27,6 +26,9 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
  * - Service: Business logic (slug generation, migrations, validation)
  * - Repository: Data access layer (Prisma queries)
  */
+/** The `-archived-<nanoid>` tail archiving appends to a dataset's slug. */
+const ARCHIVED_SLUG_SUFFIX = /-archived-[A-Za-z0-9_-]{21}$/;
+
 export const datasetRouter = createTRPCRouter({
   /**
    * Creates a new dataset or updates an existing one.
@@ -150,15 +152,15 @@ export const datasetRouter = createTRPCRouter({
     )
     .permission("datasets:delete")
     .mutation(async ({ ctx, input }) => {
-      const datasetName = (
-        await ctx.prisma.dataset.findFirst({
-          where: {
-            id: input.datasetId,
-            projectId: input.projectId,
-          },
-        })
-      )?.name;
-      const slug = slugify(datasetName ?? "");
+      const dataset = await ctx.prisma.dataset.findFirst({
+        where: {
+          id: input.datasetId,
+          projectId: input.projectId,
+        },
+      });
+      // Undo restores the slug the dataset had before archiving, not one
+      // re-derived from a name that may have changed since creation.
+      const liveSlug = (dataset?.slug ?? "").replace(ARCHIVED_SLUG_SUFFIX, "");
 
       await ctx.prisma.dataset.update({
         where: {
@@ -166,7 +168,7 @@ export const datasetRouter = createTRPCRouter({
           projectId: input.projectId,
         },
         data: {
-          slug: input.undo ? slug : `${slug}-archived-${nanoid()}`,
+          slug: input.undo ? liveSlug : `${liveSlug}-archived-${nanoid()}`,
           archivedAt: input.undo ? null : new Date(),
         },
       });
