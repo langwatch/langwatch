@@ -56,7 +56,7 @@ const KEY_NOUNS: Record<string, { noun: string; placeholder: string }> = {
 
 function keyNounOf(selector: string): { noun: string; placeholder: string } {
   if (selector.startsWith("evaluations.")) {
-    return { noun: "evaluator", placeholder: "<monitorId>" };
+    return { noun: "monitor", placeholder: "<monitorId>" };
   }
   return KEY_NOUNS[selector] ?? { noun: "key", placeholder: "<key>" };
 }

@@ -32,7 +32,7 @@ describe("filterChipsOf", () => {
           kind: "unkeyed",
           id: "evaluations.passed",
           label: "Evaluation Passed",
-          keyNoun: "evaluator",
+          keyNoun: "monitor",
           example: '{"evaluations.passed":{"<monitorId>":["false"]}}',
         },
       ]);
