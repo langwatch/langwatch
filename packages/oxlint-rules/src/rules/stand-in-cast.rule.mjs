@@ -12,6 +12,21 @@ function isGovernedSource(file) {
   return GOVERNED.test(file.workspacePath);
 }
 
+/** Production casts audited one by one: file, target, and why only the compiler can't see it. */
+const AUDITED_BOUNDARIES = [
+  // A loop-built record claimed against a variable-length tuple merge (Alex, 2026-09-28).
+  { file: "packages/api/src/trpc/compose.ts", target: "TrpcRouterDeclaration<" },
+];
+
+function isAuditedBoundary(file, source, node) {
+  const annotation = node.typeAnnotation;
+  const target = annotation ? source.slice(annotation.start, annotation.end) : "";
+
+  return AUDITED_BOUNDARIES.some(
+    (boundary) => boundary.file === file.workspacePath && target.startsWith(boundary.target),
+  );
+}
+
 const WHITESPACE = /\s+/g;
 const LINE_COMMENT = /^\s*\/\//;
 const WRONG_TYPED_INPUT_MARKER = /^\s*\/\/\s*wrong-typed input:\s*\S/;
@@ -84,6 +99,7 @@ export const standInCastRule = defineRule({
 
         covered.add(inner);
         if (file.isTest && isMarkedWrongTypedInput(source, node)) return;
+        if (!file.isTest && isAuditedBoundary(file, source, node)) return;
         context.report({
           node,
           messageId: doubleCastId,

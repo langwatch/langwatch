@@ -85,3 +85,10 @@ Feature: The stand-in-cast lint rule
     And the same marked cast in production code
     When the stand-in-cast rule runs over it
     Then it reports the cast
+
+  @unit
+  Scenario: An audited production boundary is exempt by file and target
+    Given the rule's audited list names a production file, the cast's target type and the reason
+    When the stand-in-cast rule runs over that file
+    Then it reports nothing for a cast to that target there
+    And it still reports any other target in that file, and the same target in any other file

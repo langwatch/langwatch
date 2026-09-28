@@ -1619,6 +1619,8 @@ const runtime = await createApp({ role: "api" }) // no server: nothing to tear d
   .withConfig({ annotation: {}, trace: {}, presence: {} })
 A test proving how code handles a wrong-typed input may cast it, marked `// wrong-typed input: <why>`
 directly above; the marker, not the test's name, excuses that one cast (Alex, 2026-09-27).
+Production code has no marker: a cast only the compiler cannot prove is listed by file and target,
+with its reason, in the stand-in-cast rule's audited boundaries (Alex, 2026-09-28).
   .withStores(memoryStores()) // branded → memory tier everywhere
   .boot();
 
