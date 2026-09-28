@@ -34,6 +34,7 @@
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
