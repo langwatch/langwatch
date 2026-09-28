@@ -1,11 +1,12 @@
 /**
  * The Explorer's handler for the `instant_eval` route: a known run is reused,
  * else an estimate decides between an auto-start and the dialog, a started run
- * becomes an `eval` chip, and every refusal ends in the phrase search.
+ * becomes an `eval` chip, and a refusal is a popover or ends in the phrase search.
  * @see specs/traces-v2/instant-eval-search.feature
  */
 
 import { toaster } from "@langwatch/design-system/toaster";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import {
   type ExplorerInstantEvalEstimate,
@@ -20,6 +21,7 @@ import { api } from "../../../../behavior/trace-api.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
 import { explainAnyError } from "../../errors/index.ts";
 import type { InstantEvalConfirmation } from "../instant-eval-confirm-dialog.tsx";
+import type { InstantEvalRefusal } from "../instant-eval-refusal-popover.tsx";
 
 /**
  * Under this estimate a run starts on its own; at or over it, the dialog
@@ -27,53 +29,46 @@ import type { InstantEvalConfirmation } from "../instant-eval-confirm-dialog.tsx
  */
 export const INSTANT_EVAL_AUTO_RUN_USD = 0.5;
 
-/** Where a project without Instant Evals asks for them to be switched on. */
-export const CONTACT_US_HREF =
-  "mailto:support@langwatch.ai?subject=Please%20enable%20Instant%20Evals";
-
-/** What a project the flag is off for is told, in place of starting a run. */
-export const INSTANT_EVALS_UNRELEASED_COPY = {
-  title: "Instant Evals aren't enabled for this project yet",
-  description:
-    "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
-};
-
 /**
- * The refusal for a project the flag is off for: said straight away, before
- * any estimate goes out over a run it could never start. Nothing is searched,
- * so the typed chip stays in the bar.
+ * The refusals that get a popover of their own rather than the registry's copy. A submit made
+ * while the flag read is in flight can come back `not_enabled`, which is the model popover too.
  */
-function refuseUnreleased(): void {
-  toaster.create({
-    ...INSTANT_EVALS_UNRELEASED_COPY,
-    type: "info",
-    action: {
-      label: "Contact us",
-      onClick: () => {
-        window.open(CONTACT_US_HREF, "_blank", "noopener,noreferrer");
-      },
-    },
-  });
+function refusalOf({ error }: { error: unknown }): InstantEvalRefusal | null {
+  const handled = readHandledError(error);
+  if (!handled) return null;
+  if (handled.code === "instant_eval_free_budget_exhausted") return { kind: "budget" };
+  if (
+    handled.code === "instant_eval_not_enabled" ||
+    handled.code === "instant_eval_classifier_not_configured" ||
+    handled.code === "instant_eval_classifier_unavailable"
+  ) {
+    return { kind: "model" };
+  }
+  return null;
 }
 
 export interface InstantEvalRouteState {
   onInstantEvalRoute: (payload: InstantEvalRoutePayload) => void;
   /**
-   * Drops an estimate or a start still in flight, and closes the dialog with
-   * it. Called at the head of every submit, so an estimate from the search
-   * before cannot come back and put its chip over the new one.
+   * Drops an estimate or a start still in flight, and closes the dialog and the popover with
+   * it. Called at the head of every submit, so an estimate from the search before cannot come
+   * back and put its chip over the new one.
    */
   abandonPendingRun: () => void;
   /** The dialog's content while the cost rule asks, or null. */
   confirmation: InstantEvalConfirmation | null;
   confirmRun: () => void;
-  /** The phrase search, from the dialog or a refusal. */
+  /** The phrase search, from the dialog or the popover. */
   searchWordsInstead: () => void;
+  /** The popover's content while a refusal is shown, or null. */
+  refusal: InstantEvalRefusal | null;
+  /** Closes the popover; an unreleased project has no phrase to fall back to. */
+  dismissRefusal: () => void;
   isEstimating: boolean;
   isStarting: boolean;
 }
 
-/** The payload the open dialog is about. */
+/** The payload the open dialog or popover is about. */
 interface PendingRoute {
   payload: InstantEvalRoutePayload;
   key: string;
@@ -142,29 +137,39 @@ function confirmationOf({
   };
 }
 
-/** The dialog and the refusal: what is shown, and the way out of both. */
+/** The dialog and the popover: what is shown, and the way out of both. */
 function useInstantEvalOutcome(): {
   confirmation: InstantEvalConfirmation | null;
   setConfirmation: (value: InstantEvalConfirmation | null) => void;
+  refusal: InstantEvalRefusal | null;
+  setRefusal: (value: InstantEvalRefusal | null) => void;
   pendingRef: RefObject<PendingRoute | null>;
   searchWordsInstead: () => void;
   refuse: (args: { error: unknown }) => void;
 } {
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const [confirmation, setConfirmation] = useState<InstantEvalConfirmation | null>(null);
-  // A later Enter supersedes the open dialog rather than racing it.
+  const [refusal, setRefusal] = useState<InstantEvalRefusal | null>(null);
+  // A later Enter supersedes the open dialog or popover rather than racing it.
   const pendingRef = useRef<PendingRoute | null>(null);
 
   const searchWordsInstead = useCallback(() => {
     const pending = pendingRef.current;
     pendingRef.current = null;
     setConfirmation(null);
+    setRefusal(null);
     if (pending) applyQueryText(pending.payload.fallbackQuery);
   }, [applyQueryText]);
 
   const refuse = useCallback(
     ({ error }: { error: unknown }) => {
       setConfirmation(null);
+      const popover = refusalOf({ error });
+      if (popover) {
+        setRefusal(popover);
+        return;
+      }
+      // Any other refusal: the registry's words, and the phrase search.
       const { title, description } = explainAnyError(error);
       toaster.create({
         title,
@@ -176,7 +181,15 @@ function useInstantEvalOutcome(): {
     [searchWordsInstead],
   );
 
-  return { confirmation, setConfirmation, pendingRef, searchWordsInstead, refuse };
+  return {
+    confirmation,
+    setConfirmation,
+    refusal,
+    setRefusal,
+    pendingRef,
+    searchWordsInstead,
+    refuse,
+  };
 }
 
 /** Starts a run and, when it is accepted, puts its chip in the bar. */
@@ -252,7 +265,7 @@ export function useInstantEvalRoute({
 }): InstantEvalRouteState {
   const estimate = api.traces.instantEval.estimate.useMutation();
   const outcome = useInstantEvalOutcome();
-  const { pendingRef, setConfirmation, refuse } = outcome;
+  const { pendingRef, setConfirmation, setRefusal, refuse } = outcome;
   const seqRef = useRef(0);
   const { isStarting, applyChip, startRun } = useInstantEvalStarter({ outcome, seqRef });
 
@@ -266,7 +279,8 @@ export function useInstantEvalRoute({
     seqRef.current += 1;
     pendingRef.current = null;
     setConfirmation(null);
-  }, [pendingRef, setConfirmation]);
+    setRefusal(null);
+  }, [pendingRef, setConfirmation, setRefusal]);
 
   // Under the auto-run line the run starts; at or over it the dialog asks.
   const answerEstimate = useCallback(
@@ -302,16 +316,18 @@ export function useInstantEvalRoute({
   const onInstantEvalRoute = useCallback(
     (payload: InstantEvalRoutePayload) => {
       const seq = ++seqRef.current;
+      // Refused before any estimate goes out; with nothing pending, closing only closes.
       if (!isInstantEvalAvailable) {
         pendingRef.current = null;
         setConfirmation(null);
-        refuseUnreleased();
+        setRefusal({ kind: "unreleased" });
         return;
       }
       const { timeRange, evalRuns } = useFilterStore.getState();
       const key = routeRunKey({ payload, presetId: timeRange.presetId });
       pendingRef.current = { payload, key };
       setConfirmation(null);
+      setRefusal(null);
 
       // A run already judged this scope: the chip is enough.
       const known = evalRuns[key];
@@ -322,7 +338,7 @@ export function useInstantEvalRoute({
       }
       askForEstimate({ payload, key, seq });
     },
-    [applyChip, askForEstimate, isInstantEvalAvailable, pendingRef, setConfirmation],
+    [applyChip, askForEstimate, isInstantEvalAvailable, pendingRef, setConfirmation, setRefusal],
   );
 
   return {
@@ -331,6 +347,8 @@ export function useInstantEvalRoute({
     confirmation: outcome.confirmation,
     confirmRun,
     searchWordsInstead: outcome.searchWordsInstead,
+    refusal: outcome.refusal,
+    dismissRefusal: outcome.searchWordsInstead,
     isEstimating: estimate.isPending,
     isStarting,
   };

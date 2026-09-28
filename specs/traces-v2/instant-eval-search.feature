@@ -12,9 +12,9 @@ Feature: Instant Evals inside the Trace Explorer
   - Progress is visible on the table, matches appear as pages finish, and every refusal is a
     closable popover that leaves a phrase search behind, never an error state.
 
-  # The run service and the refusal popover are the Instant Eval module's own; they arrive
-  # with it. What is here is the search bar's half: the handover, how a chip is
-  # spelled and keyed, and the four procedures the Explorer drives a run through.
+  # The run service is the Instant Eval module's own. What is here is the search bar's half:
+  # the handover, how a chip is spelled and keyed, the four procedures the Explorer drives a
+  # run through, and the popover a refusal opens.
 
   Background:
     Given a project with traces in the window
@@ -262,18 +262,34 @@ Feature: Instant Evals inside the Trace Explorer
       Then it is settled without a second read, and no bar is shown
 
   # ---------------------------------------------------------------------------
-  # The flag gate (the refusal popover arrives with the Instant Eval module;
-  # until then the search bar says this in a toast)
+  # Refusals
   # ---------------------------------------------------------------------------
 
-  Rule: A project the Instant Evals flag is off for is told so before any request
+  Rule: A refusal is a popover, never an error state
+
+    @integration
+    Scenario: A spent free budget opens the budget popover and the phrase search runs
+      Given the organization has spent its free Instant Evals budget
+      When the Explorer receives an Instant Eval payload
+      Then a closable popover anchored under the search bar says what an Instant Eval does, in two sentences
+      And the text the user typed stays visible above it
+      And it offers an Upgrade link, without the spend or budget figures
+      And "Skip" and closing both apply the phrase search
+
+    @integration
+    Scenario: A missing classifier opens the model popover and the phrase search runs
+      Given the deployment has no classifier, or the server refuses the run as not enabled for a released project
+      When the Explorer receives an Instant Eval payload
+      Then a closable popover says to configure a model
+      And closing it applies the phrase search
 
     @integration
     Scenario: Instant Evals switched off open the contact-us popover and nothing is searched
       Given the Instant Evals flag is off for the project
       When the reader submits an eval chip
-      Then the search bar says Instant Evals aren't enabled for this project and offers to contact us
+      Then a closable popover anchored under the search bar says Instant Evals aren't enabled for this project and offers to contact us
       And no estimate is requested and the typed query stays in the bar
+      And closing it, by Escape or a click outside, keeps the typed query and searches nothing
       And a chip typed alongside other words is refused the same way, before any request
 
     @integration
@@ -281,4 +297,12 @@ Feature: Instant Evals inside the Trace Explorer
       Given the flag read has not answered yet
       When the user submits an eval chip
       Then the estimate is requested
-      And nothing is said before the estimate responds
+      And no popover opens before the estimate responds
+      And a server refusal of not_enabled then opens the model popover, never the contact-us one
+
+    @integration
+    Scenario: Any other refusal falls back to the phrase search
+      Given the estimate fails for a reason the registry names
+      When the Explorer receives an Instant Eval payload
+      Then the phrase search is applied
+      And the refusal's copy is shown from the presentation registry

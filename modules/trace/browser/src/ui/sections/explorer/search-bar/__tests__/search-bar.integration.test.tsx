@@ -79,6 +79,8 @@ vi.mock("../use-instant-eval-route.ts", () => ({
     confirmation: null,
     confirmRun: vi.fn(),
     searchWordsInstead: vi.fn(),
+    refusal: null,
+    dismissRefusal: vi.fn(),
     isEstimating: false,
     isStarting: false,
   }),

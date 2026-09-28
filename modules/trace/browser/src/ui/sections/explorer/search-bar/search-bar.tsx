@@ -40,6 +40,7 @@ import { AskAiButton } from "../ai/ask-ai-button.tsx";
 import { useInstantEvalRuns } from "../hooks/use-instant-eval-runs.ts";
 import { useTraceFacets } from "../hooks/use-trace-facets.ts";
 import { InstantEvalConfirmDialog } from "../instant-eval-confirm-dialog.tsx";
+import { InstantEvalRefusalPopover } from "../instant-eval-refusal-popover.tsx";
 import { ActiveSearchEditor } from "./active-search-editor.tsx";
 import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail.tsx";
 import { FloatingAiBar } from "./floating-ai-bar.tsx";
@@ -336,6 +337,11 @@ export const SearchBar: React.FC = () => {
       data-spotlight="search-bar"
     >
       <SyntaxHelpDrawerHost />
+      {/* Anchored to a point at the bar's bottom-left: an anchor around the editor would remount
+          the popover on every keystroke. */}
+      <InstantEvalRefusalPopover refusal={instantEval.refusal} onClose={instantEval.dismissRefusal}>
+        <Box position="absolute" left={3} bottom={0} width="1px" height="1px" aria-hidden="true" />
+      </InstantEvalRefusalPopover>
       <InstantEvalConfirmDialog
         confirmation={instantEval.confirmation}
         isStarting={instantEval.isStarting}
