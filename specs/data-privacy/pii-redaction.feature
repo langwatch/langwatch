@@ -362,6 +362,12 @@ Feature: Redacting personal data from traces
     Then the analysis service's own redaction is kept, names included
 
   @unit
+  Scenario: The fallback detector also keeps a model name's name findings
+    Given the analysis service is unavailable and the fallback detector finds a person and a phone number in a model name value
+    When the value is redacted
+    Then only the phone number is masked
+
+  @unit
   Scenario: Prose written under a model name attribute is still sent for analysis
     Given the resolved PII level for "web-app" is strict
     When a trace is ingested with a model name attribute whose value is a person name with a space

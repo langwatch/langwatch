@@ -302,16 +302,27 @@ const maskDlpFindings = ({
   return { redacted, masked };
 };
 
+/** DLP's name and place info types, the ones it misreads on a model id. */
+const DLP_NAME_AND_PLACE_INFO_TYPES: ReadonlySet<string> = new Set([
+  "FIRST_NAME",
+  "LAST_NAME",
+  "PERSON_NAME",
+  "LOCATION",
+]);
+
 export const googleDLPClearPII = async ({
   currentObject,
   lastKey,
   piiRedactionLevel,
   exceptPatterns,
+  spareNamesAndPlaces = false,
 }: {
   currentObject: Record<string | number, any>;
   lastKey: string | number;
   piiRedactionLevel: PIIRedactionLevel;
   exceptPatterns?: readonly string[];
+  /** Leave name and place findings unmasked (a model or tool name). */
+  spareNamesAndPlaces?: boolean;
 }): Promise<void> => {
   getPiiChecksCounter("google_dlp").inc();
   const [text, remaining] = [
@@ -319,7 +330,11 @@ export const googleDLPClearPII = async ({
     currentObject[lastKey].slice(250_000),
   ];
 
-  const findings = await dlpCheck(text, piiRedactionLevel);
+  const findings = (await dlpCheck(text, piiRedactionLevel)).filter(
+    (finding) =>
+      !spareNamesAndPlaces ||
+      !DLP_NAME_AND_PLACE_INFO_TYPES.has(finding.infoType?.name ?? ""),
+  );
   const { redacted, masked } = maskDlpFindings({
     text,
     findings,
@@ -563,9 +578,12 @@ export type PIICheckOptions = {
    * findings carry the matched text, so a finding fully covered by an
    * exception can be vetoed before masking (see maskDlpFindings above).
    * `mainMethod: "presidio"` — the one every strict/custom analysis-service
-   * call currently uses — ignores this field entirely: Presidio's batch
-   * endpoint returns pre-anonymized text with no positions or matched text to
-   * veto against. This is why a resolved policy with exceptions narrows the
+   * call currently uses — ignores this field entirely. Presidio's batch
+   * endpoint does return finding positions (`raw_response.results`, read by
+   * redactSparingNamesAndPlaces), but those index the text after the service
+   * trims it and unfolds JSON escapes, so they only line up with the value in
+   * the narrow case that function guards for; a veto built on them could not
+   * cover every value, and exceptions are not applied there. This is why a resolved policy with exceptions narrows the
    * Presidio call to just the strict-only entities (names, locations) instead
    * of trying to pass exceptions through it (see lambdaAfterNative in
    * span-pii-redaction.service.ts) — narrowing shrinks WHICH entities are

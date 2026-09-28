@@ -101,19 +101,20 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
 /**
  * Default batch PII clearing: uses Presidio batch API, falls back to individual Google DLP calls.
  */
-const runGoogleDlpBatch = (
-  texts: string[],
-  piiRedactionLevel: PIIRedactionLevel,
-  exceptPatterns?: readonly string[],
-): Promise<(string | null)[]> =>
+const runGoogleDlpBatch: BatchClearPIIFunction = (
+  texts,
+  { piiRedactionLevel, exceptPatterns },
+  spareNamesAndPlaces,
+) =>
   Promise.all(
-    texts.map(async (text) => {
+    texts.map(async (text, i) => {
       const wrapper = { value: text };
       await googleDLPClearPII({
         currentObject: wrapper,
         lastKey: "value",
         piiRedactionLevel,
         exceptPatterns,
+        spareNamesAndPlaces: spareNamesAndPlaces?.[i] ?? false,
       });
       return wrapper.value !== text ? wrapper.value : null;
     }),
@@ -124,10 +125,10 @@ const defaultBatchClearPII: BatchClearPIIFunction = async (
   options,
   spareNamesAndPlaces,
 ) => {
-  const { piiRedactionLevel, mainMethod, entities, exceptPatterns } = options;
+  const { piiRedactionLevel, mainMethod, entities } = options;
 
   if (mainMethod === "google_dlp") {
-    return runGoogleDlpBatch(texts, piiRedactionLevel, exceptPatterns);
+    return runGoogleDlpBatch(texts, options, spareNamesAndPlaces);
   }
 
   try {
@@ -140,8 +141,9 @@ const defaultBatchClearPII: BatchClearPIIFunction = async (
     // native pass already handled the pattern-based selections, so this only
     // ever widens the analysis-service entities on a presidio outage. The
     // policy's do-not-redact exceptions do carry over, so the fallback cannot
-    // re-redact a value an exception kept.
-    return await runGoogleDlpBatch(texts, piiRedactionLevel, exceptPatterns);
+    // re-redact a value an exception kept, and so does the model/tool name
+    // flag, so the fallback never masks one as a name or place.
+    return await runGoogleDlpBatch(texts, options, spareNamesAndPlaces);
   }
 };
 
@@ -312,8 +314,8 @@ export class OtlpSpanPiiRedactionService {
    * to the identifiers only the analysis service can detect (names, locations):
    * the native floor already ran every pattern-based recognizer WITH the
    * exceptions applied, and re-scanning those entities out-of-process would
-   * re-redact the very values an exception kept (the service returns anonymized
-   * text, so vetoes cannot be applied to its findings).
+   * re-redact the very values an exception kept (vetoes are not applied to the
+   * service's findings; see PIICheckOptions.exceptPatterns in piiCheck.ts).
    *
    * Narrowing to name/location entities shrinks the blast radius, it does not
    * close the gap: `exceptPatterns` still rides along on the returned options
