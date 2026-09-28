@@ -1010,6 +1010,84 @@ async function seedRealFactRows({
   await seedAnalyticsProjections({ admin, database, tenants, weeks });
 }
 
+/** A sort-key column the per-tenant seed can fill with `<tenant>-<column>`. */
+const SEEDABLE_KEY_TYPE = /^(LowCardinality\()?(String|FixedString\(\d+\))\)?$/;
+
+/**
+ * One row per tenant in every ClickHouse-resident catalog source {@link seedRealFactRows} leaves
+ * empty, so no per-view isolation claim is an absence check. Sort-key strings per tenant,
+ * timestamps now and `_retention_days` 0 so no TTL drops the row; the rest take defaults.
+ */
+export async function seedEveryCatalogSource({
+  admin,
+  database,
+  views,
+}: {
+  admin: ClickHouseClient;
+  database: string;
+  views: readonly LangWatchQLViewDefinition[];
+}): Promise<void> {
+  const tenants = [TENANT_A, TENANT_B];
+  // Whole seconds: a plain `DateTime` column refuses a fractional value.
+  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const seeded = new Set<string>(REAL_FACT_TABLES);
+  for (const view of views) {
+    if (catalogShapes.isPostgresResident(view) || seeded.has(view.sourceTable)) continue;
+    seeded.add(view.sourceTable);
+
+    const tenantColumn = view.tenantColumn ?? "TenantId";
+    const [table] = await selectRows<{ sorting_key: string }>(
+      admin,
+      `SELECT sorting_key FROM system.tables ` +
+        `WHERE database = '${database}' AND name = '${view.sourceTable}'`,
+    );
+    const sortKey = new Set(table?.sorting_key.split(", ") ?? []);
+    await admin.command({ query: `TRUNCATE TABLE ${database}.${view.sourceTable}` });
+    const columns = await selectRows<{ name: string; type: string }>(
+      admin,
+      `SELECT name, type FROM system.columns ` +
+        `WHERE database = '${database}' AND table = '${view.sourceTable}' ` +
+        `AND default_kind IN ('', 'DEFAULT')`,
+    );
+    await admin.insert({
+      table: `${database}.${view.sourceTable}`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) => {
+        const row: Record<string, string | number> = {};
+        for (const column of columns) {
+          if (column.name === tenantColumn) {
+            row[column.name] = tenant.tenantId;
+          } else if (column.name === "_retention_days") {
+            row[column.name] = 0;
+          } else if (column.type.startsWith("DateTime")) {
+            row[column.name] = now;
+          } else if (sortKey.has(column.name) && SEEDABLE_KEY_TYPE.test(column.type)) {
+            row[column.name] = `${tenant.tenantId}-${column.name}`;
+          }
+        }
+        return row;
+      }),
+    });
+  }
+
+  // `coding_tool_results` reads only `claude_code.tool` spans, which the span seed does not write.
+  await admin.insert({
+    table: `${database}.stored_spans`,
+    format: "JSONEachRow",
+    values: tenants.map((tenant) => ({
+      ProjectionId: `${tenant.tenantId}/coding-tool-span`,
+      TenantId: tenant.tenantId,
+      TraceId: `${tenant.tenantId}-coding-tool-trace`,
+      SpanId: `${tenant.tenantId}-coding-tool-span`,
+      Sampled: 1,
+      StartTime: now,
+      EndTime: now,
+      SpanName: "claude_code.tool",
+      ServiceName: "claude-code",
+    })),
+  });
+}
+
 /**
  * Seeds the analytics projections and their per-minute rollups.
  */

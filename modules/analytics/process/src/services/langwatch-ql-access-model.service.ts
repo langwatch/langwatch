@@ -271,25 +271,6 @@ export class LangWatchQLAccessModelService {
   }
 
   /**
-   * The key map polices itself: the restricted identity sees exactly the rows its
-   * own hash set matches, so it can neither enumerate other tenants' hashes nor
-   * confirm a guessed one.
-   */
-  keyMapRowPolicyStatement({ names }: { names: LangWatchQLNames }): string {
-    this.assertNames(names);
-
-    return (
-      `CREATE ROW POLICY OR REPLACE ${keyMapPolicyName(names.keyMapTable)} ` +
-      `ON ${this.qualified(names, names.keyMapTable)}\n` +
-      `  USING ${renderPredicateTemplate(LWQL_KEY_MAP_SELF_FILTER_TEMPLATE, {
-        keyHash: KEY_MAP_COLUMNS.keyHash,
-        tenantSetting: names.tenantSetting,
-      })}\n` +
-      `  TO ${names.restrictedUser}`
-    );
-  }
-
-  /**
    * One row policy per LangWatchQL object. ClickHouse applies row policies before any user
    * predicate and inside every query shape — CTE, `UNION ALL`, both join sides, subqueries, and
    * `merge()` — so the policy, not the submitted SQL, is what bounds the read.
