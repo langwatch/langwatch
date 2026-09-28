@@ -10890,6 +10890,9 @@ importers:
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../../dashboard/contract
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract

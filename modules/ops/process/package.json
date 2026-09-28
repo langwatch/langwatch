@@ -40,6 +40,7 @@
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
