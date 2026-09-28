@@ -347,11 +347,12 @@ const RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set([
  * `anthropic/claude-sonnet-4`, `gpt-5:latest`, `lookup_profile`).
  *
  * No whitespace, so prose written under one of these names is still analysed;
- * no `@`, so an email address is still analysed; and a URL with a scheme
- * (`https://...`) is sent on too (see {@link reservesModelOrToolName}), since
- * it can carry a person in its path. A scheme-less path is not: model ids use
- * `/` themselves (`anthropic/claude-sonnet-4`), so it cannot be refused on
- * shape.
+ * no `@`, so an email address is still analysed; and a URL is sent on too
+ * (see {@link reservesModelOrToolName}), since it can carry a person in its
+ * path. Model ids use `/` themselves (`anthropic/claude-sonnet-4`,
+ * `bedrock/us.anthropic.claude-opus-4-1`), so a URL is told apart by what
+ * comes before the first `/`: a scheme, or a dotted host (`www.acme.example/`).
+ * A vendor namespace before the slash never carries a dot.
  *
  * What this knowingly lets through is a lone single-token name written under a
  * model or tool attribute ("jane.doe", "jane_doe"). It cannot be told apart by
@@ -374,7 +375,8 @@ const MODEL_OR_TOOL_NAME_VALUE = /^[A-Za-z0-9._:/+-]+$/;
  */
 export const MAX_MODEL_OR_TOOL_NAME_LENGTH = 128;
 
-const URL_SCHEME = /:\/\//;
+/** A scheme (`https://`), or a dotted host before the first `/`. */
+const URL_SHAPED = /:\/\/|^[^/]*\.[^/]*\//;
 
 /**
  * Whether this attribute is a model, provider or tool name carrying a value
@@ -391,7 +393,7 @@ export function reservesModelOrToolName({
     RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS.has(key.toLowerCase()) &&
     value.length <= MAX_MODEL_OR_TOOL_NAME_LENGTH &&
     MODEL_OR_TOOL_NAME_VALUE.test(value) &&
-    !URL_SCHEME.test(value)
+    !URL_SHAPED.test(value)
   );
 }
 
@@ -400,7 +402,7 @@ export function reservesModelOrToolName({
  * name (a trace address, or a model or tool name), or a value that is
  * exclusively one opaque identifier token.
  *
- * The model or tool name rule applies only when `afterNativePass` is set. Its
+ * The model or tool name rule applies only when `hasNativePassRun` is set. Its
  * residual is safe only because the native pass has already redacted cards,
  * phones and secrets in those values; on the no-policy path (no tenant, the
  * kill switch, a failed policy lookup) the analysis batch is the only pass, and
@@ -412,15 +414,15 @@ export function reservesModelOrToolName({
 export function isHeldOutIdentifierAttribute({
   key,
   value,
-  afterNativePass,
+  hasNativePassRun,
 }: {
   key: string;
   value: string;
-  afterNativePass: boolean;
+  hasNativePassRun: boolean;
 }): boolean {
   return (
     reservesTraceAddress({ key, value }) ||
-    (afterNativePass && reservesModelOrToolName({ key, value })) ||
+    (hasNativePassRun && reservesModelOrToolName({ key, value })) ||
     isOpaqueIdentifierValue(value)
   );
 }

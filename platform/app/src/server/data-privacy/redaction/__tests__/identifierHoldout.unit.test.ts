@@ -152,7 +152,7 @@ describe("given the identifier hold-out rules", () => {
         isHeldOutIdentifierAttribute({
           key: "metadata.trace_id",
           value: "17575001234540000091234567890123",
-          afterNativePass: false,
+          hasNativePassRun: false,
         }),
       ).toBe(true);
     });
@@ -172,7 +172,7 @@ describe("given the identifier hold-out rules", () => {
         isHeldOutIdentifierAttribute({
           key: "metadata.trace_id",
           value,
-          afterNativePass: true,
+          hasNativePassRun: true,
         }),
       ).toBe(false);
     });
@@ -203,7 +203,7 @@ describe("given the identifier hold-out rules", () => {
         isHeldOutIdentifierAttribute({
           key,
           value: "Jane Doe",
-          afterNativePass: true,
+          hasNativePassRun: true,
         }),
       ).toBe(false);
     });
@@ -227,7 +227,7 @@ describe("given the identifier hold-out rules", () => {
         isHeldOutIdentifierAttribute({
           key: `${prefix}trace_id`,
           value: DECIMAL_TRACE_ADDRESS,
-          afterNativePass: false,
+          hasNativePassRun: false,
         }),
       ).toBe(true);
     });
@@ -238,6 +238,8 @@ describe("given the identifier hold-out rules", () => {
       ["gen_ai.request.model", "claude-sonnet-4-6"],
       ["ai.model.id", "us.anthropic.claude-opus-4-1"],
       ["llm.model_name", "anthropic/claude-sonnet-4"],
+      ["llm.model_name", "bedrock/us.anthropic.claude-opus-4-1"],
+      ["gen_ai.request.model", "meta-llama/Llama-3.1-8B-Instruct"],
       ["gen_ai.system", "anthropic"],
       ["ai.model.provider", "anthropic.messages"],
       [
@@ -249,7 +251,7 @@ describe("given the identifier hold-out rules", () => {
     ])("holds %s back over %s", (key, value) => {
       expect(reservesModelOrToolName({ key, value })).toBe(true);
       expect(
-        isHeldOutIdentifierAttribute({ key, value, afterNativePass: true }),
+        isHeldOutIdentifierAttribute({ key, value, hasNativePassRun: true }),
       ).toBe(true);
     });
 
@@ -263,14 +265,14 @@ describe("given the identifier hold-out rules", () => {
         isHeldOutIdentifierAttribute({
           key: "ai.model.id",
           value: "+1-234-567-8901",
-          afterNativePass: false,
+          hasNativePassRun: false,
         }),
       ).toBe(false);
       expect(
         isHeldOutIdentifierAttribute({
           key: "gen_ai.request.model",
           value: "claude-sonnet-4-6",
-          afterNativePass: false,
+          hasNativePassRun: false,
         }),
       ).toBe(false);
     });
@@ -300,6 +302,7 @@ describe("given the identifier hold-out rules", () => {
         "a URL with a person in its path",
         "https://acme.example.com/u/jane.doe/49386409e80a37fa22dc518583b31932",
       ],
+      ["a scheme-less URL", "www.acme.example/u/Jane-Doe"],
       ["an empty value", ""],
     ])("does not hold a model name back over %s", (_case, value) => {
       expect(
@@ -317,7 +320,6 @@ describe("given the identifier hold-out rules", () => {
     it.each([
       "jane.doe",
       "jane_doe",
-      "acme.example.com/u/jane.doe",
     ])("knowingly holds back the single-token name %s", (value) => {
       expect(
         reservesModelOrToolName({ key: "gen_ai.request.model", value }),

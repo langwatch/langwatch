@@ -501,7 +501,7 @@ export class OtlpSpanPiiRedactionService {
         const ran = await this.lambdaRedactSpan(span, resource, "STRICT", {
           entities: lambda.entities,
           exceptPatterns: lambda.exceptPatterns,
-          afterNativePass: true,
+          hasNativePassRun: true,
         });
         // Mark the span only when strict could not run because the analysis
         // service is genuinely unavailable (not configured in dev): the native
@@ -558,7 +558,7 @@ export class OtlpSpanPiiRedactionService {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
       /** The native pass already ran over these values (see collect*Entries). */
-      afterNativePass?: boolean;
+      hasNativePassRun?: boolean;
     },
   ): Promise<boolean> {
     const options = await this.buildOptions(
@@ -571,7 +571,7 @@ export class OtlpSpanPiiRedactionService {
     // caller can mark a requested strict pass as incomplete.
     if (!options) return false;
 
-    const afterNativePass = lambda?.afterNativePass ?? false;
+    const hasNativePassRun = lambda?.hasNativePassRun ?? false;
     const entries: StringEntry[] = [];
     let anySkipped = false;
     let anyRedacted = false;
@@ -582,7 +582,7 @@ export class OtlpSpanPiiRedactionService {
         attributes: attrs,
         entries,
         currentTotalLength: totalLength,
-        afterNativePass,
+        hasNativePassRun,
       });
       anySkipped ||= result.skipped;
       anyRedacted ||= result.collected;
@@ -615,7 +615,7 @@ export class OtlpSpanPiiRedactionService {
         attributes: resource.attributes,
         entries,
         currentTotalLength: totalLength,
-        afterNativePass,
+        hasNativePassRun,
       });
       anySkipped ||= result.skipped;
       anyRedacted ||= result.collected;
@@ -693,7 +693,7 @@ export class OtlpSpanPiiRedactionService {
       await this.lambdaRedactLog(log, "STRICT", {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
-        afterNativePass: true,
+        hasNativePassRun: true,
       });
     }
   }
@@ -710,7 +710,7 @@ export class OtlpSpanPiiRedactionService {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
       /** The native pass already ran over these values (see collect*Entries). */
-      afterNativePass?: boolean;
+      hasNativePassRun?: boolean;
     },
   ): Promise<void> {
     const options = await this.buildOptions(
@@ -727,17 +727,17 @@ export class OtlpSpanPiiRedactionService {
     if (log.body) {
       batch.tryPush(log as unknown as Record<string, string>, "body", log.body);
     }
-    const afterNativePass = lambda?.afterNativePass ?? false;
+    const hasNativePassRun = lambda?.hasNativePassRun ?? false;
     this.collectRecordEntries({
       batch,
       record: log.attributes,
       attributeNames: log.attributeNames,
-      afterNativePass,
+      hasNativePassRun,
     });
     this.collectRecordEntries({
       batch,
       record: log.resourceAttributes,
-      afterNativePass,
+      hasNativePassRun,
     });
 
     await this.applyRedactionBatch(batch, options);
@@ -781,7 +781,7 @@ export class OtlpSpanPiiRedactionService {
       await this.lambdaRedactMetricAttributes(metric, "STRICT", {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
-        afterNativePass: true,
+        hasNativePassRun: true,
       });
     }
   }
@@ -797,7 +797,7 @@ export class OtlpSpanPiiRedactionService {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
       /** The native pass already ran over these values (see collect*Entries). */
-      afterNativePass?: boolean;
+      hasNativePassRun?: boolean;
     },
   ): Promise<void> {
     const options = await this.buildOptions(
@@ -808,17 +808,17 @@ export class OtlpSpanPiiRedactionService {
     if (!options) return;
 
     const batch = this.createRedactionBatch();
-    const afterNativePass = lambda?.afterNativePass ?? false;
+    const hasNativePassRun = lambda?.hasNativePassRun ?? false;
     this.collectRecordEntries({
       batch,
       record: metric.attributes,
       attributeNames: metric.attributeNames,
-      afterNativePass,
+      hasNativePassRun,
     });
     this.collectRecordEntries({
       batch,
       record: metric.resourceAttributes,
-      afterNativePass,
+      hasNativePassRun,
     });
 
     await this.applyRedactionBatch(batch, options);
@@ -919,12 +919,12 @@ export class OtlpSpanPiiRedactionService {
     batch,
     record,
     attributeNames,
-    afterNativePass,
+    hasNativePassRun,
   }: {
     batch: RedactionBatch;
     record: Record<string, string>;
     attributeNames?: Record<string, string>;
-    afterNativePass: boolean;
+    hasNativePassRun: boolean;
   }): void {
     for (const key of Object.keys(record)) {
       const value = record[key];
@@ -933,7 +933,7 @@ export class OtlpSpanPiiRedactionService {
         isHeldOutIdentifierAttribute({
           key: attributeNames?.[key] ?? key,
           value,
-          afterNativePass,
+          hasNativePassRun,
         })
       ) {
         continue;
@@ -987,12 +987,12 @@ export class OtlpSpanPiiRedactionService {
     attributes,
     entries,
     currentTotalLength,
-    afterNativePass,
+    hasNativePassRun,
   }: {
     attributes: OtlpKeyValue[];
     entries: StringEntry[];
     currentTotalLength: number;
-    afterNativePass: boolean;
+    hasNativePassRun: boolean;
   }): { skipped: boolean; collected: boolean; totalLength: number } {
     let skipped = false;
     let collected = false;
@@ -1008,7 +1008,7 @@ export class OtlpSpanPiiRedactionService {
           isHeldOutIdentifierAttribute({
             key: attr.key,
             value: attr.value.stringValue,
-            afterNativePass,
+            hasNativePassRun,
           })
         ) {
           continue;
