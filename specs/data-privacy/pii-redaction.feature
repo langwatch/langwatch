@@ -357,7 +357,7 @@ Feature: Redacting personal data from traces
 
   @unit
   Scenario: A model name whose findings cannot be placed keeps the full redaction
-    Given the analysis service returns no finding positions for a model name value
+    Given an older analysis service that returns no finding positions for a model name value
     When the value is redacted
     Then the analysis service's own redaction is kept, names included
 

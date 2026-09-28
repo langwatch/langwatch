@@ -148,7 +148,7 @@ describe("redactSparingNamesAndPlaces", () => {
       const result = redactSparingNamesAndPlaces({
         text,
         findings: [
-          { entity_type: "US_BANK_NUMBER", start: 3, end: 15, score: 0.4 },
+          { entity_type: "US_BANK_NUMBER", start: 3, end: 15, score: 0.5 },
           { entity_type: "CREDIT_CARD", start: 3, end: 19, score: 1 },
         ],
       });
