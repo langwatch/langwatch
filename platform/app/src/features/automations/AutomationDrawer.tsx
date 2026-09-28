@@ -162,14 +162,18 @@ function saveDisabledReason({
   nameSet,
   configComplete,
   actionPicked,
+  hasInvalidConditionRows,
 }: {
   draft: AutomationDraft;
   nameSet: boolean;
   configComplete: boolean;
   actionPicked: boolean;
+  hasInvalidConditionRows: boolean;
 }): string {
   const missing: string[] = [];
   if (!nameSet) missing.push("give it a name");
+  if (hasInvalidConditionRows)
+    missing.push("fix the attribute key marked in red");
   if (!subjectIsSet(draft)) missing.push(subjectTodo(draft));
   else if (!cadenceIsSet(draft)) missing.push(cadenceTodo(draft));
   if (draft.source === "customGraph" && draft.alertType === null)
@@ -1315,6 +1319,7 @@ export function AutomationDrawer({
                     nameSet,
                     configComplete,
                     actionPicked: !!draft.action,
+                    hasInvalidConditionRows,
                   })}
                   disabled={canSave}
                 >

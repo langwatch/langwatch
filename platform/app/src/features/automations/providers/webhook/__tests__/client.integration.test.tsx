@@ -549,6 +549,20 @@ describe("webhookClient Content-Type", () => {
         webhookClient.isComplete(onChangeSpy.mock.calls.at(-1)![0] as never),
       ).toBe(false);
     });
+
+    it("reads a cleared value as the JSON default, not as an error", () => {
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
+
+      fireEvent.change(contentTypeInput(), { target: { value: "  " } });
+
+      expect(screen.queryByText(/media type/i)).not.toBeInTheDocument();
+      const slice = onChangeSpy.mock.calls.at(-1)![0] as never;
+      expect(
+        (webhookClient.toActionParams(slice) as WebhookActionParams)
+          .contentType,
+      ).toBe("application/json");
+    });
   });
 
   describe("when the author declares a non-JSON Content-Type", () => {

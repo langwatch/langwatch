@@ -109,15 +109,15 @@ function initialSlice(): WebhookSlice {
   };
 }
 
+/** Blank means the default everywhere: validation, preview, save and test fire. */
+function effectiveContentType(slice: WebhookSlice): string {
+  return slice.contentType.trim() || DEFAULT_WEBHOOK_CONTENT_TYPE;
+}
+
 function isComplete(slice: WebhookSlice): boolean {
   return (
     validateWebhookUrlShape(slice.url.trim()) === null &&
-    // Blank means the default, exactly as `toActionParams` and the test-fire
-    // target read it — a cleared field must not block a save the send would
-    // treat as JSON.
-    validateWebhookContentType(
-      slice.contentType.trim() || DEFAULT_WEBHOOK_CONTENT_TYPE,
-    ) === null
+    validateWebhookContentType(effectiveContentType(slice)) === null
   );
 }
 
@@ -193,7 +193,7 @@ function toActionParams(slice: WebhookSlice): WebhookActionParams {
     method: slice.method,
     headers: headersRecord(slice.headers),
     bodyTemplate: bodyTemplateOf(slice),
-    contentType: slice.contentType.trim() || DEFAULT_WEBHOOK_CONTENT_TYPE,
+    contentType: effectiveContentType(slice),
     signingSecret: signingSecretOf(slice),
   };
 }
@@ -206,7 +206,7 @@ function testFireTarget(slice: WebhookSlice) {
       method: slice.method,
       headers: headersRecord(slice.headers),
       bodyTemplate: bodyTemplateOf(slice),
-      contentType: slice.contentType.trim() || DEFAULT_WEBHOOK_CONTENT_TYPE,
+      contentType: effectiveContentType(slice),
     },
   };
 }
@@ -268,7 +268,7 @@ function ContentTypeRow({
   slice: WebhookSlice;
   onChange: (next: WebhookSlice) => void;
 }) {
-  const problem = validateWebhookContentType(slice.contentType);
+  const problem = validateWebhookContentType(effectiveContentType(slice));
   return (
     <>
       <HStack gap={2}>
@@ -309,7 +309,7 @@ function HeadersEditor({
 
   return (
     <Field.Root
-      invalid={validateWebhookContentType(slice.contentType) !== null}
+      invalid={validateWebhookContentType(effectiveContentType(slice)) !== null}
     >
       <Field.Label>Headers</Field.Label>
       <VStack align="stretch" gap={2} width="full">
@@ -453,7 +453,7 @@ function BodyEditor({
   onChange,
   ctx,
 }: ConfigFormProps<WebhookSlice, WebhookPreview>) {
-  const isJson = isJsonWebhookContentType(slice.contentType);
+  const isJson = isJsonWebhookContentType(effectiveContentType(slice));
   const defaults = defaultsForSourceKind(ctx.sourceKind);
   const templateValue = isJson
     ? slice.template.value || defaults.webhookBody
@@ -497,7 +497,10 @@ function BodyEditor({
         />
       </Box>
       {preview ? (
-        <BodyPreview preview={preview} contentType={slice.contentType} />
+        <BodyPreview
+          preview={preview}
+          contentType={effectiveContentType(slice)}
+        />
       ) : null}
     </VStack>
   );

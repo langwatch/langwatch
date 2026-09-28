@@ -14,10 +14,10 @@ import type { SlackConnection } from "./slackConnectionTypes";
 type Confirming = { kind: "unused" } | { kind: "inUse"; count: number };
 
 /**
- * Every delete confirms. A connection the list says is unused asks first,
- * then deletes without force; one automations deliver through is refused
- * with the count, and only then does the reader confirm that those
- * automations stop delivering (ADR-093 §5a).
+ * Every delete confirms before anything is sent. The dialog opens with the
+ * listed count; confirming an unused one deletes without force, and a
+ * server refusal with a live count escalates to the in-use dialog, whose
+ * confirmation forces (ADR-093 §5a).
  */
 export function DeleteSlackConnectionButton({
   projectId,
@@ -75,11 +75,12 @@ export function DeleteSlackConnectionButton({
       <Button
         variant="outline"
         colorPalette="red"
-        loading={remove.isPending && confirming === null}
         onClick={() =>
-          connection.dependentAutomations > 0
-            ? runDelete({ force: false })
-            : setConfirming({ kind: "unused" })
+          setConfirming(
+            connection.dependentAutomations > 0
+              ? { kind: "inUse", count: connection.dependentAutomations }
+              : { kind: "unused" },
+          )
         }
       >
         Delete

@@ -155,6 +155,9 @@ describe("given the unified automations table", () => {
       expect(
         table.getByText("Slack app · channel C0999999"),
       ).toBeInTheDocument();
+      expect(
+        table.getByText("https://example.com/hooks/langwatch"),
+      ).toBeInTheDocument();
     });
 
     /** @scenario "Reports stay on their own tab" */

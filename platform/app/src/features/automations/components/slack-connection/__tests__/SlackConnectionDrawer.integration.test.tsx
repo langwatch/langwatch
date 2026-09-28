@@ -307,13 +307,10 @@ describe("SlackConnectionDrawer", () => {
 
   describe("when a connection automations deliver through is deleted", () => {
     /** @scenario "Deleting a connection in use says what stops delivering" */
-    it("asks to confirm with the count, then deletes with force", async () => {
+    it("asks to confirm with the count before sending anything, then deletes with force", async () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
       state.connections = [connection()];
-      state.deleteAnswers.push(
-        handledError("slack_connection_in_use", { dependentAutomations: 3 }),
-      );
       renderDrawer({ connectionId: "conn-1", onClose });
 
       await user.click(screen.getByRole("button", { name: "Delete" }));
@@ -323,22 +320,44 @@ describe("SlackConnectionDrawer", () => {
           "3 automations stop delivering until they pick another connection.",
         ),
       ).toBeInTheDocument();
-      expect(state.deleteCalls).toEqual([
-        { projectId: "project-1", id: "conn-1" },
-      ]);
+      expect(state.deleteCalls).toEqual([]);
 
       await user.click(
         screen.getByRole("button", { name: "Delete connection" }),
       );
 
       await waitFor(() =>
-        expect(state.deleteCalls[1]).toEqual({
-          projectId: "project-1",
-          id: "conn-1",
-          force: true,
-        }),
+        expect(state.deleteCalls).toEqual([
+          { projectId: "project-1", id: "conn-1", force: true },
+        ]),
       );
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a connection listed as unused turns out to be in use", () => {
+    /** @scenario "Deleting a connection in use says what stops delivering" */
+    it("escalates to the in-use confirmation with the live count", async () => {
+      const user = userEvent.setup();
+      state.connections = [connection({ dependentAutomations: 0 })];
+      state.deleteAnswers.push(
+        handledError("slack_connection_in_use", { dependentAutomations: 2 }),
+      );
+      renderDrawer({ connectionId: "conn-1" });
+
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+      await user.click(
+        await screen.findByRole("button", { name: "Delete connection" }),
+      );
+
+      expect(
+        await screen.findByText(
+          "2 automations stop delivering until they pick another connection.",
+        ),
+      ).toBeInTheDocument();
+      expect(state.deleteCalls).toEqual([
+        { projectId: "project-1", id: "conn-1" },
+      ]);
     });
   });
 

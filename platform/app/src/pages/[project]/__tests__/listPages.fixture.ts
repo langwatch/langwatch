@@ -77,9 +77,25 @@ export const botSlackTrigger = {
   filters: "{}",
 };
 
+export const webhookTrigger = {
+  id: "automation-3",
+  name: "Errors to our endpoint",
+  active: true,
+  pausedReason: null,
+  customGraphId: null,
+  customGraph: null,
+  triggerKind: TriggerKind.AUTOMATION,
+  action: "SEND_WEBHOOK",
+  actionParams: { url: "https://example.com/hooks/langwatch", method: "POST" },
+  checks: [],
+  filterQuery: "status:error",
+  filters: "{}",
+};
+
 export const allTriggers = [
   graphTrigger,
   scheduleTrigger,
   filterTrigger,
   botSlackTrigger,
+  webhookTrigger,
 ];

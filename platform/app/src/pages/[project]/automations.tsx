@@ -355,6 +355,8 @@ function AutomationsPage() {
         return <EmailList emails={actionParams.members ?? []} />;
       case "ADD_TO_DATASET":
         return getDatasetName(actionParams) ?? "";
+      case "SEND_WEBHOOK":
+        return actionParams.url ?? "";
     }
   };
 
