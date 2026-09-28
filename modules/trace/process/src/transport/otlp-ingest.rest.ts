@@ -155,7 +155,8 @@ function requestForDecompression(request: Request, bytes: Uint8Array): Request {
   return new Request(request.url, {
     method: request.method,
     headers: request.headers,
-    body: bytes,
+    // A copy: a fetch body must be backed by a plain ArrayBuffer, which a view may not be.
+    body: new Uint8Array(bytes),
   });
 }
 
