@@ -352,7 +352,7 @@ Feature: Dashboards v1
     And the board is still not listed or opened for the admin
 
   @unit
-  Scenario: AC27 Each question group of the picker is also a template
+  Scenario: AC28 Each question group of the picker is also a template
     Given the blank board
     When the member starts a board from a question group's template, such as
       "What changed?"
@@ -390,4 +390,4 @@ Feature: Dashboards v1
   # AC 24: "Boards created before this change keep working" (sharpened) → Scenario: AC24 Boards created before this change keep working
   # AC 25: "Every optional source has its own call to action" → Scenario: AC25 Scenario results shows its own call to action before any row exists; Scenario: AC25 Quality signal shows its own call to action before any row exists; Scenario: AC25 User feedback shows its own call to action before any row exists; Scenario: AC25 Gateway routing shows its own call to action before any row exists; Scenario: AC25 Your coding agents shows its own call to action before any row exists
   # AC 26: "Visibility changes who can see a board, not who can edit it" → Scenario: AC26 A member inside the audience with the edit permission can edit; Scenario: AC26 A member inside the audience without the edit permission sees no edit controls; Scenario: AC26 Only the creator or an admin can change visibility or delete the board; Scenario: AC26 The server refuses every write from a member outside the audience; Scenario: AC26 Narrowing a board with no recorded creator records who narrowed it; Scenario: AC26 An admin can manage a board they cannot see
-  # AC 27: "Each question group of the picker is also a template" → Scenario: AC27 Each question group of the picker is also a template
+  # AC 28: "Each question group of the picker is also a template" → Scenario: AC28 Each question group of the picker is also a template
