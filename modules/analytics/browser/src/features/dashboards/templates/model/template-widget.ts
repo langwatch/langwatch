@@ -26,6 +26,9 @@ export function definition({
 
 const HALF = CHART_GRID_COLUMNS / 2;
 
+/** A table widget's default height: shorter than a chart's, since rows read fine compact. */
+export const TABLE_ROWS = 4;
+
 /** A widget across the whole grid, from `gridRow` down `rowSpan` board rows. */
 export function full({
   gridRow,

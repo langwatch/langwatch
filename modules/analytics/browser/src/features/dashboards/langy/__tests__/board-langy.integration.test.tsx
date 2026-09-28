@@ -186,7 +186,7 @@ describe("Langy on a board", () => {
     ])("shows no ask bar when %s", async (_case, flags, permissions) => {
       openBoard({ server: inMemoryServer(), flags, permissions });
 
-      expect(await screen.findByRole("button", { name: /Add a block/ })).toBeInTheDocument();
+      expect(await screen.findByText("Start from a template")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: ASK_BAR })).toBeNull();
       expect(screen.queryByText("What would you like to know?")).toBeNull();
     });

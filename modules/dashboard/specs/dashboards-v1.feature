@@ -109,7 +109,6 @@ Feature: Dashboards v1
     Then it is visible only to them, under Mine in the sidebar
     When it opens
     Then they see "Add a description"
-    And they see the "Add a block" area with "Start from the question you need answered."
     And they see "Start from a template" listing the Agent Flight Deck and one
       template per question group of the picker
 
@@ -373,7 +372,7 @@ Feature: Dashboards v1
   # AC 7: "Connected state comes from real data" → Scenario: AC7 Connected state comes from real data
   # AC 8: "The Agent Flight Deck is a template" (changed: was "The Flight Deck cannot be edited"; the read-only board and its server refusal are gone) → Scenario: AC8 Starting from the template makes a new board of editable widgets
   # AC 9: "Empty period" → Scenario: AC9 Empty period shows an empty state
-  # AC 10: "Blank board matches the reference" → Scenario: AC10 Blank board matches the reference
+  # AC 10: "Blank board matches the reference" (changed by langwatch/tasks#911: no "Add a block" area on the empty board) → Scenario: AC10 Blank board matches the reference
   # AC 11: "Add a block by question" (changed: no read-only board to mark) → Scenario: AC11 Ask Langy by question
   # AC 12: "Only working questions are offered" → Scenario: AC12 Only working questions are offered
   # AC 13: "Period and grain" (changed: widgets, through their reserved parameters) → Scenario: AC13 Period and grain update every block; Scenario: AC13 Grain choices update every block

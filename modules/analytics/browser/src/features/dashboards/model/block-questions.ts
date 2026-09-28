@@ -33,6 +33,8 @@ export interface BlockQuestionSection {
   readonly id: string;
   readonly title: string;
   readonly why: string;
+  /** A short, user-facing line for what a board made from this section shows. */
+  readonly summary: string;
   /** A design-system colour palette tinting the section title and its icons. */
   readonly palette: string;
   readonly questions: readonly BlockQuestion[];
@@ -50,6 +52,7 @@ export const BLOCK_QUESTION_SECTIONS: readonly BlockQuestionSection[] = [
     id: "happen",
     title: "What happened?",
     why: "The event is discrete; you need the count as much as the trend.",
+    summary: "Traffic, success rate, latency and cost at a glance",
     palette: "purple",
     questions: [
       {
@@ -82,6 +85,7 @@ export const BLOCK_QUESTION_SECTIONS: readonly BlockQuestionSection[] = [
     id: "change",
     title: "What changed?",
     why: "Makes direction, timing and magnitude immediately visible.",
+    summary: "Satisfaction, token use and conversation length over time",
     palette: "orange",
     questions: [
       {
@@ -126,6 +130,7 @@ export const BLOCK_QUESTION_SECTIONS: readonly BlockQuestionSection[] = [
     id: "threshold",
     title: "Did something cross a line?",
     why: "Shows the current state and whether a breach is passing or persistent.",
+    summary: "Latency against its usual level, error rate and top errors",
     palette: "red",
     questions: [
       {
@@ -159,6 +164,7 @@ export const BLOCK_QUESTION_SECTIONS: readonly BlockQuestionSection[] = [
     id: "compare",
     title: "A vs B",
     why: "Comparison is the task; time is optional.",
+    summary: "Latency spread from typical to worst case",
     palette: "blue",
     questions: [
       {
@@ -179,6 +185,7 @@ export const BLOCK_QUESTION_SECTIONS: readonly BlockQuestionSection[] = [
     id: "cost-source",
     title: "Where is cost coming from?",
     why: "Separates total spend from what explains it.",
+    summary: "Spend over time, by model, and model usage",
     palette: "yellow",
     questions: [
       {
@@ -211,6 +218,7 @@ export const BLOCK_QUESTION_SECTIONS: readonly BlockQuestionSection[] = [
     id: "tradeoff",
     title: "Quality and Quantity",
     why: "Quality read next to volume reveals what averages hide.",
+    summary: "Evaluation pass rates and scenario results",
     palette: "teal",
     questions: [
       {
@@ -243,6 +251,7 @@ export const BLOCK_QUESTION_SECTIONS: readonly BlockQuestionSection[] = [
     id: "why",
     title: "Who, What, Where, When, and Why",
     why: "Root-cause work needs concrete evidence, not only a high-level chart.",
+    summary: "Which topics users bring up, and which are growing",
     palette: "pink",
     questions: [
       {
@@ -263,6 +272,7 @@ export const BLOCK_QUESTION_SECTIONS: readonly BlockQuestionSection[] = [
     id: "howto",
     title: "How do I…?",
     why: "Langy walks you through it, starting from your own numbers.",
+    summary: "Slowest steps, top errors and poorly rated traces",
     palette: "purple",
     questions: [
       {

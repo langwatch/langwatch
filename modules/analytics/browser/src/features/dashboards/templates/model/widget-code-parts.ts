@@ -29,7 +29,9 @@ const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFra
 const count = (value) => compact.format(value);
 const pct = (value, digits = 1) => (value * 100).toFixed(digits) + "%";
 function usd(value) {
-  if (value !== 0 && Math.abs(value) < 1) return "$" + value.toFixed(value < 0.01 ? 4 : 2);
+  if (value === 0) return "$0.00";
+  const abs = Math.abs(value);
+  if (abs < 1000) return (value < 0 ? "-$" : "$") + abs.toFixed(abs < 0.01 ? 4 : 2);
   return "$" + compact.format(value);
 }
 function ms(value) {

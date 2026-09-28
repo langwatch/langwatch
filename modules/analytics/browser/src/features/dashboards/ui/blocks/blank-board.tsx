@@ -1,7 +1,8 @@
 /**
- * The pieces of a board with nothing on it yet, after the reference: the
- * dashed "Add a block" target that opens the question-first picker, and the
- * "Start from a template" grid, which makes a new board from any template.
+ * The pieces of a board with nothing on it yet: the "Start from a template"
+ * grid, which makes a new board from any template. The dashed "Add a block"
+ * target stays only as the compact footer on a non-empty board; the Ask bar
+ * and the templates are the empty board's two ways to start.
  */
 
 import { Box, Button, Grid, Text, VStack } from "@chakra-ui/react";
@@ -21,7 +22,7 @@ import {
 
 import type { BoardTemplateId } from "../../templates/index.ts";
 
-/** Full-bleed on an empty board, a compact footer once blocks fill the page above it. */
+/** The compact footer below a board's widgets, opening the question picker. */
 export function AddBlockCard({
   onClick,
   compact = false,
@@ -74,6 +75,8 @@ export interface TemplateCard {
   readonly id: BoardTemplateId;
   readonly name: string;
   readonly description: string;
+  /** A user-facing line for what the board shows; falls back to `description`. */
+  readonly summary?: string;
 }
 
 /** Each template's glyph: the Flight Deck's gauge, then the picker section's own icon. */
@@ -99,6 +102,7 @@ function TemplateButton({
   onOpen: () => void;
 }) {
   const Icon = TEMPLATE_ICONS[template.id];
+  const subtitle = template.summary ?? template.description;
   return (
     <Button
       variant="outline"
@@ -140,8 +144,8 @@ function TemplateButton({
         <Text fontSize="13px" lineHeight="1.375" fontWeight="medium" color="fg" truncate>
           {template.name}
         </Text>
-        <Text fontSize="12px" lineHeight="1.625" color="fg.subtle" truncate>
-          {template.description}
+        <Text fontSize="12px" lineHeight="1.625" color="fg.subtle" lineClamp={2}>
+          {subtitle}
         </Text>
       </VStack>
     </Button>
@@ -188,17 +192,14 @@ export function TemplateStrip<Template extends TemplateCard>({
 export function BlankBoard<Template extends TemplateCard>({
   templates,
   creatingTemplateId,
-  onAddBlock,
   onOpenTemplate,
 }: {
   templates: readonly Template[];
   creatingTemplateId: BoardTemplateId | undefined;
-  onAddBlock: () => void;
   onOpenTemplate: (template: Template) => void;
 }) {
   return (
     <VStack align="stretch" gap={5}>
-      <AddBlockCard onClick={onAddBlock} />
       <TemplateStrip
         templates={templates}
         creatingId={creatingTemplateId}
