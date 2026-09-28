@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   PROJECT_KIND,
+  type ProjectApi,
   traceDestinationDecisionSchema,
   traceDestinationInputSchema,
   traceDestinationProjectSchema,
@@ -19,9 +20,9 @@ const DESTINATION_SELECT = {
 } as const;
 
 /**
- * The trace-destination half of the Project contract, from seeded rows —
- * mirrors PrismaProjectRepository's queries and resolveTraceDestination's
- * ladder, since gateway-server depends on the Project CONTRACT only.
+ * The Project reads the gateway makes (trace destinations and a project with
+ * its team), from seeded rows: mirrors PrismaProjectRepository's queries and
+ * resolveTraceDestination's ladder, since gateway depends on the contract only.
  */
 export class TraceDestinationProjectService extends TestProjectApi {
   constructor(private readonly prisma: PrismaClient) {
@@ -61,6 +62,15 @@ export class TraceDestinationProjectService extends TestProjectApi {
         ? { outcome: "ambiguous", projectScopeCount: parsed.projectScopeIds.length }
         : { outcome: "resolved", project: governance },
     );
+  }
+
+  override async findWithTeam(id: string): ReturnType<ProjectApi["findWithTeam"]> {
+    // The generated row types JSON columns wider than the contract's JSONType;
+    // the rows these suites write carry no JSON.
+    return (await this.prisma.project.findUnique({
+      where: { id },
+      include: { team: true },
+    })) as Awaited<ReturnType<ProjectApi["findWithTeam"]>>;
   }
 
   override async findTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {

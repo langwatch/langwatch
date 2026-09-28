@@ -139,6 +139,8 @@ export abstract class GatewayBudgetRepository {
   abstract findHealthById(input: GatewayBudgetReadInput): Promise<BudgetHealth | null>;
   abstract findDetailById(input: GatewayBudgetReadInput): Promise<BudgetDetail | null>;
   abstract findScopeReachCandidates(organizationId: string): Promise<GatewayKeyReachCandidate[]>;
+  /** Refuses a request-supplied scope id naming anything outside the budget's organization. */
+  abstract assertScopeWithinOrganization(input: CreateBudgetInput): Promise<void>;
   abstract create(input: CreateBudgetInput): Promise<GatewayBudgetResource>;
   abstract update(input: UpdateBudgetInput): Promise<GatewayBudgetResource>;
   abstract archive(input: ArchiveBudgetInput): Promise<GatewayBudgetResource>;

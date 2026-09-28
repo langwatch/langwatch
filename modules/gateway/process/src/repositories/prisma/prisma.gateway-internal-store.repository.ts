@@ -42,7 +42,20 @@ export class PrismaGatewayInternalStoreRepository extends GatewayInternalStoreRe
         routingPolicy: { select: gatewayRoutingPolicySelect },
       },
     });
-    return (found as VirtualKeyWithScopes | null) ?? null;
+    if (!found) return null;
+    // The record carries instants; the stored columns are Dates.
+    return {
+      ...found,
+      disabledAt: found.disabledAt ? fromDate(found.disabledAt) : null,
+      expiresAt: found.expiresAt ? fromDate(found.expiresAt) : null,
+      previousSecretValidUntil: found.previousSecretValidUntil
+        ? fromDate(found.previousSecretValidUntil)
+        : null,
+      revokedAt: found.revokedAt ? fromDate(found.revokedAt) : null,
+      createdAt: fromDate(found.createdAt),
+      updatedAt: fromDate(found.updatedAt),
+      lastUsedAt: found.lastUsedAt ? fromDate(found.lastUsedAt) : null,
+    } as VirtualKeyWithScopes;
   }
 
   async findBudget(budgetId: string): Promise<GatewayBudget | null> {

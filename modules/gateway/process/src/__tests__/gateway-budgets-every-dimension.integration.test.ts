@@ -82,9 +82,9 @@ const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) 
 const prisma = connection?.client as PrismaClient;
 
 /**
- * The three Project reads this suite makes (new key's landing, existing
- * key's landing, scope reachability) — all answered from rows the suite
- * itself writes.
+ * The Project reads this suite makes (new key's landing, existing key's
+ * landing, scope reachability, spend tenants), all answered from rows the
+ * suite itself writes.
  */
 class SuiteProjectService extends TestProjectApi {
   override async findTraceDestination(
@@ -105,6 +105,17 @@ class SuiteProjectService extends TestProjectApi {
     });
   }
 
+  /** The spend tenants a bundle reads its budgets' current spend across. */
+  override async listIdsByOrganization(
+    input: Parameters<ProjectApi["listIdsByOrganization"]>[0],
+  ): ReturnType<ProjectApi["listIdsByOrganization"]> {
+    const projects = await prisma.project.findMany({
+      where: { team: { organizationId: input.organizationId } },
+      select: { id: true },
+    });
+    return projects.map((project) => project.id);
+  }
+
   override async resolveTraceDestination(
     input: Parameters<ProjectApi["resolveTraceDestination"]>[0],
   ): ReturnType<ProjectApi["resolveTraceDestination"]> {
@@ -115,9 +126,12 @@ class SuiteProjectService extends TestProjectApi {
   }
 }
 
-/** Stored provider keys arrive already decrypted in these fixtures. */
+/**
+ * Stored provider keys arrive already decrypted in these fixtures; a provider
+ * seeded with none reads as an empty bag, as the real reader answers.
+ */
 const credentials: GatewayModelProviderCredentials = {
-  readCustomKeys: (stored: unknown) => stored as Record<string, unknown>,
+  readCustomKeys: (stored: unknown) => (stored ?? {}) as Record<string, unknown>,
 };
 
 const suffix = nanoid(8);
