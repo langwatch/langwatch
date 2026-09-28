@@ -22,3 +22,19 @@ export interface WorkbenchCaller {
     projectId: string;
   }): Promise<Readonly<{ project: LangWatchQLCaller; protections: LangWatchQLProtections }>>;
 }
+
+/**
+ * The two audience facts visibility needs about a member, asked of the peers
+ * that own them: team membership (organization) and admin rights (authz).
+ */
+export interface DashboardAudience {
+  /** Whether the member belongs to the team that owns the project. */
+  isTeamMember(input: { projectId: string; userId: string }): Promise<boolean>;
+  /** Whether the member administers the project (`project:manage`). */
+  isAdmin(input: { projectId: string; userId: string }): Promise<boolean>;
+}
+
+/** The `release_dashboards` rollout, resolved for one project. */
+export interface DashboardsRollout {
+  isDashboardsEnabled(input: { projectId: string }): Promise<boolean>;
+}

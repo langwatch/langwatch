@@ -8,7 +8,10 @@
 import {
   LangWatchQLGranularityTooFineError,
   LangWatchQLReservedGranularityTypeError,
+  LWQL_ACCEPTED_GRANULARITY_STEPS,
   LWQL_GRANULARITY_STEPS,
+  describeLangWatchQLGranularityStep,
+  lwqlGranularityStepSchema,
 } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -478,6 +481,33 @@ describe("the bucket ceiling", () => {
   // overflows. Move the ceiling and those cases stop testing what they say.
   it("admits ten thousand buckets per governed run", () => {
     expect(LWQL_GRANULARITY_MAX_BUCKETS).toBe(10_000);
+  });
+});
+
+describe("the day and week grains the Dashboards area offers", () => {
+  const QUARTER = { start: "2026-01-01T00:00:00.000Z", end: "2026-04-01T00:00:00.000Z" };
+
+  it("accepts one day and one week beside the sub-day steps", () => {
+    expect([...LWQL_ACCEPTED_GRANULARITY_STEPS]).toEqual([1, 60, 3600, 86_400, 604_800]);
+    expect(lwqlGranularityStepSchema.safeParse(86_400).success).toBe(true);
+    expect(lwqlGranularityStepSchema.safeParse(604_800).success).toBe(true);
+    expect(lwqlGranularityStepSchema.safeParse(7200).success).toBe(false);
+  });
+
+  it.each([86_400, 604_800])("binds a %i-second step as asked", (step) => {
+    expect(
+      timeWindows.resolveGranularity({
+        declared: [...PERIOD, ...GRANULARITY],
+        timeWindow: QUARTER,
+        granularitySeconds: step,
+        onBudgetOverflow: "refuse",
+      }),
+    ).toEqual({ followsGranularity: true, granularitySeconds: step });
+  });
+
+  it("names them for the member", () => {
+    expect(describeLangWatchQLGranularityStep(86_400)).toBe("1 day");
+    expect(describeLangWatchQLGranularityStep(604_800, "adjective")).toBe("1-week");
   });
 });
 

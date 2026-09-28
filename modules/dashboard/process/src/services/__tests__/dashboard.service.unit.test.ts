@@ -9,6 +9,7 @@ import {
 } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
+import { FixedDashboardAudience } from "../../app/__tests__/dashboard.fixture.ts";
 import type { WorkbenchAccess } from "../../app/dashboard.members.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
 import { DashboardService } from "../dashboard.service.ts";
@@ -29,6 +30,7 @@ function serviceWith(workbenchEnabled = true) {
     service: DashboardService.create({
       repository,
       workbenchAccess: new FixedWorkbenchAccess(workbenchEnabled),
+      audience: new FixedDashboardAudience(),
     }),
   };
 }

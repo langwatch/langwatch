@@ -47,7 +47,7 @@ export function isLangWatchQLSurfaceParameter(name: string): name is LangWatchQL
 }
 
 /**
- * Exactly `UInt32`—the smallest unsigned integer that fits all offered steps,
+ * Exactly `UInt32`—the smallest unsigned integer that fits all accepted steps,
  * no aliases.
  */
 const LWQL_GRANULARITY_PARAMETER_TYPE = /^UInt32$/;
@@ -58,21 +58,35 @@ export function isLangWatchQLGranularityParameterType(type: string): boolean {
 }
 
 /**
- * Offered granularities in seconds; deliberately sub-day to avoid DST
- * misalignment.
+ * The sub-day steps the workbench and legacy dashboard pickers offer, and the
+ * ladder a coarsening overflow climbs. Day and week are accepted separately
+ * below so those surfaces keep exactly the choices they had.
  */
 export const LWQL_GRANULARITY_STEPS = [1, 60, 3600] as const;
 
-/** One of the offered steps — the only values any door accepts. */
+/** One of the sub-day offered steps. */
 export type LangWatchQLGranularityStep = (typeof LWQL_GRANULARITY_STEPS)[number];
 
+/**
+ * Every step any door accepts: the sub-day ones plus one day and one week, the
+ * Dashboards grain choices (dashboards-v1.feature, AC13). Buckets are UTC.
+ */
+export const LWQL_ACCEPTED_GRANULARITY_STEPS = [
+  ...LWQL_GRANULARITY_STEPS,
+  86_400,
+  604_800,
+] as const;
+
+/** One of the accepted steps: the only values any door accepts. */
+export type LangWatchQLAcceptedGranularityStep = (typeof LWQL_ACCEPTED_GRANULARITY_STEPS)[number];
+
 /** Unit names keyed to steps—adding a step without a name here is a compile error. */
-const LWQL_GRANULARITY_STEP_UNITS: Readonly<
-  Record<(typeof LWQL_GRANULARITY_STEPS)[number], string>
-> = {
+const LWQL_GRANULARITY_STEP_UNITS: Readonly<Record<LangWatchQLAcceptedGranularityStep, string>> = {
   1: "second",
   60: "minute",
   3600: "hour",
+  86_400: "day",
+  604_800: "week",
 };
 
 /**

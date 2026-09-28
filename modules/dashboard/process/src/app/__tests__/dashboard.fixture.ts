@@ -5,16 +5,19 @@ import type {
   LangWatchQLQueryResult,
   LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
-import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
-import { ResourceScope } from "@langwatch/process";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { ResourceScope } from "@langwatch/kernel";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { vi } from "vitest";
 
 import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
-import { DashboardModule } from "../dashboard.app.ts";
+import { DashboardApp } from "../dashboard.app.ts";
+import type { DashboardAudience } from "../dashboard.members.ts";
 
 /** Everything visible: the caller the gates are measured against. */
 export const FULLY_PERMITTED: LangWatchQLProtections = {
@@ -65,9 +68,38 @@ export function createDashboardTestAutomation(triggers: Trigger[] = []): Automat
   });
 }
 
+export const TEST_TEAM_ID = "team-1";
+export const TEST_ORGANIZATION_ID = "organization-1";
+
 export function createDashboardTestProjects(slug = "project-one"): ProjectApi {
   return createApiFixture<ProjectApi>({
     findSummaryById: async () => ({ name: "Project One", slug }),
+    findById: async (id: string) => ({ id, teamId: TEST_TEAM_ID }) as Project,
+    getOrganizationId: async () => TEST_ORGANIZATION_ID,
+  });
+}
+
+/** `release_dashboards` for every project, on unless said otherwise. */
+export function createDashboardTestFeatureFlags(dashboardsEnabled = true): FeatureFlagApi {
+  return createApiFixture<FeatureFlagApi>({
+    isEnabled: async (flagKey) => flagKey === "release_dashboards" && dashboardsEnabled,
+  });
+}
+
+/** Admins hold `project:manage`; nobody else does. */
+export function createDashboardTestAuthz(adminIds: readonly string[] = []): AuthzApi {
+  return createApiFixture<AuthzApi>({
+    hasPermission: async (check) =>
+      check.permission === "project:manage" && adminIds.includes(check.userId),
+  });
+}
+
+/** Members of the project's team; everyone else is only in the organisation. */
+export function createDashboardTestOrganizations(
+  teamMemberIds: readonly string[] = [],
+): OrganizationApi {
+  return createApiFixture<OrganizationApi>({
+    findMemberTeamIds: async ({ userId }) => (teamMemberIds.includes(userId) ? [TEST_TEAM_ID] : []),
   });
 }
 
@@ -79,6 +111,9 @@ export function createDashboardTestApp(
       analytics: AnalyticsApi;
       automation: AutomationApi;
       projects: ProjectApi;
+      featureFlags: FeatureFlagApi;
+      authz: AuthzApi;
+      organizations: OrganizationApi;
     }>;
   }> = {},
 ): DashboardModule {
@@ -89,9 +124,30 @@ export function createDashboardTestApp(
       analytics: input.dependencies?.analytics ?? createDashboardTestAnalytics(),
       automation: input.dependencies?.automation ?? createDashboardTestAutomation(),
       projects: input.dependencies?.projects ?? createDashboardTestProjects(),
+      featureFlags: input.dependencies?.featureFlags ?? createDashboardTestFeatureFlags(),
+      authz: input.dependencies?.authz ?? createDashboardTestAuthz(),
+      organizations: input.dependencies?.organizations ?? createDashboardTestOrganizations(),
     },
     config: undefined,
     resources: new ResourceScope(),
     secrets: {} as never,
   });
+}
+
+/** An audience answered from two fixed lists, for driving the service directly. */
+export class FixedDashboardAudience implements DashboardAudience {
+  constructor(
+    private readonly members: Readonly<{
+      teamMemberIds?: readonly string[];
+      adminIds?: readonly string[];
+    }> = {},
+  ) {}
+
+  async isTeamMember(input: { userId: string }): Promise<boolean> {
+    return (this.members.teamMemberIds ?? []).includes(input.userId);
+  }
+
+  async isAdmin(input: { userId: string }): Promise<boolean> {
+    return (this.members.adminIds ?? []).includes(input.userId);
+  }
 }

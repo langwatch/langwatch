@@ -9,7 +9,13 @@ import type {
 import type { Trigger } from "@langwatch/automation-contract";
 import { moduleApi } from "@langwatch/module";
 
-import type { Dashboard, DashboardSummary } from "./dashboard.ts";
+import type {
+  Dashboard,
+  DashboardSourcePresence,
+  DashboardSummary,
+  DashboardViewer,
+  DashboardVisibility,
+} from "./dashboard.ts";
 import type { Graph, GraphLayout } from "./graph.ts";
 import type { SavedView, SavedViewPeriod } from "./saved-view.ts";
 import type { SavedWorkbenchChart } from "./saved-workbench-chart.ts";
@@ -34,27 +40,75 @@ export interface DashboardUsageCount {
 
 /** Flat operations a door or a peer calls once the dashboard app is composed. */
 export interface DashboardApi {
+  /**
+   * `viewer` is the signed-in member: boards outside their audience read as not
+   * found; without one only organisation-wide boards are reachable. Writes to a
+   * code-defined board refuse with `dashboard_read_only`.
+   */
   getAll(input: {
     projectId: string;
     graphCountScope: DashboardGraphCountScope;
+    viewer?: DashboardViewer;
   }): Promise<DashboardSummary[]>;
   getById(input: {
     projectId: string;
     dashboardId: string;
+    viewer?: DashboardViewer;
   }): Promise<Dashboard & { graphs: Graph[] }>;
-  create(input: { projectId: string; name: string }): Promise<Dashboard>;
-  rename(input: { projectId: string; dashboardId: string; name: string }): Promise<Dashboard>;
-  delete(input: { projectId: string; dashboardId: string }): Promise<Dashboard>;
-  reorder(input: { projectId: string; dashboardIds: string[] }): Promise<{ success: true }>;
-  getOrCreateFirst(input: { projectId: string }): Promise<Dashboard>;
+  /** `createdById` is the member creating it; absent for a project credential. */
+  create(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard>;
+  rename(input: {
+    projectId: string;
+    dashboardId: string;
+    name: string;
+    viewer?: DashboardViewer;
+  }): Promise<Dashboard>;
+  /** Only the creator or an admin (`dashboard_owner_only`), unless the board predates creators. */
+  delete(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer?: DashboardViewer;
+  }): Promise<Dashboard>;
+  reorder(input: {
+    projectId: string;
+    dashboardIds: string[];
+    viewer?: DashboardViewer;
+  }): Promise<{ success: true }>;
+  getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard>;
   /** Where a reader opens each of these dashboards, keyed by dashboard id. */
   getDashboardLinks(input: {
     projectId: string;
     dashboardIds: string[];
   }): Promise<Record<string, string>>;
 
-  listGraphs(input: { projectId: string; dashboardId?: string }): Promise<Graph[]>;
-  getGraph(input: { projectId: string; graphId: string }): Promise<Graph>;
+  /** Dashboards area: `dashboards_not_enabled` while `release_dashboards` is off. */
+  updateDashboardDetails(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer: DashboardViewer;
+    name?: string;
+    description?: string | null;
+  }): Promise<Dashboard>;
+  /** Dashboards area. Same creator-or-admin rule as `delete`. */
+  setDashboardVisibility(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer: DashboardViewer;
+    visibility: DashboardVisibility;
+  }): Promise<Dashboard>;
+  /** Dashboards area: whether each Flight Deck source ever recorded a row, as this member reads. */
+  getSourcePresence(input: {
+    projectId: string;
+    viewer: DashboardViewer;
+  }): Promise<DashboardSourcePresence>;
+
+  /** Graphs on a board outside the viewer's audience read and write as not found. */
+  listGraphs(input: {
+    projectId: string;
+    dashboardId?: string;
+    viewer?: DashboardViewer;
+  }): Promise<Graph[]>;
+  getGraph(input: { projectId: string; graphId: string; viewer?: DashboardViewer }): Promise<Graph>;
   createGraph(input: {
     projectId: string;
     name: string;
@@ -62,6 +116,7 @@ export interface DashboardApi {
     filters?: Record<string, unknown>;
     dashboardId?: string;
     layout?: Partial<GraphLayout>;
+    viewer?: DashboardViewer;
   }): Promise<Graph>;
   updateGraph(input: {
     projectId: string;
@@ -69,16 +124,23 @@ export interface DashboardApi {
     name?: string;
     graph?: Record<string, unknown>;
     filters?: Record<string, unknown>;
+    viewer?: DashboardViewer;
   }): Promise<Graph>;
-  deleteGraph(input: { projectId: string; graphId: string }): Promise<Graph>;
+  deleteGraph(input: {
+    projectId: string;
+    graphId: string;
+    viewer?: DashboardViewer;
+  }): Promise<Graph>;
   updateGraphLayout(input: {
     projectId: string;
     graphId: string;
     layout: GraphLayout;
+    viewer?: DashboardViewer;
   }): Promise<Graph>;
   batchUpdateGraphLayouts(input: {
     projectId: string;
     layouts: { graphId: string; layout: GraphLayout }[];
+    viewer?: DashboardViewer;
   }): Promise<{ success: true }>;
 
   /**
