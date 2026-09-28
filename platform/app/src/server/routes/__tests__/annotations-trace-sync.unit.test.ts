@@ -6,6 +6,7 @@
  * search.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as AuthMiddleware from "~/server/api-key/auth-middleware";
 
 const mockAnnotationCreate = vi.fn();
 const mockAnnotationDelete = vi.fn();
@@ -44,8 +45,7 @@ vi.mock("~/server/api-key/token-resolver", () => ({
 }));
 
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
+  const actual = await importOriginal<typeof AuthMiddleware>();
   return {
     ...actual,
     extractCredentials: vi.fn(() => ({ token: "test-token" })),
