@@ -60,24 +60,19 @@ const RESOLVES_CLIENT =
  * not, and none reads tenant rows as the application.
  */
 
-// - the process stores build the managed client (`clickhouse-member`) and the
-//   untenanted admin seam migrations and one-shot tasks run on (`store-targets`).
-// - `goose.migration-runner` and `ttl.reconciler` run per call against a URL
-//   that is not the application's.
-// - the LangWatchQL executor and provisioning repositories authenticate as the
-//   restricted LangWatchQL identity, whose limits are server-side.
-// - the ops EXPLAIN repository connects as `langwatch_ops` under a readonly
-//   profile that rejects the client-side settings the managed client sends.
-// - the LangWatchQL columns manifest script runs migrations into a throwaway
-//   container; the test endpoints and the client double never reach a tenant.
 const MAY_CONSTRUCT = new Set([
+  // The managed client itself, and the untenanted admin seam migrations and tasks run on.
   "packages/process-stores/src/clickhouse-member.ts",
   "packages/process-stores/src/store-targets.ts",
+  // Per call, against a URL that is not the application's.
   "packages/clickhouse-migrations/src/goose.migration-runner.ts",
   "packages/clickhouse-migrations/src/ttl.reconciler.ts",
+  // The restricted LangWatchQL identity, whose limits are server-side.
   "modules/analytics/process/src/repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts",
   "modules/analytics/process/src/repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts",
+  // `langwatch_ops` under a readonly profile that refuses the managed client's settings.
   "modules/ops/process/src/repositories/clickhouse/clickhouse.ops-explain.repository.ts",
+  // A throwaway container, test endpoints and a never-connected double: no tenant rows.
   "modules/analytics/process/scripts/generate-lwql-columns-manifest.ts",
   "packages/test-harness/src/clickhouse-test-endpoints.ts",
   "packages/test-harness/src/client-doubles/clickhouse.double.ts",

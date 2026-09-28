@@ -56,6 +56,21 @@ const FORBIDDEN_FRAMEWORK = [/event-sourcing/, /^@langwatch\/eventing(?:\/|$)/];
 
 const FORBIDDEN_FOR_CONTRACT = [...FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE, ...FORBIDDEN_FRAMEWORK];
 
+/** Every file that constructs an IdentityService, sorted; the class's own factory is not one. */
+function identityServiceConstructors(): string[] {
+  const constructors: string[] = [];
+  for (const root of APPLICATION_ROOTS) {
+    for (const file of sourceFiles(join(REPO_ROOT, root))) {
+      const source = readFileSync(file, "utf8");
+      if (/\bclass IdentityService\b/.test(source)) continue;
+      if (CONSTRUCTS_IDENTITY_SERVICE.test(source)) {
+        constructors.push(relative(REPO_ROOT, file).split(sep).join("/"));
+      }
+    }
+  }
+  return constructors.toSorted();
+}
+
 describe("identity package boundaries", () => {
   describe("when the pure core's sources are scanned", () => {
     /** @scenario "The pure identity core compiles without node types" */
@@ -104,18 +119,7 @@ describe("identity package boundaries", () => {
   describe("when every process, module and package is scanned", () => {
     /** @scenario "Only the identity module's app composes an IdentityService" */
     it("construct IdentityService only in the identity module's app", () => {
-      const constructors: string[] = [];
-      for (const root of APPLICATION_ROOTS) {
-        for (const file of sourceFiles(join(REPO_ROOT, root))) {
-          const source = readFileSync(file, "utf8");
-          // The class's own static factory is the constructor, not a composition of it.
-          if (/\bclass IdentityService\b/.test(source)) continue;
-          if (CONSTRUCTS_IDENTITY_SERVICE.test(source)) {
-            constructors.push(relative(REPO_ROOT, file).split(sep).join("/"));
-          }
-        }
-      }
-      expect(constructors.sort()).toEqual([
+      expect(identityServiceConstructors()).toEqual([
         "modules/identity/process/src/app/identity-migrations-composition.build.ts",
         "modules/identity/process/src/app/identity.app.ts",
       ]);
