@@ -1,4 +1,5 @@
 import { Box, Container, chakra, Grid, HStack, Skeleton, Spacer, VStack } from "@chakra-ui/react";
+import { useEffect } from "react";
 import { LuCalendarClock } from "react-icons/lu";
 
 // The page's serif display voice (Sentient) is declared in langy-theme.css.
@@ -7,6 +8,7 @@ import { LuCalendarClock } from "react-icons/lu";
 // where no Langy surface mounts.
 import { homeApi } from "../../../behavior/home-api.ts";
 import { useProjectHomeHost } from "../../../model/project-home-host.ts";
+import { safeReturnToPath } from "../../../model/project-switch.ts";
 import { BriefingMockSwitcher, HomeBriefingSection, SetupHairline } from "./briefing/index.ts";
 import {
   chartVariantFor,
@@ -241,7 +243,20 @@ function LangyHome() {
 }
 
 /**
- * The default export the page loader resolves. `HomePage` stays named for
- * the suite that has always driven it by name.
+ * The home route the page loader resolves. A safe `return_to` from a project switch
+ * lands back there once the scope has resolved (so the switch is remembered first),
+ * as main's `HomePageWithReturnTo` did; nothing renders meanwhile.
  */
-export default HomePage;
+export function HomeScreen() {
+  const host = useProjectHomeHost();
+  const returnTo = safeReturnToPath(host.returnTo());
+  const isReady = !host.isLoading();
+
+  useEffect(() => {
+    if (returnTo && isReady) host.navigate(returnTo);
+  }, [host, returnTo, isReady]);
+
+  return returnTo ? null : <HomePage />;
+}
+
+export default HomeScreen;

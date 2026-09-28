@@ -6,11 +6,13 @@
 
 import {
   useUiCapabilities,
+  useUiDeclarations,
   useUiScope,
   type UiFeedback,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
-import { useMemo, type ReactNode } from "react";
+import type { UiProjectSwitcherProps } from "@langwatch/browser-host/declarations";
+import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
 import {
   SecretHostApi,
@@ -21,12 +23,22 @@ import {
 } from "../model/secret-host.ts";
 
 class CapabilitySecretHost extends SecretHostApi {
-  constructor(
-    private readonly projectId: string | undefined,
-    private readonly session: UiSession,
-    private readonly feedback: UiFeedback,
-  ) {
+  private readonly projectId: string | undefined;
+  private readonly session: UiSession;
+  private readonly feedback: UiFeedback;
+  private readonly Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
+
+  constructor(options: {
+    projectId: string | undefined;
+    session: UiSession;
+    feedback: UiFeedback;
+    Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
+  }) {
     super();
+    this.projectId = options.projectId;
+    this.session = options.session;
+    this.feedback = options.feedback;
+    this.Switcher = options.Switcher;
   }
 
   scope(): SecretHostScope {
@@ -45,9 +57,15 @@ class CapabilitySecretHost extends SecretHostApi {
     this.feedback.failed(failure);
   }
 
-  /** No switcher capability exists, and this port says null is an answer. */
+  /** Project's lent switcher (ARCHITECTURE §10); null only where no module lends one. */
   projectSwitcher(): ReactNode | null {
-    return null;
+    const { Switcher } = this;
+    if (!Switcher) return null;
+    return (
+      <Suspense fallback={null}>
+        <Switcher />
+      </Suspense>
+    );
   }
 }
 
@@ -59,9 +77,15 @@ class CapabilitySecretHost extends SecretHostApi {
 export default function SecretHostMount({ children }: { children?: ReactNode }) {
   const { session, feedback } = useUiCapabilities();
   const { projectId } = useUiScope().activeScope();
+  const declarations = useUiDeclarations();
+  // `lazy` once per declaration, never per render, so the switcher is not remounted.
+  const Switcher = useMemo(() => {
+    const [lent] = declarations.declared("projectSwitcher");
+    return lent ? lazy(lent.capability.load) : void 0;
+  }, [declarations]);
   const host = useMemo(
-    () => new CapabilitySecretHost(projectId ?? void 0, session, feedback),
-    [projectId, session, feedback],
+    () => new CapabilitySecretHost({ projectId: projectId ?? void 0, session, feedback, Switcher }),
+    [projectId, session, feedback, Switcher],
   );
   return <SecretHostProvider value={host}>{children}</SecretHostProvider>;
 }

@@ -52,9 +52,9 @@ export function userCanOpenTeam({
 }
 
 /**
- * Ambient team for organization-level work. Membership decides first —
- * the teams list carries the whole organization, not just the caller's
- * corner. Ordering and the personal-sorts-last rule: `ui-family-move-manifests.md`.
+ * Ambient team for organization-level work. Membership decides first:
+ * for an administrator the teams list carries the whole organization.
+ * Ordering and the personal-sorts-last rule: `ui-family-move-manifests.md`.
  */
 export function selectAmbientTeam<
   T extends {

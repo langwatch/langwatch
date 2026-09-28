@@ -17,6 +17,7 @@ import type {
   OrganizationDemoProject,
   OrganizationSettingsSecret,
 } from "../app/organization.members.ts";
+import { userCanOpenTeam } from "../rules/team-visibility.rules.ts";
 import { OrganizationMembershipService } from "./organization-membership.service.ts";
 
 /**
@@ -312,10 +313,7 @@ export class OrganizationVisibilityService {
           ];
     }
 
-    const isExternal =
-      !adminByBinding &&
-      organization.members[0]?.role !== "ADMIN" &&
-      organization.members[0]?.role !== "MEMBER";
+    const organizationRole = organization.members.find((member) => member.userId === userId)?.role;
 
     organization.teams = organization.teams.filter((team) => {
       team.members = team.members.filter(
@@ -329,7 +327,7 @@ export class OrganizationVisibilityService {
       }).members;
 
       if (isDemoOrganization) return true;
-      return isExternal ? team.members.some((member) => member.userId === userId) : true;
+      return userCanOpenTeam({ team, userId, organizationRole });
     });
 
     if (!isDemoOrganization) return;

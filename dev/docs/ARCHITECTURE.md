@@ -1324,6 +1324,12 @@ Identity provider, Connectors) spans organization, sso and scim pages.
 never null. The case: settings/secrets lost main's project selector beside
 Add Secret because no module lent one.
 
+**A graph a peer borrows arrives already narrowed to the caller** (Alex,
+2026-09-28): the owner's service applies its own visibility rule before the
+graph leaves, and the borrower never re-filters it. The case: `organization.getAll`
+returns only the teams, and their projects, that the caller can open, so the
+project switcher lists them as they arrive.
+
 ### 10.1 Shared browser machinery (ruled 2026-09-18)
 
 The browser mirrors the process grammar, adapted rather than copied — when a
