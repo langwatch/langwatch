@@ -11,8 +11,9 @@ const GRAIN = "{dashboard_context_granularity_seconds:UInt32}";
 const PREVIOUS_START = `subtractSeconds(${START}, dateDiff('second', ${START}, ${END}))`;
 
 /**
- * Seconds from the epoch (a Thursday) to the first Monday. Every accepted step
- * divides it, so shifting by it moves only week buckets, onto Mondays (UTC).
+ * Seconds from the epoch (a Thursday) to the first Monday. Every sub-week
+ * step divides it, so the shift is a no-op there; the week step does not,
+ * so shifting by it pins week buckets to Monday (UTC).
  */
 const MONDAY_OFFSET_SECONDS = 345_600;
 
@@ -113,7 +114,14 @@ WHERE ${inPeriod("OccurredAt")}
 GROUP BY bucket
 ORDER BY bucket`;
 
-/** Current and previous period side by side, one row: the Status tiles and their deltas. */
+/** The comparison window, shared by the cost subselects below. */
+const COMPARISON_WINDOW = `BucketStart >= ${PREVIOUS_START} AND BucketStart < ${END}`;
+
+/**
+ * Current and previous period, one row: the Status tiles and their deltas.
+ * Cost reads the same `trace_metrics_by_minute` rollup as the cost blocks,
+ * so the two never disagree.
+ */
 export const PERIOD_COMPARISON_SQL = `SELECT
   uniqExactIf(TraceId, OccurredAt >= ${START}) AS requests,
   uniqExactIf(TraceId, OccurredAt < ${START}) AS requests_prev,
@@ -121,8 +129,8 @@ export const PERIOD_COMPARISON_SQL = `SELECT
   uniqExactIf(TraceId, OccurredAt < ${START} AND HasError) AS errors_prev,
   quantileExactIf(0.95)(TotalDurationMs, OccurredAt >= ${START}) AS p95_ms,
   quantileExactIf(0.95)(TotalDurationMs, OccurredAt < ${START}) AS p95_ms_prev,
-  sumIf(TotalCost, OccurredAt >= ${START}) AS cost,
-  sumIf(TotalCost, OccurredAt < ${START}) AS cost_prev
+  (SELECT sumIf(CostSum, BucketStart >= ${START}) FROM trace_metrics_by_minute WHERE ${COMPARISON_WINDOW}) AS cost,
+  (SELECT sumIf(CostSum, BucketStart < ${START}) FROM trace_metrics_by_minute WHERE ${COMPARISON_WINDOW}) AS cost_prev
 FROM trace_metrics
 WHERE OccurredAt >= ${PREVIOUS_START} AND OccurredAt < ${END}`;
 
@@ -144,9 +152,14 @@ WHERE ${inPeriod("OccurredAt")}
 GROUP BY bucket
 ORDER BY bucket`;
 
+/**
+ * Cost is a subselect on `trace_metrics_by_minute`, the same rollup
+ * TOTAL_COST_SQL and COST_BY_MODEL_SQL read, so this panel's total never
+ * disagrees with its own model breakdown.
+ */
 export const COST_SUMMARY_SQL = `SELECT
   uniqExact(TraceId) AS traces,
-  sum(TotalCost) AS cost,
+  (SELECT sum(CostSum) FROM trace_metrics_by_minute WHERE ${inPeriod("BucketStart")}) AS cost,
   countIf(NOT HasError) AS successes,
   sum(PromptTokens) AS tokens_in,
   sum(CompletionTokens) AS tokens_out
@@ -216,7 +229,8 @@ export const CODING_AGENTS_SQL = `SELECT Agent AS agent,
 FROM coding_sessions
 WHERE ${inPeriod("StartedAt")}
 GROUP BY agent
-ORDER BY cost DESC`;
+ORDER BY cost DESC
+LIMIT 10`;
 
 export const CODING_AGENT_TREND_SQL = `SELECT Agent AS agent, ${bucketOf("StartedAt")} AS bucket, count() AS sessions
 FROM coding_sessions

@@ -311,7 +311,7 @@ describe("a member's own board", () => {
     });
 
     describe("when they choose a question", () => {
-      /** @scenario "AC11 Add a block by question" */
+      /** @scenario "AC11 Ask Langy by question" */
       it("closes the picker and asks Langy the question's prompt, writing nothing", async () => {
         const user = userEvent.setup();
         const { server, host } = openPicker();
@@ -335,7 +335,7 @@ describe("a member's own board", () => {
     });
 
     describe("when they choose a block from Blocks", () => {
-      /** @scenario "AC11 Add a block by question" */
+      /** @scenario "AC11 Ask Langy by question" */
       it("adds that one block to the board, where it renders the block's real data", async () => {
         const user = userEvent.setup();
         const { server, host } = openPicker();
@@ -718,7 +718,7 @@ describe("the Agent Flight Deck", () => {
   });
 
   describe("when the member adds a chart from it", () => {
-    /** @scenario "AC11 Add a block by question" */
+    /** @scenario "AC11 Ask Langy by question" */
     it("asks Langy a question with the deck attached as read-only, writing nothing", async () => {
       const user = userEvent.setup();
       const server = inMemoryServer({ boards: OWN_BOARDS });
@@ -743,7 +743,7 @@ describe("the Agent Flight Deck", () => {
       expect(writesTo(server)).toEqual([]);
     });
 
-    /** @scenario "AC11 Add a block by question" */
+    /** @scenario "AC11 Ask Langy by question" */
     it("adds a Blocks block to the chosen board of their own, never to the Flight Deck", async () => {
       const user = userEvent.setup();
       const server = inMemoryServer({ boards: OWN_BOARDS });
