@@ -152,40 +152,33 @@ const captureFlow = async ({
 const signInSide = async ({ plan, side }: { plan: Plan; side: Side }): Promise<void> => {
   if (plan.credential.email === "") return;
   const emails = [plan.credential.email, ...(plan.credential.fallbackEmails ?? [])];
+  const failures: string[] = [];
   for (const email of emails) {
-    await signIn({
+    const failure = await signIn({
       side,
       slug: plan.slug,
       credential: { ...plan.credential, email },
       args: {},
       snapshot: async () => undefined,
-    });
+    }).then(
+      () => "",
+      (thrown: unknown) => (thrown instanceof Error ? thrown.message : String(thrown)),
+    );
     await side.waitUntilQuiet();
-    if (!new URL(side.page.url()).pathname.startsWith("/auth/")) {
+    if (failure === "" && !new URL(side.page.url()).pathname.startsWith("/auth/")) {
       side.drain();
       return;
     }
+    failures.push(`${email}: ${failure === "" ? "still on an /auth/ page" : failure}`);
   }
+  const page = (await side.ariaSnapshot()).replaceAll("\n", " | ").slice(0, 1500);
   throw new Error(
-    `${side.name} could not sign in as ${emails.join(" or ")}: still on ${side.page.url()}`,
+    `${side.name} could not sign in (${failures.join("; ")}) at ${side.page.url()}; page: ${page}`,
   );
 };
 
-const captureSide = async ({
-  plan,
-  definition,
-  collect,
-}: {
-  plan: Plan;
-  definition: PlanSide;
-  collect: Collect;
-}): Promise<void> => {
-  if (definition.replay !== undefined) {
-    for (const message of readReplay({ file: definition.replay, plan, side: definition.name })) {
-      collect(message);
-    }
-    return;
-  }
+/** openSignedIn opens a live side and signs it in; every side does this before any capture. */
+const openSignedIn = async ({ plan, definition }: { plan: Plan; definition: PlanSide }) => {
   const side = await openSide({
     side: definition,
     viewport: plan.viewport,
@@ -194,6 +187,23 @@ const captureSide = async ({
   });
   try {
     await signInSide({ plan, side });
+  } catch (thrown) {
+    await side.browser.close().catch(() => undefined);
+    throw thrown;
+  }
+  return side;
+};
+
+const captureSide = async ({
+  plan,
+  side,
+  collect,
+}: {
+  plan: Plan;
+  side: Side;
+  collect: Collect;
+}): Promise<void> => {
+  try {
     await captureRoutes({ plan, side, collect });
     for (const flow of plan.flows) {
       await captureFlow({ plan, flow, side, collect });
@@ -218,8 +228,24 @@ const main = async (): Promise<void> => {
     const diff = pairing.add(message);
     if (diff !== null) emit({ message: diff, out });
   };
-  for (const definition of plan.sides.toSorted((a, b) => captureOrder(a) - captureOrder(b))) {
-    await captureSide({ plan, definition, collect });
+  const ordered = plan.sides.toSorted((a, b) => captureOrder(a) - captureOrder(b));
+  for (const definition of ordered) {
+    if (definition.replay === undefined) continue;
+    for (const message of readReplay({ file: definition.replay, plan, side: definition.name })) {
+      collect(message);
+    }
+  }
+  const live: Side[] = [];
+  try {
+    for (const definition of ordered) {
+      if (definition.replay === undefined) live.push(await openSignedIn({ plan, definition }));
+    }
+  } catch (thrown) {
+    await Promise.all(live.map((side) => side.browser.close().catch(() => undefined)));
+    throw thrown;
+  }
+  for (const side of live) {
+    await captureSide({ plan, side, collect });
   }
   emit({ message: { type: "done" }, out });
 };
