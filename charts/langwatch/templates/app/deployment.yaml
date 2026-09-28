@@ -171,6 +171,10 @@ spec:
             # through a different URL.
             - name: LANGWATCH_ENDPOINT
               value: {{ .Values.app.http.langwatchEndpoint | default (printf "http://localhost:%v" (.Values.app.service.port | default 5560)) | quote }}
+            # The api process listens on API_PORT; the container port, the
+            # probes and the Service all name the service port.
+            - name: API_PORT
+              value: {{ .Values.app.service.port | default 5560 | quote }}
 
             # Content-hashed asset base (ADR-086). Empty by default → assets are
             # served same-origin from the pod. Set to a commit-prefixed CDN base

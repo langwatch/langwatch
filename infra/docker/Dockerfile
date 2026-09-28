@@ -246,6 +246,8 @@ COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.
 COPY --from=builder /app/feature-map.json ./feature-map.json
 
 ENV NODE_ENV=production
+# The api process listens on API_PORT (6560 unset); the image serves on 5560.
+ENV API_PORT=5560
 EXPOSE 5560
 
 # Set bash as the default shell
