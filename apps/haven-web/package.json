@@ -10,7 +10,7 @@
     "build": "vite build",
     "screenshot": "node scripts/screenshot.ts",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@langwatch/design-system-internal": "workspace:*",
