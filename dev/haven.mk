@@ -75,12 +75,12 @@ else
 	@$(HAVEN) $(HAVEN_ARGS)
 endif
 
-# `make haven-web` builds apps/haven-web, the hub and every stack's home, into
-# tools/thuishaven/adapters/dashboard/web/dist, which the haven binary embeds
-# (ADR-160). `make haven install` runs it first; a failed build still installs
-# a haven, which then serves a page naming this target instead of the console.
+# `make haven-web` builds the consoles the haven binary embeds (ADR-160): the
+# hub and stack homes, the mail inbox and the IdP console. `make haven install`
+# runs it first; a console that fails to build (--no-bail keeps the others)
+# serves a page naming this target instead.
 haven-web:
-	@pnpm --filter @langwatch/haven-web build
+	@pnpm --no-bail --filter @langwatch/haven-web --filter @langwatch/mailsim-web --filter @langwatch/idpsim-web build
 
 # =============================================================================
 # LOCAL OBSERVABILITY STACK (owned by haven — one capped container on colima)

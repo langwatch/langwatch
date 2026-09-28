@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"html"
-	"html/template"
 	"io"
 	"regexp"
 	"strings"
@@ -154,36 +153,3 @@ func withPopupBase(body string) string {
 
 // headOpenTag matches the opening <head> tag, with or without attributes.
 var headOpenTag = regexp.MustCompile(`(?i)<head[^>]*>`)
-
-// textLinkPattern is linkPattern with the HTML delimiters left in, because
-// plain text has none: a URL in a text body ends at whitespace, and the
-// trailing punctuation a sentence leaves on it is trimmed after the match.
-var textLinkPattern = regexp.MustCompile(`(?i)https?://\S+`)
-
-// LinkifiedText is the plain-text body with its URLs turned into anchors, safe
-// to render directly. Everything is escaped first and only the anchors are
-// added back, so a text body containing `<script>` stays the four words it is.
-//
-// It exists because the plain-text tab is where a text-only message is read,
-// and a sign-in link printed there as characters is one a developer has to
-// select and paste. The preview tab got its links back by being allowed to open
-// them; this is the same fix for the other half of the message.
-func (m *Message) LinkifiedText() template.HTML {
-	var b strings.Builder
-	rest := m.Text
-	for {
-		loc := textLinkPattern.FindStringIndex(rest)
-		if loc == nil {
-			b.WriteString(template.HTMLEscapeString(rest))
-			break
-		}
-		b.WriteString(template.HTMLEscapeString(rest[:loc[0]]))
-		raw := rest[loc[0]:loc[1]]
-		link := strings.TrimRight(raw, ".,;:!?)'\"]}")
-		escaped := template.HTMLEscapeString(link)
-		b.WriteString(`<a href="` + escaped + `" target="_blank" rel="noreferrer">` + escaped + `</a>`)
-		b.WriteString(template.HTMLEscapeString(raw[len(link):]))
-		rest = rest[loc[1]:]
-	}
-	return template.HTML(b.String()) //nolint:gosec // every segment above is escaped; only the anchors are markup
-}

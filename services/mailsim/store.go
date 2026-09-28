@@ -61,11 +61,21 @@ func (m *Message) matches(to, subject string) bool {
 	return false
 }
 
+// WaitFilter narrows a long poll: To and Subject as List does, and After, when
+// set, to messages caught after that id (ids sort in arrival order).
+type WaitFilter struct {
+	To, Subject, After string
+}
+
+func (f WaitFilter) matches(m *Message) bool {
+	return m.matches(f.To, f.Subject) && (f.After == "" || m.ID > f.After)
+}
+
 // waiter is one long-poll request parked on a filter until a matching
 // message arrives, or its own context ends first.
 type waiter struct {
-	to, subject string
-	ch          chan *Message
+	filter WaitFilter
+	ch     chan *Message
 }
 
 // Store holds every caught message, in arrival order, with an optional file
@@ -136,7 +146,7 @@ func (st *Store) Deliver(msg *Message) error {
 	var matched []*waiter
 	remaining := make([]*waiter, 0, len(st.waiters))
 	for _, w := range st.waiters {
-		if msg.matches(w.to, w.subject) {
+		if w.filter.matches(msg) {
 			matched = append(matched, w)
 		} else {
 			remaining = append(remaining, w)
@@ -229,18 +239,18 @@ func (st *Store) Clear() {
 	}
 }
 
-// Wait blocks until a message matching both filters exists — one already
+// Wait blocks until a message matching the filter exists — one already
 // caught, or the next one to arrive — or ctx ends first.
-func (st *Store) Wait(ctx context.Context, to, subject string) (*Message, bool) {
+func (st *Store) Wait(ctx context.Context, filter WaitFilter) (*Message, bool) {
 	st.mu.Lock()
 	for i := len(st.messages) - 1; i >= 0; i-- {
-		if st.messages[i].matches(to, subject) {
+		if filter.matches(st.messages[i]) {
 			m := st.messages[i]
 			st.mu.Unlock()
 			return m, true
 		}
 	}
-	w := &waiter{to: to, subject: subject, ch: make(chan *Message, 1)}
+	w := &waiter{filter: filter, ch: make(chan *Message, 1)}
 	st.waiters = append(st.waiters, w)
 	st.mu.Unlock()
 

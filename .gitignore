@@ -31,6 +31,12 @@ dist/
 !/tools/thuishaven/adapters/dashboard/web/dist/
 /tools/thuishaven/adapters/dashboard/web/dist/*
 !/tools/thuishaven/adapters/dashboard/web/dist/.gitkeep
+!/services/mailsim/web/dist/
+/services/mailsim/web/dist/*
+!/services/mailsim/web/dist/.gitkeep
+!/services/idpsim/web/dist/
+/services/idpsim/web/dist/*
+!/services/idpsim/web/dist/.gitkeep
 /dev/.cache/
 
 langwatch_server/
