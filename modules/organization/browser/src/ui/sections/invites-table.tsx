@@ -102,13 +102,18 @@ const InviteRow = ({
   const canViewLink = displayStatus === "PENDING";
 
   return (
-    <Table.Row>
+    <Table.Row data-testid="invite-row">
       <Table.Cell>
         <RandomColorAvatar size="2xs" name={invite.email} />
       </Table.Cell>
       <Table.Cell>{invite.email}</Table.Cell>
       <Table.Cell>
-        <Badge size="sm" variant="surface" colorPalette={badge.colorPalette}>
+        <Badge
+          size="sm"
+          variant="surface"
+          colorPalette={badge.colorPalette}
+          data-testid="invite-status"
+        >
           {badge.label}
         </Badge>
       </Table.Cell>
