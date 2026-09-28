@@ -1319,6 +1319,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     page: number;
     limit: number;
     projectIds?: string[];
+    includeGovernance?: boolean;
   }): Promise<PaginatedProjects> {
     return this.#dependencies.projects.listByOrganization(input);
   }

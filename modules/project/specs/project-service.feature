@@ -88,3 +88,16 @@ Feature: Shared project service
     Then the feature package mints the project identifier and the ingestion key
     And the ingestion key keeps the prefixed 54-byte alphanumeric shape the onboarding snippets are sized against
     And no composition root describes either format
+
+  @unit
+  Scenario: Project listings leave out the organization's governance project
+    Given an organization holds an application project and its hidden governance project in one team
+    When a caller lists the organization's or the team's projects without asking for the governance project
+    Then only the application project is listed
+    And the page total counts only the application project
+
+  @unit
+  Scenario: A caller that covers every tenant asks for the governance project
+    Given an organization holds an application project and its hidden governance project in one team
+    When a caller lists the organization's or the team's projects with includeGovernance
+    Then both projects are listed

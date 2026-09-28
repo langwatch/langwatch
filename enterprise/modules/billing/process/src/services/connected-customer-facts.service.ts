@@ -137,6 +137,7 @@ export class ConnectedCustomerFactsService implements ConnectedStatementSources 
         organizationId,
         page,
         limit: PROJECT_PAGE_SIZE,
+        includeGovernance: true,
       });
       ids.push(...data.map((project) => project.id));
       total = data.length < PROJECT_PAGE_SIZE ? ids.length : pagination.total;

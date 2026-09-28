@@ -79,8 +79,13 @@ export interface ProjectRepository {
     page: number;
     limit: number;
     projectIds?: string[];
+    includeGovernance?: boolean;
   }): Promise<PaginatedProjects>;
-  findAllByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]>;
+  findAllByTeam(input: {
+    organizationId: string;
+    teamId: string;
+    includeGovernance?: boolean;
+  }): Promise<Project[]>;
   findNamesByIds(projectIds: string[]): Promise<ProjectIdentity[]>;
   findIdentity(id: string): Promise<ProjectIdentity | null>;
   findIdsByOrganization(organizationId: string): Promise<string[]>;

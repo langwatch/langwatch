@@ -286,6 +286,7 @@ export class DataRetentionService {
       const projects = await this.options.projects.listByTeam({
         organizationId: team.organizationId,
         teamId: scope.scopeId,
+        includeGovernance: true,
       });
 
       return projects.map((project) => project.id);
@@ -295,6 +296,7 @@ export class DataRetentionService {
       organizationId: scope.scopeId,
       page: 1,
       limit: 10_000,
+      includeGovernance: true,
     });
 
     return projects.data.map((project) => project.id);

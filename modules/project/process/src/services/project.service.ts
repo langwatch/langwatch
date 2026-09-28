@@ -425,11 +425,16 @@ export class ProjectService {
     page: number;
     limit: number;
     projectIds?: string[];
+    includeGovernance?: boolean;
   }): Promise<PaginatedProjects> {
     return this.repository.listAllByOrganization(projectPaginationSchema.parse(input));
   }
 
-  listByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
+  listByTeam(input: {
+    organizationId: string;
+    teamId: string;
+    includeGovernance?: boolean;
+  }): Promise<Project[]> {
     return this.repository.findAllByTeam(input);
   }
 

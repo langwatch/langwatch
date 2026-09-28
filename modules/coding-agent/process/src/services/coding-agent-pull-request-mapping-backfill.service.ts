@@ -33,6 +33,7 @@ export type CodingAgentBackfillProjects = {
     organizationId: string;
     page: number;
     limit: number;
+    includeGovernance?: boolean;
   }): Promise<{ data: readonly { id: string }[] }>;
 };
 
@@ -64,6 +65,7 @@ export class CodingAgentPullRequestMappingBackfillService {
         organizationId: parsed.organizationId,
         page: 1,
         limit: PULL_REQUEST_MAPPING_BACKFILL_BRANCH_CAP,
+        includeGovernance: true,
       })
     ).data.map((project) => project.id);
     const targets = new Map<string, PullRequestMappingTarget>();

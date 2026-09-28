@@ -85,6 +85,12 @@ Feature: Data Retention service boundary
     Then it uses the Project or Organization service
     And its repository reads only retention policy rows
 
+  @unit
+  Scenario: An organization or team retention rule reaches the governance project
+    Given the organization holds its hidden governance project beside an application project
+    When a retention rule is written at the organization or at the governance project's team
+    Then the resolved policy of the governance project is invalidated too
+
   Scenario: Boot supplies the platform default
     Given the process has validated its retention configuration
     When it composes the Data Retention service

@@ -408,11 +408,16 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     page: number;
     limit: number;
     projectIds?: string[];
+    includeGovernance?: boolean;
   }): Promise<PaginatedProjects> {
     return this.#projectService.listByOrganization(input);
   }
 
-  listByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
+  listByTeam(input: {
+    organizationId: string;
+    teamId: string;
+    includeGovernance?: boolean;
+  }): Promise<Project[]> {
     return this.#projectService.listByTeam(input);
   }
 

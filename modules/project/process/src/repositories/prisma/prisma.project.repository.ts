@@ -393,10 +393,12 @@ export class PrismaProjectRepository
     page: number;
     limit: number;
     projectIds?: string[];
+    includeGovernance?: boolean;
   }): Promise<PaginatedProjects> {
     const where = {
       archivedAt: null,
       team: { organizationId: input.organizationId },
+      ...(input.includeGovernance ? {} : { kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE } }),
       ...(input.projectIds ? { id: { in: input.projectIds } } : {}),
     };
     const [rows, total] = await Promise.all([
@@ -414,12 +416,16 @@ export class PrismaProjectRepository
     };
   }
 
-  async findAllByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
+  async findAllByTeam(input: {
+    organizationId: string;
+    teamId: string;
+    includeGovernance?: boolean;
+  }): Promise<Project[]> {
     const rows = await this.prisma.project.findMany({
       where: {
         teamId: input.teamId,
         archivedAt: null,
-        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        ...(input.includeGovernance ? {} : { kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE } }),
         team: { organizationId: input.organizationId },
       },
       orderBy: { createdAt: "desc" },

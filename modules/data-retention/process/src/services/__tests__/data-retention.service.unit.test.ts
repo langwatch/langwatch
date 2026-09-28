@@ -244,4 +244,41 @@ describe("DataRetentionService", () => {
       expect(cache.deleted).toEqual([PROJECT, "project-2", PROJECT, "project-2"]);
     });
   });
+
+  describe("given the organization holds its hidden governance project", () => {
+    async function governanceAwareProjects(): Promise<ProjectApi> {
+      const application = await createDataRetentionTestProjects().findWithTeam(PROJECT);
+      if (!application) throw new Error("the retention fixture seeds its project");
+      const governance = { ...application, id: "project-governance", kind: "internal_governance" };
+      const visible = (includeGovernance: boolean | undefined) =>
+        includeGovernance ? [application, governance] : [application];
+
+      return createApiFixture<ProjectApi>({
+        listByTeam: async ({ includeGovernance }) => visible(includeGovernance),
+        listByOrganization: async ({ includeGovernance }) => {
+          const data = visible(includeGovernance);
+          return { data, pagination: { page: 1, limit: data.length, total: data.length } };
+        },
+      });
+    }
+
+    /** @scenario "An organization or team retention rule reaches the governance project" */
+    it("invalidates the governance project for organization and team rules", async () => {
+      const cache = new RecordingCache();
+      const service = createService({ cache, projects: await governanceAwareProjects() });
+
+      await service.setForScope({
+        scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },
+        category: "traces",
+        retentionDays: 63,
+      });
+      await service.setForScope({
+        scope: { scopeType: "TEAM", scopeId: retentionTestGraph.teamId },
+        category: "traces",
+        retentionDays: 63,
+      });
+
+      expect(cache.deleted).toEqual([PROJECT, "project-governance", PROJECT, "project-governance"]);
+    });
+  });
 });
