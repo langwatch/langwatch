@@ -1037,6 +1037,14 @@ so may `lwql-provision.ts` and `lwql-render-access-config.ts`: LangWatchQL provi
 both schemas under the same migration lock, before serve, and the access-config render runs from
 env alone in its Helm job (Alex, 2026-09-28).
 
+**In-place system migrations belong to their subject; the runner belongs to ops.** Identity and
+authz each answer the migrations they own through their `*Api` (`registeredMigrations()`, with
+identity's user-rooted `userMigrations()` beside it), and ops composes the migrations page,
+enrolment, the targeted run and the pass over its own `SystemMigration*` tables and Redis lease,
+never importing a peer's process package. The api serves the page and awaits a targeted run
+in-request, as main did; passes run on a worker (§9); apps/tasks keeps the startup convergence
+(Alex, 2026-09-28).
+
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path.
 
@@ -1079,6 +1087,12 @@ the right physical endpoint internally, per call. No resolver type, no
 `.resolve()` step, and no adapter exists outside that package; a caller
 never thinks about resolution at all. The per-module resolver adapters
 (`create<F>ClickHouseResolver`) are transitional and die when this lands.
+
+**The `clickhouse` member exposes its routing table** (Alex, 2026-09-28):
+`privateRoutes()` answers the organizations it routes to a private endpoint, parsed once at boot
+from the `CLICKHOUSE_URL__*` family. A module needing that deployment fact (ops' cohort exclusion,
+read through `RoutingTableOrganizationDataplaneService`) reads the member, never a second
+declaration of the env family in its own config.
 
 ---
 
@@ -1211,6 +1225,11 @@ A process-manager handler emits intents through the typed accessor `ctx.intent(n
 registers with `.on(eventSchema, handler)` (or reads its `.toPayload(schema, map)` view); no cast (Alex, 2026-09-27).
 Per-entity calendar work (a report's cron) is a keyed process manager on its owner's pipeline; the
 eventing `ScheduledJob` scheduler is retired, its table dropped a release after its code (Alex, 2026-09-26).
+The system-migration re-drive and an operator's "run a pass now" are one scheduled process manager
+on ops' `ops_system_migrations` (Alex, 2026-09-28): the hourly wake asks for a pass only when the
+stored state holds a tenant a pass could still move, and the kick is a command whose event asks
+the same intent ungated. The kick's tenant is the operator's user, which the event store places on
+the shared cluster, and its aggregate is not the scheduled singleton, whose wake an event would clear.
 An experiment run executes on its pipeline, never in a request: `StartRun` is a command, a process manager
 emits one cell intent per row and target, the worker runs each cell as a command appending its result
 events, and projections fold progress that SSE and polling read. Abort is a command the manager honours.
@@ -1224,6 +1243,15 @@ A run's live frames are published from its progress fold, which assigns each fra
 counts, so a reconnect's replay and the live stream cannot disagree; its events carry every detail a
 frame shows (an evaluator's error type, traceback, domain error, raw response and cost currency) as
 additive fields, never a side channel (Alex, 2026-09-28).
+An operator's projection replay runs as a worker process-manager intent, never in a request: the api
+takes the Redis replay lock, records the run and sends `requestProjectionReplay` on ops'
+`ops_projection_replay`; the intent awaits the whole run, fenced by the lock holder, so a delivery
+for a run that no longer holds the lock does nothing. Status, history and cancel stay the Redis keys
+every role reads (Alex, 2026-09-28).
+A replay reads its projections off the pipelines the process registered: `replayProjectionsOf`
+unwraps a `RedisCachedFoldStore` to its durable tier, and a map projection's owner declares the
+`targetTable` a rebuild optimizes on its definition. No list outside the owning module names a
+store or a table (Alex, 2026-09-28).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
