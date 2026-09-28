@@ -7,6 +7,7 @@ import type {
   LicenseRegistryInfrastructure,
   LicenseStorage,
   OrganizationLicenseReads,
+  OrganizationLicenseStorage,
   SelfHostedInstancesInfrastructure,
 } from "../app/licensing.members.ts";
 
@@ -28,14 +29,34 @@ export class LicensingInfrastructureService {
     getMemberCount?: (organizationId: string) => Promise<number>;
     getMembersLiteCount?: (organizationId: string) => Promise<number>;
   }): LicensingInfrastructure {
-    const licenses = options.licenses;
     const unavailable = () => new Error(`${this.processName} does not compose license mutation`);
+    return this.withStorage({
+      ...options,
+      licenses: {
+        getOrganizationLicense: (organizationId) =>
+          options.licenses.getOrganizationLicense(organizationId),
+        findOrganizationsWithLicense: () => options.licenses.findOrganizationsWithLicense(),
+        organizationExists: () => Promise.reject(unavailable()),
+        storeLicense: () => Promise.reject(unavailable()),
+        removeLicense: () => Promise.reject(unavailable()),
+      },
+    });
+  }
+
+  /** The licence rows read and written, with seat counts supplied by the caller or refused. */
+  withStorage(options: {
+    licenses: OrganizationLicenseStorage;
+    getMemberCount?: (organizationId: string) => Promise<number>;
+    getMembersLiteCount?: (organizationId: string) => Promise<number>;
+  }): LicensingInfrastructure {
+    const licenses = options.licenses;
+    const unavailable = () => new Error(`${this.processName} does not compose seat counts`);
     const repository: LicenseStorage = {
       getOrganizationLicense: (organizationId) => licenses.getOrganizationLicense(organizationId),
       findOrganizationsWithLicense: () => licenses.findOrganizationsWithLicense(),
-      organizationExists: () => Promise.reject(unavailable()),
-      storeLicense: () => Promise.reject(unavailable()),
-      removeLicense: () => Promise.reject(unavailable()),
+      organizationExists: (organizationId) => licenses.organizationExists(organizationId),
+      storeLicense: (organizationId, license) => licenses.storeLicense(organizationId, license),
+      removeLicense: (organizationId) => licenses.removeLicense(organizationId),
       getMemberCount: options.getMemberCount ?? (() => Promise.reject(unavailable())),
       getMembersLiteCount: options.getMembersLiteCount ?? (() => Promise.reject(unavailable())),
     };
