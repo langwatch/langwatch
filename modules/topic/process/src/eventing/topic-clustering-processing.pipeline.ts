@@ -12,6 +12,7 @@ import {
 
 import type { TopicApp } from "../app/topic.app.ts";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "../rules/topic-clustering-process.rules.ts";
 import {
   TopicClusteringRequestedEventSchema,
   TopicClusteringRunStartedEventSchema,
@@ -49,17 +50,14 @@ import {
   recordTopicsDedupeId,
   type TopicClusteringDispatchDeps,
 } from "./topic-clustering.intent.ts";
-import {
-  TOPIC_CLUSTERING_PROCESS_NAME,
-  TopicClusteringProcess,
-} from "./topic-clustering.process.ts";
+import { topicClusteringProcessManager } from "./topic-clustering.process.ts";
 import { type TopicModelData, TopicModelFoldProjection } from "./topic-model.projection.ts";
 
 export const TOPIC_CLUSTERING_PIPELINE_NAME = "topic_clustering_processing";
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (state, intents, handlers, outbox tuning) is declared
- *  in `TopicClusteringProcess.processManager`, ADR-052 "Approved builder API", like automations. */
+ *  in `topicClusteringProcessManager`, ADR-052 "Approved builder API", like automations. */
 export interface TopicClusteringProcessingPipelineDeps {
   /** Postgres run-status read model behind the settings page (ADR-051 §7). */
   topicClusteringRunStatusStore: StateProjectionStore<TopicClusteringRunStatusData>;
@@ -112,10 +110,7 @@ const buildTopicClusteringProcessingPipeline = (deps: TopicClusteringProcessingP
         ttlMs: 60_000,
       },
     })
-    .withProcessManager(
-      TOPIC_CLUSTERING_PROCESS_NAME,
-      TopicClusteringProcess.processManager(deps.dispatch),
-    )
+    .withProcessManager(TOPIC_CLUSTERING_PROCESS_NAME, topicClusteringProcessManager(deps.dispatch))
     .withProcessManager(TOPIC_CLUSTERING_SEED_PROCESS_NAME, (pm) =>
       pm
         .state(topicClusteringSeedStateSchema, TOPIC_CLUSTERING_SEED_INITIAL_STATE)

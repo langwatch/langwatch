@@ -21,8 +21,8 @@
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
+      "types": "./dist/__tests__/testing.d.ts",
+      "default": "./src/__tests__/testing.ts"
     },
     "./composition/trace-edit-overlay": {
       "types": "./dist/repositories/prisma/prisma.trace-edit-overlay.repository.d.ts",

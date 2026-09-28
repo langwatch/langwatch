@@ -89,6 +89,7 @@ import type {
 } from "./ops-system-migration.ts";
 import type { ProductAnalyticsTarget } from "./ops.config.ts";
 import type {
+  OpsApiGetBadgeCountsOutput,
   OpsDoorAnswer,
   OpsEventLogSearchWindow,
   OpsExplainAnswer,
@@ -566,7 +567,7 @@ export interface OpsApi {
     credential: Readonly<{ token: string; projectId: string | null }> | null;
   }): Promise<OpsDoorAnswer>;
   findDashboardData(): DashboardData | null;
-  badgeCounts(): { blockedCount: number; dlqCount: number; computedAt: Date | null };
+  badgeCounts(): OpsApiGetBadgeCountsOutput;
   streamDashboard(input: StreamDashboardInput): AsyncIterable<DashboardData>;
   getQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo>;
   computeProjectionState(input: {

@@ -87,9 +87,11 @@ export const graphTrpcTransport = defineTrpcRouter(DashboardApi, graphTrpc)
       projectId: input.projectId,
     });
 
+    const filters = knownFilters(graph.filters);
+
     return {
       ...legacyGraph(graph),
-      filters: knownFilters(graph.filters),
+      filters: Object.keys(filters).length > 0 ? filters : undefined,
       alert: trigger === undefined ? undefined : alertOf(trigger),
     };
   })
@@ -171,8 +173,8 @@ function alertOf(trigger: Trigger): GraphAlert {
  */
 function knownFilters(
   filters: Graph["filters"],
-): Record<string, string[] | Record<string, string[]>> | undefined {
-  if (!filters || typeof filters !== "object") return undefined;
+): Record<string, string[] | Record<string, string[]>> {
+  if (!filters || typeof filters !== "object") return {};
 
   const known: Record<string, string[] | Record<string, string[]>> = {};
   for (const [key, value] of Object.entries(filters)) {
@@ -182,5 +184,5 @@ function knownFilters(
     }
   }
 
-  return Object.keys(known).length > 0 ? known : undefined;
+  return known;
 }

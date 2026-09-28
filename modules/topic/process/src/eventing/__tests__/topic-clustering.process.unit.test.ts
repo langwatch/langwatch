@@ -3,10 +3,14 @@ import { buildProcessDefinition, buildProcessManager } from "@langwatch/eventing
 import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
+import {
+  nextDailySlot,
+  TOPIC_CLUSTERING_PROCESS_NAME,
+} from "../../rules/topic-clustering-process.rules.ts";
 import type { TopicClusteringProcessingEvent } from "../../services/topic-events.service.ts";
 import {
-  TOPIC_CLUSTERING_PROCESS_NAME,
-  TopicClusteringProcess,
+  buildTopicClusteringProcessEventView,
+  topicClusteringProcessManager,
   type TopicClusteringProcessState,
 } from "../topic-clustering.process.ts";
 
@@ -21,7 +25,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const definition = buildProcessDefinition(
   buildProcessManager<TopicClusteringProcessingEvent>({
     name: TOPIC_CLUSTERING_PROCESS_NAME,
-    applier: TopicClusteringProcess.processManager({
+    applier: topicClusteringProcessManager({
       runPort: { runClusteringPage: () => Promise.reject(new Error("unused")) },
       commands: {
         recordClusteringRunStarted: () => Promise.reject(new Error("unused in evolve tests")),
@@ -79,7 +83,7 @@ function evolveEvent(
         tenantId: String(event.tenantId),
         projectId: String(event.tenantId),
         processKey: String(event.aggregateId),
-        payload: TopicClusteringProcess.buildProcessEventView(event),
+        payload: buildTopicClusteringProcessEventView(event),
       },
       now: now ?? event.occurredAt,
     },
@@ -110,14 +114,14 @@ function runKey(runId: string, page: number): string {
 
 describe("nextDailySlot", () => {
   it("is deterministic and stable across days for one project", () => {
-    const first = TopicClusteringProcess.nextDailySlot(PROJECT_ID, 1_752_700_000_000);
-    const dayLater = TopicClusteringProcess.nextDailySlot(PROJECT_ID, first);
+    const first = nextDailySlot({ projectId: PROJECT_ID, afterMs: 1_752_700_000_000 });
+    const dayLater = nextDailySlot({ projectId: PROJECT_ID, afterMs: first });
     expect(dayLater - first).toBe(DAY_MS);
   });
 
   it("is strictly after the reference instant", () => {
     const afterMs = 1_752_700_000_000;
-    expect(TopicClusteringProcess.nextDailySlot(PROJECT_ID, afterMs)).toBeGreaterThan(afterMs);
+    expect(nextDailySlot({ projectId: PROJECT_ID, afterMs })).toBeGreaterThan(afterMs);
   });
 
   it("spreads a fleet of projects across the whole day, not a few spikes", () => {
@@ -126,7 +130,7 @@ describe("nextDailySlot", () => {
     const slots = new Set<number>();
     const hours = new Set<number>();
     for (const id of ids) {
-      const offset = TopicClusteringProcess.nextDailySlot(id, base) % DAY_MS;
+      const offset = nextDailySlot({ projectId: id, afterMs: base }) % DAY_MS;
       slots.add(offset);
       hours.add(Math.floor(offset / (60 * 60 * 1000)));
     }
@@ -155,7 +159,7 @@ describe("topicClustering process (runtime-built definition)", () => {
       expect(evolution.state.enabled).toBe(true);
       expect(evolution.state.projectId).toBe(PROJECT_ID);
       expect(evolution.intents).toEqual([]);
-      expect(evolution.nextWakeAt).toBe(TopicClusteringProcess.nextDailySlot(PROJECT_ID, 10_000));
+      expect(evolution.nextWakeAt).toBe(nextDailySlot({ projectId: PROJECT_ID, afterMs: 10_000 }));
     });
 
     it("is idempotent when re-sent by the backfill task", () => {
@@ -199,7 +203,7 @@ describe("topicClustering process (runtime-built definition)", () => {
         startedAtMs: scheduledFor,
       });
       expect(evolution.nextWakeAt).toBe(
-        TopicClusteringProcess.nextDailySlot(PROJECT_ID, scheduledFor),
+        nextDailySlot({ projectId: PROJECT_ID, afterMs: scheduledFor }),
       );
     });
   });
@@ -221,7 +225,7 @@ describe("topicClustering process (runtime-built definition)", () => {
       expect(evolution.intents).toEqual([]);
       expect(evolution.state.currentRun).toEqual(state.currentRun);
       expect(evolution.nextWakeAt).toBe(
-        TopicClusteringProcess.nextDailySlot(PROJECT_ID, scheduledFor),
+        nextDailySlot({ projectId: PROJECT_ID, afterMs: scheduledFor }),
       );
     });
   });
@@ -343,7 +347,7 @@ describe("topicClustering process (runtime-built definition)", () => {
         },
       ]);
       expect(evolution.nextWakeAt).toBe(
-        TopicClusteringProcess.nextDailySlot(PROJECT_ID, occurredAt),
+        nextDailySlot({ projectId: PROJECT_ID, afterMs: occurredAt }),
       );
     });
   });
@@ -523,7 +527,7 @@ describe("topicClustering process (runtime-built definition)", () => {
       expect(evolution.intents).toEqual([]);
       expect(evolution.state.currentRun).toBeNull();
       expect(evolution.nextWakeAt).toBe(
-        TopicClusteringProcess.nextDailySlot(PROJECT_ID, occurredAt),
+        nextDailySlot({ projectId: PROJECT_ID, afterMs: occurredAt }),
       );
     });
   });
@@ -547,7 +551,7 @@ describe("topicClustering process (runtime-built definition)", () => {
       // Scheduling from business time put nextWakeAt in the PAST, which fired
       // an immediate wake whose run intent collided with an already-dispatched
       // messageKey and was dropped, losing a day's clustering with no signal.
-      expect(evolution.nextWakeAt).toBe(TopicClusteringProcess.nextDailySlot(PROJECT_ID, now));
+      expect(evolution.nextWakeAt).toBe(nextDailySlot({ projectId: PROJECT_ID, afterMs: now }));
       expect(evolution.nextWakeAt!).toBeGreaterThan(now);
     });
   });

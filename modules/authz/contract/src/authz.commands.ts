@@ -49,20 +49,15 @@ const commandIdentitySchema = z
   })
   .strict();
 
-function commandDataSchema<Shape extends z.ZodRawShape>(
-  shape: Shape,
-): z.ZodType<z.infer<ReturnType<typeof commandIdentitySchema.extend<Shape>>>> {
-  return commandIdentitySchema.extend(shape).refine(
-    (data) => {
-      const identity = data as { tenantId: string; organizationId: string };
-      return identity.tenantId === identity.organizationId;
-    },
-    {
-      message: "tenantId must equal organizationId: one grants ledger per organization",
-      path: ["tenantId"],
-    },
-  );
-}
+type CommandIdentity = z.infer<typeof commandIdentitySchema>;
+
+/** One grants ledger per organization: every command names its tenant twice. */
+const isOneLedgerPerOrganization = (data: CommandIdentity): boolean =>
+  data.tenantId === data.organizationId;
+const ONE_LEDGER_PER_ORGANIZATION = {
+  message: "tenantId must equal organizationId: one grants ledger per organization",
+  path: ["tenantId"],
+};
 
 export const attachGrantEntrySchema = z
   .object({
@@ -104,35 +99,42 @@ export const attachGrantEntrySchema = z
   );
 export type AttachGrantEntry = z.infer<typeof attachGrantEntrySchema>;
 
-export const attachGrantCommandDataSchema = commandDataSchema({
-  grant: attachGrantEntrySchema,
-}).refine(
-  (data) =>
-    !data.grant.membershipBootstrap ||
-    data.grant.scope.type !== "ORGANIZATION" ||
-    data.grant.scope.id === data.organizationId,
-  {
-    message: "organization bootstrap must target its tenant organization",
-    path: ["grant", "scope", "id"],
-  },
-);
+export const attachGrantCommandDataSchema = commandIdentitySchema
+  .safeExtend({
+    grant: attachGrantEntrySchema,
+  })
+  .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION)
+  .refine(
+    (data) =>
+      !data.grant.membershipBootstrap ||
+      data.grant.scope.type !== "ORGANIZATION" ||
+      data.grant.scope.id === data.organizationId,
+    {
+      message: "organization bootstrap must target its tenant organization",
+      path: ["grant", "scope", "id"],
+    },
+  );
 export type AttachGrantCommandData = z.infer<typeof attachGrantCommandDataSchema>;
 
-export const changeGrantRoleCommandDataSchema = commandDataSchema({
-  grantId: z.string().min(1),
-  from: z.string().min(1).nullable(),
-  to: z.string().min(1),
-  actor: grantsLedgerActorSchema,
-  occurredAtMs: z.number().int().nonnegative(),
-});
+export const changeGrantRoleCommandDataSchema = commandIdentitySchema
+  .safeExtend({
+    grantId: z.string().min(1),
+    from: z.string().min(1).nullable(),
+    to: z.string().min(1),
+    actor: grantsLedgerActorSchema,
+    occurredAtMs: z.number().int().nonnegative(),
+  })
+  .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
 export type ChangeGrantRoleCommandData = z.infer<typeof changeGrantRoleCommandDataSchema>;
 
-export const revokeGrantCommandDataSchema = commandDataSchema({
-  grantId: z.string().min(1),
-  reason: z.string().min(1).optional(),
-  actor: grantsLedgerActorSchema,
-  occurredAtMs: z.number().int().nonnegative(),
-});
+export const revokeGrantCommandDataSchema = commandIdentitySchema
+  .safeExtend({
+    grantId: z.string().min(1),
+    reason: z.string().min(1).optional(),
+    actor: grantsLedgerActorSchema,
+    occurredAtMs: z.number().int().nonnegative(),
+  })
+  .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
 export type RevokeGrantCommandData = z.infer<typeof revokeGrantCommandDataSchema>;
 
 export const defineRoleEntrySchema = z
@@ -147,27 +149,33 @@ export const defineRoleEntrySchema = z
   .strict();
 export type DefineRoleEntry = z.infer<typeof defineRoleEntrySchema>;
 
-export const defineRoleCommandDataSchema = commandDataSchema({
-  role: defineRoleEntrySchema,
-  actor: grantsLedgerActorSchema,
-});
+export const defineRoleCommandDataSchema = commandIdentitySchema
+  .safeExtend({
+    role: defineRoleEntrySchema,
+    actor: grantsLedgerActorSchema,
+  })
+  .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
 export type DefineRoleCommandData = z.infer<typeof defineRoleCommandDataSchema>;
 
-export const changeRolePermissionsCommandDataSchema = commandDataSchema({
-  roleId: z.string().min(1),
-  permissions: z.array(z.string().min(1)),
-  actor: grantsLedgerActorSchema,
-  occurredAtMs: z.number().int().nonnegative(),
-});
+export const changeRolePermissionsCommandDataSchema = commandIdentitySchema
+  .safeExtend({
+    roleId: z.string().min(1),
+    permissions: z.array(z.string().min(1)),
+    actor: grantsLedgerActorSchema,
+    occurredAtMs: z.number().int().nonnegative(),
+  })
+  .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
 export type ChangeRolePermissionsCommandData = z.infer<
   typeof changeRolePermissionsCommandDataSchema
 >;
 
-export const deleteRoleCommandDataSchema = commandDataSchema({
-  roleId: z.string().min(1),
-  actor: grantsLedgerActorSchema,
-  occurredAtMs: z.number().int().nonnegative(),
-});
+export const deleteRoleCommandDataSchema = commandIdentitySchema
+  .safeExtend({
+    roleId: z.string().min(1),
+    actor: grantsLedgerActorSchema,
+    occurredAtMs: z.number().int().nonnegative(),
+  })
+  .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
 export type DeleteRoleCommandData = z.infer<typeof deleteRoleCommandDataSchema>;
 
 /**

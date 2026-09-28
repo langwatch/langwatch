@@ -53,9 +53,6 @@ export type { TopicClusteringCommands } from "./app/topic.members.ts";
 export { RequestTopicClusteringTask } from "./eventing/run-topic-clustering.intent.ts";
 export { TopicClusteringRunTask } from "./tasks/topic-clustering-run.task.ts";
 export type { TopicClusteringScheduleReader } from "./app/topic.app.ts";
-export {
-  TOPIC_CLUSTERING_PROCESS_NAME,
-  TopicClusteringProcess,
-  type TopicClusteringProcessState,
-} from "./eventing/topic-clustering.process.ts";
+export type { TopicClusteringProcessState } from "./eventing/topic-clustering.process.ts";
+export { TOPIC_CLUSTERING_PROCESS_NAME } from "./rules/topic-clustering-process.rules.ts";
 export { topicTrpcTransport } from "./transport/topic.trpc.ts";

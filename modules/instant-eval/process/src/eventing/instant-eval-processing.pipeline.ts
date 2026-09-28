@@ -10,6 +10,7 @@ import {
   definePipeline,
   type EventingSetup,
   type Projection,
+  type RegisteredCommand,
   type StateProjectionStore,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
@@ -44,11 +45,11 @@ export interface InstantEvalProcessingPipelineDeps {
   dispatch: InstantEvalDispatchDeps;
 }
 
-/** The pipeline this module registers; commands left `any`, as its peers do. */
+/** The pipeline this module registers. */
 export type InstantEvalProcessingPipelineDefinition = StaticPipelineDefinition<
   InstantEvalProcessingEvent,
   Record<string, Projection>,
-  any
+  RegisteredCommand
 >;
 
 function buildInstantEvalProcessingPipeline(
