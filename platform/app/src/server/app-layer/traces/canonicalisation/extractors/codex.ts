@@ -84,7 +84,6 @@ const CODEX_EVENT_NAME_PREFIX = "codex.";
  * exec the response-span skip below must never fire, and it is the rollup
  * that defers instead.
  */
-const CODEX_EXEC_SCOPE_NAME = CODEX_EXEC_SCOPE;
 export const CODEX_TURN_SPAN_NAME = "session_task.turn";
 
 // codex's per-response model-call span. Its gen_ai.usage.* is already summed
@@ -239,7 +238,7 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       // the authoritative usage record (older codex emits no turn rollup
       // there at all), so skipping them would zero those traces' totals;
       // the exec-side duplicate is the rollup, handled below.
-      if (scopeName !== CODEX_EXEC_SCOPE_NAME) {
+      if (scopeName !== CODEX_EXEC_SCOPE) {
         this.markRedundantUsageSpan(ctx);
       }
       return;
@@ -296,7 +295,7 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // codex-spelled is still recognised. If a future codex exec drops its
     // response spans, this zeroes those traces' totals; today every exec
     // trace carries both records and counting both doubles all of them.
-    if (scopeName === CODEX_EXEC_SCOPE_NAME && this.hasTokenUsage(ctx)) {
+    if (scopeName === CODEX_EXEC_SCOPE && this.hasTokenUsage(ctx)) {
       ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
       ctx.recordRule("codex/skip-exec-rollup-usage");
     }
