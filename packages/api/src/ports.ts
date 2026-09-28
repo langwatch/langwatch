@@ -18,7 +18,7 @@ export interface RateLimiter {
 /** Response cache port; keys use the complete validated handler input. */
 export interface ResponseCache {
   get(key: string): Promise<Uint8Array | null>;
-  set(key: string, tag: string, body: Uint8Array, ttlSeconds: number): Promise<void>;
+  set(entry: { key: string; tag: string; body: Uint8Array; ttlSeconds: number }): Promise<void>;
   invalidateTag(tag: string): Promise<void>;
 }
 

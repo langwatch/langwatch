@@ -413,7 +413,7 @@ export async function storeRestAnswer({
   logger: Logger;
 }): Promise<void> {
   try {
-    await cache.set(key, policy.tag, body, policy.ttlSeconds);
+    await cache.set({ key, tag: policy.tag, body, ttlSeconds: policy.ttlSeconds });
   } catch (error) {
     logger.warn({ error }, "the response cache could not be written");
   }
