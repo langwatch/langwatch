@@ -1,6 +1,6 @@
 /**
- * What a browser installs when it installs organization: the Members,
- * Teams, Groups and Audit Log settings screens, and the two surfaces
+ * What a browser installs when it installs organization: the Directory
+ * (members, teams, groups) and Audit Log settings screens, and the two surfaces
  * annotation and project mount today.
  */
 
@@ -22,11 +22,12 @@ export const organizationWeb = defineWebModule("organization")
       label: "Audit Log",
       load: () => import("./ui/sections/organization/audit-log.screen.tsx"),
     },
-    "pages/settings/members": {
-      path: "/settings/members",
+    // Members, Teams and Groups are the Directory's tabs; their old addresses redirect.
+    "pages/settings/directory": {
+      path: "/settings/directory",
       within: "settings",
-      label: "Members",
-      load: () => import("./ui/sections/organization/members.screen.tsx"),
+      label: "Directory",
+      load: () => import("./ui/sections/organization/directory.screen.tsx"),
     },
     "pages/settings/authentication": {
       path: "/settings/authentication",
@@ -34,18 +35,6 @@ export const organizationWeb = defineWebModule("organization")
       label: "Authentication",
       load: () =>
         import("./features/authentication-settings/ui/sections/authentication-settings.screen.tsx"),
-    },
-    "pages/settings/groups": {
-      path: "/settings/groups",
-      within: "settings",
-      label: "Groups",
-      load: () => import("./ui/sections/organization/groups.screen.tsx"),
-    },
-    "pages/settings/teams": {
-      path: "/settings/teams",
-      within: "settings",
-      label: "Teams",
-      load: () => import("./ui/sections/organization/teams.screen.tsx"),
     },
     "pages/settings/teams/[team]": {
       path: "/settings/teams/:team",

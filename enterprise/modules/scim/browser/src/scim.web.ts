@@ -1,7 +1,7 @@
 /**
- * What a browser installs when it installs scim: the provisioning screens, the
- * back office's directory sync, and the overview's directory card. Always
- * installed — scim refuses per-organization on entitlement, never by tier.
+ * What a browser installs when it installs scim: the connectors screen, the back
+ * office's directory sync, the overview's directory card and the Directory's status
+ * band. Always installed — scim refuses per-organization on entitlement, never by tier.
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
@@ -14,12 +14,6 @@ export const scimWeb = defineWebModule("scim")
   .withScreens({
     // Placed by the application's settings table until a settings anchor
     // accepts declared routes; the loader is this module's either way.
-    "pages/settings/scim": {
-      path: "/settings/scim",
-      within: "settings",
-      label: "SCIM Provisioning",
-      load: () => import("./ui/sections/scim.screen.tsx"),
-    },
     "pages/settings/authentication/connectors": {
       path: "/settings/authentication/connectors",
       within: "settings",
@@ -37,4 +31,6 @@ export const scimWeb = defineWebModule("scim")
     authenticationOverviewCard: {
       load: () => import("./ui/sections/directory-overview-card.tsx"),
     },
+    // What the directory has been doing, above organization's Directory tabs.
+    directorySummary: { load: () => import("./ui/sections/directory-summary.tsx") },
   });

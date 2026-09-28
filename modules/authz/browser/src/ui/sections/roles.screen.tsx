@@ -33,6 +33,7 @@ import { PermissionViewer } from "../blocks/permission-viewer.tsx";
 import { RoleCard } from "../blocks/role-card.tsx";
 import { EnterpriseUpsell } from "../elements/enterprise-upsell.tsx";
 import { RoleFormDialog, type RoleFormData } from "./role-form-dialog.tsx";
+import { RolesTabs } from "./roles-tabs.tsx";
 
 // Permission list cast; wire carries strings; registry filters unrecognised.
 function asPermissions(permissions: readonly string[]): AuthzPermission[] {
@@ -77,7 +78,13 @@ export default function RolesScreen() {
     );
   }
 
-  return <RolesManagement organizationId={organizationId} host={host} />;
+  return (
+    <RolesTabs
+      host={host}
+      organizationId={organizationId}
+      roles={<RolesManagement organizationId={organizationId} host={host} />}
+    />
+  );
 }
 
 function RolesManagement({ organizationId, host }: { organizationId: string; host: AuthzHostApi }) {
@@ -189,13 +196,7 @@ function RolesManagement({ organizationId, host }: { organizationId: string; hos
 
   return (
     <VStack align="start" width="full" gap={6}>
-      <HStack justify="space-between" width="full">
-        <VStack align="start" gap={1}>
-          <Heading as="h2">Roles &amp; Permissions</Heading>
-          <Text color="fg.muted" fontSize="sm">
-            Create custom roles and assign specific permissions to control access
-          </Text>
-        </VStack>
+      <HStack justify="end" width="full">
         <Tooltip
           content="You need organization:manage permissions to create roles."
           disabled={canManage}

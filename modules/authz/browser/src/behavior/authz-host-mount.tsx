@@ -18,6 +18,7 @@ import {
   type AuthzFailureNotice,
   type AuthzHostScope,
   type AuthzPlanReading,
+  type AuthzRouteReading,
   type AuthzSuccessNotice,
 } from "../model/authz-host.ts";
 import { authzApi } from "./authz-api.ts";
@@ -29,6 +30,8 @@ class CapabilityAuthzHost extends AuthzHostApi {
       session: UiSession;
       feedback: UiFeedback;
       plan: AuthzPlanReading;
+      route: AuthzRouteReading;
+      setQuery: AuthzHostApi["setQuery"];
     },
   ) {
     super();
@@ -46,6 +49,17 @@ class CapabilityAuthzHost extends AuthzHostApi {
     return this.deps.plan;
   }
 
+  route(): AuthzRouteReading {
+    return this.deps.route;
+  }
+
+  setQuery(
+    next: Readonly<Record<string, string | undefined>>,
+    options?: { replace?: boolean },
+  ): void {
+    this.deps.setQuery(next, options);
+  }
+
   succeeded(notice: AuthzSuccessNotice): void {
     this.deps.feedback.succeeded(notice);
   }
@@ -61,7 +75,8 @@ class CapabilityAuthzHost extends AuthzHostApi {
  * is what `mounts.load` resolves.
  */
 export default function AuthzHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback } = useUiCapabilities();
+  const { session, feedback, route } = useUiCapabilities();
+  const { query } = route.reading();
   const { organizationId } = useUiScope().activeScope();
   // The same question, gate and cache entry as the navigation's plan reading.
   const usage = authzApi.limits.getUsage.useQuery(
@@ -80,8 +95,10 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
         session,
         feedback,
         plan,
+        route: { query },
+        setQuery: (next, options) => route.setQuery(next, options),
       }),
-    [organizationId, session, feedback, plan],
+    [organizationId, session, feedback, plan, query, route],
   );
   return <AuthzHostProvider value={host}>{children}</AuthzHostProvider>;
 }

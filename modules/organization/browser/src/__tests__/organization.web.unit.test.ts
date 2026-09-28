@@ -33,8 +33,8 @@ describe("given a browser that installs organization", () => {
       expect(loaded).toHaveProperty("default");
     });
 
-    it("answers with the Members component", async () => {
-      const screen = organizationWeb.installation.screens["pages/settings/members"];
+    it("answers with the Directory component", async () => {
+      const screen = organizationWeb.installation.screens["pages/settings/directory"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
@@ -48,18 +48,13 @@ describe("given a browser that installs organization", () => {
       expect(loaded).toHaveProperty("default");
     });
 
-    it("answers with the Groups component", async () => {
-      const screen = organizationWeb.installation.screens["pages/settings/groups"];
-      const loaded = await screen?.load?.();
+    /** Members, Groups and Teams became the Directory's tabs; their addresses redirect. */
+    it("declares no page for the retired addresses", () => {
+      const screens = organizationWeb.installation.screens;
 
-      expect(loaded).toHaveProperty("default");
-    });
-
-    it("answers with the Teams component", async () => {
-      const screen = organizationWeb.installation.screens["pages/settings/teams"];
-      const loaded = await screen?.load?.();
-
-      expect(loaded).toHaveProperty("default");
+      expect(screens).not.toHaveProperty("pages/settings/members");
+      expect(screens).not.toHaveProperty("pages/settings/groups");
+      expect(screens).not.toHaveProperty("pages/settings/teams");
     });
 
     it("answers with the Team Detail component", async () => {

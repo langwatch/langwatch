@@ -1,6 +1,9 @@
 /** Host port for organization screens: sealed imports (ui, router, session) routed here. */
 
-import type { UiAuthenticationOverviewCardProps } from "@langwatch/browser-host/declarations";
+import type {
+  UiAuthenticationOverviewCardProps,
+  UiDirectorySummaryProps,
+} from "@langwatch/browser-host/declarations";
 import { createContext, useContext } from "react";
 import type { ComponentType, ReactNode } from "react";
 
@@ -84,6 +87,9 @@ export type AuthenticationOverviewCard = {
   Card: ComponentType<UiAuthenticationOverviewCardProps>;
 };
 
+/** The directory status band a peer lends the Directory page (scim). */
+export type DirectorySummaryBand = ComponentType<UiDirectorySummaryProps>;
+
 /** The one thing a screen is handed. */
 export abstract class OrganizationHostApi {
   /** The organization and project this page is about. */
@@ -164,6 +170,9 @@ export abstract class OrganizationHostApi {
    * through `withCapabilities`, in the order the overview draws them.
    */
   abstract authenticationOverviewCards(): readonly AuthenticationOverviewCard[];
+
+  /** The status band scim declares through `withCapabilities`; absent, none is drawn. */
+  abstract directorySummary(): DirectorySummaryBand | undefined;
 
   abstract failed(failure: OrganizationFailureNotice): void;
 }

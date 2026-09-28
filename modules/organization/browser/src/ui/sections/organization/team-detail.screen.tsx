@@ -259,7 +259,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
       {
         onSuccess: () => {
           setShowArchiveDialog(false);
-          host.navigate("/settings/teams");
+          host.navigate("/settings/directory?tab=teams");
         },
         onError: (error: unknown) => {
           const refused = trpcErrorCode(error) === "FORBIDDEN";

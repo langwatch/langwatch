@@ -1,4 +1,4 @@
-// The SCIM family as the browser application mounts it: one screen at /settings/scim.
+// The SCIM family as the browser application mounts it: the connectors screen.
 // Owning frontend must mount tRPC provider, host port, base URL, and notices.
 
 export { scimApi, type ScimApiMap, type ScimTokenRow } from "./behavior/scim-api.ts";

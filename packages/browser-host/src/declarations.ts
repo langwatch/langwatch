@@ -80,6 +80,9 @@ export type UiAuthenticationOverviewCardProps = {
   canReadMembership: boolean;
 };
 
+/** What organization's Directory hands the directory status band above its tabs. */
+export type UiDirectorySummaryProps = UiAuthenticationOverviewCardProps;
+
 /** What a landing hero hands project's lent inline command palette. */
 export type UiHeroAskFieldProps = { placeholder: string };
 
@@ -598,6 +601,8 @@ export type UiDeclaredCapabilities = {
     readonly section?: "sign-in" | "provisioning";
   };
   conversationThread: UiDeclaredComponent<UiConversationThreadProps>;
+  /** The directory's status band, drawn above the Directory's tabs; scim lends it. */
+  directorySummary: UiDeclaredComponent<UiDirectorySummaryProps>;
   customGraph: UiDeclaredComponent<UiCustomGraphProps>;
   datasetEditorTable: UiDeclaredComponent<UiDatasetEditorTableProps>;
   datasetPickerList: UiDeclaredComponent<UiDatasetPickerListProps>;

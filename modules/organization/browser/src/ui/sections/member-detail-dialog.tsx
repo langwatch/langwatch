@@ -197,7 +197,7 @@ function GroupAccessList({
             <Text fontSize="sm" color="fg.muted">
               {group.name}
             </Text>
-            <Link href="/settings/groups" fontSize="xs" color="blue.400">
+            <Link href="/settings/directory?tab=groups" fontSize="xs" color="blue.400">
               No access configured
             </Link>
           </HStack>

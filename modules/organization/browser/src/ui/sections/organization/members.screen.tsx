@@ -1,5 +1,5 @@
 /**
- * The people in an organization, at `/settings/members`.
+ * The people in an organization: the Directory's People tab.
  */
 
 import {

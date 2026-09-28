@@ -88,7 +88,7 @@ describe("given a directory that manages three of four members", () => {
     expect(screen.getByText(/1 arrived another way/)).toBeInTheDocument();
     expect(screen.getByText("See who it manages").closest("a")).toHaveAttribute(
       "href",
-      "/settings/members?people=members",
+      "/settings/directory",
     );
     expect(
       screen.getAllByTestId("directory-card-group-chip").map((chip) => chip.textContent),

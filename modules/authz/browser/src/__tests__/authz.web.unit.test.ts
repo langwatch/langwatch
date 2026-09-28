@@ -33,11 +33,9 @@ describe("given a browser that installs authz", () => {
       expect(loaded).toHaveProperty("default");
     });
 
-    it("answers with the Role Bindings component", async () => {
-      const screen = authzWeb.installation.screens["pages/settings/role-bindings"];
-      const loaded = await screen?.load?.();
-
-      expect(loaded).toHaveProperty("default");
+    /** Role Bindings became the Roles page's assignments tab; its address redirects. */
+    it("declares no page for the retired Role Bindings address", () => {
+      expect(authzWeb.installation.screens).not.toHaveProperty("pages/settings/role-bindings");
     });
   });
 });

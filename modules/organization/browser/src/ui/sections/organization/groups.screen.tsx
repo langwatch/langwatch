@@ -1,5 +1,5 @@
 /**
- * Groups an organization grants access through, at `/settings/groups`. A
+ * Groups an organization grants access through: the Directory's Groups tab. A
  * SCIM-synced group's deletion here only holds until the next sync.
  * Enterprise gates the FEATURE, not the PAGE — never a missing page.
  */

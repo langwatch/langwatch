@@ -13,6 +13,7 @@ import type { ReactElement, ReactNode } from "react";
 
 import {
   type AuthenticationOverviewCard,
+  type DirectorySummaryBand,
   type OrganizationActor,
   type OrganizationProjectReading,
   type OrganizationSuccessNotice,
@@ -70,6 +71,7 @@ export class FakeOrganizationHost extends OrganizationHostApi {
       hasEmailProvider?: boolean;
       flags?: ReadonlySet<string>;
       overviewCards?: readonly AuthenticationOverviewCard[];
+      directorySummary?: DirectorySummaryBand;
     } = {},
   ) {
     super();
@@ -166,6 +168,10 @@ export class FakeOrganizationHost extends OrganizationHostApi {
 
   authenticationOverviewCards(): readonly AuthenticationOverviewCard[] {
     return this.options.overviewCards ?? [];
+  }
+
+  directorySummary(): DirectorySummaryBand | undefined {
+    return this.options.directorySummary;
   }
 
   failed(failure: OrganizationFailureNotice): void {

@@ -267,8 +267,13 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         children: [
           { path: "/settings", page: "pages/settings" },
           {
+            // Role Bindings became the Roles page's assignments tab.
             path: "/settings/role-bindings",
-            page: "pages/settings/role-bindings",
+            redirect: {
+              from: "/settings/role-bindings",
+              to: "/settings/roles",
+              pinParams: { tab: "assignments" },
+            },
           },
           {
             path: "/settings/annotation-scores",
@@ -307,8 +312,17 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/settings/security",
           },
           {
+            // Members, Teams, Groups and SCIM became the Directory and its tabs.
+            path: "/settings/directory",
+            page: "pages/settings/directory",
+          },
+          {
             path: "/settings/groups",
-            page: "pages/settings/groups",
+            redirect: {
+              from: "/settings/groups",
+              to: "/settings/directory",
+              pinParams: { tab: "groups" },
+            },
           },
           {
             path: "/settings/connect",
@@ -323,8 +337,13 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/settings/license",
           },
           {
+            // The old `tab` named a cut of the people; it travels as `people`.
             path: "/settings/members",
-            page: "pages/settings/members",
+            redirect: {
+              from: "/settings/members",
+              to: "/settings/directory",
+              renameParams: { tab: "people" },
+            },
           },
           {
             path: "/settings/model-costs",
@@ -352,7 +371,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           },
           {
             path: "/settings/scim",
-            page: "pages/settings/scim",
+            redirect: { from: "/settings/scim", to: "/settings/directory" },
           },
           {
             path: "/settings/secrets",
@@ -364,7 +383,11 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           },
           {
             path: "/settings/teams",
-            page: "pages/settings/teams",
+            redirect: {
+              from: "/settings/teams",
+              to: "/settings/directory",
+              pinParams: { tab: "teams" },
+            },
           },
           {
             path: "/settings/teams/:team",

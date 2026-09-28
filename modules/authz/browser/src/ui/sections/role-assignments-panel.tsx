@@ -1,13 +1,15 @@
-// Audit surface: organization grants grouped by holder; filter in state, not URL.
+/**
+ * The Roles page's assignments tab: every role assignment in the organization,
+ * gathered onto whoever holds it. It was a page called Role Bindings; the screen
+ * says assignment, never the engine's word. The Roles page gates the plan.
+ */
 
 import {
   Badge,
   Box,
   Button,
   Card,
-  Heading,
   HStack,
-  Separator,
   Spacer,
   Spinner,
   Table,
@@ -19,7 +21,6 @@ import { Users } from "lucide-react";
 import { useState } from "react";
 
 import { authzApi } from "../../behavior/authz-api.ts";
-import { useAuthzHost } from "../../model/authz-host.ts";
 import {
   type BindingPrincipal,
   type BindingScopeFilter,
@@ -31,7 +32,6 @@ import {
   scopePalette,
   scopePillText,
 } from "../../model/role-binding-principals.ts";
-import { EnterpriseUpsell } from "../elements/enterprise-upsell.tsx";
 import { PrincipalAvatar } from "../elements/principal-avatar.tsx";
 
 const SCOPE_TIERS = roleBindingScopeTypeSchema.enum;
@@ -43,34 +43,18 @@ const FILTERS: readonly { label: string; value: BindingScopeFilter }[] = [
   { label: scopeLabel(SCOPE_TIERS.PROJECT), value: SCOPE_TIERS.PROJECT },
 ];
 
-export default function RoleBindingsScreen() {
-  const host = useAuthzHost();
-  const { organizationId } = host.scope();
-  const { isEnterprise, isLoading: isPlanLoading } = host.plan();
+export function RoleAssignmentsPanel({ organizationId }: { organizationId: string }) {
   const [scopeFilter, setScopeFilter] = useState<BindingScopeFilter>("ALL");
 
   const { data: bindings, isLoading } = authzApi.roleBinding.listForOrg.useQuery(
-    { organizationId: organizationId ?? "" },
-    { enabled: !!organizationId && isEnterprise },
+    { organizationId },
+    { enabled: !!organizationId },
   );
-
-  if (isPlanLoading || !organizationId) return <Spinner />;
-
-  if (!isEnterprise) return <EnterpriseUpsell />;
 
   const principals = groupBindingsByPrincipal(bindingsInFilter(bindings ?? [], scopeFilter));
 
   return (
     <VStack align="start" gap={6} width="full">
-      <VStack align="start" gap={1} width="full">
-        <Heading as="h2">Role Bindings</Heading>
-        <Text color="fg.muted" fontSize="sm">
-          All role bindings in this organization.
-        </Text>
-      </VStack>
-
-      <Separator />
-
       <HStack width="full">
         <HStack gap={1}>
           {FILTERS.map((filter) => (
@@ -88,14 +72,14 @@ export default function RoleBindingsScreen() {
         <Spacer />
         {bindings && (
           <Text fontSize="sm" color="fg.muted">
-            {principals.length} {principals.length === 1 ? "principal" : "principals"}
+            {principals.length} {principals.length === 1 ? "member or group" : "members and groups"}
           </Text>
         )}
       </HStack>
 
       <Card.Root width="full" overflow="hidden">
         <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-          <BindingsTable isLoading={isLoading} principals={principals} />
+          <AssignmentsTable isLoading={isLoading} principals={principals} />
         </Card.Body>
       </Card.Root>
     </VStack>
@@ -103,7 +87,7 @@ export default function RoleBindingsScreen() {
 }
 
 /** The three states of the list: still reading, nothing to show, the rows. */
-function BindingsTable({
+function AssignmentsTable({
   isLoading,
   principals,
 }: {
@@ -121,7 +105,7 @@ function BindingsTable({
   if (principals.length === 0) {
     return (
       <Box padding={8} textAlign="center">
-        <Text color="fg.muted">No role bindings found.</Text>
+        <Text color="fg.muted">Nobody has been assigned a role yet.</Text>
       </Box>
     );
   }
@@ -141,7 +125,7 @@ function BindingsTable({
               <PrincipalCell principal={principal} />
             </Table.Cell>
             <Table.Cell>
-              <BindingsCell bindings={principal.bindings} />
+              <AssignmentsCell bindings={principal.bindings} />
             </Table.Cell>
           </Table.Row>
         ))}
@@ -203,8 +187,8 @@ function PrincipalCell({ principal }: { principal: BindingPrincipal }) {
   );
 }
 
-/** What the row can do, and where: one line per binding. */
-function BindingsCell({ bindings }: { bindings: readonly RoleBinding[] }) {
+/** What the row can do, and where: one line per assignment. */
+function AssignmentsCell({ bindings }: { bindings: readonly RoleBinding[] }) {
   return (
     <VStack gap={1} align="end">
       {bindings.map((binding) => (

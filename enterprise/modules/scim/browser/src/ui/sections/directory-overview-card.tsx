@@ -17,7 +17,7 @@ import { CONNECTORS_PAGE } from "../../model/scim-host.ts";
 
 /** Groups named before the rest collapse into a count. */
 const GROUPS_SHOWN = 4;
-const DIRECTORY_PAGE = "/settings/members?people=members";
+const DIRECTORY_PAGE = "/settings/directory";
 
 type DirectoryFactsRead = ReturnType<typeof useDirectoryFacts>;
 type WaitingConnection = DirectoryFactsRead["connections"][number];
