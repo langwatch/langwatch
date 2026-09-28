@@ -1,7 +1,60 @@
 {
-  "updatedAt": "2026-09-25T11:45:12.286Z",
-  "modelCount": 489,
+  "updatedAt": "2026-09-28T02:25:59.437Z",
+  "modelCount": 490,
   "models": {
+    "typesafe/jev-router": {
+      "id": "typesafe/jev-router",
+      "name": "TypeSafe: Jev Router",
+      "provider": "typesafe",
+      "pricing": {
+        "inputCostPerToken": -1,
+        "outputCostPerToken": -1
+      },
+      "contextLength": 1000000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": {},
+      "modality": "text+image+file+audio+video->text",
+      "mode": "chat",
+      "description": "Jev Router picks the best model and reasoning effort for each request, balancing quality, speed, and cost. It runs on , TypeSafe's first System One model, and adapts as your...",
+      "supportsImageInput": true,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "perceptron/perceptron-mk1.5": {
+      "id": "perceptron/perceptron-mk1.5",
+      "name": "Perceptron: Perceptron Mk1.5",
+      "provider": "perceptron",
+      "pricing": {
+        "inputCostPerToken": 1.5e-7,
+        "outputCostPerToken": 0.0000015
+      },
+      "contextLength": 36864,
+      "maxCompletionTokens": 8192,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p"
+      ],
+      "defaultParameters": {},
+      "modality": "text+image+audio+video->text",
+      "mode": "chat",
+      "description": "Perceptron Mk1.5 is Perceptron's embodied reasoning model for physical agents. It accepts text, image, video, and audio input, and answers with text plus optional structured annotations: points, boxes, polygons, tracks,...",
+      "supportsImageInput": true,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "fireworks/ember-1": {
       "id": "fireworks/ember-1",
       "name": "Fireworks: Ember-1",
@@ -746,7 +799,7 @@
         "outputCostPerToken": 8.7e-7,
         "inputCacheReadPerToken": 3.6e-9
       },
-      "contextLength": 1048576,
+      "contextLength": 1050000,
       "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
@@ -967,9 +1020,9 @@
       "name": "DeepSeek: DeepSeek Pro Latest",
       "provider": "~deepseek",
       "pricing": {
-        "inputCostPerToken": 2.528e-7,
-        "outputCostPerToken": 0.00000288,
-        "inputCacheReadPerToken": 8.832e-8
+        "inputCostPerToken": 2.523e-7,
+        "outputCostPerToken": 0.0000035,
+        "inputCacheReadPerToken": 2.518e-7
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -1012,9 +1065,9 @@
       "name": "DeepSeek: DeepSeek Flash Latest",
       "provider": "~deepseek",
       "pricing": {
-        "inputCostPerToken": 4e-8,
-        "outputCostPerToken": 4.9e-7,
-        "inputCacheReadPerToken": 1e-8
+        "inputCostPerToken": 2.975e-8,
+        "outputCostPerToken": 6e-7,
+        "inputCacheReadPerToken": 2.678e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -1338,9 +1391,9 @@
       "name": "inclusionAI: Ling 3.0 Flash VL",
       "provider": "inclusionai",
       "pricing": {
-        "inputCostPerToken": 6e-8,
-        "outputCostPerToken": 1.8e-7,
-        "inputCacheReadPerToken": 1.2e-8
+        "inputCostPerToken": 2.1e-8,
+        "outputCostPerToken": 6.16e-8,
+        "inputCacheReadPerToken": 4.2e-9
       },
       "contextLength": 262144,
       "maxCompletionTokens": 32768,
@@ -1379,12 +1432,12 @@
       "name": "DeepSeek: DeepSeek V4.1 Flash",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 1.5e-7,
+        "inputCostPerToken": 2.975e-8,
         "outputCostPerToken": 6e-7,
-        "inputCacheReadPerToken": 3e-9
+        "inputCacheReadPerToken": 2.678e-8
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 393216,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -2111,12 +2164,12 @@
       "name": "Z.ai: GLM 5.3 Flash",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 4.5e-8,
-        "outputCostPerToken": 1.4e-7,
-        "inputCacheReadPerToken": 1e-8
+        "inputCostPerToken": 1.5e-7,
+        "outputCostPerToken": 5e-7,
+        "inputCacheReadPerToken": 3e-8
       },
       "contextLength": 1310720,
-      "maxCompletionTokens": 128000,
+      "maxCompletionTokens": 943717,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -2240,7 +2293,7 @@
         "inputCacheReadPerToken": 6e-9
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 943718,
+      "maxCompletionTokens": 943717,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -2329,12 +2382,12 @@
       "name": "Z.ai: GLM Latest",
       "provider": "~z-ai",
       "pricing": {
-        "inputCostPerToken": 5.614e-7,
-        "outputCostPerToken": 0.0000017644,
-        "inputCacheReadPerToken": 1.0426e-7
+        "inputCostPerToken": 4.522e-7,
+        "outputCostPerToken": 0.000002805,
+        "inputCacheReadPerToken": 1.46625e-7
       },
       "contextLength": 1310720,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -2743,12 +2796,12 @@
       "name": "DeepSeek: DeepSeek V4 Pro 0813",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 4.62e-7,
-        "outputCostPerToken": 0.000001386,
-        "inputCacheReadPerToken": 1.54e-8
+        "inputCostPerToken": 2.523e-7,
+        "outputCostPerToken": 0.0000035,
+        "inputCacheReadPerToken": 2.518e-7
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 384000,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -2830,7 +2883,7 @@
         "outputCostPerToken": 2e-7,
         "inputCacheReadPerToken": 4e-8
       },
-      "contextLength": 262144,
+      "contextLength": 1000000,
       "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
@@ -3012,7 +3065,7 @@
       "name": "DeepSeek: DeepSeek V4 Flash Latest",
       "provider": "~deepseek",
       "pricing": {
-        "inputCostPerToken": 3e-8,
+        "inputCostPerToken": 2.1e-8,
         "outputCostPerToken": 3.2e-7,
         "inputCacheReadPerToken": 1.6e-8
       },
@@ -3056,7 +3109,7 @@
       "name": "DeepSeek: DeepSeek V4 Flash 0731",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 3e-8,
+        "inputCostPerToken": 2.1e-8,
         "outputCostPerToken": 3.2e-7,
         "inputCacheReadPerToken": 1.6e-8
       },
@@ -3104,7 +3157,7 @@
         "outputCostPerToken": 0.0000012,
         "inputCacheReadPerToken": 1e-7
       },
-      "contextLength": 1048576,
+      "contextLength": 524288,
       "maxCompletionTokens": 262144,
       "supportedParameters": [
         "frequency_penalty",
@@ -3569,7 +3622,7 @@
         "outputCostPerToken": 0.00000405,
         "inputCacheReadPerToken": 1.7e-7
       },
-      "contextLength": 1048576,
+      "contextLength": 524288,
       "maxCompletionTokens": 471859,
       "supportedParameters": [
         "frequency_penalty",
@@ -5884,9 +5937,9 @@
       "name": "MoonshotAI: Kimi Latest",
       "provider": "~moonshotai",
       "pricing": {
-        "inputCostPerToken": 8.845e-7,
-        "outputCostPerToken": 0.0000105346,
-        "inputCacheReadPerToken": 3.3e-7
+        "inputCostPerToken": 0.000001,
+        "outputCostPerToken": 0.000009,
+        "inputCacheReadPerToken": 3e-7
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -6164,11 +6217,10 @@
       "provider": "qwen",
       "pricing": {
         "inputCostPerToken": 3.2e-7,
-        "outputCostPerToken": 0.0000027,
-        "inputCacheReadPerToken": 1.5e-7
+        "outputCostPerToken": 0.0000032
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 262140,
+      "maxCompletionTokens": 81920,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -6402,7 +6454,7 @@
         "inputCacheReadPerToken": 6e-9
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 384000,
+      "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -6805,9 +6857,9 @@
       "name": "Z.ai: GLM 5.1",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 9.646e-7,
-        "outputCostPerToken": 0.0000030316,
-        "inputCacheReadPerToken": 1.7914e-7
+        "inputCostPerToken": 0.0000014,
+        "outputCostPerToken": 0.0000044,
+        "inputCacheReadPerToken": 2.6e-7
       },
       "contextLength": 204800,
       "maxCompletionTokens": 131072,
@@ -6850,9 +6902,9 @@
       "name": "Google: Gemma 4 26B A4B ",
       "provider": "gemini",
       "pricing": {
-        "inputCostPerToken": 9e-8,
-        "outputCostPerToken": 3e-7,
-        "inputCacheReadPerToken": 5e-8
+        "inputCostPerToken": 6.75e-8,
+        "outputCostPerToken": 2.25e-7,
+        "inputCacheReadPerToken": 3.75e-8
       },
       "contextLength": 262144,
       "maxCompletionTokens": 235929,
@@ -7972,12 +8024,11 @@
       "name": "Qwen: Qwen3.5-35B-A3B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 3.125e-7,
-        "outputCostPerToken": 0.00000125,
-        "inputCacheReadPerToken": 1.5625e-7
+        "inputCostPerToken": 1.625e-7,
+        "outputCostPerToken": 0.0000013
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 16384,
+      "maxCompletionTokens": 65536,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -8065,7 +8116,7 @@
         "outputCostPerToken": 0.00000208
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": 235929,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -14616,8 +14667,9 @@
       "name": "DeepSeek: DeepSeek V3 0324",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 2.5e-7,
-        "outputCostPerToken": 0.000001
+        "inputCostPerToken": 2.9e-7,
+        "outputCostPerToken": 0.00000114,
+        "inputCacheReadPerToken": 1.1e-7
       },
       "contextLength": 163840,
       "maxCompletionTokens": 147456,
@@ -15540,7 +15592,7 @@
         "inputCacheReadPerToken": 2.8e-8
       },
       "contextLength": 163840,
-      "maxCompletionTokens": 16384,
+      "maxCompletionTokens": 16000,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -16868,38 +16920,6 @@
       "modality": "text+image->text",
       "mode": "chat",
       "description": "The latest GPT-4 Turbo model with vision capabilities. Vision requests can now use JSON mode and function calling. Training data: up to December 2023.",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "anthropic/claude-3-haiku": {
-      "id": "anthropic/claude-3-haiku",
-      "name": "Anthropic: Claude 3 Haiku",
-      "provider": "anthropic",
-      "pricing": {
-        "inputCostPerToken": 2.5e-7,
-        "outputCostPerToken": 0.00000125,
-        "inputCacheReadPerToken": 3e-8,
-        "inputCacheWritePerToken": 3e-7,
-        "inputCacheWrite1hPerToken": 5e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 4096,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "Claude 3 Haiku is Anthropic's fastest and most compact model for near-instant responsiveness. Quick and accurate targeted performance. See the launch announcement and benchmark results [here](https://www.anthropic.com/news/claude-3-haiku) #multimodal",
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
