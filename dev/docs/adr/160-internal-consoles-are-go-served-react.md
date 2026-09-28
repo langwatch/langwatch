@@ -35,7 +35,8 @@ Go API is only for working on the console itself.
 | `apps/mailsim-web`     | `services/mailsim`                     | `mail.<slug>.langwatch.localhost`                      |
 
 All of them, plus the mail room's chrome and the Storybook manager theme, draw
-from one package, `@langwatch/design-system-internal`: the hub's paper look as
+from one package, `@langwatch/design-system-internal` (and read the clock through
+`@langwatch/time`, as everything else does): the hub's paper look as
 tokens, a stylesheet and a small set of React components. It depends on React
 only; no Chakra, no product design system, no product module.
 

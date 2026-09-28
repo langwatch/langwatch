@@ -47,7 +47,7 @@ Shared, machine-wide (one daemon serves all worktrees):
 
 | Hostname                            | What                                    |
 | ----------------------------------- | --------------------------------------- |
-| `langwatch.localhost`               | Dashboard — which worktree runs what    |
+| `hub.langwatch.localhost`           | The hub: which worktree runs what       |
 | `observability.langwatch.localhost` | The local Grafana LGTM stack (:3000)    |
 | `telemetry.langwatch.localhost`     | OTLP fan-out to **every** running stack |
 
@@ -265,18 +265,21 @@ from can never be destroyed. One-key handoffs: `c` opens the interactive
 cleanup picker and returns, `w` opens the machine's web dashboard, and `m`
 toggles the monitor panel — the shared servers' footprints plus the daemon's
 recent reaping (stacks, test containers, governed processes, idle databases),
-newest first, from the persisted event record. The web dashboard
-(`langwatch.localhost`) shows the same machine: the memory chart, the stack
-cards (their own services only — the shared servers are stated once), the idle
-worktrees, and the reaping feed. Each stack card has a **logs** button. The
-log panel refreshes every two seconds, with stack/service selection, severity
-and text filters, pause/resume, follow, wrap, copy and download. Scrolling up
-stops following; the **Follow latest** button returns to the live bottom.
-The panel survives dashboard refreshes and preserves selected text. It reads
-up to the last 128 KiB of each capture and returns at most 1,000 complete
-lines; use `haven logs` for more history. It works without the observability
-stack. The read-only `/api/logs?stack=<slug>&service=<lane>` endpoint only
-reads registered stack captures.
+newest first, from the persisted event record. The web hub
+(`hub.langwatch.localhost`, or the bare `langwatch.localhost`) shows the same
+machine: the memory chart, a card per stack (its own surfaces only; the
+shared servers are stated once), the idle worktrees with a start button, and
+the reaping feed. Each card links to the stack's home and has **Logs** and
+**Restart** (a second click within three seconds confirms). The log view,
+`/logs/<slug>[/<lane>]`, refreshes every two seconds, with stack and service
+selection, counted severity checkboxes, a text filter (`/` focuses it, Escape
+clears it), pause and resume, copy and download; scrolling up stops following
+and **Jump to latest** returns to the bottom. It reads up to the last 128 KiB
+of each capture and returns at most 1,000 complete lines; use `haven logs` for
+more history. It works without the observability stack. The read-only
+`/api/logs?stack=<slug>&service=<lane>` endpoint only reads registered stack
+captures. The hub and every stack home are one React bundle, `apps/haven-web`
+(see [The stack home](#the-stack-home)).
 
 **Seeding.** `haven db seed` reseeds in place — an idempotent upsert that can
 only add or refresh, never discard — and `haven db reset` is the destructive
@@ -334,7 +337,7 @@ in-process (a Go module dependency — nothing extra to install) for the current
 worktree; pass a stack slug, worktree name, or path to open another. Inside the
 TUI, Enter on a branch shows its diff against HEAD without checking it out, and
 Enter on a worktree re-targets the whole view at that worktree — the filesystem
-is never touched. The hub page (`langwatch.localhost`) shows the same fleet with
+is never touched. The web hub (`hub.langwatch.localhost`) shows the same fleet with
 live health, per-stack RAM, and database names.
 
 **Destructive-operation guards.** Database drops only ever run against the
@@ -478,12 +481,19 @@ pruning the worktree (destroying it from the hub or `haven clean`, the daily
 reclaim, `DestroyStack`) takes it away. A slug that spells a machine-wide name
 (`hub`, `idp`, `observability`, `telemetry`) gets no home.
 
+`pnpm --filter @langwatch/haven-web dev` serves the console on :5572 with
+`/api` proxied to the daemon (`HAVEN_HUB_URL`, default the hub's hostname):
+open `feat-x.langwatch.localhost:5572` for a home. `pnpm --filter
+@langwatch/haven-web screenshot` shoots every view from the built bundle
+against fixture JSON, light and dark, at 1280 and 390 wide.
+
 The daemon's JSON, which the console reads:
 
 | Route                               | What                                                  |
 | ----------------------------------- | ----------------------------------------------------- |
 | `GET /api/hub`                      | the machine: memory, stacks, idle worktrees, reaping  |
 | `GET /api/stacks/<slug>`            | one stack home; 404 with a hub link for unknown slugs |
+| `GET /api/logs?stack=&service=`     | the log view's captured lines                         |
 | `POST /api/stacks/<slug>/api-key`   | reveals the local API key (same-origin only)          |
 | `POST /api/stacks/<slug>/restart`   | bounces a live stack                                  |
 | `POST /api/worktrees/start`         | brings a stopped worktree up                          |

@@ -9,7 +9,7 @@ Feature: A worktree's own home page at <slug>.langwatch.localhost
   # UI: apps/haven-web (StackHome). Design: packages/design-system-internal/README.md.
   # ADR-160. @unit scenarios bind to Go tests via `// @scenario`
   # (tools/thuishaven/adapters/dashboard/stackhome_test.go); @integration to
-  # apps/haven-web component tests.
+  # apps/haven-web/src/home/__tests__/stack-home.integration.test.tsx.
 
   Background:
     Given the haven daemon is running

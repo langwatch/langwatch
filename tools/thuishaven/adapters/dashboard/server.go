@@ -74,7 +74,6 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "ok") })
 	mux.HandleFunc("/api/registry", s.handleRegistry)
 	mux.HandleFunc("GET /api/logs", s.handleLogs)
-	mux.HandleFunc("GET /assets/logs.js", serveLogsScript)
 	mux.HandleFunc("GET /api/hub", s.handleHub)
 	mux.HandleFunc("GET /api/stacks/{slug}", s.handleStackHome)
 	mux.HandleFunc("POST /api/stacks/{slug}/api-key", s.handleRevealAPIKey)
@@ -143,19 +142,10 @@ func (s *Server) hostAllowed(host string) bool {
 	return h == base || strings.HasSuffix(h, "."+base)
 }
 
-// handleIndex serves the console bundle, except the hub's own root, which the
-// server-rendered page keeps until apps/haven-web draws the hub too.
+// handleIndex serves the console bundle (apps/haven-web): the hub on its own
+// host, a stack's home on <slug>.langwatch.localhost, and every client route.
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" || s.isStackHome(r) {
-		s.console.ServeHTTP(w, r)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_, _ = io.WriteString(w, renderHTML(s.config.Stacks(), renderInputs{
-		sharedURL: s.config.SharedURL, probes: s.config.Probes, extras: s.extras(),
-		canRestart: s.config.Actions.Restart != nil, canStart: s.config.Actions.Start != nil,
-	}))
+	s.console.ServeHTTP(w, r)
 }
 
 // registryStack mirrors domain.Stack for the unauthenticated /api/registry

@@ -33,10 +33,3 @@ func newConsole(bundle fs.FS) http.Handler {
 	}
 	return webconsole.New(bundle, consoleBuildCommand)
 }
-
-// isStackHome reports whether a request's Host is a worktree's home,
-// <slug>.langwatch.localhost, rather than the hub.
-func (s *Server) isStackHome(r *http.Request) bool {
-	_, ok := s.config.Naming.StackHomeSlug(r.Host)
-	return ok
-}

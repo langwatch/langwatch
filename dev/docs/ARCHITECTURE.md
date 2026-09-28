@@ -34,8 +34,8 @@ reads the parent-child protocol from `@langwatch/scenario-contract` (Alex,
 
 `apps/*-web` are the internal consoles (haven hub and stack home, IdP
 simulator, mail sink): React bundles built by Vite and served by their Go
-owner, on `@langwatch/design-system-internal` only, importing nothing from
-`modules/` ([ADR-160](adr/160-internal-consoles-are-go-served-react.md); Alex,
+owner, on `@langwatch/design-system-internal` and `@langwatch/time` only,
+importing nothing from `modules/` ([ADR-160](adr/160-internal-consoles-are-go-served-react.md); Alex,
 2026-09-28).
 
 **The same code runs everywhere.** One `main.ts` per app, byte-identical

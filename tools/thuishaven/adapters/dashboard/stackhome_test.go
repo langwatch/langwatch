@@ -134,8 +134,8 @@ func TestStackHostServesTheConsole(t *testing.T) {
 			t.Errorf("GET feat-x.langwatch.localhost%s = %d %q, want the console bundle", path, rec.Code, rec.Body)
 		}
 	}
-	if rec := f.get("hub.langwatch.localhost", "/"); !strings.Contains(rec.Body.String(), "this machine's stacks") {
-		t.Errorf("the hub's root must stay the server-rendered page until haven-web draws it, got %q", rec.Body)
+	if rec := f.get("hub.langwatch.localhost", "/"); !strings.Contains(rec.Body.String(), "haven-web") {
+		t.Errorf("the hub's root must serve the console too, got %d %q", rec.Code, rec.Body)
 	}
 	if rec := f.get("hub.langwatch.localhost", "/logs/feat-x/api"); !strings.Contains(rec.Body.String(), "haven-web") {
 		t.Errorf("the hub's client routes must reach the console, got %d %q", rec.Code, rec.Body)

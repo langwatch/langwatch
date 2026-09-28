@@ -1043,6 +1043,9 @@ importers:
       '@langwatch/design-system-internal':
         specifier: workspace:*
         version: link:../../packages/design-system-internal
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../packages/time
       react:
         specifier: ^19.2.7
         version: 19.2.8

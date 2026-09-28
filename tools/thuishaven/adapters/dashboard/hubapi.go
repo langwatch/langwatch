@@ -11,7 +11,7 @@ import (
 // maxHubEvents caps the daemon's reclamations the hub lists, newest first.
 const maxHubEvents = 12
 
-// The JSON the hub reads: everything the server-rendered page draws, as raw
+// The JSON the hub reads: the whole machine apps/haven-web draws, as raw
 // values (bytes, seconds, RFC 3339 times) rather than display strings.
 type hubJSON struct {
 	Shared    sharedJSON        `json:"shared"`

@@ -430,6 +430,9 @@
       "path": "packages/mail/tsconfig.json"
     },
     {
+      "path": "apps/haven-web/tsconfig.json"
+    },
+    {
       "path": "apps/mailsim-web/tsconfig.json"
     },
     {

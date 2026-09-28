@@ -1,7 +1,6 @@
 package dashboard
 
 import (
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"io"
@@ -21,15 +20,6 @@ const logTailBytes = 128 << 10
 const logTailLines = 1000
 
 var errLogDirectory = errors.New("invalid log directory")
-
-//go:embed logs.js
-var logsJS string
-
-func serveLogsScript(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache")
-	_, _ = io.WriteString(w, logsJS)
-}
 
 type logLine struct {
 	At      time.Time `json:"at"`
