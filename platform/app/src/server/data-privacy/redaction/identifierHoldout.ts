@@ -310,8 +310,67 @@ export function reservesTraceAddress({
 }
 
 /**
+ * Attribute names whose value is a model, provider or tool name: chosen by the
+ * developer or reported by the provider, never typed by the end user.
+ *
+ * These are the values the name/place pass gets most visibly wrong. A bare
+ * Anthropic model id (`claude-sonnet-4-6`) reads to it as a first name, so under
+ * the strict level every call to that provider stored `[PERSON]` in place of
+ * the model, and tool names written as words went the same way. None of them is
+ * opaque — they split into short readable runs — so the value rule above never
+ * holds them back; only the name can.
+ *
+ * Compared lower-cased. Like the trace list, the names are not a namespace
+ * anyone owns, so the value is gated too ({@link MODEL_OR_TOOL_NAME_VALUE}).
+ */
+const RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set([
+  "ai.model.id",
+  "ai.model.provider",
+  "ai.response.model",
+  "ai.toolcall.name",
+  "gen_ai.request.model",
+  "gen_ai.response.model",
+  "gen_ai.system",
+  "gen_ai.provider.name",
+  "gen_ai.tool.name",
+  "llm.model_name",
+]);
+
+/**
+ * What a model, provider or tool name is written as: one token of letters,
+ * digits and the separators vendors use (`us.anthropic.claude-opus-4-1`,
+ * `anthropic/claude-sonnet-4`, `gpt-5:latest`, `lookup_profile`).
+ *
+ * No whitespace, so prose written under one of these names is still analysed;
+ * no `@`, so an email address is still analysed. What this knowingly lets
+ * through is a lone single-token name written under a model or tool attribute
+ * ("jane.doe"). That is the residual, and it is accepted: those attributes are
+ * set by code, and the native pass still runs on them, so card numbers, phone
+ * numbers and secrets in them are redacted either way.
+ */
+const MODEL_OR_TOOL_NAME_VALUE = /^[A-Za-z0-9._:/+-]{1,128}$/;
+
+/**
+ * Whether this attribute is a model, provider or tool name carrying a value
+ * shaped like one.
+ */
+export function reservesModelOrToolName({
+  key,
+  value,
+}: {
+  key: string;
+  value: string;
+}): boolean {
+  return (
+    RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS.has(key.toLowerCase()) &&
+    MODEL_OR_TOOL_NAME_VALUE.test(value)
+  );
+}
+
+/**
  * Whether one attribute is held back from PII analysis altogether: reserved by
- * name, or a value that is exclusively one opaque identifier token.
+ * name (a trace address, or a model or tool name), or a value that is
+ * exclusively one opaque identifier token.
  *
  * Attribute values only. Free text — a log body, a status message, the chat
  * content itself — is content by definition and always analysed.
@@ -323,5 +382,9 @@ export function isHeldOutIdentifierAttribute({
   key: string;
   value: string;
 }): boolean {
-  return reservesTraceAddress({ key, value }) || isOpaqueIdentifierValue(value);
+  return (
+    reservesTraceAddress({ key, value }) ||
+    reservesModelOrToolName({ key, value }) ||
+    isOpaqueIdentifierValue(value)
+  );
 }

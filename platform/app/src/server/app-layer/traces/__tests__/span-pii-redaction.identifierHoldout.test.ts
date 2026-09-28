@@ -219,6 +219,83 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
     });
   });
 
+  // Strict mode offers every attribute to the name detector, and a bare
+  // Anthropic model id reads to it as a first name, so `claude-sonnet-4-6` is
+  // stored as `[PERSON]`, and so are some tool names. Model and tool names are chosen by the
+  // developer and the provider, never typed by the end user, so the names
+  // below hold them back from that pass.
+  describe("given a model or tool name attribute", () => {
+    /** @scenario "A model or tool name attribute is never sent for analysis" */
+    it.each([
+      ["ai.model.id", "claude-sonnet-4-6"],
+      ["ai.response.model", "claude-sonnet-4-6"],
+      ["gen_ai.request.model", "claude-sonnet-4-6"],
+      ["gen_ai.response.model", "claude-haiku-4-5-20251001"],
+      ["ai.model.provider", "anthropic.messages"],
+      ["gen_ai.system", "anthropic"],
+      ["gen_ai.provider.name", "anthropic"],
+      ["llm.model_name", "anthropic/claude-sonnet-4"],
+      ["ai.toolCall.name", "getWeatherForecast"],
+      ["gen_ai.tool.name", "search_documents"],
+    ])("never submits %s = %s, and stores it unchanged", async (key, value) => {
+      const { service, submitted } = makeService();
+      const span = spanWith({
+        [key]: value,
+        "app.support_note": PROSE_THAT_MUST_BE_ANALYSED,
+      });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submitted()).toContain(PROSE_THAT_MUST_BE_ANALYSED);
+      expect(submitted()).not.toContain(value);
+      expect(attr(span, key)).toBe(value);
+    });
+
+    // The control: the same value under a name nobody reserved still goes to
+    // the analysis pass, so the name is what the test above measures.
+    it("still submits the same model id under an unreserved name", async () => {
+      const { service, submitted } = makeService();
+      const span = spanWith({ "app.preferred_model": "claude-sonnet-4-6" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submitted()).toContain("claude-sonnet-4-6");
+    });
+
+    // The names are not a namespace anyone owns: a sender can write anything
+    // under `gen_ai.request.model`. Only a single token is held back, so prose
+    // and an email address are still redacted.
+    /** @scenario "Prose written under a model name attribute is still sent for analysis" */
+    it("still submits prose written under a model name", async () => {
+      const { service, submitted } = makeService();
+      const span = spanWith({ "gen_ai.request.model": "Jane Doe" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submitted()).toContain("Jane Doe");
+    });
+
+    /** @scenario "An email address written under a model name attribute is still redacted" */
+    it("still redacts an email address written under a model name", async () => {
+      const { service, submitted } = makeService();
+      const span = spanWith({ "ai.model.id": "jane@example.com" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(attr(span, "ai.model.id")).toBe("[EMAIL_ADDRESS]");
+      expect(submitted()).not.toContain("jane@example.com");
+    });
+
+    it("still redacts a phone number written under a model name", async () => {
+      const { service } = makeService();
+      const span = spanWith({ "ai.model.id": "+1-234-567-8901" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(attr(span, "ai.model.id")).not.toContain("234-567-8901");
+    });
+  });
+
   // Custom metadata does not reach redaction spelled the way the caller wrote
   // it. The REST collector rewrites every key to `langwatch.metadata.<key>`
   // before the span is dispatched, and the canonicalisation back to

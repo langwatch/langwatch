@@ -322,6 +322,31 @@ Feature: Redacting personal data from traces
     When a trace is ingested with a reserved trace identifier attribute
     Then the analysis service never received that value
 
+  # Model, provider and tool names are set by code, never typed by the end user,
+  # and the name detector misreads them: a bare model id such as
+  # "claude-sonnet-4-6" reads to it as a first name. They are held back by name,
+  # but only while the value is one token, so prose or an email address written
+  # under one of those names is still analysed.
+  @unit
+  Scenario: A model or tool name attribute is never sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a model name attribute whose value reads like a first name
+    Then the analysis service never received that value
+    And the stored attribute still reads as it was sent
+
+  @unit
+  Scenario: Prose written under a model name attribute is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a model name attribute whose value is a person name with a space
+    Then the analysis service received that value
+
+  @unit
+  Scenario: An email address written under a model name attribute is still redacted
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a model name attribute whose value is an email address
+    Then the stored attribute has the email address redacted
+    And the analysis service never received the email address in the clear
+
   # The reserved names are not a namespace anyone owns. Attributes arrive on the
   # ingestion endpoint spelled exactly as the sender wrote them, so a sender can
   # put an email address under a trace identifier name - by mistake or on
