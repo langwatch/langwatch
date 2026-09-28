@@ -74,7 +74,7 @@ function postgresTenantPredicate({
   sourceDatabase,
 }: {
   names: LangWatchQLNames;
-  /** Where the key map lives: the app's own ClickHouse database in a real deploy (migration 00084). */
+  /** Where the key map lives: in a real deploy, the app's own ClickHouse database (00084). */
   sourceDatabase: string;
 }): string {
   // The key map is aliased and the inner reference qualified because the two relations name
