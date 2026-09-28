@@ -42,6 +42,7 @@
     "@langwatch/navigation-browser": "workspace:*",
     "@langwatch/onboarding-browser": "workspace:*",
     "@langwatch/onboarding-browser-kit": "workspace:*",
+    "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/organization-browser": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

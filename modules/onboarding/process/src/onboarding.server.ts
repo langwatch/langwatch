@@ -2,12 +2,13 @@ import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/r
 import { defineServerModule } from "@langwatch/kernel";
 
 import { OnboardingApp } from "./app/onboarding.app.ts";
+import { integrationsChecksTrpcTransport } from "./transport/integrations-checks.trpc.ts";
 import { onboardingRest, onboardingRestCredential } from "./transport/onboarding.rest.ts";
 import { onboardingTrpcTransport } from "./transport/onboarding.trpc.ts";
 
 export const onboardingServer = defineServerModule("onboarding")
   .withApp(OnboardingApp)
-  .withTransports(onboardingTrpcTransport, onboardingRest)
+  .withTransports(onboardingTrpcTransport, integrationsChecksTrpcTransport, onboardingRest)
   .withTransportFacts(() => [
     bindRestMiddleware(onboardingRestCredential, (context) => {
       const credential = projectCredentialOfRequest(context.req.raw);

@@ -55,28 +55,6 @@ export const topicClusteringRequestSchema = z.union([
 export type TopicClusteringRequest = z.infer<typeof topicClusteringRequestSchema>;
 
 /**
- * How far a project has been set up. Nine of the eleven figures belong to
- * other verticals and arrive already counted; the last two are the project's
- * own columns, and every count reads as "more than none".
- */
-export const integrationsCheckStatusSchema = z
-  .object({
-    workflows: z.number(),
-    customGraphs: z.number(),
-    datasets: z.number(),
-    onlineEvaluations: z.number(),
-    triggers: z.number(),
-    simulations: z.number(),
-    modelProviders: z.number(),
-    prompts: z.number(),
-    teamMembers: z.number(),
-    firstMessage: z.boolean(),
-    integrated: z.boolean(),
-  })
-  .strict();
-export type IntegrationsCheckStatus = z.infer<typeof integrationsCheckStatusSchema>;
-
-/**
  * One project as `/api/projects` answers it: identity, setup fields, team —
  * no credential (its own gated route) or archive stamp (never listed).
  */

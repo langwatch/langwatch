@@ -57,10 +57,10 @@ export class MemoryDashboardRepository implements DashboardRepository {
   }: {
     projectIds: readonly string[];
   }): Promise<DashboardUsageCount> {
+    const inScope = this.#charts.filter((chart) => projectIds.includes(chart.projectId));
     return {
-      builderCharts: this.#charts.filter(
-        (chart) => chart.kind === "builder" && projectIds.includes(chart.projectId),
-      ).length,
+      builderCharts: inScope.filter((chart) => chart.kind === "builder").length,
+      charts: inScope.length,
     };
   }
 
