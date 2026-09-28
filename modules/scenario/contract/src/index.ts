@@ -84,7 +84,12 @@ export {
   voiceCallMaxSeconds,
 } from "./voice/voice-limits.ts";
 export type { CallRecord, CallTurn } from "./voice/call-record.ts";
-export type { MediaAudioPlayback, MediaPartProps, MediaProbeResult } from "./media-part.types.ts";
+export type {
+  MediaAudioElement,
+  MediaAudioPlayback,
+  MediaPartProps,
+  MediaProbeResult,
+} from "./media-part.types.ts";
 export * from "./voice/voice-session.errors.ts";
 export { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "./voice/voice-public-url-env.ts";
 export type { VoiceMediaUpgrade } from "./voice/voice-media-upgrade.ts";
