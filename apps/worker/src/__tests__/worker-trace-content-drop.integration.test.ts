@@ -48,6 +48,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   spanReceivedEventDataSchema,
+  TraceApi,
   type OtlpKeyValue,
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
@@ -62,6 +63,8 @@ const SYNTHETIC_ENVIRONMENT: Readonly<Record<string, string>> = {
   // No quick tunnel from a test process: it would open a real one where cloudflared is on PATH.
   VOICE_TUNNEL: "false",
   BASE_HOST: "http://langwatch.test",
+  // The API-key pepper chain refuses a boot where none of its secrets is set.
+  API_KEY_PEPPER: "synthetic-api-key-pepper",
 };
 
 const IO_ATTRIBUTES = {
@@ -327,6 +330,22 @@ describe.skipIf(!DB_URL)("given the worker records spans for a project", () => {
       expect(keys).not.toContain("langwatch.input");
       expect(keys).not.toContain("langwatch.output");
       expect(keys).toContain(PRIVACY_DROPPED_MARKER_ATTR);
+    });
+  });
+
+  describe("when the trace summary folds a span whose input was dropped", () => {
+    /** @scenario The trace-level computed input is cleared when input is dropped */
+    it("reads back a folded summary with no computed input, keeping the computed output", async () => {
+      const { organizationId, projectId } = await seedProject(prisma, "fold");
+      await ruleFor(worker, organizationId, dropping({ input: "drop" }));
+
+      await recordedSpanKeys(worker, { projectId, traceId: "trace-fold" });
+
+      await expect
+        .poll(() =>
+          worker.runtime.service(TraceApi).findSummary({ projectId, traceId: "trace-fold" }),
+        )
+        .toMatchObject({ computedInput: null, computedOutput: expect.any(String) });
     });
   });
 
