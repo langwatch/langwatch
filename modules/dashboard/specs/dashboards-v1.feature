@@ -1,7 +1,8 @@
 Feature: Dashboards v1
   As a project member
-  I want a Dashboards area that opens on a ready-made Agent Flight Deck and
-  lets me build my own boards from blocks and ask Langy the questions I have
+  I want a Dashboards area that opens on my own board, lets me start a board
+  from the Agent Flight Deck template and edit every widget on it, and ask
+  Langy the questions I have
   So that I can see traffic, quality, latency and cost in one place, learn
   what else I should connect, and never touch legacy analytics or a mocked
   query to do it
@@ -17,21 +18,29 @@ Feature: Dashboards v1
     Then they get the not-found page
     And the product switcher does not offer Dashboards
 
-  @e2e
-  Scenario: AC2 Landing on the Flight Deck
+  @integration
+  Scenario: AC2 Landing on the member's first own board
     Given the release_dashboards flag is on for the project
-    And the member has no default board of their own
+    And the member can see at least one board
     When they open /[project]/dashboards
-    Then they land on the Agent Flight Deck
-    And it is marked "Default" in the header
-    And it is marked "Default" in the sidebar
+    Then they land on the first board they created
+    And when they created none, on the first board they can see
+    And no board is created
+
+  @integration
+  Scenario: AC2 A member with no board gets My dashboard
+    Given the release_dashboards flag is on for the project
+    And the member can see no board
+    When they open /[project]/dashboards
+    Then exactly one board named "My dashboard" is created, visible only to them
+    And it opens
 
   @integration
   Scenario: AC3 Sidebar matches the reference
     Given the release_dashboards flag is on for the project
     When the member looks at the Dashboards product sidebar
     Then they see "Saved dashboards" with a create button
-    And the Agent Flight Deck is listed first
+    And only stored boards are listed, with no built-in board and no "Default" tag
     And each of their own boards is listed with a menu
     And the sidebar shows nothing else besides Quick Search
 
@@ -69,17 +78,15 @@ Feature: Dashboards v1
     And no URL flag or setting decided that the source is connected
 
   @integration
-  Scenario: AC8 No edit controls appear on the Flight Deck
-    Given any member, including an admin
-    When they view the Flight Deck
-    Then there is no rename control
-    And there is no block menu with move or delete
-
-  @integration
-  Scenario: AC8 The server rejects a write against the Flight Deck
-    Given the Flight Deck is defined in code and has no database rows
-    When any member calls a dashboard write procedure against the Flight Deck
-    Then the server refuses the write
+  Scenario: AC8 Starting from the template makes a new board of editable widgets
+    Given a member on a board with nothing on it
+    When they choose the Agent Flight Deck under "Start from a template"
+    Then a new board named "Agent Flight Deck" is created, visible only to them
+    And when that name is taken it is numbered: "Agent Flight Deck 2", then 3
+    And it carries the template's description
+    And every template widget is stored on it as an ordinary widget, at its template place
+    And the new board opens
+    And when a write fails the error is shown, the half-made board is removed and the member stays where they were
 
   @integration
   Scenario: AC9 Empty period shows an empty state
@@ -100,16 +107,16 @@ Feature: Dashboards v1
     When it opens
     Then they see "Add a description"
     And they see the "Add a block" area with "Start from the question you need answered."
-    And they see "Start from a template" listing the Agent Flight Deck
+    And they see "Start from a template" listing the Agent Flight Deck template
 
   @e2e
   Scenario: AC11 Ask Langy by question
-    Given a member on their own board or the Agent Flight Deck
+    Given a member on a board
     And Langy is enabled for the project and the member may start a conversation
     When they open the picker and choose a question
     Then the picker closes
     And Langy opens with that question's own prompt, the dashboard period and grain
-    And the current board is passed as context, marked read-only on the Flight Deck
+    And the open board is passed as context, by its name and id
     And nothing is written to any board
 
   @integration
@@ -121,15 +128,15 @@ Feature: Dashboards v1
 
   @integration
   Scenario: AC13 Period and grain update every block
-    Given a board with time-series blocks
+    Given a board with widgets
     When the member changes the period
-    Then every block on the board updates to match
+    Then every widget on the board reads over the new period as its reserved parameters
 
   @integration
   Scenario: AC13 Grain choices update every block
-    Given a board with time-series blocks
+    Given a board with widgets
     When the member changes the grain to auto, 1h, 1d or 1w
-    Then every block on the board updates to match the chosen grain
+    Then every widget on the board reads at the chosen grain as its reserved parameter
 
   @integration
   Scenario: AC14 Rename and describe
@@ -139,28 +146,22 @@ Feature: Dashboards v1
     And it is shown in the sidebar
 
   @integration
-  Scenario: AC15 Block menu actions persist after reload
-    Given a block on a user board
-    When the member uses Duplicate, Move to another dashboard, or Delete
-    Then the board reflects the action after reload
+  Scenario: AC15 Widget menu actions persist after reload
+    Given a widget on a board, including one made from the template
+    When the member opens its menu
+    Then it offers Edit, Duplicate and Delete
+    And Edit opens the widget drawer on that widget's own code and queries
+    And a Duplicate, a Delete, a move or a resize on the grid is still there after reload
 
   @integration
   Scenario: AC16 Ask Langy from the board
     Given Langy is enabled for the project
-    When the member presses "What would you like to know?" on any board, the Flight Deck included
+    When the member presses "What would you like to know?" on any board
     Then the question picker opens, since the bar is a button and never a text field
     And a pinned "Ask Langy" footer is always visible below the list
     When they type their own question and press "Ask Langy" on the footer
     Then Langy opens with that question
     And the current board is passed as context
-
-  @integration
-  Scenario: AC17 Langy insights on a block quote the block's own result
-    Given a block was just added
-    And its query returned a result containing a number
-    When the member accepts "Generate insights"
-    Then Langy returns insight text
-    And the insight text quotes at least one number present in that block's own query result
 
   @integration
   Scenario: AC18 Visibility hides a board from members outside its audience
@@ -343,22 +344,22 @@ Feature: Dashboards v1
 
   # --- AC Coverage Map ---
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
-  # AC 2: "Landing on the Flight Deck" → Scenario: AC2 Landing on the Flight Deck
-  # AC 3: "Sidebar matches the reference" → Scenario: AC3 Sidebar matches the reference
+  # AC 2: "Landing" (changed: the member's own board, or a new "My dashboard"; no built-in board) → Scenario: AC2 Landing on the member's first own board; Scenario: AC2 A member with no board gets My dashboard
+  # AC 3: "Sidebar matches the reference" (changed: stored boards only, no "Default" row) → Scenario: AC3 Sidebar matches the reference
   # AC 4: "The ten panels in prototype order" → Scenario: AC4 The ten panels in prototype order
   # AC 5: "Status tiles compare with the previous period" → Scenario: AC5 Status tiles compare with the previous period
   # AC 6: "Unconnected source shows a call to action" → Scenario: AC6 Unconnected source shows a call to action
   # AC 7: "Connected state comes from real data" → Scenario: AC7 Connected state comes from real data
-  # AC 8: "The Flight Deck cannot be edited" → Scenario: AC8 No edit controls appear on the Flight Deck; Scenario: AC8 The server rejects a write against the Flight Deck
+  # AC 8: "The Agent Flight Deck is a template" (changed: was "The Flight Deck cannot be edited"; the read-only board and its server refusal are gone) → Scenario: AC8 Starting from the template makes a new board of editable widgets
   # AC 9: "Empty period" → Scenario: AC9 Empty period shows an empty state
   # AC 10: "Blank board matches the reference" → Scenario: AC10 Blank board matches the reference
-  # AC 11: "Add a block by question" → Scenario: AC11 Ask Langy by question
+  # AC 11: "Add a block by question" (changed: no read-only board to mark) → Scenario: AC11 Ask Langy by question
   # AC 12: "Only working questions are offered" → Scenario: AC12 Only working questions are offered
-  # AC 13: "Period and grain" → Scenario: AC13 Period and grain update every block; Scenario: AC13 Grain choices update every block
+  # AC 13: "Period and grain" (changed: widgets, through their reserved parameters) → Scenario: AC13 Period and grain update every block; Scenario: AC13 Grain choices update every block
   # AC 14: "Rename and describe" → Scenario: AC14 Rename and describe
-  # AC 15: "Block menu" → Scenario: AC15 Block menu actions persist after reload
+  # AC 15: "Widget menu" (changed: Edit, Duplicate, Delete; no move to another board) → Scenario: AC15 Widget menu actions persist after reload
   # AC 16: "Ask Langy from the board" → Scenario: AC16 Ask Langy from the board
-  # AC 17: "Langy insights on a block" (sharpened) → Scenario: AC17 Langy insights on a block quote the block's own result
+  # AC 17: "Langy insights on a block" (withdrawn: a widget's result lives in its sandboxed frame; no scenario until it can be read)
   # AC 18: "Visibility" → Scenario: AC18 Visibility hides a board from members outside its audience; Scenario: AC18 Blocks on a board follow the board's visibility; Scenario: AC18 Saved charts on a board follow the board's visibility
   # AC 19: "LWQL only" → Scenario: AC19 Every dashboard data request goes to LWQL and none to legacy analytics
   # AC 20: "Legacy analytics untouched" → Scenario: AC20 Legacy analytics files are untouched; Scenario: AC20 Legacy analytics pages behave exactly as before

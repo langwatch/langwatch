@@ -1,13 +1,11 @@
 /**
  * The pieces of a board with nothing on it yet, after the reference: the
  * dashed "Add a block" target that opens the question-first picker, and the
- * "Start from a template" strip offering the Agent Flight Deck.
+ * "Start from a template" strip, which makes a new board from a template.
  */
 
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { Gauge, Plus } from "lucide-react";
-
-import { FLIGHT_DECK } from "../../model/boards.ts";
 
 /** Full-bleed on an empty board, a compact footer once blocks fill the page above it. */
 export function AddBlockCard({
@@ -57,7 +55,22 @@ export function AddBlockCard({
   );
 }
 
-export function TemplateStrip({ onOpen }: { onOpen: () => void }) {
+/** A template as its card shows it. */
+export interface TemplateCard {
+  readonly name: string;
+  readonly description: string;
+}
+
+export function TemplateStrip({
+  template,
+  isCreating,
+  onOpen,
+}: {
+  template: TemplateCard;
+  /** True while the board is being made; the card shows it is busy and takes no second press. */
+  isCreating: boolean;
+  onOpen: () => void;
+}) {
   return (
     <VStack align="stretch" gap={2}>
       <Text
@@ -87,6 +100,8 @@ export function TemplateStrip({ onOpen }: { onOpen: () => void }) {
           background: "bg.panel",
           boxShadow: "0 2px 8px rgb(16 16 32 / 0.06)",
         }}
+        loading={isCreating}
+        loadingText={`Creating ${template.name}…`}
         onClick={onOpen}
       >
         <Box
@@ -103,10 +118,10 @@ export function TemplateStrip({ onOpen }: { onOpen: () => void }) {
         </Box>
         <VStack align="start" gap={0} minWidth={0}>
           <Text fontSize="13px" lineHeight="1.375" fontWeight="medium" color="fg" truncate>
-            {FLIGHT_DECK.name}
+            {template.name}
           </Text>
           <Text fontSize="12px" lineHeight="1.625" color="fg.subtle" truncate>
-            {FLIGHT_DECK.description}
+            {template.description}
           </Text>
         </VStack>
       </Button>
@@ -116,16 +131,24 @@ export function TemplateStrip({ onOpen }: { onOpen: () => void }) {
 
 /** Everything a blank board shows under its header. */
 export function BlankBoard({
+  template,
+  isCreatingFromTemplate,
   onAddBlock,
   onOpenTemplate,
 }: {
+  template: TemplateCard;
+  isCreatingFromTemplate: boolean;
   onAddBlock: () => void;
   onOpenTemplate: () => void;
 }) {
   return (
     <VStack align="stretch" gap={5}>
       <AddBlockCard onClick={onAddBlock} />
-      <TemplateStrip onOpen={onOpenTemplate} />
+      <TemplateStrip
+        template={template}
+        isCreating={isCreatingFromTemplate}
+        onOpen={onOpenTemplate}
+      />
     </VStack>
   );
 }

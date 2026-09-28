@@ -1,43 +1,35 @@
 /**
- * One board: the Agent Flight Deck when the address names it, read-only with
- * its panels, otherwise one of the member's own, editable, with its blocks on
- * the grid or the blank-board state. Both share the header and the picker.
+ * One board: its header, the ask bar, and its stored widgets on the grid, or
+ * the blank-board state with the template strip. Every widget is editable;
+ * "Add chart" opens the widget drawer, "Add a block" the question picker.
  */
 
 import { Box, Spinner, VStack } from "@chakra-ui/react";
 import { UiPageLoading, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { HandledErrorAlert } from "../../../../ui/elements/handled-error-alert.tsx";
+import { CreateDashboardWidgetDrawer } from "../../../../ui/sections/create-dashboard-widget-drawer.tsx";
 import { useBlockPickerAddress } from "../../behavior/use-block-picker-address.ts";
-import { useBoardBlocks } from "../../behavior/use-board-blocks.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
+import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
 import { useBoardPeriod } from "../../behavior/use-board-period.ts";
 import { useBoardVisibility } from "../../behavior/use-board-visibility.ts";
+import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
-import { FlightDeckPanels } from "../../blocks/index.ts";
-import { FLIGHT_DECK_SUBJECT, ownBoardSubject } from "../../langy/model/board-langy.ts";
+import { boardSubject } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
-import { dashboardsPath, FLIGHT_DECK } from "../../model/boards.ts";
+import { AGENT_FLIGHT_DECK_TEMPLATE } from "../../templates/index.ts";
 import { AddBlockCard, BlankBoard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
-import { BoardLinkButton } from "../blocks/board-link-button.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { BoardVisibilityControl } from "../blocks/board-visibility-control.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
-import { BoardBlocksGrid } from "./board-blocks-grid.tsx";
+import { BoardWidgetsGrid } from "./board-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
-function BoardPage({
-  header,
-  areaLabel,
-  children,
-}: {
-  header: ReactNode;
-  areaLabel: string;
-  children: ReactNode;
-}) {
+function BoardPage({ header, children }: { header: ReactNode; children: ReactNode }) {
   // The prototype's narrow page: charts hold their shape at 980px.
   return (
     <VStack
@@ -51,88 +43,48 @@ function BoardPage({
       lineHeight="1.45"
     >
       {header}
-      <Box as="section" aria-label={areaLabel} minHeight="240px">
+      <Box as="section" aria-label="Widgets" minHeight="240px">
         {children}
       </Box>
     </VStack>
   );
 }
 
-function usePeriodControl() {
-  const { range, grain, period, setRange, setGrain } = useBoardPeriod();
-  const control = (
-    <BoardPeriodControl
-      range={range}
-      grain={grain}
-      onRangeChange={setRange}
-      onGrainChange={setGrain}
-    />
-  );
-  return { period, control };
-}
-
-function FlightDeckBoard() {
-  const projectId = useAnalyticsHost().project()?.id;
-  const { period, control } = usePeriodControl();
-  const picker = useBlockPickerAddress();
-
-  return (
-    <BoardPage
-      areaLabel="Panels"
-      header={
-        <BoardHeader
-          name={FLIGHT_DECK.name}
-          isDefault={FLIGHT_DECK.isDefault}
-          description={FLIGHT_DECK.description}
-          onAddChart={picker.open}
-          periodControl={control}
-          shareControl={<BoardLinkButton dashboardId={FLIGHT_DECK.id} />}
-        />
-      }
-    >
-      <BoardLangy
-        board={FLIGHT_DECK_SUBJECT}
-        period={period}
-        projectId={projectId ?? ""}
-        onOpenPicker={picker.open}
-      />
-      {projectId && <FlightDeckPanels projectId={projectId} {...period} />}
-      {picker.isOpen && (
-        <BlockPickerDialog board={FLIGHT_DECK_SUBJECT} period={period} onClose={picker.close} />
-      )}
-    </BoardPage>
-  );
-}
-
-function OwnBoard({ board }: { board: SavedBoard }) {
+function OpenBoard({ board }: { board: SavedBoard }) {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
   const saved = useSavedDashboards();
-  const boardBlocks = useBoardBlocks();
+  const boardWidgets = useBoardWidgets();
+  const fromTemplate = useBoardFromTemplate();
   const { description, saveDescription } = useBoardDescription({
     dashboardId: board.id,
     stored: board.description,
   });
   const visibility = useBoardVisibility({ board });
-  const { period, control } = usePeriodControl();
+  const { range, grain, period, setRange, setGrain } = useBoardPeriod();
   const picker = useBlockPickerAddress();
-  const blocks = boardBlocks.blocksOn(board.id);
-  const otherBoards = saved.boards.filter(({ id }) => id !== board.id);
-  const subject = ownBoardSubject({ board, blocks });
+  const [isAddChartOpen, setIsAddChartOpen] = useState(false);
+  const widgets = boardWidgets.widgetsOn(board.id);
+  const subject = boardSubject({ board, widgets });
 
   return (
     <BoardPage
-      areaLabel="Blocks"
       header={
         <BoardHeader
           name={board.name}
-          isDefault={false}
           description={description}
           visibility={visibility.visibility}
           onRename={(name) => saved.renameBoard({ dashboardId: board.id, name })}
           onDescribe={saveDescription}
-          onAddChart={picker.open}
-          periodControl={control}
+          onAddChart={() => setIsAddChartOpen(true)}
+          periodControl={
+            <BoardPeriodControl
+              range={range}
+              grain={grain}
+              onRangeChange={setRange}
+              onGrainChange={setGrain}
+            />
+          }
           shareControl={
             <BoardVisibilityControl
               visibility={visibility.visibility}
@@ -144,44 +96,45 @@ function OwnBoard({ board }: { board: SavedBoard }) {
         />
       }
     >
-      <BoardLangy
-        board={subject}
-        period={period}
-        projectId={projectId}
-        watched={{ blocks, settled: boardBlocks.status === "success" }}
-        onOpenPicker={picker.open}
-      />
-      {boardBlocks.status === "pending" && <Spinner size="sm" />}
-      {boardBlocks.status === "error" && (
+      <BoardLangy onOpenPicker={picker.open} />
+      {boardWidgets.status === "pending" && <Spinner size="sm" />}
+      {boardWidgets.status === "error" && (
         <HandledErrorAlert
-          error={boardBlocks.error}
-          fallbackTitle="This dashboard could not load its blocks"
+          error={boardWidgets.error}
+          fallbackTitle="This dashboard could not load its widgets"
         />
       )}
-      {boardBlocks.status === "success" && blocks.length === 0 && (
+      {boardWidgets.status === "success" && widgets.length === 0 && (
         <BlankBoard
+          template={AGENT_FLIGHT_DECK_TEMPLATE}
+          isCreatingFromTemplate={fromTemplate.creatingId === AGENT_FLIGHT_DECK_TEMPLATE.id}
           onAddBlock={picker.open}
           onOpenTemplate={() =>
-            host.navigate(
-              dashboardsPath({ projectSlug: saved.projectSlug, dashboardId: FLIGHT_DECK.id }),
-            )
+            void fromTemplate.createFromTemplate({
+              template: AGENT_FLIGHT_DECK_TEMPLATE,
+              existingNames: saved.boards.map(({ name }) => name),
+            })
           }
         />
       )}
-      {boardBlocks.status === "success" && blocks.length > 0 && (
+      {boardWidgets.status === "success" && widgets.length > 0 && (
         <VStack align="stretch" gap={4}>
-          <BoardBlocksGrid
+          <BoardWidgetsGrid
             projectId={projectId}
-            blocks={blocks}
+            projectSlug={saved.projectSlug}
+            dashboardId={board.id}
+            widgets={widgets}
             period={period}
-            otherBoards={otherBoards}
-            isWriting={boardBlocks.isWriting}
-            onDuplicate={(boardBlock) =>
-              void boardBlocks.duplicateBlock({ dashboardId: board.id, boardBlock })
+            isWriting={boardWidgets.isWriting}
+            isSaving={boardWidgets.isSaving}
+            onDuplicate={(widget) =>
+              void boardWidgets.duplicateWidget({ dashboardId: board.id, widget })
             }
-            onMove={(input) => void boardBlocks.moveBlock(input)}
-            onDelete={(boardBlock) => void boardBlocks.removeBlock({ boardBlock })}
-            onPlacementsCommit={(placements) => void boardBlocks.commitPlacements(placements)}
+            onDelete={(widget) => void boardWidgets.removeWidget({ widget })}
+            onSave={({ widget, draft, onSaved }) =>
+              void boardWidgets.saveWidget({ widgetId: widget.id, draft, onSaved })
+            }
+            onPlacementsCommit={(placements) => void boardWidgets.commitPlacements(placements)}
           />
           <AddBlockCard compact onClick={picker.open} />
         </VStack>
@@ -189,23 +142,25 @@ function OwnBoard({ board }: { board: SavedBoard }) {
       {picker.isOpen && (
         <BlockPickerDialog board={subject} period={period} onClose={picker.close} />
       )}
+      <CreateDashboardWidgetDrawer
+        open={isAddChartOpen}
+        onClose={() => setIsAddChartOpen(false)}
+        projectId={projectId}
+        projectSlug={saved.projectSlug}
+        dashboardId={board.id}
+      />
     </BoardPage>
   );
 }
 
-function SavedBoardScreen({ dashboardId }: { dashboardId: string | undefined }) {
+function Board() {
+  const dashboardId = useAnalyticsHost().route().params.dashboardId;
   const { boards, isLoading } = useSavedDashboards();
   if (isLoading) return <UiPageLoading />;
   const board = boards.find(({ id }) => id === dashboardId);
   if (!board) return <UiPageNotFound />;
   // Keyed so a board's in-flight edits never leak into the next board.
-  return <OwnBoard key={board.id} board={board} />;
-}
-
-function Board() {
-  const dashboardId = useAnalyticsHost().route().params.dashboardId;
-  if (dashboardId === FLIGHT_DECK.id) return <FlightDeckBoard />;
-  return <SavedBoardScreen dashboardId={dashboardId} />;
+  return <OpenBoard key={board.id} board={board} />;
 }
 
 export default function DashboardBoardScreen() {

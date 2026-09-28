@@ -1,14 +1,14 @@
 /**
  * The "Saved dashboards" list navigation draws in the sidebar, lent through
  * `withCapabilities` (§3.4 rule 7): analytics keeps the reads and writes.
- * Grouped Mine, Team, Organisation; the Flight Deck always leads Mine.
+ * Grouped Mine, Team, Organisation; only stored boards are listed.
  */
 
 import { Box, IconButton, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { UiSavedDashboardsProps } from "@langwatch/browser-host/declarations";
 import type { DashboardVisibility } from "@langwatch/dashboard-contract";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Building2, Gauge, type LucideIcon, Plus, Star, Users } from "lucide-react";
+import { Building2, type LucideIcon, Plus, Star, Users } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
@@ -18,7 +18,7 @@ import {
   boardVisibilityGroups,
   canManageBoard,
 } from "../../model/board-visibility.ts";
-import { dashboardsPath, FLIGHT_DECK } from "../../model/boards.ts";
+import { dashboardsPath } from "../../model/boards.ts";
 import { SavedDashboardRow } from "../blocks/saved-dashboard-row.tsx";
 
 const GROUP_LABEL_STYLE = {
@@ -60,8 +60,8 @@ export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsP
       dashboardId,
       onDeleted: () => {
         setPendingDelete(void 0);
-        if (dashboardId !== activeDashboardId) return;
-        host.navigate(dashboardsPath({ projectSlug, dashboardId: FLIGHT_DECK.id }));
+        // The area's landing picks the next board, or makes one when none is left.
+        if (dashboardId === activeDashboardId) host.navigate(dashboardsPath({ projectSlug }));
       },
     });
   };
@@ -87,15 +87,6 @@ export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsP
       </HStack>
       {boardVisibilityGroups(saved.boards).map((group) => (
         <BoardGroup key={group.key} label={group.label}>
-          {group.key === "only_me" && (
-            <SavedDashboardRow
-              name={FLIGHT_DECK.name}
-              href={dashboardsPath({ projectSlug, dashboardId: FLIGHT_DECK.id })}
-              icon={<RowIcon icon={Gauge} />}
-              isActive={activeDashboardId === FLIGHT_DECK.id}
-              tag="Default"
-            />
-          )}
           {group.boards.map((board) => (
             <SavedDashboardRow
               key={board.id}

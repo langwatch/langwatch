@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 
-import type { BlockPeriod } from "../../blocks/index.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
   type BoardSubject,
@@ -40,6 +39,7 @@ import {
   type BlockQuestionSection,
   searchBlockQuestions,
 } from "../../model/block-questions.ts";
+import type { BoardPeriod } from "../../model/board-period.ts";
 
 const QUESTION_ICONS: Readonly<Record<BlockQuestionIcon, LucideIcon>> = {
   gauge: Gauge,
@@ -64,7 +64,7 @@ export function BlockPickerDialog({
 }: {
   /** The board the picker opened on, attached as Langy's context. */
   board: BoardSubject;
-  period: BlockPeriod;
+  period: BoardPeriod;
   onClose: () => void;
 }) {
   const langy = useLangyAsk();

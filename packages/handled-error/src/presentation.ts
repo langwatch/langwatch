@@ -514,11 +514,6 @@ const presentations = {
     title: "Dashboard not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
-  dashboard_read_only: {
-    title: "This dashboard can't be changed",
-    describe: () =>
-      "Built-in dashboards such as the Agent Flight Deck are read-only. Create your own dashboard to customise it.",
-  },
   dashboard_owner_only: {
     title: "Only the creator or an admin can do that",
     describe: () =>

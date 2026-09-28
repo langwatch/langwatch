@@ -42,8 +42,7 @@ export interface DashboardUsageCount {
 export interface DashboardApi {
   /**
    * `viewer` is the signed-in member: boards outside their audience read as not
-   * found; without one only organisation-wide boards are reachable. Writes to a
-   * code-defined board refuse with `dashboard_read_only`.
+   * found; without one only organisation-wide boards are reachable.
    */
   getAll(input: {
     projectId: string;

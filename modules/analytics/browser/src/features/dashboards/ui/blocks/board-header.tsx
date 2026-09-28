@@ -1,12 +1,12 @@
 /**
  * A board's header, after the reference: the title with its rename pencil, the
  * share control and "Add chart" on the first row, the description and period
- * on the second. Without `onRename`/`onDescribe` the board is read-only.
+ * on the second. Without `onRename`/`onDescribe` the name and description stay fixed.
  */
 
 import { Box, Button, Heading, HStack, IconButton, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { DashboardVisibility } from "@langwatch/dashboard-contract";
-import { Building2, Gauge, type LucideIcon, Pencil, Plus, Star, Users } from "lucide-react";
+import { Building2, type LucideIcon, Pencil, Plus, Star, Users } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { boardVisibilityLabel } from "../../model/board-visibility.ts";
@@ -22,7 +22,6 @@ const SHARED_CHIPS: Partial<
 
 export function BoardHeader({
   name,
-  isDefault,
   description,
   visibility,
   onRename,
@@ -32,15 +31,13 @@ export function BoardHeader({
   shareControl,
 }: {
   name: string;
-  isDefault: boolean;
   description: string;
-  /** Who the board is shown to; the Flight Deck has none. */
-  visibility?: DashboardVisibility;
+  visibility: DashboardVisibility;
   onRename?: (name: string) => void;
   onDescribe?: (description: string) => void;
   onAddChart: () => void;
   periodControl: ReactNode;
-  /** The share icon: the visibility menu on a member's board, a copy-link on the Flight Deck. */
+  /** The share icon: the board's visibility menu. */
   shareControl: ReactNode;
 }) {
   return (
@@ -48,26 +45,10 @@ export function BoardHeader({
       <HStack gap={3}>
         <HStack gap={2.5} flex={1} minWidth={0}>
           <Box color="teal.solid" flexShrink={0}>
-            {isDefault ? <Gauge size={16} aria-hidden /> : <Star size={16} aria-hidden />}
+            <Star size={16} aria-hidden />
           </Box>
           <BoardTitle name={name} onRename={onRename} />
-          {isDefault && (
-            <Box
-              as="span"
-              flexShrink={0}
-              borderRadius="md"
-              background="bg.muted"
-              color="fg.subtle"
-              paddingX={1.5}
-              paddingY={0.5}
-              fontSize="11px"
-              fontWeight="medium"
-              whiteSpace="nowrap"
-            >
-              Default
-            </Box>
-          )}
-          {visibility && <SharedChip visibility={visibility} />}
+          <SharedChip visibility={visibility} />
         </HStack>
         <HStack gap={3} flexShrink={0}>
           {shareControl}

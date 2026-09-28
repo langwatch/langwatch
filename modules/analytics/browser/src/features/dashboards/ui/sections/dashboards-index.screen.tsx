@@ -1,24 +1,25 @@
 /** `/[project]/dashboards` has no page of its own: it forwards to the member's landing board. */
 
-import { UiPageLoading } from "@langwatch/ui-kernel/page-fallbacks";
-import { useEffect } from "react";
+import { Box } from "@chakra-ui/react";
+import { UiPageLoading, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
 
-import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { dashboardsPath, landingBoardId } from "../../model/boards.ts";
+import { HandledErrorAlert } from "../../../../ui/elements/handled-error-alert.tsx";
+import { useLandingBoard } from "../../behavior/use-landing-board.ts";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
 function LandingRedirect() {
-  const host = useAnalyticsHost();
-  const projectSlug = host.project()?.slug;
-
-  useEffect(() => {
-    if (!projectSlug) return;
-    host.navigate(dashboardsPath({ projectSlug, dashboardId: landingBoardId() }), {
-      replace: true,
-    });
-  }, [host, projectSlug]);
-
-  return <UiPageLoading />;
+  const { loadError, createError } = useLandingBoard();
+  // A refused list reads as the same not-found page the board screen shows (AC21).
+  if (loadError) return <UiPageNotFound />;
+  if (!createError) return <UiPageLoading />;
+  return (
+    <Box maxWidth="640px" marginX="auto" padding={8}>
+      <HandledErrorAlert
+        error={createError}
+        fallbackTitle="Your first dashboard could not be made"
+      />
+    </Box>
+  );
 }
 
 export default function DashboardsIndexScreen() {

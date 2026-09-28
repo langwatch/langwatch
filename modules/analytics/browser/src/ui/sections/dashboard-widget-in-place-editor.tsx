@@ -4,6 +4,8 @@
  * since the frame fully remounts (fresh CDN/Babel) on identity change, not on every keystroke.
  */
 
+import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
+
 import { useDashboardWidgetInPlaceEditor } from "../../behavior/use-dashboard-widget-in-place-editor.ts";
 import type { DashboardWidgetDraft } from "../../model/dashboard-widget-definition.ts";
 import { DashboardWidgetEditDrawer } from "./dashboard-widget-edit-drawer.tsx";
@@ -29,6 +31,8 @@ interface DashboardWidgetInPlaceEditorProps {
   projectSlug: string;
   /** The window the preview's queries run against: the dashboard's own period. */
   timeWindow: { start: number; end: number };
+  /** The dashboard's own step, when it has one; the preview's hourly default otherwise. */
+  granularitySeconds?: LangWatchQLAcceptedGranularityStep;
   isSaving: boolean;
   onClose: () => void;
   onSave: (args: { draft: DashboardWidgetDraft; onSuccess: () => void }) => void;
@@ -41,6 +45,7 @@ export function DashboardWidgetInPlaceEditor({
   projectId,
   projectSlug,
   timeWindow,
+  granularitySeconds,
   isSaving,
   onClose,
   onSave,
@@ -71,6 +76,7 @@ export function DashboardWidgetInPlaceEditor({
     projectId,
     projectSlug,
     timeWindow,
+    ...(granularitySeconds ? { granularitySeconds } : {}),
     onClose,
     onSave,
   });

@@ -1,10 +1,9 @@
 /**
  * The server half of Dashboards v1, through the composed app over memory
- * repositories: the read-only Flight Deck, visibility, who may manage a
- * board, the rollout gate and source presence. Spec: dashboards-v1.feature.
+ * repositories: visibility, who may manage a board, the rollout gate and
+ * source presence. Spec: dashboards-v1.feature.
  */
 import type { LangWatchQLExecuteInput } from "@langwatch/analytics-contract";
-import { FLIGHT_DECK_DASHBOARD_ID } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
@@ -85,57 +84,6 @@ async function boardSetTo(
 }
 
 describe("Dashboards v1 on the server", () => {
-  describe("given the Flight Deck, which is defined in code and has no row", () => {
-    /** @scenario "AC8 The server rejects a write against the Flight Deck" */
-    it("refuses every dashboard and chart write aimed at it with dashboard_read_only", async () => {
-      const app = appWith();
-      const deck = { projectId: PROJECT, dashboardId: FLIGHT_DECK_DASHBOARD_ID, viewer: ADMIN };
-      const layout = { gridColumn: 0, gridRow: 0, colSpan: 1, rowSpan: 1 };
-
-      const codes = await Promise.all([
-        codeOf(app.rename({ ...deck, name: "Renamed" })),
-        codeOf(app.updateDashboardDetails({ ...deck, description: "Mine now" })),
-        codeOf(app.setDashboardVisibility({ ...deck, visibility: "only_me" })),
-        codeOf(app.delete(deck)),
-        codeOf(app.reorder({ projectId: PROJECT, dashboardIds: [FLIGHT_DECK_DASHBOARD_ID] })),
-        codeOf(
-          app.createGraph({
-            projectId: PROJECT,
-            name: "Added",
-            graph: {},
-            dashboardId: FLIGHT_DECK_DASHBOARD_ID,
-            layout,
-          }),
-        ),
-        codeOf(
-          app.createDashboardWidget({
-            projectId: PROJECT,
-            dashboardId: FLIGHT_DECK_DASHBOARD_ID,
-            name: "Widget",
-            code: "export default () => null;",
-            queries: [{ name: "q", sql: "SELECT 1" }],
-          }),
-        ),
-        codeOf(
-          app.assignDashboardWidgetToDashboard({
-            projectId: PROJECT,
-            id: "widget-1",
-            dashboardId: FLIGHT_DECK_DASHBOARD_ID,
-          }),
-        ),
-        codeOf(
-          app.placeSavedWorkbenchChart({
-            projectId: PROJECT,
-            chartId: "chart-1",
-            dashboardId: FLIGHT_DECK_DASHBOARD_ID,
-          }),
-        ),
-      ]);
-
-      expect(codes).toEqual(Array(codes.length).fill("dashboard_read_only"));
-    });
-  });
-
   describe("given boards set to only me, team and organisation by their creator", () => {
     /** @scenario "AC18 Visibility hides a board from members outside its audience" */
     it("lists and opens each board only for members inside its audience", async () => {

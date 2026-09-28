@@ -26,19 +26,6 @@ export class DashboardNotFoundError extends HandledError {
   }
 }
 
-/** A write aimed at a code-defined board, such as the Agent Flight Deck: it has no row. */
-export class DashboardReadOnlyError extends HandledError {
-  declare readonly code: "dashboard_read_only";
-
-  constructor(dashboardId: string) {
-    super("dashboard_read_only", "This dashboard is built in and cannot be changed", {
-      httpStatus: 403,
-      meta: { dashboardId },
-    });
-    this.name = "DashboardReadOnlyError";
-  }
-}
-
 /** A visibility change or delete by someone neither the board's creator nor an admin. */
 export class DashboardOwnerOnlyError extends HandledError {
   declare readonly code: "dashboard_owner_only";

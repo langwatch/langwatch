@@ -9,18 +9,6 @@ export const dashboardNameSchema = z.string().trim().min(1).max(255);
 export const dashboardDescriptionSchema = z.string().trim().max(2000);
 
 /**
- * Boards shipped in code rather than stored: no database row, never writable.
- * The browser addresses the Agent Flight Deck by this id.
- */
-export const FLIGHT_DECK_DASHBOARD_ID = "agent-flight-deck";
-export const CODE_DEFINED_DASHBOARD_IDS: readonly string[] = [FLIGHT_DECK_DASHBOARD_ID];
-
-/** Whether an id names a code-defined board, which every write refuses. */
-export function isCodeDefinedDashboardId(dashboardId: string): boolean {
-  return CODE_DEFINED_DASHBOARD_IDS.includes(dashboardId);
-}
-
-/**
  * Who may see a board: its creator only, the project's team, or the whole
  * organisation. Organisation is the default and what every older board keeps.
  */
