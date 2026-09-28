@@ -110,7 +110,13 @@ function BlockCard({ block, children }: { block: BlockDefinition; children: Reac
           {block.subtitle}
         </Text>
       </Card.Header>
-      <Card.Body paddingX={4} paddingTop={0} paddingBottom={4}>
+      <Card.Body
+        display="flex"
+        flexDirection="column"
+        paddingX={4}
+        paddingTop={0}
+        paddingBottom={4}
+      >
         {children}
       </Card.Body>
     </Card.Root>
@@ -155,7 +161,7 @@ export function NotConnected({
         justifyContent="center"
         boxSize={9}
         borderRadius="lg"
-        background="teal.solid/10"
+        background="bg.muted"
         color="teal.solid"
       >
         <Icon size={18} strokeWidth={1.8} aria-hidden />
@@ -227,21 +233,23 @@ export interface DashboardBlockProps extends BlockPeriod {
   readonly projectId: string;
 }
 
-/** One registered block, fetched and drawn on its own. */
+/** One registered block, fetched and drawn on its own, its plot filling the card the grid sizes. */
 export function DashboardBlock({ blockId, projectId, ...period }: DashboardBlockProps) {
   const block = findBlock(blockId);
   if (!block) return null;
-  return <RegisteredBlock block={block} projectId={projectId} period={period} />;
+  return <RegisteredBlock block={block} projectId={projectId} period={period} fill />;
 }
 
 function RegisteredBlock({
   block,
   projectId,
   period,
+  fill = false,
 }: {
   block: BlockDefinition;
   projectId: string;
   period: BlockPeriod;
+  fill?: boolean;
 }) {
   const source = useSourceConnection({ projectId, source: block.source });
   const data = useBlockData({ projectId, block, period, enabled: source.connected });
@@ -274,6 +282,7 @@ function RegisteredBlock({
           rows={data.rows}
           unit={block.unit ?? "count"}
           granularitySeconds={data.granularitySeconds}
+          fill={fill}
         />
       )}
     </BlockCard>

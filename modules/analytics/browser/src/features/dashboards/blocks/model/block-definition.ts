@@ -118,6 +118,21 @@ export function periodDelta({ current, previous }: { current: number; previous: 
   return previous > 0 ? (current - previous) / previous : 0;
 }
 
+/** A change against the previous period, or "new" when that period had nothing. */
+export type PeriodChange = number | "new";
+
+/** As {@link periodDelta}, except a figure the previous period lacked reads as new. */
+export function periodChange({
+  current,
+  previous,
+}: {
+  current: number;
+  previous: number;
+}): PeriodChange {
+  if (previous <= 0 && current > 0) return "new";
+  return periodDelta({ current, previous });
+}
+
 /**
  * The finest accepted step, up to a week, at or above the request that keeps
  * the period within the bucket budget.

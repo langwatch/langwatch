@@ -8,13 +8,13 @@ import { Box, chakra, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react"
 import { ArrowDownRight, ArrowRight, ArrowUpRight, ThumbsDown, ThumbsUp } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { periodDelta } from "../model/block-definition.ts";
+import { periodChange, type PeriodChange } from "../model/block-definition.ts";
 import {
   type BlockRow,
   type BlockRows,
-  formatBucket,
   formatCount,
   formatDelta,
+  formatFirstSeen,
   formatMs,
   formatRatio,
   formatUsd,
@@ -44,7 +44,14 @@ function deltaIcon({ up, down }: { up: boolean; down: boolean }) {
   return ArrowRight;
 }
 
-function DeltaLine({ delta, polarity }: { delta: number; polarity: Polarity }) {
+function DeltaLine({ delta, polarity }: { delta: PeriodChange; polarity: Polarity }) {
+  if (delta === "new") {
+    return (
+      <Text marginTop={0.5} fontSize="11px" fontWeight="medium" color="gray.400">
+        New
+      </Text>
+    );
+  }
   const up = delta > 0.0005;
   const down = delta < -0.0005;
   const good = polarity === "upGood" ? up : down;
@@ -69,7 +76,7 @@ function Tile({
 }: {
   label: string;
   value: string;
-  delta: number;
+  delta: PeriodChange;
   polarity: Polarity;
 }) {
   return (
@@ -111,7 +118,7 @@ export function StatusView({ rows }: TableViewProps) {
   const success = requests > 0 ? 1 - rowNumber(row, "errors") / requests : 0;
   const successPrev = requestsPrev > 0 ? 1 - rowNumber(row, "errors_prev") / requestsPrev : 0;
   const delta = (key: string) =>
-    periodDelta({ current: rowNumber(row, key), previous: rowNumber(row, `${key}_prev`) });
+    periodChange({ current: rowNumber(row, key), previous: rowNumber(row, `${key}_prev`) });
   return (
     <SimpleGrid columns={{ base: 2, lg: 4 }} gap={3}>
       <Tile
@@ -123,7 +130,7 @@ export function StatusView({ rows }: TableViewProps) {
       <Tile
         label="Success rate"
         value={formatRatio(success)}
-        delta={periodDelta({ current: success, previous: successPrev })}
+        delta={periodChange({ current: success, previous: successPrev })}
         polarity="upGood"
       />
       <Tile
@@ -169,7 +176,18 @@ export function CostEfficiencyView({ rows }: TableViewProps) {
       <Text marginBottom={1} fontSize="11px" fontWeight="medium" color="fg.subtle">
         Highest-cost models
       </Text>
-      <RankingList rows={rows.models ?? []} unit="usd" />
+      <RankedRows height="128px">
+        <RankingList rows={rows.models ?? []} unit="usd" />
+      </RankedRows>
+    </VStack>
+  );
+}
+
+/** The prototype's fixed-height box a leaderboard sits centred in. */
+function RankedRows({ height, children }: { height: string; children: ReactNode }) {
+  return (
+    <VStack align="stretch" justify="center" height={height} overflowY="auto">
+      {children}
     </VStack>
   );
 }
@@ -256,7 +274,7 @@ export function FailuresView({ rows }: TableViewProps) {
         { header: "Operation", cell: (row) => mono(rowText(row, "operation")) },
         {
           header: "First seen",
-          cell: (row) => faint(formatBucket({ value: row.first_seen, granularitySeconds: 60 })),
+          cell: (row) => faint(formatFirstSeen(row.first_seen)),
         },
         {
           header: "Count",
@@ -292,7 +310,11 @@ export function ScenariosView({ rows }: TableViewProps) {
 }
 
 export function GatewayView({ rows }: TableViewProps) {
-  return <RankingList rows={rows.main ?? []} unit="usd" />;
+  return (
+    <RankedRows height="160px">
+      <RankingList rows={rows.main ?? []} unit="usd" />
+    </RankedRows>
+  );
 }
 
 const AGENT_LABELS: Readonly<Record<string, string>> = {

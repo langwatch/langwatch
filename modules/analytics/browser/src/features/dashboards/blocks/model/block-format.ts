@@ -4,7 +4,7 @@
  * goes through {@link rowNumber}.
  */
 
-import { format, toEpochMs } from "@langwatch/time";
+import { format, toEpochMs, toZonedDateTime } from "@langwatch/time";
 
 import type { BlockUnit, BlockView } from "./block-definition.ts";
 
@@ -104,6 +104,25 @@ export function formatValue({ value, unit }: { value: number; unit: BlockUnit })
   }
 }
 
+/** Epoch milliseconds from a ClickHouse `YYYY-MM-DD hh:mm:ss` UTC cell, or NaN. */
+function cellEpochMs(value: unknown): number {
+  const text = stringifyUnknown(value);
+  return toEpochMs(text.includes("T") ? text : `${text.replace(" ", "T")}Z`);
+}
+
+const WEEKDAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+/** A moment as the prototype's failure table reads it: "Thu, Jul 23, 1pm". */
+export function formatFirstSeen(value: unknown): string {
+  const epochMs = cellEpochMs(value);
+  if (Number.isNaN(epochMs)) return stringifyUnknown(value);
+  const zoned = toZonedDateTime(epochMs);
+  const hour = zoned.hour % 12 === 0 ? 12 : zoned.hour % 12;
+  const meridiem = zoned.hour < 12 ? "am" : "pm";
+  const weekday = WEEKDAYS_SHORT[zoned.dayOfWeek - 1] ?? "";
+  return `${weekday}, ${format(epochMs, "MMM d")}, ${hour}${meridiem}`;
+}
+
 /** A bucket instant as a short axis label; ClickHouse sends `YYYY-MM-DD hh:mm:ss` in UTC. */
 export function formatBucket({
   value,
@@ -112,9 +131,7 @@ export function formatBucket({
   value: unknown;
   granularitySeconds: number;
 }): string {
-  const text = stringifyUnknown(value);
-  const iso = text.includes("T") ? text : `${text.replace(" ", "T")}Z`;
-  const epochMs = toEpochMs(iso);
-  if (Number.isNaN(epochMs)) return text;
+  const epochMs = cellEpochMs(value);
+  if (Number.isNaN(epochMs)) return stringifyUnknown(value);
   return format(epochMs, granularitySeconds >= 86_400 ? "MMM d" : "MMM d HH:mm");
 }

@@ -95,7 +95,7 @@ function RowTag({ children }: { children: string }) {
       flexShrink={0}
       borderRadius="sm"
       background="bg.muted"
-      paddingX={1.5}
+      paddingX={1}
       paddingY={0.5}
       fontSize="9px"
       fontWeight="semibold"

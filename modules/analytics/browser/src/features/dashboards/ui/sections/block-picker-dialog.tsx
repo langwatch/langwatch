@@ -24,7 +24,7 @@ import {
   TrendingDown,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { BlockPeriod } from "../../blocks/index.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
@@ -69,6 +69,7 @@ export function BlockPickerDialog({
 }) {
   const langy = useLangyAsk();
   const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const sections = langy.enabled
     ? searchBlockQuestions({ sections: BLOCK_QUESTION_SECTIONS, search })
@@ -89,7 +90,12 @@ export function BlockPickerDialog({
   };
 
   return (
-    <Dialog.Root open size="lg" onOpenChange={({ open }) => !open && onClose()}>
+    <Dialog.Root
+      open
+      size="lg"
+      initialFocusEl={() => searchRef.current}
+      onOpenChange={({ open }) => !open && onClose()}
+    >
       <Dialog.Content maxHeight="76vh" maxWidth="720px" borderRadius="xl">
         <Dialog.Header borderBottomWidth="1px" paddingX={5} paddingY={3.5}>
           <Dialog.Title fontSize="14px" fontWeight="semibold">
@@ -99,6 +105,7 @@ export function BlockPickerDialog({
         </Dialog.Header>
         <VStack align="stretch" gap={3} paddingX={5} paddingY={5} borderBottomWidth="1px">
           <SearchInput
+            ref={searchRef}
             aria-label="Search questions"
             placeholder={langy.enabled ? "What do you need to know?" : "Search questions"}
             height="54px"
@@ -172,6 +179,7 @@ export function BlockPickerDialog({
                 bgGradient="to-r"
                 gradientFrom="purple.600"
                 gradientTo="pink.600"
+                color="white"
                 _hover={{ opacity: 0.9 }}
                 onClick={() => askLangy(search)}
               >
@@ -277,10 +285,10 @@ function PickerRow({
         <Icon size={16} strokeWidth={2.1} aria-hidden />
       </Box>
       <VStack align="start" gap={0} minWidth={0}>
-        <Text fontSize="13px" lineHeight="snug" fontWeight="medium" color="fg" truncate>
+        <Text fontSize="13px" lineHeight="1.375" fontWeight="medium" color="fg" truncate>
           {title}
         </Text>
-        <Text fontSize="12px" lineHeight="relaxed" color="fg.subtle" truncate>
+        <Text fontSize="12px" lineHeight="1.625" color="fg.subtle" truncate>
           {detail}
         </Text>
       </VStack>

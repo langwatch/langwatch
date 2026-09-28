@@ -26,6 +26,7 @@ export function AddBlockCard({
       gap={2}
       paddingX={6}
       paddingY={compact ? 8 : 16}
+      lineHeight="1.45"
       borderWidth="1px"
       borderStyle="dashed"
       borderColor="border.emphasized/80"
@@ -95,16 +96,16 @@ export function TemplateStrip({ onOpen }: { onOpen: () => void }) {
           boxSize={8}
           flexShrink={0}
           borderRadius="md"
-          background="teal.solid/10"
+          background="bg.muted"
           color="teal.solid"
         >
           <Gauge size={16} strokeWidth={2.1} aria-hidden />
         </Box>
         <VStack align="start" gap={0} minWidth={0}>
-          <Text fontSize="13px" lineHeight="snug" fontWeight="medium" color="fg" truncate>
+          <Text fontSize="13px" lineHeight="1.375" fontWeight="medium" color="fg" truncate>
             {FLIGHT_DECK.name}
           </Text>
-          <Text fontSize="12px" lineHeight="relaxed" color="fg.subtle" truncate>
+          <Text fontSize="12px" lineHeight="1.625" color="fg.subtle" truncate>
             {FLIGHT_DECK.description}
           </Text>
         </VStack>
