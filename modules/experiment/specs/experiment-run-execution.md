@@ -45,7 +45,10 @@ a re-executed cell appends duplicates the store and the fold's applied-id set dr
   Appends `cell_finished{failed, experiment_cell_lost}` under the same idempotency key a finishing cell
   uses, so a cell that finishes after all is dropped as a duplicate.
 
-## 4. Process manager `experimentRunExecution`, keyed by runId
+## 4. Process manager `experimentRunExecution`, keyed by the run's aggregate
+
+Keyed by the aggregate id (`makeExperimentRunKey`), not the runId alone: runIds are unique only
+within an experiment, and a run without one is keyed by its runId anyway (D3).
 
 - **State:** `concurrency`, the phase-1 and phase-2 cell counts, the next unsent ordinal, a bitmap of
   finished ordinals (base64, n/8 bytes so a 5,000-cell run holds about 1 KB), `aborting`, and

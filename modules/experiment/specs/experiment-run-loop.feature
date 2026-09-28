@@ -77,6 +77,53 @@ Feature: An experiment run executes on its pipeline
     Then a run with no limit of its own uses that many cells at once
     And a deployment that names none uses ten
 
+  @unit
+  Scenario: The run manager sends cells up to the run's concurrency, then one per finished cell
+    Given a run of six cells started with a concurrency of two
+    When the run starts and its cells finish one by one
+    Then the manager sends two cells, each carrying only its ordinal and phase
+    And sends the next cell as each one finishes
+    And completes the run finished after the last
+
+  @unit
+  Scenario: The run manager opens the comparison cells only once every target cell has finished
+    Given a run with two target cells and two comparison cells
+    When only the first target cell has finished
+    Then no comparison cell is sent
+    And both are sent once the second target cell finishes
+
+  @unit
+  Scenario: The run manager counts a redelivered finish once
+    Given a run with a concurrency of one
+    When the same cell's finish is delivered twice
+    Then one more cell is sent, not two
+
+  @unit
+  Scenario: The run manager stops sending on abort and completes once its cells in flight finish
+    Given a run asked to abort with one cell in flight
+    When that cell finishes
+    Then no further cell is sent
+    And the run completes stopped
+
+  @unit
+  Scenario: The run manager fails every unfinished cell as lost after the stall window
+    Given a run where no cell has finished for fifteen minutes
+    When the manager's wake fires
+    Then every unfinished cell, sent or not, is failed
+    And no further cell is sent
+
+  @unit
+  Scenario: A lost cell is failed as experiment_cell_lost
+    Given a cell the stall wake gave up on
+    When the manager's failure is delivered
+    Then the cell finishes failed with code "experiment_cell_lost" in the run's tenant
+
+  @unit
+  Scenario: A run started without a plan is folded but never driven
+    Given a run started before runs carried a plan
+    When the manager sees its start
+    Then it sends no cell and arms no wake
+
   @integration @unimplemented
   Scenario: A streamed workbench run executes on the worker and ends with done
     Given the experiment module installed in an api and a worker sharing one event store

@@ -837,6 +837,10 @@ const presentations = {
     title: "This evaluation can't run as a monitor yet",
     describe: () => "Add an evaluator to it and save, then try again.",
   },
+  experiment_cell_lost: {
+    title: "Cell lost",
+    describe: () => "This cell was lost when its worker stopped; run it again.",
+  },
   experiment_evaluation_input_invalid: {
     title: "This evaluation's data could not be read",
     describe: () =>

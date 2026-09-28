@@ -226,6 +226,7 @@ export const APP_ERROR_CODES = [
   "evaluator_type_immutable",
   "evaluator_workflow_evaluator_exists",
   "evaluator_workflow_version_required",
+  "experiment_cell_lost",
   "experiment_evaluation_input_invalid",
   "experiment_evaluation_reference_not_found",
   "experiment_evaluation_too_many_rows",
