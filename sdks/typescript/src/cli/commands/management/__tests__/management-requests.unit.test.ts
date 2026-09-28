@@ -109,7 +109,7 @@ describe("role-bindings list", () => {
       });
 
       const url = new URL(lastRequest().url);
-      expect(url.pathname).toBe("/api/v1/role-bindings/latest/");
+      expect(url.pathname).toBe("/api/v1/role-bindings/latest");
       expect(url.searchParams.get("apiKeyId")).toBe("key_1");
       expect(url.searchParams.get("scopeType")).toBe("PROJECT");
       expect(url.searchParams.get("scopeId")).toBe("project_1");
@@ -123,7 +123,7 @@ describe("role-bindings list", () => {
       mockFetch.mockClear();
       respondWith({ bindings: [], totalCount: 0 });
       await listRoleBindingsCommand({});
-      expect(lastRequest().url).toBe("https://app.langwatch.ai/api/v1/role-bindings/latest/");
+      expect(lastRequest().url).toBe("https://app.langwatch.ai/api/v1/role-bindings/latest");
     });
   });
 });
