@@ -415,6 +415,7 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 				missingReported = true
 				findings = append(findings, missingOperationFinding(operation, probeCase.name, transcript))
 			}
+			findings = append(findings, oneSidedServerError(operation, probeCase.name, transcript)...)
 			continue
 		}
 		findings = append(findings, engine.compareCase(operation, probeCase, transcript)...)
@@ -638,6 +639,24 @@ func (engine *probeEngine) runCase(operation Operation, probeCase probeCase, tar
 // once per operation, and never for a ruled-retired one.
 func reportsMissing(operation Operation, alreadyReported bool) bool {
 	return !alreadyReported && !RetiredRestOperation(operation.Path)
+}
+
+// oneSidedServerError is a status_diff for a branch 5xx where main answered
+// otherwise: an operation only one side documents is still served by both,
+// and operation_missing alone would hide the regression.
+func oneSidedServerError(operation Operation, caseName string, transcript Transcript) []Finding {
+	branch, main := statusClass(transcript.A.Status), statusClass(transcript.B.Status)
+	if branch != "server-error" || main == "server-error" {
+		return nil
+	}
+	return []Finding{{
+		Kind: FindingStatusDiff, Method: operation.Method, Path: operation.Path, Case: caseName,
+		OperationID: operation.OperationID,
+		Fields: map[string][2]any{
+			"status": {transcript.B.Status, transcript.A.Status},
+			"class":  {main, branch},
+		},
+	}}
 }
 
 // missingOperationFinding records an operation present on only one side,
