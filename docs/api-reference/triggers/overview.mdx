@@ -85,16 +85,20 @@ What `actionParams` holds for each channel:
 
 ## Slack delivery
 
-A `SEND_SLACK_MESSAGE` automation posts in one of two ways, chosen by `actionParams.slackDelivery`:
+A `SEND_SLACK_MESSAGE` automation posts through a Slack connection, named by `actionParams.slackIntegrationId`. Connections are listed and added in the dashboard under **Settings → Integrations → Slack**; the API can use any connection the project can use, which is its own project connections and its organization's organization connections.
 
-- **`webhook`** (the default): send `slackWebhook`, an incoming webhook URL (`https://hooks.slack.com/...`).
-- **`bot`**: send `slackChannelId`, the channel the LangWatch Slack app posts in. The bot token comes from the project's Slack connection, which an admin sets up once under **Settings → Integrations → Slack**, so no automation needs a token of its own.
+- A **bot** connection also needs `slackChannelId`, the channel the LangWatch Slack app posts in.
+- An **incoming webhook** connection needs nothing else: the webhook posts to the channel Slack tied it to.
 
 ```json
-{ "action": "SEND_SLACK_MESSAGE", "actionParams": { "slackDelivery": "bot", "slackChannelId": "C0123456789" } }
+{ "action": "SEND_SLACK_MESSAGE", "actionParams": { "slackIntegrationId": "<connectionId>", "slackChannelId": "C0123456789" } }
 ```
 
-A Slack automation with neither a webhook nor a bot channel never posts.
+Reading the automation back returns `slackIntegrationId` and never a token or URL. A connection that is deleted, or that belongs to another project, fails delivery with `slack_integration_missing`.
+
+<Note>
+For one release the API still accepts the legacy fields: `slackWebhook` (an incoming webhook URL, with `slackDelivery` absent or `"webhook"`) or `slackBotToken` with `slackChannelId` (with `slackDelivery: "bot"`). The server stores the secret as a connection, reusing the organization's connection that already holds it or creating a project connection, and the automation keeps only that connection's id. Send `slackIntegrationId` in new integrations.
+</Note>
 
 ## Alerts on a graph
 
@@ -114,7 +118,7 @@ curl -X POST "https://app.langwatch.ai/api/triggers" \
   -d '{
     "name": "Checkout p95 latency",
     "action": "SEND_SLACK_MESSAGE",
-    "actionParams": { "slackWebhook": "https://hooks.slack.com/services/..." },
+    "actionParams": { "slackIntegrationId": "<connectionId>" },
     "customGraphId": "<graphId>",
     "alertType": "WARNING",
     "graphAlert": { "seriesName": "0/performance.completion_time/p95", "operator": "gt", "threshold": 8000, "timePeriod": 15 }
@@ -178,4 +182,4 @@ The CLI and the MCP server page the same way: `langwatch trigger fires <id> --cu
 | Fire history | `langwatch trigger fires <id> [--limit <n>] [--cursor <cursor>]` | `platform_list_trigger_fires` |
 | Delete | `langwatch trigger delete <id>` | `platform_delete_trigger` |
 
-In the CLI, `--action-params` takes the channel's configuration as JSON, and `--slack-webhook <url>` is a shortcut for a Slack webhook. In MCP, `platform_create_trigger` takes `actionParams` as an optional object.
+In the CLI, `--action-params` takes the channel's configuration as JSON, and `--slack-connection <id>` with `--slack-channel <id>` (for a bot connection) are shortcuts for Slack delivery; `--slack-webhook <url>` is the legacy shortcut and is stored as a connection. In MCP, `platform_create_trigger` takes `actionParams` as an optional object.

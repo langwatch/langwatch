@@ -46,31 +46,41 @@ export const emailActionParamsSchema = z
 
 export const slackActionParamsSchema = z
   .object({
+    slackIntegrationId: z
+      .string()
+      .optional()
+      .describe(
+        "The Slack connection to post through (an organization connection or one of this project's; they are listed in LangWatch under Settings, Integrations, Slack). A bot connection also needs `slackChannelId`; a webhook connection needs nothing else. Preferred over `slackWebhook` and `slackBotToken`.",
+      ),
     slackDelivery: z
       .enum(["webhook", "bot"])
       .optional()
       .describe(
-        "How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. Absent means `webhook`.",
+        "How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. With `slackIntegrationId` it follows the connection's kind. Absent without a connection means `webhook`.",
       ),
     slackWebhook: z
       .string()
       .optional()
       .describe(
-        "The incoming webhook URL (https://hooks.slack.com/...), for `webhook` delivery. A credential: it reads back as [redacted], and sending [redacted] back keeps the stored one.",
+        "Legacy, accepted for one release: an incoming webhook URL (https://hooks.slack.com/...). It is stored as a Slack connection and the automation keeps only the connection id. Send `slackIntegrationId` instead.",
       ),
     slackChannelId: z
       .string()
       .optional()
-      .describe("The channel the bot posts in, for `bot` delivery."),
+      .describe(
+        "The channel the bot posts in, for a bot connection or `bot` delivery.",
+      ),
     slackBotToken: z
       .string()
       .optional()
-      .describe("The bot token, for `bot` delivery. It never reads back."),
+      .describe(
+        "Legacy, accepted for one release: a bot token, stored as a Slack connection. It never reads back. Send `slackIntegrationId` instead.",
+      ),
     slackBotTokenSet: z
       .boolean()
       .optional()
       .describe(
-        "Read: whether a bot token is stored. Write: true keeps the stored one.",
+        "Legacy. Read: whether an automation not yet moved to a connection stores its own bot token. Write: true keeps it.",
       ),
   })
   .passthrough();
@@ -135,19 +145,28 @@ export const actionParamsSchema = z.union([
 
 /**
  * The write-side Slack shape. Every field on the read schema is optional so a
- * redacted read round-trips, but a WRITE with no destination cannot deliver —
- * the server refuses it, so refuse it here with the field named: `webhook`
- * delivery (the default) needs `slackWebhook`, `bot` delivery needs
- * `slackChannelId` (the token may come from the project's Slack integration).
+ * redacted read round-trips, but a WRITE with no destination cannot deliver,
+ * so refuse it here with the field named. A connection decides its own kind;
+ * without one, the legacy fields need a webhook URL, or a channel and a token.
  */
 const slackActionParamsWriteSchema = slackActionParamsSchema.superRefine(
   (params, ctx) => {
     const delivery = params.slackDelivery ?? "webhook";
+    if (params.slackIntegrationId) {
+      if (delivery === "bot" && !params.slackChannelId) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["slackChannelId"],
+          message: "a bot connection needs the channel to post in",
+        });
+      }
+      return;
+    }
     if (delivery === "webhook" && !params.slackWebhook) {
       ctx.addIssue({
         code: "custom",
-        path: ["slackWebhook"],
-        message: "webhook delivery needs the incoming webhook URL",
+        path: ["slackIntegrationId"],
+        message: "name the Slack connection to post through",
       });
     }
     if (delivery === "bot" && !params.slackChannelId) {
@@ -155,6 +174,17 @@ const slackActionParamsWriteSchema = slackActionParamsSchema.superRefine(
         code: "custom",
         path: ["slackChannelId"],
         message: "bot delivery needs the channel to post in",
+      });
+    }
+    if (
+      delivery === "bot" &&
+      !params.slackBotToken &&
+      params.slackBotTokenSet !== true
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["slackIntegrationId"],
+        message: "bot delivery needs the Slack connection to post through",
       });
     }
   },
@@ -216,9 +246,9 @@ export const TRIGGER_FILTER_QUERY_DESCRIPTION = [
   'Examples: status:error · evaluator:"<evaluator name>" AND evaluatorVerdict:fail · trace.attribute.<key>:<value>.',
 ].join(" ");
 
-/** Stated on the create tool: Slack needs a destination or it never posts. */
+/** Stated on the create tool: Slack needs a connection or it never posts. */
 export const SLACK_DELIVERY_NOTE =
-  'For SEND_SLACK_MESSAGE, send either {"slackWebhook":"https://hooks.slack.com/..."} or {"slackDelivery":"bot","slackChannelId":"C..."} (bot delivery uses the project\'s Slack integration token when none is sent). A Slack automation with neither will never post.';
+  'For SEND_SLACK_MESSAGE, send {"slackIntegrationId":"<connection id>"} for a webhook connection, or {"slackIntegrationId":"<connection id>","slackChannelId":"C..."} for a bot connection. Slack connections are listed and added in LangWatch under Settings, Integrations, Slack (organization-wide or for one project); there is no tool that lists them, so ask the user for the id. slackIntegrationId is preferred: a legacy {"slackWebhook":"https://hooks.slack.com/..."} or {"slackDelivery":"bot","slackBotToken":"xoxb-...","slackChannelId":"C..."} is still accepted for one release and is stored as a connection. A Slack automation with no connection will never post.';
 
 export const graphAlertSchema = z
   .object({

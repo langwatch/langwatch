@@ -205,6 +205,25 @@ describe("getTriggerCommand()", () => {
     });
   });
 
+  describe("when the automation posts through a Slack connection", () => {
+    it("prints the connection id", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () =>
+          makeTrigger({
+            action: "SEND_SLACK_MESSAGE",
+            actionParams: { slackIntegrationId: "slack_1", slackDelivery: "webhook" },
+          }),
+      });
+
+      const result = await getTriggerCommand("trigger_abc");
+      result?.table?.();
+
+      const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
+      expect(printed).toContain("slack_1");
+    });
+  });
+
   describe("when the automation is a report", () => {
     it("prints a one-line report summary", async () => {
       mockFetch.mockResolvedValue({
@@ -297,6 +316,48 @@ describe("createTriggerCommand()", () => {
     });
   });
 
+  describe("when a Slack automation names its connection", () => {
+    it("sends the connection and channel, and prints the connection", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () =>
+          makeTrigger({
+            action: "SEND_SLACK_MESSAGE",
+            actionParams: { slackIntegrationId: "slack_1", slackChannelId: "C123" },
+          }),
+      });
+
+      const result = await createTriggerCommand("Errors to Slack", {
+        action: "SEND_SLACK_MESSAGE",
+        slackConnection: "slack_1",
+        slackChannel: "C123",
+      });
+      result?.table?.();
+
+      const body = JSON.parse(mockFetch.mock.calls[0]?.[1]?.body);
+      expect(body.actionParams).toEqual({
+        slackIntegrationId: "slack_1",
+        slackChannelId: "C123",
+      });
+      const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
+      expect(printed).toContain("slack_1 in C123");
+    });
+
+    it("still sends a legacy webhook URL as given", async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => makeTrigger() });
+
+      await createTriggerCommand("Errors to Slack", {
+        action: "SEND_SLACK_MESSAGE",
+        slackWebhook: "https://hooks.slack.com/services/T/B/x",
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0]?.[1]?.body);
+      expect(body.actionParams).toEqual({
+        slackWebhook: "https://hooks.slack.com/services/T/B/x",
+      });
+    });
+  });
+
   describe("when a scheduled report is created", () => {
     it("sends the report as stated", async () => {
       mockFetch.mockResolvedValue({ ok: true, json: async () => makeTrigger({ kind: "REPORT" }) });
@@ -354,6 +415,23 @@ describe("updateTriggerCommand()", () => {
       );
     });
   });
+  describe("when the Slack connection is changed", () => {
+    it("sends it as the delivery configuration", async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => makeTrigger() });
+
+      await updateTriggerCommand("trigger_abc", {
+        slackConnection: "slack_2",
+        slackChannel: "C999",
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0]?.[1]?.body);
+      expect(body.actionParams).toEqual({
+        slackIntegrationId: "slack_2",
+        slackChannelId: "C999",
+      });
+    });
+  });
+
   describe("when an alert's rule or a report is changed", () => {
     it("sends the rule and the report", async () => {
       mockFetch.mockResolvedValue({ ok: true, json: async () => makeTrigger() });

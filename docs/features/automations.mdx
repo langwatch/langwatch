@@ -54,10 +54,23 @@ A condition on an evaluation result names the **monitor** that ran the evaluatio
 
 ## Slack
 
-A Slack automation posts in one of two ways:
+A Slack automation posts through a **Slack connection**. Connections live under **Settings → Integrations → Slack**, where each one is listed with its name, kind, scope and how many automations use it. Add one with **Add Slack connection**, or with **New Slack connection** while setting up an automation's Slack delivery; the new connection comes back selected.
 
-- **Incoming webhook**: paste a Slack incoming webhook URL into the automation.
-- **Slack app**: pick a channel, and the LangWatch Slack app posts there. Connect the app once per project under **Settings → Integrations → Slack**; every automation in the project then uses that connection.
+A connection is one of two kinds:
+
+- **Bot**: a Slack app bot token. Pick a channel for each automation, and the app posts there with every block of the message. Invite the app to the channel first.
+- **Incoming webhook**: one webhook URL, which posts to the one channel Slack tied it to. Charts and tables are sent as text.
+
+Each connection has a scope:
+
+- **Organization**: every project in the organization can use it. Adding, editing or deleting one needs permission to manage the organization.
+- **Project**: only that project can use it. Adding, editing or deleting one needs permission to update the project.
+
+A token or URL is stored once per organization: adding a connection with a secret another connection already holds is refused, naming that connection. Replacing a connection's token or URL takes effect for every automation that uses it, with no automation edited. Deleting a connection that active automations use asks you to confirm how many stop delivering.
+
+<Note>
+Automations used to carry their own webhook URL or bot token, and a project had one Slack integration. Each of those secrets is now a connection, and every automation points at the connection holding its secret: automations that shared a secret within one project share a project connection, and a secret shared across projects became an organization connection. Nothing needs re-entering.
+</Note>
 
 ## Alerts and reports
 

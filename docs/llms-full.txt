@@ -38927,10 +38927,23 @@ A condition on an evaluation result names the **monitor** that ran the evaluatio
 
 ## Slack
 
-A Slack automation posts in one of two ways:
+A Slack automation posts through a **Slack connection**. Connections live under **Settings → Integrations → Slack**, where each one is listed with its name, kind, scope and how many automations use it. Add one with **Add Slack connection**, or with **New Slack connection** while setting up an automation's Slack delivery; the new connection comes back selected.
 
-- **Incoming webhook**: paste a Slack incoming webhook URL into the automation.
-- **Slack app**: pick a channel, and the LangWatch Slack app posts there. Connect the app once per project under **Settings → Integrations → Slack**; every automation in the project then uses that connection.
+A connection is one of two kinds:
+
+- **Bot**: a Slack app bot token. Pick a channel for each automation, and the app posts there with every block of the message. Invite the app to the channel first.
+- **Incoming webhook**: one webhook URL, which posts to the one channel Slack tied it to. Charts and tables are sent as text.
+
+Each connection has a scope:
+
+- **Organization**: every project in the organization can use it. Adding, editing or deleting one needs permission to manage the organization.
+- **Project**: only that project can use it. Adding, editing or deleting one needs permission to update the project.
+
+A token or URL is stored once per organization: adding a connection with a secret another connection already holds is refused, naming that connection. Replacing a connection's token or URL takes effect for every automation that uses it, with no automation edited. Deleting a connection that active automations use asks you to confirm how many stop delivering.
+
+<Note>
+Automations used to carry their own webhook URL or bot token, and a project had one Slack integration. Each of those secrets is now a connection, and every automation points at the connection holding its secret: automations that shared a secret within one project share a project connection, and a secret shared across projects became an organization connection. Nothing needs re-entering.
+</Note>
 
 ## Alerts and reports
 
@@ -58528,12 +58541,12 @@ Langy sets these up with the `langwatch` CLI, so the alert or automation lives i
 
   ```bash
   langwatch trigger create "Checkout p95 latency" \
-    --action SEND_SLACK_MESSAGE --slack-webhook "https://hooks.slack.com/services/..." \
+    --action SEND_SLACK_MESSAGE --slack-connection <connectionId> --slack-channel C0123456789 \
     --custom-graph-id <graphId> --alert-type WARNING \
     --graph-alert '{"seriesName":"0/performance.completion_time/p95","operator":"gt","threshold":8000,"timePeriod":15}'
   ```
 
-  The threshold is in milliseconds, and `timePeriod` is the window in minutes.
+  The threshold is in milliseconds, and `timePeriod` is the window in minutes. The Slack connection is one listed under **Settings → Integrations → Slack**; a webhook connection needs no `--slack-channel`.
 - A **per-trace automation**, such as flagging every trace where an evaluation fails, is `langwatch trigger create --filters`, keyed by the id of the monitor that runs the evaluation. If no monitor runs it yet, Langy adds one with `langwatch monitor create`.
 
 The [Triggers API](/api-reference/triggers/overview) has every option.
@@ -72189,16 +72202,20 @@ What `actionParams` holds for each channel:
 
 ## Slack delivery
 
-A `SEND_SLACK_MESSAGE` automation posts in one of two ways, chosen by `actionParams.slackDelivery`:
+A `SEND_SLACK_MESSAGE` automation posts through a Slack connection, named by `actionParams.slackIntegrationId`. Connections are listed and added in the dashboard under **Settings → Integrations → Slack**; the API can use any connection the project can use, which is its own project connections and its organization's organization connections.
 
-- **`webhook`** (the default): send `slackWebhook`, an incoming webhook URL (`https://hooks.slack.com/...`).
-- **`bot`**: send `slackChannelId`, the channel the LangWatch Slack app posts in. The bot token comes from the project's Slack connection, which an admin sets up once under **Settings → Integrations → Slack**, so no automation needs a token of its own.
+- A **bot** connection also needs `slackChannelId`, the channel the LangWatch Slack app posts in.
+- An **incoming webhook** connection needs nothing else: the webhook posts to the channel Slack tied it to.
 
 ```json
-{ "action": "SEND_SLACK_MESSAGE", "actionParams": { "slackDelivery": "bot", "slackChannelId": "C0123456789" } }
+{ "action": "SEND_SLACK_MESSAGE", "actionParams": { "slackIntegrationId": "<connectionId>", "slackChannelId": "C0123456789" } }
 ```
 
-A Slack automation with neither a webhook nor a bot channel never posts.
+Reading the automation back returns `slackIntegrationId` and never a token or URL. A connection that is deleted, or that belongs to another project, fails delivery with `slack_integration_missing`.
+
+<Note>
+For one release the API still accepts the legacy fields: `slackWebhook` (an incoming webhook URL, with `slackDelivery` absent or `"webhook"`) or `slackBotToken` with `slackChannelId` (with `slackDelivery: "bot"`). The server stores the secret as a connection, reusing the organization's connection that already holds it or creating a project connection, and the automation keeps only that connection's id. Send `slackIntegrationId` in new integrations.
+</Note>
 
 ## Alerts on a graph
 
@@ -72218,7 +72235,7 @@ curl -X POST "https://app.langwatch.ai/api/triggers" \
   -d '{
     "name": "Checkout p95 latency",
     "action": "SEND_SLACK_MESSAGE",
-    "actionParams": { "slackWebhook": "https://hooks.slack.com/services/..." },
+    "actionParams": { "slackIntegrationId": "<connectionId>" },
     "customGraphId": "<graphId>",
     "alertType": "WARNING",
     "graphAlert": { "seriesName": "0/performance.completion_time/p95", "operator": "gt", "threshold": 8000, "timePeriod": 15 }
@@ -72282,7 +72299,7 @@ The CLI and the MCP server page the same way: `langwatch trigger fires <id> --cu
 | Fire history | `langwatch trigger fires <id> [--limit <n>] [--cursor <cursor>]` | `platform_list_trigger_fires` |
 | Delete | `langwatch trigger delete <id>` | `platform_delete_trigger` |
 
-In the CLI, `--action-params` takes the channel's configuration as JSON, and `--slack-webhook <url>` is a shortcut for a Slack webhook. In MCP, `platform_create_trigger` takes `actionParams` as an optional object.
+In the CLI, `--action-params` takes the channel's configuration as JSON, and `--slack-connection <id>` with `--slack-channel <id>` (for a bot connection) are shortcuts for Slack delivery; `--slack-webhook <url>` is the legacy shortcut and is stored as a connection. In MCP, `platform_create_trigger` takes `actionParams` as an optional object.
 
 ---
 

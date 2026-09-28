@@ -8,6 +8,8 @@ import { commandValidationError, reportCommandError } from "../../utils/errorOut
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { parseJsonObject } from "./parseJsonObject";
 import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
+import { slackShorthands } from "./slackShorthands";
+import { summariseSlackConnection } from "./summary";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -26,6 +28,8 @@ export const createTriggerCommand = async (
     message?: string;
     alertType?: string;
     slackWebhook?: string;
+    slackConnection?: string;
+    slackChannel?: string;
     actionParams?: string;
     customGraphId?: string;
     graphAlert?: string;
@@ -74,10 +78,9 @@ export const createTriggerCommand = async (
     });
     process.exit(1);
   }
-  // The delivery configuration the chosen channel reads. `--slack-webhook`
-  // is the shorthand for the one field a Slack automation most often needs;
-  // everything else is stated with `--action-params`.
-  if (options.slackWebhook) actionParams.slackWebhook = options.slackWebhook;
+  // Shorthands for the Slack fields; everything else goes in `--action-params`.
+  // `--slack-webhook` is legacy: the server stores the URL as a connection.
+  Object.assign(actionParams, slackShorthands(options));
 
   try {
 
@@ -107,7 +110,7 @@ export const createTriggerCommand = async (
       process.exit(1);
     }
 
-    const trigger = await response.json() as { id: string; name: string; action: string; kind?: string; platformUrl?: string };
+    const trigger = await response.json() as { id: string; name: string; action: string; kind?: string; actionParams?: Record<string, unknown>; platformUrl?: string };
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     return {
@@ -119,6 +122,8 @@ export const createTriggerCommand = async (
         console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
         console.log(`  ${chalk.gray("Action:")} ${trigger.action}`);
         if (trigger.kind) console.log(`  ${chalk.gray("Kind:")}   ${trigger.kind}`);
+        const slack = summariseSlackConnection({ actionParams: trigger.actionParams });
+        if (slack) console.log(`  ${chalk.gray("Slack:")}  ${slack}`);
         if (trigger.platformUrl) {
           console.log(`  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`);
         }

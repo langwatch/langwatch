@@ -6,7 +6,7 @@ import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
-import { summariseGraphAlert, summariseReport } from "./summary";
+import { summariseGraphAlert, summariseReport, summariseSlackConnection } from "./summary";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -71,6 +71,8 @@ export const getTriggerCommand = async (
         console.log(`    ${chalk.gray("Name:")}    ${chalk.cyan(trigger.name)}`);
         console.log(`    ${chalk.gray("Action:")}  ${trigger.action}`);
         if (trigger.kind) console.log(`    ${chalk.gray("Kind:")}    ${trigger.kind}`);
+        const slack = summariseSlackConnection({ actionParams: trigger.actionParams });
+        if (slack) console.log(`    ${chalk.gray("Slack:")}   ${slack}`);
         console.log(`    ${chalk.gray("Status:")}  ${trigger.active ? chalk.green("active") : chalk.gray("inactive")}`);
         console.log(`    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`);
         console.log(`    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`);

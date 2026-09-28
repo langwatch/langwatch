@@ -32340,7 +32340,7 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
-                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
@@ -32551,20 +32551,22 @@ export interface operations {
                 } | {
                     /** @constant */
                     action: "SEND_SLACK_MESSAGE";
-                    /** @description Slack delivery, by incoming webhook or by bot connection. */
+                    /** @description Slack delivery through a Slack connection (`slackIntegrationId`), plus `slackChannelId` when the connection is a bot. */
                     actionParams: {
+                        /** @description The Slack connection this automation posts through: an organization connection or one of this project's, listed under Settings, Integrations, Slack. A bot connection also needs `slackChannelId`; a webhook connection needs nothing else. Preferred over `slackWebhook` and `slackBotToken`, and what a read returns in their place. */
+                        slackIntegrationId?: string;
                         /**
-                         * @description How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. Absent means `webhook`.
+                         * @description How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. With `slackIntegrationId` it follows the connection's kind. Absent without a connection means `webhook`.
                          * @enum {string}
                          */
                         slackDelivery?: "webhook" | "bot";
-                        /** @description The incoming webhook URL, for `webhook` delivery. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one. */
+                        /** @description Legacy, accepted for one release: an incoming webhook URL, for `webhook` delivery. It is stored as a Slack connection (an existing one holding the same URL, else a new project connection) and the automation keeps only that connection's id. Send `slackIntegrationId` instead. */
                         slackWebhook?: string;
-                        /** @description The channel the bot posts in, for `bot` delivery. */
+                        /** @description The channel the bot posts in, for a bot connection or `bot` delivery. Invite the LangWatch app to it first. */
                         slackChannelId?: string;
-                        /** @description The bot token, for `bot` delivery. A credential: it never reads back. Send `slackBotTokenSet: true` to keep the stored one. */
+                        /** @description Legacy, accepted for one release: a bot token, for `bot` delivery. It is stored as a Slack connection (an existing one holding the same token, else a new project connection) and never reads back. Send `slackIntegrationId` instead. */
                         slackBotToken?: string;
-                        /** @description Read: whether a bot token is stored. Write: `true` keeps the stored one. */
+                        /** @description Legacy. Read: whether an automation not yet moved to a connection still stores its own bot token. Write: `true` keeps it. */
                         slackBotTokenSet?: boolean;
                     } & {
                         [key: string]: unknown;
@@ -32911,7 +32913,7 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
-                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
@@ -33054,7 +33056,7 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
-                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
@@ -33302,25 +33304,27 @@ export interface operations {
                     filterQuery?: string | null;
                     /** @enum {string} */
                     action?: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
-                    /** @description Replaces the delivery configuration as a whole rather than merging into it: send the fields this automation should have from now on, and anything left out is removed — omit `headers` and it delivers with none, omit `signingSecret` and its deliveries are no longer signed. The one exception is a credential the read hid: send back the `[redacted]` placeholder (or, for a Slack bot connection, the `slackBotTokenSet` flag the read echoes) and the stored credential is kept, so reading an automation, changing one field and writing the whole object back is safe. Only this channel's fields are accepted; anything else is refused rather than dropped, and the rule this automation fires by belongs in `graphAlert` or `report`. */
+                    /** @description Replaces the delivery configuration as a whole rather than merging into it: send the fields this automation should have from now on, and anything left out is removed — omit `headers` and it delivers with none, omit `signingSecret` and its deliveries are no longer signed. The one exception is a credential the read hid: send back the `[redacted]` placeholder (or, for a legacy Slack bot token, the `slackBotTokenSet` flag the read echoes) and the stored credential is kept, so reading an automation, changing one field and writing the whole object back is safe. Only this channel's fields are accepted; anything else is refused rather than dropped, and the rule this automation fires by belongs in `graphAlert` or `report`. */
                     actionParams?: ({
                         /** @description Who receives the email. Any address, not only teammates. */
                         members: string[];
                     } & {
                         [key: string]: unknown;
                     }) | ({
+                        /** @description The Slack connection this automation posts through: an organization connection or one of this project's, listed under Settings, Integrations, Slack. A bot connection also needs `slackChannelId`; a webhook connection needs nothing else. Preferred over `slackWebhook` and `slackBotToken`, and what a read returns in their place. */
+                        slackIntegrationId?: string;
                         /**
-                         * @description How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. Absent means `webhook`.
+                         * @description How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. With `slackIntegrationId` it follows the connection's kind. Absent without a connection means `webhook`.
                          * @enum {string}
                          */
                         slackDelivery?: "webhook" | "bot";
-                        /** @description The incoming webhook URL, for `webhook` delivery. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one. */
+                        /** @description Legacy, accepted for one release: an incoming webhook URL, for `webhook` delivery. It is stored as a Slack connection (an existing one holding the same URL, else a new project connection) and the automation keeps only that connection's id. Send `slackIntegrationId` instead. */
                         slackWebhook?: string;
-                        /** @description The channel the bot posts in, for `bot` delivery. */
+                        /** @description The channel the bot posts in, for a bot connection or `bot` delivery. Invite the LangWatch app to it first. */
                         slackChannelId?: string;
-                        /** @description The bot token, for `bot` delivery. A credential: it never reads back. Send `slackBotTokenSet: true` to keep the stored one. */
+                        /** @description Legacy, accepted for one release: a bot token, for `bot` delivery. It is stored as a Slack connection (an existing one holding the same token, else a new project connection) and never reads back. Send `slackIntegrationId` instead. */
                         slackBotToken?: string;
-                        /** @description Read: whether a bot token is stored. Write: `true` keeps the stored one. */
+                        /** @description Legacy. Read: whether an automation not yet moved to a connection still stores its own bot token. Write: `true` keeps it. */
                         slackBotTokenSet?: boolean;
                     } & {
                         [key: string]: unknown;
@@ -33431,7 +33435,7 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
-                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
@@ -33683,7 +33687,7 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
-                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
@@ -33838,7 +33842,7 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
-                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };

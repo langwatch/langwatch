@@ -204,6 +204,39 @@ describe("Feature: an agent configures an automation over MCP", () => {
       ).toBe(false);
     });
 
+    it("refuses bot delivery with a channel but no connection or token", () => {
+      const result = validateActionParamsForAction({
+        action: "SEND_SLACK_MESSAGE",
+        actionParams: { slackDelivery: "bot", slackChannelId: "C123" },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.ok ? "" : result.message).toContain("slackIntegrationId");
+    });
+
+    it("refuses a bot connection with no channel", () => {
+      expect(
+        validateActionParamsForAction({
+          action: "SEND_SLACK_MESSAGE",
+          actionParams: { slackIntegrationId: "slack_1", slackDelivery: "bot" },
+        }).ok,
+      ).toBe(false);
+    });
+
+    it("accepts a Slack connection by id, with a channel for a bot", () => {
+      expect(
+        validateActionParamsForAction({
+          action: "SEND_SLACK_MESSAGE",
+          actionParams: { slackIntegrationId: "slack_1" },
+        }).ok,
+      ).toBe(true);
+      expect(
+        validateActionParamsForAction({
+          action: "SEND_SLACK_MESSAGE",
+          actionParams: { slackIntegrationId: "slack_1", slackChannelId: "C123" },
+        }).ok,
+      ).toBe(true);
+    });
+
     it("accepts a Slack destination once it names where to deliver", () => {
       expect(
         validateActionParamsForAction({
@@ -216,7 +249,21 @@ describe("Feature: an agent configures an automation over MCP", () => {
       expect(
         validateActionParamsForAction({
           action: "SEND_SLACK_MESSAGE",
-          actionParams: { slackDelivery: "bot", slackChannelId: "C123" },
+          actionParams: {
+            slackDelivery: "bot",
+            slackBotToken: "xoxb-legacy",
+            slackChannelId: "C123",
+          },
+        }).ok,
+      ).toBe(true);
+      expect(
+        validateActionParamsForAction({
+          action: "SEND_SLACK_MESSAGE",
+          actionParams: {
+            slackDelivery: "bot",
+            slackBotTokenSet: true,
+            slackChannelId: "C123",
+          },
         }).ok,
       ).toBe(true);
     });
@@ -348,20 +395,20 @@ describe("Feature: an agent configures an automation over MCP", () => {
       );
     });
 
-    it("accepts Slack bot delivery naming only the channel", async () => {
+    it("sends a Slack connection and channel as given", async () => {
       request.mockResolvedValue(TRIGGER);
 
       await handleCreateTrigger({
         name: "Errors to Slack",
         action: "SEND_SLACK_MESSAGE",
-        actionParams: { slackDelivery: "bot", slackChannelId: "C123" },
+        actionParams: { slackIntegrationId: "slack_1", slackChannelId: "C123" },
       });
 
       expect(request).toHaveBeenCalledWith(
         "POST",
         "/api/triggers",
         expect.objectContaining({
-          actionParams: { slackDelivery: "bot", slackChannelId: "C123" },
+          actionParams: { slackIntegrationId: "slack_1", slackChannelId: "C123" },
         }),
       );
     });
@@ -432,9 +479,12 @@ describe("Feature: an agent configures an automation over MCP", () => {
       expect(TRIGGER_FILTER_QUERY_DESCRIPTION).toContain("evaluatorVerdict:fail");
     });
 
-    it("says a Slack automation needs a webhook or bot delivery", () => {
+    it("says a Slack automation needs a connection, and where to find one", () => {
+      expect(SLACK_DELIVERY_NOTE).toContain('"slackIntegrationId"');
+      expect(SLACK_DELIVERY_NOTE).toContain("slackChannelId");
+      expect(SLACK_DELIVERY_NOTE).toContain("Settings, Integrations, Slack");
+      expect(SLACK_DELIVERY_NOTE).toContain("preferred");
       expect(SLACK_DELIVERY_NOTE).toContain("slackWebhook");
-      expect(SLACK_DELIVERY_NOTE).toContain('"slackDelivery":"bot"');
       expect(SLACK_DELIVERY_NOTE).toContain("never post");
     });
   });

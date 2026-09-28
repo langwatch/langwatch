@@ -37,12 +37,12 @@ Langy sets these up with the `langwatch` CLI, so the alert or automation lives i
 
   ```bash
   langwatch trigger create "Checkout p95 latency" \
-    --action SEND_SLACK_MESSAGE --slack-webhook "https://hooks.slack.com/services/..." \
+    --action SEND_SLACK_MESSAGE --slack-connection <connectionId> --slack-channel C0123456789 \
     --custom-graph-id <graphId> --alert-type WARNING \
     --graph-alert '{"seriesName":"0/performance.completion_time/p95","operator":"gt","threshold":8000,"timePeriod":15}'
   ```
 
-  The threshold is in milliseconds, and `timePeriod` is the window in minutes.
+  The threshold is in milliseconds, and `timePeriod` is the window in minutes. The Slack connection is one listed under **Settings → Integrations → Slack**; a webhook connection needs no `--slack-channel`.
 - A **per-trace automation**, such as flagging every trace where an evaluation fails, is `langwatch trigger create --filters`, keyed by the id of the monitor that runs the evaluation. If no monitor runs it yet, Langy adds one with `langwatch monitor create`.
 
 The [Triggers API](/api-reference/triggers/overview) has every option.

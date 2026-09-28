@@ -7,6 +7,7 @@ import { commandValidationError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { parseJsonObject } from "./parseJsonObject";
 import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
+import { slackShorthands } from "./slackShorthands";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -26,6 +27,8 @@ export const updateTriggerCommand = async (
     filters?: string;
     filterQuery?: string;
     actionParams?: string;
+    slackConnection?: string;
+    slackChannel?: string;
     graphAlert?: string;
     report?: string;
   },
@@ -76,7 +79,10 @@ export const updateTriggerCommand = async (
     // The delivery configuration this automation should have from now on: it
     // replaces the stored one rather than merging into it. A credential the
     // read hid comes back as `[redacted]`; send that to keep the stored value.
-    if (parsedActionParams) body.actionParams = parsedActionParams;
+    const slack = slackShorthands(options);
+    if (parsedActionParams || Object.keys(slack).length > 0) {
+      body.actionParams = { ...parsedActionParams, ...slack };
+    }
     if (parsedGraphAlert) body.graphAlert = parsedGraphAlert;
     if (parsedReport) body.report = parsedReport;
 
@@ -84,7 +90,7 @@ export const updateTriggerCommand = async (
       failSpinner({
         spinner,
         error: commandValidationError(
-          "No fields to update. Use --name, --active, --message, --alert-type, --filters, --filter-query, --action-params, --graph-alert or --report.",
+          "No fields to update. Use --name, --active, --message, --alert-type, --filters, --filter-query, --action-params, --slack-connection, --slack-channel, --graph-alert or --report.",
         ),
         action: "update trigger",
       });

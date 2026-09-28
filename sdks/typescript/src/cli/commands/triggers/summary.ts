@@ -44,6 +44,22 @@ export function summariseReport({ report }: { report: Loose }): string | undefin
   return `${target} at "${String(schedule.cron ?? "?")}" ${String(schedule.timezone ?? "")}${compare}`.trimEnd();
 }
 
+/** The Slack connection (and channel) an automation posts through, if any. */
+export function summariseSlackConnection({
+  actionParams,
+}: {
+  actionParams: Loose;
+}): string | undefined {
+  if (!actionParams || typeof actionParams.slackIntegrationId !== "string") {
+    return undefined;
+  }
+  const channel =
+    typeof actionParams.slackChannelId === "string"
+      ? ` in ${actionParams.slackChannelId}`
+      : "";
+  return `${actionParams.slackIntegrationId}${channel}`;
+}
+
 /** The rule column for a listing: the alert or report summary, or `-`. */
 export function summariseRule(trigger: {
   graphAlert?: Loose;
