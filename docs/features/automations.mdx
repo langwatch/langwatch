@@ -3,13 +3,17 @@ title: Alerts and Automations
 description: Configure Alerts and Automations in LangWatch to detect regressions, notify teams, and enforce automated guardrails for AI agent testing.
 ---
 
-## Create automations based on LangWatch filters
+An automation watches something in your project and acts when it happens. There are three kinds:
 
-LangWatch offers you the possibility to create automations based on your selected filters. You can use these automations to send notifications to either Slack or selected team email addresses.
+- **Automations** act on each trace that matches a filter: send an email, a Slack message or a webhook, add the trace to a dataset, or send it to an annotation queue.
+- **Alerts** watch a series on a custom graph and fire when it crosses a threshold, for example p95 latency above 8 seconds.
+- **Reports** send a dashboard, a single graph or a table of traces on a schedule, for example every Monday at 09:00.
 
-#### Usage
+All three live on the **Automations** page of your project, which has a tab for each kind and an **Activity** tab with everything they have done.
 
-To create an automation in the LangWatch dashboard, follow these steps:
+<Info>**Also check:** [Triggers API](/api-reference/triggers/overview) to manage automations over REST, the CLI or MCP, and [Datasets from traces](/datasets/automatically-from-traces) for the dataset column mapping.</Info>
+
+## Create an automation from a filter
 
 - Click the filter button located at the top right of the LangWatch dashboard.
 - After creating a filter, an automation button will appear.
@@ -34,7 +38,9 @@ To create an automation in the LangWatch dashboard, follow these steps:
 />
 </Frame>
 
-Once the automation is created, you will receive an alert whenever a message meets the criteria of the automation. These automation checks are run on the minute but not instantaneously, as the data needs time to be processed. You can find the created automations under the Settings section, where you can deactivate or delete an automation to stop receiving notifications.
+Once the automation is created, it acts on every trace that meets its conditions. Conditions are checked shortly after a trace arrives, not instantly, because the trace needs time to be processed. Notifications are grouped into a digest (every five minutes for a new automation) so a broad condition does not send one message per trace.
+
+A condition on an evaluation result names the **monitor** that ran the evaluation, not the evaluator. The dashboard picks this for you; over the API, see [Evaluation keys are monitor ids](/api-reference/triggers/overview#evaluation-keys-are-monitor-ids).
 
 **Automation settings**
 
@@ -45,3 +51,24 @@ Once the automation is created, you will receive an alert whenever a message mee
   alt="LangWatch"
 />
 </Frame>
+
+## Slack
+
+A Slack automation posts in one of two ways:
+
+- **Incoming webhook**: paste a Slack incoming webhook URL into the automation.
+- **Slack app**: pick a channel, and the LangWatch Slack app posts there. Connect the app once per project under **Settings → Integrations → Slack**; every automation in the project then uses that connection.
+
+## Alerts and reports
+
+An **alert** is set up on a custom graph: pick the series to watch, the comparison (above, below, equal), the threshold and the window (1 minute to 1 day). It fires when the series crosses the threshold and records when it recovers.
+
+A **report** renders a dashboard, one graph, or a table of the top traces for a filter, and sends it by email or Slack on a cron schedule in the timezone you choose. A report sends at most once every 15 minutes.
+
+Both can also be created with `langwatch trigger create --graph-alert` and `--report`; see the [Triggers API](/api-reference/triggers/overview#alerts-on-a-graph).
+
+## Pause, test and history
+
+- **Pause** an automation to stop it acting without deleting it, and resume it later. A paused report stops sending.
+- **Test** sends the automation's message to its saved destination so you can check it arrives. A test is not recorded as a fire.
+- **Activity** lists every fire, newest first. The same history is available with `GET /api/triggers/{id}/fires`, `langwatch trigger fires <id>` and the MCP tool `platform_list_trigger_fires`, each paged by cursor.

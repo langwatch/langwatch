@@ -169,6 +169,7 @@
               },
               "features/querying-your-data",
               "features/automations",
+              "features/topic-clustering",
               "features/embedded-analytics"
             ]
           },
