@@ -61,11 +61,14 @@ type Streams struct {
 // lets a test assert that teardown happened after a failed capture without
 // booting anything.
 type Deps struct {
-	Run           runner
-	Start         func(ctx context.Context, stack Stack, logDir string) (func(), error)
-	Wait          func(ctx context.Context, urls []string, timeout time.Duration) error
-	Seed          func(ctx context.Context, request SeedRequest) (SeedResult, error)
-	Capture       func(ctx context.Context, plan RunnerPlan, options CaptureOptions) (RunnerStream, error)
+	Run     runner
+	Start   func(ctx context.Context, stack Stack, logDir string) (func(), error)
+	Wait    func(ctx context.Context, urls []string, timeout time.Duration) error
+	Seed    func(ctx context.Context, request SeedRequest) (SeedResult, error)
+	Capture func(ctx context.Context, plan RunnerPlan, options CaptureOptions) (RunnerStream, error)
+	// Preflight proves the runner can launch its browser before any stack
+	// boots, so a missing Playwright install fails in seconds, not minutes.
+	Preflight     func(ctx context.Context, root string) error
 	Listening     func(port int) bool
 	Layout        func(dir string) (Layout, error)
 	Now           func() time.Time
@@ -140,6 +143,7 @@ func (deps *Deps) fill() {
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
+	deps.fillPreflight()
 	if deps.Capture == nil {
 		deps.Capture = RunRunner
 	}
@@ -150,6 +154,30 @@ func (deps *Deps) fill() {
 		deps.AllocateRedis = ResolveRedisAllocation
 	}
 	deps.fillHaven()
+}
+
+// prepareInfra proves the runner's browser launches, then (off haven) takes
+// ports and Redis databases; haven owns both on its own path.
+func prepareInfra(ctx context.Context, inputs portInfraInputs, options Options) error {
+	if err := inputs.deps.Preflight(ctx, options.Root); err != nil {
+		return err
+	}
+	if options.UseHaven {
+		return nil
+	}
+	return resolvePortBasedInfra(ctx, inputs)
+}
+
+// fillPreflight runs the real browser check only with the real runner, so a
+// test's fake capture never shells out.
+func (deps *Deps) fillPreflight() {
+	if deps.Preflight != nil {
+		return
+	}
+	deps.Preflight = func(context.Context, string) error { return nil }
+	if deps.Capture == nil {
+		deps.Preflight = RunnerPreflight
+	}
 }
 
 // fillHaven defaults the two dependencies only the haven path uses, split out
@@ -211,12 +239,8 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 		writeBaselinePlan(streams.Out, options.Editions, baselines)
 		return result, nil
 	}
-	if !options.UseHaven {
-		// The haven path never reaches here at all: haven owns both the
-		// ports and each stack's Redis database.
-		if err := resolvePortBasedInfra(ctx, portInfraInputs{plan: &plan, deps: deps, stderr: streams.Err}); err != nil {
-			return result, err
-		}
+	if err := prepareInfra(ctx, portInfraInputs{plan: &plan, deps: deps, stderr: streams.Err}, options); err != nil {
+		return result, err
 	}
 	result.Plan = plan
 
@@ -858,4 +882,17 @@ func RunRunner(ctx context.Context, plan RunnerPlan, options CaptureOptions) (Ru
 		return stream, fmt.Errorf("runner: %w", runErr)
 	}
 	return stream, nil
+}
+
+// RunnerPreflight launches and closes the runner's browser; its stderr names
+// the install command when Playwright's browser is missing.
+func RunnerPreflight(ctx context.Context, root string) error {
+	// #nosec G204 -- constant executable and constant args.
+	command := exec.CommandContext(ctx, "pnpm", "--silent", "--filter", RunnerPackage, "preflight")
+	command.Dir = root
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("runner preflight: %w\n%s", err, output)
+	}
+	return nil
 }
