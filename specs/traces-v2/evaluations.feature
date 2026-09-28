@@ -394,11 +394,9 @@ Rule: Feedback is displayed as events
     # `event` is a real facet field exposed via `query-language/metadata`
     # and the "Trace" facet group in the sidebar.
 
-  @planned
+  @unit
   Scenario: `@has:feedback` shorthand
-    # Not yet implemented as of 2026-05-01 — the query language supports
-    # `has:eval`, `has:user`, `has:conversation`, etc., but no `has:feedback`
-    # shorthand is registered.
+    # Feedback is the `thumbs_up_down` tracked event, from the REST API or the SDK.
     When the user applies the filter "has:feedback"
     Then only traces with feedback events are shown
 
