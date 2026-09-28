@@ -145,24 +145,24 @@ describe("Integrations settings, Slack section", () => {
     });
 
     /** @scenario "Settings lists connections and opens the drawer" */
-    it("lists each with its kind, scope, workspace or hint, and usage", () => {
+    it("lists each with its kind, whose it is, workspace or hint, and usage", () => {
       renderPage();
 
       const bot = screen.getByRole("button", {
-        name: "Open Slack connection Alerts bot",
+        name: "Edit Alerts bot",
       });
       expect(within(bot).getByText("Bot")).toBeInTheDocument();
-      expect(within(bot).getByText("Acme Corp")).toBeInTheDocument();
+      expect(within(bot).getByText("Organization")).toBeInTheDocument();
       expect(within(bot).getByText("Acme HQ")).toBeInTheDocument();
       expect(
         within(bot).getByText("Used by 3 automations"),
       ).toBeInTheDocument();
 
       const webhook = screen.getByRole("button", {
-        name: "Open Slack connection Ops webhook",
+        name: "Edit Ops webhook",
       });
       expect(within(webhook).getByText("Webhook")).toBeInTheDocument();
-      expect(within(webhook).getByText("Checkout")).toBeInTheDocument();
+      expect(within(webhook).getByText("This project")).toBeInTheDocument();
       expect(within(webhook).getByText("••••wxyz")).toBeInTheDocument();
       expect(
         within(webhook).getByText("Used by 1 automation"),
@@ -176,7 +176,7 @@ describe("Integrations settings, Slack section", () => {
 
       await user.click(
         screen.getByRole("button", {
-          name: "Open Slack connection Ops webhook",
+          name: "Edit Ops webhook",
         }),
       );
       await user.click(

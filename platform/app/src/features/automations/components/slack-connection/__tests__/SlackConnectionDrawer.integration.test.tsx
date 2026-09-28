@@ -201,7 +201,10 @@ describe("SlackConnectionDrawer", () => {
       renderDrawer({});
 
       await user.click(screen.getByText("Incoming webhook"));
-      await user.type(screen.getByPlaceholderText("Alerts bot"), "Ops room");
+      await user.type(
+        screen.getByPlaceholderText("Alerts channel webhook"),
+        "Ops room",
+      );
       await user.type(
         screen.getByPlaceholderText("https://hooks.slack.com/services/…"),
         "https://hooks.slack.com/services/T/B/x",
@@ -333,6 +336,36 @@ describe("SlackConnectionDrawer", () => {
           id: "conn-1",
           force: true,
         }),
+      );
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a connection nothing delivers through is deleted", () => {
+    /** @scenario "Deleting an unused connection is confirmed too" */
+    it("asks to confirm first, then deletes without force", async () => {
+      const user = userEvent.setup();
+      const onClose = vi.fn();
+      state.connections = [connection({ dependentAutomations: 0 })];
+      renderDrawer({ connectionId: "conn-1", onClose });
+
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      expect(
+        await screen.findByText(
+          "Nothing uses it; its saved secret is removed.",
+        ),
+      ).toBeInTheDocument();
+      expect(state.deleteCalls).toEqual([]);
+
+      await user.click(
+        screen.getByRole("button", { name: "Delete connection" }),
+      );
+
+      await waitFor(() =>
+        expect(state.deleteCalls).toEqual([
+          { projectId: "project-1", id: "conn-1" },
+        ]),
       );
       expect(onClose).toHaveBeenCalledTimes(1);
     });

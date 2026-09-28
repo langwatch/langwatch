@@ -79,6 +79,15 @@ Feature: Slack connections
       When the user confirms
       Then the connection is removed
 
+    @integration
+    Scenario: Deleting an unused connection is confirmed too
+      Given a connection no automation delivers through
+      When the user deletes it
+      Then the drawer asks to confirm that nothing uses it and its saved secret is removed
+      And nothing is deleted yet
+      When the user confirms
+      Then the connection is removed
+
   Rule: The settings page and the automation drawer share one connection drawer
 
     @integration

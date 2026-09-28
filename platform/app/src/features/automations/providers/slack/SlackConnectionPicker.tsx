@@ -11,7 +11,10 @@ import { Plus } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
-import { slackConnectionKindLabel } from "~/features/automations/components/slack-connection/slackConnectionCopy";
+import {
+  slackConnectionKindLabel,
+  slackConnectionScopeLabel,
+} from "~/features/automations/components/slack-connection/slackConnectionCopy";
 import type { SlackIntegrationKind } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
@@ -73,7 +76,7 @@ export function SlackConnectionPicker({
           ...(data?.connections ?? []).map((connection) => ({
             value: connection.id,
             label: connection.name,
-            detail: `${slackConnectionKindLabel(connection.kind)} · ${connection.scopeName}`,
+            detail: `${slackConnectionKindLabel(connection.kind)} · ${slackConnectionScopeLabel(connection.scopeType)}`,
           })),
           ...(canCreate
             ? [

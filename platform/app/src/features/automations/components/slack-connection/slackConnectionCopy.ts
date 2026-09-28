@@ -1,5 +1,8 @@
 import { readHandledError } from "~/features/errors";
-import type { SlackIntegrationKind } from "~/generated/prisma/client";
+import type {
+  SlackIntegrationKind,
+  SlackIntegrationScopeType,
+} from "~/generated/prisma/client";
 
 /**
  * The words the settings list, the connection drawer and the automation's
@@ -29,6 +32,14 @@ export function slackConnectionKindLabel(kind: SlackIntegrationKind): string {
   return kind === "BOT" ? "Bot" : "Webhook";
 }
 
+/** A PROJECT connection only lists in its own project, so "This project"
+ *  tells it apart from an organization connection with the same name. */
+export function slackConnectionScopeLabel(
+  scopeType: SlackIntegrationScopeType,
+): string {
+  return scopeType === "PROJECT" ? "This project" : "Organization";
+}
+
 /** Only the last four characters of a secret ever reach the browser. */
 export function maskedSecret(secretHint: string): string {
   return `••••${secretHint}`;
@@ -53,6 +64,19 @@ export function inUseDeleteConfirmation({
       count === 1
         ? "1 automation stops delivering until it picks another connection."
         : `${count} automations stop delivering until they pick another connection.`,
+    confirmLabel: "Delete connection",
+  };
+}
+
+/** Deleting a connection nothing uses still asks first: its secret goes too. */
+export function unusedDeleteConfirmation({ name }: { name: string }): {
+  title: string;
+  message: string;
+  confirmLabel: string;
+} {
+  return {
+    title: `Delete "${name}"?`,
+    message: "Nothing uses it; its saved secret is removed.",
     confirmLabel: "Delete connection",
   };
 }

@@ -77,7 +77,7 @@ export function SlackConnectionForm({
         <Input
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="Alerts bot"
+          placeholder={kind === "BOT" ? "Alerts bot" : "Alerts channel webhook"}
         />
       </Field.Root>
       <ConnectionScopeField
@@ -154,6 +154,7 @@ function ConnectionScopeField({
       allowedScopeTypes={["ORGANIZATION", "PROJECT"]}
       singleSelect
       label="Who can use it"
+      subjectNoun="connection"
       currentOrganizationId={canManageOrganization ? organization?.id : null}
       currentProjectId={canManageProject ? project?.id : null}
     />

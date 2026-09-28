@@ -3374,15 +3374,12 @@ const presentations = {
     // the general instruction.
     describe: (error) => {
       switch (str(error, "slackError", "")) {
-        case "invalid_auth":
-        case "not_authed":
-          return "Paste a Bot User OAuth token from your Slack app — it starts with xoxb-.";
         case "token_revoked":
           return "That token was revoked in Slack. Reinstall the app and paste the new token.";
         case "account_inactive":
           return "That Slack app was removed from the workspace. Reinstall it and paste the new token.";
         default:
-          return "Check the token and try again.";
+          return "Slack says this token isn't valid. Check you copied the whole Bot User OAuth token (it starts with xoxb-), or reinstall the app to get a new one.";
       }
     },
   },

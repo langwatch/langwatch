@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { FaSlack } from "react-icons/fa";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { HandledErrorAlert } from "~/features/errors";
@@ -19,6 +19,7 @@ import { api } from "~/utils/api";
 import {
   maskedSecret,
   slackConnectionKindLabel,
+  slackConnectionScopeLabel,
   usedByLabel,
 } from "./slackConnectionCopy";
 import type { SlackConnection } from "./slackConnectionTypes";
@@ -114,7 +115,7 @@ function SlackConnectionRow({
       cursor="pointer"
       _hover={{ bg: "bg.subtle" }}
       onClick={onOpen}
-      aria-label={`Open Slack connection ${connection.name}`}
+      aria-label={`Edit ${connection.name}`}
     >
       <HStack justify="space-between" gap={3} align="start">
         <VStack align="start" gap={1} minWidth={0}>
@@ -131,7 +132,8 @@ function SlackConnectionRow({
                 {
                   scopeType: connection.scopeType,
                   scopeId: connection.scopeId,
-                  name: connection.scopeName,
+                  name: slackConnectionScopeLabel(connection.scopeType),
+                  detail: connection.scopeName,
                 },
               ]}
             />
@@ -140,9 +142,12 @@ function SlackConnectionRow({
             {connection.slackTeamName ?? maskedSecret(connection.secretHint)}
           </Text>
         </VStack>
-        <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-          {usedByLabel(connection.dependentAutomations)}
-        </Text>
+        <HStack gap={2} flexShrink={0} color="fg.muted">
+          <Text fontSize="xs">
+            {usedByLabel(connection.dependentAutomations)}
+          </Text>
+          <ChevronRight size={16} aria-hidden />
+        </HStack>
       </HStack>
     </Box>
   );
