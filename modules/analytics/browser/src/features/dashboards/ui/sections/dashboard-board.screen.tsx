@@ -7,6 +7,7 @@
 
 import { Box, Spinner, VStack } from "@chakra-ui/react";
 import { UiPageLoading, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
+import { nowInstant } from "@langwatch/time";
 import { useState, type ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
@@ -70,6 +71,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const { range, grain, period, setRange, setGrain } = useBoardPeriod();
   const picker = useBlockPickerAddress();
   const [isAddChartOpen, setIsAddChartOpen] = useState(false);
+  const [openedAt] = useState(() => nowInstant().epochMilliseconds);
   const widgets = boardWidgets.widgetsOn(board.id);
   const subject = boardSubject({ board, widgets });
   const autoRefresh = useDashboardAutoRefresh();
@@ -104,7 +106,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
             <DashboardAutoRefreshMenu
               option={autoRefresh.option}
               onChange={autoRefresh.setOption}
-              refreshedAt={autoRefresh.refreshedAt}
+              refreshedAt={autoRefresh.refreshedAt ?? openedAt}
               onRefreshNow={autoRefresh.refreshNow}
             />
           }
