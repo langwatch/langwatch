@@ -289,6 +289,20 @@ export const FEATURE_FLAGS = [
       "Opens the custom-chart-playground page, its playground-widget REST routes, and the Langy skill that drives them, outside local development — otherwise all three are dev-only unconditionally. Default off, so the surface stays dev-only until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_custom_chart_playground.",
   },
   {
+    key: "release_dashboards",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Opens the Dashboards area (/[project]/dashboards): the Agent Flight Deck and the member's own boards, with its sidebar entry and saved-dashboards list (spec: modules/dashboard/specs/dashboards-v1.feature). Default off; while off the area answers not-found and the sidebar shows no entry. Legacy analytics is untouched either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards.",
+  },
+  {
+    key: "release_ui_home_signal_focused_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Switches the project home to the signal-focused composition — the briefing sheet leads, the chrome grid and recent work follow (spec: specs/home/signal-focused-home-rollout.feature). Deliberately decoupled from release_langy_enabled: this flag alone decides the home's composition, while Langy access only decides whether the sheet's hand-to-Langy affordances render. Default off = classic home. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_home_signal_focused_enabled.",
+  },
+  {
     key: "release_ui_comparison_leaderboard_enabled",
     scope: "PRODUCT",
     defaultValue: false,

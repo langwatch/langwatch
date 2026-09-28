@@ -4,9 +4,10 @@
  */
 
 import { nowInstant } from "@langwatch/time";
-import { GitPullRequest, SquareTerminal } from "lucide-react";
+import { GitPullRequest, LayoutDashboard, SquareTerminal } from "lucide-react";
 import React from "react";
 
+import { SavedDashboards } from "../../behavior/lent-saved-dashboards.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../../model/coding-agent-activity.ts";
 import { featureIcons } from "../../model/feature-icons.ts";
@@ -15,7 +16,11 @@ import {
   isOnlineEvaluationsActivePath,
 } from "../../model/navigation-active-state.ts";
 import { useNavigationHost, type NavigationProject } from "../../model/navigation-host.ts";
-import { projectNavItems, toProjectRoutePattern } from "../../model/project-nav-items.ts";
+import {
+  dashboardsAreaAt,
+  projectNavItems,
+  toProjectRoutePattern,
+} from "../../model/project-nav-items.ts";
 import { projectScopedDestination } from "../../model/project-scoped-nav.ts";
 import { CollapsibleMenuGroup } from "../blocks/collapsible-menu-group.tsx";
 import { SideMenuLink } from "../blocks/side-menu-link.tsx";
@@ -42,6 +47,9 @@ export const MainMenuSections = function MainMenuSections({
     { enabled: !!project?.id },
   );
   const codingAgentLinks = useCodingAgentLinks();
+  const canSeeDashboards =
+    host.featureFlag("release_dashboards").enabled && host.hasPermission("analytics:view");
+  const dashboardsArea = canSeeDashboards ? dashboardsAreaAt(pathname) : void 0;
 
   const sectionProps = { showExpanded, project, pathname };
 
@@ -56,7 +64,15 @@ export const MainMenuSections = function MainMenuSections({
         showLabel={showExpanded}
       />
 
-      <ObserveSection {...sectionProps} codingAgentLinks={codingAgentLinks} />
+      {dashboardsArea && showExpanded && (
+        <SavedDashboards activeDashboardId={dashboardsArea.dashboardId} />
+      )}
+
+      <ObserveSection
+        {...sectionProps}
+        codingAgentLinks={codingAgentLinks}
+        canSeeDashboards={canSeeDashboards}
+      />
       <TestSection {...sectionProps} pendingAnnotationCount={pendingItemsCount.data?.count} />
       <BuildSection {...sectionProps} canSeeAutomations={host.hasPermission("triggers:view")} />
     </>
@@ -109,7 +125,8 @@ function ObserveSection({
   project,
   pathname,
   codingAgentLinks,
-}: ProjectSectionProps & { codingAgentLinks: CodingAgentLinks }) {
+  canSeeDashboards,
+}: ProjectSectionProps & { codingAgentLinks: CodingAgentLinks; canSeeDashboards: boolean }) {
   return (
     <SidebarSection id="observe" label="Observe" showExpanded={showExpanded}>
       <PageMenuLink
@@ -120,6 +137,16 @@ function ObserveSection({
         isActive={pathname.includes("/analytics")}
         showLabel={showExpanded}
       />
+      {canSeeDashboards && (
+        <PageMenuLink
+          path={projectNavItems.dashboards.path}
+          icon={LayoutDashboard}
+          label={projectNavItems.dashboards.title}
+          project={project}
+          isActive={dashboardsAreaAt(pathname) !== void 0}
+          showLabel={showExpanded}
+        />
+      )}
       <PageMenuLink
         path={projectNavItems.traces_v2.path}
         icon={featureIcons.traces_v2.icon}

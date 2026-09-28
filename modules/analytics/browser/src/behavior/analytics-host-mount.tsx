@@ -10,6 +10,7 @@ import {
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
+  type UiSession,
 } from "@langwatch/browser-host/capabilities";
 import { useMemo, type ReactNode } from "react";
 
@@ -28,7 +29,7 @@ import { analyticsApi } from "./analytics-api.ts";
 class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly project_: AnalyticsHostProject | undefined;
   private readonly organizationId_: string | undefined;
-  private readonly hasPermissionOf: (permission: string) => boolean;
+  private readonly session: UiSession;
   private readonly routeCapability: UiRoute;
   private readonly navigationCapability: UiNavigation;
   private readonly feedback: UiFeedback;
@@ -36,14 +37,14 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   constructor({
     project_,
     organizationId_,
-    hasPermissionOf,
+    session,
     routeCapability,
     navigationCapability,
     feedback,
   }: {
     project_: AnalyticsHostProject | undefined;
     organizationId_: string | undefined;
-    hasPermissionOf: (permission: string) => boolean;
+    session: UiSession;
     routeCapability: UiRoute;
     navigationCapability: UiNavigation;
     feedback: UiFeedback;
@@ -51,7 +52,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     super();
     this.project_ = project_;
     this.organizationId_ = organizationId_;
-    this.hasPermissionOf = hasPermissionOf;
+    this.session = session;
     this.routeCapability = routeCapability;
     this.navigationCapability = navigationCapability;
     this.feedback = feedback;
@@ -66,7 +67,15 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   }
 
   hasPermission(permission: string): boolean {
-    return this.hasPermissionOf(permission);
+    return this.session.hasPermission(permission);
+  }
+
+  isSettled(): boolean {
+    return this.session.isSettled();
+  }
+
+  featureFlag(flag: string): boolean | undefined {
+    return this.session.featureFlag(flag);
   }
 
   route(): AnalyticsRouteReading {
@@ -81,8 +90,9 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     this.routeCapability.setQuery(next, options);
   }
 
-  navigate(to: string): void {
-    this.navigationCapability.navigate(to);
+  navigate(to: string, options?: { replace?: boolean }): void {
+    if (options?.replace) this.navigationCapability.replace(to);
+    else this.navigationCapability.navigate(to);
   }
 
   openAutomationDrawer(request: AnalyticsAlertAuthoring): void {
@@ -134,7 +144,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
               }
             : void 0,
         organizationId_: organizationId ?? void 0,
-        hasPermissionOf: (permission) => session.hasPermission(permission),
+        session,
         routeCapability: route,
         navigationCapability: navigation,
         feedback,

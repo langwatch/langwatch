@@ -23,6 +23,10 @@ export type StubAnalyticsHostOptions = {
   project?: AnalyticsHostProject | undefined;
   organizationId?: string | undefined;
   permissions?: readonly string[];
+  /** Whether the grants have arrived; settled unless a test says otherwise. */
+  settled?: boolean;
+  /** A flag named here answers its value, `undefined` included; any other is off. */
+  flags?: Readonly<Record<string, boolean | undefined>>;
   route?: AnalyticsRouteReading;
 };
 
@@ -57,6 +61,15 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
     return (this.options.permissions ?? ["analytics:view", "cost:view", "traces:view"]).includes(
       permission,
     );
+  }
+
+  isSettled(): boolean {
+    return this.options.settled ?? true;
+  }
+
+  featureFlag(flag: string): boolean | undefined {
+    const flags = this.options.flags ?? {};
+    return flag in flags ? flags[flag] : false;
   }
 
   route(): AnalyticsRouteReading {

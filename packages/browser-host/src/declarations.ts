@@ -467,6 +467,9 @@ export type UiStudioPromptEditorProps = {
 /** What a screen hands analytics' filter sidebar; it reads the filters from the URL itself. */
 export type UiFilterSidebarProps = { defaultShowFilters?: boolean; hideTopics?: boolean };
 
+/** What navigation hands analytics' saved-dashboards list: the board open now, if any. */
+export type UiSavedDashboardsProps = { activeDashboardId: string | undefined };
+
 /** What a check form hands trace's mapping editor, which reads its own sample traces. */
 export type UiEvaluatorTracesMappingProps = {
   targetFields: string[];
@@ -668,7 +671,7 @@ export type UiDeclaredCapabilities = {
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
   runExperimentViaApiDialog: UiDeclaredComponent<UiRunExperimentViaApiDialogProps>;
-  sampleChoice: UiGovernanceSampleChoice;
+  savedDashboards: UiDeclaredComponent<UiSavedDashboardsProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   sidebar: UiNavigationSidebar;
   suggestBody: UiDeclaredComponent<UiSuggestBodyProps>;
