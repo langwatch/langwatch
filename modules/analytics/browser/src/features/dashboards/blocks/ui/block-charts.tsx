@@ -68,8 +68,9 @@ const TOOLTIP_CURSOR = { fill: CHART_COLORS.accent, fillOpacity: 0.06 };
 type ChartPoint = { x: string } & Readonly<Record<string, number | string>>;
 
 /**
- * The prototype's chart tooltip: the bucket in small mono, then one
- * label-value row per series. Recharts fills `active`, `payload` and `label`.
+ * The prototype's tooltip. Kept separate from the shared `ChartTooltip`,
+ * whose blurred panel and colour swatches would change this
+ * prototype-matched look. Recharts fills `active`, `payload` and `label`.
  */
 function BlockTooltip({
   active,

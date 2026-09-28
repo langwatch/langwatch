@@ -102,7 +102,7 @@ Feature: Dashboards v1
     And they see "Start from a template" listing the Agent Flight Deck
 
   @e2e
-  Scenario: AC11 Add a block by question
+  Scenario: AC11 Ask Langy by question
     Given a member on their own board or the Agent Flight Deck
     And Langy is enabled for the project and the member may start a conversation
     When they open the picker and choose a question
@@ -168,6 +168,23 @@ Feature: Dashboards v1
     When another member outside that audience lists dashboards
     Then the board is not listed
     And its URL is refused
+
+  @integration
+  Scenario: AC18 Blocks on a board follow the board's visibility
+    Given a member sets a board holding blocks to only me or team
+    When another member outside that audience lists, adds, moves or deletes blocks on it
+    Then its blocks are not listed
+    And every read or write of those blocks is refused as not found
+    And a project credential reaches only the blocks on organisation-wide boards
+
+  @unit
+  Scenario: AC18 Saved charts on a board follow the board's visibility
+    Given a member places a saved chart on a board set to only me or team
+    When another member outside that audience lists, opens, runs, edits or deletes saved charts
+    Then that chart is not listed
+    And every read, run or write of it is refused as not found
+    And a saved chart on no board stays reachable as before
+    And a project credential reaches only the charts on organisation-wide boards or on no board
 
   # ---------------------------------------------------------------------------
   # Guard rails
@@ -309,6 +326,21 @@ Feature: Dashboards v1
     When that member sends any write for the board
     Then the server refuses every one of those writes
 
+  @integration
+  Scenario: AC26 Narrowing a board with no recorded creator records who narrowed it
+    Given a board with no recorded creator
+    When a member sets it to only me or team
+    Then that member is recorded as its creator
+    And the board stays visible to them
+    And a project credential cannot set it to only me or team
+
+  @integration
+  Scenario: AC26 An admin can manage a board they cannot see
+    Given a board set to only me by another member
+    When an admin changes its visibility or deletes it
+    Then the server accepts the write
+    And the board is still not listed or opened for the admin
+
   # --- AC Coverage Map ---
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
   # AC 2: "Landing on the Flight Deck" → Scenario: AC2 Landing on the Flight Deck
@@ -320,14 +352,14 @@ Feature: Dashboards v1
   # AC 8: "The Flight Deck cannot be edited" → Scenario: AC8 No edit controls appear on the Flight Deck; Scenario: AC8 The server rejects a write against the Flight Deck
   # AC 9: "Empty period" → Scenario: AC9 Empty period shows an empty state
   # AC 10: "Blank board matches the reference" → Scenario: AC10 Blank board matches the reference
-  # AC 11: "Add a block by question" → Scenario: AC11 Add a block by question
+  # AC 11: "Add a block by question" → Scenario: AC11 Ask Langy by question
   # AC 12: "Only working questions are offered" → Scenario: AC12 Only working questions are offered
   # AC 13: "Period and grain" → Scenario: AC13 Period and grain update every block; Scenario: AC13 Grain choices update every block
   # AC 14: "Rename and describe" → Scenario: AC14 Rename and describe
   # AC 15: "Block menu" → Scenario: AC15 Block menu actions persist after reload
   # AC 16: "Ask Langy from the board" → Scenario: AC16 Ask Langy from the board
   # AC 17: "Langy insights on a block" (sharpened) → Scenario: AC17 Langy insights on a block quote the block's own result
-  # AC 18: "Visibility" → Scenario: AC18 Visibility hides a board from members outside its audience
+  # AC 18: "Visibility" → Scenario: AC18 Visibility hides a board from members outside its audience; Scenario: AC18 Blocks on a board follow the board's visibility; Scenario: AC18 Saved charts on a board follow the board's visibility
   # AC 19: "LWQL only" → Scenario: AC19 Every dashboard data request goes to LWQL and none to legacy analytics
   # AC 20: "Legacy analytics untouched" → Scenario: AC20 Legacy analytics files are untouched; Scenario: AC20 Legacy analytics pages behave exactly as before
   # AC 21: "Permissions" (sharpened) → Scenario: AC21 A member without analytics:view is refused; Scenario: AC21 A refused member sees the same not-found page
@@ -335,4 +367,4 @@ Feature: Dashboards v1
   # AC 23: "A failing query does not take the board down" → Scenario: AC23 A failing query does not take the board down
   # AC 24: "Boards created before this change keep working" (sharpened) → Scenario: AC24 Boards created before this change keep working
   # AC 25: "Every optional source has its own call to action" → Scenario: AC25 Scenario results shows its own call to action before any row exists; Scenario: AC25 Quality signal shows its own call to action before any row exists; Scenario: AC25 User feedback shows its own call to action before any row exists; Scenario: AC25 Gateway routing shows its own call to action before any row exists; Scenario: AC25 Your coding agents shows its own call to action before any row exists
-  # AC 26: "Visibility changes who can see a board, not who can edit it" → Scenario: AC26 A member inside the audience with the edit permission can edit; Scenario: AC26 A member inside the audience without the edit permission sees no edit controls; Scenario: AC26 Only the creator or an admin can change visibility or delete the board; Scenario: AC26 The server refuses every write from a member outside the audience
+  # AC 26: "Visibility changes who can see a board, not who can edit it" → Scenario: AC26 A member inside the audience with the edit permission can edit; Scenario: AC26 A member inside the audience without the edit permission sees no edit controls; Scenario: AC26 Only the creator or an admin can change visibility or delete the board; Scenario: AC26 The server refuses every write from a member outside the audience; Scenario: AC26 Narrowing a board with no recorded creator records who narrowed it; Scenario: AC26 An admin can manage a board they cannot see

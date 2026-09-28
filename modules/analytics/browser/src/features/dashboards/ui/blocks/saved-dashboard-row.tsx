@@ -4,13 +4,14 @@
  * menu. Rename swaps in an inline field; Enter or blur saves, Escape cancels.
  */
 
-import { Box, Button, Input, Link as ChakraLink, Text } from "@chakra-ui/react";
+import { Box, Button, Link as ChakraLink, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { MoreVertical } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
+import { InlineTextField } from "../elements/inline-text-field.tsx";
 
 export type SavedDashboardRowActions = {
   isRenaming: boolean;
@@ -148,37 +149,18 @@ function RowMenu({
 }
 
 function RenameField({ name, actions }: { name: string; actions: SavedDashboardRowActions }) {
-  const [draft, setDraft] = useState(name);
-  // Enter settles the field and the blur that follows must not settle it twice.
-  const settled = useRef(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-  const commit = () => {
-    if (settled.current) return;
-    settled.current = true;
-    const trimmed = draft.trim();
-    if (trimmed && trimmed !== name) actions.onRenameCommit(trimmed);
-    else actions.onRenameCancel();
-  };
-
   return (
     <Box as="li" listStyleType="none" width="full" paddingX={1}>
-      <Input
-        ref={inputRef}
+      <InlineTextField
+        value={name}
+        label="Dashboard name"
         size="xs"
         fontSize="13px"
-        aria-label="Dashboard name"
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") commit();
-          if (event.key === "Escape") {
-            settled.current = true;
-            actions.onRenameCancel();
-          }
+        onCancel={actions.onRenameCancel}
+        onCommit={(draft) => {
+          const trimmed = draft.trim();
+          if (trimmed && trimmed !== name) actions.onRenameCommit(trimmed);
+          else actions.onRenameCancel();
         }}
       />
     </Box>

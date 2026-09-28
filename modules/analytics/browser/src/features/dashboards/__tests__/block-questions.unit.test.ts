@@ -57,7 +57,7 @@ describe("the picker's questions", () => {
       }
     });
 
-    /** @scenario "AC11 Add a block by question" */
+    /** @scenario "AC11 Ask Langy by question" */
     it("asks Langy the prompt with the concrete period and grain and the board attached", () => {
       const [first] = every;
       const request = boardPromptQuestion({
