@@ -41,6 +41,7 @@
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
+    "ioredis": "catalog:",
     "openapi-types": "catalog:",
     "zod": "catalog:"
   },
