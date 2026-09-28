@@ -595,6 +595,17 @@ func TestAStackHavenGaveUpOnFailsTheRunAtOnce(t *testing.T) {
 		}
 	})
 
+	t.Run("given a not-yet-live stack whose log holds only haven's start banner, it is still booting", func(t *testing.T) {
+		booting := HavenSlug(testRunID, "candidate")
+		banner := "haven: stack \"" + booting + "\"  (redis db 7)\n  thuishaven: stack \"" + booting + "\"\n"
+		if err := os.WriteFile(filepath.Join(home, "logs", booting+".log"), []byte(banner), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if fatal, _ := havenGaveUp(havenrun.Status{}, booting, 0); fatal != "" {
+			t.Fatalf("the start banner read as a give-up: %q", fatal)
+		}
+	})
+
 	t.Run("given the same stack reported live, it is still booting", func(t *testing.T) {
 		live := havenrun.Status{Stacks: []havenrun.StackStatus{{Slug: slug, Live: true}}}
 		if fatal, _ := havenGaveUp(live, slug, 0); fatal != "" {
