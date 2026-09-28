@@ -4,16 +4,9 @@
  * colours and helpers: what a member opens in the edit drawer runs as is.
  */
 
-import type { NavigableTarget } from "@langwatch/analytics-contract/chart-frame-protocol";
+import { CALLS_TO_ACTION, type WidgetSource } from "./widget-calls-to-action.ts";
 
-/** The sources a panel reads, as the block library names them. */
-export type WidgetSource =
-  | "traces"
-  | "scenarios"
-  | "judges"
-  | "feedback"
-  | "gateway"
-  | "codingAgents";
+export type { WidgetSource } from "./widget-calls-to-action.ts";
 
 export const PALETTE = `const dark = LW.theme === "dark";
 const C = {
@@ -163,63 +156,83 @@ function Thumb({ up, color }) {
   );
 }`;
 
-interface CallToAction {
-  readonly title: string;
-  readonly line: string;
-  readonly icon: string;
-  readonly button: string;
-  /** The route key `LW.navigate` opens: an allowlisted page, never a raw path. */
-  readonly target: NavigableTarget;
-}
+/** A small labelled figure on a muted tile. */
+export const STAT = `function Stat({ label, value }) {
+  return (
+    <div style={{ borderRadius: 6, background: C.muted, padding: "6px 8px" }}>
+      <div style={{ fontSize: 10, color: C.faint }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 600 }}>{value}</div>
+    </div>
+  );
+}`;
 
-/** Texts from `SOURCE_CALLS_TO_ACTION`; icons are the Lucide paths the block cards draw. */
-const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
-  traces: {
-    title: "Connect traces to light up the flight deck",
-    line: "Once traces flow in you'll see request volume, success rate, p95 latency, cost and the traces that explain every spike.",
-    icon: `<path d="M8 5h13M13 12h8M13 19h8M3 10a2 2 0 0 0 2 2h3M3 5v12a2 2 0 0 0 2 2h3" />`,
-    button: "Connect traces",
-    target: "traces",
-  },
-  scenarios: {
-    title: "Run a scenario",
-    line: "Scenario pass rate and coverage across your suites, so you know what behaviour is actually tested.",
-    icon: `<path d="M13 5h8M13 12h8M13 19h8M3 17l2 2 4-4M3 7l2 2 4-4" />`,
-    button: "Run a scenario",
-    target: "scenarios",
-  },
-  judges: {
-    title: "Add a judge",
-    line: "Evaluator pass rate plotted against latency and cost, so you can see quality move with load.",
-    icon: `<path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2M6.453 15h11.094M8.5 2h7" />`,
-    button: "Add a judge",
-    target: "onlineEvaluations",
-  },
-  feedback: {
-    title: "Collect feedback",
-    line: "Thumbs and annotations from your users, tracked over time next to quality and cost.",
-    icon: `<path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" />`,
-    button: "Collect feedback",
-    target: "annotations",
-  },
-  gateway: {
-    title: "Route via the Gateway",
-    line: "Cost broken down by virtual key / route, so you can see which integration is spending.",
-    icon: `<circle cx="6" cy="19" r="3" />
-          <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
-          <circle cx="18" cy="5" r="3" />`,
-    button: "Route via Gateway",
-    target: "gatewayVirtualKeys",
-  },
-  codingAgents: {
-    title: "Connect your coding agents",
-    line: "Connect your coding agent to see this.",
-    icon: `<path d="M12 8V4H8M2 14h2M20 14h2M15 13v2M9 13v2" />
-          <rect width="16" height="12" x="4" y="8" rx="2" />`,
-    button: "Connect",
-    target: "codingSessions",
-  },
-};
+/** A trace id that opens the trace; reads `mono` from `TABLE`. */
+export const TRACE_LINK = `function TraceLink({ id }) {
+  const open = () => LW.navigate("trace", { traceId: id });
+  return (
+    <span onClick={open} title={id} style={{ cursor: "pointer", display: "block", maxWidth: 240,
+      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      {mono(id, C.teal)}
+    </span>
+  );
+}`;
+
+/** The Recharts components `SERIES_CHART` draws with. */
+export const SERIES_CHART_IMPORTS = [
+  "ResponsiveContainer",
+  "ComposedChart",
+  "CartesianGrid",
+  "XAxis",
+  "YAxis",
+  "Tooltip",
+  "Bar",
+  "Line",
+] as const;
+
+/** A time series of bars and lines on one axis; reads `CHART_STYLE`. */
+export const SERIES_CHART = `// series: { key, label, colour, dashed?, bars? }; format labels the axis and the tooltip.
+function SeriesChart({ points, series, format, domain }) {
+  const legend = series.map((item) => [item.colour, item.label, item.dashed]);
+  return (
+    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <Legend items={legend} />
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
+            <CartesianGrid vertical={false} stroke={C.border} />
+            <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
+              dy={4} />
+            <YAxis tick={AXIS} tickLine={false} axisLine={false} width={48} domain={domain}
+              tickFormatter={format} />
+            <Tooltip contentStyle={TIP} formatter={(value, name) => [format(value), name]} />
+            {series.map((item) => item.bars ? (
+              <Bar key={item.key} dataKey={item.key} name={item.label} fill={item.colour}
+                radius={[2, 2, 0, 0]} isAnimationActive={false} />
+            ) : (
+              <Line key={item.key} type="monotone" dataKey={item.key} name={item.label}
+                stroke={item.colour} strokeWidth={2} dot={false} isAnimationActive={false}
+                strokeDasharray={item.dashed ? "4 3" : undefined} />
+            ))}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}`;
+
+/** The one big figure over a panel, and the change helpers; reads `NUMBERS`. */
+export const HEADLINE = `const signed = (value) => (value > 0 ? "+" : "") + pct(value, 0);
+// The change from the first value to the last, as a share of the first.
+const drift = (first, last) => (first > 0 ? (last - first) / first : 0);
+
+function Headline({ value, label }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+      <span style={{ fontSize: 22, fontWeight: 600 }}>{value}</span>
+      <span style={{ fontSize: 11, color: C.subtle }}>{label}</span>
+    </div>
+  );
+}`;
 
 const BUTTON = `const BUTTON = {
   flexShrink: 0,

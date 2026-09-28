@@ -3,15 +3,24 @@
  * Quality signal and User feedback. Each draws the matching block view.
  */
 
-import { CHART_STYLE, DATES, NUMBERS, THUMBS, widgetCode } from "./widget-code-parts.ts";
+import {
+  CHART_STYLE,
+  DATES,
+  NUMBERS,
+  THUMBS,
+  widgetCode,
+  type WidgetSource,
+} from "./widget-code-parts.ts";
 
-export const STATUS_CODE = widgetCode({
-  summary: "Request volume, success rate, p95 latency and total cost against the period before.",
-  subtitle: "Traffic, quality, latency and cost at a glance",
-  source: "traces",
-  compactCallToAction: true,
-  parts: [NUMBERS],
-  components: `// rising is what a rise means for this figure: "good", "bad" or "neutral".
+/** The Status tiles, with the not-connected face of `source`. */
+export const statusCode = ({ source }: { source: WidgetSource }) =>
+  widgetCode({
+    summary: "Request volume, success rate, p95 latency and total cost against the period before.",
+    subtitle: "Traffic, quality, latency and cost at a glance",
+    source,
+    compactCallToAction: true,
+    parts: [NUMBERS],
+    components: `// rising is what a rise means for this figure: "good", "bad" or "neutral".
 function Change({ current, previous, rising }) {
   const line = { marginTop: 2, fontSize: 11, fontWeight: 500 };
   if (previous <= 0 && current > 0) return <div style={{ ...line, color: C.faint }}>New</div>;
@@ -42,8 +51,8 @@ function Tile({ label, value, current, previous, rising }) {
     </div>
   );
 }`,
-  queries: ["main"],
-  body: `  const row = main.data[0] || {};
+    queries: ["main"],
+    body: `  const row = main.data[0] || {};
   const requests = num(row.requests);
   const requestsPrev = num(row.requests_prev);
   if (requests === 0) return <Panel><CallToAction /></Panel>;
@@ -64,7 +73,9 @@ function Tile({ label, value, current, previous, rising }) {
       </div>
     </Panel>
   );`,
-});
+  });
+
+export const STATUS_CODE = statusCode({ source: "traces" });
 
 export const THROUGHPUT_CODE = widgetCode({
   summary: "Traces per bucket as bars, p95 latency as a line and the error rate as a low ribbon.",

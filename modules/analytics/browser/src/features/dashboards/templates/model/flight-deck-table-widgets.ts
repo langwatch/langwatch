@@ -4,21 +4,22 @@
  * and Most impactful traces. Each draws the matching block view.
  */
 
-import { BARS, DATES, NUMBERS, TABLE, THUMBS, widgetCode } from "./widget-code-parts.ts";
+import {
+  BARS,
+  DATES,
+  NUMBERS,
+  STAT,
+  TABLE,
+  THUMBS,
+  TRACE_LINK,
+  widgetCode,
+} from "./widget-code-parts.ts";
 
 export const COST_EFFICIENCY_CODE = widgetCode({
   summary: "Cost per successful trace, tokens in and out, and the five models that cost the most.",
   subtitle: "What the spend buys",
   source: "traces",
-  parts: [NUMBERS, BARS],
-  components: `function Stat({ label, value }) {
-  return (
-    <div style={{ borderRadius: 6, background: C.muted, padding: "6px 8px" }}>
-      <div style={{ fontSize: 10, color: C.faint }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 600 }}>{value}</div>
-    </div>
-  );
-}`,
+  parts: [NUMBERS, BARS, STAT],
   queries: ["summary", "models"],
   body: `  const totals = summary.data[0] || {};
   if (num(totals.traces) === 0) return <Panel><CallToAction /></Panel>;
@@ -159,7 +160,7 @@ export const IMPACTFUL_TRACES_CODE = widgetCode({
   summary: "The ten traces with the highest impact: errors, slow and costly runs, thumbs down.",
   subtitle: "Ranked by blended impact: errors, extreme latency, cost, negative feedback",
   source: "traces",
-  parts: [NUMBERS, TABLE, THUMBS],
+  parts: [NUMBERS, TABLE, THUMBS, TRACE_LINK],
   components: `function Status({ row }) {
   let label = "ok";
   let color = C.green;
@@ -183,16 +184,6 @@ function Feedback({ value }) {
   if (value === "up") return <Thumb up color={C.green} />;
   if (value === "down") return <Thumb color={C.red} />;
   return <span style={{ color: C.faint }}>-</span>;
-}
-
-function TraceLink({ id }) {
-  const open = () => LW.navigate("trace", { traceId: id });
-  return (
-    <span onClick={open} title={id} style={{ cursor: "pointer", display: "block", maxWidth: 240,
-      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-      {mono(id, C.teal)}
-    </span>
-  );
 }`,
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
