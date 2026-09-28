@@ -1084,6 +1084,10 @@ export async function seedEveryCatalogSource({
       EndTime: now,
       SpanName: "claude_code.tool",
       ServiceName: "claude-code",
+      SpanAttributes: {
+        "langwatch.input": SEEDED_CONTENT.spanInput,
+        "langwatch.output": SEEDED_CONTENT.spanOutput,
+      },
     })),
   });
 }

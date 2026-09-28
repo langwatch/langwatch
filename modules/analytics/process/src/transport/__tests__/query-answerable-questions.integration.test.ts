@@ -1369,14 +1369,14 @@ function mountQueryDoor({
   tenant: () => QueryTenant;
   service: () => LangWatchQLService;
 }): { fetch: (path: string, init?: RequestInit) => Promise<Response> } {
-  const projectScope = () => ({ tier: "project" as const, id: tenant().id });
+  // An API key resolves its organization; the key-reach fact below fans it out to the tenant.
+  const keyScope = () => ({ tier: "organization" as const, id: `org-of-${tenant().id}` });
 
   const runtime = createRestRuntime({
-    // The whole of the credential chain this test fakes: one authenticated
-    // tenant, resolved as the project scope every handler reads.
+    // The whole of the credential chain this test fakes: one authenticated key.
     identity: {
-      authenticate: () => ({ actor: { type: "api_key", id: "key-asking" }, scope: projectScope() }),
-      identify: () => ({ actor: { type: "api_key", id: "key-asking" }, scope: projectScope() }),
+      authenticate: () => ({ actor: { type: "api_key", id: "key-asking" }, scope: keyScope() }),
+      identify: () => ({ actor: { type: "api_key", id: "key-asking" }, scope: keyScope() }),
     },
   });
 
