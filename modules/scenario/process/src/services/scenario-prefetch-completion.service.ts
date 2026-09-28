@@ -1,6 +1,8 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { resolveRunModels } from "@langwatch/scenario-contract";
 import type {
   ScenarioExecutionPrefetchInput,
@@ -83,24 +85,21 @@ type PreparedModels = {
   judge: ModelParamsResult;
 };
 
+type CompletionOptions = {
+  config: ScenarioExecutionPrefetchConfig;
+  lookups: ScenarioExecutionLookupService;
+  modelParameters: ScenarioModelParametersService;
+  traces: TraceApi;
+  projects: Pick<ProjectApi, "findOrganizationId">;
+  apiKeys: Pick<ApiKeyApi, "getOrMintAgentSandboxKey">;
+};
+
 export class ScenarioPrefetchCompletionService {
-  static create(options: {
-    config: ScenarioExecutionPrefetchConfig;
-    lookups: ScenarioExecutionLookupService;
-    modelParameters: ScenarioModelParametersService;
-    traces: TraceApi;
-  }): ScenarioPrefetchCompletionService {
+  static create(options: CompletionOptions): ScenarioPrefetchCompletionService {
     return new ScenarioPrefetchCompletionService(options);
   }
 
-  private constructor(
-    private readonly options: {
-      config: ScenarioExecutionPrefetchConfig;
-      lookups: ScenarioExecutionLookupService;
-      modelParameters: ScenarioModelParametersService;
-      traces: TraceApi;
-    },
-  ) {}
+  private constructor(private readonly options: CompletionOptions) {}
 
   async complete(input: {
     context: ScenarioExecutionPrefetchInput["context"];
@@ -124,6 +123,7 @@ export class ScenarioPrefetchCompletionService {
     }
 
     this.applyPromptMappings(validated.adapter, input.target, validated.suite);
+    await this.applySandboxKey(validated.adapter, input.context.projectId);
     const models = await this.resolveModels(input.context, validated);
     if (!models.success) {
       return models.result;
@@ -280,6 +280,27 @@ export class ScenarioPrefetchCompletionService {
             candidate.type === "prompt" && candidate.referenceId === target.referenceId,
         )?.scenarioMappings
       : undefined;
+  }
+
+  /**
+   * One key for the whole run, the one the project's other runs hold, so turns share the cache
+   * entries it writes. A run that cannot get one still runs (main's tryGetAgentSandboxApiKey).
+   */
+  private async applySandboxKey(adapter: TargetAdapterData, projectId: string): Promise<void> {
+    if (adapter.type !== "code") return;
+    try {
+      const organizationId = await this.options.projects.findOrganizationId(projectId);
+      if (!organizationId) return;
+      adapter.sandboxApiKey = await this.options.apiKeys.getOrMintAgentSandboxKey({
+        projectId,
+        organizationId,
+      });
+    } catch (error) {
+      logger.warn(
+        { projectId, error },
+        "could not get an agent sandbox key; the run continues without the agent cache",
+      );
+    }
   }
 
   private async resolveModels(

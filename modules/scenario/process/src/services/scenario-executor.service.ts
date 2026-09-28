@@ -1,4 +1,5 @@
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { ResourceOwnership } from "@langwatch/kernel";
 import { DEFAULT_MODEL, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -41,6 +42,7 @@ export type ScenarioExecutorPeers = Readonly<{
   workflows: WorkflowApi;
   projects: ProjectApi;
   modelProviders: ModelProviderApi;
+  apiKeys: ApiKeyApi;
 }>;
 
 /** Where the compiled child sits and the sources a spawn checks it against. */
@@ -135,6 +137,7 @@ export class ScenarioExecutorService {
       modelProviders: peers.modelProviders,
       secrets: peers.secrets,
       traces: peers.traces,
+      apiKeys: peers.apiKeys,
       voiceTargets: null,
     });
     const execution = ScenarioExecutionService.create({

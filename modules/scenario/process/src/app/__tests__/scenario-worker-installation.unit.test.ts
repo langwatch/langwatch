@@ -6,6 +6,7 @@ import { EventEmitter } from "node:events";
 
 import { type AgentApi, AgentNotFoundError } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -92,6 +93,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       "feature-flag": createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
       authz: createApiFixture<AuthzApi>(),
       gateway: createApiFixture<GatewayApi>(),
+      "api-key": createApiFixture<ApiKeyApi>(),
     });
 }
 

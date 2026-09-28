@@ -2,6 +2,7 @@
  * Unit tests for model selection logic with dependency injection.
  */
 
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { ModelNotConfiguredError, findAliasTarget } from "@langwatch/model-provider-contract";
 import type {
   ScenarioChildEnvironment,
@@ -472,6 +473,92 @@ describe("prefetchWithFixture, when selecting a model", () => {
           "openai/judge-default",
         );
       });
+    });
+  });
+});
+
+describe("prefetchWithFixture, given a code target in a project with an organization", () => {
+  const codeAgent = {
+    id: "agent_code",
+    type: "code" as const,
+    name: "Test Code Agent",
+    projectId: "proj_123",
+    config: {
+      parameters: [
+        { identifier: "code", type: "code", value: "def execute(input):\n    return input" },
+      ],
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+    },
+    workflowId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    archivedAt: null,
+  };
+
+  function codeDeps(mint: ApiKeyApi["getOrMintAgentSandboxKey"]) {
+    const getOrMintAgentSandboxKey = vi.fn(mint);
+    const deps = createMockDeps({
+      agentFetcher: { findById: vi.fn().mockResolvedValue(codeAgent) },
+      organizationId: "organization_1",
+      apiKeys: { getOrMintAgentSandboxKey },
+    });
+    return { deps, getOrMintAgentSandboxKey };
+  }
+
+  function sandboxKeyOf(result: ScenarioExecutionPrefetchResult): string | undefined {
+    if (!result.success || result.data.adapterData.type !== "code") return void 0;
+    return result.data.adapterData.sandboxApiKey;
+  }
+
+  describe("when the run data is prefetched", () => {
+    it("carries the project's one sandbox key, minted for its project and organization", async () => {
+      const { deps, getOrMintAgentSandboxKey } = codeDeps(async () => "sandbox-key-1");
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: { type: "code", referenceId: "agent_code" },
+        deps,
+      });
+
+      expect(sandboxKeyOf(result)).toBe("sandbox-key-1");
+      expect(getOrMintAgentSandboxKey).toHaveBeenCalledWith({
+        projectId: "proj_123",
+        organizationId: "organization_1",
+      });
+    });
+  });
+
+  describe("when the key cannot be minted", () => {
+    /** @scenario "A run whose key could not be minted still runs" */
+    it("prepares the run without a cache credential", async () => {
+      const { deps } = codeDeps(async () => {
+        throw new Error("mint refused");
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: { type: "code", referenceId: "agent_code" },
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      expect(sandboxKeyOf(result)).toBeUndefined();
+    });
+  });
+
+  describe("when the target is not a code agent", () => {
+    it("mints no key", async () => {
+      const { deps, getOrMintAgentSandboxKey } = codeDeps(async () => "sandbox-key-1");
+      deps.promptFetcher.findByIdOrHandle = vi.fn().mockResolvedValue({ model: "openai/gpt-4" });
+
+      await prefetchWithFixture({
+        context: defaultContext,
+        target: { type: "prompt", referenceId: "prompt_1" },
+        deps,
+      });
+
+      expect(getOrMintAgentSandboxKey).not.toHaveBeenCalled();
     });
   });
 });
