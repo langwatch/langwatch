@@ -45,7 +45,6 @@
     "@langwatch/organization-browser": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/trace-browser": "workspace:*",
     "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "@paper-design/shaders-react": "catalog:",

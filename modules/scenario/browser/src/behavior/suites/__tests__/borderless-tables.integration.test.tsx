@@ -6,15 +6,14 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   GroupRow,
-  makeBatchRun,
-  makeScenarioRunData,
-  makeSummary,
   type RunGroup,
   type RunGroupSummary,
   RunRow,
 } from "@langwatch/suite-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "./run-history-fixtures.ts";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),
@@ -78,9 +77,9 @@ describe("<RunRow/> borderless styling", () => {
         { wrapper: Wrapper },
       );
 
-      const header = screen.getByRole("button", { name: /Run from/ });
-      expect(header).toBeInTheDocument();
-      expect(header).toHaveAttribute("data-testid", "run-row-header");
+      // The toggle sits straight inside the header, since 494f28125e split them.
+      const toggle = screen.getByRole("button", { name: /Run from/ });
+      expect(toggle.parentElement).toHaveAttribute("data-testid", "run-row-header");
     });
 
     /** @scenario "Run row headers are sticky when scrolling" */

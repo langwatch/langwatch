@@ -1,7 +1,8 @@
 /** Enables the advanced-features bundle before an annotation hand-off to a dataset. */
 
-import { personalWorkspaceFeaturesApi } from "@langwatch/organization-browser/surfaces/personal-workspace-features";
 import { useCallback, useEffect, useState } from "react";
+
+import { annotationApi } from "./annotation-api.ts";
 
 type PendingEnable = {
   projectId: string;
@@ -93,14 +94,14 @@ export function usePersonalDatasetGate({
   projectId: string | undefined;
   isOwnPersonalWorkspace: boolean;
 }): PersonalFeatureGate {
-  const features = personalWorkspaceFeaturesApi.personalWorkspaceFeatures.get.useQuery(
+  const features = annotationApi.personalWorkspaceFeatures.get.useQuery(
     { projectId: projectId ?? "" },
     { enabled: isOwnPersonalWorkspace && !!projectId, refetchOnWindowFocus: false },
   );
 
-  const utils = personalWorkspaceFeaturesApi.useUtils();
+  const utils = annotationApi.useUtils();
 
-  const enableAll = personalWorkspaceFeaturesApi.personalWorkspaceFeatures.enableAll.useMutation({
+  const enableAll = annotationApi.personalWorkspaceFeatures.enableAll.useMutation({
     onSuccess: () => {
       void utils.personalWorkspaceFeatures.get.invalidate();
     },

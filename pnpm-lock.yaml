@@ -4489,9 +4489,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/organization-browser':
-        specifier: workspace:*
-        version: link:../../organization/browser
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
@@ -11346,9 +11343,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/trace-browser':
-        specifier: workspace:*
-        version: link:../../trace/browser
       '@langwatch/trace-browser-kit':
         specifier: workspace:*
         version: link:../../trace/browser-kit

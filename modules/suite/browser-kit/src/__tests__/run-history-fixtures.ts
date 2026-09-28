@@ -1,7 +1,4 @@
-/**
- * Shared test factories for suites tests: `makeScenarioRunData`,
- * `makeBatchRun`, and `makeSummary`, to avoid duplication.
- */
+/** Test factories for the kit's own suite tests; never exported from the barrel. */
 import {
   SimulationRunStatus as ScenarioRunStatus,
   SimulationVerdict as Verdict,
@@ -9,7 +6,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { BatchRun, BatchRunSummary } from "./run-history-transforms.ts";
+import type { BatchRun, BatchRunSummary } from "../model/run-history-transforms.ts";
 
 export function makeScenarioRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {
