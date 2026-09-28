@@ -16,17 +16,6 @@ async function main(): Promise<void> {
     return;
   }
 
-  process.on("uncaughtException", (error) => {
-    process.stderr.write(`langy-worker: uncaught exception: ${error.stack ?? error.message}\n`);
-    process.exit(1);
-  });
-  process.on("unhandledRejection", (reason) => {
-    process.stderr.write(
-      `langy-worker: unhandled rejection: ${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}\n`,
-    );
-    process.exit(1);
-  });
-
   await runApp();
   process.exit(0);
 }

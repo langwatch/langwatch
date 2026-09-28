@@ -51,6 +51,17 @@ describe("given a governed file", () => {
     });
   });
 
+  describe("when the file is the dev runtime's backend entry", () => {
+    /** @scenario "The dev runtime's backend entry is exempt" */
+    it("reports nothing there and still reports its siblings", () => {
+      const code = 'const entry = await import("./backend.entrypoint.main.ts");';
+      const devRuntime = "tools/dev-runtime/src";
+
+      expect(report(code, `${devRuntime}/backend.entrypoint.ts`)).toEqual([]);
+      expect(report(code, `${devRuntime}/backend.entrypoint.main.ts`)).toHaveLength(1);
+    });
+  });
+
   describe("when the file is the CLI's tsup config", () => {
     /** @scenario "The CLI tsup config is exempt" */
     it("reports nothing", () => {

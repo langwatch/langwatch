@@ -1,7 +1,7 @@
 import { defineRule } from "../define-rule.mjs";
 
-// Dynamic import() hides dependencies. Allowed: the CLI and MCP startup paths,
-// the Google DLP channel, web package entry files, UI routes/drawers,
+// Dynamic import() hides dependencies. Allowed: the CLI and MCP startup paths, the
+// Google DLP channel, the dev runtime's backend entry, web package entry files, UI routes/drawers,
 // `lazy(() => import(...))`, and tests, where an import after `vi.mock` is what
 // makes the mock apply.
 
@@ -17,6 +17,9 @@ const GOOGLE_DLP_CHANNEL =
 const CLI_TSUP_CONFIG = /^sdks\/typescript\/tsup\.config\.ts$/;
 const WEB_PACKAGE_ENTRY = /^(?:enterprise\/)?modules\/[^/]+\/browser\/src\/[^/]+\.ts$/;
 const UI_APPLICATION = /^apps\/ui\/src\//;
+// The dev runtime's entry loads its main after the boot guard, so the fatal handlers
+// cover ESM link failures in that graph too (9ef4238a13). That one file only.
+const DEV_RUNTIME_BACKEND_ENTRY = /^tools\/dev-runtime\/src\/backend\.entrypoint\.ts$/;
 
 function isExempt(workspacePath) {
   return (
@@ -25,7 +28,8 @@ function isExempt(workspacePath) {
     GOOGLE_DLP_CHANNEL.test(workspacePath) ||
     CLI_TSUP_CONFIG.test(workspacePath) ||
     WEB_PACKAGE_ENTRY.test(workspacePath) ||
-    UI_APPLICATION.test(workspacePath)
+    UI_APPLICATION.test(workspacePath) ||
+    DEV_RUNTIME_BACKEND_ENTRY.test(workspacePath)
   );
 }
 
