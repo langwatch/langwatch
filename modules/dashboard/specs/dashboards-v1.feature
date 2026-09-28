@@ -152,7 +152,8 @@ Feature: Dashboards v1
     Given Langy is enabled for the project
     When the member presses "What would you like to know?" on any board, the Flight Deck included
     Then the question picker opens, since the bar is a button and never a text field
-    When they type their own question in the picker and ask it
+    And a pinned "Ask Langy" footer is always visible below the list
+    When they type their own question and press "Ask Langy" on the footer
     Then Langy opens with that question
     And the current board is passed as context
 
