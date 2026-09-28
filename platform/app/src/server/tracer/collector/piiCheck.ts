@@ -243,6 +243,19 @@ const codepointToCodeUnitConverter = (
 };
 
 /**
+ * DLP's name and place info types, the ones it misreads on a model id; the DLP
+ * counterpart of NAME_AND_PLACE_ENTITIES. STREET_ADDRESS stays masked on
+ * purpose: it needs a street-shaped value, so it does not misfire on a model id,
+ * and sparing it would only widen what a flagged value can leak.
+ */
+const DLP_NAME_AND_PLACE_INFO_TYPES: ReadonlySet<string> = new Set([
+  "FIRST_NAME",
+  "LAST_NAME",
+  "PERSON_NAME",
+  "LOCATION",
+]);
+
+/**
  * Mask every DLP finding over `text`, skipping findings vetoed by a policy
  * exception. DLP reports codepoint offsets against the original text; they are
  * converted to code-unit indices once. Each mask replaces the range with the
@@ -253,10 +266,16 @@ const maskDlpFindings = ({
   text,
   findings,
   exceptions,
+  spareNamesAndPlaces = false,
 }: {
   text: string;
   findings: google.privacy.dlp.v2.IFinding[];
   exceptions: readonly RegExp[];
+  /**
+   * Leave name and place findings unmasked. They still protect an exception's
+   * range first, so sparing one never lets an overlapping finding mask it.
+   */
+  spareNamesAndPlaces?: boolean;
 }): { redacted: string; masked: number } => {
   const toCodeUnit = codepointToCodeUnitConverter(text);
   const ranged = findings.flatMap((finding) => {
@@ -287,7 +306,13 @@ const maskDlpFindings = ({
 
   let redacted = text;
   let masked = 0;
-  for (const { startIdx, endIdx } of ranged) {
+  for (const { finding, startIdx, endIdx } of ranged) {
+    if (
+      spareNamesAndPlaces &&
+      DLP_NAME_AND_PLACE_INFO_TYPES.has(finding.infoType?.name ?? "")
+    ) {
+      continue;
+    }
     for (const part of subtractProtectedRanges(
       { start: startIdx, end: endIdx },
       protectedRanges,
@@ -301,14 +326,6 @@ const maskDlpFindings = ({
   }
   return { redacted, masked };
 };
-
-/** DLP's name and place info types, the ones it misreads on a model id. */
-const DLP_NAME_AND_PLACE_INFO_TYPES: ReadonlySet<string> = new Set([
-  "FIRST_NAME",
-  "LAST_NAME",
-  "PERSON_NAME",
-  "LOCATION",
-]);
 
 export const googleDLPClearPII = async ({
   currentObject,
@@ -330,15 +347,12 @@ export const googleDLPClearPII = async ({
     currentObject[lastKey].slice(250_000),
   ];
 
-  const findings = (await dlpCheck(text, piiRedactionLevel)).filter(
-    (finding) =>
-      !spareNamesAndPlaces ||
-      !DLP_NAME_AND_PLACE_INFO_TYPES.has(finding.infoType?.name ?? ""),
-  );
+  const findings = await dlpCheck(text, piiRedactionLevel);
   const { redacted, masked } = maskDlpFindings({
     text,
     findings,
     exceptions: compilePiiExceptPatterns(exceptPatterns ?? []),
+    spareNamesAndPlaces,
   });
   if (masked > 0) {
     currentObject[lastKey] = redacted.replace(/✳+/g, "[REDACTED]") + remaining;

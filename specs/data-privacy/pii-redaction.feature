@@ -363,9 +363,16 @@ Feature: Redacting personal data from traces
 
   @unit
   Scenario: The fallback detector also keeps a model name's name findings
-    Given the analysis service is unavailable and the fallback detector finds a person and a phone number in a model name value
+    Given the resolved PII level for "web-app" is strict
+    And the analysis service is unavailable
+    When a trace is ingested with a model name attribute and a free text attribute
+    Then the fallback detector keeps name findings on the model name only
+
+  @unit
+  Scenario: A spared name an exception keeps still blocks an overlapping finding on the fallback detector
+    Given the fallback detector finds a name the policy's exceptions keep and a phone number that overlaps it in a model name value
     When the value is redacted
-    Then only the phone number is masked
+    Then the name stays readable and only the phone number beyond it is masked
 
   @unit
   Scenario: Prose written under a model name attribute is still sent for analysis
