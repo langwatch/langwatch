@@ -1366,6 +1366,42 @@ function registerDashboardTools(server: McpServer): void {
       };
     }),
   );
+
+  server.tool(
+    "add_dashboard_widget",
+    "Creates a custom dashboard widget and places it on the given dashboard. A widget's `code` is a TSX file run in a sandbox: it receives a global `LW` with `LW.useChartQuery(name)` (reads one of the widget's own named queries), `LW.navigate` and `LW.theme`. `queries` are named LangWatchQL SQL statements the code can read by name — validate each statement's SQL first with run_query before calling this tool, since a query only runs inside the sandbox at render time and a mistake surfaces there, not here. Up to 8 queries per widget.",
+    {
+      dashboardId: z.string().describe("The dashboard to add the widget to"),
+      name: z.string().describe("The widget's display name"),
+      code: z
+        .string()
+        .describe(
+          "The widget's TSX source. Runs sandboxed with a global LW (LW.useChartQuery(name), LW.navigate, LW.theme) in scope."
+        ),
+      queries: z
+        .union([
+          z.record(z.string(), z.string()).describe('{"<name>": "<LWQL SQL>"}'),
+          z
+            .array(
+              z.object({
+                name: z.string().describe('Referenced from code as LW.useChartQuery("name")'),
+                sql: z.string().describe("The LangWatchQL statement"),
+              })
+            )
+            .describe("Named LWQL queries, array form"),
+        ])
+        .describe(
+          "The widget's named LangWatchQL queries: either {name: sql} or an array of {name, sql}. Max 8. Validate each statement with run_query first."
+        ),
+    },
+    withToolLogging("add_dashboard_widget", async (params) => {
+      requireApiKey();
+      const { handleAddDashboardWidget } = await import("./tools/add-dashboard-widget.js");
+      return {
+        content: [{ type: "text", text: await handleAddDashboardWidget(params) }],
+      };
+    }),
+  );
 }
 
 // --- Platform Workflow Tools (require API key) ---
