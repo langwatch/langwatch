@@ -1,7 +1,8 @@
 /**
  * Delivery credentials are redacted at the REST boundary: the write paths.
  * Creating and updating echo the automation back redacted, while what is
- * stored — and what deliveries actually use — keeps the real credential.
+ * stored — and what deliveries actually use — keeps the real credential. A
+ * typed Slack secret becomes a connection the automation points at (ADR-093 §5a).
  */
 import { nanoid } from "nanoid";
 import { describe, expect, it, vi } from "vitest";
@@ -11,6 +12,7 @@ import {
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
 import { PrismaTriggerRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
+import { createSlackDestinationResolver } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
 import { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import { REDACTED_CREDENTIAL } from "~/server/app-layer/automations/trigger-redaction";
 import { prisma } from "~/server/db";
@@ -42,6 +44,7 @@ describe("Feature: delivery credentials survive the REST write paths redacted", 
   const { projectId, headers, storeTrigger, makeWriteBack } =
     registerRedactionProject(ns);
   const writeBack = makeWriteBack((input, init) => app.request(input, init));
+  const slackDestination = createSlackDestinationResolver({ prisma });
 
   describe("when an automation is created over the API", () => {
     /** @scenario "Creating a trigger echoes it back redacted" */
@@ -67,18 +70,19 @@ describe("Feature: delivery credentials survive the REST write paths redacted", 
         id: string;
         actionParams: Record<string, unknown>;
       };
-      // The create response redacts like a read: the shape stays visible,
-      // the credential comes back as the placeholder.
-      expect(created.actionParams).toMatchObject({
-        slackWebhook: REDACTED_CREDENTIAL,
+      // The typed URL is stored as a connection: the automation names it and
+      // carries no secret, so neither the echo nor the row can leak one.
+      expect(created.actionParams).toEqual({
+        slackDelivery: "webhook",
+        slackIntegrationId: expect.any(String),
       });
+      const { actionParams } = await prisma.trigger.findUniqueOrThrow({
+        where: { id: created.id, projectId: projectId() },
+      });
+      expect(actionParams).toEqual(created.actionParams);
       expect(
-        await prisma.trigger.findUniqueOrThrow({
-          where: { id: created.id, projectId: projectId() },
-        }),
-      ).toMatchObject({
-        actionParams: { slackWebhook: SLACK_WEBHOOK },
-      });
+        await slackDestination({ projectId: projectId(), actionParams }),
+      ).toEqual({ kind: "webhook", url: SLACK_WEBHOOK });
     });
 
     // A listing copied into a create call names no destination — the
@@ -178,11 +182,13 @@ describe("Feature: delivery credentials survive the REST write paths redacted", 
       });
 
       expect(response.status).toBe(200);
+      const { actionParams } = await prisma.trigger.findUniqueOrThrow({
+        where: { id: stored.id, projectId: projectId() },
+      });
+      expect(JSON.stringify(actionParams)).not.toContain("hooks.slack.com");
       expect(
-        await prisma.trigger.findUniqueOrThrow({
-          where: { id: stored.id, projectId: projectId() },
-        }),
-      ).toMatchObject({ actionParams: { slackWebhook: typed } });
+        await slackDestination({ projectId: projectId(), actionParams }),
+      ).toEqual({ kind: "webhook", url: typed });
     });
 
     /** @scenario "An integrator writes the read response back and the stored credential survives" */

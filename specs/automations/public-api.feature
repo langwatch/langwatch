@@ -38,7 +38,7 @@ Feature: Automations over the public API
     @integration
     Scenario: Creating a trigger echoes it back redacted
       When an automation is created over the API with a Slack incoming webhook
-      Then the created automation is returned with the placeholder in place of the webhook URL
+      Then the created automation is returned pointing at a Slack connection, with no webhook URL
       And the automation still delivers to the configured webhook
 
     @integration

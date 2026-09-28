@@ -20,7 +20,13 @@ import {
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { SlackConnectionSaved } from "~/features/automations/components/slack-connection/slackConnectionTypes";
 import type { ConfigFormCtx } from "~/features/automations/providers/types";
+
+interface ConnectionDrawerProps {
+  onSuccess: (saved: SlackConnectionSaved) => void;
+  onClose: () => void;
+}
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
 vi.mock("~/components/ui/color-mode", () => ({
@@ -77,7 +83,8 @@ const connectionList: {
 
 const { openDrawerMock, goBackMock, keepDraftOnReturnMock } = vi.hoisted(
   () => ({
-    openDrawerMock: vi.fn(),
+    openDrawerMock:
+      vi.fn<(drawer: string, props: ConnectionDrawerProps) => void>(),
     goBackMock: vi.fn(),
     keepDraftOnReturnMock: vi.fn(),
   }),
@@ -519,20 +526,13 @@ describe("SlackConfigForm connection", () => {
 
   describe("when the author creates a connection from the Slack step", () => {
     const connectionDrawerProps = () => {
-      const [drawer, props] = openDrawerMock.mock.calls.at(-1) as [
-        string,
-        {
-          onSuccess: (saved: {
-            connectionId: string;
-            kind: "BOT" | "INCOMING_WEBHOOK";
-          }) => void;
-          onClose: () => void;
-        },
-      ];
-      if (drawer !== "slackConnection") {
-        throw new Error(`expected the connection drawer, opened "${drawer}"`);
+      const call = openDrawerMock.mock.calls.at(-1);
+      if (call?.[0] !== "slackConnection") {
+        throw new Error(
+          `expected the connection drawer, opened "${call?.[0]}"`,
+        );
       }
-      return props;
+      return call[1];
     };
 
     /** @scenario "A connection created from the automation drawer is selected on return" */

@@ -26,16 +26,6 @@ const {
   mockGetReportSchedules: vi.fn(),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
-
 import { PrismaTriggerRepository } from "../../../app-layer/automations/repositories/trigger.prisma.repository";
 import { TriggerService } from "../../../app-layer/automations/trigger.service";
 import { automationRouter } from "../automations";
@@ -94,7 +84,13 @@ describe("automationRouter in-depth view reads", () => {
     Object.assign(triggerService, {
       getReportSchedules: mockGetReportSchedules,
     });
-    globalForApp.__langwatch_app = createTestApp({ triggers: triggerService });
+    const app = createTestApp({ triggers: triggerService });
+    // The `.permission("triggers:view")` gate decides through the App.
+    vi.spyOn(app.permissions, "getDecision").mockResolvedValue({
+      permitted: true,
+      organizationRole: "MEMBER",
+    });
+    globalForApp.__langwatch_app = app;
     caller = createTestCaller();
   });
 

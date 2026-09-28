@@ -8507,7 +8507,7 @@
 		{
 			"name": "SlackIntegration",
 			"tableName": "SlackIntegration",
-			"documentation": "A Slack workspace connection owned by one scope (ADR-093 §5). The bot token\nis AES-256-GCM encrypted at rest (shared encrypt/decrypt, CREDENTIALS_SECRET)\nand is never returned to any client: reads answer with presence plus the\nworkspace identity pinned by `auth.test` at save time. Single-scope-per-row\nper ADR-021 — inline (scopeType, scopeId) plus the organizationId tenancy\nanchor — and the one-per-project decision is the unique constraint.\n\nNo relation to Project, and no cascade: `scopeId` is polymorphic by design\n(a TEAM or ORGANIZATION row is a future enum value, not a schema change), so\nthere is no column a foreign key could point at. RetentionPolicy,\nDataPrivacyPolicy and CustomLLMModelCost carry the same shape for the same\nreason. Projects are archived rather than deleted in the product — no code\npath hard-deletes one — so a row cannot be orphaned by ordinary use; a\nhard delete outside the product must clear this row's scope pair too, or the\nciphertext outlives what it belonged to.",
+			"documentation": "One named Slack connection (ADR-093 §5a); an organization holds as many as\nit likes, each scoped to the organization or to one project. The secret is\nAES-256-GCM ciphertext and never returned to a client. `secretFingerprint`\nis an HMAC of the plaintext, so one secret is one connection per\norganization without decrypting anything. No foreign key: `scopeId` is\npolymorphic (ADR-021), as on RetentionPolicy and CustomLLMModelCost.",
 			"primaryKey": ["id"],
 			"fields": [
 				{
@@ -8520,13 +8520,31 @@
 					"documentation": ""
 				},
 				{
+					"name": "name",
+					"columnName": "name",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "kind",
+					"columnName": "kind",
+					"type": "SlackIntegrationKind",
+					"kind": "enum",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
 					"name": "scopeType",
 					"columnName": "scopeType",
 					"type": "SlackIntegrationScopeType",
 					"kind": "enum",
 					"isList": false,
 					"isOptional": false,
-					"documentation": "No default: the writer names the scope it is writing at. PROJECT being\nthe only value today is a fact about now, not an assumption to bake in."
+					"documentation": ""
 				},
 				{
 					"name": "scopeId",
@@ -8552,6 +8570,33 @@
 					"type": "String",
 					"kind": "scalar",
 					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "webhookUrlEncrypted",
+					"columnName": "webhookUrlEncrypted",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "secretFingerprint",
+					"columnName": "secretFingerprint",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "secretHint",
+					"columnName": "secretHint",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
 					"isOptional": false,
 					"documentation": ""
 				},
@@ -8561,7 +8606,7 @@
 					"type": "String",
 					"kind": "scalar",
 					"isList": false,
-					"isOptional": false,
+					"isOptional": true,
 					"documentation": ""
 				},
 				{
@@ -8570,7 +8615,7 @@
 					"type": "String",
 					"kind": "scalar",
 					"isList": false,
-					"isOptional": false,
+					"isOptional": true,
 					"documentation": ""
 				},
 				{
@@ -22495,7 +22540,11 @@
 		},
 		{
 			"name": "SlackIntegrationScopeType",
-			"values": ["PROJECT"]
+			"values": ["ORGANIZATION", "PROJECT"]
+		},
+		{
+			"name": "SlackIntegrationKind",
+			"values": ["BOT", "INCOMING_WEBHOOK"]
 		},
 		{
 			"name": "WebhookDeliveryOutcome",

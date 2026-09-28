@@ -109,6 +109,10 @@ export const registerRedactionProject = (ns: string) => {
     }
     if (team) await prisma.team.delete({ where: { id: team.id } });
     if (organization) {
+      // A Slack secret typed over the API is stored as a connection (§5a).
+      await prisma.slackIntegration.deleteMany({
+        where: { organizationId: organization.id },
+      });
       await prisma.organization.delete({ where: { id: organization.id } });
     }
   });
