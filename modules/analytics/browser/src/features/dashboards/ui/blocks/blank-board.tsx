@@ -28,21 +28,28 @@ export function AddBlockCard({
       paddingY={compact ? 8 : 16}
       borderWidth="1px"
       borderStyle="dashed"
-      borderColor="border.emphasized"
+      borderColor="border.emphasized/80"
       borderRadius="2xl"
-      color="fg.subtle"
+      color="gray.400"
       fontWeight="normal"
       whiteSpace="normal"
-      _hover={{ borderColor: "teal.emphasized", color: "teal.fg" }}
+      _hover={{ borderColor: "teal.solid/60", color: "teal.solid" }}
       onClick={onClick}
     >
-      <Box borderRadius="full" background="bg.muted" padding={2.5}>
+      <Box
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        boxSize={10}
+        borderRadius="full"
+        background="bg.muted"
+      >
         <Plus size={18} aria-hidden />
       </Box>
       <Text fontSize="14px" fontWeight="medium">
         Add a block
       </Text>
-      <Text fontSize="13px" color="fg.muted">
+      <Text fontSize="12.5px" color="fg.subtle">
         Start from the question you need answered.
       </Text>
     </Button>
@@ -58,7 +65,7 @@ export function TemplateStrip({ onOpen }: { onOpen: () => void }) {
         fontWeight="semibold"
         letterSpacing="0.09em"
         textTransform="uppercase"
-        color="fg.subtle"
+        color="gray.400"
       >
         Start from a template
       </Text>
@@ -70,17 +77,34 @@ export function TemplateStrip({ onOpen }: { onOpen: () => void }) {
         paddingX={4}
         paddingY={3}
         borderRadius="xl"
+        borderColor="border"
+        background="bg.panel"
+        boxShadow="0 1px 2px rgb(16 16 32 / 0.03)"
         fontWeight="normal"
+        _hover={{
+          borderColor: "teal.solid/50",
+          background: "bg.panel",
+          boxShadow: "0 2px 8px rgb(16 16 32 / 0.06)",
+        }}
         onClick={onOpen}
       >
-        <Box borderRadius="md" background="bg.muted" padding={2} color="teal.fg">
-          <Gauge size={16} aria-hidden />
+        <Box
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          boxSize={8}
+          flexShrink={0}
+          borderRadius="md"
+          background="teal.solid/10"
+          color="teal.solid"
+        >
+          <Gauge size={16} strokeWidth={2.1} aria-hidden />
         </Box>
         <VStack align="start" gap={0} minWidth={0}>
-          <Text fontSize="13px" fontWeight="medium" truncate>
+          <Text fontSize="13px" lineHeight="snug" fontWeight="medium" color="fg" truncate>
             {FLIGHT_DECK.name}
           </Text>
-          <Text fontSize="12px" color="fg.muted" truncate>
+          <Text fontSize="12px" lineHeight="relaxed" color="fg.subtle" truncate>
             {FLIGHT_DECK.description}
           </Text>
         </VStack>
@@ -98,7 +122,7 @@ export function BlankBoard({
   onOpenTemplate: () => void;
 }) {
   return (
-    <VStack align="stretch" gap={8}>
+    <VStack align="stretch" gap={5}>
       <AddBlockCard onClick={onAddBlock} />
       <TemplateStrip onOpen={onOpenTemplate} />
     </VStack>

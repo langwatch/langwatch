@@ -5,7 +5,6 @@
  */
 
 import { Box, Spinner, VStack } from "@chakra-ui/react";
-import { PageLayout } from "@langwatch/design-system/page-layout";
 import { UiPageLoading, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
 import type { ReactNode } from "react";
 
@@ -18,6 +17,8 @@ import { useBoardPeriod } from "../../behavior/use-board-period.ts";
 import { useBoardVisibility } from "../../behavior/use-board-visibility.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { FlightDeckPanels } from "../../blocks/index.ts";
+import { FLIGHT_DECK_SUBJECT, ownBoardSubject } from "../../langy/model/board-langy.ts";
+import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
 import { dashboardsPath, FLIGHT_DECK } from "../../model/boards.ts";
 import { AddBlockCard, BlankBoard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
@@ -36,14 +37,21 @@ function BoardPage({
   areaLabel: string;
   children: ReactNode;
 }) {
+  // The prototype's narrow page: charts hold their shape at 980px.
   return (
-    <VStack align="stretch" gap={0} width="full">
+    <VStack
+      align="stretch"
+      gap={0}
+      width="full"
+      maxWidth="980px"
+      marginX="auto"
+      paddingX={8}
+      paddingY={6}
+    >
       {header}
-      <PageLayout.Container maxWidth="full" width="full">
-        <Box as="section" aria-label={areaLabel} minHeight="240px">
-          {children}
-        </Box>
-      </PageLayout.Container>
+      <Box as="section" aria-label={areaLabel} minHeight="240px">
+        {children}
+      </Box>
     </VStack>
   );
 }
@@ -79,6 +87,7 @@ function FlightDeckBoard() {
         />
       }
     >
+      <BoardLangy board={FLIGHT_DECK_SUBJECT} period={period} projectId={projectId ?? ""} />
       {projectId && <FlightDeckPanels projectId={projectId} {...period} />}
       {picker.isOpen && <BlockPickerDialog onClose={picker.close} />}
     </BoardPage>
@@ -108,6 +117,7 @@ function OwnBoard({ board }: { board: SavedBoard }) {
           name={board.name}
           isDefault={false}
           description={description}
+          visibility={visibility.visibility}
           onRename={(name) => saved.renameBoard({ dashboardId: board.id, name })}
           onDescribe={saveDescription}
           onAddChart={picker.open}
@@ -123,6 +133,12 @@ function OwnBoard({ board }: { board: SavedBoard }) {
         />
       }
     >
+      <BoardLangy
+        board={ownBoardSubject({ board, blocks })}
+        period={period}
+        projectId={projectId}
+        watched={{ blocks, settled: boardBlocks.status === "success" }}
+      />
       {boardBlocks.status === "pending" && <Spinner size="sm" />}
       {boardBlocks.status === "error" && (
         <HandledErrorAlert

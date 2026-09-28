@@ -91,19 +91,28 @@ const VIEW_ICONS: Partial<Readonly<Record<BlockView, LucideIcon>>> = {
 function BlockCard({ block, children }: { block: BlockDefinition; children: ReactNode }) {
   const Icon = VIEW_ICONS[block.view] ?? SOURCE_ICONS[block.source];
   return (
-    <Card.Root height="full" data-testid={`dashboard-block-${block.id}`}>
-      <Card.Header paddingBottom={2}>
-        <HStack gap={1.5}>
-          <Box color="teal.fg">
+    <Card.Root
+      height="full"
+      borderRadius="xl"
+      borderColor="border"
+      background="bg.panel"
+      boxShadow="0 1px 2px rgb(16 16 32 / 0.04)"
+      data-testid={`dashboard-block-${block.id}`}
+    >
+      <Card.Header paddingX={4} paddingTop={3.5} paddingBottom={2} gap={0.5}>
+        <HStack gap={1.5} fontSize="13px" fontWeight="medium">
+          <Box as="span" display="flex" color="teal.solid">
             <Icon size={15} aria-hidden />
           </Box>
-          <Text fontWeight="medium">{block.title}</Text>
+          <Text as="span">{block.title}</Text>
         </HStack>
-        <Text fontSize="13px" color="fg.muted">
+        <Text fontSize="11.5px" color="gray.400">
           {block.subtitle}
         </Text>
       </Card.Header>
-      <Card.Body paddingTop={2}>{children}</Card.Body>
+      <Card.Body paddingX={4} paddingTop={0} paddingBottom={4}>
+        {children}
+      </Card.Body>
     </Card.Root>
   );
 }
@@ -127,24 +136,46 @@ export function NotConnected({
 }) {
   return (
     <VStack
+      height="full"
+      justify="center"
       gap={2}
       borderWidth="1px"
       borderStyle="dashed"
+      borderColor="border.emphasized"
       borderRadius="lg"
-      background="bg.subtle"
+      background="bg.muted/30"
       paddingX={5}
       paddingY={8}
       textAlign="center"
       data-testid="block-not-connected"
     >
-      <Box borderRadius="lg" background="bg.muted" padding={2} color="teal.fg">
+      <Box
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        boxSize={9}
+        borderRadius="lg"
+        background="teal.solid/10"
+        color="teal.solid"
+      >
         <Icon size={18} strokeWidth={1.8} aria-hidden />
       </Box>
-      <Text fontWeight="semibold">{title}</Text>
-      <Text fontSize="13px" color="fg.muted" maxWidth="sm">
+      <Text fontSize="13px" fontWeight="semibold">
+        {title}
+      </Text>
+      <Text fontSize="11.5px" color="fg.subtle" maxWidth="xs">
         {line}
       </Text>
-      <Button size="sm" colorPalette="teal" onClick={onAction}>
+      <Button
+        marginTop={1}
+        height={7}
+        paddingX={2.5}
+        borderRadius="lg"
+        fontSize="12px"
+        fontWeight="medium"
+        colorPalette="teal"
+        onClick={onAction}
+      >
         {button}
       </Button>
     </VStack>
@@ -185,7 +216,7 @@ function BlockError({ error, onRetry }: { error: unknown; onRetry: () => void })
 
 function BlockPlaceholder({ children }: { children: ReactNode }) {
   return (
-    <HStack justify="center" gap={2} minHeight="120px" color="fg.muted" fontSize="13px">
+    <HStack justify="center" gap={2} minHeight="120px" color="gray.400" fontSize="11.5px">
       {children}
     </HStack>
   );

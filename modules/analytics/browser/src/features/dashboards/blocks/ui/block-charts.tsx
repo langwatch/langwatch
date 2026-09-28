@@ -6,6 +6,7 @@
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   Area,
   Bar,
@@ -31,27 +32,86 @@ import {
   rowText,
 } from "../model/block-format.ts";
 
-/** The throughput tooltip's value for a named series: latency, error rate, or a plain count. */
-function formatTooltipValue({ value, name }: { value: unknown; name: string }): string {
-  if (name === "p95 latency") return formatMs(Number(value));
-  if (name === "error rate") return formatRatio(Number(value));
-  return formatCount(Number(value));
-}
-
 export const CHART_COLORS = {
   primary: "var(--chakra-colors-orange-400)",
-  accent: "var(--chakra-colors-teal-500)",
-  danger: "var(--chakra-colors-red-500)",
+  accent: "var(--chakra-colors-teal-solid)",
+  danger: "var(--chakra-colors-red-solid)",
   series: [
     "var(--chakra-colors-teal-500)",
     "var(--chakra-colors-orange-400)",
     "var(--chakra-colors-purple-500)",
     "var(--chakra-colors-blue-500)",
   ],
-  grid: "var(--chakra-colors-border-muted)",
+  /** The prototype's categorical ramp, one hue per ranked row. */
+  ramp: [
+    "var(--chakra-colors-blue-400)",
+    "var(--chakra-colors-orange-400)",
+    "var(--chakra-colors-purple-400)",
+    "var(--chakra-colors-green-400)",
+    "var(--chakra-colors-pink-400)",
+    "var(--chakra-colors-teal-400)",
+    "var(--chakra-colors-cyan-400)",
+    "var(--chakra-colors-yellow-400)",
+  ],
+  grid: "var(--chakra-colors-border)",
 } as const;
 
-const AXIS_TICK = { fontSize: 11 };
+const AXIS_TICK = {
+  fontSize: 10.5,
+  fontFamily: "var(--chakra-fonts-mono)",
+  fill: "var(--chakra-colors-gray-400)",
+};
+
+const TOOLTIP_CURSOR = { fill: CHART_COLORS.accent, fillOpacity: 0.06 };
+
+/** One charted bucket as the tooltip reads it: the axis label and the drawn values. */
+type ChartPoint = { x: string } & Readonly<Record<string, number | string>>;
+
+/**
+ * The prototype's chart tooltip: the bucket in small mono, then one
+ * label-value row per series. Recharts fills `active`, `payload` and `label`.
+ */
+function BlockTooltip({
+  active,
+  payload,
+  label,
+  rows,
+}: {
+  active?: boolean;
+  payload?: readonly { payload?: ChartPoint }[];
+  label?: string | number;
+  rows: (point: ChartPoint) => readonly { label: string; value: string }[];
+}) {
+  const point = payload?.[0]?.payload;
+  if (!active || !point) return null;
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="lg"
+      background="bg.panel"
+      paddingX={2.5}
+      paddingY={2}
+      boxShadow="lg"
+    >
+      <Text marginBottom={1} fontFamily="mono" fontSize="10.5px" color="gray.400">
+        {label}
+      </Text>
+      {rows(point).map((row) => (
+        <HStack key={row.label} gap={4} fontSize="12px">
+          <Text as="span" color="fg.subtle">
+            {row.label}
+          </Text>
+          <Text as="span" marginLeft="auto" fontWeight="medium" fontVariantNumeric="tabular-nums">
+            {row.value}
+          </Text>
+        </HStack>
+      ))}
+    </Box>
+  );
+}
+
+const pointNumber = (point: ChartPoint, key: string) => Number(point[key] ?? 0);
 
 export interface ChartViewProps {
   readonly rows: BlockRows;
@@ -59,11 +119,32 @@ export interface ChartViewProps {
   readonly granularitySeconds: number;
 }
 
-function LegendItem({ color, label }: { color: string; label: string }) {
+function LegendItem({
+  color,
+  label,
+  dashed = false,
+}: {
+  color: string;
+  label: string;
+  dashed?: boolean;
+}) {
+  const swatch = dashed ? (
+    <Box width={3} height={0} borderTopWidth="2px" borderStyle="dashed" borderColor={color} />
+  ) : (
+    <Box boxSize={2} borderRadius="full" background={color} />
+  );
   return (
-    <HStack gap={1.5} fontSize="11px" color="fg.muted">
-      <Box boxSize={2} borderRadius="full" background={color} />
+    <HStack gap={1.5} fontSize="10.5px" color="fg.subtle">
+      {swatch}
       {label}
+    </HStack>
+  );
+}
+
+function Legend({ children }: { children: ReactNode }) {
+  return (
+    <HStack columnGap={3} rowGap={0.5} flexWrap="wrap" marginBottom={1}>
+      {children}
     </HStack>
   );
 }
@@ -86,7 +167,14 @@ export function LineView({ rows, unit, granularitySeconds }: ChartViewProps) {
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-          <XAxis dataKey="x" tick={AXIS_TICK} tickLine={false} axisLine={false} minTickGap={28} />
+          <XAxis
+            dataKey="x"
+            tick={AXIS_TICK}
+            tickLine={false}
+            axisLine={false}
+            minTickGap={28}
+            dy={4}
+          />
           <YAxis
             tick={AXIS_TICK}
             tickLine={false}
@@ -94,7 +182,19 @@ export function LineView({ rows, unit, granularitySeconds }: ChartViewProps) {
             width={52}
             tickFormatter={(value: number) => formatValue({ value, unit })}
           />
-          <Tooltip formatter={(value) => formatValue({ value: Number(value), unit })} />
+          <Tooltip
+            cursor={TOOLTIP_CURSOR}
+            content={
+              <BlockTooltip
+                rows={(point) =>
+                  seriesKeys.map((key) => ({
+                    label: key.replaceAll("_", " "),
+                    value: formatValue({ value: pointNumber(point, key), unit }),
+                  }))
+                }
+              />
+            }
+          />
           {seriesKeys.map((key, index) => (
             <Line
               key={key}
@@ -113,36 +213,45 @@ export function LineView({ rows, unit, granularitySeconds }: ChartViewProps) {
   );
 }
 
-/** A horizontal leaderboard: first column is the label, second the value. */
-export function RankingList({
-  rows,
-  unit,
-  color = CHART_COLORS.primary,
-}: {
-  rows: readonly BlockRow[];
-  unit: BlockUnit;
-  color?: string;
-}) {
+/** A horizontal leaderboard, one ramp hue per row: first column the label, second the value. */
+export function RankingList({ rows, unit }: { rows: readonly BlockRow[]; unit: BlockUnit }) {
   const [labelKey = "", valueKey = ""] = Object.keys(rows[0] ?? {});
   const max = Math.max(...rows.map((row) => rowNumber(row, valueKey)), Number.MIN_VALUE);
   return (
     <VStack align="stretch" gap={1.5}>
-      {rows.map((row) => {
+      {rows.map((row, index) => {
         const value = rowNumber(row, valueKey);
         return (
-          <HStack key={rowText(row, labelKey)} gap={3} fontSize="13px">
-            <Text flex="0 0 40%" truncate>
+          <HStack key={rowText(row, labelKey)} gap={2} fontSize="11.5px">
+            <Text width="128px" flexShrink={0} color="fg.subtle" truncate>
               {rowText(row, labelKey) || "Unknown"}
             </Text>
-            <Box flex={1} height="14px" borderRadius="sm" background="bg.muted">
+            <Box
+              position="relative"
+              flex={1}
+              minWidth={0}
+              height={4}
+              overflow="hidden"
+              borderRadius="4px"
+              background="bg.muted"
+            >
               <Box
-                height="full"
-                borderRadius="sm"
-                background={color}
+                position="absolute"
+                insetY={0}
+                left={0}
+                borderRadius="4px"
+                opacity={0.8}
+                background={CHART_COLORS.ramp[index % CHART_COLORS.ramp.length]}
                 width={`${(value / max) * 100}%`}
               />
             </Box>
-            <Text flex="0 0 64px" textAlign="right" fontVariantNumeric="tabular-nums">
+            <Text
+              width="56px"
+              flexShrink={0}
+              textAlign="right"
+              fontWeight="medium"
+              fontVariantNumeric="tabular-nums"
+            >
               {formatValue({ value, unit })}
             </Text>
           </HStack>
@@ -166,17 +275,24 @@ export function ThroughputView({ rows, granularitySeconds }: ChartViewProps) {
   }));
   const maxRate = Math.max(0.01, ...data.map((point) => point.errorRate));
   return (
-    <VStack align="stretch" gap={1}>
-      <HStack gap={3}>
+    <VStack align="stretch" gap={0}>
+      <Legend>
         <LegendItem color={CHART_COLORS.primary} label="throughput" />
         <LegendItem color={CHART_COLORS.accent} label="p95 latency" />
         <LegendItem color={CHART_COLORS.danger} label="error rate" />
-      </HStack>
+      </Legend>
       <Box height="256px">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-            <XAxis dataKey="x" tick={AXIS_TICK} tickLine={false} axisLine={false} minTickGap={28} />
+            <XAxis
+              dataKey="x"
+              tick={AXIS_TICK}
+              tickLine={false}
+              axisLine={false}
+              minTickGap={28}
+              dy={4}
+            />
             <YAxis
               yAxisId="req"
               tick={AXIS_TICK}
@@ -191,17 +307,29 @@ export function ThroughputView({ rows, granularitySeconds }: ChartViewProps) {
               tick={AXIS_TICK}
               tickLine={false}
               axisLine={false}
-              width={52}
+              width={48}
               tickFormatter={formatMs}
             />
             <YAxis yAxisId="rate" hide domain={[0, maxRate * 4]} />
-            <Tooltip formatter={(value, name) => formatTooltipValue({ value, name })} />
+            <Tooltip
+              cursor={TOOLTIP_CURSOR}
+              content={
+                <BlockTooltip
+                  rows={(point) => [
+                    { label: "Throughput", value: formatCount(pointNumber(point, "throughput")) },
+                    { label: "p95 latency", value: formatMs(pointNumber(point, "p95")) },
+                    { label: "Error rate", value: formatRatio(pointNumber(point, "errorRate")) },
+                  ]}
+                />
+              }
+            />
             <Area
               yAxisId="rate"
               type="monotone"
               dataKey="errorRate"
               name="error rate"
               stroke={CHART_COLORS.danger}
+              strokeWidth={1.2}
               fill={CHART_COLORS.danger}
               fillOpacity={0.1}
               dot={false}
@@ -244,16 +372,23 @@ export function QualityView({ rows, granularitySeconds }: ChartViewProps) {
     };
   });
   return (
-    <VStack align="stretch" gap={1}>
-      <HStack gap={3}>
+    <VStack align="stretch" gap={0}>
+      <Legend>
         <LegendItem color={CHART_COLORS.accent} label="evaluator pass rate" />
-        <LegendItem color={CHART_COLORS.danger} label="error rate" />
-      </HStack>
+        <LegendItem color={CHART_COLORS.danger} label="error rate" dashed />
+      </Legend>
       <Box height="160px">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-            <XAxis dataKey="x" tick={AXIS_TICK} tickLine={false} axisLine={false} minTickGap={28} />
+            <XAxis
+              dataKey="x"
+              tick={AXIS_TICK}
+              tickLine={false}
+              axisLine={false}
+              minTickGap={28}
+              dy={4}
+            />
             <YAxis
               tick={AXIS_TICK}
               tickLine={false}
@@ -262,7 +397,17 @@ export function QualityView({ rows, granularitySeconds }: ChartViewProps) {
               domain={[0, 1]}
               tickFormatter={(value: number) => formatRatio(value, 0)}
             />
-            <Tooltip formatter={(value) => formatRatio(Number(value))} />
+            <Tooltip
+              cursor={TOOLTIP_CURSOR}
+              content={
+                <BlockTooltip
+                  rows={(point) => [
+                    { label: "Pass rate", value: formatRatio(pointNumber(point, "passRate"), 0) },
+                    { label: "Error rate", value: formatRatio(pointNumber(point, "errorRate")) },
+                  ]}
+                />
+              }
+            />
             <Line
               type="monotone"
               dataKey="passRate"
@@ -299,23 +444,33 @@ export function FeedbackView({ rows, granularitySeconds }: ChartViewProps) {
     positive: rowNumber(row, "positive_rate"),
   }));
   return (
-    <VStack align="stretch" gap={2}>
-      <HStack gap={4}>
-        <Text fontSize="22px" fontWeight="semibold">
+    <VStack align="stretch" gap={0}>
+      <HStack gap={4} marginBottom={3}>
+        <Text fontSize="22px" fontWeight="semibold" fontVariantNumeric="tabular-nums">
           {formatRatio(up + down > 0 ? up / (up + down) : 0, 0)}
         </Text>
-        <HStack gap={1} fontSize="12px" color="green.fg">
+        <HStack gap={1} fontSize="12px" color="green.solid">
           <ThumbsUp size={13} /> {formatCount(up)}
         </HStack>
-        <HStack gap={1} fontSize="12px" color="red.fg">
+        <HStack gap={1} fontSize="12px" color="red.solid">
           <ThumbsDown size={13} /> {formatCount(down)}
         </HStack>
       </HStack>
+      <Legend>
+        <LegendItem color={CHART_COLORS.ramp[4]} label="positive feedback rate" dashed />
+      </Legend>
       <Box height="128px">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-            <XAxis dataKey="x" tick={AXIS_TICK} tickLine={false} axisLine={false} minTickGap={28} />
+            <XAxis
+              dataKey="x"
+              tick={AXIS_TICK}
+              tickLine={false}
+              axisLine={false}
+              minTickGap={28}
+              dy={4}
+            />
             <YAxis
               tick={AXIS_TICK}
               tickLine={false}
@@ -324,12 +479,24 @@ export function FeedbackView({ rows, granularitySeconds }: ChartViewProps) {
               domain={[0, 1]}
               tickFormatter={(value: number) => formatRatio(value, 0)}
             />
-            <Tooltip formatter={(value) => formatRatio(Number(value))} />
+            <Tooltip
+              cursor={TOOLTIP_CURSOR}
+              content={
+                <BlockTooltip
+                  rows={(point) => [
+                    {
+                      label: "Positive feedback",
+                      value: formatRatio(pointNumber(point, "positive"), 0),
+                    },
+                  ]}
+                />
+              }
+            />
             <Line
               type="monotone"
               dataKey="positive"
               name="positive feedback"
-              stroke={CHART_COLORS.series[2]}
+              stroke={CHART_COLORS.ramp[4]}
               strokeWidth={1.8}
               strokeDasharray="4 3"
               dot={false}

@@ -50,7 +50,7 @@ export function BoardBlocksGrid({
               <Box
                 className={CHART_GRID_DRAG_HANDLE_CLASS}
                 cursor="grab"
-                color="fg.subtle"
+                color="gray.400"
                 padding={1}
                 title="Drag to move"
               >

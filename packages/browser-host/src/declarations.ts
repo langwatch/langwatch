@@ -543,6 +543,64 @@ export type UiSetupWithAgentButtonProps = {
   size?: "sm" | "md";
 };
 
+/** Operations a module declares, loaded the first time something calls one. */
+export type UiDeclaredOperations<Operations> = {
+  readonly load: () => Promise<{ readonly default: Operations }>;
+};
+/** How a device ceremony ended: `cancelled` is a dismissed prompt, not a refusal. */
+export type UiCeremonyOutcome =
+  | { ok: true }
+  | { ok: false; cancelled: true }
+  | { ok: false; cancelled: false };
+/** One passkey the reader holds, as auth lends it. */
+export type UiHeldPasskey = {
+  id: string;
+  name?: string | null;
+  createdAt: TimeInput;
+  transports?: string | null;
+};
+/** What auth lends the screen where a reader manages their own passkeys. */
+export type UiPasskeyCeremonies = {
+  list(): Promise<readonly UiHeldPasskey[]>;
+  register(): Promise<UiCeremonyOutcome>;
+  rename(input: { id: string; name: string }): Promise<UiCeremonyOutcome>;
+  remove(input: { id: string }): Promise<UiCeremonyOutcome>;
+};
+/** The value, or the refusal as the endpoint answered it, for the registry to read by code. */
+export type UiTwoStepAnswer<Value> = { ok: true; value: Value } | { ok: false; error: unknown };
+/** What auth lends for setting two-step verification up; no password where the account has none. */
+export type UiTwoStepCeremonies = {
+  start(input: {
+    password?: string;
+  }): Promise<UiTwoStepAnswer<{ setupUri: string; backupCodes: readonly string[] }>>;
+  confirm(input: { code: string }): Promise<UiTwoStepAnswer<{ confirmed: true }>>;
+  regenerateBackupCodes(input: {
+    password?: string;
+  }): Promise<UiTwoStepAnswer<{ backupCodes: readonly string[] }>>;
+};
+
+/** How linking a further sign-in method ended; `reason` is the provider's refusal to show. */
+export type UiLinkSignInMethodOutcome = { ok: true } | { ok: false; reason?: string };
+/** What auth lends for linking another sign-in method to the reader's own account. */
+export type UiSignInMethodLinking = {
+  link(input: { provider: string }): Promise<UiLinkSignInMethodOutcome>;
+};
+
+/** One reference riding with a question to Langy: `kind` is one of Langy's resource kinds. */
+export type UiLangyAskContext = { kind: string; ref: string; label: string };
+
+/** A question to ask Langy outright, or a sentence for the reader to finish, with its context. */
+export type UiLangyAskRequest = {
+  question?: string;
+  draft?: string;
+  context?: readonly UiLangyAskContext[];
+};
+
+/** What Langy lends for asking it about another module's screen; its store stays its own. */
+export type UiLangyAsk = {
+  ask(request: UiLangyAskRequest): void;
+};
+
 /** A usage-against-limit row licensing lends: a limit type it names, or a caller's label. */
 export type UiResourceLimitRowProps = { current: number; max?: number } & (
   | { label: string; limitType?: never }
@@ -648,6 +706,7 @@ export type UiDeclaredCapabilities = {
   hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
   inlineCommandPalette: UiDeclaredComponent<UiInlineCommandPaletteProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
+  langyAsk: UiDeclaredOperations<UiLangyAsk>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
   comparisonConfigForm: UiDeclaredComponent<UiComparisonConfigFormProps>;
   codingAgentPullRequestsTable: UiDeclaredComponent<UiCodingAgentPullRequestsTableProps>;

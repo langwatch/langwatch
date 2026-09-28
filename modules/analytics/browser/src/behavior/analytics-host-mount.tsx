@@ -6,12 +6,14 @@
 
 import {
   useUiCapabilities,
+  useUiDeclarations,
   useUiScope,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import type { UiDeclarations } from "@langwatch/browser-host/declarations";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -20,6 +22,7 @@ import {
   type AnalyticsAlertAuthoring,
   type AnalyticsFailureNotice,
   type AnalyticsHostProject,
+  type AnalyticsLangyAskRequest,
   type AnalyticsRouteReading,
   type AnalyticsSuccessNotice,
 } from "../model/analytics-host.ts";
@@ -33,6 +36,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly routeCapability: UiRoute;
   private readonly navigationCapability: UiNavigation;
   private readonly feedback: UiFeedback;
+  private readonly declarations: UiDeclarations;
 
   constructor({
     project_,
@@ -41,6 +45,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     routeCapability,
     navigationCapability,
     feedback,
+    declarations,
   }: {
     project_: AnalyticsHostProject | undefined;
     organizationId_: string | undefined;
@@ -48,6 +53,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     routeCapability: UiRoute;
     navigationCapability: UiNavigation;
     feedback: UiFeedback;
+    declarations: UiDeclarations;
   }) {
     super();
     this.project_ = project_;
@@ -56,6 +62,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     this.routeCapability = routeCapability;
     this.navigationCapability = navigationCapability;
     this.feedback = feedback;
+    this.declarations = declarations;
   }
 
   project(): AnalyticsHostProject | undefined {
@@ -111,6 +118,13 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   failed(failure: AnalyticsFailureNotice): void {
     this.feedback.failed(failure);
   }
+
+  /** Through what Langy lends by name; with Langy not installed nothing is declared. */
+  askLangy(request: AnalyticsLangyAskRequest): void {
+    const lent = this.declarations.declared("langyAsk")[0]?.capability;
+    if (!lent) return;
+    void lent.load().then(({ default: langy }) => langy.ask(request));
+  }
 }
 
 /**
@@ -120,6 +134,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
  */
 export default function AnalyticsHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
+  const declarations = useUiDeclarations();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeProject = session.snapshot().scope.project;
   const scopeProjectId = scopeProject?.id;
@@ -152,6 +167,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
         routeCapability: route,
         navigationCapability: navigation,
         feedback,
+        declarations,
       }),
     [
       scopeProjectId,
@@ -164,6 +180,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
       route,
       navigation,
       feedback,
+      declarations,
     ],
   );
   return <AnalyticsHostProvider value={host}>{children}</AnalyticsHostProvider>;

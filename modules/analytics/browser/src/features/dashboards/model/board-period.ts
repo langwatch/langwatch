@@ -3,10 +3,7 @@
  * grain into millisecond bounds and a server-legal granularity. No React.
  */
 
-import {
-  LWQL_ACCEPTED_GRANULARITY_STEPS,
-  type LangWatchQLAcceptedGranularityStep,
-} from "@langwatch/analytics-contract";
+import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
 
 import { fitGranularity } from "../blocks/index.ts";
 
@@ -28,12 +25,19 @@ const RANGE_MS: Readonly<Record<BoardPeriodRange, number>> = {
   "1y": 365 * 86_400_000,
 };
 
-/** The seconds each fixed grain asks for; "auto" has none, it asks for the finest step. */
+/** The seconds each fixed grain asks for. */
 const GRAIN_REQUESTED_SECONDS: Readonly<Record<Exclude<BoardPeriodGrain, "auto">, number>> = {
   "1h": 3600,
   "1d": 86_400,
   "1w": 7 * 86_400,
 };
+
+/** What "auto" reads a span at, after the prototype: hours up to a day, days up to a month. */
+function autoGrain({ spanMs }: { spanMs: number }): Exclude<BoardPeriodGrain, "auto"> {
+  if (spanMs <= RANGE_MS["24h"]) return "1h";
+  if (spanMs <= RANGE_MS["30d"]) return "1d";
+  return "1w";
+}
 
 /** `[periodStart, periodEnd]` in epoch milliseconds for a range ending at `now`. */
 export function boardPeriodBounds({ range, now }: { range: BoardPeriodRange; now: number }): {
@@ -44,9 +48,8 @@ export function boardPeriodBounds({ range, now }: { range: BoardPeriodRange; now
 }
 
 /**
- * The granularity actually sent to the server. "Auto" asks for the finest
- * accepted step and lets {@link fitGranularity} widen it to the bucket budget;
- * a fixed grain too fine for the range widens the same way.
+ * The granularity actually sent to the server. "Auto" picks a grain for the
+ * span; a grain too fine for the range widens through {@link fitGranularity}.
  */
 export function boardPeriodGranularity({
   grain,
@@ -57,20 +60,8 @@ export function boardPeriodGranularity({
   periodStart: number;
   periodEnd: number;
 }): LangWatchQLAcceptedGranularityStep {
-  const requested =
-    grain === "auto" ? LWQL_ACCEPTED_GRANULARITY_STEPS[0] : GRAIN_REQUESTED_SECONDS[grain];
-  return fitGranularity({ periodStart, periodEnd, requested });
-}
-
-/** The label the header button shows, e.g. "30d · auto". */
-export function boardPeriodLabel({
-  range,
-  grain,
-}: {
-  range: BoardPeriodRange;
-  grain: BoardPeriodGrain;
-}): string {
-  return `${range} · ${grain}`;
+  const fixed = grain === "auto" ? autoGrain({ spanMs: periodEnd - periodStart }) : grain;
+  return fitGranularity({ periodStart, periodEnd, requested: GRAIN_REQUESTED_SECONDS[fixed] });
 }
 
 /** Parses a range from an untrusted string (e.g. a URL query value); falls back to the default. */

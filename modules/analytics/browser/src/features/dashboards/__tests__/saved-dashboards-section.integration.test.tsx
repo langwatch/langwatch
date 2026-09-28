@@ -5,6 +5,7 @@
 
 import type { UiProcedureCall } from "@langwatch/browser-host/testing-transport";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
@@ -15,11 +16,13 @@ const board = ({
   id,
   name,
   visibility = "only_me",
+  createdById = "user-1",
 }: {
   id: string;
   name: string;
   visibility?: string;
-}) => ({ id, name, description: null, visibility, createdById: "user-1" });
+  createdById?: string;
+}) => ({ id, name, description: null, visibility, createdById });
 
 const OWN_BOARDS = [
   board({ id: "board-1", name: "Weekly review" }),
@@ -114,6 +117,28 @@ describe("the saved-dashboards list in the sidebar", () => {
         ]);
         expect(hrefsIn("Team")).toEqual(["/test-project/dashboards/board-2"]);
         expect(hrefsIn("Organisation")).toEqual(["/test-project/dashboards/board-1"]);
+      });
+    });
+
+    describe("when a teammate's board is shared with the member", () => {
+      /** @scenario "AC26 Only the creator or an admin can change visibility or delete the board" */
+      it("offers delete on the member's own board only, not on a teammate's", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        renderSection({
+          boards: [
+            board({ id: "board-1", name: "Weekly review" }),
+            board({ id: "board-2", name: "Latency", visibility: "team", createdById: "user-2" }),
+          ],
+        });
+
+        await user.click(await screen.findByRole("button", { name: "Actions for Weekly review" }));
+        expect(await screen.findByRole("menuitem", { name: "Delete" })).toBeInTheDocument();
+        await user.keyboard("{Escape}");
+        await waitFor(() => expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull());
+
+        await user.click(screen.getByRole("button", { name: "Actions for Latency" }));
+        expect(await screen.findByRole("menuitem", { name: "Rename" })).toBeInTheDocument();
+        expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
       });
     });
 

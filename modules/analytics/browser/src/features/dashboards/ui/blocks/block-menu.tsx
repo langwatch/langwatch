@@ -27,7 +27,7 @@ export function BlockMenu({
           aria-label={`Actions for ${title}`}
           variant="ghost"
           size="xs"
-          color="fg.subtle"
+          color="gray.400"
           disabled={disabled}
         >
           <MoreVertical size={14} />

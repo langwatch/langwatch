@@ -23,9 +23,16 @@ export const langyWeb = defineBrowserModule("langy")
     },
   })
   // All another module may do to the panel: dock it with a kickoff and hear
-  // the scope it entered. The shell wires this into the consumer's own
-  // `*HostApi`; nothing else reaches Langy's store.
-  .withCapabilities({ guidedOnboarding: langyGuidedOnboarding })
+  // the scope it entered, or ask it a question with the view it is about. A
+  // consumer's own host reads `langyAsk` by name; nothing else reaches the store.
+  .withCapabilities({
+    guidedOnboarding: langyGuidedOnboarding,
+    langyAsk: {
+      load: async () => ({
+        default: (await import("./behavior/langy-ask.capability.ts")).langyAsk,
+      }),
+    },
+  })
   .withHosts({
     requires: ["LangyHostApi"],
     mounts: { LangyHostApi: { load: () => import("./behavior/langy-host-mount.tsx") } },

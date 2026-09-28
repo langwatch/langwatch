@@ -4,7 +4,7 @@
  * and Most impactful traces. Each reads the rows of its own statements only.
  */
 
-import { Badge, Box, HStack, SimpleGrid, Table, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, ThumbsDown, ThumbsUp } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -21,7 +21,7 @@ import {
   rowNumber,
   rowText,
 } from "../model/block-format.ts";
-import { CHART_COLORS, RankingList, Sparkline } from "./block-charts.tsx";
+import { RankingList, Sparkline } from "./block-charts.tsx";
 
 export interface TableViewProps {
   readonly rows: BlockRows;
@@ -33,8 +33,8 @@ type Polarity = "upGood" | "upBad" | "neutral";
 
 /** The delta line's colour: neutral grey, otherwise green for good news, red for bad. */
 function colorFor({ neutral, good }: { neutral: boolean; good: boolean }): string {
-  if (neutral) return "fg.muted";
-  return good ? "green.fg" : "red.fg";
+  if (neutral) return "gray.400";
+  return good ? "green.solid" : "red.solid";
 }
 
 /** The delta line's arrow: up, down, or flat when neither. */
@@ -51,10 +51,10 @@ function DeltaLine({ delta, polarity }: { delta: number; polarity: Polarity }) {
   const color = colorFor({ neutral: polarity === "neutral" || (!up && !down), good });
   const Icon = deltaIcon({ up, down });
   return (
-    <HStack gap={0.5} fontSize="11px" color={color}>
+    <HStack gap={0.5} marginTop={0.5} fontSize="11px" fontWeight="medium" color={color}>
       <Icon size={12} />
       {formatDelta(delta)}
-      <Text as="span" color="fg.muted">
+      <Text as="span" color="gray.400">
         vs prev
       </Text>
     </HStack>
@@ -73,11 +73,26 @@ function Tile({
   polarity: Polarity;
 }) {
   return (
-    <Box borderWidth="1px" borderRadius="lg" paddingX={3} paddingY={2.5} data-testid="status-tile">
-      <Text fontSize="12px" color="fg.muted">
+    <Box
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="lg"
+      background="bg.muted/40"
+      paddingX={3}
+      paddingY={2.5}
+      data-testid="status-tile"
+    >
+      <Text fontSize="11px" fontWeight="medium" color="fg.subtle">
         {label}
       </Text>
-      <Text fontSize="22px" fontWeight="semibold" lineHeight="short">
+      <Text
+        marginTop={0.5}
+        fontSize="20px"
+        lineHeight="24px"
+        fontWeight="semibold"
+        letterSpacing="tight"
+        fontVariantNumeric="tabular-nums"
+      >
         {value}
       </Text>
       <DeltaLine delta={delta} polarity={polarity} />
@@ -129,11 +144,11 @@ export function StatusView({ rows }: TableViewProps) {
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <Box borderRadius="md" background="bg.muted" paddingX={2} paddingY={1.5}>
-      <Text fontSize="11px" color="fg.muted">
+    <Box borderRadius="md" background="bg.muted/50" paddingX={2} paddingY={1.5}>
+      <Text fontSize="10px" color="gray.400">
         {label}
       </Text>
-      <Text fontSize="15px" fontWeight="semibold">
+      <Text fontSize="14px" fontWeight="semibold" fontVariantNumeric="tabular-nums">
         {value}
       </Text>
     </Box>
@@ -145,26 +160,27 @@ export function CostEfficiencyView({ rows }: TableViewProps) {
   const successes = rowNumber(summary, "successes");
   const cost = rowNumber(summary, "cost");
   return (
-    <VStack align="stretch" gap={3}>
-      <SimpleGrid columns={3} gap={2}>
+    <VStack align="stretch" gap={0}>
+      <SimpleGrid columns={3} gap={2} marginBottom={3}>
         <MiniStat label="Cost / success" value={formatUsd(successes > 0 ? cost / successes : 0)} />
         <MiniStat label="Tokens in" value={formatCount(rowNumber(summary, "tokens_in"))} />
         <MiniStat label="Tokens out" value={formatCount(rowNumber(summary, "tokens_out"))} />
       </SimpleGrid>
-      <Text fontSize="12px" fontWeight="medium" color="fg.muted">
+      <Text marginBottom={1} fontSize="11px" fontWeight="medium" color="fg.subtle">
         Highest-cost models
       </Text>
-      <RankingList rows={rows.models ?? []} unit="usd" color={CHART_COLORS.series[3]} />
+      <RankingList rows={rows.models ?? []} unit="usd" />
     </VStack>
   );
 }
 
 interface Column {
   readonly header: string;
-  readonly numeric?: boolean;
+  readonly align?: "start" | "end" | "center";
   readonly cell: (row: BlockRow) => ReactNode;
 }
 
+/** The prototype's compact table: sentence-case grey headers, hairline row rules. */
 function RowsTable({
   rows,
   columns,
@@ -175,41 +191,57 @@ function RowsTable({
   rowKey: (row: BlockRow) => string;
 }) {
   return (
-    <Table.Root size="sm" variant="line">
-      <Table.Header>
-        <Table.Row>
+    <chakra.table width="full" fontSize="11.5px" borderCollapse="collapse">
+      <chakra.thead>
+        <chakra.tr color="gray.400">
           {columns.map((column) => (
-            <Table.ColumnHeader
+            <chakra.th
               key={column.header}
-              textAlign={column.numeric ? "end" : "start"}
-              color="fg.muted"
+              textAlign={column.align ?? "start"}
+              fontWeight="medium"
+              paddingBottom={1}
             >
               {column.header}
-            </Table.ColumnHeader>
+            </chakra.th>
           ))}
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+        </chakra.tr>
+      </chakra.thead>
+      <chakra.tbody>
         {rows.map((row) => (
-          <Table.Row key={rowKey(row)}>
+          <chakra.tr key={rowKey(row)} borderTopWidth="1px" borderColor="border/60">
             {columns.map((column) => (
-              <Table.Cell
+              <chakra.td
                 key={column.header}
-                textAlign={column.numeric ? "end" : "start"}
+                textAlign={column.align ?? "start"}
+                paddingY={1}
+                paddingRight={2}
+                _last={{ paddingRight: 0 }}
                 fontVariantNumeric="tabular-nums"
               >
                 {column.cell(row)}
-              </Table.Cell>
+              </chakra.td>
             ))}
-          </Table.Row>
+          </chakra.tr>
         ))}
-      </Table.Body>
-    </Table.Root>
+      </chakra.tbody>
+    </chakra.table>
   );
 }
 
-const mono = (text: string) => (
-  <Text as="span" fontFamily="mono" fontSize="12px" color="fg.muted">
+const mono = (text: string, color = "fg.subtle") => (
+  <Text as="span" fontFamily="mono" fontSize="10.5px" color={color}>
+    {text}
+  </Text>
+);
+
+const faint = (text: string) => (
+  <Text as="span" color="gray.400">
+    {text}
+  </Text>
+);
+
+const strong = (text: ReactNode, weight: "medium" | "semibold" = "medium") => (
+  <Text as="span" fontWeight={weight}>
     {text}
   </Text>
 );
@@ -224,9 +256,13 @@ export function FailuresView({ rows }: TableViewProps) {
         { header: "Operation", cell: (row) => mono(rowText(row, "operation")) },
         {
           header: "First seen",
-          cell: (row) => formatBucket({ value: row.first_seen, granularitySeconds: 60 }),
+          cell: (row) => faint(formatBucket({ value: row.first_seen, granularitySeconds: 60 })),
         },
-        { header: "Count", numeric: true, cell: (row) => formatCount(rowNumber(row, "failures")) },
+        {
+          header: "Count",
+          align: "end",
+          cell: (row) => strong(formatCount(rowNumber(row, "failures"))),
+        },
       ]}
     />
   );
@@ -241,16 +277,16 @@ export function ScenariosView({ rows }: TableViewProps) {
     pass_rate: rowNumber(row, "runs") > 0 ? rowNumber(row, "passed") / rowNumber(row, "runs") : 0,
   }));
   return (
-    <VStack align="stretch" gap={3}>
-      <HStack gap={2} alignItems="baseline">
-        <Text fontSize="22px" fontWeight="semibold">
+    <VStack align="stretch" gap={0}>
+      <HStack gap={2} alignItems="baseline" marginBottom={3}>
+        <Text fontSize="22px" fontWeight="semibold" fontVariantNumeric="tabular-nums">
           {formatRatio(runs > 0 ? passed / runs : 0, 0)}
         </Text>
-        <Text fontSize="12px" color="fg.muted">
+        <Text fontSize="11px" color="fg.subtle">
           {formatCount(passed)} / {formatCount(runs)} runs passing
         </Text>
       </HStack>
-      <RankingList rows={suites} unit="ratio" color={CHART_COLORS.accent} />
+      <RankingList rows={suites} unit="ratio" />
     </VStack>
   );
 }
@@ -281,19 +317,23 @@ export function CodingAgentsView({ rows }: TableViewProps) {
         },
         {
           header: "Sessions",
-          numeric: true,
+          align: "end",
           cell: (row) => formatCount(rowNumber(row, "sessions")),
         },
-        { header: "Tokens", numeric: true, cell: (row) => formatCount(rowNumber(row, "tokens")) },
-        { header: "Cost", numeric: true, cell: (row) => formatUsd(rowNumber(row, "cost")) },
+        { header: "Tokens", align: "end", cell: (row) => formatCount(rowNumber(row, "tokens")) },
+        {
+          header: "Cost",
+          align: "end",
+          cell: (row) => strong(formatUsd(rowNumber(row, "cost")), "semibold"),
+        },
         {
           header: "Success",
-          numeric: true,
+          align: "end",
           cell: (row) => formatRatio(rowNumber(row, "success_rate"), 0),
         },
         {
           header: "Trend",
-          numeric: true,
+          align: "end",
           cell: (row) => <Sparkline points={pointsOf(rowText(row, "agent"))} />,
         },
       ]}
@@ -308,14 +348,30 @@ function traceStatus(row: BlockRow): { label: string; palette: string } {
   return { label: "ok", palette: "green" };
 }
 
-function FeedbackMark({ feedback }: { feedback: string }) {
-  if (feedback === "up") return <ThumbsUp size={13} color="var(--chakra-colors-green-fg)" />;
-  if (feedback === "down") return <ThumbsDown size={13} color="var(--chakra-colors-red-fg)" />;
+/** The prototype's status pill: the tone at a tenth for the ground, full for the word. */
+function StatusPill({ row }: { row: BlockRow }) {
+  const { label, palette } = traceStatus(row);
   return (
-    <Text as="span" color="fg.muted">
-      -
-    </Text>
+    <Box
+      as="span"
+      display="inline-flex"
+      borderRadius="md"
+      paddingX={1.5}
+      paddingY={0.5}
+      fontSize="11px"
+      fontWeight="medium"
+      background={`${palette}.solid/10`}
+      color={`${palette}.solid`}
+    >
+      {label}
+    </Box>
   );
+}
+
+function FeedbackMark({ feedback }: { feedback: string }) {
+  if (feedback === "up") return <ThumbsUp size={13} color="var(--chakra-colors-green-solid)" />;
+  if (feedback === "down") return <ThumbsDown size={13} color="var(--chakra-colors-red-solid)" />;
+  return faint("-");
 }
 
 export function ImpactfulTracesView({ rows }: TableViewProps) {
@@ -324,19 +380,21 @@ export function ImpactfulTracesView({ rows }: TableViewProps) {
       rows={rows.main ?? []}
       rowKey={(row) => rowText(row, "trace_id")}
       columns={[
-        { header: "Trace", cell: (row) => mono(rowText(row, "trace_id")) },
+        { header: "Trace", cell: (row) => mono(rowText(row, "trace_id"), "teal.solid") },
         { header: "Operation", cell: (row) => mono(rowText(row, "operation")) },
+        { header: "Status", cell: (row) => <StatusPill row={row} /> },
+        { header: "Latency", align: "end", cell: (row) => formatMs(rowNumber(row, "latency_ms")) },
+        { header: "Cost", align: "end", cell: (row) => formatUsd(rowNumber(row, "cost")) },
         {
-          header: "Status",
-          cell: (row) => {
-            const status = traceStatus(row);
-            return <Badge colorPalette={status.palette}>{status.label}</Badge>;
-          },
+          header: "Feedback",
+          align: "center",
+          cell: (row) => <FeedbackMark feedback={rowText(row, "feedback")} />,
         },
-        { header: "Latency", numeric: true, cell: (row) => formatMs(rowNumber(row, "latency_ms")) },
-        { header: "Cost", numeric: true, cell: (row) => formatUsd(rowNumber(row, "cost")) },
-        { header: "Feedback", cell: (row) => <FeedbackMark feedback={rowText(row, "feedback")} /> },
-        { header: "Impact", numeric: true, cell: (row) => Math.round(rowNumber(row, "impact")) },
+        {
+          header: "Impact",
+          align: "end",
+          cell: (row) => strong(Math.round(rowNumber(row, "impact")), "semibold"),
+        },
       ]}
     />
   );

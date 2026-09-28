@@ -25,10 +25,14 @@ describe("boardPeriodGranularity", () => {
     expect(boardPeriodGranularity({ grain, ...bounds })).toBe(seconds);
   });
 
-  it("keeps auto at an hour over a year", () => {
-    expect(
-      boardPeriodGranularity({ grain: "auto", ...boardPeriodBounds({ range: "1y", now: NOW }) }),
-    ).toBe(3600);
+  it.each([
+    ["24h", 3600],
+    ["30d", DAY_S],
+    ["90d", WEEK_S],
+    ["1y", WEEK_S],
+  ] as const)("reads auto over %s at %i-second buckets", (range, seconds) => {
+    const bounds = boardPeriodBounds({ range, now: NOW });
+    expect(boardPeriodGranularity({ grain: "auto", ...bounds })).toBe(seconds);
   });
 });
 

@@ -59,6 +59,15 @@ export type AnalyticsAlertAuthoring = {
   seriesName?: string;
 };
 
+/** One reference riding with a question to Langy, as self-describing text the agent reads. */
+export type AnalyticsLangyContext = { kind: "dashboard"; ref: string; label: string };
+
+/** A question for Langy and what it is asked about. */
+export type AnalyticsLangyAskRequest = {
+  question: string;
+  context: readonly AnalyticsLangyContext[];
+};
+
 export abstract class AnalyticsHostApi {
   /** The project in scope, or undefined before one resolves. */
   abstract project(): AnalyticsHostProject | undefined;
@@ -97,6 +106,12 @@ export abstract class AnalyticsHostApi {
   abstract succeeded(notice: AnalyticsSuccessNotice): void;
 
   abstract failed(failure: AnalyticsFailureNotice): void;
+
+  /**
+   * Hands a question, and what it is about, to Langy. An application without
+   * Langy does nothing with it, which is why a screen never reaches Langy itself.
+   */
+  abstract askLangy(request: AnalyticsLangyAskRequest): void;
 }
 
 const AnalyticsHostContext = createContext<AnalyticsHostApi | undefined>(void 0);
