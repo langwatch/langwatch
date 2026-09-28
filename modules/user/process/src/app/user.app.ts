@@ -28,6 +28,7 @@ import type {
 } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
+import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
 import type {
   ChangeOwnPasswordInput,
@@ -176,6 +177,7 @@ export class UserApp implements UserApi {
     organizations: typeof OrganizationApi;
     ops: typeof OpsApi;
     projects: typeof ProjectApi;
+    storedObjects: typeof StoredObjectApi;
   } = {
     auth: AuthApi,
     authz: AuthzApi,
@@ -185,6 +187,7 @@ export class UserApp implements UserApi {
     organizations: OrganizationApi,
     ops: OpsApi,
     projects: ProjectApi,
+    storedObjects: StoredObjectApi,
   };
 
   static create(setup: UserSetup): UserApp {
@@ -199,6 +202,7 @@ export class UserApp implements UserApi {
       governance: setup.dependencies.governance,
       mail: setup.members.mail,
       publicBaseUrl: setup.members.publicBaseUrl,
+      storedObjects: setup.dependencies.storedObjects,
     });
 
     return UserApp.#build({
@@ -1082,26 +1086,23 @@ export class UserApp implements UserApi {
   }
 
   async #changeFederatedPassword(input: ChangeOwnPasswordInput): Promise<void> {
-    const account = await this.#members.federatedPasswords.findDatabaseAccount({
-      userId: input.userId,
-    });
-
-    if (!account) throw new UserFederatedPasswordAccountMissingError(input.userId);
-
     const profile = await this.#users.findById({ id: input.userId });
-
-    // Nothing the caller sent causes an account with no address, and nothing
-    // they can send avoids it, so it degrades to the generic failure.
-    if (!profile?.email) throw new Error("the authenticated account carries no email address");
-
-    const result = await this.#members.federatedPasswords.changePassword({
-      email: profile.email,
-      providerUserId: account.providerAccountId,
+    const result = await this.#peers.auth.changeFederatedPassword({
+      userId: input.userId,
+      email: profile?.email ?? null,
       currentPassword: input.currentPassword,
       newPassword: input.newPassword,
     });
 
     if (result.outcome === "changed") return;
+    if (result.outcome === "no_federated_account") {
+      throw new UserFederatedPasswordAccountMissingError(input.userId);
+    }
+    // Nothing the caller sent causes an account with no address, and nothing
+    // they can send avoids it, so it degrades to the generic failure.
+    if (result.outcome === "no_address_on_record") {
+      throw new Error("the authenticated account carries no email address");
+    }
     if (result.outcome === "wrong_password") throw new UserPasswordIncorrectError();
     // The provider's policy rejected the NEW password, and its wording is the
     // only thing that says what to fix.

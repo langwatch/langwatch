@@ -7,6 +7,7 @@ export {
   type LegacySsoAccessQuery,
 } from "./auth.api.ts";
 export * from "./auth.errors.ts";
+export * from "./federated-password.ts";
 export * from "./account-lockout.ts";
 export * from "./auth-cli-device-flow.schemas.ts";
 export * from "./browser-session.ts";

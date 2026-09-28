@@ -12,6 +12,10 @@ import type {
   VerifiedBrowserSession,
 } from "./browser-session.ts";
 import type {
+  AuthFederatedPasswordChange,
+  AuthFederatedPasswordOutcome,
+} from "./federated-password.ts";
+import type {
   AddressConfirmation,
   InviteLanding,
   PriorSession,
@@ -268,6 +272,14 @@ export interface AuthApi {
    * them asks rather than reading them (ADR-129).
    */
   findFederatedAccountProviders(input: { userId: string }): Promise<string[]>;
+  /**
+   * Changes the password the Auth0 tenant holds for this person's database
+   * identity: the current one is proven first. Main's `changeFederatedPassword`;
+   * whether a tenant is configured is decided on each call.
+   */
+  changeFederatedPassword(
+    input: AuthFederatedPasswordChange,
+  ): Promise<AuthFederatedPasswordOutcome>;
   /**
    * Whether this person still owes the single sign-on their address's
    * organization pins, asked of the accounts they hold now: live, never stored.

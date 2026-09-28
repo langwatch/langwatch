@@ -21,6 +21,7 @@ import {
   type ProjectIdentity,
 } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { UserApi } from "@langwatch/user-contract";
@@ -102,6 +103,7 @@ function process(
       organization: createUserTestOrganizations(),
       ops: createUserTestOps(),
       project: peers.project ?? createApiFixture<ProjectApi>(),
+      "stored-object": createApiFixture<StoredObjectApi>(),
     });
 }
 

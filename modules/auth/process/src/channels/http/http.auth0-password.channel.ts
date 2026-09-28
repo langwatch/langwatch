@@ -2,6 +2,12 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
+import {
+  Auth0PasswordChannel,
+  type Auth0PasswordChangeOutcome,
+  type Auth0PasswordChangeRequest,
+} from "../auth0-password.channel.ts";
+
 const logger = createLogger("langwatch:auth0:password");
 
 /**
@@ -414,4 +420,41 @@ export async function changeAuth0Password(args: {
   });
 
   return { ok: true };
+}
+
+/** An Auth0 refusal as the outcome the caller acts on; the tenant's own policy keeps its words. */
+function auth0Refusal(error: Auth0ApiError): Auth0PasswordChangeOutcome {
+  if (error.code === "weak_password") return { outcome: "weak_password", message: error.message };
+  if (error.code === "unknown") return { outcome: "failed" };
+
+  return { outcome: error.code };
+}
+
+/**
+ * The Auth0 tenant's password change over the deployment's Management
+ * credentials. They are validated on every call, as main's `loadConfig` was,
+ * so an unconfigured tenant answers `not_configured` rather than failing boot.
+ */
+export class HttpAuth0PasswordChannel extends Auth0PasswordChannel {
+  static create(credentials: Auth0ManagementCredentials): HttpAuth0PasswordChannel {
+    return new HttpAuth0PasswordChannel(credentials);
+  }
+
+  private constructor(private readonly credentials: Auth0ManagementCredentials) {
+    super();
+  }
+
+  async changePassword(input: Auth0PasswordChangeRequest): Promise<Auth0PasswordChangeOutcome> {
+    try {
+      const result = await changeAuth0Password({
+        config: buildAuth0Config(this.credentials),
+        ...input,
+      });
+
+      return result.ok ? { outcome: "changed" } : { outcome: "wrong_password" };
+    } catch (error) {
+      if (error instanceof Auth0ApiError) return auth0Refusal(error);
+      throw error;
+    }
+  }
 }

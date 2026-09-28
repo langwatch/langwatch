@@ -8,13 +8,19 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { sendBudgetIncreaseRequestEmail, type EmailDelivery } from "@langwatch/mail";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
-import { UserCapabilityUnavailableError } from "@langwatch/user-contract";
+import {
+  USER_AVATAR_OWNER_KIND,
+  USER_AVATAR_PURPOSE,
+  UserCapabilityUnavailableError,
+} from "@langwatch/user-contract";
 import { hash, compare } from "bcrypt";
 
 import { PrismaUserOrganizationDirectoryRepository } from "../repositories/prisma/prisma.user-organization-directory.repository.ts";
@@ -35,23 +41,13 @@ export function buildUserInfrastructure(input: {
   governance: Pick<GovernanceRestApi, "personalUsage">;
   mail: EmailDelivery;
   publicBaseUrl: string | undefined;
+  storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById">;
 }): UserInfrastructure {
   const { prisma, redis, organizations, enterpriseGateway, gateway } = input;
-  const { auth, projects, governance, mail, publicBaseUrl } = input;
+  const { auth, projects, governance, mail, publicBaseUrl, storedObjects } = input;
 
   return {
-    avatarStorage: {
-      store: () =>
-        Promise.reject(
-          unavailable("stored-object application, so it cannot store an uploaded avatar"),
-        ),
-    },
-    avatarObjects: {
-      findById: () =>
-        Promise.reject(
-          unavailable("stored-object application, so it cannot read an avatar object"),
-        ),
-    },
+    ...avatarObjectStore(storedObjects),
     // The stored-password format, stated ONCE for this process. Both halves
     // of a rotation run through it, and the credential service (the only
     // holder of a stored hash) is built over it by the installer.
@@ -60,20 +56,6 @@ export function buildUserInfrastructure(input: {
     // The product-analytics sink is the deployment's. Absent, and silent on
     // purpose: an analytics write has never been allowed to fail a request.
     analytics: { trackServerEvent: () => undefined },
-    federatedPasswords: {
-      // The Auth0 tenant is the deployment's own, and reading or changing an
-      // identity in it is an API call against credentials this process does
-      // not hold. Both halves refuse together: a lookup that answered would
-      // only reach a change that cannot.
-      findDatabaseAccount: () =>
-        Promise.reject(
-          unavailable("Auth0 tenant credentials, so it cannot read an Auth0 identity"),
-        ),
-      changePassword: () =>
-        Promise.reject(
-          unavailable("Auth0 tenant credentials, so it cannot change an Auth0 password"),
-        ),
-    },
     // Main's CliTokenRevocationService.revokeForUser: auth owns the CLI tokens.
     cliCredentials: {
       revokeForUser: async ({ userId }) => {
@@ -100,6 +82,57 @@ export function buildUserInfrastructure(input: {
     // The spend rollup behind `/api/me/usage`, main's PersonalUsageService.
     personalUsage: {
       personalUsage: (usageInput) => governance.personalUsage(usageInput),
+    },
+  };
+}
+
+/** The deployment's delivery audience for an avatar: any viewer of the project it sits in. */
+const AVATAR_AUDIENCE = "project:view";
+
+/**
+ * Main's avatar objects: bytes kept as a user-owned object in the uploader's
+ * personal project. A read of a row that is not there answers nothing, and
+ * the avatar door turns that into its one refusal.
+ */
+export function avatarObjectStore(
+  storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById">,
+): Pick<UserInfrastructure, "avatarStorage" | "avatarObjects"> {
+  return {
+    avatarStorage: {
+      store: async ({ projectId, userId, mediaType, bytes }) => {
+        const { reference } = await storedObjects.storeFromBytes({
+          projectId,
+          filename: "avatar",
+          mediaType,
+          bytes,
+          audience: AVATAR_AUDIENCE,
+          purpose: USER_AVATAR_PURPOSE,
+          ownerKind: USER_AVATAR_OWNER_KIND,
+          ownerId: userId,
+        });
+
+        return { id: reference.id };
+      },
+    },
+    avatarObjects: {
+      findById: async (input) => {
+        const read = await storedObjects.readById(input).catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "stored_object_not_found")
+            return null;
+          throw error;
+        });
+        if (!read) return null;
+
+        const metadata = {
+          byteLength: read.row.size_bytes,
+          mediaType: read.row.media_type,
+          purpose: read.row.purpose,
+          ownerKind: read.row.owner_kind,
+        };
+        if ("status" in read) return { status: "missing", metadata };
+
+        return { status: "available", metadata, stream: ReadableStream.from(read.stream) };
+      },
     },
   };
 }

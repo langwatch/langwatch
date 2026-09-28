@@ -4,8 +4,13 @@
  * demands the current password — which proves the caller knows the credential,
  * not that the credential is theirs to replace. Spec: specs/identity/passkeys.feature
  */
-import { ImpersonationCannotChangeCredentialsError } from "@langwatch/user-contract";
-import { beforeEach, describe, expect, it } from "vitest";
+import type { AuthFederatedPasswordOutcome } from "@langwatch/auth-contract";
+import {
+  ImpersonationCannotChangeCredentialsError,
+  UserFederatedPasswordAccountMissingError,
+  UserFederatedPasswordChangeUnavailableError,
+} from "@langwatch/user-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createUserTestApp, createUserTestAuth } from "./user.fixture.ts";
 
@@ -124,6 +129,54 @@ describe("changing an existing password", () => {
           keepSessionId: "sess-1",
         }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("given a deployment that brokers every password through Auth0", () => {
+    async function brokeredChange(outcome: AuthFederatedPasswordOutcome) {
+      const auth = Object.assign(createUserTestAuth("auth0"), {
+        changeFederatedPassword: vi.fn(async () => outcome),
+      });
+      const app = createUserTestApp({ dependencies: { auth } });
+      const created = await app.create({ name: "Sam", email: SELF.email });
+      const change = app.changeOwnPassword({
+        userId: created.id,
+        caller: owner(created.id),
+        currentPassword: "first",
+        newPassword: "a-good-password",
+        keepSessionId: "sess-1",
+      });
+
+      return { auth, created, change };
+    }
+
+    it("changes the tenant's password and ends every other session", async () => {
+      const { auth, created, change } = await brokeredChange({ outcome: "changed" });
+
+      await expect(change).resolves.toBeUndefined();
+      expect(auth.changeFederatedPassword).toHaveBeenCalledWith({
+        userId: created.id,
+        email: SELF.email,
+        currentPassword: "first",
+        newPassword: "a-good-password",
+      });
+      expect(auth.revokeOtherBrowserSessions).toHaveBeenCalledWith({
+        userId: created.id,
+        keepSessionId: "sess-1",
+      });
+    });
+
+    it("refuses as unavailable where no Auth0 tenant is configured", async () => {
+      const { auth, change } = await brokeredChange({ outcome: "not_configured" });
+
+      await expect(change).rejects.toBeInstanceOf(UserFederatedPasswordChangeUnavailableError);
+      expect(auth.revokeOtherBrowserSessions).not.toHaveBeenCalled();
+    });
+
+    it("refuses as not found where the person holds no Auth0 database identity", async () => {
+      const { change } = await brokeredChange({ outcome: "no_federated_account" });
+
+      await expect(change).rejects.toBeInstanceOf(UserFederatedPasswordAccountMissingError);
     });
   });
 });

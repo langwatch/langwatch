@@ -17,6 +17,7 @@ import type {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { UserApi } from "@langwatch/user-contract";
@@ -75,6 +76,7 @@ function process(
       organization: peers.organization ?? createUserTestOrganizations(),
       ops: createUserTestOps(),
       project: createApiFixture<ProjectApi>(),
+      "stored-object": createApiFixture<StoredObjectApi>(),
     });
 }
 

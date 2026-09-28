@@ -135,10 +135,6 @@ export function createUserTestInfrastructure(
     passwords: new TestPasswordHasher(),
     rateLimit: vi.fn(async () => ({ allowed: true, resetAt: 0 })),
     analytics: { trackServerEvent: vi.fn() },
-    federatedPasswords: {
-      findDatabaseAccount: vi.fn(async () => null),
-      changePassword: vi.fn(async () => ({ outcome: "failed" as const })),
-    },
     cliCredentials: { revokeForUser: vi.fn(async () => undefined) },
     organizations: {
       findSupportContact: vi.fn(async () => null),

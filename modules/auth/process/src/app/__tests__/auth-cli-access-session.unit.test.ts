@@ -43,6 +43,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       trustedIdpOrigins: undefined,
       idpSimulatorUrl: undefined,
       localPasswords: false,
+      auth0ManagementClientId: undefined,
       signInProviders: NO_SIGN_IN_PROVIDERS,
     },
     repositories,

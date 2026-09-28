@@ -35,6 +35,8 @@ import {
   type SignUpEnrollment,
   type SignUpVerificationRequest,
   type PriorSession,
+  type AuthFederatedPasswordChange,
+  type AuthFederatedPasswordOutcome,
 } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
@@ -64,10 +66,11 @@ import type { EmailDelivery } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { sessionSecret, signInProviderSecrets } from "@langwatch/secrets";
+import { Secret, sessionSecret, signInProviderSecrets } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
+import { auth0PasswordChannels } from "../channels/auth0-password-channels.registry.ts";
 import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
 import { isBornFinalizedSignUp } from "../channels/http/http.born-finalized-opt-in.channel.ts";
 import { passwordResetMailChannels } from "../channels/password-reset-mail-channels.registry.ts";
@@ -92,6 +95,7 @@ import {
 } from "../services/cli-device-flow.service.ts";
 import { CliDeviceSessionService } from "../services/cli-device-session.service.ts";
 import { FederatedAccountReadsService } from "../services/federated-account-reads.service.ts";
+import { FederatedPasswordService } from "../services/federated-password.service.ts";
 import {
   LegacySsoAccessService,
   type LegacySsoAccessConnections,
@@ -240,6 +244,8 @@ export class AuthApp implements AuthApiContract {
   static readonly secrets = {
     session: sessionSecret,
     ...signInProviderSecrets,
+    /** The Auth0 Management app's secret; absent, the login app's stands in, as main's did. */
+    auth0ManagementSecret: Secret.load("AUTH0_MGMT_CLIENT_SECRET", { optional: true }),
   } as const;
 
   readonly #sessions: BrowserSessionService;
@@ -271,6 +277,8 @@ export class AuthApp implements AuthApiContract {
   readonly #twoStep: TwoStepVerificationService;
   /** This deployment's sign-in mode, set once the provider secrets resolve. */
   #authProviders: AuthProviderService | null = null;
+  /** The Auth0 tenant's password change; set once the provider secrets resolve. */
+  #federatedPasswords: FederatedPasswordService | null = null;
   /**
    * Composes the deployment's ONE Better Auth instance on first use (it asks
    * the SSO peer, which construction may not), or nothing where it named no
@@ -511,6 +519,18 @@ export class AuthApp implements AuthApiContract {
       into: setup.secrets.into,
       baseUrl: config.sessionUrl ?? "",
     });
+    const auth0ManagementSecret = await setup.secrets.into(
+      AuthApp.secrets.auth0ManagementSecret,
+      (value) => value,
+    );
+    app.#federatedPasswords = FederatedPasswordService.create({
+      accounts: accountRows,
+      auth0: auth0PasswordChannels.http.create({
+        issuer: config.signInProviders.auth0Issuer,
+        mgmtClientId: config.auth0ManagementClientId ?? config.signInProviders.auth0ClientId,
+        mgmtClientSecret: auth0ManagementSecret ?? signInProviders.auth0ClientSecret,
+      }),
+    });
     app.#authProviders = AuthProviderService.create({
       configuredProvider: configuredAuthProvider(config.signInProviders).provider,
       providerMounted: isNamedProviderMounted(signInProviders),
@@ -609,6 +629,19 @@ export class AuthApp implements AuthApiContract {
     actorUserId: string;
   }): Promise<ReleaseHeldAccountResult> {
     return this.#signInSecurity.release(input);
+  }
+
+  changeFederatedPassword(
+    input: AuthFederatedPasswordChange,
+  ): Promise<AuthFederatedPasswordOutcome> {
+    const federatedPasswords = this.#federatedPasswords;
+    if (!federatedPasswords) {
+      throw new AuthUnavailableError({
+        capability: "identity-provider password change",
+        processName: this.#members.processName,
+      });
+    }
+    return federatedPasswords.changePassword(input);
   }
 
   findFederatedAccountProviders(input: { userId: string }): Promise<string[]> {

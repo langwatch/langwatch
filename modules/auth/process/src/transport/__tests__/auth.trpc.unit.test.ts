@@ -76,6 +76,7 @@ const door: AuthApi = {
   getSignInSecuritySettings: () => unreached("getSignInSecuritySettings"),
   saveSignInSecuritySettings: () => unreached("saveSignInSecuritySettings"),
   releaseHeldAccount: () => unreached("releaseHeldAccount"),
+  changeFederatedPassword: () => unreached("changeFederatedPassword"),
 };
 
 /** The front door reaches no session operation: naming one here would be a bug. */
