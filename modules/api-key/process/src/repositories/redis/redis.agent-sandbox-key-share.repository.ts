@@ -1,8 +1,7 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type { Cluster, Redis } from "ioredis";
+import { z } from "zod";
 
 import {
   AGENT_SANDBOX_KEY_REUSE_MS,
@@ -12,12 +11,17 @@ import {
 const logger = createLogger("langwatch:api-key:agent-sandbox");
 
 const KEY_PREFIX = "ttlcache:agent-sandbox-key:";
-const ALGORITHM = "aes-256-gcm";
-const KEY_BYTES = 32;
-const IV_BYTES = 12;
+/** Main's TtlCache wrote each value as JSON, so a pod of either release reads the other's. */
+const storedValueSchema = z.string();
 
 /** Only what the share calls. */
 export type AgentSandboxKeyShareRedis = Pick<Redis | Cluster, "get" | "setex">;
+
+/** The deployment's symmetric cipher: the one main's shared key was sealed with. */
+export type AgentSandboxKeySealing = Readonly<{
+  encrypt(plaintext: string): string;
+  decrypt(ciphertext: string): string;
+}>;
 
 type HeldToken = { sealed: string; expiresAt: number };
 
@@ -25,25 +29,16 @@ type HeldToken = { sealed: string; expiresAt: number };
 // fallback is the contract rather than a failure: no Redis means one share per
 // pod, which is what a dev stack and a test both want.
 
-/** The shared token, sealed at rest as `iv:ciphertext:authTag`, AES-256-GCM. */
+/** The shared token, sealed at rest with the deployment's cipher, as main's TtlCache held it. */
 export class RedisAgentSandboxKeyShareRepository extends AgentSandboxKeyShareRepository {
-  /**
-   * Refuses a key that is not 32 bytes of hex at composition time, rather than
-   * on the first run that wants a sandbox key.
-   */
   static create(options: {
     redis: AgentSandboxKeyShareRedis | null;
-    /** The deployment's 32-byte hex secret; the one its stored secrets use. */
-    secret: string;
+    sealing: AgentSandboxKeySealing;
     reuseMs?: number;
   }): RedisAgentSandboxKeyShareRepository {
-    const key = Buffer.from(options.secret, "hex");
-    if (key.length !== KEY_BYTES) {
-      throw new Error("Agent sandbox key sharing requires a 32-byte hex secret.");
-    }
     return new RedisAgentSandboxKeyShareRepository(
       options.redis,
-      key,
+      options.sealing,
       options.reuseMs ?? AGENT_SANDBOX_KEY_REUSE_MS,
     );
   }
@@ -52,7 +47,7 @@ export class RedisAgentSandboxKeyShareRepository extends AgentSandboxKeyShareRep
 
   private constructor(
     private readonly redis: AgentSandboxKeyShareRedis | null,
-    private readonly key: Uint8Array,
+    private readonly sealing: AgentSandboxKeySealing,
     private readonly reuseMs: number,
   ) {
     super();
@@ -63,7 +58,7 @@ export class RedisAgentSandboxKeyShareRepository extends AgentSandboxKeyShareRep
     if (sealed === undefined) return undefined;
 
     try {
-      return this.open(sealed);
+      return this.sealing.decrypt(sealed);
     } catch {
       // The secret rotated, or the entry was altered. Neither is recoverable,
       // and both mean no share: the caller mints a new key and shares that one.
@@ -76,7 +71,7 @@ export class RedisAgentSandboxKeyShareRepository extends AgentSandboxKeyShareRep
   }
 
   async hold(input: { projectId: string; token: string }): Promise<void> {
-    const sealed = this.seal(input.token);
+    const sealed = this.sealing.encrypt(input.token);
     // Shadow-written to memory always, so the fallback is warm if Redis goes
     // down after this write.
     this.memory.set(input.projectId, {
@@ -89,7 +84,7 @@ export class RedisAgentSandboxKeyShareRepository extends AgentSandboxKeyShareRep
       await this.redis.setex(
         `${KEY_PREFIX}${input.projectId}`,
         Math.ceil(this.reuseMs / 1000),
-        sealed,
+        JSON.stringify(sealed),
       );
     } catch (error) {
       logger.warn(
@@ -99,27 +94,13 @@ export class RedisAgentSandboxKeyShareRepository extends AgentSandboxKeyShareRep
     }
   }
 
-  private seal(token: string): string {
-    const iv = randomBytes(IV_BYTES);
-    const cipher = createCipheriv(ALGORITHM, this.key, iv);
-    const sealed = cipher.update(token, "utf8", "hex") + cipher.final("hex");
-    return `${iv.toString("hex")}:${sealed}:${cipher.getAuthTag().toString("hex")}`;
-  }
-
-  private open(sealed: string): string {
-    const [ivHex, ciphertext, authTagHex] = sealed.split(":");
-    if (!ivHex || !ciphertext || !authTagHex) {
-      throw new Error("Invalid sealed agent sandbox token format");
-    }
-    const decipher = createDecipheriv(ALGORITHM, this.key, Buffer.from(ivHex, "hex"));
-    decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
-    return decipher.update(ciphertext, "hex", "utf8") + decipher.final("utf8");
-  }
-
   private async readSealed(projectId: string): Promise<string | undefined> {
     if (!this.redis) return undefined;
     try {
-      return (await this.redis.get(`${KEY_PREFIX}${projectId}`)) ?? undefined;
+      const stored = await this.redis.get(`${KEY_PREFIX}${projectId}`);
+      if (stored === null) return undefined;
+      const parsed = storedValueSchema.safeParse(JSON.parse(stored));
+      return parsed.success ? parsed.data : undefined;
     } catch {
       return undefined;
     }

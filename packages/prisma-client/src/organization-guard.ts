@@ -125,6 +125,12 @@ const isNonEmptyStringList = (value: unknown): boolean => {
   return list.every((item) => typeof item === "string");
 };
 
+/** A predicate naming one user, or a non-empty list of them. */
+const hasUserBound = (clause: unknown): boolean => {
+  const userId = clauseField(clause, "userId");
+  return typeof userId === "string" || isNonEmptyStringList(userId);
+};
+
 // A single organizationId literal is the canonical single-org predicate. We
 // deliberately do NOT accept `organizationId: { in: [...] }` here: a list of
 // org ids would target several organizations, which the single-organization
@@ -170,8 +176,12 @@ const boundsToSingleOrg = (clause: unknown): boolean =>
  */
 const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // Original three guarded models, preserved (organizationId / row id /
-  // composite-org key cover their existing access patterns).
-  OrganizationUser: {},
+  // composite-org key cover their existing access patterns). OrganizationUser
+  // also answers "which organizations is this user in" - a READ bounded by the
+  // named user(s); a write keyed on userId alone still crosses tenants.
+  OrganizationUser: {
+    extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),
+  },
   Team: {},
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it
@@ -184,10 +194,11 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   CustomRole: {},
   Group: {},
   // A request to join one organization (D12), read by organization or row id,
-  // plus one read bounded by subject: "what am I waiting on" spans every
-  // organization one named user asked. A bare `findMany()` stays refused.
+  // plus one READ bounded by subject: "what am I waiting on" spans every
+  // organization one named user asked. Writes keyed on userId stay refused.
   JoinRequest: {
-    extraBound: ({ clause }) => typeof clauseField(clause, "userId") === "string",
+    extraBound: ({ clause, action }) =>
+      READ_ACTIONS.has(action) && typeof clauseField(clause, "userId") === "string",
   },
   // One row per SSO connection's sync state (D08), carrying the connection's
   // `organizationId`. Reachable by that or by the connection itself, which

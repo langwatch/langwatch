@@ -197,26 +197,17 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
     const userIds = verifiedOnDomain.map((row) => row.userId);
     if (userIds.length === 0) return [];
 
-    // Asked of Organization: membership rows keyed only by users span every
-    // organization, which the org-tenancy guard refuses (ADR-021).
-    const organizations = await this.prisma.organization.findMany({
-      where: { members: { some: { userId: { in: userIds }, disabledAt: null } } },
-      select: {
-        id: true,
-        members: {
-          where: { userId: { in: userIds }, disabledAt: null },
-          select: { userId: true },
-        },
-      },
+    const memberships = await this.prisma.organizationUser.findMany({
+      where: { userId: { in: userIds }, disabledAt: null },
+      select: { organizationId: true, userId: true },
     });
-    if (organizations.length === 0) return [];
+    if (memberships.length === 0) return [];
 
     const verifiedByOrganization = new Map<string, Set<string>>();
-    for (const organization of organizations) {
-      verifiedByOrganization.set(
-        organization.id,
-        new Set(organization.members.map((member) => member.userId)),
-      );
+    for (const membership of memberships) {
+      const held = verifiedByOrganization.get(membership.organizationId) ?? new Set<string>();
+      held.add(membership.userId);
+      verifiedByOrganization.set(membership.organizationId, held);
     }
 
     return this.describe({

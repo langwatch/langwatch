@@ -88,6 +88,11 @@ export interface ApiKeyApi {
   findResolvedToken(input: ApiKeyTokenResolutionInput): Promise<ResolvedApiKeyCredential | null>;
   /** Rotates a deprecated project credential while preserving its wire format. */
   regenerateLegacyProjectKey(input: { projectId: string }): Promise<string>;
+  /**
+   * The key a code agent's sandbox authenticates with: the one the project's runs share, or a
+   * freshly minted one. Throws when none can be minted; a run then goes without the agent cache.
+   */
+  getOrMintAgentSandboxKey(input: { projectId: string; organizationId: string }): Promise<string>;
   /** Resolves organization-only credentials while keeping refusal classes apart. */
   resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,

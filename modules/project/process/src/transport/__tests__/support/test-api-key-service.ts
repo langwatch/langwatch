@@ -23,6 +23,7 @@ export class TestApiKeyService implements ApiKeyApi {
   findResolvedToken = unsupported<ApiKeyApi["findResolvedToken"]>();
   findVerifiedToken = unsupported<ApiKeyApi["findVerifiedToken"]>();
   getByIdForCaller = unsupported<ApiKeyApi["getByIdForCaller"]>();
+  getOrMintAgentSandboxKey = unsupported<ApiKeyApi["getOrMintAgentSandboxKey"]>();
   getOrgMembers = unsupported<ApiKeyApi["getOrgMembers"]>();
   getOrgProjects = unsupported<ApiKeyApi["getOrgProjects"]>();
   getOrgTeams = unsupported<ApiKeyApi["getOrgTeams"]>();

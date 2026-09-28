@@ -1258,4 +1258,63 @@ describe("guardOrganizationId — JoinRequest", () => {
       ).rejects.toThrow(/organizationId/);
     });
   });
+
+  describe("when a write is keyed on the user alone", () => {
+    it.each(["updateMany", "deleteMany"])("refuses %s across organizations", async (action) => {
+      await expect(
+        runOrganizationGuard({
+          model: "JoinRequest",
+          action,
+          args: { where: { userId: "user-1" } },
+        }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+});
+
+describe("guardOrganizationId — OrganizationUser", () => {
+  const runOrganizationGuard = (params: GuardParams) =>
+    guardOrganizationId(
+      params,
+      vi.fn(async () => "ok"),
+    );
+
+  describe("when a read asks which organizations named users belong to", () => {
+    it.each([{ userId: "user-1" }, { userId: { in: ["user-1", "user-2"] } }])(
+      "permits a read bounded by %o",
+      async (bound) => {
+        await expect(
+          runOrganizationGuard({
+            model: "OrganizationUser",
+            action: "findMany",
+            args: { where: { ...bound, disabledAt: null } },
+          }),
+        ).resolves.toBe("ok");
+      },
+    );
+  });
+
+  describe("when a read names an empty list of users", () => {
+    it("refuses it", async () => {
+      await expect(
+        runOrganizationGuard({
+          model: "OrganizationUser",
+          action: "findMany",
+          args: { where: { userId: { in: [] } } },
+        }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+
+  describe("when a write is keyed on the user alone", () => {
+    it.each(["updateMany", "deleteMany"])("refuses %s across organizations", async (action) => {
+      await expect(
+        runOrganizationGuard({
+          model: "OrganizationUser",
+          action,
+          args: { where: { userId: "user-1" } },
+        }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
 });
