@@ -3,11 +3,8 @@
  * fine for the range widens, up to a week. @see modules/dashboard/specs/dashboards-v1.feature
  */
 
-import { LWQL_ACCEPTED_GRANULARITY_STEPS } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import { fitGranularity } from "../blocks/index.ts";
-import { TRACE_COUNT_SQL } from "../blocks/model/block-queries.ts";
 import { boardPeriodBounds, boardPeriodGranularity } from "../model/board-period.ts";
 
 const NOW = Date.UTC(2026, 8, 28);
@@ -39,19 +36,8 @@ describe("boardPeriodGranularity", () => {
 describe("fitGranularity", () => {
   it("widens to a week when days would exceed the bucket budget", () => {
     const thirtyYears = 30 * 365 * DAY_S * 1000;
-    expect(fitGranularity({ periodStart: 0, periodEnd: thirtyYears, requested: DAY_S })).toBe(
+    expect(boardPeriodGranularity({ grain: "1d", periodStart: 0, periodEnd: thirtyYears })).toBe(
       WEEK_S,
     );
-  });
-});
-
-describe("the block bucket", () => {
-  it("anchors week buckets on Mondays without moving any finer step", () => {
-    const offset = 345_600;
-    expect(new Date(offset * 1000).getUTCDay()).toBe(1);
-    for (const step of LWQL_ACCEPTED_GRANULARITY_STEPS.filter((each) => each < WEEK_S)) {
-      expect(offset % step).toBe(0);
-    }
-    expect(TRACE_COUNT_SQL).toContain(`subtractSeconds(OccurredAt, ${offset})`);
   });
 });

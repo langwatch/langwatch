@@ -3,9 +3,11 @@
  * grain into millisecond bounds and a server-legal granularity. No React.
  */
 
-import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
-
-import { fitGranularity } from "../blocks/index.ts";
+import {
+  LWQL_ACCEPTED_GRANULARITY_STEPS,
+  LWQL_GRANULARITY_MAX_BUCKETS,
+  type LangWatchQLAcceptedGranularityStep,
+} from "@langwatch/analytics-contract";
 
 export const BOARD_PERIOD_RANGES = ["1h", "24h", "7d", "30d", "90d", "1y"] as const;
 export type BoardPeriodRange = (typeof BOARD_PERIOD_RANGES)[number];
@@ -52,6 +54,26 @@ export function boardPeriodBounds({ range, now }: { range: BoardPeriodRange; now
   periodEnd: number;
 } {
   return { periodStart: now - RANGE_MS[range], periodEnd: now };
+}
+
+/**
+ * The finest accepted step, up to a week, at or above the request that keeps
+ * the period within the bucket budget.
+ */
+function fitGranularity({
+  periodStart,
+  periodEnd,
+  requested,
+}: {
+  periodStart: number;
+  periodEnd: number;
+  requested: number;
+}): LangWatchQLAcceptedGranularityStep {
+  const seconds = Math.max(1, (periodEnd - periodStart) / 1000);
+  const fitting = LWQL_ACCEPTED_GRANULARITY_STEPS.find(
+    (step) => step >= requested && seconds / step <= LWQL_GRANULARITY_MAX_BUCKETS,
+  );
+  return fitting ?? LWQL_ACCEPTED_GRANULARITY_STEPS[LWQL_ACCEPTED_GRANULARITY_STEPS.length - 1]!;
 }
 
 /**
