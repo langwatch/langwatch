@@ -35,6 +35,7 @@
     "prompts/*.mdx",
     "skills/*.mdx",
     "langy/*.mdx",
+    "playbooks/**/*.mdx",
     "self-hosting/*.mdx",
     "hybrid-setup/*.mdx",
     "api-reference/**/*.mdx",

@@ -21,6 +21,7 @@ export const FEATURE_SKILLS = [
   "datasets",
   "context-sweet-spot",
   "provider-cost-comparison",
+  "how-do-i",
 ] as const;
 
 // Skills that ship only with Langy. Their canonical sources still live at the

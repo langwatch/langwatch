@@ -62,6 +62,12 @@
         "promptFile": "provider-cost-comparison.docs.txt"
       },
       {
+        "title": "How do I improve my agent's latency?",
+        "skill": "langwatch/skills/how-do-i",
+        "slashCommand": "/how-do-i",
+        "promptFile": "how-do-i.docs.txt"
+      },
+      {
         "boldPrefix": "\u2b50 All of the above:",
         "title": "Take my agent to the next level",
         "skill": "langwatch/skills/level-up",

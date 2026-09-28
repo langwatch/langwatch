@@ -75,7 +75,10 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 // field, this stops compiling. That is the whole point: the last time these two
 // drifted, `safeParse` silently dropped `pageContext` on every single turn and
 // nobody found out for weeks.
-import type { LangyResourceContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import type {
+  LangyResourceContext,
+  LangySkillContext,
+} from "~/server/app-layer/langy/langyTurnContext.schema";
 import { isLangyHiddenLocalNotice } from "~/shared/langy/langyLocalNotices";
 import { api, trpcClient } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -425,6 +428,11 @@ interface LangySendOptions {
    * they never wrote it, so they must not be left holding it.
    */
   keepOnFailure?: boolean;
+  /**
+   * Skills to pin on this turn, so the agent loads them instead of guessing
+   * from a text-only prompt.
+   */
+  skills?: LangySkillContext[];
 }
 
 export function LangySidecar({
@@ -929,6 +937,13 @@ function LangyPanel({
   // these — which is what makes `regenerate()` (no per-send body) carry the
   // projectId + context, killing the old "Try again" 400.
   const turnContextRef = useRef<LangyTurnRequestContext | null>(null);
+  // A chip that names a skill (e.g. the empty state's latency ask) pins it
+  // here so the outgoing turn cannot skip loading it — gpt-5-mini answered
+  // from analytics alone without the playbook when the prompt was text-only.
+  // Distinct from the store's `skillChips` (the `/` palette's own UI state):
+  // that is not wired to the wire context at all. Held until the next send
+  // replaces it, so a regenerate of the same turn still carries the pin.
+  const pinnedSkillsRef = useRef<LangySkillContext[] | null>(null);
   // The text of the send in flight, held so a failure can hand it back.
   const lastSentTextRef = useRef<string | null>(null);
   // Cleared the moment the turn is dispatched (see `onIds`): from then on the
@@ -997,7 +1012,13 @@ function LangyPanel({
         getContext: () => {
           const ctx = turnContextRef.current;
           if (!ctx) throw new Error("Langy turn context not ready");
-          return ctx;
+          // The pin is applied HERE, at the point the transport reads the
+          // context, and nowhere else: `turnContextRef` is rebuilt every
+          // render, so a send dispatched before the next render would
+          // otherwise drop a skill pinned this click.
+          return pinnedSkillsRef.current
+            ? { ...ctx, skills: pinnedSkillsRef.current }
+            : ctx;
         },
         onIds: ({ conversationId, turnId }) => {
           // The turn was dispatched: adopt the conversation + turn and enter the
@@ -1996,9 +2017,10 @@ function LangyPanel({
   );
   sendImplementationRef.current = async (
     text: string,
-    { keepOnFailure = true }: LangySendOptions = {},
+    { keepOnFailure = true, skills }: LangySendOptions = {},
   ) => {
     if (!text.trim() || !projectId || isBusy) return;
+    pinnedSkillsRef.current = skills?.length ? skills : null;
     // `/feedback` is a client command, not a message: it summons the rating
     // card under the latest answer (bypassing the backend cadence — the user
     // asking to rate is never nagging) and sends nothing to Langy. This
@@ -3747,7 +3769,24 @@ function LangyPanel({
                                 : SIDEBAR_PANEL_WIDTH
                             }
                             suggestions={emptySuggestions}
-                            onPick={(prompt) => void send(prompt)}
+                            onPick={(prompt, options) =>
+                              void send(prompt, {
+                                ...(options?.skill
+                                  ? {
+                                      skills: [
+                                        {
+                                          id: options.skill,
+                                          // The label is deliberately the id: the server renders it into
+                                          // the "user asked for these capabilities" block, and the id is
+                                          // the exact name the agent passes to its `skill` tool. A display
+                                          // label ("How do i") would make the agent guess the id back.
+                                          label: options.skill,
+                                        },
+                                      ],
+                                    }
+                                  : {}),
+                              })
+                            }
                           />
                         ) : (
                           <VStack

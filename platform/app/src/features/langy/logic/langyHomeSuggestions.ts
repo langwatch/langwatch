@@ -28,11 +28,12 @@ export interface ProjectReach {
 export const HOME_SUGGESTION_COUNT = 3;
 
 /**
- * How many asks the panel's empty state shows — its historical four rows, so a
- * project that has reached everything still sees the full range in the place
- * where people learn what Langy can do.
+ * How many asks the panel's empty state shows — the full set of real asks, so a
+ * project that has reached everything still sees the whole range in the place
+ * where people learn what Langy can do. It tracks SUGGESTIONS.length: the
+ * latency playbook ask joined the row, so the panel widened from four to five.
  */
-export const PANEL_SUGGESTION_COUNT = 4;
+export const PANEL_SUGGESTION_COUNT = 5;
 
 /**
  * The asks a project can actually act on, best first. Shared by the home

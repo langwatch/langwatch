@@ -301,4 +301,174 @@ describe("native skill generation", () => {
       });
     });
   });
+
+  // Backs specs/langy/langy-how-do-i-latency.feature. The how-do-i skill is
+  // the thin resolver for the docs playbooks under docs/playbooks/how-do-i/:
+  // it must ship in the compiled native set, carry none of the domain
+  // knowledge that belongs only in the playbook, and the baked playbook copy
+  // must be byte-identical to the docs source it was compiled from.
+  describe("given the how-do-i skill and its baked playbooks", () => {
+    const repoRoot = path.resolve(skillsRoot, "..");
+    const nativeDir = path.join(skillsRoot, "_compiled", "native");
+    const HOW_DO_I_SLUG = "how-do-i";
+    const LATENCY_SLUG = "improve-agent-latency";
+    const LATENCY_TOKENS = [
+      "p50",
+      "p95",
+      "latency distribution",
+      "slowest operation",
+      "span timing",
+    ];
+
+    /** @scenario "The how-do-i skill ships with Langy" */
+    it("is present in the compiled native set and the registry", () => {
+      const slugs = skills.map((s) => s.slug);
+      expect(slugs, "how-do-i is not in the native skill set").toContain(
+        HOW_DO_I_SLUG,
+      );
+
+      const compiledDirs = fs.existsSync(nativeDir)
+        ? fs
+            .readdirSync(nativeDir, { withFileTypes: true })
+            .filter((e) => e.isDirectory())
+            .map((e) => e.name)
+        : [];
+      expect(
+        compiledDirs,
+        "how-do-i is not committed under skills/_compiled/native/",
+      ).toContain(HOW_DO_I_SLUG);
+    });
+
+    /** @scenario "The how-do-i skill carries no latency knowledge" */
+    it("contains none of the latency domain tokens and references the playbook by slug", () => {
+      const skill = skills.find((s) => s.slug === HOW_DO_I_SLUG);
+      expect(skill, "how-do-i skill not found in native skill set").toBeDefined();
+
+      const body = renderSkill(skill!).toLowerCase();
+      for (const token of LATENCY_TOKENS) {
+        expect(
+          body,
+          `how-do-i skill body contains forbidden latency token: ${token}`,
+        ).not.toContain(token);
+      }
+      expect(
+        body,
+        "how-do-i skill body never references the improve-agent-latency playbook",
+      ).toContain(LATENCY_SLUG);
+    });
+
+    /** @scenario "The baked playbook is the docs playbook" */
+    it("bakes a byte-identical copy of every docs how-do-i playbook, with no orphaned compiled copy", () => {
+      const docsPlaybooksDir = path.join(
+        repoRoot,
+        "docs",
+        "playbooks",
+        "how-do-i",
+      );
+      const compiledPlaybooksDir = path.join(
+        nativeDir,
+        HOW_DO_I_SLUG,
+        "playbooks",
+      );
+
+      const docsSlugs = fs.existsSync(docsPlaybooksDir)
+        ? fs
+            .readdirSync(docsPlaybooksDir)
+            .filter((f) => f.endsWith(".mdx"))
+            .map((f) => f.replace(/\.mdx$/, ""))
+            .sort()
+        : [];
+      expect(
+        docsSlugs,
+        "no docs/playbooks/how-do-i/*.mdx sources found",
+      ).toContain(LATENCY_SLUG);
+
+      const compiledSlugs = fs.existsSync(compiledPlaybooksDir)
+        ? fs
+            .readdirSync(compiledPlaybooksDir)
+            .filter((f) => f.endsWith(".md"))
+            .map((f) => f.replace(/\.md$/, ""))
+            .sort()
+        : [];
+
+      expect(
+        compiledSlugs,
+        "compiled playbooks under skills/_compiled/native/how-do-i/playbooks/ do not match the docs sources",
+      ).toEqual(docsSlugs);
+
+      for (const slug of docsSlugs) {
+        const docsContent = fs.readFileSync(
+          path.join(docsPlaybooksDir, `${slug}.mdx`),
+          "utf8",
+        );
+        const compiledContent = fs.readFileSync(
+          path.join(compiledPlaybooksDir, `${slug}.md`),
+          "utf8",
+        );
+        expect(
+          compiledContent,
+          `${slug}: compiled playbook is not byte-identical to the docs source`,
+        ).toBe(docsContent);
+      }
+    });
+  });
+
+  // Backs specs/langy/langy-how-do-i-latency.feature. AGENTS.md must send a
+  // "How do I" question to the how-do-i skill before any topic-specific row
+  // gets a chance to claim it — the latency row already matches on the word
+  // "latency", so ordering is what keeps the generic prefix from being
+  // shadowed by a more specific row appearing first in the table.
+  describe("given a How do I question in the routing table", () => {
+    const readAgentsMd = () =>
+      fs.readFileSync(
+        path.resolve(
+          skillsRoot,
+          "..",
+          "services",
+          "langyagent",
+          "internal",
+          "assets",
+          "AGENTS.md",
+        ),
+        "utf8",
+      );
+
+    const routingRowsWithIntent = (): { intent: string; skill: string }[] =>
+      readAgentsMd()
+        .split("\n")
+        .filter((row) => row.startsWith("|"))
+        .map((row) => row.split("|").map((cell) => cell.trim()))
+        .flatMap((cells) => {
+          const skill = cells[2]?.match(/^`([a-z0-9-]+)`$/)?.[1];
+          return skill ? [{ intent: cells[1] ?? "", skill }] : [];
+        });
+
+    /** @scenario "A question that starts with How do I routes to the how-do-i skill" */
+    it("routes a How do I intent to how-do-i, before the row that names latency", () => {
+      const rows = routingRowsWithIntent();
+      const howDoIIndex = rows.findIndex((row) =>
+        row.intent.toLowerCase().includes("how do i"),
+      );
+      const latencyIndex = rows.findIndex((row) =>
+        row.intent.toLowerCase().includes("latency"),
+      );
+
+      expect(
+        howDoIIndex,
+        'no routing row has an intent cell containing "How do I"',
+      ).toBeGreaterThanOrEqual(0);
+      expect(
+        rows[howDoIIndex]!.skill,
+        'the "How do I" row does not name the how-do-i skill',
+      ).toBe("how-do-i");
+      expect(
+        latencyIndex,
+        "no routing row names latency — this check is scanning nothing",
+      ).toBeGreaterThanOrEqual(0);
+      expect(
+        howDoIIndex,
+        'the "How do I" row must come before the row naming latency',
+      ).toBeLessThan(latencyIndex);
+    });
+  });
 });

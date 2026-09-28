@@ -60,22 +60,25 @@ async function lwFetch({
   throw lastError;
 }
 
-async function lwGet(path: string): Promise<any> {
-  return lwFetch({ path, init: { headers: { "X-Auth-Token": LW_KEY } } });
+async function lwGet(path: string, apiKey: string = LW_KEY): Promise<any> {
+  return lwFetch({ path, init: { headers: { "X-Auth-Token": apiKey } } });
 }
 
 async function lwPost({
   path,
   body,
+  apiKey = LW_KEY,
 }: {
   path: string;
   body: unknown;
+  /** Defaults to this suite's project key; a scratch project passes its own. */
+  apiKey?: string;
 }): Promise<any> {
   return lwFetch({
     path,
     init: {
       method: "POST",
-      headers: { "X-Auth-Token": LW_KEY, "Content-Type": "application/json" },
+      headers: { "X-Auth-Token": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     },
   });
@@ -300,9 +303,13 @@ export async function mostRecentTraceId(): Promise<string | null> {
  * through the same REST surface any integration would use, instead of asking
  * the LLM judge to verify ids it has no evidence for.
  */
-export async function traceExists(traceId: string): Promise<boolean> {
+export async function traceExists(
+  traceId: string,
+  apiKey: string = LW_KEY,
+): Promise<boolean> {
   const result = await lwPost({
     path: "/api/traces/search",
+    apiKey,
     body: {
       startDate: new Date("2020-01-01").getTime(),
       endDate: Date.now() + 365 * 24 * 60 * 60 * 1000,
@@ -328,14 +335,28 @@ export async function listTriggers(): Promise<
 }
 
 /**
- * Seeds application-origin traffic into the project so data questions
- * ("how much traffic", "what's my p95") have a true answer.
+ * Seeds traffic into a project so data questions ("how much traffic", "what's
+ * my p95") have a true answer.
  *
- * Without this, a fresh local project only contains Langy's own mirrored
- * runs (origin: langy), which rule 27 makes Langy exclude — so "no traces
- * in the last 24h" is CORRECT, and any judge that expects a non-zero count
- * is grading against data that does not exist. Spans carry no
- * langwatch.origin, which the platform coalesces to "application".
+ * Without this, a fresh project only contains Langy's own mirrored runs
+ * (origin: langy), which rule 27 makes Langy exclude — so "no traces in the
+ * last 24h" is CORRECT, and any judge that expects a non-zero count is
+ * grading against data that does not exist. Spans carry no langwatch.origin,
+ * which the platform coalesces to "application".
+ *
+ * `shape` controls what the seeded spans look like:
+ * - `"healthy"` (default): typed `llm` spans with a model and real start/end
+ *   timestamps, so p50/p95 are real figures. Preserves the original fixture
+ *   exactly — same trace/span-id scheme, same varied 0.8s-9.6s latencies, one
+ *   error span — so existing callers see no behavior change.
+ * - `"broken"`: the how-do-i-latency "telemetry set up incorrectly" premise.
+ *   Spans carry no `type`, no `model`, and `started_at === finished_at` (zero
+ *   duration) — the three defects that make a span unusable for a latency
+ *   analysis, while still carrying enough of a name/input to prove the trace
+ *   itself was received.
+ *
+ * `apiKey` defaults to this suite's own project key; a scratch project passes
+ * its own so the traces land where the scenario actually reads from.
  *
  * Returns only once the seeded traces are QUERYABLE, not merely accepted. The
  * collector acks before indexing completes, so returning on the ack raced the
@@ -344,7 +365,15 @@ export async function listTriggers(): Promise<
  * was really a timing artifact. A false red here is the one failure this suite
  * must never produce, because it is read as evidence about the agent.
  */
-export async function seedApplicationTraces(count = 8): Promise<void> {
+export async function seedApplicationTraces({
+  count = 8,
+  apiKey = LW_KEY,
+  shape = "healthy",
+}: {
+  count?: number;
+  apiKey?: string;
+  shape?: "healthy" | "broken";
+} = {}): Promise<void> {
   const now = Date.now();
   const traceIds = Array.from(
     { length: count },
@@ -354,15 +383,19 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
     const startedAt = now - (i + 1) * 60_000;
     // Varied latencies (0.8s–9.6s) so p95 is a real figure, one error span.
     const durationMs = 800 + i * 1_100 + (i % 3) * 200;
+    const finishedAt = shape === "broken" ? startedAt : startedAt + durationMs;
     return lwPost({
       path: "/api/collector",
+      apiKey,
       body: {
         spans: [
           {
             trace_id: traceIds[i],
             span_id: `span_e2e_seed_${now}_${i}`,
-            type: "llm",
-            model: "gpt-5-mini",
+            ...(shape === "healthy"
+              ? { type: "llm", model: "gpt-5-mini" }
+              : { type: "span" }),
+            name: shape === "broken" ? "unnamed-operation" : undefined,
             input: {
               type: "text",
               value: `customer support question #${i}: where is my order?`,
@@ -375,7 +408,7 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
                     value: `Your order #10${i} is out for delivery.`,
                   },
             error:
-              i === count - 1
+              shape === "healthy" && i === count - 1
                 ? {
                     message: "upstream model timeout after 30s",
                     stacktrace: [],
@@ -384,7 +417,7 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
                 : undefined,
             timestamps: {
               started_at: startedAt,
-              finished_at: startedAt + durationMs,
+              finished_at: finishedAt,
             },
           },
         ],
@@ -401,7 +434,9 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
   // batch as the ground truth.
   const deadline = Date.now() + INGESTION_VISIBILITY_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const visible = await Promise.all(traceIds.map(traceExists));
+    const visible = await Promise.all(
+      traceIds.map((id) => traceExists(id, apiKey)),
+    );
     if (visible.every(Boolean)) return;
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
