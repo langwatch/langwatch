@@ -30,7 +30,20 @@ export const signIn: Action = async (context) => {
     await context.snapshot("after sign up");
     return;
   }
-  await fillField({ context, target: "password", value: credential.password });
+  const passwordShown = await fillField({
+    context,
+    target: "password",
+    value: credential.password,
+  }).then(
+    () => true,
+    () => false,
+  );
+  if (!passwordShown) {
+    // Identifier-first sign-in (main): the address step answers before the password shows.
+    await clickText({ context, text: "Continue" });
+    await context.side.waitUntilQuiet();
+    await fillField({ context, target: "password", value: credential.password });
+  }
   await clickText({ context, text: "Sign in" });
   await context.snapshot("after sign in");
 };
