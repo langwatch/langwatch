@@ -1201,6 +1201,10 @@ A cell intent carries only its ordinal and phase: `started` carries the scoped p
 it, and each cell reads its row, target and evaluators from the fold. The comparison set is planned from the
 run's configuration at start; each comparison cell decides from its own row's variant outputs whether it runs
 or finishes skipped, so the manager stays pure over counts (Alex, 2026-09-28).
+A run's live frames are published from its progress fold, which assigns each frame's seq and keeps the
+counts, so a reconnect's replay and the live stream cannot disagree; its events carry every detail a
+frame shows (an evaluator's error type, traceback, domain error, raw response and cost currency) as
+additive fields, never a side channel (Alex, 2026-09-28).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
