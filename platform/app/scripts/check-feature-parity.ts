@@ -730,6 +730,10 @@ const LEGACY_PARTIAL: string[] = [
   // assertion, so tagging them would misstate what covers them.
   "specs/auth/auth-signin-flows.feature",
   "specs/automations/authoring-drawer.feature",
+  // Reason: left LEGACY_INERT when its two default-layout scenarios (trace
+  // excerpts, the default Slack message) gained bindings; the other
+  // nineteen Liquid-template scenarios stay untagged.
+  "specs/automations/notification-templates.feature",
   "specs/automations/process-manager-dispatch.feature",
   "specs/ci/path-filters.feature",
   // Reason: reached this branch from main already partially tagged, and its
