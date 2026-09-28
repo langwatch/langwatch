@@ -8,24 +8,16 @@ import { MemoryVoiceNonceHandoffChannel } from "../memory.voice-nonce-handoff.ch
 
 describe("MemoryVoiceNonceHandoffChannel", () => {
   describe("when the child registers its nonce", () => {
-    it("lands in the parent's registry against that child and its token", async () => {
+    it("lands in the parent's registry against that child", async () => {
       const registry = VoiceNonceRegistryService.create({
         nonces: MemoryVoiceNonceRepository.create(),
       });
       const child = new ChildProcess();
-      const channel = MemoryVoiceNonceHandoffChannel.create({
-        registry,
-        child,
-        authToken: "twilio-token",
-      });
+      const channel = MemoryVoiceNonceHandoffChannel.create({ registry, child });
 
       await channel.registerNonce({ nonce: "n1" });
 
-      await expect(registry.consume("n1")).resolves.toEqual({
-        ok: true,
-        child,
-        authToken: "twilio-token",
-      });
+      await expect(registry.consume("n1")).resolves.toEqual({ ok: true, child });
     });
   });
 });

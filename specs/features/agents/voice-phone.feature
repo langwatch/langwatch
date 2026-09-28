@@ -337,61 +337,17 @@ Feature: Voice agents: reach an agent by phone
     Then the child receives the socket handle and the bytes read during the upgrade
 
   # ---------------------------------------------------------------------------
-  # Door hardening: Redis nonces and Twilio's signature (ARCHITECTURE.md §8, Alex 2026-09-28)
+  # Door hardening: Redis nonces (ARCHITECTURE.md §8, Alex 2026-09-28)
   # ---------------------------------------------------------------------------
-  # Nonces live in Redis, single-use and 60 seconds long; the child and its Twilio auth
-  # token stay on the worker that spawned it, which is the only one Twilio dials back.
+  # Nonces live in Redis, single-use and 60 seconds long; the child stays on the worker
+  # that spawned it, which is the only one Twilio dials back. The X-Twilio-Signature
+  # check is deferred (Alex, 2026-09-28).
 
   @unit
   Scenario: The media door refuses a plain request on the media path
     Given the voice media door is running
     When a request without an upgrade arrives on a Twilio media path
     Then it answers not found and the scenario is never asked to accept it
-
-  @unit
-  Scenario: A media upgrade signed by Twilio for its stream URL is handed to the child
-    Given a nonce registered to a phone child whose Twilio auth token is known
-    When an upgrade arrives on that nonce's media path signed for the stream URL the child was given
-    Then the raw socket is handed to the registered child
-
-  @unit
-  Scenario: A media upgrade without Twilio's signature is refused and its nonce is spent
-    Given a nonce registered to a phone child
-    When an upgrade arrives on that nonce's media path with no X-Twilio-Signature header
-    Then the upgrade is closed with forbidden before any audio
-    And the child is told the upgrade was refused
-    And a second upgrade on the same nonce is refused as unknown
-
-  @unit
-  Scenario: A media upgrade signed with another account's token is refused
-    Given a nonce registered to a phone child
-    When an upgrade arrives on that nonce's media path signed with a different auth token
-    Then the upgrade is closed with forbidden before any audio
-
-  @unit
-  Scenario: A media upgrade signed for another URL is refused
-    Given a nonce registered to a phone child
-    When an upgrade arrives signed for a stream URL on another host
-    Then the upgrade is closed with forbidden before any audio
-
-  @unit
-  Scenario: The media signature is Twilio's HMAC-SHA1 of the stream URL
-    Given a Twilio auth token and the wss stream URL a call was placed with
-    When the upgrade's signature is checked
-    Then the base64 HMAC-SHA1 of that URL under that token is accepted, spelt wss or https
-    And a signature under another token, for another URL, or missing is refused
-
-  @unit
-  Scenario: A phone child without a Twilio credential cannot register a nonce
-    Given a phone child whose job carries no Twilio credential
-    When it asks the parent to register its stream nonce
-    Then the registration is refused and nothing is stored
-
-  @unit
-  Scenario: A worker without a public media URL refuses every media upgrade
-    Given a worker whose public media URL is unavailable
-    When an upgrade arrives on a registered nonce's media path
-    Then the upgrade is closed with forbidden before any audio
 
   @unit
   Scenario: A nonce registered on another worker is refused here

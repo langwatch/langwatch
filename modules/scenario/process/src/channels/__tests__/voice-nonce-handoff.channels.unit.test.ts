@@ -157,7 +157,7 @@ describe("handleVoiceNonceRegisterMessage", () => {
   } as const;
 
   describe("given a registry that accepts the registration", () => {
-    it("registers the nonce against the sending child and its token, then acks ok", async () => {
+    it("registers the nonce against the sending child, then acks ok", async () => {
       const registry = VoiceNonceRegistryService.create({
         nonces: MemoryVoiceNonceRepository.create(),
       });
@@ -166,36 +166,12 @@ describe("handleVoiceNonceRegisterMessage", () => {
       const ack = await handleVoiceNonceRegisterMessage({
         message,
         child,
-        authToken: "twilio-token",
         registry,
       });
 
       expect(ack).toEqual({ type: VOICE_NONCE_REGISTER_ACK_MESSAGE, requestId: "req-1", ok: true });
       // The registration is real, not merely reported: consuming it answers this child.
-      await expect(registry.consume("n1")).resolves.toEqual({
-        ok: true,
-        child,
-        authToken: "twilio-token",
-      });
-    });
-  });
-
-  describe("given a phone child whose job carries no Twilio credential", () => {
-    /** @scenario "A phone child without a Twilio credential cannot register a nonce" */
-    it("refuses the registration and stores nothing", async () => {
-      const nonces = MemoryVoiceNonceRepository.create();
-      const registry = VoiceNonceRegistryService.create({ nonces });
-
-      const ack = await handleVoiceNonceRegisterMessage({
-        message,
-        child: new ChildProcess(),
-        authToken: undefined,
-        registry,
-      });
-
-      expect(ack).toMatchObject({ requestId: "req-1", ok: false });
-      expect(registry.size).toBe(0);
-      await expect(nonces.take("n1")).resolves.toEqual({ taken: false });
+      await expect(registry.consume("n1")).resolves.toEqual({ ok: true, child });
     });
   });
 
@@ -212,7 +188,6 @@ describe("handleVoiceNonceRegisterMessage", () => {
       const ack = await handleVoiceNonceRegisterMessage({
         message,
         child: new ChildProcess(),
-        authToken: "twilio-token",
         registry,
       });
 

@@ -1,5 +1,5 @@
 // Voice worker's per-call nonce registry: the nonce lives in the fleet's store, single-use and
-// time-boxed; the owning child and its Twilio token stay on this worker, the one Twilio dials back.
+// time-boxed; the owning child stays on this worker, the one Twilio dials back.
 
 import type { ChildProcess } from "node:child_process";
 
@@ -13,19 +13,18 @@ import type { VoiceNonceRepository } from "../repositories/voice-nonce.repositor
 export const VOICE_NONCE_DEFAULT_TTL_MS = 60_000;
 
 /**
- * The outcome of consuming a nonce: the owning child and the auth token Twilio signs its
- * upgrade with, or why it was refused. An "expired" refusal still carries the child, so the
- * door can stop it waiting for the connect timeout; "unknown" has no child to notify.
+ * The outcome of consuming a nonce: the owning child, or why it was refused. An "expired"
+ * refusal still carries the child, so the door can stop it waiting for the connect timeout;
+ * "unknown" has no child to notify.
  */
 export type VoiceNonceLookup =
-  | { ok: true; child: ChildProcess; authToken: string }
+  | { ok: true; child: ChildProcess }
   | { ok: false; reason: "unknown" }
   | { ok: false; reason: "expired"; child: ChildProcess };
 
 interface HeldRegistration {
   registration: string;
   child: ChildProcess;
-  authToken: string;
   expiresAt: number;
 }
 
@@ -56,10 +55,10 @@ export class VoiceNonceRegistryService {
   }
 
   /**
-   * Register a nonce against the child that owns the call and its Twilio auth token.
-   * Registering the same nonce again re-arms the clock and replaces the owner.
+   * Register a nonce against the child that owns the call. Registering the same nonce
+   * again re-arms the clock and replaces the owner.
    */
-  async register(params: { nonce: string; child: ChildProcess; authToken: string }): Promise<void> {
+  async register(params: { nonce: string; child: ChildProcess }): Promise<void> {
     const registration = generate("scenario").toString();
     await this.nonces.store({
       nonce: params.nonce,
@@ -69,7 +68,6 @@ export class VoiceNonceRegistryService {
     this.held.set(params.nonce, {
       registration,
       child: params.child,
-      authToken: params.authToken,
       expiresAt: this.now() + this.ttlMs,
     });
   }
@@ -88,7 +86,7 @@ export class VoiceNonceRegistryService {
     if (!taken.taken || taken.registration !== held.registration) {
       return { ok: false, reason: "unknown" };
     }
-    return { ok: true, child: held.child, authToken: held.authToken };
+    return { ok: true, child: held.child };
   }
 
   /** Drop a nonce without consuming it (e.g. the call was abandoned). */

@@ -11,9 +11,8 @@ export class MemoryVoiceNonceHandoffChannel implements VoiceSocketReceiver {
   static create(input: {
     registry: VoiceNonceRegistryService;
     child: ChildProcess;
-    authToken: string;
   }): MemoryVoiceNonceHandoffChannel {
-    return new MemoryVoiceNonceHandoffChannel(input.registry, input.child, input.authToken);
+    return new MemoryVoiceNonceHandoffChannel(input.registry, input.child);
   }
 
   readonly #handlers = new Set<(received: ReceivedVoiceSocket) => void>();
@@ -21,15 +20,10 @@ export class MemoryVoiceNonceHandoffChannel implements VoiceSocketReceiver {
   private constructor(
     private readonly registry: VoiceNonceRegistryService,
     private readonly child: ChildProcess,
-    private readonly authToken: string,
   ) {}
 
   registerNonce = async (input: { nonce: string }): Promise<void> => {
-    await this.registry.register({
-      nonce: input.nonce,
-      child: this.child,
-      authToken: this.authToken,
-    });
+    await this.registry.register({ nonce: input.nonce, child: this.child });
   };
 
   raceUpgradeRefusal = <T>(promise: Promise<T>): Promise<T> => promise;

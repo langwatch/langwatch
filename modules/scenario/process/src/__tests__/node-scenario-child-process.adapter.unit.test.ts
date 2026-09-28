@@ -108,7 +108,7 @@ describe("NodeScenarioChildService", () => {
   });
 
   describe("given a phone run's child asking to register its stream nonce", () => {
-    it("registers it against the Twilio token the run's job carries, then acks", async () => {
+    it("registers it against that child, then acks", async () => {
       const nonces = VoiceNonceRegistryService.create({
         nonces: MemoryVoiceNonceRepository.create(),
       });
@@ -158,10 +158,7 @@ describe("NodeScenarioChildService", () => {
           expect.objectContaining({ requestId: "r1", ok: true }),
         ),
       );
-      await expect(nonces.consume("n1")).resolves.toMatchObject({
-        ok: true,
-        authToken: "twilio-token",
-      });
+      await expect(nonces.consume("n1")).resolves.toMatchObject({ ok: true });
     });
   });
 

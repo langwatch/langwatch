@@ -24,15 +24,11 @@ function registryAt(clock: { now: number }, ttlMs?: number) {
 
 describe("VoiceNonceRegistryService", () => {
   describe("given a registered nonce", () => {
-    it("returns the owning child and its token once, then never again", async () => {
+    it("returns the owning child once, then never again", async () => {
       const { registry } = registryAt({ now: 1000 });
-      await registry.register({ nonce: "abc", child: fakeChild, authToken: "tok" });
+      await registry.register({ nonce: "abc", child: fakeChild });
 
-      await expect(registry.consume("abc")).resolves.toEqual({
-        ok: true,
-        child: fakeChild,
-        authToken: "tok",
-      });
+      await expect(registry.consume("abc")).resolves.toEqual({ ok: true, child: fakeChild });
       await expect(registry.consume("abc")).resolves.toEqual({ ok: false, reason: "unknown" });
     });
 
@@ -40,7 +36,7 @@ describe("VoiceNonceRegistryService", () => {
     it("still hands it over just inside the lifetime", async () => {
       const clock = { now: 0 };
       const { registry } = registryAt(clock);
-      await registry.register({ nonce: "abc", child: fakeChild, authToken: "tok" });
+      await registry.register({ nonce: "abc", child: fakeChild });
 
       clock.now = VOICE_NONCE_DEFAULT_TTL_MS - 1;
 
@@ -62,7 +58,7 @@ describe("VoiceNonceRegistryService", () => {
     it("reports it expired, naming the child, and a replay reads unknown", async () => {
       const clock = { now: 0 };
       const { registry } = registryAt(clock, 100);
-      await registry.register({ nonce: "abc", child: fakeChild, authToken: "tok" });
+      await registry.register({ nonce: "abc", child: fakeChild });
 
       clock.now = 100; // exactly at the boundary counts as expired
 
@@ -80,7 +76,7 @@ describe("VoiceNonceRegistryService", () => {
     it("refuses it as expired", async () => {
       const clock = { now: 0 };
       const { registry } = registryAt(clock);
-      await registry.register({ nonce: "abc", child: fakeChild, authToken: "tok" });
+      await registry.register({ nonce: "abc", child: fakeChild });
 
       clock.now = VOICE_NONCE_DEFAULT_TTL_MS;
 
@@ -99,7 +95,7 @@ describe("VoiceNonceRegistryService", () => {
       const nonces = MemoryVoiceNonceRepository.create({ now });
       const first = VoiceNonceRegistryService.create({ nonces, now });
       const second = VoiceNonceRegistryService.create({ nonces, now });
-      await first.register({ nonce: "abc", child: fakeChild, authToken: "tok" });
+      await first.register({ nonce: "abc", child: fakeChild });
 
       await expect(second.consume("abc")).resolves.toEqual({ ok: false, reason: "unknown" });
       await expect(first.consume("abc")).resolves.toEqual({ ok: false, reason: "unknown" });
@@ -109,7 +105,7 @@ describe("VoiceNonceRegistryService", () => {
   describe("when a nonce is discarded", () => {
     it("is gone from this worker and the store without being consumed", async () => {
       const { registry, nonces } = registryAt({ now: 0 });
-      await registry.register({ nonce: "abc", child: fakeChild, authToken: "tok" });
+      await registry.register({ nonce: "abc", child: fakeChild });
       expect(registry.size).toBe(1);
 
       await registry.discard("abc");

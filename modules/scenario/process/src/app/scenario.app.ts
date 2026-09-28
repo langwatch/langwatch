@@ -507,10 +507,7 @@ export class ScenarioApp implements ScenarioApi {
       }),
       platformLinks,
       runViews: SimulationRunViewService.create({ simulations, platformLinks }),
-      voiceMedia: VoiceMediaDoorService.create({
-        nonces: voiceNonces,
-        publicUrl: voice.publicUrl,
-      }),
+      voiceMedia: VoiceMediaDoorService.create({ nonces: voiceNonces }),
       voiceSessions: VoiceSessionService.compose({
         peers: setup.dependencies,
         scenarios,

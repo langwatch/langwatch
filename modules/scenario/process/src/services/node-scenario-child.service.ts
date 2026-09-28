@@ -14,7 +14,6 @@ import {
   ScenarioAgentInstanceSchema,
   VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV,
   type ChildProcessJobData,
-  type VoiceAgentData,
   type ScenarioEgressPolicy,
   type ScenarioExecutionResult,
   type ScenarioLogContext,
@@ -152,6 +151,16 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
       stdio: isVoiceChild ? ["pipe", "pipe", "pipe", "ipc"] : ["pipe", "pipe", "pipe"],
       cwd: this.options.config.packageRoot,
     });
+    if (isVoiceChild) {
+      child.on("message", (message: unknown) => {
+        if (!isVoiceNonceRegisterMessage(message)) return;
+        void handleVoiceNonceRegisterMessage({
+          message,
+          child,
+          registry: this.options.nonces,
+        }).then((ack) => child.send?.(ack));
+      });
+    }
     log("info", "Child process spawned", {
       pid: child.pid,
       spawnMs: nowInstant().epochMilliseconds - spawnStartedAt,
@@ -159,13 +168,7 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
 
     this.options.pool.registerChild(input.jobData.scenarioRunId, child);
     const completion = this.observeChild({ child, jobData: input.jobData, log });
-    return NodeScenarioChildExecutionSession.create({
-      child,
-      completion,
-      log,
-      nonces: this.options.nonces,
-      isVoiceChild,
-    });
+    return NodeScenarioChildExecutionSession.create({ child, completion, log });
   };
 
   private observeChild(input: {
@@ -242,9 +245,6 @@ class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession
       message: string,
       extra?: Record<string, unknown>,
     ) => void;
-    nonces: VoiceNonceRegistryService;
-    /** Only a voice child has the IPC slot a nonce registration arrives on. */
-    isVoiceChild: boolean;
   }): NodeScenarioChildExecutionSession {
     return new NodeScenarioChildExecutionSession(options);
   }
@@ -260,8 +260,6 @@ class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession
         message: string,
         extra?: Record<string, unknown>,
       ) => void;
-      nonces: VoiceNonceRegistryService;
-      isVoiceChild: boolean;
     },
   ) {}
 
@@ -270,10 +268,6 @@ class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession
       throw new Error("Scenario child execution has already started");
     }
     this.started = true;
-    // The child registers its nonce only after reading this job, so the listener is ready first.
-    if (this.options.isVoiceChild && data.adapterData.type === "voice") {
-      this.answerNonceRegistrations(data.adapterData);
-    }
     try {
       this.options.child.stdin?.write(JSON.stringify(data));
       this.options.child.stdin?.end();
@@ -283,20 +277,6 @@ class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession
       });
     }
     return this.options.completion;
-  }
-
-  /** Registers the child's stream nonce against it and the Twilio token its job carries. */
-  private answerNonceRegistrations(voice: VoiceAgentData): void {
-    const { child, nonces } = this.options;
-    const { voiceTarget } = voice;
-    const authToken =
-      voiceTarget.transport === "phone" ? voiceTarget.credential?.authToken : undefined;
-    child.on("message", (message: unknown) => {
-      if (!isVoiceNonceRegisterMessage(message)) return;
-      void handleVoiceNonceRegisterMessage({ message, child, authToken, registry: nonces }).then(
-        (ack) => child.send?.(ack),
-      );
-    });
   }
 
   async abort(): Promise<void> {

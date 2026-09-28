@@ -9,32 +9,21 @@ import {
 } from "@langwatch/scenario-contract";
 
 import { handOffVoiceSocket } from "../channels/voice-socket-handoff.channels.ts";
-import {
-  isTwilioMediaSignatureValid,
-  twilioMediaStreamUrl,
-} from "../rules/twilio-media-signature.rules.ts";
 import type { VoiceNonceRegistryService } from "./voice-nonce-registry.service.ts";
-import type { VoicePublicUrl } from "./voice-public-url.service.ts";
 
 const logger = createLogger("langwatch:voice:media-door");
 
 /**
  * Main's voice media listener, behind the worker's raw-socket door: an unknown or expired
- * nonce, or an upgrade Twilio did not sign for the stream URL, is closed 403 (a known child is
- * told why); a live, signed one hands the raw socket to the scenario child that registered it.
+ * nonce is closed 403 (an expired one tells its child why); a live one hands the raw socket
+ * to the scenario child that registered it.
  */
 export class VoiceMediaDoorService {
-  static create(input: {
-    nonces: VoiceNonceRegistryService;
-    publicUrl: VoicePublicUrl;
-  }): VoiceMediaDoorService {
-    return new VoiceMediaDoorService(input.nonces, input.publicUrl);
+  static create(input: { nonces: VoiceNonceRegistryService }): VoiceMediaDoorService {
+    return new VoiceMediaDoorService(input.nonces);
   }
 
-  private constructor(
-    private readonly nonces: VoiceNonceRegistryService,
-    private readonly publicUrl: VoicePublicUrl,
-  ) {}
+  private constructor(private readonly nonces: VoiceNonceRegistryService) {}
 
   accept(upgrade: VoiceMediaUpgrade): void {
     const { socket } = upgrade;
@@ -59,19 +48,6 @@ export class VoiceMediaDoorService {
     if (!lookup.ok) {
       const child = lookup.reason === "expired" ? lookup.child : undefined;
       refuse({ upgrade, socket, reason: `nonce ${lookup.reason}`, child });
-      return;
-    }
-    if (!("url" in this.publicUrl)) {
-      refuse({ upgrade, socket, reason: "no public media URL", child: lookup.child });
-      return;
-    }
-    const streamUrl = twilioMediaStreamUrl({
-      publicBaseUrl: this.publicUrl.url,
-      nonce: upgrade.nonce,
-    });
-    const signature = upgrade.headers["x-twilio-signature"];
-    if (!isTwilioMediaSignatureValid({ authToken: lookup.authToken, streamUrl, signature })) {
-      refuse({ upgrade, socket, reason: "Twilio signature invalid", child: lookup.child });
       return;
     }
     await handOffVoiceSocket({
