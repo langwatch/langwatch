@@ -259,7 +259,7 @@ function PostResetPasskeyOffer({
         width="full"
         minHeight="42px"
         fontSize="13.5px"
-        borderRadius={SHAPE.control}
+        borderRadius={SHAPE.field}
         onClick={onAdd}
         data-testid="reset-add-passkey"
       >
