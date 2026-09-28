@@ -84,6 +84,8 @@ let organizationId = "";
 let teamId = "";
 let projectId = "";
 let otherProjectId = "";
+// A restore stamps the actor as the scenario's last editor, a foreign key to a real user.
+let restorerId = "";
 let scenarios: ScenarioService;
 
 function createScenario(situation = "situation v1"): Promise<Scenario> {
@@ -150,6 +152,10 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
 
     projectId = project.id;
     otherProjectId = otherProject.id;
+    const restorer = await db.user.create({
+      data: { name: "Restorer", email: `restorer-${namespace}@example.com` },
+    });
+    restorerId = restorer.id;
     scenarios = ScenarioService.create({
       repository: PrismaScenarioRepository.create(db),
       simulations: createApiFixture<SimulationService>(),
@@ -176,6 +182,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
           ["scenario", { projectId: { in: projectIds } }],
           ["simulationSuite", { projectId: { in: projectIds } }],
           ["project", { id: { in: projectIds } }],
+          ["user", { id: restorerId }],
           ["team", { id: teamId }],
           ["organization", { id: organizationId }],
         ]);
@@ -293,9 +300,11 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
       await scenarios.moveToTestSuite({ projectId, scenarioId: scenario.id, testSuiteId });
     }
 
+    // Unfiling files the scenario back into the project's Default suite, where
+    // a scenario created without a suite starts (specs/suites/default-suite.feature).
     await expect(scenarios.getById({ id: scenario.id, projectId })).resolves.toMatchObject({
       version: 1,
-      testSuiteId: null,
+      testSuiteId: scenario.testSuiteId,
     });
     await expect(
       scenarios.listVersions({ projectId, scenarioId: scenario.id }),
@@ -456,7 +465,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
       projectId,
       scenarioId: scenario.id,
       version: 2,
-      actor: { userId: "user_restorer", label: "user" },
+      actor: { userId: restorerId, label: "user" },
     });
     const originalLatest = await scenarios.getVersion({
       projectId,
@@ -487,7 +496,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
       {
         version: 6,
         changeDescription: "Restored from v2",
-        authorId: "user_restorer",
+        authorId: restorerId,
         authorLabel: "user",
       },
     ]);
