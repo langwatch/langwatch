@@ -3600,6 +3600,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/identity/contract
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
@@ -3661,6 +3664,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../../packages/ksuid
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
