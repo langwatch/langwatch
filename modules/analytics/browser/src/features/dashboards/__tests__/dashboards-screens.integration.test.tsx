@@ -13,6 +13,16 @@ import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import DashboardsIndexScreen from "../ui/sections/dashboards-index.screen.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
+/**
+ * The Flight Deck now fires `analytics.lwql.query` mutations for its panels;
+ * this suite is about routing and gating, so it answers them with empty
+ * rows rather than mocking the query layer (@see flight-deck-panels test).
+ */
+const ANSWER_EMPTY_LWQL = (call: { path: string }) =>
+  call.path === "analytics.lwql.query"
+    ? Promise.resolve({ columns: [], rows: [], diagnostics: [] })
+    : NO_PROCEDURES(call);
+
 const FLAG_ON = { release_dashboards: true };
 const FLAG_OFF = { release_dashboards: false };
 const NOT_FOUND = { name: "This page is not here" };
@@ -100,15 +110,17 @@ describe("the Dashboards screens", () => {
     });
 
     describe("when the member opens the Agent Flight Deck", () => {
-      it("titles the page, marks it Default and leaves the panel area empty", () => {
+      it("titles the page, marks it Default and renders the Flight Deck panels", async () => {
         renderDashboards({
           element: <DashboardBoardScreen />,
           host: hostOpening({ dashboardId: FLIGHT_DECK.id, flags: FLAG_ON }),
+          answer: ANSWER_EMPTY_LWQL,
         });
 
         expect(screen.getByRole("heading", { name: "Agent Flight Deck" })).toBeInTheDocument();
         expect(screen.getByText("Default")).toBeInTheDocument();
-        expect(screen.getByRole("region", { name: "Panels" })).toBeEmptyDOMElement();
+        const panels = screen.getByRole("region", { name: "Panels" });
+        await waitFor(() => expect(panels).not.toBeEmptyDOMElement());
       });
     });
 

@@ -7,6 +7,7 @@ export {
   type BlockDefinition,
   type BlockSource,
   blockDefinitionSchema,
+  fitGranularity,
   periodDelta,
   SOURCE_CALLS_TO_ACTION,
   SOURCE_EXISTENCE_SQL,
