@@ -15667,6 +15667,9 @@ importers:
 
   packages/design-system:
     dependencies:
+      '@paper-design/shaders-react':
+        specifier: 'catalog:'
+        version: 0.0.76(@types/react@19.2.18)(react@19.2.8)
       lodash-es:
         specifier: 'catalog:'
         version: 4.18.1
