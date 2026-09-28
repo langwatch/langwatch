@@ -153,6 +153,7 @@ describe("the saved-dashboards list in the sidebar", () => {
         expect(calls.find((call) => call.path === "dashboards.create")?.input).toEqual({
           projectId: "proj-1",
           name: "Untitled dashboard 3",
+          visibility: "only_me",
         });
       });
     });
