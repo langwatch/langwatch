@@ -90,8 +90,8 @@ describe("batchPresidioClearPII sparing names and places", () => {
     });
   });
 
-  /** @scenario "A name found in a model name is dropped while a phone number beside it is redacted" */
   describe("given a flagged text with a person and a phone number", () => {
+    /** @scenario "A name found in a model name is dropped while a phone number beside it is redacted" */
     it("replaces only the phone number with its marker", async () => {
       presidioAnswers([
         {
@@ -110,8 +110,8 @@ describe("batchPresidioClearPII sparing names and places", () => {
     });
   });
 
-  /** @scenario "A model name whose findings cannot be placed keeps the full redaction" */
   describe("given a flagged text but no finding positions in the response", () => {
+    /** @scenario "A model name whose findings cannot be placed keeps the full redaction" */
     it("keeps the analysis service's own redaction, names included", async () => {
       presidioAnswers([{ anonymized: "<PERSON>-sonnet-4-6" }]);
 
@@ -138,8 +138,8 @@ describe("redactSparingNamesAndPlaces", () => {
     });
   });
 
-  /** @scenario "Overlapping findings in a model name are redacted as one span" */
   describe("given two overlapping non-name findings", () => {
+    /** @scenario "Overlapping findings in a model name are redacted as one span" */
     it("replaces the whole overlapping span with one marker", () => {
       const text = "id-4111111111111111-x";
       const result = redactSparingNamesAndPlaces(text, [
