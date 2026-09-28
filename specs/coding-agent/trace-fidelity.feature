@@ -287,7 +287,7 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
 
   @unit
   Scenario: Spans from other instrumentation scopes are never filtered
-    Given a span from any scope other than codex_cli_rs or opencode
+    Given a span from any scope other than codex's (codex_cli_rs, codex_exec, codex-app-server) or opencode
     When the span is ingested
     Then the span is kept regardless of its name or attributes
 
