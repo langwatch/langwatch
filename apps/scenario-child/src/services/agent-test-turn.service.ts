@@ -5,24 +5,46 @@
  */
 
 import { generate } from "@langwatch/ksuid";
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import {
+  AgentRole,
+  ScenarioExecutionState,
+  type AgentAdapter,
+  type AgentInput,
+  type ScenarioConfig,
+} from "@langwatch/scenario";
 import type { AgentTestTurnAnswer, AgentTestTurnJob } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
 import type { ScenarioChildRuntime } from "./scenario-child-execution.service.ts";
 
-/** The input of a single turn, as the adapters read it. */
-function oneTurnInput({ threadId, message }: { threadId: string; message: string }): AgentInput {
+/** The input of a single turn, as the adapters read it: a one-message scenario of its own. */
+function oneTurnInput({
+  threadId,
+  message,
+  agent,
+}: {
+  threadId: string;
+  message: string;
+  agent: AgentAdapter;
+}): AgentInput {
   const userMessage = { role: "user" as const, content: message };
+  const scenarioConfig: ScenarioConfig = {
+    name: "Agent test",
+    description: "One test turn: the user's message, sent once to the agent.",
+    agents: [agent],
+  };
+  const scenarioState = new ScenarioExecutionState(scenarioConfig);
+  scenarioState.threadId = threadId;
+  scenarioState.addMessage(userMessage);
 
   return {
     threadId,
     messages: [userMessage],
     newMessages: [userMessage],
     requestedRole: AgentRole.AGENT,
-    scenarioState: {} as AgentInput["scenarioState"],
-    scenarioConfig: {} as AgentInput["scenarioConfig"],
+    scenarioState,
+    scenarioConfig,
   };
 }
 
@@ -67,7 +89,13 @@ async function runAgentTestTurnValue({
   });
   const startedAt = nowInstant().epochMilliseconds;
   const answer = await withinCallDeadline(
-    adapter.call(oneTurnInput({ threadId: generate("scenario").toString(), message: job.message })),
+    adapter.call(
+      oneTurnInput({
+        threadId: generate("scenario").toString(),
+        message: job.message,
+        agent: adapter,
+      }),
+    ),
     job.timeoutMs,
   );
   if (answer.timedOut) {

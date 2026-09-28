@@ -700,6 +700,10 @@ jobs:
       - name: Run @langwatch/scenario-process tests
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/scenario-process run test
+      # the scenario child program: agent adapters, turn execution, the bundle it spawns from.
+      - name: Run @langwatch/scenario-child tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/scenario-child run test
       # the suite and run-plan forms.
       - name: Run @langwatch/suite-browser tests
         if: matrix.app == 'platform-api'

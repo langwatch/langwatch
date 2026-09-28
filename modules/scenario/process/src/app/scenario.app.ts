@@ -4,6 +4,7 @@ import {
   type AgentTestRunResult,
   type AgentTestTurnResult,
 } from "@langwatch/agent-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -269,6 +270,8 @@ export const scenarioAppDependencyTokens = {
   authz: AuthzApi,
   /** The project's ElevenLabs key, read server-side for voice sessions. */
   gateway: GatewayApi,
+  /** The code-agent run's sandbox key, minted per project as main's prefetcher did. */
+  apiKeys: ApiKeyApi,
 };
 
 /**
@@ -413,7 +416,7 @@ export class ScenarioApp implements ScenarioApi {
     const broadcast = redis
       ? scenarioEventBroadcastChannels.live.create(redis)
       : scenarioEventBroadcastChannels.memory.create();
-    const voiceNonces = VoiceNonceRegistryService.create();
+    const voiceNonces = VoiceNonceRegistryService.create({ nonces: repositories.voiceNonces });
     const memoryCancellations = MemoryScenarioCancellationChannel.create();
     const cancellations = redis
       ? RedisScenarioCancellationPublisherChannel.create(redis)
@@ -472,6 +475,7 @@ export class ScenarioApp implements ScenarioApi {
         modelProviders: peers.modelProviders,
         secrets: peers.secrets,
         traces: peers.traces,
+        apiKeys: peers.apiKeys,
         voiceTargets: null,
       }),
       failures: ScenarioFailureHandlerService.create({ agents: peers.agents, simulations }),
@@ -503,7 +507,10 @@ export class ScenarioApp implements ScenarioApi {
       }),
       platformLinks,
       runViews: SimulationRunViewService.create({ simulations, platformLinks }),
-      voiceMedia: VoiceMediaDoorService.create({ nonces: voiceNonces }),
+      voiceMedia: VoiceMediaDoorService.create({
+        nonces: voiceNonces,
+        publicUrl: voice.publicUrl,
+      }),
       voiceSessions: VoiceSessionService.compose({
         peers: setup.dependencies,
         scenarios,

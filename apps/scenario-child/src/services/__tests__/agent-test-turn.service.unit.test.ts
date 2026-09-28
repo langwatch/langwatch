@@ -63,6 +63,8 @@ describe("runAgentTestTurn", () => {
       expect(answer).toMatchObject({ success: true, output: "pong" });
       expect(agent.inputs[0]?.messages).toEqual([{ role: "user", content: "ping" }]);
       expect(agent.inputs[0]?.newMessages).toEqual([{ role: "user", content: "ping" }]);
+      expect(agent.inputs[0]?.scenarioState.lastUserMessage()).toMatchObject({ content: "ping" });
+      expect(agent.inputs[0]?.scenarioConfig.agents).toEqual([agent]);
     });
   });
 

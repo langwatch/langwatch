@@ -5,6 +5,7 @@ import { MemoryScenarioTabStoreRepository } from "./memory.scenario-tab-store.re
 import { MemoryScenarioRepository } from "./memory.scenario.repository.ts";
 import { MemorySimulationRunProcessingRepository } from "./memory.simulation-run-processing.repository.ts";
 import { MemoryStalledSimulationRunRepository } from "./memory.stalled-simulation-run.repository.ts";
+import { MemoryVoiceNonceRepository } from "./memory.voice-nonce.repository.ts";
 
 /** The Scenario aggregate and its run stores with no datastore behind them. */
 export class MemoryScenarioRepositories {
@@ -18,6 +19,7 @@ export class MemoryScenarioRepositories {
       tabs: MemoryScenarioTabStoreRepository.create(),
       resultAtoms: MemoryResultAtomsRepository.create(),
       runConfigurations: MemoryRunConfigurationsRepository.create(),
+      voiceNonces: MemoryVoiceNonceRepository.create(),
     };
   }
 }

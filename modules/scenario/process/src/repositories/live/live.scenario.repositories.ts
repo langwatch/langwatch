@@ -7,6 +7,7 @@ import { ClickHouseStalledSimulationRunRepository } from "../clickhouse/clickhou
 import { PostgresScenarioRepositories } from "../prisma/prisma.scenario.repositories.ts";
 import { RedisScenarioTabStoreRepository } from "../redis/redis.scenario-tab-store.repository.ts";
 import { RedisSimulationRunProcessingRepository } from "../redis/redis.simulation-run-processing.repository.ts";
+import { RedisVoiceNonceRepository } from "../redis/redis.voice-nonce.repository.ts";
 import type { ScenarioRepositories } from "../scenario.repositories.ts";
 
 /** Scenario's live stores: the aggregate in Postgres, runs in ClickHouse behind Redis. */
@@ -26,6 +27,7 @@ export class LiveScenarioRepositories {
       tabs: RedisScenarioTabStoreRepository.create(redis),
       resultAtoms: ResultAtomsClickHouseRepository.create(sessions),
       runConfigurations: RunConfigurationsClickHouseRepository.create(sessions),
+      voiceNonces: RedisVoiceNonceRepository.create(redis),
     };
   }
 }

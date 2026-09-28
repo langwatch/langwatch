@@ -61,29 +61,38 @@ export class VoiceNonceRegistrationNoChannelError extends Error {
 }
 
 /**
- * Parent side: handle one child's registration request — register the
- * nonce with `registry`, build the ack. Pure apart from that mutation, so
- * it is unit-testable with no real child process or IPC channel.
+ * Parent side: handle one child's registration request — register the nonce with
+ * `registry` against the child and the Twilio auth token its job carries, then build the
+ * ack. A child whose job has no Twilio token is refused: its upgrade could not be verified.
  */
-export function handleVoiceNonceRegisterMessage(params: {
+export async function handleVoiceNonceRegisterMessage(params: {
   message: VoiceNonceRegisterMessage;
   child: ChildProcess;
-  registry: { register(p: { nonce: string; child: ChildProcess }): void };
-}): VoiceNonceRegisterAckMessage {
-  try {
-    params.registry.register({
-      nonce: params.message.nonce,
-      child: params.child,
-    });
+  authToken: string | undefined;
+  registry: {
+    register(p: { nonce: string; child: ChildProcess; authToken: string }): Promise<void>;
+  };
+}): Promise<VoiceNonceRegisterAckMessage> {
+  const { requestId } = params.message;
+  if (params.authToken === undefined) {
     return {
       type: VOICE_NONCE_REGISTER_ACK_MESSAGE,
-      requestId: params.message.requestId,
-      ok: true,
+      requestId,
+      ok: false,
+      error: "this run carries no Twilio credential to verify its media upgrade with",
     };
+  }
+  try {
+    await params.registry.register({
+      nonce: params.message.nonce,
+      child: params.child,
+      authToken: params.authToken,
+    });
+    return { type: VOICE_NONCE_REGISTER_ACK_MESSAGE, requestId, ok: true };
   } catch (error) {
     return {
       type: VOICE_NONCE_REGISTER_ACK_MESSAGE,
-      requestId: params.message.requestId,
+      requestId,
       ok: false,
       error: error instanceof Error ? error.message : String(error),
     };

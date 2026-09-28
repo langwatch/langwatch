@@ -4,6 +4,7 @@ import type { RunConfigurationsRepository } from "./run-configurations.repositor
 import type { ScenarioRepository } from "./scenario.repository.ts";
 import type { SimulationRunProcessingRepository } from "./simulation-run-processing.repository.ts";
 import type { StalledSimulationRunRepository } from "./stalled-simulation-run.repository.ts";
+import type { VoiceNonceRepository } from "./voice-nonce.repository.ts";
 
 /**
  * The persistence one Scenario application is built over: the test case and
@@ -21,4 +22,6 @@ export interface ScenarioRepositories {
   readonly resultAtoms: ResultAtomsRepository;
   /** The configurations a project's run plans already ran with. */
   readonly runConfigurations: RunConfigurationsRepository;
+  /** The Twilio media nonces the worker's door takes, one use each. */
+  readonly voiceNonces: VoiceNonceRepository;
 }

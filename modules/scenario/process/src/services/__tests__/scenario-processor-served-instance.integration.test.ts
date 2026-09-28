@@ -23,6 +23,7 @@ import type {
   CancellationSubscriber,
   ScenarioProcessorServiceMetrics,
 } from "../../app/scenario.app.ts";
+import { MemoryVoiceNonceRepository } from "../../repositories/memory/memory.voice-nonce.repository.ts";
 import { NodeScenarioChildService } from "../node-scenario-child.service.ts";
 import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service.ts";
 import type { ExecutionJobData } from "../scenario-execution-pool.service.ts";
@@ -89,7 +90,7 @@ function buildProcessor() {
     cancellations: new SilentCancellations(),
     childProcesses: NodeScenarioChildService.create({
       pool,
-      nonces: VoiceNonceRegistryService.create(),
+      nonces: VoiceNonceRegistryService.create({ nonces: MemoryVoiceNonceRepository.create() }),
       config: {
         packageRoot: process.cwd(),
         sourcePath: `${process.cwd()}/src/scenario-child.entrypoint.ts`,

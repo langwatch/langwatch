@@ -1,7 +1,11 @@
-// Voice worker's per-call nonce registry. Phone jobs register nonces against spawned children;
-// media listener consumes nonce and hands socket to owning child. Single-use, time-boxed.
+// Voice worker's per-call nonce registry: the nonce lives in the fleet's store, single-use and
+// time-boxed; the owning child and its Twilio token stay on this worker, the one Twilio dials back.
 
 import type { ChildProcess } from "node:child_process";
+
+import { generate } from "@langwatch/ksuid";
+
+import type { VoiceNonceRepository } from "../repositories/voice-nonce.repository.ts";
 
 /** How long a freshly registered nonce stays valid before it is treated as
  *  expired. A dial-back that has not arrived within the window is a call that
@@ -9,71 +13,87 @@ import type { ChildProcess } from "node:child_process";
 export const VOICE_NONCE_DEFAULT_TTL_MS = 60_000;
 
 /**
- * The outcome of consuming a nonce: the owning child, or why it was
- * refused. An "expired" refusal still carries the child, so the listener
- * can stop it waiting for the connect timeout; "unknown" has no child to notify.
+ * The outcome of consuming a nonce: the owning child and the auth token Twilio signs its
+ * upgrade with, or why it was refused. An "expired" refusal still carries the child, so the
+ * door can stop it waiting for the connect timeout; "unknown" has no child to notify.
  */
 export type VoiceNonceLookup =
-  | { ok: true; child: ChildProcess }
+  | { ok: true; child: ChildProcess; authToken: string }
   | { ok: false; reason: "unknown" }
   | { ok: false; reason: "expired"; child: ChildProcess };
 
-interface RegisteredNonce {
+interface HeldRegistration {
+  registration: string;
   child: ChildProcess;
+  authToken: string;
   expiresAt: number;
 }
 
-/**
- * An in-memory map of live nonces. One instance per worker process: the media
- * door and the child spawner share the one the scenario app builds.
- */
 export class VoiceNonceRegistryService {
-  static create(options?: { ttlMs?: number; now?: () => number }): VoiceNonceRegistryService {
-    return new VoiceNonceRegistryService(options);
+  static create(options: {
+    nonces: VoiceNonceRepository;
+    ttlMs?: number;
+    now?: () => number;
+  }): VoiceNonceRegistryService {
+    return new VoiceNonceRegistryService(
+      options.nonces,
+      options.ttlMs ?? VOICE_NONCE_DEFAULT_TTL_MS,
+      options.now ?? Date.now,
+    );
   }
 
-  private readonly _byNonce = new Map<string, RegisteredNonce>();
-  private readonly _ttlMs: number;
-  private readonly _now: () => number;
+  private readonly held = new Map<string, HeldRegistration>();
 
-  private constructor(options?: { ttlMs?: number; now?: () => number }) {
-    this._ttlMs = options?.ttlMs ?? VOICE_NONCE_DEFAULT_TTL_MS;
-    this._now = options?.now ?? Date.now;
-  }
+  private constructor(
+    private readonly nonces: VoiceNonceRepository,
+    private readonly ttlMs: number,
+    private readonly now: () => number,
+  ) {}
 
-  /** Number of nonces currently registered (expired-but-unconsumed included). */
+  /** Number of nonces this worker holds (expired-but-unconsumed included). */
   get size(): number {
-    return this._byNonce.size;
+    return this.held.size;
   }
 
   /**
-   * Register a nonce against the child that owns the call. Overwrites any
-   * existing entry for the same nonce, so a re-registration re-arms the clock.
+   * Register a nonce against the child that owns the call and its Twilio auth token.
+   * Registering the same nonce again re-arms the clock and replaces the owner.
    */
-  register(params: { nonce: string; child: ChildProcess }): void {
-    this._byNonce.set(params.nonce, {
+  async register(params: { nonce: string; child: ChildProcess; authToken: string }): Promise<void> {
+    const registration = generate("scenario").toString();
+    await this.nonces.store({
+      nonce: params.nonce,
+      registration,
+      ttlSeconds: Math.ceil(this.ttlMs / 1000),
+    });
+    this.held.set(params.nonce, {
+      registration,
       child: params.child,
-      expiresAt: this._now() + this._ttlMs,
+      authToken: params.authToken,
+      expiresAt: this.now() + this.ttlMs,
     });
   }
 
   /**
-   * Consume a nonce: single-use, so a match is removed whether or not it had
-   * expired. Returns the owning child on a hit, or the refusal reason. An
-   * expired hit is still removed, so a replay reads as unknown, not expired.
+   * Consume a nonce: single-use, so the store's entry is taken whether or not it had expired,
+   * and a replay reads as unknown. A nonce this worker never registered is unknown here even
+   * when the store held it, since only the registering worker holds the child.
    */
-  consume(nonce: string): VoiceNonceLookup {
-    const entry = this._byNonce.get(nonce);
-    if (!entry) return { ok: false, reason: "unknown" };
-    this._byNonce.delete(nonce);
-    if (this._now() >= entry.expiresAt) {
-      return { ok: false, reason: "expired", child: entry.child };
+  async consume(nonce: string): Promise<VoiceNonceLookup> {
+    const held = this.held.get(nonce);
+    this.held.delete(nonce);
+    const taken = await this.nonces.take(nonce);
+    if (!held) return { ok: false, reason: "unknown" };
+    if (this.now() >= held.expiresAt) return { ok: false, reason: "expired", child: held.child };
+    if (!taken.taken || taken.registration !== held.registration) {
+      return { ok: false, reason: "unknown" };
     }
-    return { ok: true, child: entry.child };
+    return { ok: true, child: held.child, authToken: held.authToken };
   }
 
   /** Drop a nonce without consuming it (e.g. the call was abandoned). */
-  discard(nonce: string): void {
-    this._byNonce.delete(nonce);
+  async discard(nonce: string): Promise<void> {
+    this.held.delete(nonce);
+    await this.nonces.discard(nonce);
   }
 }
