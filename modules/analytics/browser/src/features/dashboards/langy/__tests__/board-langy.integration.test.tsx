@@ -187,7 +187,7 @@ describe("Langy on a board", () => {
         const host = openBoard({ server: inMemoryServer(), query: { addBlock: "open" } });
 
         await user.type(await screen.findByRole("searchbox"), "Why did cost jump last week?");
-        await user.click(screen.getByRole("button", { name: /^Ask Langy: "Why did cost jump/ }));
+        await user.click(screen.getByRole("button", { name: "Ask Langy" }));
 
         expect(host.lastQuery).toEqual({ addBlock: void 0 });
         expect(host.langyAsks).toHaveLength(1);
@@ -226,14 +226,28 @@ describe("Langy on a board", () => {
 
     describe("when the picker's search is empty", () => {
       /** @scenario "AC16 Ask Langy from the board" */
-      it("offers no typed question and asks nothing on Enter", async () => {
+      it("asks nothing on Enter, though the Ask Langy footer stays visible", async () => {
         const user = userEvent.setup();
         const host = openBoard({ server: inMemoryServer(), query: { addBlock: "open" } });
 
         await user.type(await screen.findByRole("searchbox"), "{Enter}");
 
-        expect(screen.queryByRole("button", { name: /^Ask Langy:/ })).toBeNull();
+        expect(screen.getByRole("button", { name: "Ask Langy" })).toBeInTheDocument();
         expect(host.langyAsks).toEqual([]);
+      });
+    });
+
+    describe("when the member presses the footer's Ask Langy button with an empty field", () => {
+      /** @scenario "AC16 Ask Langy from the board" */
+      it("asks Langy to help build a dashboard", async () => {
+        const user = userEvent.setup();
+        const host = openBoard({ server: inMemoryServer(), query: { addBlock: "open" } });
+
+        await screen.findByRole("searchbox");
+        await user.click(screen.getByRole("button", { name: "Ask Langy" }));
+
+        expect(host.langyAsks).toHaveLength(1);
+        expect(host.langyAsks[0]?.question).toBe("Help me build a dashboard");
       });
     });
   });

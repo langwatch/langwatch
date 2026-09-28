@@ -1,7 +1,7 @@
 /**
- * The "Add a block" picker. With Langy, a question (or one the member types) closes it and asks
- * Langy with the board attached, writing nothing. "Blocks" adds a library block; from the Flight
- * Deck it asks which of the member's own boards (or a new one) gets it.
+ * The "Add a block" picker. With Langy, a question closes it and asks Langy with the board
+ * attached, writing nothing; a pinned footer always offers to ask Langy anything else.
+ * "Blocks" adds a library block; from the Flight Deck it asks which board gets it.
  */
 
 import { Box, Button, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
@@ -84,15 +84,17 @@ export function BlockPickerDialog({
     : [];
   const blocks = searchLibraryBlocks(search);
   const typed = search.trim();
-  const canAskTyped = langy.enabled && typed.length > 0;
+  const hasMatches = sections.length > 0 || blocks.length > 0;
+  const canAskOnEnter = langy.enabled && !hasMatches && typed.length > 0;
 
   const ask = (question: BlockQuestion) => {
     langy.ask(boardPromptQuestion({ prompt: question.prompt, board, period }));
     onClose();
   };
 
-  const askTyped = () => {
-    langy.ask(boardQuestion({ question: typed, board, period }));
+  const askLangy = (text: string) => {
+    const question = text.trim() === "" ? "Help me build a dashboard" : text;
+    langy.ask(boardQuestion({ question, board, period }));
     onClose();
   };
 
@@ -116,23 +118,14 @@ export function BlockPickerDialog({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key !== "Enter" || !canAskTyped) return;
+              if (event.key !== "Enter" || !canAskOnEnter) return;
               event.preventDefault();
-              askTyped();
+              askLangy(typed);
             }}
           />
         </VStack>
         <Dialog.Body overflowY="auto" paddingY={5}>
           <VStack align="stretch" gap={6}>
-            {canAskTyped && (
-              <PickerRow
-                title={`Ask Langy: "${typed}"`}
-                detail="Langy answers with this dashboard attached."
-                icon={Sparkles}
-                palette="purple"
-                onClick={askTyped}
-              />
-            )}
             {sections.map((section) => (
               <QuestionSection key={section.id} section={section} onChoose={ask} />
             ))}
@@ -143,13 +136,67 @@ export function BlockPickerDialog({
                 onClose={onClose}
               />
             )}
-            {!canAskTyped && sections.length === 0 && blocks.length === 0 && (
+            {!hasMatches && (
               <Text fontSize="13px" color="fg.muted">
-                Nothing matches your search.
+                {langy.enabled
+                  ? "No matching questions. Ask Langy below."
+                  : "Nothing matches your search."}
               </Text>
             )}
           </VStack>
         </Dialog.Body>
+        {langy.enabled && (
+          <Dialog.Footer borderTopWidth="1px" paddingX={5} paddingY={3.5} position="relative">
+            <Box
+              aria-hidden
+              position="absolute"
+              insetX={0}
+              top={0}
+              height="3px"
+              bgGradient="to-r"
+              gradientFrom="purple.400"
+              gradientVia="pink.400/60"
+              gradientTo="transparent"
+            />
+            <HStack width="full" gap={3}>
+              <Box
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                boxSize={7}
+                borderRadius="md"
+                bgGradient="to-br"
+                gradientFrom="purple.500"
+                gradientTo="pink.500"
+                color="white"
+                flexShrink={0}
+              >
+                <Sparkles size={14} strokeWidth={2.1} aria-hidden />
+              </Box>
+              <Text
+                flex={1}
+                minWidth={0}
+                truncate
+                fontSize="12.5px"
+                fontWeight="medium"
+                color="purple.600"
+              >
+                Can't find what you're looking for?
+              </Text>
+              <Button
+                variant="solid"
+                flexShrink={0}
+                bgGradient="to-r"
+                gradientFrom="purple.600"
+                gradientTo="pink.600"
+                _hover={{ opacity: 0.9 }}
+                onClick={() => askLangy(search)}
+              >
+                Ask Langy
+              </Button>
+            </HStack>
+          </Dialog.Footer>
+        )}
       </Dialog.Content>
     </Dialog.Root>
   );
