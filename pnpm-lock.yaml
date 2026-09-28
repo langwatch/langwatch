@@ -4922,6 +4922,9 @@ importers:
       '@langwatch/system-migrations':
         specifier: workspace:*
         version: link:../../../packages/system-migrations
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
