@@ -40277,6 +40277,79 @@ for your project.
 All board data is read with LangWatchQL, LangWatch's query layer over your
 traces, evaluations and cost data.
 
+## Build boards from your own AI agent
+
+Your coding assistant can build and edit LangWatch dashboards for you, through
+the [LangWatch MCP server](/integration/mcp).
+
+### Connect the MCP server
+
+Connect Claude Code, Cursor, or another MCP-capable assistant to LangWatch
+first. Follow the [LangWatch MCP Server setup guide](/integration/mcp) to add
+the server and set your API key.
+
+### Dashboard tools
+
+Once connected, your agent has these dashboard tools:
+
+- `platform_list_dashboards`: list every dashboard in the project.
+- `platform_get_dashboard`: read one dashboard, including its widgets.
+- `platform_create_dashboard`: create a new, empty dashboard.
+- `platform_rename_dashboard`: rename a dashboard.
+- `platform_delete_dashboard`: delete a dashboard and its widgets.
+- `run_query`: run one read-only LangWatchQL (LWQL) statement and see the rows
+  it returns. Use this to check a query before it goes into a widget.
+- `add_dashboard_widget`: create a custom widget and add it to a dashboard.
+
+### The widget definition format
+
+A widget has two parts:
+
+- **`code`**: a TSX source file. It runs sandboxed in the browser and renders
+  the widget's chart or panel.
+- **`queries`**: up to 8 named LangWatchQL statements the code can read from.
+  Pass them as `{ "<name>": "<LWQL SQL>" }`, or as a list of `{ name, sql }`
+  entries.
+
+Ask your agent to validate each query with `run_query` before it calls
+`add_dashboard_widget`. A query only actually runs once the widget renders
+inside the sandbox, so catching a mistake in the SQL earlier, with
+`run_query`, is faster than catching it on the dashboard.
+
+### The LW widget API
+
+Inside `code`, a global `LW` object gives the widget everything it needs:
+
+- `LW.dashboardContext`: the dashboard's current time window, granularity,
+  timezone and theme.
+- `LW.params`: the widget's own author-declared parameter values.
+- `LW.theme`: the dashboard's current colour theme (`"light"` or `"dark"`).
+- `LW.query(name, params?)`: runs one of the widget's named queries and
+  returns its rows.
+- `LW.useChartQuery(name, params?)`: the React hook version of `LW.query`.
+  Gives `data`, `isLoading`, `isFetching`, `isError`, `error`, `status`, and
+  `refetch`, and refetches automatically when the dashboard's time window or
+  granularity changes. Use this instead of `LW.query` in most widgets.
+- `LW.setHeight(px)`: resizes the widget's frame once its content's height is
+  known.
+- `LW.onDashboardContextChange(callback)` / `LW.useDashboardContext()`:
+  subscribe to, or read, the dashboard's live context.
+- `LW.useParams()`: read the widget's author-declared parameter values.
+- `LW.error(err)`: report an error without throwing.
+- `LW.navigate(target, params?)`: navigate the host to an allowlisted target,
+  such as a trace list or a single trace.
+
+### Example prompt
+
+```
+Add a widget to my Agent health board that shows p95 latency by model
+for the last 7 days.
+```
+
+Your agent will validate the LWQL with `run_query`, write the widget's TSX
+code against `LW.useChartQuery`, and call `add_dashboard_widget` to add it to
+the board.
+
 ---
 
 # FILE: ./features/embedded-analytics.mdx
