@@ -1,17 +1,28 @@
-import { Box, Flex, Heading } from "@chakra-ui/react";
-import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import { useTheme } from "next-themes";
+import "@langwatch/design-system-internal/styles.css";
+import "./app.css";
+import {
+  applyThemeChoice,
+  Callout,
+  IconMonitor,
+  IconMoon,
+  IconSun,
+  Page,
+  SegmentedControl,
+  Text,
+  TopBar,
+} from "@langwatch/design-system-internal";
 import { StrictMode, useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { createRoot } from "react-dom/client";
 
 import { GalleryView, type Density } from "./gallery-view.tsx";
 import { InspectView } from "./inspect-view.tsx";
 import {
-  type WIDTHS,
-  type PreviewScheme,
+  galleryResponseSchema,
+  templatesResponseSchema,
   type GalleryEntry,
+  type PreviewScheme,
   type TemplateSummary,
+  type WIDTHS,
 } from "./studio-shared.ts";
 import {
   buildSearch,
@@ -34,21 +45,21 @@ const Studio = (): JSX.Element => {
   const [currentProps, setCurrentProps] = useState<unknown>(null);
 
   const [previewScheme, setPreviewScheme] = useState<PreviewScheme>(initialUrl.theme);
-  const { resolvedTheme, setTheme } = useTheme();
-  const previewDark = resolvedTheme === "dark";
+  const previewDark = useResolvedDark({ scheme: previewScheme });
 
   const [everyFixture, setEveryFixture] = useState(initialUrl.everyFixture);
   const [width, setWidth] = useState<keyof typeof WIDTHS>(initialUrl.width);
   const [density, setDensity] = useState<Density>(initialUrl.density);
 
   useEffect(() => {
-    setTheme(previewScheme);
-  }, [previewScheme, setTheme]);
+    applyThemeChoice({ choice: previewScheme });
+  }, [previewScheme]);
 
   useEffect(() => {
     fetch("/__templates")
       .then((response) => response.json())
-      .then((body: TemplateSummary[] | { error: string }) => {
+      .then((json: unknown) => {
+        const body = templatesResponseSchema.parse(json);
         if ("error" in body) {
           setFailure(body.error);
           return;
@@ -127,58 +138,55 @@ const Studio = (): JSX.Element => {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  if (failure) {
-    return (
-      <Box padding={6} color="red.700">
-        The studio could not load the templates: {failure}
-      </Box>
-    );
-  }
-  if (!templates) {
-    return (
-      <Box padding={6} color="fg.muted">
-        Loading templates…
-      </Box>
-    );
-  }
+  const nav = (
+    <StudioTopBar
+      view={view}
+      onViewChange={setView}
+      previewScheme={previewScheme}
+      onPreviewSchemeChange={setPreviewScheme}
+    />
+  );
 
-  return (
-    <Flex direction="column" height="100vh" bg="bg">
-      <StudioHeader
-        view={view}
-        onViewChange={setView}
-        previewScheme={previewScheme}
-        onPreviewSchemeChange={setPreviewScheme}
-      />
-
-      <Box flex="1" minHeight={0}>
-        {view === "inspect" ? (
-          <InspectView
-            templates={inspectTemplates}
-            selected={selected}
-            currentProps={currentProps}
-            onPropsChange={setCurrentProps}
-            onSelect={choose}
-            previewDark={previewDark}
-            width={width}
-            onWidthChange={setWidth}
-          />
+  if (failure || !templates) {
+    return (
+      <Page nav={nav}>
+        {failure ? (
+          <Callout tone="error" title="The mail room could not load the templates">
+            {failure}
+          </Callout>
         ) : (
-          <GalleryView
-            entries={galleryEntries}
-            failure={galleryFailure}
-            everyFixture={everyFixture}
-            onEveryFixtureChange={setEveryFixture}
-            width={width}
-            onWidthChange={setWidth}
-            density={density}
-            onDensityChange={setDensity}
-            previewDark={previewDark}
-            onOpen={openInInspect}
-          />
+          <Text tone="secondary">Loading templates…</Text>
         )}
-      </Box>
-    </Flex>
+      </Page>
+    );
+  }
+
+  return view === "inspect" ? (
+    <InspectView
+      nav={nav}
+      templates={inspectTemplates}
+      selected={selected}
+      currentProps={currentProps}
+      onPropsChange={setCurrentProps}
+      onSelect={choose}
+      previewDark={previewDark}
+      width={width}
+      onWidthChange={setWidth}
+    />
+  ) : (
+    <GalleryView
+      nav={nav}
+      entries={galleryEntries}
+      failure={galleryFailure}
+      everyFixture={everyFixture}
+      onEveryFixtureChange={setEveryFixture}
+      width={width}
+      onWidthChange={setWidth}
+      density={density}
+      onDensityChange={setDensity}
+      previewDark={previewDark}
+      onOpen={openInInspect}
+    />
   );
 };
 
@@ -215,7 +223,8 @@ function useGalleryEntries({ view, everyFixture }: { view: View; everyFixture: b
     const controller = new AbortController();
     fetch(`/__gallery${everyFixture ? "?fixtures=all" : ""}`, { signal: controller.signal })
       .then((response) => response.json())
-      .then((body: GalleryEntry[] | { error: string }) => {
+      .then((json: unknown) => {
+        const body = galleryResponseSchema.parse(json);
         if ("error" in body) {
           setGalleryFailure(body.error);
           return;
@@ -300,7 +309,33 @@ function useAddressBarSync({
   }, [width, density, previewScheme, everyFixture, currentProps]);
 }
 
-function StudioHeader({
+const DARK_QUERY = "(prefers-color-scheme: dark)";
+
+/** Whether the studio, and so every mail frame, is dark: "system" follows the OS live. */
+function useResolvedDark({ scheme }: { scheme: PreviewScheme }): boolean {
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia(DARK_QUERY).matches);
+  useEffect(() => {
+    const query = window.matchMedia(DARK_QUERY);
+    const onChange = () => setSystemDark(query.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+  return scheme === "system" ? systemDark : scheme === "dark";
+}
+
+const VIEW_OPTIONS: { value: View; label: string }[] = [
+  { value: "inspect", label: "Inspect" },
+  { value: "gallery", label: "Gallery" },
+];
+
+/** The kit's ThemeToggle, but bound to the address bar's `theme` rather than localStorage. */
+const SCHEME_OPTIONS: { value: PreviewScheme; label: string; icon: JSX.Element }[] = [
+  { value: "system", label: "System theme", icon: <IconMonitor /> },
+  { value: "light", label: "Light theme", icon: <IconSun /> },
+  { value: "dark", label: "Dark theme", icon: <IconMoon /> },
+];
+
+function StudioTopBar({
   view,
   onViewChange,
   previewScheme,
@@ -312,51 +347,38 @@ function StudioHeader({
   onPreviewSchemeChange: (scheme: PreviewScheme) => void;
 }): JSX.Element {
   return (
-    <Flex
-      as="header"
-      align="center"
-      justify="space-between"
-      gap={4}
-      paddingX={4}
-      paddingY={2}
-      borderBottomWidth="1px"
-      borderColor="border"
-      bg="bg.panel"
-      flexWrap="wrap"
-    >
-      <Heading size="sm">LangWatch mail</Heading>
-      <Flex gap={4} align="center" flexWrap="wrap">
-        <SegmentedControl
-          size="xs"
-          items={[
-            { value: "inspect", label: "Inspect" },
-            { value: "gallery", label: "Gallery" },
-          ]}
-          value={view}
-          onValueChange={(details) => onViewChange(details.value as View)}
-        />
-        <SegmentedControl
-          size="xs"
-          items={[
-            { value: "light", label: "Light" },
-            { value: "system", label: "System" },
-            { value: "dark", label: "Dark" },
-          ]}
-          value={previewScheme}
-          onValueChange={(details) => onPreviewSchemeChange(details.value as PreviewScheme)}
-        />
-      </Flex>
-    </Flex>
+    <TopBar
+      name="Mail room"
+      themeToggle={false}
+      actions={
+        <>
+          <SegmentedControl
+            label="View"
+            size="sm"
+            options={VIEW_OPTIONS}
+            value={view}
+            onChange={onViewChange}
+          />
+          <SegmentedControl
+            label="Theme"
+            size="sm"
+            iconOnly
+            options={SCHEME_OPTIONS}
+            value={previewScheme}
+            onChange={onPreviewSchemeChange}
+          />
+        </>
+      }
+    />
   );
 }
 
 const mount = document.getElementById("studio");
 if (mount) {
+  applyThemeChoice({ choice: initialUrl.theme });
   createRoot(mount).render(
     <StrictMode>
-      <DesignSystemProvider>
-        <Studio />
-      </DesignSystemProvider>
+      <Studio />
     </StrictMode>,
   );
 }

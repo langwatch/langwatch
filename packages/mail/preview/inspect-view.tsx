@@ -1,19 +1,42 @@
-import { Box, Button, chakra, Flex, Heading, HStack, Stack, Text } from "@chakra-ui/react";
-import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import { useEffect, useState, type JSX } from "react";
+import {
+  Button,
+  Callout,
+  CodeBlock,
+  CopyButton,
+  Inline,
+  Link,
+  Page,
+  Panel,
+  SegmentedControl,
+  Stack,
+  Text,
+} from "@langwatch/design-system-internal";
+import { useEffect, useState, type JSX, type ReactNode } from "react";
 
 import { PropsForm } from "./props-form.tsx";
 import {
   prepareMailDocument,
+  renderResponseSchema,
   WIDTHS,
   type Rendered,
   type TemplateSummary,
 } from "./studio-shared.ts";
 
-const HtmlButton = chakra("button");
-const HtmlIframe = chakra("iframe");
+type Tab = "html" | "text";
+type Width = keyof typeof WIDTHS;
+
+const TAB_OPTIONS: { value: Tab; label: string }[] = [
+  { value: "html", label: "HTML" },
+  { value: "text", label: "Text" },
+];
+
+export const WIDTH_OPTIONS: { value: Width; label: string }[] = [
+  { value: "desktop", label: "Desktop" },
+  { value: "mobile", label: "Mobile" },
+];
 
 export interface InspectViewProps {
+  nav: ReactNode;
   templates: TemplateSummary[];
   selected: { id: string; fixture: string } | null;
   currentProps: unknown;
@@ -25,6 +48,7 @@ export interface InspectViewProps {
 }
 
 export const InspectView = ({
+  nav,
   templates,
   selected,
   currentProps,
@@ -36,7 +60,7 @@ export const InspectView = ({
 }: InspectViewProps): JSX.Element => {
   const [rendered, setRendered] = useState<Rendered | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"html" | "text">("html");
+  const [tab, setTab] = useState<Tab>("html");
 
   const template = templates.find((entry) => entry.id === selected?.id) ?? null;
 
@@ -48,14 +72,15 @@ export const InspectView = ({
       body: JSON.stringify({ id: selected.id, props: currentProps }),
       signal: controller.signal,
     })
-      .then(async (response) => ({ ok: response.ok, body: await response.json() }))
-      .then(({ ok, body }) => {
-        if (ok) {
-          setRendered(body as Rendered);
-          setRenderError(null);
-        } else {
-          setRenderError((body as { error: string }).error);
+      .then((response) => response.json())
+      .then((json: unknown) => {
+        const body = renderResponseSchema.parse(json);
+        if ("error" in body) {
+          setRenderError(body.error);
+          return;
         }
+        setRendered(body);
+        setRenderError(null);
       })
       .catch(() => undefined);
     return () => controller.abort();
@@ -67,152 +92,92 @@ export const InspectView = ({
   const frameHtml = rendered ? prepareMailDocument(rendered.html, previewDark) : "";
 
   return (
-    <Flex height="full" minHeight={0}>
-      <Stack
-        as="nav"
-        width="260px"
-        flexShrink={0}
-        gap={4}
-        padding={4}
-        overflowY="auto"
-        borderRightWidth="1px"
-        borderColor="border"
-        bg="bg.panel"
-      >
-        <Box>
-          <Heading size="xs">LangWatch mail</Heading>
-          <Text fontSize="2xs" color="fg.muted" marginTop={0.5}>
-            {templates.length} messages
-          </Text>
-        </Box>
-        {templates.map((entry) => (
-          <TemplateNavEntry key={entry.id} entry={entry} selected={selected} onSelect={onSelect} />
-        ))}
-      </Stack>
+    <Page
+      nav={nav}
+      width="full"
+      title={template?.title ?? "Inspect"}
+      subtitle={template?.sentWhen}
+      actions={
+        <Inline gap={2} wrap justify="end">
+          <SegmentedControl
+            label="Part"
+            size="sm"
+            options={TAB_OPTIONS}
+            value={tab}
+            onChange={setTab}
+          />
+          <SegmentedControl
+            label="Width"
+            size="sm"
+            options={WIDTH_OPTIONS}
+            value={width}
+            onChange={onWidthChange}
+          />
+          <CopyButton value={rendered?.html ?? ""} label="Copy HTML" showLabel />
+          <Link href={documentUrl} external>
+            Open in new tab
+          </Link>
+        </Inline>
+      }
+    >
+      <div className="mailroom-inspect">
+        <div className="mailroom-messages">
+          <Panel title="Messages" meta={`${templates.length}`}>
+            <div className="mailroom-message-list">
+              <Stack gap={4}>
+                {templates.map((entry) => (
+                  <TemplateNavEntry
+                    key={entry.id}
+                    entry={entry}
+                    selected={selected}
+                    onSelect={onSelect}
+                  />
+                ))}
+              </Stack>
+            </div>
+          </Panel>
+        </div>
 
-      <Stack flex="1" minWidth={0} gap={0}>
-        <Stack
-          as="header"
-          gap={2}
-          padding={4}
-          borderBottomWidth="1px"
-          borderColor="border"
-          bg="bg.panel"
-        >
-          <Box>
-            <Text fontSize="2xs" textTransform="uppercase" letterSpacing="wide" color="fg.muted">
-              Subject
-            </Text>
-            <Heading size="sm">{rendered?.subject ?? "—"}</Heading>
-          </Box>
-          <HStack gap={3} flexWrap="wrap">
-            <SegmentedControl
-              size="xs"
-              items={["html", "text"]}
-              value={tab}
-              onValueChange={(details) => setTab(details.value as "html" | "text")}
-            />
-            <SegmentedControl
-              size="xs"
-              items={["desktop", "mobile"]}
-              value={width}
-              onValueChange={(details) => onWidthChange(details.value as keyof typeof WIDTHS)}
-            />
-            <Button
-              size="2xs"
-              variant="outline"
-              onClick={() => void navigator.clipboard.writeText(rendered?.html ?? "")}
-            >
-              Copy HTML
-            </Button>
-            <Button asChild size="2xs" variant="outline">
-              <a href={documentUrl} target="_blank" rel="noreferrer">
-                Open in new tab
-              </a>
-            </Button>
-          </HStack>
-        </Stack>
-        {renderError && (
-          <Box
-            padding={3}
-            bg="red.50"
-            color="red.700"
-            fontSize="xs"
-            borderBottomWidth="1px"
-            borderColor="red.200"
-          >
-            These props were rejected: {renderError}
-          </Box>
-        )}
-        <Flex
-          flex="1"
-          overflow="auto"
-          justify="center"
-          padding={6}
-          bg={previewDark ? "#14161a" : "bg.muted"}
-        >
-          {tab === "html" ? (
-            <Box
-              width={WIDTHS[width]}
-              minHeight="640px"
-              height="full"
-              borderWidth="1px"
-              borderColor={previewDark ? "#2a2e36" : "border"}
-              borderRadius="md"
-              bg={previewDark ? "#14161a" : "white"}
-              overflow="hidden"
-              shadow="xs"
-            >
-              <HtmlIframe
-                title="Rendered email"
-                srcDoc={frameHtml}
-                width="full"
-                height="full"
-                border="none"
-              />
-            </Box>
-          ) : (
-            <Box
-              as="pre"
-              width={WIDTHS[width]}
-              height="fit-content"
-              whiteSpace="pre-wrap"
-              fontFamily="mono"
-              fontSize="xs"
-              lineHeight="tall"
-              padding={5}
-              bg="bg.panel"
-              borderWidth="1px"
-              borderColor="border"
-              borderRadius="md"
-            >
-              {rendered?.text ?? ""}
-            </Box>
+        <Stack gap={4} className="mailroom-preview">
+          {renderError && (
+            <Callout tone="error" title="These props were rejected">
+              {renderError}
+            </Callout>
           )}
-        </Flex>
-      </Stack>
+          <Panel flush title={<Text truncate>{rendered?.subject ?? "—"}</Text>}>
+            <div className="mailroom-stage">
+              {tab === "html" ? (
+                <div className="mailroom-frame" style={{ width: WIDTHS[width] }}>
+                  <iframe title="Rendered email" srcDoc={frameHtml} />
+                </div>
+              ) : (
+                <div className="mailroom-text" style={{ width: WIDTHS[width] }}>
+                  <CodeBlock code={rendered?.text ?? ""} label="Plain text" wrap />
+                </div>
+              )}
+            </div>
+          </Panel>
+        </Stack>
 
-      <Stack
-        as="aside"
-        width="320px"
-        flexShrink={0}
-        gap={3}
-        padding={4}
-        overflowY="auto"
-        borderLeftWidth="1px"
-        borderColor="border"
-        bg="bg.panel"
-      >
-        <Heading size="xs">Props</Heading>
-        {template && (
-          <PropsForm schema={template.formSchema} props={currentProps} onChange={onPropsChange} />
-        )}
-      </Stack>
-    </Flex>
+        <div className="mailroom-props">
+          <Panel title="Props">
+            {template ? (
+              <PropsForm
+                schema={template.formSchema}
+                props={currentProps}
+                onChange={onPropsChange}
+              />
+            ) : (
+              <Text tone="secondary">Pick a message to edit its props.</Text>
+            )}
+          </Panel>
+        </div>
+      </div>
+    </Page>
   );
 };
 
-/** One template in the navigation: its title, when it is sent, and a chip per fixture. */
+/** One template in the navigation: its title, when it is sent, and a button per fixture. */
 function TemplateNavEntry({
   entry,
   selected,
@@ -223,43 +188,26 @@ function TemplateNavEntry({
   onSelect: InspectViewProps["onSelect"];
 }): JSX.Element {
   const isCurrent = entry.id === selected?.id;
-  const firstFixture = entry.fixtures[0];
   return (
-    <Box>
-      <HtmlButton
-        type="button"
-        width="full"
-        textAlign="left"
-        cursor="pointer"
-        borderRadius="sm"
-        paddingY={0.5}
-        onClick={() => firstFixture && onSelect(entry.id, firstFixture.name)}
-      >
-        <Heading size="xs" color={isCurrent ? "orange.500" : "fg"}>
-          {entry.title}
-        </Heading>
-        <Text fontSize="2xs" color="fg.muted">
+    <Stack gap={2}>
+      <Stack gap={1}>
+        <Text weight="semibold">{entry.title}</Text>
+        <Text size="sm" tone="secondary" as="p">
           {entry.sentWhen}
         </Text>
-      </HtmlButton>
-      <HStack gap={1} flexWrap="wrap" marginTop={1.5}>
-        {entry.fixtures.map((fixture) => {
-          const isFixtureCurrent = isCurrent && fixture.name === selected.fixture;
-          return (
-            <Button
-              key={fixture.name}
-              type="button"
-              size="2xs"
-              variant={isFixtureCurrent ? "solid" : "outline"}
-              colorPalette={isFixtureCurrent ? "orange" : "gray"}
-              borderRadius="full"
-              onClick={() => onSelect(entry.id, fixture.name)}
-            >
-              {fixture.name}
-            </Button>
-          );
-        })}
-      </HStack>
-    </Box>
+      </Stack>
+      <Inline gap={1} wrap>
+        {entry.fixtures.map((fixture) => (
+          <Button
+            key={fixture.name}
+            size="sm"
+            variant={isCurrent && fixture.name === selected.fixture ? "primary" : "secondary"}
+            onClick={() => onSelect(entry.id, fixture.name)}
+          >
+            {fixture.name}
+          </Button>
+        ))}
+      </Inline>
+    </Stack>
   );
 }
