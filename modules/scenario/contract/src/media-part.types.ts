@@ -17,7 +17,7 @@ export interface MediaAudioElement {
 
 /** The props an audio element spreads so only one plays at a time. */
 export interface MediaAudioPlayback {
-  ref(element: MediaAudioElement | null): void;
+  ref: (element: MediaAudioElement | null) => void;
   onPlay: () => void;
   onEnded: () => void;
 }

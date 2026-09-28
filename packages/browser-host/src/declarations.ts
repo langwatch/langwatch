@@ -11,7 +11,11 @@ import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
 import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
-import type { MediaPartProps, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+import type {
+  MediaAudioElement,
+  MediaPartProps,
+  ScenarioParameterDefinition,
+} from "@langwatch/scenario-contract";
 import type { TimeInput } from "@langwatch/time";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import type {
@@ -278,7 +282,7 @@ export type UiEditModelProviderFormProps = {
  * hands it out. The thread never starts a clip; it passes these to the media.
  */
 export type UiConversationAudioPlayback = {
-  ref: (element: HTMLAudioElement | null) => void;
+  ref: (element: MediaAudioElement | null) => void;
   onPlay: () => void;
   onEnded: () => void;
 };
