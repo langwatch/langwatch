@@ -271,13 +271,15 @@ describe("Langy on a board", () => {
   });
 
   describe("given a block was just added and its query returned a number", () => {
-    /** Adds the trace-count block through the picker's Blocks and waits for the offer. */
+    /** Duplicates the board's existing trace-count block and waits for the offer. */
     const addTraceCount = async () => {
-      // The picker stays open under a static test address, so its backdrop is ignored.
       const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const server = inMemoryServer();
-      const host = openBoard({ server, query: { addBlock: "open" } });
-      await user.click(await screen.findByRole("button", { name: /Trace count over time/ }));
+      const server = inMemoryServer({ widgets: [storedTraceCount("w-1")] });
+      const host = openBoard({ server });
+      await user.click(
+        await screen.findByRole("button", { name: "Actions for Trace count over time" }),
+      );
+      await user.click(await screen.findByRole("menuitem", { name: /Duplicate/ }));
       const accept = await screen.findByRole("button", { name: "Generate insights", hidden: true });
       await waitFor(() => expect(accept).toBeEnabled());
       return { user, server, host, accept };

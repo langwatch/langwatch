@@ -1,10 +1,10 @@
 /**
- * The "Add a block" picker. With Langy, a question closes it and asks Langy with the board
+ * The "Add a block" picker. A question closes it and asks Langy with the board
  * attached, writing nothing; a pinned footer always offers to ask Langy anything else.
- * "Blocks" adds a library block; from the Flight Deck it asks which board gets it.
+ * With Langy unavailable to the member, no question can be sent, so the picker is empty.
  */
 
-import { Box, Button, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import {
@@ -17,7 +17,6 @@ import {
   Gauge,
   GitCompare,
   HelpCircle,
-  LayoutGrid,
   type LucideIcon,
   MessageSquare,
   Scale,
@@ -27,10 +26,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { useBoardBlocks } from "../../behavior/use-board-blocks.ts";
-import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
-import type { BlockDefinition, BlockPeriod } from "../../blocks/index.ts";
+import type { BlockPeriod } from "../../blocks/index.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
   type BoardSubject,
@@ -43,9 +39,7 @@ import {
   type BlockQuestionIcon,
   type BlockQuestionSection,
   searchBlockQuestions,
-  searchLibraryBlocks,
 } from "../../model/block-questions.ts";
-import { dashboardsPath } from "../../model/boards.ts";
 
 const QUESTION_ICONS: Readonly<Record<BlockQuestionIcon, LucideIcon>> = {
   gauge: Gauge,
@@ -63,15 +57,12 @@ const QUESTION_ICONS: Readonly<Record<BlockQuestionIcon, LucideIcon>> = {
   scale: Scale,
 };
 
-/** The destination value that creates a board for the block. */
-const NEW_BOARD = "__new__";
-
 export function BlockPickerDialog({
   board,
   period,
   onClose,
 }: {
-  /** The board the picker opened on; a read-only one sends blocks to a board the member picks. */
+  /** The board the picker opened on, attached as Langy's context. */
   board: BoardSubject;
   period: BlockPeriod;
   onClose: () => void;
@@ -82,9 +73,8 @@ export function BlockPickerDialog({
   const sections = langy.enabled
     ? searchBlockQuestions({ sections: BLOCK_QUESTION_SECTIONS, search })
     : [];
-  const blocks = searchLibraryBlocks(search);
   const typed = search.trim();
-  const hasMatches = sections.length > 0 || blocks.length > 0;
+  const hasMatches = sections.length > 0;
   const canAskOnEnter = langy.enabled && !hasMatches && typed.length > 0;
 
   const ask = (question: BlockQuestion) => {
@@ -109,8 +99,8 @@ export function BlockPickerDialog({
         </Dialog.Header>
         <VStack align="stretch" gap={3} paddingX={5} paddingY={5} borderBottomWidth="1px">
           <SearchInput
-            aria-label={langy.enabled ? "Search questions and blocks" : "Search blocks"}
-            placeholder={langy.enabled ? "What do you need to know?" : "Search blocks"}
+            aria-label="Search questions"
+            placeholder={langy.enabled ? "What do you need to know?" : "Search questions"}
             height="54px"
             borderRadius="2xl"
             fontSize="15px"
@@ -129,13 +119,6 @@ export function BlockPickerDialog({
             {sections.map((section) => (
               <QuestionSection key={section.id} section={section} onChoose={ask} />
             ))}
-            {blocks.length > 0 && (
-              <BlocksSection
-                blocks={blocks}
-                targetDashboardId={board.readOnly ? void 0 : board.id}
-                onClose={onClose}
-              />
-            )}
             {!hasMatches && (
               <Text fontSize="13px" color="fg.muted">
                 {langy.enabled
@@ -217,88 +200,6 @@ function SectionHeading({ title, why, palette }: { title: string; why: string; p
       <Text fontSize="12px" lineHeight="relaxed" color="fg.subtle">
         {why}
       </Text>
-    </VStack>
-  );
-}
-
-function BlocksSection({
-  blocks,
-  targetDashboardId,
-  onClose,
-}: {
-  blocks: readonly BlockDefinition[];
-  /** Absent on the Flight Deck, where the member picks one of their own boards. */
-  targetDashboardId: string | undefined;
-  onClose: () => void;
-}) {
-  const host = useAnalyticsHost();
-  const saved = useSavedDashboards();
-  const boardBlocks = useBoardBlocks();
-  const [chosenDestination, setChosenDestination] = useState<string | undefined>();
-  const [isAdding, setIsAdding] = useState(false);
-  const destination = chosenDestination ?? saved.boards[0]?.id ?? NEW_BOARD;
-
-  const addToDestination = async (block: BlockDefinition) => {
-    if (targetDashboardId) {
-      const added = await boardBlocks.addBlock({
-        dashboardId: targetDashboardId,
-        blockId: block.id,
-      });
-      if (added) onClose();
-      return;
-    }
-    const target =
-      destination === NEW_BOARD
-        ? await saved.createUntitledBoard()
-        : saved.boards.find(({ id }) => id === destination);
-    if (!target) return;
-    const added = await boardBlocks.addBlock({ dashboardId: target.id, blockId: block.id });
-    if (!added) return;
-    host.succeeded({ title: `Added to ${target.name}` });
-    host.navigate(dashboardsPath({ projectSlug: saved.projectSlug, dashboardId: target.id }));
-  };
-
-  const choose = (block: BlockDefinition) => {
-    setIsAdding(true);
-    void addToDestination(block).finally(() => setIsAdding(false));
-  };
-
-  return (
-    <VStack as="section" aria-label="Blocks" align="stretch" gap={1.5}>
-      <SectionHeading title="Blocks" why="Add a ready-made block to a board." palette="gray" />
-      {!targetDashboardId && (
-        <HStack gap={2} paddingX={1}>
-          <Text fontSize="13px" color="fg.muted" flexShrink={0}>
-            Add to
-          </Text>
-          <NativeSelect.Root size="sm">
-            <NativeSelect.Field
-              aria-label="Add to"
-              value={destination}
-              onChange={(event) => setChosenDestination(event.currentTarget.value)}
-            >
-              {saved.boards.map((each) => (
-                <option key={each.id} value={each.id}>
-                  {each.name}
-                </option>
-              ))}
-              <option value={NEW_BOARD}>A new dashboard</option>
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-        </HStack>
-      )}
-      {blocks.map((block) => (
-        <PickerRow
-          key={block.id}
-          title={block.title}
-          detail={block.subtitle}
-          icon={LayoutGrid}
-          palette="gray"
-          disabled={isAdding}
-          onClick={() => choose(block)}
-        />
-      ))}
     </VStack>
   );
 }

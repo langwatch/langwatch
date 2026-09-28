@@ -110,17 +110,13 @@ Feature: Dashboards v1
     And Langy opens with that question's own prompt, the dashboard period and grain
     And the current board is passed as context, marked read-only on the Flight Deck
     And nothing is written to any board
-    When they instead choose a block from the "Blocks" section
-    Then only that one block is added to their board
-    And from the Flight Deck it is added to the board of their own they chose
 
   @integration
   Scenario: AC12 Only working questions are offered
     Given the picker is open
     When the member browses every section
     Then every listed question carries its own prompt naming the LangWatchQL views and the dashboard period
-    And the "Blocks" section lists every library block
-    And when Langy is not available to the member only the "Blocks" section is shown
+    And when Langy is not available to the member the picker shows no questions and nothing to choose
 
   @integration
   Scenario: AC13 Period and grain update every block
