@@ -45,6 +45,20 @@ Feature: Event-sourced topic clustering scheduling
     Then they are told a run is already in progress
     And they are not told a new run has started
 
+  @unit
+  Scenario: A disabled manual request is not reported as started
+    Given the requestClustering command switch is enabled for a project
+    When the user asks to run clustering from the settings page
+    Then the endpoint reports that the run was not started
+    And the page explains the request is disabled without a success toast
+
+  @unit
+  Scenario: An enabled manual request keeps its accepted feedback
+    Given the requestClustering command switch is off for a project
+    When the user asks to run clustering from the settings page
+    Then the endpoint sends the request and reports it started
+    And the page shows the existing success toast
+
   Scenario: A large backlog is processed page by page through durable cursors
     Given a clustering run that fills a whole page of traces
     When the run completes with a continuation cursor
