@@ -12,6 +12,12 @@ import {
   dashboardTrpcRowSchema,
   dashboardTrpcSummarySchema,
 } from "./dashboard.responses.ts";
+import {
+  dashboardDescriptionSchema,
+  dashboardNameSchema,
+  dashboardSourcePresenceSchema,
+  dashboardVisibilitySchema,
+} from "./dashboard.ts";
 
 const projectScopeSchema = z.object({ projectId: z.string() });
 const dashboardScopeSchema = z.object({
@@ -54,4 +60,28 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
   .query("getOrCreateFirst")
   .withInput(projectScopeSchema)
   .withOutput(dashboardTrpcRowSchema)
+
+  /**
+   * Dashboards area only, like the two below: refused while `release_dashboards`
+   * is off. The board's inline name and description.
+   */
+  .mutation("updateDetails")
+  .withInput(
+    z.object({
+      ...dashboardScopeSchema.shape,
+      name: dashboardNameSchema.optional(),
+      description: dashboardDescriptionSchema.nullable().optional(),
+    }),
+  )
+  .withOutput(dashboardTrpcRowSchema)
+
+  /** The creator or an admin; for a board older than creators, anyone who may edit. */
+  .mutation("setVisibility")
+  .withInput(z.object({ ...dashboardScopeSchema.shape, visibility: dashboardVisibilitySchema }))
+  .withOutput(dashboardTrpcRowSchema)
+
+  /** Per Flight Deck source, whether the project ever recorded a row. */
+  .query("sourcePresence")
+  .withInput(projectScopeSchema)
+  .withOutput(dashboardSourcePresenceSchema)
   .build();

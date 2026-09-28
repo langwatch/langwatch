@@ -5,7 +5,7 @@
  */
 import {
   langWatchQLQueryResultSchema,
-  LWQL_GRANULARITY_STEPS,
+  lwqlGranularityStepSchema,
   lwqlTimeWindowSchema,
 } from "@langwatch/analytics-contract";
 import { defineTrpcContract } from "@langwatch/api/contract";
@@ -18,17 +18,6 @@ const chartScopeSchema = z.object({ ...projectScopeSchema.shape, id: z.string() 
 
 /** Request shape only — length, not meaning. */
 const nameSchema = z.string().min(1).max(200);
-
-/**
- * The datapoint steps this deployment offers, so an off-list value is a schema
- * rejection here rather than reaching the application's backstop. The
- * bucket-budget arithmetic and its refusal are still the application's.
- */
-const granularityStepSchema = z.union([
-  z.literal(LWQL_GRANULARITY_STEPS[0]),
-  z.literal(LWQL_GRANULARITY_STEPS[1]),
-  z.literal(LWQL_GRANULARITY_STEPS[2]),
-]);
 
 export const savedWorkbenchChartDeletedSchema = z.object({ success: z.literal(true) });
 
@@ -74,7 +63,7 @@ export const savedWorkbenchChartTrpc = defineTrpcContract("analytics.savedWorkbe
     z.object({
       ...chartScopeSchema.shape,
       timeWindow: lwqlTimeWindowSchema.optional(),
-      granularitySeconds: granularityStepSchema.optional(),
+      granularitySeconds: lwqlGranularityStepSchema.optional(),
       onBudgetOverflow: z.enum(["refuse", "coarsen"]).optional(),
     }),
   )

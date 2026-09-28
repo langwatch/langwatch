@@ -28,10 +28,11 @@ type AlertActionParams = {
 export const graphTrpcTransport = defineTrpcRouter(DashboardApi, graphTrpc)
   .procedure("create")
   .withPermission("analytics:create")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     legacyGraph(
       await app.createGraph({
         projectId: input.projectId,
+        viewer: { userId: actor.id },
         name: input.name,
         graph: JSON.parse(input.graph) as Record<string, unknown>,
         filters: input.filterParams?.filters ?? {},
@@ -48,10 +49,11 @@ export const graphTrpcTransport = defineTrpcRouter(DashboardApi, graphTrpc)
 
   .procedure("getAll")
   .withPermission("analytics:view")
-  .handle(async ({ app, input }) => {
+  .handle(async ({ app, input, actor }) => {
     const { projectId, dashboardId } = input;
     const graphs = await app.listGraphs({
       projectId,
+      viewer: { userId: actor.id },
       ...(dashboardId === undefined ? {} : { dashboardId }),
     });
 
@@ -73,33 +75,46 @@ export const graphTrpcTransport = defineTrpcRouter(DashboardApi, graphTrpc)
 
   .procedure("delete")
   .withPermission("analytics:delete")
-  .handle(async ({ app, input }) =>
-    legacyGraph(await app.deleteGraph({ projectId: input.projectId, graphId: input.id })),
+  .handle(async ({ app, input, actor }) =>
+    legacyGraph(
+      await app.deleteGraph({
+        projectId: input.projectId,
+        graphId: input.id,
+        viewer: { userId: actor.id },
+      }),
+    ),
   )
 
   .procedure("getById")
   .withPermission("analytics:view")
-  .handle(async ({ app, input }) => {
-    const graph = await app.getGraph({ projectId: input.projectId, graphId: input.id });
+  .handle(async ({ app, input, actor }) => {
+    const graph = await app.getGraph({
+      projectId: input.projectId,
+      graphId: input.id,
+      viewer: { userId: actor.id },
+    });
 
     const trigger = await app.findAlertForGraph({
       customGraphId: input.id,
       projectId: input.projectId,
     });
 
+    const filters = knownFilters(graph.filters);
+
     return {
       ...legacyGraph(graph),
-      filters: knownFilters(graph.filters),
+      filters: Object.keys(filters).length > 0 ? filters : undefined,
       alert: trigger === undefined ? undefined : alertOf(trigger),
     };
   })
 
   .procedure("updateById")
   .withPermission("analytics:update")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     legacyGraph(
       await app.updateGraph({
         projectId: input.projectId,
+        viewer: { userId: actor.id },
         graphId: input.graphId,
         name: input.name,
         graph: JSON.parse(input.graph) as Record<string, unknown>,
@@ -110,10 +125,11 @@ export const graphTrpcTransport = defineTrpcRouter(DashboardApi, graphTrpc)
 
   .procedure("updateLayout")
   .withPermission("analytics:update")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     legacyGraph(
       await app.updateGraphLayout({
         projectId: input.projectId,
+        viewer: { userId: actor.id },
         graphId: input.graphId,
         layout: {
           gridColumn: input.gridColumn,
@@ -127,9 +143,10 @@ export const graphTrpcTransport = defineTrpcRouter(DashboardApi, graphTrpc)
 
   .procedure("batchUpdateLayouts")
   .withPermission("analytics:update")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     app.batchUpdateGraphLayouts({
       projectId: input.projectId,
+      viewer: { userId: actor.id },
       layouts: input.layouts.map((layout) => ({
         graphId: layout.graphId,
         layout: {
@@ -171,8 +188,8 @@ function alertOf(trigger: Trigger): GraphAlert {
  */
 function knownFilters(
   filters: Graph["filters"],
-): Record<string, string[] | Record<string, string[]>> | undefined {
-  if (!filters || typeof filters !== "object") return undefined;
+): Record<string, string[] | Record<string, string[]>> {
+  if (!filters || typeof filters !== "object") return {};
 
   const known: Record<string, string[] | Record<string, string[]>> = {};
   for (const [key, value] of Object.entries(filters)) {
@@ -182,5 +199,5 @@ function knownFilters(
     }
   }
 
-  return Object.keys(known).length > 0 ? known : undefined;
+  return known;
 }
