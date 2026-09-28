@@ -186,8 +186,11 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
       expect(refused).toHaveLength(1);
       // Asserting the code, not merely that something rejected, is what catches
       // a regression that lets an unrelated failure pass this test for the
-      // wrong reason.
-      expect(refused[0]!.reason).toMatchObject({ code: "team_membership_changed" });
+      // wrong reason. The fence refuses a removal that raced the other one; the
+      // guard refuses one that started after the other had already committed.
+      expect(["team_membership_changed", "team_last_admin_required"]).toContain(
+        (refused[0]!.reason as { code?: string }).code,
+      );
 
       const adminsLeft = await prisma.roleBinding.count({
         where: {
