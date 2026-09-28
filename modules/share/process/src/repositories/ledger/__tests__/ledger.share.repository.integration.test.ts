@@ -5,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * @see modules/share/specs/share.feature
  */
 import { AUTHZ_ENGINE_MIGRATION_NAME, type AuthzApi } from "@langwatch/authz-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
