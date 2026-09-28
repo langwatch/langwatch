@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import type { MediaPartData } from "@langwatch/trace-contract";
 
 /** The stored-object existence probe the host runs for a media part. */
