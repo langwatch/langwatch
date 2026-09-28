@@ -294,7 +294,9 @@ export class WorkflowEvaluationService {
   #baseUrl(): string {
     const baseUrl = this.dependencies.baseUrl;
     if (!baseUrl) {
-      throw new ExperimentRunLoopUnavailableError("public address for the run's results link");
+      throw new ExperimentRunLoopUnavailableError({
+        capability: "public address for the run's results link",
+      });
     }
 
     return baseUrl;

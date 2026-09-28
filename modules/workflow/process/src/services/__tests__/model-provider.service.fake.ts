@@ -162,6 +162,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve([]);
   }
 
+  listCostsWithCatalogue(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
   deleteCost(): Promise<void> {
     return Promise.resolve();
   }

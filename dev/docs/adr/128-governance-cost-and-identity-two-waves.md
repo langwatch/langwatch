@@ -11,7 +11,7 @@ generalizes), ADR-018 (unified substrate, hidden governance project),
 ADR-034 (the speed split; why rollups are fed by our code, not database
 views), ADR-015 (fold-projection replay — the rebuild machinery §4 reuses),
 ADR-092 (the authorization engine §18 rides), ADR-101 (login identity —
-the platform this ADR's identity tables live *beside*, never inside),
+the platform this ADR's identity tables live _beside_, never inside),
 ADR-022 (the event log is the source of truth; its retention bounds replay).
 
 **Replaces:** the unmerged identity branch (PRs #6987 → #6994 → #7001,
@@ -21,7 +21,7 @@ behaviour and requirements, not from that branch.
 
 **Revises:** ADR-088 Decision 4. It attributed pulled cost at org/team and
 left project deliberately unattributed; §8 stamps the org's governance
-project as the *home* of every pulled row and separates "home" from
+project as the _home_ of every pulled row and separates "home" from
 "spender" into different fields.
 
 > **One line:** every AI dollar — **gateway traffic** and **provider
@@ -88,14 +88,14 @@ in heads and branches, the more it gets "remembered" instead of read.
 All from the script kits (`databricks-scripts/`, `openai-scripts/`,
 `anthropic` probes, `microsoft-copilot-scripts/`), run against real
 accounts — each a **single account** (n=1), so account-level
-configuration may differ per customer. Claims marked *unprobed* are
+configuration may differ per customer. Claims marked _unprobed_ are
 documentation-derived, not measured; §20 names the probes that must run
 before the relying code ships:
 
 - **OpenAI** puts `user_id`, `user_email`, `api_key_id` on every cost row
   (1,579/1,579) — but 53% of measured spend ($153.28 of $286.85) sits on
   **deleted keys**, so resolving spend through the key roster is a trap.
-- **Anthropic**'s `created_by` names the key's *creator*, not the caller
+- **Anthropic**'s `created_by` names the key's _creator_, not the caller
   (one person "credited" 16,265,003 of 16,265,003 tokens); `principal`
   was unset on all 57 keys; amounts arrive in **cents**
   (the 100× class of bug, #6977).
@@ -114,23 +114,23 @@ before the relying code ships:
   prepaid consumption a "proven dead end" citing a `KNOWN_DEAD.md` that
   exists in neither the repo nor the vault; the claim is **withdrawn**
   as stronger than its evidence. The research note is explicit that the
-  Microsoft 365 admin centre *does* render month-to-date credits **per
+  Microsoft 365 admin centre _does_ render month-to-date credits **per
   agent** — the detail we want — and that our search for the interface
   behind that screen was "a failed search, not proof that none exists".
   §21 therefore never infers prepaid from data, and §20 carries the
-  probe. The per-seat price API's *absence* is separately reasoned from
+  probe. The per-seat price API's _absence_ is separately reasoned from
   the licensing model, not a probe — no probe can prove a negative. It
   has SKU/roster counts (4 licensed / 2 enabled measured) and activity.
 - **Databricks** query history shows humans as **emails** and service
-  principals as **bare UUIDs** — proven *under app-only
-  service-principal auth* (`51_by_user.csv`; the probe's own client id
+  principals as **bare UUIDs** — proven _under app-only
+  service-principal auth_ (`51_by_user.csv`; the probe's own client id
   is one of those UUIDs). SCIM listing of people under that same
   app-only auth is **unprobed** (the script ran but no output artifact
   survives, and its curl would pass a 403 silently); the 11/13 Entra
   `externalId` match exists in prose notes only. The research itself
   later corrected course (2026-08-20): **email is the primary join key** —
   `externalId` exists only for IdP-provisioned users, refreshes daily,
-  and Databricks advises against building on it. Genie *serving* tokens
+  and Databricks advises against building on it. Genie _serving_ tokens
   are provably untieable to requests; warehouse cost prorates by
   statement.
 
@@ -141,10 +141,10 @@ design — wave 1 ships the lanes **independent**; §2's interconnection
 and §7's mapping ship in **wave 2** (ruled by Sergio 2026-08-29) —
 §9–§17 identity, §18–§22 cross-cutting. **The §9–§17 grouping is
 topical, not a wave assignment**: each section states its own wave, and
-two of them straddle. §9 in particular is split — *stamping* the
+two of them straddle. §9 in particular is split — _stamping_ the
 provider's raw actor id at ingest is **wave 1** (§4 puts `RawActorId` in
 the rollup's dedup key on day one, and §16's wave-1 idle-seat aggregate
-distinct-counts it); *resolving* that id to a person and a department,
+distinct-counts it); _resolving_ that id to a person and a department,
 via §11–§13, is **wave 2**. §16 says the same of itself in its title.
 
 ### §1. One ADR, two waves, cost before identity
@@ -174,7 +174,7 @@ metering, separately labeled, no combined figure (§1). Everything below
 is the ruled design for the **wave-2** connected view.
 
 Where a pulled bill covers traffic (per provider/day — the bill's finest
-grain; *which* gateway traffic a bill covers is the admin's key mapping,
+grain; _which_ gateway traffic a bill covers is the admin's key mapping,
 §7):
 
 - **Total shown = the bill.** The screen's number can be held against the
@@ -184,22 +184,22 @@ grain; *which* gateway traffic a bill covers is the admin's key mapping,
   unallocated share is its own line, never silently netted.
 - **If gateway logs more than the bill** ($6.50 vs $6.00): the total is
   still $6.00, and the screen shows a visible "metering ran $0.50 over
-  bill" variance line. No subtraction, and no negative numbers *invented
-  by us* — a provider's own refund can make a billed day genuinely
+  bill" variance line. No subtraction, and no negative numbers _invented
+  by us_ — a provider's own refund can make a billed day genuinely
   negative (bill composition, below), and that renders as-is.
 - Both numbers are always stored and comparable; the wave-2
   estimated-vs-billed report is this variance line given its own screen.
 - **Days the bill hasn't reached yet are marked "estimated."** Gateway
   rows arrive instantly; the bill lands days later. Until a provider/day
   has a bill row, the screen shows the gateway number with an
-  *estimated* tag; when the bill lands, the number flips to the bill and
+  _estimated_ tag; when the bill lands, the number flips to the bill and
   the tag disappears. Computed at read (does the bill row exist yet?),
   nothing stored — the same pattern AWS, Azure and GCP cost pages use,
   so Tuesday's $4.20 becoming Thursday's $6.00 never looks like a
   silent change.
 
 Where no bill covers the traffic, gateway rows stand alone, labeled
-*metered*. The overlap rule runs at **query time, never insert time**:
+_metered_. The overlap rule runs at **query time, never insert time**:
 gateway rows arrive instantly, bills days later, and Anthropic restates 30
 days back (#6978) — only a read-time rule survives a restated bill.
 
@@ -232,7 +232,7 @@ Every stored amount is a whole number of nano-units (1 dollar =
 1,000,000,000 units — the existing `CostNanoUSD` / `AmountNanoUSD` Int64
 convention, `parseSummedNanoUsd()` / `nanoUsdToDecimalString()` untouched)
 with a **currency code column** on every row. Anthropic's cents and
-OpenAI's dollars are converted to *units* on arrival (exact integer math,
+OpenAI's dollars are converted to _units_ on arrival (exact integer math,
 never a float). The currency column is load-bearing from day one: Azure
 already returned EUR on our own subscription.
 
@@ -256,7 +256,7 @@ model exports cleanly if ever needed — `AmountNanoMinor` →
 `ChargePeriodStart/End`, `Provider` → `ProviderName`; actor, model and
 our metered amounts as custom `x_` columns. Our metered amount is
 **never** exported as FOCUS's `EffectiveCost` — that column means
-amortized *billed* money, and ours is a list-rate estimate.
+amortized _billed_ money, and ours is a list-rate estimate.
 
 ### §4. One daily rollup, filled by a fold projection, read through a thin service
 
@@ -295,10 +295,10 @@ flowchart LR
   FP --> R
 ```
 
-*Write path: bounded pull runs and gateway metering both append events. The
+_Write path: bounded pull runs and gateway metering both append events. The
 fold projection is registered on the pulled-usage pipeline alone and writes
 the billed lane's daily rollup; gateway events reach the per-request ledger
-and never the rollup (v3.16).*
+and never the rollup (v3.16)._
 
 ```mermaid
 flowchart LR
@@ -327,13 +327,13 @@ flowchart LR
   S --> SP
 ```
 
-*Read path: one service, five stores, three lanes that are labeled separately
+_Read path: one service, five stores, three lanes that are labeled separately
 and never summed into one figure. The billed lane reads the rollup; the
-metered lane reads the gateway's per-request ledger (v3.16).*
+metered lane reads the gateway's per-request ledger (v3.16)._
 
 The rollup projection consumes the **pulled-usage events** on the log and
 nothing else (v3.16). The `gateway_spend` table and the budget ledger are
-*sibling projection outputs* of the gateway-spend stream, and `gateway_spend`
+_sibling projection outputs_ of the gateway-spend stream, and `gateway_spend`
 is the metered lane's read store, not a rollup input. One registration, on
 the pulled-usage pipeline, writes the rollup; replay means replaying that one
 aggregate from the log. Until v3.16 the fold was also registered on the
@@ -346,14 +346,14 @@ them; those rows remain in the table and every read filters them out.
   raw-actor-id (see Schema). **Every one of those dimensions is in the
   table's dedup key** — `OrganizationId` is deliberately payload rather
   than a dimension, because `TenantId` already addresses the row
-  (Schema) — in a ReplacingMergeTree the ORDER BY tuple *is*
+  (Schema) — in a ReplacingMergeTree the ORDER BY tuple _is_
   the row's identity, and a dimension left out of it is not "stored for
   drill-down", it is silently collapsed on merge (this codebase already
   shipped that bug once: migration 00069's comment documents two budgets
   sharing a scope collapsing into one aggregate). Filled by a **fold
   projection** (our own app code on the event stream, ADR-015), **not** a
   ClickHouse materialized view: a rebuild is a replay, and a correction
-  event *updates* the affected old day instead of adding to it — the
+  event _updates_ the affected old day instead of adding to it — the
   known MV failure mode on corrected rows (and the reason ADR-034 already
   made this exact choice for trace analytics).
 - **A pull that changes nothing still appends an event.** Re-reading a
@@ -364,20 +364,20 @@ them; those rows remain in the table and every read filters them out.
   timestamp, so the fold takes that value off the event rather than off
   the clock and a replay lands on the same number (Invariants,
   "Rebuild = replay"). Suppressing confirming events would leave the
-  provisional marker anchored on the last *change*, which is the calendar
+  provisional marker anchored on the last _change_, which is the calendar
   bug §15 already rejected wearing a different hat.
 - **All columns on day one, wave-2 ones included** (raw actor id,
   department at time of spend). Summed rows cannot grow dimensions later.
 - **Thin service in front**: computes seat money at read (§6), attaches
   names from Postgres at read (app-layer join — the codebase's standard),
-  serves per-*request* drill-down from the raw tables (`gateway_spend`,
-  ledger) — per-*person* aggregates come from the rollup itself, since
+  serves per-_request_ drill-down from the raw tables (`gateway_spend`,
+  ledger) — per-_person_ aggregates come from the rollup itself, since
   raw-actor-id is a rollup dimension — joins puller health (§4a) so a
   missing day renders as "no data", and enforces §18's permissions.
 - **Every read of this table must be dedup-safe** (`argMax` by
   `EventTimestamp` — the ReplacingMergeTree's replacement version — or
   the IN-tuple pattern, ADR-015:98). The shipped table's column named
-  `Version` is *not* that: it is the fold's schema-snapshot stamp
+  `Version` is _not_ that: it is the fold's schema-snapshot stamp
   (Schema), and taking `argMax` over it would dedup on the wrong axis
   entirely. ReplacingMergeTree dedups
   eventually, in background merges, not on write: after a restatement,
@@ -434,10 +434,10 @@ production. Wave 1 ships with, not after:
   [last successful pull]" — distinct from a genuine $0 day.
   **Unhealthy = 3 consecutive failed runs** (ruled by Sergio
   2026-08-29); a single flake never reads as unhealthy, a third strike always
-  does. **[Implementation note: health is *derived at read* from recent run
+  does. **[Implementation note: health is _derived at read_ from recent run
   history (`pullers/sourceHealth.ts`) and is never written to the source row —
   `IngestionSource.status` says what an admin configured, and a broken provider
-  must not rewrite it.]** Prerequisite named in §20, and it is *two* fixes, not
+  must not rewrite it.]** Prerequisite named in §20, and it is _two_ fixes, not
   one: the puller worker today records no consecutive-failure count
   (`pullerWorker.ts` `assertRunMadeProgress` raises and stops), the
   model's error counter has **no production writer**, and no
@@ -464,7 +464,7 @@ Values: `gateway` and `pulled` — the two lanes wave 1 ships
 added when a lane actually ships, never reserved ahead of one.
 
 - **`seat` is never a value** — seat money is computed at read, never
-  stored as rows (§6). The roster *counts* it is computed from live in
+  stored as rows (§6). The roster _counts_ it is computed from live in
   their own sibling table, `governance_seat_count_1d` (Schema, §16), not
   in this one. **[NOT BUILT — see revision v3.12]** — shipped counts are read from the latest
   seat-report rows in `governance_ocsf_events`, not from a projection.
@@ -478,8 +478,8 @@ added when a lane actually ships, never reserved ahead of one.
 
 > **[REVERSED — see revision v3.11]** Seats ship as counts only; no price list was built.
 
-Each day the roster puller writes an event: *"provider reported N seats of
-type X."* Like every other pulled event it lands on the log and is folded
+Each day the roster puller writes an event: _"provider reported N seats of
+type X."_ Like every other pulled event it lands on the log and is folded
 into a projection the screen can read — `governance_seat_count_1d`
 (Schema), the counts half of §16's wave-1 aggregate. **[NOT BUILT — see revision v3.12]** Money is the
 multiplication, done at read: count-event × dated
@@ -511,7 +511,7 @@ Gateway, provider-bill, and seat channels are separately labeled and never
 double-count. **In wave 1 this invariant is structural**: the lanes are
 never summed into one figure (§1), so there is nothing to exclude and
 the rollup projection is **not blocked** on any filter — the evidence
-pack ranked the missing filter as risk #1 *for a combined view*, and
+pack ranked the missing filter as risk #1 _for a combined view_, and
 wave 1 doesn't build one. (Deferral ruled by Sergio 2026-08-29; it
 removes the filter from the wave-1 critical path.)
 
@@ -530,7 +530,7 @@ than letting the last admin to hit Save win. The rule then reads:
 
 - A gateway row whose key is **mapped** to a source: the bill replaces
   its number in the combined total; the row still splits the bill (§2).
-- A gateway row whose key is **unmapped**: it stands alone as *metered*
+- A gateway row whose key is **unmapped**: it stands alone as _metered_
   — its dollars are real and no bill claims them.
 - Mapped keys' gateway sum **exceeding** the bill is §2's variance line:
   total stays the bill, the overrun is shown, never subtracted.
@@ -540,7 +540,7 @@ than letting the last admin to hit Save win. The rule then reads:
   biller-provided USD conversion exists, the mapping is **ineligible** —
   both lanes render separately, each in its own currency, until a biller
   conversion or a dated rate table (§3 b) is available. Where a biller
-  conversion *does* exist the split uses the converted amount and the
+  conversion _does_ exist the split uses the converted amount and the
   variance is computed in that currency; the original invoice currency
   is still shown alongside.
 
@@ -558,7 +558,7 @@ than letting the last admin to hit Save win. The rule then reads:
 
 **Re-pointing is one transaction, and a gap is unrepresentable.** The
 guarantee the database gives here is non-overlap, and a non-overlap
-constraint structurally cannot see a *gap*: two admins editing through
+constraint structurally cannot see a _gap_: two admins editing through
 independent updates can close the open row for a key and open its
 successor an hour later, leaving an hour of that key's spend covered by
 no bill at all, with nothing raised and nothing to find it later. So
@@ -576,7 +576,7 @@ Three constraint rules follow from that:
 - **No partial unique index.** The exclusion constraint alone already
   rejects a second open row for a key (SQLSTATE 23P01). Adding
   `UNIQUE ("virtualKeyId") WHERE "validTo" IS NULL` on top is strictly
-  redundant, and it makes the *common* race surface as 23505 instead of
+  redundant, and it makes the _common_ race surface as 23505 instead of
   23P01 — two error codes for one rule, and the application would have to
   handle both to say one sentence. Exclusion constraint only.
 - **`CHECK ("validTo" IS NULL OR "validTo" > "validFrom")`.** A zero-width
@@ -629,7 +629,7 @@ screen that merges lanes cannot ship before it. Rejected: a list column of
 key ids on `IngestionSource` — un-dated, rewritten wholesale on every
 edit, and with no way for the database itself to hold the one-home rule.
 Rejected: provider-wide
-coverage — one connected bill silently claiming *all* that provider's
+coverage — one connected bill silently claiming _all_ that provider's
 gateway traffic. Zero-config, and correct for a single-account org, but
 an org with a second, unconnected account of the same provider would
 have that account's gateway dollars silently swallowed by the wrong
@@ -670,11 +670,11 @@ every row a tenant home.
 
 ### §9. Money rows carry the provider's raw actor id, stamped at ingest, never edited
 
-**Waves.** The *stamping* ships in **wave 1**: `RawActorId` is a day-one
+**Waves.** The _stamping_ ships in **wave 1**: `RawActorId` is a day-one
 rollup column and a dedup-key dimension (§4, Schema), §16's wave-1
 idle-seat aggregate distinct-counts it, and the erasure rules below are
 therefore a wave-1 obligation, not a wave-2 one. Turning that id into a
-*person* — and the department they were in on that date — is **wave 2**,
+_person_ — and the department they were in on that date — is **wave 2**,
 via §11–§13. Nothing in this section defers the ingest-time capture.
 
 Whatever the provider said — `user_email`, Anthropic member id `user_…`, a
@@ -705,8 +705,8 @@ When a provider-supplied raw actor id contains personal data (e.g. an
 email address), GDPR erasure:
 
 1. **records the erased identifiers on a suppression list** — a hash of
-   each identifier the erasure covers, scoped to the organization *and
-   the provider* (`ErasedIdentifierSuppression`, Schema), so erasing an
+   each identifier the erasure covers, scoped to the organization _and
+   the provider_ (`ErasedIdentifierSuppression`, Schema), so erasing an
    address a customer holds at one provider does not silently suppress
    the same string arriving from another. Without this the erasure is
    undone by the pipeline that produced it: the pullers look 30 days
@@ -737,13 +737,14 @@ email address), GDPR erasure:
    One check, consulted at each of those write points, is what makes the
    erasure hold against a pipeline whose whole job is to re-fetch the
    same 30 days tomorrow.
+
 2. blanks `IdentityMatch.userId` (§11) where a platform user was linked,
 3. pseudonymizes `rawActorId` and `displayText` on the `DiscoveredPerson`
    row (hash-replace, preserving the row for spend attribution),
 4. rewrites the rollup rows carrying that id so they carry the pseudonym
    instead. **Not with an `ALTER TABLE … UPDATE`:** `RawActorId` is in
    the ORDER BY, and ClickHouse refuses a mutation on a sorting-key
-   column — the key *is* the row's identity, so a changed key is a
+   column — the key _is_ the row's identity, so a changed key is a
    different row rather than an edited one, and the engine will not
    pretend otherwise. Erasure goes through the rebuild path the rollup
    already has (§4: "a rebuild is a replay"): record the identifier on
@@ -769,9 +770,10 @@ email address), GDPR erasure:
    those days drop by the erased amount. The alternative — leaving the
    row and its personal data in place — is not one, so the erasure job
    records which days it could not rebuild instead of failing silently.
+
 5. **Replay safety, with no stored mapping from pseudonym back to the
    original.** The fold / replay pipeline (§4) must pseudonymize an
-   erased `RawActorId` *before* writing the rollup row. Without that, a
+   erased `RawActorId` _before_ writing the rollup row. Without that, a
    replay re-derives the original value from the raw event log and
    inserts it beside the pseudonymized row, duplicating the amount.
 
@@ -888,7 +890,7 @@ operation nobody connects to governance).
 the organization is only half the fix; the other half is how the org is
 translated back to the ClickHouse tenant at read and at erasure. A live
 `resolveGovProjectId` call is not that translation, because it filters
-`archivedAt: null` and therefore returns *null forever* once someone
+`archivedAt: null` and therefore returns _null forever_ once someone
 archives the governance project — while the write path re-reads the same
 project by slug with no such filter and keeps landing rows under the old
 `TenantId`. The org would map to zero tenants on read and one on write:
@@ -903,7 +905,7 @@ used and never pruned. Reads resolve against the whole history (the
 current tenant for new rows, all of them for totals); erasure walks all
 of them, because personal data does not stop existing in a tenant that
 stopped being current. The live resolver stays what it is — the way to
-find *today's* write target — and stops being load-bearing for anything
+find _today's_ write target — and stops being load-bearing for anything
 historical.
 
 **Guard rails so the governance project stays out of generic routes.**
@@ -933,7 +935,7 @@ supplementary rather than primary, and all three are structural:
   latch, and that gate ships closed fleet-wide, so deleting a user right
   now produces zero events. A design that depended on it would be a
   design that erased nothing and looked finished.
-- Its payload carries no identifier *values* — the fold has already
+- Its payload carries no identifier _values_ — the fold has already
   nulled them by the time the event exists — so a subscriber cannot
   learn which email to pseudonymize. It can name a user; it cannot
   perform §9's steps 1, 3 or 4.
@@ -942,8 +944,8 @@ There is a fourth reason not to depend on it, which is why it is a
 trigger and not a queue: subscriber dispatch in the event-sourcing router
 is caught-and-logged with no retry, and subscribers are unreachable from
 replay by construction, so an erasure event missed while the subscriber
-was down is missed permanently. A missed *trigger* costs a manual erase
-action; a missed *driver* would cost the erasure itself. Rejects (v3.8's
+was down is missed permanently. A missed _trigger_ costs a manual erase
+action; a missed _driver_ would cost the erasure itself. Rejects (v3.8's
 position): driving erasure from the listener, on the reasoning that
 subscribing covers every erasure path automatically — it covers no path
 at all today, and only ever a minority of the population.
@@ -977,7 +979,7 @@ The match policy for `IdentityMatch`:
   pairs, and plain Levenshtein over that set measured **2.9 seconds of
   blocked event loop** — per page load, uncached, stalling every other
   request on the instance. The resolve-at-read argument is right about
-  *facts* (§9's people and departments are cheap lookups); it does not
+  _facts_ (§9's people and departments are cheap lookups); it does not
   survive contact with a scoring pass. A second reason: without stored
   rows there is no pending-count badge, because counting the maybes
   costs the same full sweep as showing them, on every navigation render.
@@ -998,13 +1000,14 @@ The match policy for `IdentityMatch`:
   discovery, and dismissals are now storable but stay out of v1 (a maybe
   an admin ignores still comes back), so dismiss-fatigue is unresolved
   either way.
+
 - **Conflict rule (the two-m.silvas safeguard):** if evidence points at
   two candidates, or new evidence contradicts an existing link (a
   provider id already linked to someone else), automatic linking
   **suspends for that identity** and flags a human. Directory ids cannot
   collide (unique by construction); the risk lives in email evidence —
   shared mailboxes, and addresses re-issued to new hires. Re-issued
-  emails are survivable *because links are dated*: the leaver's link
+  emails are survivable _because links are dated_: the leaver's link
   closes at offboarding, the new hire gets a new link, and January's
   spend stays with January's person. **The suspension itself is stored**,
   and on the discovered person rather than in the suggestion job's
@@ -1064,7 +1067,7 @@ SCIM degrade to "unassigned", never break.
 - **Anthropic**: a fourth bucket, **"key owner — not spender"** —
   `created_by` names the key's creator, and one measured account credited
   one person with 100% of tokens through it. Key names are stored as
-  *hints* (`claude_code_key_<team>_*` is signal), never as attribution.
+  _hints_ (`claude_code_key_<team>_*` is signal), never as attribution.
 - **OpenAI**: the label is **"attributed to", never "spent by"**, and
   spend is never resolved through the key roster — 53% of measured spend
   sits on deleted keys. The `user_id`/`user_email` on the cost row itself
@@ -1099,7 +1102,7 @@ to the resolve-at-read philosophy (a denormalized display hint, not
 derived truth). Exports and API responses carry the revised flag so
 finance can explain a changed number. Not in v1: revision-history
 screens, diffs, notifications — the event log retains everything if ever
-needed. If ever exported, corrections materialize as *new rows*
+needed. If ever exported, corrections materialize as _new rows_
 synthesized from the event log (the FOCUS `ChargeClass="Correction"`
 shape), never as mutated rows. Rejects: silent recompute
 (unreconcilable exports); freeze-after-N-days (our screen would
@@ -1107,7 +1110,7 @@ knowingly disagree with the provider's own console).
 
 **Provisional is a second marker, and it is orthogonal to the first.** A
 figure whose day still sits inside the provider's settling window renders
-as **provisional** — "this can still move" — while *revised* says a
+as **provisional** — "this can still move" — while _revised_ says a
 restatement already happened. The two are not opposites and do not
 compete: "already moved" and "can still move" are independent facts
 about a day, and a day can be both. No source supplies finality:
@@ -1129,7 +1132,7 @@ Three rules make the marker mean what it says.
   provisional while fewer than `SETTLING_WINDOW_DAYS` have passed since
   **a pull last touched that day**, not since the day itself. Calendar
   age gets both ends wrong. On the first connect a puller backfills 90
-  days, so every day older than 30 would render *settled* the instant it
+  days, so every day older than 30 would render _settled_ the instant it
   landed, having been read exactly once — the opposite of the truth. And
   a source pulled weekly keeps showing days as provisional for up to 23
   days after the provider has stopped touching them, because the clock
@@ -1145,7 +1148,7 @@ Three rules make the marker mean what it says.
   stamped every day as observed today, breaking the rebuild-equals-replay
   invariant, and would let §9's delete-then-replay erasure quietly flip
   long-settled days back to provisional. It is also not the shipped
-  `LastEventOccurredAt`, which is the newest *provider-side* event time
+  `LastEventOccurredAt`, which is the newest _provider-side_ event time
   folded into the row — that one stands still exactly when a re-pull
   re-confirms old events, which is the case this marker exists to see.
 - **Revised and provisional render together, because together is the
@@ -1153,7 +1156,7 @@ Three rules make the marker mean what it says.
   days, so essentially every revision we see lands on a day that is
   still inside its own window: the both-true cell is not an edge case,
   it is the common one. The cell shows both markers, in one line —
-  *"revised, was $X — may still change"*. Showing only one of them would
+  _"revised, was $X — may still change"_. Showing only one of them would
   either hide a change that already happened or promise a finality we do
   not have.
 - **Gateway rows are exempt.** Rows with `IngestionSourceId = ''` are
@@ -1244,8 +1247,8 @@ expression.
 - **Wave 1, the aggregate**: "you pay for N seats, M are assigned" per
   provider — both numbers straight from the provider's SKU/roster counts
   (bought vs assigned). No identity needed, no usage join.
-- **Wave 2, the names and the activity**: an *active*-seat count (distinct
-  raw actor ids on usage rows) and listing *which* seats are idle both
+- **Wave 2, the names and the activity**: an _active_-seat count (distinct
+  raw actor ids on usage rows) and listing _which_ seats are idle both
   require the roster ↔ usage-actor join (§11). Idle default: no activity
   for 30 days, adjustable per org; last-activity date always shown. The
   roster side of that join comes from **extending the seat pull to
@@ -1259,7 +1262,7 @@ expression.
   and email addresses — the same class of personal data §9 already carries
   on usage rows, under the same erasure path (§9, §11). Rejects: keeping
   the pull counts-only, which would quietly demote this bullet's promise
-  from *which* seats are idle to *how many*.
+  from _which_ seats are idle to _how many_.
 - FR3 is **partially** met in wave 1, met in wave 2 — the ADR says so
   rather than rounding up.
 
@@ -1319,7 +1322,7 @@ shipping the widening without the containment:
 Wave 1 ships the built-in screen only. LWQL is one-project-per-query
 fail-closed (`provisioning.ts:380-393`) and org-wide cost cuts across
 projects — its own design pass. **FR8 (ROI)**: the money half ships in
-wave 1; the *value* half (time saved, output produced) has no data source
+wave 1; the _value_ half (time saved, output produced) has no data source
 in any provider API or script we ran, and stays out until a value signal
 exists. Rejects: shipping "activity per dollar" as a proxy — it is
 usage-efficiency and would get quoted as ROI. **FR6 (retention)** stays
@@ -1332,7 +1335,7 @@ permission verbs in the ADR-092 registry (e.g. `governance_cost:view`,
 `governance_identity:manage`), granted via role bindings on the existing
 org → team → project scope tree to users or groups. Pulled-money
 visibility is **org-scoped**: wave 1 grants `governance_cost:view` at
-org scope (ruled by Sergio 2026-08-29). What a viewer *sees*
+org scope (ruled by Sergio 2026-08-29). What a viewer _sees_
 narrows with scope (a team-scoped viewer sees their team's slice). The
 identity tables are **data on those screens, never inputs to the
 permission decision** (hard constraint 3). Discovered people do not get
@@ -1390,12 +1393,12 @@ or has to stop leaning on. Written down here so nobody re-discovers them
 as surprises during implementation, and so the ones being fixed inside
 wave 2 are visibly scoped rather than quietly absorbed.
 
-| Defect | Status |
-|---|---|
-| `governance_ocsf_events` declares no TTL at all, so its rows are kept forever, while four already-shipped pullers write provider email addresses into it — and the SIEM export ships the table filtered only by tenant and time | **Fixed inside wave 2** (§16): a fixed 13-month `TTL … DELETE` declared in the migration, the table deliberately left out of the retention map (whole-clause `MODIFY TTL` would overwrite the fixed bound with a customer-settable one), seat rows excluded from the export by action name |
-| The hidden governance project is reachable through the generic project routes — `PATCH /api/projects/:id` and the archive path guard personal projects but not `kind`; the hiding invariant is enforced only on the list surface | **Fixed inside wave 2** (§11): `kind` guard on archive, update and GET-by-id, on top of the `GovernanceTenantHistory` table that makes an archive survivable rather than fatal |
-| The `event_log` plaintext erasure service designed in ADR-101 §5 was never written, so pre-erasure identifier values remain in the log (already documented in ADR-127) | Tracked separately; §9's erasure is complete for the rollup and the identity tables and does not claim to reach the event log |
-| The identity migration latch ships closed fleet-wide, so `lw.identity.user_erased` currently fires for no one | Tracked separately; §11 demotes that event to an optional trigger precisely so this does not block or fake governance erasure |
+| Defect                                                                                                                                                                                                                           | Status                                                                                                                                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `governance_ocsf_events` declares no TTL at all, so its rows are kept forever, while four already-shipped pullers write provider email addresses into it — and the SIEM export ships the table filtered only by tenant and time  | **Fixed inside wave 2** (§16): a fixed 13-month `TTL … DELETE` declared in the migration, the table deliberately left out of the retention map (whole-clause `MODIFY TTL` would overwrite the fixed bound with a customer-settable one), seat rows excluded from the export by action name |
+| The hidden governance project is reachable through the generic project routes — `PATCH /api/projects/:id` and the archive path guard personal projects but not `kind`; the hiding invariant is enforced only on the list surface | **Fixed inside wave 2** (§11): `kind` guard on archive, update and GET-by-id, on top of the `GovernanceTenantHistory` table that makes an archive survivable rather than fatal                                                                                                             |
+| The `event_log` plaintext erasure service designed in ADR-101 §5 was never written, so pre-erasure identifier values remain in the log (already documented in ADR-127)                                                           | Tracked separately; §9's erasure is complete for the rollup and the identity tables and does not claim to reach the event log                                                                                                                                                              |
+| The identity migration latch ships closed fleet-wide, so `lw.identity.user_erased` currently fires for no one                                                                                                                    | Tracked separately; §11 demotes that event to an optional trigger precisely so this does not block or fake governance erasure                                                                                                                                                              |
 
 ### §21. Azure billing is a second identity on the same connection, and a bill we could not read is never rendered as zero
 
@@ -1415,7 +1418,7 @@ Resource Manager, holding **Cost Management Reader** at the
 subscription). They are separate credential keys in the same connection,
 not separate connection types.
 
-*Why.* Separation of duty is a property of which login holds which
+_Why._ Separation of duty is a property of which login holds which
 permission, not of how many things a customer has to connect. Azure
 reports spend **per subscription**, and every environment in a Copilot
 deployment bills to one subscription — so a second connection type would
@@ -1424,19 +1427,19 @@ what a customer has to get right. The security goal is met entirely by
 the credential split: the approver who signs off on the finance grant
 hands out a permission that reads money and cannot read a conversation.
 
-*Rejects:* a dedicated billing connection type (§21 rejected
+_Rejects:_ a dedicated billing connection type (§21 rejected
 alternatives); and **any fallback to the bot identity** when billing
 credentials are absent. A fallback silently re-creates the exact grant
 this section exists to break, and it does so in the one case nobody is
 watching — the customer who declined to give billing access.
 
-*Form default (v3.7).* The create form defaults to **one app
+_Form default (v3.7)._ The create form defaults to **one app
 registration for both reads**: the switch "Use one app registration for
 everything" starts on, and the builder copies the bot pair into the
 billing keys at save time. This is not a fallback — the billing keys are
 always present when a subscription is claimed, written deliberately, and
 the token paths stay separate. The split arrangement remains the
-*recommendation* for tenants whose finance approval is separate, one
+_recommendation_ for tenants whose finance approval is separate, one
 flip away; the guard never required the pairs to differ, so the default
 codifies what most admins were going to do anyway rather than weakening
 an enforced boundary. The choice is recorded as
@@ -1450,7 +1453,7 @@ are already `Record<string, string>`
 (`pullers/pullerAdapter.ts:164-168`), decrypted by the worker before an
 adapter sees them, and carried across edits without ever being returned
 to the browser (`activity-monitor/ingestionSource.service.ts:771-791`).
-The billing identity is two more keys in that map. *Why:* the encryption,
+The billing identity is two more keys in that map. _Why:_ the encryption,
 carry-across and never-echo guarantees are the expensive parts and they
 already exist and are pinned by test
 (`dashboard/pages/__tests__/ingestionSourceSecretFields.unit.test.ts`);
@@ -1460,7 +1463,7 @@ adding a second secret storage shape would mean auditing two of them.
 both never-echo guards match the key `"credentials"` by exact string
 equality (`routers/ingestionSources.ts:104`,
 `activity-monitor/ingestionSource.service.ts:791`). A billing secret at
-any *new* top-level key — `billingCredentials`, say — would be returned
+any _new_ top-level key — `billingCredentials`, say — would be returned
 to the browser and dropped on edit. The new keys go inside the existing
 `credentials` map or nowhere.
 
@@ -1484,13 +1487,13 @@ because Azure's 403 and 429 die at the same line; the list carries one
 `billing_read_failed` reason for both until a reason survives the
 puller, which is its own change with its own tests.
 
-*Why.* This is the whole point of the work. A finance lead who reports
+_Why._ This is the whole point of the work. A finance lead who reports
 "$0 Copilot spend" to a board because the panel was blank has been
 misled by us, and the number is wrong in the direction that looks
 reassuring. Wrong beats incomplete only when the reader can tell which
 they are looking at.
 
-*Rejects:* passing the provider's own error text to the browser —
+_Rejects:_ passing the provider's own error text to the browser —
 untranslatable, changes without notice, and can carry identifiers we do
 not want rendered in a customer's page. Also rejects claiming a
 granularity of reason the pipeline does not preserve — a panel that says
@@ -1498,27 +1501,27 @@ granularity of reason the pipeline does not preserve — a panel that says
 the silent zero, wearing more words.
 
 **21.4 Prepaid is declared by the customer, never inferred.** The
-connection form carries a customer-set flag: *this Copilot runs on
-prepaid message packs*. The prepaid sentence is shown only when it is
+connection form carries a customer-set flag: _this Copilot runs on
+prepaid message packs_. The prepaid sentence is shown only when it is
 set.
 
-*Why.* Prepaid credit packs create no Azure resource, so the cost feed
+_Why._ Prepaid credit packs create no Azure resource, so the cost feed
 returns nothing — which is byte-for-byte what a quiet pay-as-you-go
 month returns. Nothing in the response distinguishes them (measured,
 Context §"Measured provider behaviour"). Inferring would print a
 confident claim about a customer's contract that we cannot support, and
 would print it most often for the customer who simply had a quiet month.
 
-*Rejects:* inferring prepaid from persistently-zero spend alongside
+_Rejects:_ inferring prepaid from persistently-zero spend alongside
 present seats.
 
 **21.5 A billing failure never changes connection health.** The source
 stays **active** while conversations flow. The billing problem is
 reported on the spend lane only.
 
-*Why.* The connection's job is arriving data, and it is doing it. Red
+_Why._ The connection's job is arriving data, and it is doing it. Red
 sends whoever investigates hunting a bot fault that does not exist,
-while the actionable message — *we cannot see your bill* — is on the
+while the actionable message — _we cannot see your bill_ — is on the
 panel of the person who went looking for spend. The research note
 reached this independently for the rate-limit case: a refusal "should
 never be the reason a collection run is reported as broken"
@@ -1526,7 +1529,7 @@ never be the reason a collection run is reported as broken"
 minute, **shared with the customer's own staff browsing cost in the
 portal**, so refusals are ordinary operation, not incident.
 
-*Rejects:* red on any billing failure; and an amber third health state,
+_Rejects:_ red on any billing failure; and an amber third health state,
 which would be a new state across every connection type, not just this
 one.
 
@@ -1542,18 +1545,18 @@ when a grant happened, and a hold is recorded identically for refusal,
 throttle, timeout and malformed reply — a lane keyed on it would say
 "checking billing access" to a customer who never granted anything.
 (c) **The premise misread the measurement**: what was measured
-(`configuration.md`, not in this repo) was a *subscriptions list*
+(`configuration.md`, not in this repo) was a _subscriptions list_
 returning empty after a grant — a different endpoint from the cost
 query, and an empty list is not a refusal; an empty 200 on the cost
-query takes the *priced* branch, not a failure branch. What survives:
+query takes the _priced_ branch, not a failure branch. What survives:
 the propagation delay is real and belongs in the **setup instructions**
 ("if the check fails right after granting, wait two minutes and retry")
 — copy, not machinery.
 
 **21.7 The lane shape is copied from seats, not factored out — and the
 copy is of the shape, not the semantics.** The seat union
-(`GovernanceSeatLaneDto`) is the precedent for *a discriminated union
-the panel switches copy on*. It is **not** precedent for reporting a
+(`GovernanceSeatLaneDto`) is the precedent for _a discriminated union
+the panel switches copy on_. It is **not** precedent for reporting a
 provider refusal (corrected by the red-team, v3.4): its `read_failed`
 arm fires only when **our own** ClickHouse query throws
 (`governanceCost.service.ts:129-131` for the lane DTO,
@@ -1563,13 +1566,13 @@ forbids for spend. Spend copies the union shape and must do better than
 its semantics; the seat lane's own gap is recorded as an open question
 rather than silently inherited as a standard.
 
-*Why not factor out.* This is the **second** occurrence, not the third.
+_Why not factor out._ This is the **second** occurrence, not the third.
 An abstraction built at n=2 is shaped like its first caller and the
 next one bends to fit — §19's own reasoning, applied one level down.
 Factoring out would also mean editing working seat code nobody asked us
 to change, in a branch already four deep in a stack.
 
-*Rejects:* a shared lane type spanning seats and spend now. Revisit at
+_Rejects:_ a shared lane type spanning seats and spend now. Revisit at
 the third lane.
 
 ### §22. New surfaces speak FOCUS; the shipped internal names stay
@@ -1581,7 +1584,7 @@ where it does not. FOCUS through 1.4 has no columns for identity, team,
 cost center, or AI/token dimensions, so most of what this ADR adds is
 necessarily an extension; naming them the standard's way now means a
 customer's FOCUS tooling ingests our export without a translation table,
-and the ones FOCUS *does* define (§3's `BilledCost`, `BillingCurrency`,
+and the ones FOCUS _does_ define (§3's `BilledCost`, `BillingCurrency`,
 `ChargePeriodStart/End`, `ProviderName`) already line up.
 `IdentityMatch.evidenceKind` (§11) stays mappable onto the pull-mode
 architecture map's `x_PersonResolutionMethod` vocabulary — the values are
@@ -1601,75 +1604,75 @@ drift apart).
 
 ## Constants
 
-| Name | Value | Purpose |
-|---|---|---|
-| Nano scale | 1 unit = 10⁻⁹ of one currency unit; $1 = 1,000,000,000 units | exact integer money math; matches `CostNanoUSD`/`AmountNanoUSD` |
-| `cost_source` values | `gateway`, `pulled` (`GOVERNANCE_COST_SOURCE`) | which lane the money came from, in one filterable column; the provider is the `Provider` column; `seat` and `trace` never appear |
-| Rollup table | `governance_cost_rollup_1d` | the one summed table charts read |
-| Seat count table | `governance_seat_count_1d` | roster counts (§6) for the wave-1 idle-seat aggregate; counts only, never money. **[NOT BUILT — see revision v3.12]** |
-| Rollup grain | 1 day (`toDate`) | matches bill grain; volume is thousands/day |
-| Idle-seat default | 30 days without activity, per-org adjustable | FR3 wave-2 listing |
-| Permission verbs | `governance_cost:view`, `governance_identity:manage` (registry names final at implementation) | ADR-092 registry entries gating the screens |
-| Feature flags | `release_ui_ai_governance_enabled`, `release_ui_governance_billed_cost_enabled` — both already registered (backend + frontend registries), already gating nav and placeholder routes | staged rollout of the screens |
-| Anthropic restatement window | 30 days back (#6978) | why overlap/dedup rules are read-time only |
-| Billing credential keys (§21.1) | `billingClientId`, `billingClientSecret` in the existing `credentials` map; tenant reused from `tenantId` | the Azure Resource Manager identity, separate from the bot's `clientId`/`clientSecret` |
-| Prepaid declaration (§21.4) | `azureBillingIsPrepaid: boolean`, customer-set on the connection, default `false` | the only thing that licenses the prepaid sentence; never inferred |
-| One-app choice (§21.1 form default, v3.7) | `azureBillingUsesSameApp: boolean`, written by the create form's builder beside a claimed subscription, default `true` | the only durable record of whether the billing pair is a copy of the bot's or a second app; nothing reads it at run time — the edit path (#7777) will |
-| Spend-lane reasons (§21.3) | `billing_read_failed`, `prepaid_declared`, `no_spend_recorded` | closed list bounded by what the system can know (v3.4: `awaiting_grant` withdrawn with §21.6; `billing_access_denied` folded into `billing_read_failed` — 403 and 429 die at the same line today; `no_billing_credentials` became a save-time refusal, `assertAzureBillHasItsOwnCredential`, so the state cannot be stored to need a sentence — true on every write path only since v3.5, which closed the create that still passed through); the screen maps each to a sentence, provider text never reaches the browser |
-| Azure cost read interval | 6 h (`AZURE_COST_READ_INTERVAL_MS`), max hold 7 d (`AZURE_COST_MAX_HOLD_MS`) | already shipped; the allowance is a few requests/minute **shared with the customer's own portal users** |
-| `SETTLING_WINDOW_DAYS` | 30 days, overridable per ingestion source; measured for Anthropic only, provisional for Azure/Databricks | §15: a day renders *provisional* while fewer than this many days have passed since **a pull last touched that day** (not since the day itself); gateway rows are exempt; no provider feed supplies finality |
+| Name                                      | Value                                                                                                                                                                                | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nano scale                                | 1 unit = 10⁻⁹ of one currency unit; $1 = 1,000,000,000 units                                                                                                                         | exact integer money math; matches `CostNanoUSD`/`AmountNanoUSD`                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `cost_source` values                      | `gateway`, `pulled` (`GOVERNANCE_COST_SOURCE`)                                                                                                                                       | which lane the money came from, in one filterable column; the provider is the `Provider` column; `seat` and `trace` never appear                                                                                                                                                                                                                                                                                                                                                                                          |
+| Rollup table                              | `governance_cost_rollup_1d`                                                                                                                                                          | the one summed table charts read                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Seat count table                          | `governance_seat_count_1d`                                                                                                                                                           | roster counts (§6) for the wave-1 idle-seat aggregate; counts only, never money. **[NOT BUILT — see revision v3.12]**                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Rollup grain                              | 1 day (`toDate`)                                                                                                                                                                     | matches bill grain; volume is thousands/day                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Idle-seat default                         | 30 days without activity, per-org adjustable                                                                                                                                         | FR3 wave-2 listing                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Permission verbs                          | `governance_cost:view`, `governance_identity:manage` (registry names final at implementation)                                                                                        | ADR-092 registry entries gating the screens                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Feature flags                             | `release_ui_ai_governance_enabled`, `release_ui_governance_billed_cost_enabled` — both already registered (backend + frontend registries), already gating nav and placeholder routes | staged rollout of the screens                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Anthropic restatement window              | 30 days back (#6978)                                                                                                                                                                 | why overlap/dedup rules are read-time only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Billing credential keys (§21.1)           | `billingClientId`, `billingClientSecret` in the existing `credentials` map; tenant reused from `tenantId`                                                                            | the Azure Resource Manager identity, separate from the bot's `clientId`/`clientSecret`                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Prepaid declaration (§21.4)               | `azureBillingIsPrepaid: boolean`, customer-set on the connection, default `false`                                                                                                    | the only thing that licenses the prepaid sentence; never inferred                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| One-app choice (§21.1 form default, v3.7) | `azureBillingUsesSameApp: boolean`, written by the create form's builder beside a claimed subscription, default `true`                                                               | the only durable record of whether the billing pair is a copy of the bot's or a second app; nothing reads it at run time — the edit path (#7777) will                                                                                                                                                                                                                                                                                                                                                                     |
+| Spend-lane reasons (§21.3)                | `billing_read_failed`, `prepaid_declared`, `no_spend_recorded`                                                                                                                       | closed list bounded by what the system can know (v3.4: `awaiting_grant` withdrawn with §21.6; `billing_access_denied` folded into `billing_read_failed` — 403 and 429 die at the same line today; `no_billing_credentials` became a save-time refusal, `assertAzureBillHasItsOwnCredential`, so the state cannot be stored to need a sentence — true on every write path only since v3.5, which closed the create that still passed through); the screen maps each to a sentence, provider text never reaches the browser |
+| Azure cost read interval                  | 6 h (`AZURE_COST_READ_INTERVAL_MS`), max hold 7 d (`AZURE_COST_MAX_HOLD_MS`)                                                                                                         | already shipped; the allowance is a few requests/minute **shared with the customer's own portal users**                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `SETTLING_WINDOW_DAYS`                    | 30 days, overridable per ingestion source; measured for Anthropic only, provisional for Azure/Databricks                                                                             | §15: a day renders _provisional_ while fewer than this many days have passed since **a pull last touched that day** (not since the day itself); gateway rows are exempt; no provider feed supplies finality                                                                                                                                                                                                                                                                                                               |
 
 ## Invariants
 
-| Invariant | Meaning | Satisfied by / test anchor |
-|---|---|---|
-| Bill = total | per provider/day with a bill: the billed lane's displayed total equals the provider's **pre-tax cost-feed subtotal** (§2 bill composition — refund days may be negative, never clamped); in the wave-2 connected view, gateway split + unallocated line sum to it exactly | query-time §2 rule; test: split + unallocated = bill for seeded over-, under-metered *and negative* days (wave 2) |
-| No cross-currency sums | no query ever adds amounts with different currency codes | `CurrencyCode` in the rollup's ORDER BY (dedup key) and every group key; test: mixed EUR/USD seed renders two totals |
-| Full-grain dedup key | the rollup's ORDER BY is `(TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId)` and equals its full dimension tuple — no *dimension* exists only as a payload column. `OrganizationId` is payload by design (`TenantId` already addresses the row; keying on it would make an org rename a key change), as are the markers `RevisedAt`, `PreviousAmountNanoUsd` and `LastObservedAt` | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows |
-| Dedup-safe reads | every query on the rollup uses `argMax` over `EventTimestamp` — the ReplacingMergeTree's replacement version, *not* the `Version` schema-snapshot stamp — or the IN-tuple pattern (ADR-015:98), never plain SUM | thin-service query helpers; test: seed pre- and post-restatement versions of one day *without* OPTIMIZE, read must return only the restated amount |
-| Rebuild = replay | dropping `governance_cost_rollup_1d` and replaying events reproduces it exactly | ADR-015 fold projection; test: replay equality on seeded corrections |
-| Erasure never mutates a key | an erased actor id leaves the rollup by delete-then-replay, never by `ALTER TABLE … UPDATE` on `RawActorId` — ClickHouse refuses mutations on a sorting-key column | §9 step 4; test against the deployed ClickHouse version: the `UPDATE` is rejected, and erase → delete → replay leaves only the pseudonymized key with the original total |
-| One dollar, one home | a dollar appears in exactly one channel; wave 1: structural — lanes are never summed into one figure (§1); wave 2: the combined view counts each dollar once | wave 1: no cross-lane sum exists (code review gate); wave 2: §7 key-to-bill mapping + exclusion filter, blocking prerequisite of the combined view; test: gateway row whose key maps to a pulled bill is excluded from the combined total once |
-| Pulled rows never enforce | no budget resolver ever reaches `Scope="pulled"` rows | structural, ADR-088 Decision 3 (unchanged) |
-| Raw ids stay raw | actor-id columns contain only what the provider sent; no resolved name or person id is ever written into a money row | §9; code review gate + test: ingest path has no identity lookup |
-| Identity grants nothing | no authz code path reads `DiscoveredPerson`/`DiscoveredAgent`/`IdentityMatch` | hard constraint 3; test: authz engine module has no import of identity tables |
-| Matches are dated and evidenced | every `IdentityMatch` row has evidence kind + validFrom; corrections close and reopen, never rewrite | §11/§12; unique-open-link constraint + test |
-| No figure we did not read | the spend lane renders a currency amount only when a cost read returned one; every other state renders a sentence from the closed reason list, never `0` and never blank | §21.3; table-driven test over all three reasons asserting each renders its sentence and **none** renders a currency amount (`azureBillingNote.unit.test.ts`, digit-free assertion) |
-| The billing identity reads only money | the Resource Manager token is minted from `billingClientId`/`billingClientSecret`; the Dataverse and Graph tokens are minted from the bot's — no code path mints one from the other's credentials, and no fallback exists | §21.1; test: with billing credentials absent, the cost read is skipped and **zero** Resource Manager calls are made — asserted on the captured call list, not on the absence of a log line |
-| Billing secrets never echo | `billingClientSecret` is never returned to the browser on read or edit, and survives an edit that does not resend it | §21.2; `ingestionSourceSecretFields.unit.test.ts` extended to the new keys — merge blocker |
-| Prepaid is declared, never derived | the prepaid sentence is reachable only when `azureBillingIsPrepaid` is set; no code path sets it from response data | §21.4; test: zero-row cost read with seats present renders `no_spend_recorded`, not `prepaid_declared` |
+| Invariant                             | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                            | Satisfied by / test anchor                                                                                                                                                                                                                     |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bill = total                          | per provider/day with a bill: the billed lane's displayed total equals the provider's **pre-tax cost-feed subtotal** (§2 bill composition — refund days may be negative, never clamped); in the wave-2 connected view, gateway split + unallocated line sum to it exactly                                                                                                                                                          | query-time §2 rule; test: split + unallocated = bill for seeded over-, under-metered _and negative_ days (wave 2)                                                                                                                              |
+| No cross-currency sums                | no query ever adds amounts with different currency codes                                                                                                                                                                                                                                                                                                                                                                           | `CurrencyCode` in the rollup's ORDER BY (dedup key) and every group key; test: mixed EUR/USD seed renders two totals                                                                                                                           |
+| Full-grain dedup key                  | the rollup's ORDER BY is `(TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId)` and equals its full dimension tuple — no _dimension_ exists only as a payload column. `OrganizationId` is payload by design (`TenantId` already addresses the row; keying on it would make an org rename a key change), as are the markers `RevisedAt`, `PreviousAmountNanoUsd` and `LastObservedAt` | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows                                                                                              |
+| Dedup-safe reads                      | every query on the rollup uses `argMax` over `EventTimestamp` — the ReplacingMergeTree's replacement version, _not_ the `Version` schema-snapshot stamp — or the IN-tuple pattern (ADR-015:98), never plain SUM                                                                                                                                                                                                                    | thin-service query helpers; test: seed pre- and post-restatement versions of one day _without_ OPTIMIZE, read must return only the restated amount                                                                                             |
+| Rebuild = replay                      | dropping `governance_cost_rollup_1d` and replaying events reproduces it exactly                                                                                                                                                                                                                                                                                                                                                    | ADR-015 fold projection; test: replay equality on seeded corrections                                                                                                                                                                           |
+| Erasure never mutates a key           | an erased actor id leaves the rollup by delete-then-replay, never by `ALTER TABLE … UPDATE` on `RawActorId` — ClickHouse refuses mutations on a sorting-key column                                                                                                                                                                                                                                                                 | §9 step 4; test against the deployed ClickHouse version: the `UPDATE` is rejected, and erase → delete → replay leaves only the pseudonymized key with the original total                                                                       |
+| One dollar, one home                  | a dollar appears in exactly one channel; wave 1: structural — lanes are never summed into one figure (§1); wave 2: the combined view counts each dollar once                                                                                                                                                                                                                                                                       | wave 1: no cross-lane sum exists (code review gate); wave 2: §7 key-to-bill mapping + exclusion filter, blocking prerequisite of the combined view; test: gateway row whose key maps to a pulled bill is excluded from the combined total once |
+| Pulled rows never enforce             | no budget resolver ever reaches `Scope="pulled"` rows                                                                                                                                                                                                                                                                                                                                                                              | structural, ADR-088 Decision 3 (unchanged)                                                                                                                                                                                                     |
+| Raw ids stay raw                      | actor-id columns contain only what the provider sent; no resolved name or person id is ever written into a money row                                                                                                                                                                                                                                                                                                               | §9; code review gate + test: ingest path has no identity lookup                                                                                                                                                                                |
+| Identity grants nothing               | no authz code path reads `DiscoveredPerson`/`DiscoveredAgent`/`IdentityMatch`                                                                                                                                                                                                                                                                                                                                                      | hard constraint 3; test: authz engine module has no import of identity tables                                                                                                                                                                  |
+| Matches are dated and evidenced       | every `IdentityMatch` row has evidence kind + validFrom; corrections close and reopen, never rewrite                                                                                                                                                                                                                                                                                                                               | §11/§12; unique-open-link constraint + test                                                                                                                                                                                                    |
+| No figure we did not read             | the spend lane renders a currency amount only when a cost read returned one; every other state renders a sentence from the closed reason list, never `0` and never blank                                                                                                                                                                                                                                                           | §21.3; table-driven test over all three reasons asserting each renders its sentence and **none** renders a currency amount (`azureBillingNote.unit.test.ts`, digit-free assertion)                                                             |
+| The billing identity reads only money | the Resource Manager token is minted from `billingClientId`/`billingClientSecret`; the Dataverse and Graph tokens are minted from the bot's — no code path mints one from the other's credentials, and no fallback exists                                                                                                                                                                                                          | §21.1; test: with billing credentials absent, the cost read is skipped and **zero** Resource Manager calls are made — asserted on the captured call list, not on the absence of a log line                                                     |
+| Billing secrets never echo            | `billingClientSecret` is never returned to the browser on read or edit, and survives an edit that does not resend it                                                                                                                                                                                                                                                                                                               | §21.2; `ingestionSourceSecretFields.unit.test.ts` extended to the new keys — merge blocker                                                                                                                                                     |
+| Prepaid is declared, never derived    | the prepaid sentence is reachable only when `azureBillingIsPrepaid` is set; no code path sets it from response data                                                                                                                                                                                                                                                                                                                | §21.4; test: zero-row cost read with seats present renders `no_spend_recorded`, not `prepaid_declared`                                                                                                                                         |
 
 ## Assumptions
 
-| Assumption | What breaks if false |
-|---|---|
-| Provider admin APIs stay pull-accessible at current auth scopes | that provider's billed lane goes dark; screens show "no data since [last pull]", never zero — backed by the §4a `IngestionSource` health join, not by hope; FR5 coverage shrinks, design survives |
-| Volume stays thousands of rows/day (daily buckets, per-statement rows) | millions/day would force hourly grain + ADR-034-style routing; upgrade path exists, fan-out not chaining |
-| One writer per money lane | a second writer stamping the same spend breaks one-dollar-one-home; guarded by the exclusion-filter invariant test |
-| `event_log` retention covers the replay horizon (ADR-022: retention is the durability ceiling) | rollup days older than retention keep their last projected values and cannot be rebuilt; restatement markers on those days freeze |
-| SCIM/Entra directory data flows for department links | orgs without it degrade to "unassigned" department; per-person drill still works via provider-native ids |
-| Azure serves `totalCostUSD` on the customer's agreement type (unprobed — §20) | the biller-conversion column stays 0 for Azure; per-currency totals still correct; single-total view waits for a rate table |
-| Databricks grants the puller SCIM read + system-table access under app-only auth (SCIM listing unprobed; privilege bar is high — §20) | Databricks people arrive nameless (UUIDs/emails from query history only); identity wave degrades to email evidence; cost lane unaffected |
-| The billed subscription sits in the **same tenant** as the Copilot environment, so the billing identity can reuse `tenantId` (§21.1) | cross-tenant billing arrangements (CSP, Lighthouse) cannot connect the bill at all until an optional `billingTenantId` ships; conversations and seats are unaffected — open question below |
-| An Azure cost response with zero rows means "nothing billed", not "we were refused" — refusals arrive as 401/403/429, not as an empty result (§21.3) | a permission failure renders as `no_spend_recorded` and the customer waits forever for a read that will never succeed; the closed reason list stops being honest. **Verified in the puller** (v3.4): a non-OK status takes the held branch (`copilotStudioDataverse.puller.ts:1115-1128`), never the priced one; only a parsed 200 can price a window |
-| No API exposes prepaid credit consumption (§21.4) | **already known to be shaky** — the M365 admin centre renders month-to-date credits per agent, so an endpoint likely exists and our search for it failed. If one is found, §21.4's declaration flag becomes a fallback for un-probed tenants rather than the only source, and the prepaid sentence is replaced by a real figure. Nothing in this design has to be undone |
-| Customers who are prepaid will tick the prepaid box (§21.4) | a prepaid customer who leaves it unticked sees `no_spend_recorded` — "no spend recorded this period" — which is *true but unhelpful*; they conclude the integration is broken rather than that Azure cannot see their credits. Mitigation is copy, not architecture |
+| Assumption                                                                                                                                           | What breaks if false                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Provider admin APIs stay pull-accessible at current auth scopes                                                                                      | that provider's billed lane goes dark; screens show "no data since [last pull]", never zero — backed by the §4a `IngestionSource` health join, not by hope; FR5 coverage shrinks, design survives                                                                                                                                                                        |
+| Volume stays thousands of rows/day (daily buckets, per-statement rows)                                                                               | millions/day would force hourly grain + ADR-034-style routing; upgrade path exists, fan-out not chaining                                                                                                                                                                                                                                                                 |
+| One writer per money lane                                                                                                                            | a second writer stamping the same spend breaks one-dollar-one-home; guarded by the exclusion-filter invariant test                                                                                                                                                                                                                                                       |
+| `event_log` retention covers the replay horizon (ADR-022: retention is the durability ceiling)                                                       | rollup days older than retention keep their last projected values and cannot be rebuilt; restatement markers on those days freeze                                                                                                                                                                                                                                        |
+| SCIM/Entra directory data flows for department links                                                                                                 | orgs without it degrade to "unassigned" department; per-person drill still works via provider-native ids                                                                                                                                                                                                                                                                 |
+| Azure serves `totalCostUSD` on the customer's agreement type (unprobed — §20)                                                                        | the biller-conversion column stays 0 for Azure; per-currency totals still correct; single-total view waits for a rate table                                                                                                                                                                                                                                              |
+| Databricks grants the puller SCIM read + system-table access under app-only auth (SCIM listing unprobed; privilege bar is high — §20)                | Databricks people arrive nameless (UUIDs/emails from query history only); identity wave degrades to email evidence; cost lane unaffected                                                                                                                                                                                                                                 |
+| The billed subscription sits in the **same tenant** as the Copilot environment, so the billing identity can reuse `tenantId` (§21.1)                 | cross-tenant billing arrangements (CSP, Lighthouse) cannot connect the bill at all until an optional `billingTenantId` ships; conversations and seats are unaffected — open question below                                                                                                                                                                               |
+| An Azure cost response with zero rows means "nothing billed", not "we were refused" — refusals arrive as 401/403/429, not as an empty result (§21.3) | a permission failure renders as `no_spend_recorded` and the customer waits forever for a read that will never succeed; the closed reason list stops being honest. **Verified in the puller** (v3.4): a non-OK status takes the held branch (`copilotStudioDataverse.puller.ts:1115-1128`), never the priced one; only a parsed 200 can price a window                    |
+| No API exposes prepaid credit consumption (§21.4)                                                                                                    | **already known to be shaky** — the M365 admin centre renders month-to-date credits per agent, so an endpoint likely exists and our search for it failed. If one is found, §21.4's declaration flag becomes a fallback for un-probed tenants rather than the only source, and the prepaid sentence is replaced by a real figure. Nothing in this design has to be undone |
+| Customers who are prepaid will tick the prepaid box (§21.4)                                                                                          | a prepaid customer who leaves it unticked sees `no_spend_recorded` — "no spend recorded this period" — which is _true but unhelpful_; they conclude the integration is broken rather than that Azure cannot see their credits. Mitigation is copy, not architecture                                                                                                      |
 
 ## Gates
 
-| Path | Reversible? | Blast radius | Gate |
-|---|---|---|---|
-| ClickHouse migration `ALTER`ing `governance_cost_rollup_1d` (the table itself shipped in wave 1 as 00092; wave 2 adds exactly two columns, `RevisedAt` and `LastObservedAt`, as migration 00093 — the prior-amount column `PreviousAmountNanoUsd` is already there) | no (schema) | large | human review + a written manual rollback (`DROP COLUMN` per added column — the down path is narrower than wave 1's `DROP TABLE` precisely because the table is not ours to drop any more) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
-| Prisma migration adding the identity tables, [seat price list — reversed v3.11], [coverage — deleted v3.11], tenant history, suppression list and suggestion index | no (schema) | large | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration); the identity migration needs no extensions (§7 — the one-open-link rule is a plain partial unique index); if `SeatPrice` re-opens the `btree_gist` question, that PR re-inherits the availability-guard, docs and Helm gates |
-| Rollup fold projection | yes (replayable) | large | automated: replay-equality test; feature flags gate the screens (no §7 dependency in wave 1 — lanes never summed) |
-| Exclusion filter + key-to-bill mapping (wave 2) | yes | large (money correctness) | automated: one-dollar-one-home test suite is a merge blocker for the first lane-merging screen |
-| Auto-link on deterministic evidence | yes (links are dated; closing reverses) | medium | automated: conflict-rule tests (two candidates → suspend + flag); fuzzy scoring runs **only** in §12's background suggestion job, never inline in a request — test: no request path computes an edit distance |
-| GDPR erasure blanking person references | no | large | human review, always; erasure blanks person fields, money amounts stay |
-| Screens behind flags | yes | small | none — ship it |
-| Seat price list edits (admin) | yes (recompute at read heals) | small | none — audit-logged, no approval step |
-| Billing credential keys on the connection form (§21.2) | **no** — a secret echoed to a browser stays echoed | medium | human review of the form diff (both credential builders: `dashboard/pages/inventory.tsx:2647` create and `:2702-2708` edit — a change applied to one and not the other is the failure mode), **plus** `ingestionSourceSecretFields.unit.test.ts` extended to `billingClientSecret` as a merge blocker |
-| Dropping the bot-identity fallback for the cost read (§21.1) | yes (re-add credentials) | small — **no connected source can be in this state**: `azureSubscriptionId` has never shipped to `main`, so it arrives in the same release as the save-time refusal and no stored source claims a bill without the pair | automated: ships behind `release_ui_governance_billed_cost_enabled`; the refusal is `assertAzureBillHasItsOwnCredential` on create AND on an edit that adds the claim (v3.5). A source claiming nothing reads no bill, exactly as today |
-| Spend-lane reason states (§21.3) | yes | medium (customer-visible money) | automated: the three-reason table-driven test + the no-currency-amount assertion; behind the existing flag |
+| Path                                                                                                                                                                                                                                                                | Reversible?                                        | Blast radius                                                                                                                                                                                                            | Gate                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ClickHouse migration `ALTER`ing `governance_cost_rollup_1d` (the table itself shipped in wave 1 as 00092; wave 2 adds exactly two columns, `RevisedAt` and `LastObservedAt`, as migration 00093 — the prior-amount column `PreviousAmountNanoUsd` is already there) | no (schema)                                        | large                                                                                                                                                                                                                   | human review + a written manual rollback (`DROP COLUMN` per added column — the down path is narrower than wave 1's `DROP TABLE` precisely because the table is not ours to drop any more) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise             |
+| Prisma migration adding the identity tables, [seat price list — reversed v3.11], [coverage — deleted v3.11], tenant history, suppression list and suggestion index                                                                                                  | no (schema)                                        | large                                                                                                                                                                                                                   | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration); the identity migration needs no extensions (§7 — the one-open-link rule is a plain partial unique index); if `SeatPrice` re-opens the `btree_gist` question, that PR re-inherits the availability-guard, docs and Helm gates |
+| Rollup fold projection                                                                                                                                                                                                                                              | yes (replayable)                                   | large                                                                                                                                                                                                                   | automated: replay-equality test; feature flags gate the screens (no §7 dependency in wave 1 — lanes never summed)                                                                                                                                                                                                                                        |
+| Exclusion filter + key-to-bill mapping (wave 2)                                                                                                                                                                                                                     | yes                                                | large (money correctness)                                                                                                                                                                                               | automated: one-dollar-one-home test suite is a merge blocker for the first lane-merging screen                                                                                                                                                                                                                                                           |
+| Auto-link on deterministic evidence                                                                                                                                                                                                                                 | yes (links are dated; closing reverses)            | medium                                                                                                                                                                                                                  | automated: conflict-rule tests (two candidates → suspend + flag); fuzzy scoring runs **only** in §12's background suggestion job, never inline in a request — test: no request path computes an edit distance                                                                                                                                            |
+| GDPR erasure blanking person references                                                                                                                                                                                                                             | no                                                 | large                                                                                                                                                                                                                   | human review, always; erasure blanks person fields, money amounts stay                                                                                                                                                                                                                                                                                   |
+| Screens behind flags                                                                                                                                                                                                                                                | yes                                                | small                                                                                                                                                                                                                   | none — ship it                                                                                                                                                                                                                                                                                                                                           |
+| Seat price list edits (admin)                                                                                                                                                                                                                                       | yes (recompute at read heals)                      | small                                                                                                                                                                                                                   | none — audit-logged, no approval step                                                                                                                                                                                                                                                                                                                    |
+| Billing credential keys on the connection form (§21.2)                                                                                                                                                                                                              | **no** — a secret echoed to a browser stays echoed | medium                                                                                                                                                                                                                  | human review of the form diff (both credential builders: `dashboard/pages/inventory.tsx:2647` create and `:2702-2708` edit — a change applied to one and not the other is the failure mode), **plus** `ingestionSourceSecretFields.unit.test.ts` extended to `billingClientSecret` as a merge blocker                                                    |
+| Dropping the bot-identity fallback for the cost read (§21.1)                                                                                                                                                                                                        | yes (re-add credentials)                           | small — **no connected source can be in this state**: `azureSubscriptionId` has never shipped to `main`, so it arrives in the same release as the save-time refusal and no stored source claims a bill without the pair | automated: ships behind `release_ui_governance_billed_cost_enabled`; the refusal is `assertAzureBillHasItsOwnCredential` on create AND on an edit that adds the claim (v3.5). A source claiming nothing reads no bill, exactly as today                                                                                                                  |
+| Spend-lane reason states (§21.3)                                                                                                                                                                                                                                    | yes                                                | medium (customer-visible money)                                                                                                                                                                                         | automated: the three-reason table-driven test + the no-currency-amount assertion; behind the existing flag                                                                                                                                                                                                                                               |
 
 ## Schema
 
@@ -1681,14 +1684,14 @@ because a column list is the readable way to say what the table means.
 Wave 2 does not create it, and adds **two** columns, not three:
 `RevisedAt` and `LastObservedAt`, by **`ALTER TABLE … ADD COLUMN`** in
 migration `00093`. The
-prior-amount column is *not* one of them — 00092 already ships
+prior-amount column is _not_ one of them — 00092 already ships
 `PreviousAmountNanoUsd Nullable(Int64)` alongside `RevisionCount`, so
 adding a `PreviousAmountNano` would put a second prior-amount money
 column on the table and leave a reader to guess which one is authoritative.
 §15's restatement markers use the shipped column. What a reader should
 check is the defaults of the two that are genuinely new: existing
 rows get `LastObservedAt` = epoch, so every pre-migration day reads as
-long since observed and therefore *settled*. That is the right answer
+long since observed and therefore _settled_. That is the right answer
 rather than a compromise, because the pullers look 30 days back: any day
 still genuinely in its settling window gets re-stamped on the next daily
 pull, and any day the backfill "wrongly" called settled was one no pull
@@ -1934,7 +1937,7 @@ model IdentityMatchSuggestion {
 
 Seat counts are **events** on the existing spine ("provider reported N
 seats of type X on day D") — the roster puller appends them like every
-other pull. Their *read* path is a sibling projection output, not the
+other pull. Their _read_ path is a sibling projection output, not the
 rollup above, because `seat` is never a `cost_source` (§5):
 
 > **[NOT BUILT — see revision v3.12]** No such table exists; the seat lane reads the latest
@@ -2049,24 +2052,24 @@ money tables, only the identity tables and read paths.
 
 ## Open questions
 
-| Question | Owner |
-|---|---|
-| Collision-review screen for suspended auto-links (§12) — shape and priority | Sergio (flagged for pending/) |
-| Email re-issue policy detail: minimum evidence to *reopen* a closed identity under a reused address | identity implementer |
-| Genie serving-token attribution — revisit only if Databricks exposes request-level linkage | watch provider changelog |
-| Copilot prepaid-credit visibility — **one-script probe**, not a changelog watch: the M365 admin centre renders month-to-date credits per agent, so an endpoint plausibly exists and our earlier search for it failed. Probe it; record the answer in the Assumptions table either way (§20's rule) | Sergio |
-| Cross-tenant billing: does any real customer bill the subscription from a different tenant than the Copilot environment? If yes, `billingTenantId` becomes a third billing key (§21.1 assumption) | deferred until one appears |
-| Should the connection form stop asking for the subscription id at all? The billing identity **finds the subscription by itself** (measured, `configuration.md`: "the form does not need to ask for it, and should not"). Removing the field would also dissolve #7738's uniqueness race, which is a race on that very field | Sergio — sequence against #7738 |
-| Does a failed billing read count toward the source's `errorCount`? §21.5 fixes the *health colour*; the error counter is a separate mechanism — the cost read already refuses to feed it by contract (`azureCostManagement.ts:200`) | resolved v3.4 — it does not, verified |
-| The seat lane's `read_failed` fires only when our own store query throws (`governanceCost.service.ts:129-131` for the lane DTO, `:545-555` for the emission); a provider-side Graph 403 writes no rows and renders as `awaiting_data`. Same collapse §21.3 forbids for spend — does the seat lane get the same honesty pass? | Sergio — follow-up issue |
-| A reason surviving the puller: 403 vs 429 die at the same `return null` (`copilotStudioDataverse.puller.ts:1128`), so `billing_read_failed` cannot yet say *refused* vs *throttled*. Worth threading a reason through the cursor? | implementation PR or follow-up |
-| ~~The rollup's `costSource` is the LANE (`pulled`), not the provider, and the Azure billing note reads pulled-lane content as Azure content~~ | resolved in the implementation PR — the premise ("Azure is the only pulled producer") was already false: the OpenAI, Anthropic and Databricks admin pullers feed the same lane today, so a mixed org's note fell permanently silent, including the failed-read warning. The note's spend check now asks the rollup for the CLAIMING SOURCE's own rows (`hasRowsForSource`, keyed on `IngestionSourceId`), never the lane's |
-| Two sources may claim two DIFFERENT subscriptions (the ownership guard refuses only a duplicate), and the spend panel carries one note — the oldest claim speaks (`createdAt` order, deterministic). One note for two bills is unresolved | before a second claiming source is a real shape |
-| Azure and Databricks restatement windows are unmeasured; `SETTLING_WINDOW_DAYS` stays provisional for those sources until probed (§15) | Sergio / puller implementer |
-| Payload-level redaction for `governance_ocsf_events` — the raw OCSF JSON holds names and email addresses that a single-column pseudonym cannot reach; wave 2 answers with delete-and-suppress (§16), a redacting read path or structured columns is owed | identity implementer |
-| `btree_gist` availability per managed-Postgres provider (Azure Database for PostgreSQL unverified) — no longer needed by the identity tables (§7 reversal), but still ahead of `SeatPrice` and `IngestionSourceKeyCoverage` if their overlap rules stay database-held | Sergio |
-| LWQL org-wide cost surface (§17) — own design pass, wave 2+ | deferred |
-| Registry-final permission verb names (§18) | implementation PR |
+| Question                                                                                                                                                                                                                                                                                                                     | Owner                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Collision-review screen for suspended auto-links (§12) — shape and priority                                                                                                                                                                                                                                                  | Sergio (flagged for pending/)                                                                                                                                                                                                                                                                                                                                                                                              |
+| Email re-issue policy detail: minimum evidence to _reopen_ a closed identity under a reused address                                                                                                                                                                                                                          | identity implementer                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Genie serving-token attribution — revisit only if Databricks exposes request-level linkage                                                                                                                                                                                                                                   | watch provider changelog                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Copilot prepaid-credit visibility — **one-script probe**, not a changelog watch: the M365 admin centre renders month-to-date credits per agent, so an endpoint plausibly exists and our earlier search for it failed. Probe it; record the answer in the Assumptions table either way (§20's rule)                           | Sergio                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Cross-tenant billing: does any real customer bill the subscription from a different tenant than the Copilot environment? If yes, `billingTenantId` becomes a third billing key (§21.1 assumption)                                                                                                                            | deferred until one appears                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Should the connection form stop asking for the subscription id at all? The billing identity **finds the subscription by itself** (measured, `configuration.md`: "the form does not need to ask for it, and should not"). Removing the field would also dissolve #7738's uniqueness race, which is a race on that very field  | Sergio — sequence against #7738                                                                                                                                                                                                                                                                                                                                                                                            |
+| Does a failed billing read count toward the source's `errorCount`? §21.5 fixes the _health colour_; the error counter is a separate mechanism — the cost read already refuses to feed it by contract (`azureCostManagement.ts:200`)                                                                                          | resolved v3.4 — it does not, verified                                                                                                                                                                                                                                                                                                                                                                                      |
+| The seat lane's `read_failed` fires only when our own store query throws (`governanceCost.service.ts:129-131` for the lane DTO, `:545-555` for the emission); a provider-side Graph 403 writes no rows and renders as `awaiting_data`. Same collapse §21.3 forbids for spend — does the seat lane get the same honesty pass? | Sergio — follow-up issue                                                                                                                                                                                                                                                                                                                                                                                                   |
+| A reason surviving the puller: 403 vs 429 die at the same `return null` (`copilotStudioDataverse.puller.ts:1128`), so `billing_read_failed` cannot yet say _refused_ vs _throttled_. Worth threading a reason through the cursor?                                                                                            | implementation PR or follow-up                                                                                                                                                                                                                                                                                                                                                                                             |
+| ~~The rollup's `costSource` is the LANE (`pulled`), not the provider, and the Azure billing note reads pulled-lane content as Azure content~~                                                                                                                                                                                | resolved in the implementation PR — the premise ("Azure is the only pulled producer") was already false: the OpenAI, Anthropic and Databricks admin pullers feed the same lane today, so a mixed org's note fell permanently silent, including the failed-read warning. The note's spend check now asks the rollup for the CLAIMING SOURCE's own rows (`hasRowsForSource`, keyed on `IngestionSourceId`), never the lane's |
+| Two sources may claim two DIFFERENT subscriptions (the ownership guard refuses only a duplicate), and the spend panel carries one note — the oldest claim speaks (`createdAt` order, deterministic). One note for two bills is unresolved                                                                                    | before a second claiming source is a real shape                                                                                                                                                                                                                                                                                                                                                                            |
+| Azure and Databricks restatement windows are unmeasured; `SETTLING_WINDOW_DAYS` stays provisional for those sources until probed (§15)                                                                                                                                                                                       | Sergio / puller implementer                                                                                                                                                                                                                                                                                                                                                                                                |
+| Payload-level redaction for `governance_ocsf_events` — the raw OCSF JSON holds names and email addresses that a single-column pseudonym cannot reach; wave 2 answers with delete-and-suppress (§16), a redacting read path or structured columns is owed                                                                     | identity implementer                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `btree_gist` availability per managed-Postgres provider (Azure Database for PostgreSQL unverified) — no longer needed by the identity tables (§7 reversal), but still ahead of `SeatPrice` and `IngestionSourceKeyCoverage` if their overlap rules stay database-held                                                        | Sergio                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| LWQL org-wide cost surface (§17) — own design pass, wave 2+                                                                                                                                                                                                                                                                  | deferred                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Registry-final permission verb names (§18)                                                                                                                                                                                                                                                                                   | implementation PR                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ## Revisions
 
@@ -2171,8 +2174,8 @@ money tables, only the identity tables and read paths.
     dollars. The section header sentence and the new closing block both say
     so now.
   - **§15 gains an EVENT DRIVEN block** stating the prior total's exact
-    definition — *the sum of each cell's amount as it stood immediately
-    before that day's latest revision* — and the two rules that make it
+    definition — _the sum of each cell's amount as it stood immediately
+    before that day's latest revision_ — and the two rules that make it
     computable: a cell created at the revision contributes a stated zero to
     the dollar prior total while naming NO earlier amount in its own
     currency (`PriorAmountNanoMinor` is `NULL`, and the cell is left out of
@@ -2235,7 +2238,7 @@ money tables, only the identity tables and read paths.
   document rather than inferred. No design reversal:
   - **§9 is split across the waves, and now says so** (Decision intro,
     §9). The intro filed §9–§17 as "identity and wave 2", but §9's
-    ingest-time raw-actor-id *stamping* is wave 1 — §4 puts `RawActorId`
+    ingest-time raw-actor-id _stamping_ is wave 1 — §4 puts `RawActorId`
     in the day-one rollup dedup key and §16's wave-1 aggregate counts it.
     The §9–§17 bucket is now stated as topical, with the stamping (wave 1)
     separated from the resolution to a person (wave 2, §11–§13).
@@ -2248,7 +2251,7 @@ money tables, only the identity tables and read paths.
     it could not be the rollup, and the §4 diagram did not show roster
     events entering anything. The diagram now carries that lane, and the
     thin service still never reads the event log at request time.
-  - *Numbered v3.12 on rebase: it merged to `main` as v3.3 while this branch
+  - _Numbered v3.12 on rebase: it merged to `main` as v3.3 while this branch
     had already used v3.3–v3.11. Its §16 seat-aggregate text (the
     `countDistinct(RawActorId)` active count and `governance_seat_count_1d`)
     lost the merge to the shipped bought/assigned lane, which moves the
@@ -2257,7 +2260,7 @@ money tables, only the identity tables and read paths.
     §6, Constants, Schema) are marked NOT BUILT rather than deleted: the
     shipped service reads `N` from the latest seat-report rows in
     `governance_ocsf_events` at request time, so the "never reads the
-    event log at request time" claim above does not hold for seats.*
+    event log at request time" claim above does not hold for seats._
 - **v3.11 (2026-09-06, captain: Sergio Esteban).** Documentation caught up with
   what actually shipped. No decision is taken here; five statements the ADR made
   are corrected or marked as reversed, and the prose they correct is left
@@ -2285,15 +2288,15 @@ money tables, only the identity tables and read paths.
     (`services/pullers/sourceHealth.ts`), unhealthy after three consecutive
     failures. `status` records what an admin configured, and a failing provider
     must not be able to rewrite it. §4a and §20 are amended.
-  - *Also in this pass: the rollup's migration numbers are corrected throughout —
+  - _Also in this pass: the rollup's migration numbers are corrected throughout —
     the table shipped as `00092`, and wave 2's `RevisedAt` / `LastObservedAt`
     columns as `00093`; the stale `governanceCost.service.ts:275-295` citation is
     replaced with the real anchors; and a note records that the fold's suppression
-    check is organization-wide, wider than §9 states.*
+    check is organization-wide, wider than §9 states._
 - **v3.10 (2026-09-03, captain: Sergio Esteban).** `IdentityMatch`'s
   overlap rule is narrowed to "at most one OPEN link per person", held by
   a plain partial unique index (`UNIQUE (discoveredPersonId) WHERE
-  "validTo" IS NULL`, SQLSTATE 23505 / Prisma P2002) — the `btree_gist`
+"validTo" IS NULL`, SQLSTATE 23505 / Prisma P2002) — the `btree_gist`
   exclusion constraint, and with it the repo's first `CREATE EXTENSION`,
   is dropped before shipping (§7 deployment note, Schema, Gates, open
   questions). The general rule guarded a case wave 2 cannot produce:
@@ -2317,7 +2320,7 @@ money tables, only the identity tables and read paths.
   Status unchanged (Proposed).
   - **Re-pointing a key is one transaction, and the constraints are
     corrected** (§7, Schema, Gates): a non-overlap constraint cannot see a
-    *gap*, and two independent updates were proved on live Postgres to
+    _gap_, and two independent updates were proved on live Postgres to
     leave an hour of spend covered by no bill, silently. Re-point is now a
     single `SELECT … FOR UPDATE` transaction. The redundant partial unique
     index is **dropped** (the exclusion constraint already rejects a second
@@ -2389,7 +2392,7 @@ money tables, only the identity tables and read paths.
     `LastObservedAt` payload column (Schema), moved forward by every fold
     write that touches the day — a re-pull confirming an unchanged figure
     included, which is exactly what `RevisedAt` would miss; the flag stays
-    computed at read, now *from* that stored timestamp. Its value is the
+    computed at read, now _from_ that stored timestamp. Its value is the
     **pull's observation timestamp, carried on the event**, never the wall
     clock at fold time: a clock read would make replay non-deterministic,
     breaking "Rebuild = replay" and its equality gate, and would let §9's
@@ -2401,7 +2404,7 @@ money tables, only the identity tables and read paths.
     re-confirmation case this marker exists to notice.
     revised ∧ provisional is the **normal** case, not a contradiction —
     Anthropic revises within 30 days and the window is 30 days — and the
-    cell shows both: *"revised, was $X — may still change"*; the v3.8
+    cell shows both: _"revised, was $X — may still change"_; the v3.8
     sentence calling the two markers opposites is corrected. Gateway rows
     (`IngestionSourceId = ''`) are exempt: metered in real time, never
     restated. Azure and Databricks windows are recorded as unmeasured.
@@ -2454,7 +2457,7 @@ money tables, only the identity tables and read paths.
     create — and there are **two** of them, `RevisedAt` and
     `LastObservedAt`, not three: 00092 already carries
     `PreviousAmountNanoUsd`, so the ADR's `PreviousAmountNano` would have
-    added a *second* prior-amount money column to the same table, with
+    added a _second_ prior-amount money column to the same table, with
     nothing to tell a reader which one the restatement markers meant. The
     sketch, the invariant, the Gates row and §15 now all name the shipped
     column. `LastObservedAt` backfills as epoch, which reads every
@@ -2474,8 +2477,8 @@ money tables, only the identity tables and read paths.
     event-log erasure service that was never written; the closed identity
     latch — with which of them wave 2 fixes and which are tracked
     elsewhere.
-  - *Numbered v3.9 rather than v3.4 on rebase: wave 1 shipped v3.3–v3.7 to
-    `main` in parallel with this branch.*
+  - _Numbered v3.9 rather than v3.4 on rebase: wave 1 shipped v3.3–v3.7 to
+    `main` in parallel with this branch._
 
 - **v3.8 (2026-09-01, captain: Sergio Esteban).** Wave-2 lock completed; the
   two #7740 forks plus four gaps found in the lock-completeness pass, all
@@ -2507,14 +2510,14 @@ money tables, only the identity tables and read paths.
   - **New surfaces speak FOCUS** (§22 new, §15, Constants): FOCUS names on
     new customer-visible surfaces and `x_` extensions where the standard has
     none, with the live rollup's internal names left alone; plus a
-    *provisional* marker, distinct from *revised*, derived from a
+    _provisional_ marker, distinct from _revised_, derived from a
     `SETTLING_WINDOW_DAYS` window because no provider feed states finality.
-  - *Numbered v3.8 rather than v3.3 on rebase: wave 1 shipped v3.3–v3.7 to
-    `main` in parallel with this branch.*
+  - _Numbered v3.8 rather than v3.3 on rebase: wave 1 shipped v3.3–v3.7 to
+    `main` in parallel with this branch._
 
 - **v3.7 (2026-09-03, captain: Sergio Esteban).** The create form's
   default flipped to one app registration for both reads (issue #7775).
-  §21.1 gains the *Form default* paragraph: the builder copies the bot
+  §21.1 gains the _Form default_ paragraph: the builder copies the bot
   pair into the billing keys when the switch is on, the split
   arrangement stays the recommendation one flip away, and the choice is
   persisted as `azureBillingUsesSameApp` because sealed credentials
@@ -2564,9 +2567,9 @@ money tables, only the identity tables and read paths.
   - **§21.6 withdrawn.** The save-time verification read had no seam
     (no save path reads cost; the six-hour gate holds), keyed on a state
     nothing stores (when a grant happened), and misread its own
-    measurement (a subscriptions *list* returning empty, not a cost
+    measurement (a subscriptions _list_ returning empty, not a cost
     query being refused). The propagation delay survives as setup copy.
-  - **§21.7 corrected.** The seat union is precedent for the *shape*
+  - **§21.7 corrected.** The seat union is precedent for the _shape_
     only. Its `read_failed` fires solely on our own store query
     throwing; a provider 403 renders as `awaiting_data` — the very
     collapse §21.3 forbids. The seat lane's own gap is now an open
@@ -2590,7 +2593,7 @@ money tables, only the identity tables and read paths.
   billing identity and the honesty rule for the spend lane — and
   withdraws an overstated evidence claim. Supersedes issue #7733; the
   work is issued as #7745.
-  - **Framing.** Decision scoped to Copilot Studio only, *not* stated as
+  - **Framing.** Decision scoped to Copilot Studio only, _not_ stated as
     a rule for every connection: Databricks' permission model has not
     been examined, and asserting a rule for it would be asserting
     something unverified. Blast radius set at "a customer reads a wrong
@@ -2598,7 +2601,7 @@ money tables, only the identity tables and read paths.
     gates below are automated rather than human, except on the secret
     path.
   - **Round 1 (four forks, two re-asked).** Two constraints assumed
-    settled in discussion were deliberately *not* re-locked by the
+    settled in discussion were deliberately _not_ re-locked by the
     captain and so were re-opened rather than carried: the connection
     shape and the health colour. Both then locked as §21.1 and §21.5,
     with reasons that are now written down instead of remembered.
@@ -2606,7 +2609,7 @@ money tables, only the identity tables and read paths.
     captain challenged the prepaid claim directly ("do you have
     evidence?"). The cited `KNOWN_DEAD.md` exists in neither the repo
     nor the vault, and the underlying research note says in terms that
-    the admin centre *does* render per-agent credits and that our search
+    the admin centre _does_ render per-agent credits and that our search
     for the interface behind it was "a failed search, not proof that
     none exists". The Context bullet is rewritten to claim only what was
     measured — prepaid packs create no Azure resource, so the cost feed
@@ -2615,7 +2618,7 @@ money tables, only the identity tables and read paths.
     on the dead end being real; §21.4 asks the customer instead, which
     is correct either way.
   - **Round 2 (one new fork, found in prior art, not in discussion).**
-    The research note records that Azure answers *empty* for a minute or
+    The research note records that Azure answers _empty_ for a minute or
     two after the role is granted — identical to a refusal. §21.6 adds a
     save-time verification with a 3-minute window, because the six-hour
     read cadence would otherwise freeze a false "no billing access" for
@@ -2639,7 +2642,7 @@ money tables, only the identity tables and read paths.
     dollars would be silently swallowed). Overrun on mapped keys =
     show the bill + the §2 variance line, never subtract.
   - **Estimated tag** (§2, wave 2): not-yet-billed days show the
-    gateway number tagged *estimated*, computed at read; flips to the
+    gateway number tagged _estimated_, computed at read; flips to the
     bill when it lands.
   - **Pulled-money visibility** (§18): org-scoped
     `governance_cost:view`.
@@ -2659,7 +2662,7 @@ money tables, only the identity tables and read paths.
     documentation claim promoted to a design foundation); Databricks
     SCIM listing under app-only auth (script ran, no artifact survives,
     a 403 would have passed silently); the 11/13 Entra match
-    (prose-only); OpenAI credit netting (never checked). What *is*
+    (prose-only); OpenAI credit netting (never checked). What _is_
     proven under app-only auth: Azure cost read, and Databricks
     human-email vs service-principal-UUID attribution in query history.
   - **Bill composition stated** (§2, Invariants): "the bill" is the
@@ -2676,7 +2679,7 @@ money tables, only the identity tables and read paths.
     Copilot seat-price dead end is documented reasoning, not a
     `KNOWN_DEAD.md` probe (that file proves the credits API only).
   - **Machinery claims aligned with the repo**: the rollup projection
-    consumes *events*, not the sibling tables (§4 diagram redrawn; two
+    consumes _events_, not the sibling tables (§4 diagram redrawn; two
     per-pipeline registrations, one table; `CLICKHOUSE_ENGINE_REPLACING_PREFIX`
     envsub); the Gates' "tested down path" replaced with what the repo
     actually supports (manual DROP rollback per the 00067 precedent;

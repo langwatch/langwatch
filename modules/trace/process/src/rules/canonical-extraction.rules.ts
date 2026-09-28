@@ -1,13 +1,13 @@
 import type { CanonicalEvent } from "@langwatch/trace-contract";
 import { ATTR_KEYS, SPAN_TYPE_TO_GEN_AI_OP } from "@langwatch/trace-contract";
 
-import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
+import { type ExtractorContext, takeAttribute, takeEvents } from "./canonical-attributes.rules.ts";
 import { asNumber, isNonEmptyString, isRecord } from "./canonical-guard.rules.ts";
 import {
   decodeMessagesPayload,
   extractSystemInstructionFromMessages,
   normalizeToMessages,
-  stripSystemMessages,
+  stripLiftedSystemMessage,
 } from "./canonical-message.rules.ts";
 
 export type MessageSource =
@@ -36,7 +36,7 @@ const extractMessagesFromAttr = ({
   ruleId: string;
   config: ExtractMessagesConfig;
 }): boolean => {
-  const raw = ctx.bag.attrs.take(key);
+  const raw = takeAttribute(ctx.bag.attrs, key);
   if (raw === void 0) return false;
 
   const msgs = normalizeToMessages(decodeMessagesPayload(raw), config.defaultRole);
@@ -45,7 +45,7 @@ const extractMessagesFromAttr = ({
   if (config.extractSystemInstructions) {
     const systemInstruction = extractSystemInstructionFromMessages(msgs);
     // Strip system messages — they go to gen_ai.system_instructions
-    const chatMsgs = systemInstruction ? stripSystemMessages(msgs) : msgs;
+    const chatMsgs = systemInstruction ? stripLiftedSystemMessage(msgs) : msgs;
     if (chatMsgs.length > 0) {
       ctx.setAttr(config.attrKey, chatMsgs);
     }
@@ -77,7 +77,7 @@ const extractMessagesFromEvents = ({
   config: ExtractMessagesConfig;
 }): boolean => {
   const messages: unknown[] = [];
-  for (const ev of ctx.bag.events.takeAll(source.name)) {
+  for (const ev of takeEvents(ctx.bag.events, source.name)) {
     const extracted = source.extractor(ev);
     if (extracted !== void 0) {
       messages.push(extracted);
@@ -172,7 +172,7 @@ export const extractModelToBoth = ({
     return false;
   }
 
-  const raw = ctx.bag.attrs.take(sourceKey);
+  const raw = takeAttribute(ctx.bag.attrs, sourceKey);
   if (raw !== void 0) {
     const model = transform(raw);
     if (isNonEmptyString(model)) {
@@ -201,7 +201,7 @@ export const coerceStringNumberAttrs = (
     if (typeof raw === "string") {
       const n = asNumber(raw);
       if (n !== null) {
-        ctx.bag.attrs.take(key);
+        takeAttribute(ctx.bag.attrs, key);
         ctx.setAttr(key, n);
         ctx.recordRule(`${extractorId}:coerce(${key})`);
       }
@@ -220,7 +220,7 @@ export type UsageTokenSources =
 const pickFirstTokenCount = (ctx: ExtractorContext, keys: readonly string[]): number | null => {
   let count: number | null = null;
   for (const key of keys) {
-    const val = ctx.bag.attrs.take(key);
+    const val = takeAttribute(ctx.bag.attrs, key);
     if (val === void 0) continue;
 
     count = asNumber(val);
@@ -239,7 +239,7 @@ export const extractUsageTokens = (
   let outTok: number | null = null;
 
   if ("object" in sources) {
-    const usageObj = ctx.bag.attrs.take(sources.object);
+    const usageObj = takeAttribute(ctx.bag.attrs, sources.object);
     if (isRecord(usageObj)) {
       inTok = asNumber(usageObj.promptTokens);
       outTok = asNumber(usageObj.completionTokens);

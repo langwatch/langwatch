@@ -4,8 +4,8 @@
  * to ensure both replicas answer from the same Redis instance.
  */
 import { createLogger } from "@langwatch/observability";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { nowInstant } from "@langwatch/time";
-import type { Redis } from "ioredis";
 
 import { ExperimentRunAbortRepository } from "../experiment-run-abort.repository.ts";
 
@@ -19,11 +19,11 @@ const RUNNING_KEY_PREFIX = "eval_v3_running:";
 const ABORT_TTL_SECONDS = 3600;
 
 export class RedisExperimentRunAbortRepository extends ExperimentRunAbortRepository {
-  static create(options: { redis: Redis }): RedisExperimentRunAbortRepository {
+  static create(options: { redis: ProcessMembers["redis"] }): RedisExperimentRunAbortRepository {
     return new RedisExperimentRunAbortRepository(options.redis);
   }
 
-  private constructor(private readonly redis: Redis) {
+  private constructor(private readonly redis: ProcessMembers["redis"]) {
     super();
   }
 

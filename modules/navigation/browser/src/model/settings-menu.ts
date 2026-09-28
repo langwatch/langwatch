@@ -14,17 +14,13 @@ import {
   CreditCard,
   DatabaseZap,
   EyeOff,
-  FileBadge,
   Server,
   Fingerprint,
   Flag,
-  FolderKanban,
   FolderOpen,
   Gauge,
   KeyRound,
-  Link2,
   Lock,
-  type LucideIcon,
   MailX,
   Network,
   RefreshCw,
@@ -34,10 +30,11 @@ import {
   Sparkles,
   Stethoscope,
   UserCog,
-  Users,
-  UsersRound,
+  UserRound,
   Workflow,
   UserSearch,
+  BookUser,
+  type LucideIcon,
 } from "lucide-react";
 
 import { isPathUnder } from "./products.ts";
@@ -98,6 +95,21 @@ export interface SettingsMenuGates {
   isPlatformAdmin: boolean;
 }
 
+/**
+ * The two pages about the reader, not the organization, which is why this group is first.
+ * No gates at all: a member who may do nothing else here still has a password to change.
+ */
+function youGroup(): SettingsMenuGroup {
+  return {
+    id: "settings-you",
+    label: "You",
+    items: [
+      { label: "Profile", href: "/settings/profile", icon: UserRound },
+      { label: "Security", href: "/settings/security", icon: Fingerprint },
+    ],
+  };
+}
+
 function organizationGroup({
   hasPermission,
   isSaaS,
@@ -118,29 +130,24 @@ function organizationGroup({
       // came first and left a page most readers use at the bottom of a group
       // they cannot open.
       ...(!isLiteMember ? [{ label: "API Keys", href: "/settings/api-keys", icon: KeyRound }] : []),
-      // Main's authentication rail: the overview, the identity provider and the connectors.
-      {
-        label: "Authentication",
-        href: "/settings/authentication",
-        isExactMatch: true,
-        icon: Fingerprint,
-      },
-      {
-        label: "Identity Provider",
-        href: "/settings/authentication/provider",
-        icon: ShieldCheck,
-      },
-      {
-        label: "Connectors",
-        href: "/settings/authentication/connectors",
-        icon: Network,
-      },
       ...(showEnterpriseNav && !isLiteMember && hasPermission("auditLog:view")
         ? [
             {
               label: "Audit Log",
               href: "/settings/audit-log",
               icon: ScrollText,
+              isEnterprise: true,
+            },
+          ]
+        : []),
+      // How the organization signs in; one entry lit on the provider and connectors pages too.
+      // Offered only to a reader who may see single sign-on; the page refuses the address as well.
+      ...(showEnterpriseNav && !isLiteMember && hasPermission("sso:view")
+        ? [
+            {
+              label: "Authentication",
+              href: "/settings/authentication",
+              icon: Lock,
               isEnterprise: true,
             },
           ]
@@ -171,18 +178,22 @@ function organizationGroup({
 function accessGroup({ showEnterpriseNav, isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-access",
-    label: "Access",
+    label: "People & access",
     items: [
       {
-        label: "Members",
-        href: "/settings/members",
-        includePath: "/settings/members",
-        icon: Users,
-      },
-      {
-        label: "Teams & Projects",
-        href: "/settings/teams",
-        icon: FolderKanban,
+        // On every plan: members, teams and groups are tabs of this one page,
+        // and each old address forwards onto its tab, as on main.
+        label: "Directory",
+        href: "/settings/directory",
+        includePath: "/settings/directory",
+        icon: BookUser,
+        alsoActiveAt: [
+          "/settings/scim",
+          "/settings/groups",
+          "/settings/members",
+          "/settings/teams",
+          "/settings/access",
+        ],
       },
       ...(showEnterpriseNav && !isLiteMember ? enterpriseAccessItems() : []),
     ],
@@ -192,27 +203,11 @@ function accessGroup({ showEnterpriseNav, isLiteMember }: SettingsMenuGates): Se
 function enterpriseAccessItems(): SettingsMenuItem[] {
   return [
     {
-      label: "Groups",
-      href: "/settings/groups",
-      icon: UsersRound,
-      isEnterprise: true,
-    },
-    {
-      label: "Roles & Permissions",
+      // Definitions and their assignments are two tabs of one page.
+      label: "Roles",
       href: "/settings/roles",
       icon: ShieldCheck,
-      isEnterprise: true,
-    },
-    {
-      label: "Role Bindings",
-      href: "/settings/role-bindings",
-      icon: Link2,
-      isEnterprise: true,
-    },
-    {
-      label: "SCIM Provisioning",
-      href: "/settings/scim",
-      icon: RefreshCw,
+      alsoActiveAt: ["/settings/role-bindings"],
       isEnterprise: true,
     },
   ];
@@ -220,7 +215,7 @@ function enterpriseAccessItems(): SettingsMenuItem[] {
 
 function aiInfrastructureGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
   return {
-    id: "settings-ai-members",
+    id: "settings-ai-infrastructure",
     label: "AI Infrastructure",
     items: [
       {
@@ -357,6 +352,12 @@ export function backofficeGroup(): SettingsMenuGroup {
         href: "/ops/backoffice/sso-connections",
         icon: ShieldCheck,
       },
+      { label: "Licenses", href: "/ops/backoffice/licenses", icon: KeyRound },
+      {
+        label: "Self-hosted installs",
+        href: "/ops/backoffice/self-hosted-instances",
+        icon: Server,
+      },
       {
         label: "Identity Lookup",
         href: "/ops/backoffice/identity-lookup",
@@ -372,16 +373,6 @@ export function backofficeGroup(): SettingsMenuGroup {
         href: "/ops/backoffice/bug-reports",
         icon: Bug,
       },
-      {
-        label: "Licenses",
-        href: "/ops/backoffice/licenses",
-        icon: FileBadge,
-      },
-      {
-        label: "Self-hosted Installs",
-        href: "/ops/backoffice/self-hosted-instances",
-        icon: Server,
-      },
     ],
   };
 }
@@ -389,6 +380,7 @@ export function backofficeGroup(): SettingsMenuGroup {
 /** Settings menu data: grouped, iconed, filtered by gates; pure function of its gates */
 export function settingsMenu(gates: SettingsMenuGates): SettingsMenuGroup[] {
   const groups: SettingsMenuGroup[] = [
+    youGroup(),
     organizationGroup(gates),
     accessGroup(gates),
     aiInfrastructureGroup(gates),

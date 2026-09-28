@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.shared.json",
   "compilerOptions": {
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2023"],

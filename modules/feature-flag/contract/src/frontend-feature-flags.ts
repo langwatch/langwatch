@@ -50,6 +50,10 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_custom_chart_playground",
   // The Dashboards area, its sidebar entry and its saved-dashboards list.
   "release_dashboards",
+  // Gates the `eval:"..."` chip on the Trace Explorer search bar. Off, the
+  // bar says Instant Evals are not enabled instead of starting a run
+  // (specs/traces-v2/instant-eval-search.feature).
+  "release_instant_evals",
   // The guided onboarding variant, read on the welcome flow with the user's
   // id, which the percentage rollout buckets on (guided-onboarding-variant.feature).
   "experiment_onboarding_langy_guided",

@@ -17,18 +17,21 @@ import {
   type AuthzFailureNotice,
   type AuthzHostScope,
   type AuthzPlanReading,
+  type AuthzRouteReading,
   type AuthzSuccessNotice,
 } from "./model/authz-host.ts";
 
 export class FakeAuthzHost extends AuthzHostApi {
   readonly successes: AuthzSuccessNotice[] = [];
   readonly failures: AuthzFailureNotice[] = [];
+  readonly queries: Record<string, string | undefined>[] = [];
 
   constructor(
     private readonly options: {
       scope?: AuthzHostScope;
       grants?: ReadonlySet<string>;
       plan?: AuthzPlanReading;
+      query?: Readonly<Record<string, string | undefined>>;
     } = {},
   ) {
     super();
@@ -44,6 +47,14 @@ export class FakeAuthzHost extends AuthzHostApi {
 
   plan(): AuthzPlanReading {
     return this.options.plan ?? { isEnterprise: true, isLoading: false };
+  }
+
+  route(): AuthzRouteReading {
+    return { query: this.options.query ?? {} };
+  }
+
+  setQuery(next: Readonly<Record<string, string | undefined>>): void {
+    this.queries.push({ ...next });
   }
 
   succeeded(notice: AuthzSuccessNotice): void {

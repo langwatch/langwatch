@@ -2,15 +2,19 @@
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
+import {
+  type AttributeCanonicaliser,
+  type ExtractorContext,
+  takeAttribute,
+} from "../rules/canonical-attributes.rules.ts";
 import { recordValueType } from "../rules/canonical-extraction.rules.ts";
 import { asNumber } from "../rules/canonical-guard.rules.ts";
 import {
   extractLastUserMessageText,
   extractSystemInstructionFromMessages,
   normalizeToMessages,
-  stripSystemMessages,
+  stripLiftedSystemMessage,
 } from "../rules/canonical-message.rules.ts";
-import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 import { MastraValuesService } from "./mastra-value.service.ts";
 
 const mastraValuesService = MastraValuesService.create();
@@ -115,7 +119,7 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
 
     const systemInstruction = extractSystemInstructionFromMessages(msgs);
     // Strip system messages — they go to gen_ai.system_instructions
-    const chatMsgs = systemInstruction ? stripSystemMessages(msgs) : msgs;
+    const chatMsgs = systemInstruction ? stripLiftedSystemMessage(msgs) : msgs;
     if (chatMsgs.length > 0) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
       recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
@@ -294,7 +298,7 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
 
   /** Extract threadId and map to gen_ai.conversation.id. */
   private extractThreadId(ctx: ExtractorContext): void {
-    const threadId = ctx.bag.attrs.take(ATTR_KEYS.MASTRA_METADATA_THREAD_ID);
+    const threadId = takeAttribute(ctx.bag.attrs, ATTR_KEYS.MASTRA_METADATA_THREAD_ID);
     if (typeof threadId === "string" && threadId.length > 0) {
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, threadId);
       ctx.recordRule(`${this.id}:mastra.metadata.threadId->conversation.id`);
@@ -303,7 +307,7 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
 
   /** Map non-standard cached_input_tokens to canonical cache_read.input_tokens. */
   private mapTokenNames(ctx: ExtractorContext): void {
-    const cachedTokens = ctx.bag.attrs.take(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS);
+    const cachedTokens = takeAttribute(ctx.bag.attrs, ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS);
     if (cachedTokens !== void 0) {
       const n = asNumber(cachedTokens);
       if (n !== null) {

@@ -2,7 +2,6 @@ import {
   createTrpcErrorFormatter,
   TrpcRootDefinition,
   trpcFailureTraceIds,
-  type PendingPermissionProcedureBuilder,
 } from "@langwatch/api/trpc";
 import { z } from "zod";
 
@@ -23,26 +22,6 @@ const response = caller.project({ projectId: "project-1" });
 
 type _ContextAndInputRemainConcrete = Assert<
   Equal<Awaited<typeof response>, { actorId: string; projectId: string }>
->;
-
-/** Ensures pending builders cannot become procedures before authorization. */
-type Pending = PendingPermissionProcedureBuilder<
-  { permissionChecked: boolean },
-  { actor: { id: string } },
-  object,
-  object,
-  { projectId: string },
-  { projectId: string },
-  unknown,
-  unknown,
-  false
->;
-
-type _DeclarationIsMandatoryByConstruction = Assert<
-  Equal<
-    keyof Pending,
-    "input" | "use" | "permission" | "permissionAny" | "noPermission" | "authorizeInService"
-  >
 >;
 
 /**

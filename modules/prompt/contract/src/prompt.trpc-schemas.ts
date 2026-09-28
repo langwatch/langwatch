@@ -1,7 +1,6 @@
 /** tRPC input shapes; accept unknown keys for forward-compatible clients. */
 import { z } from "zod";
 
-import type { nodeDatasetSchema } from "./prompt.field-schemas.ts";
 import {
   handleSchema,
   inputsSchema,
@@ -214,15 +213,6 @@ export const promptAssignTagTrpcInputSchema = z.object({
   versionId: z.string(),
   tag: z.string().min(1),
 });
-
-/** Write payload types for create and update prompts (inferred from schema factories). */
-export type PromptCreateTrpcInput = z.infer<
-  ReturnType<typeof createPromptCreateTrpcInputSchema<typeof nodeDatasetSchema>>
->;
-
-export type PromptUpdateTrpcInput = z.infer<
-  ReturnType<typeof createPromptUpdateTrpcInputSchema<typeof nodeDatasetSchema>>
->;
 
 /**
  * The input shapes the nine borrowed procedures take, as declared types. The

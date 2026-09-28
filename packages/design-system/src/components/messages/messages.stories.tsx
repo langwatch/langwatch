@@ -7,9 +7,9 @@ const meta = {
   title: "Components/Messages",
   component: MessageRoleLabel,
   tags: ["autodocs"],
-  args: { role: "user" },
+  args: { messageRole: "user" },
   argTypes: {
-    role: { control: "inline-radio", options: ["system", "user", "assistant"] },
+    messageRole: { control: "inline-radio", options: ["system", "user", "assistant"] },
   },
 } satisfies Meta<typeof MessageRoleLabel>;
 
@@ -21,9 +21,9 @@ export const RoleLabel: Story = {};
 export const AllRoles: Story = {
   render: () => (
     <HStack gap="2">
-      <MessageRoleLabel role="system" />
-      <MessageRoleLabel role="user" />
-      <MessageRoleLabel role="assistant" />
+      <MessageRoleLabel messageRole="system" />
+      <MessageRoleLabel messageRole="user" />
+      <MessageRoleLabel messageRole="assistant" />
     </HStack>
   ),
 };

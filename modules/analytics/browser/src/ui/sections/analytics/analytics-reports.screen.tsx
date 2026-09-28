@@ -189,13 +189,8 @@ function ReportsContent() {
 
       {/* Empty state */}
       {hasNoGraphs && (
-        <Alert.Root
-          status="info"
-          borderStartWidth="4px"
-          borderStartColor="colorPalette.solid"
-          marginBottom={6}
-        >
-          <Alert.Indicator alignSelf="start" />
+        <Alert.Root status="info" variant="surface" marginBottom={6}>
+          <Alert.Indicator />
           <VStack align="start">
             <Alert.Title>Add your custom graphs here</Alert.Title>
             <Alert.Description>

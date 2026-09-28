@@ -32,7 +32,8 @@ why 31 rows name `testing.ts`, one names governance's
 The private-path test, `feature-layout.ts:277`:
 
 ```ts
-const PRIVATE_SERVER_EXPORT = /(?:^|\/)(?:app|projections|repositories|rules|services|stores)(?:\/|$)/;
+const PRIVATE_SERVER_EXPORT =
+  /(?:^|\/)(?:app|projections|repositories|rules|services|stores)(?:\/|$)/;
 ```
 
 Within an entrypoint, only **export declarations** are examined, and type-only
@@ -67,7 +68,7 @@ export (keeping `export type { … }` is always legal — line 657), or stop the
 transitive star leak.
 
 **And the baseline entry must then be deleted**, or the run fails anyway: a
-fixed edge becomes a *stale* row, its own violation
+fixed edge becomes a _stale_ row, its own violation
 (`boundary-edge-baseline.ts:56-59` — "Boundary edge baseline entry … no longer
 exists. / Delete the stale entry so the checked-in baseline only shrinks.").
 Fix + row deletion travel in the same collected commit.
@@ -96,12 +97,12 @@ imports one of the row's runtime binding names from that package's entrypoint
 (root and subpath imports both scanned; no namespace imports of these packages
 exist anywhere):
 
-| Class | Rows | Meaning | Job |
-|---|---|---|---|
-| DELETE | 569 | no external importer of any runtime name on the line | delete the runtime names (keep `export type` members); re-check self-imports[^self] |
-| TYPE-ONLY | 5 | external usage is type-position only | convert to `export type { … } from`, flip importers to `import type` |
-| VALUE-USED | 256 | ≥1 external file constructs/calls the binding | seam work: importer rewired through the package's factory, then export deleted |
-| GONE | 7 | export already absent in this working tree (live lanes / recent commits) | baseline row deletion only — coordinator |
+| Class      | Rows | Meaning                                                                  | Job                                                                                 |
+| ---------- | ---- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| DELETE     | 569  | no external importer of any runtime name on the line                     | delete the runtime names (keep `export type` members); re-check self-imports[^self] |
+| TYPE-ONLY  | 5    | external usage is type-position only                                     | convert to `export type { … } from`, flip importers to `import type`                |
+| VALUE-USED | 256  | ≥1 external file constructs/calls the binding                            | seam work: importer rewired through the package's factory, then export deleted      |
+| GONE       | 7    | export already absent in this working tree (live lanes / recent commits) | baseline row deletion only — coordinator                                            |
 
 The classifier is a regex approximation of the TS graph. **Every lane
 re-verifies each row before acting**: grep the runtime names repo-wide (the
@@ -171,17 +172,17 @@ importers switch to `import type`.
   like `ClickHouseUnavailableError`): a factory for a constant is absurd.
   The correct fix is **relocation to a legal home** — the module's contract
   package when it is genuinely cross-feature vocabulary, otherwise a
-  non-private server file. Relocation is allowed *narrowly*: constants, error
+  non-private server file. Relocation is allowed _narrowly_: constants, error
   classes, pure predicate/derivation functions. Moving a service or repository
   out of its directory to dodge the regex is forbidden.
 - **Repository registries** (`traceRepositories`, `webhookRepositories`,
   `PostgresScenarioRepositories`): the annotation reference is explicit that
   the bundle stays private ("Repositories are never exported from
-  `index.ts`"). Compositions receive the *built* bundle from the feature's
+  `index.ts`"). Compositions receive the _built_ bundle from the feature's
   factory instead of building it themselves.
 - **`testing.ts` rows** (30): the entry may keep doubles
   (`TESTING_ENTRY_DOUBLE`), so `memory.*.repository.ts` exports are already
-  legal — the flagged rows export *real* repositories and services to other
+  legal — the flagged rows export _real_ repositories and services to other
   packages' tests (langy 11, governance 9, trace 4, analytics 1, gateway 1,
   automation 1). Fix per row: export the memory/fake double instead, or give
   the consuming test what it actually needs through the factory, or move the
@@ -193,7 +194,7 @@ importers switch to `import type`.
   then becomes a pure deletion. The pre-1 lane must coordinate through the
   coordinator rather than invent a second seam. (The other three
   module-to-module composition imports — organization→entitlement,
-  gateway→webhook/analytics, monitor→analytics/evaluator — are *not* among
+  gateway→webhook/analytics, monitor→analytics/evaluator — are _not_ among
   the 18 and stay in this drive.)
 
 ### 3e. Forbidden workarounds (each "clears" the checker and betrays the rule)
@@ -228,7 +229,7 @@ them.
 
 Two kinds. **Package lanes** own their feature packages: they clear DELETE and
 TYPE-ONLY rows immediately, and for VALUE-USED rows they build the factory
-seam *while keeping the old exports alive* (still baselined until 10-01),
+seam _while keeping the old exports alive_ (still baselined until 10-01),
 publishing a rewire map (old import → seam call) in the handoff; when the
 coordinator confirms every importer of a given export has been rewired, the
 same lane deletes the export, clearing the row. **Rewire lanes** own disjoint
@@ -243,30 +244,30 @@ pre-18 last. Models: sonnet where the work is verified deletion sweeps plus
 small pattern-following seams; opus where a real composition seam must be
 designed.
 
-| Lane | Model | Packages (owned globs) | Rows | D/T/V | Blockers |
-|---|---|---|---|---|---|
-| pre-1 identity-organization-auth | sonnet | modules/{identity,organization,auth}/server | 92 | 89/0/3 | identity's auth-row: coordinate with server cross-feature drive (§3d) |
-| pre-2 langy | sonnet | modules/langy/process | 58 | 51/0/7 | — |
-| pre-3 ops-authz-log-metric | sonnet | modules/{ops,authz,log,metric}/server + modules/share/process (rewire-only) | 67 | 53/0/14 | log/metric V-rows are consumed only by worker-production (pre-18 gates their deletion); share's test rewire gates on this lane's own authz seam; log's trace-importing test waits on pre-14 |
-| pre-4 experiment-cluster | sonnet | modules/{experiment,prompt,topic,coding-agent,github,presence,agent}/server | 58 | 45/0/13 | experiment/coding-agent phase-2 rewires wait on pre-8 (workflow) and pre-14 (trace) seams |
-| pre-5 evaluation-model-provider | opus | modules/{evaluation,model-provider,evaluator}/server | 46 | 19/1/26 | evaluation's workflow-importing service waits on pre-8 |
-| pre-6 automation-notification | opus | modules/{automation,notification}/server | 44 | 17/0/27 | — |
-| pre-7 gateway-webhook | opus | modules/{gateway,webhook}/server | 42 | 30/0/12 | gateway.app's analytics import waits on pre-8 |
-| pre-8 analytics-workflow | opus | modules/{analytics,workflow}/server + modules/{monitor,dashboard}/server (rewire-only) | 45 | 32/0/13 | monitor build's evaluator import waits on pre-5 |
-| pre-9 dataset-stored-object | sonnet | modules/{dataset,stored-object}/server | 36 | 21/0/15 | — |
-| pre-10 small-tails | sonnet | modules/{api-key,entitlement,data-privacy,platform-health,user,role,hosted-mcp,feature-flag,data-retention}/server | 35 | 23/0/12 | — |
-| pre-11 enterprise | opus | enterprise/modules/{governance,billing,licensing,sso,scim,managed-provider,audit-log}/server + enterprise/packages/composition/** | 120 | 71/1/48 | composition rewires of webhook names wait on pre-7 |
-| pre-12 project | sonnet | modules/project/process | 10 | 4/0/6 | **BLOCKED**: uncommitted work in this checkout under modules/project/process |
-| pre-13 scenario-suite | opus | modules/{scenario,suite}/server | 41 | 25/0/16 | **BLOCKED**: live idempotency lanes own both trees |
-| pre-14 trace | opus | modules/trace/process | 136 | 89/3/44 | **BLOCKED**: a different human's session owns modules/trace |
-| pre-15 rewire-tasks-api | sonnet | apps/tasks importer files, 3 apps/api files, prisma seed | 0 | rewires only | seams: pre-1,3,5,8,9,10,11,12,13 |
-| pre-16 rewire-worker-trace | sonnet | the ~28 apps/worker files that import trace/scenario/suite | 0 | rewires only | seams: pre-4,5,6,8,9,13,**14** |
-| pre-17 rewire-worker-platform | sonnet | every other apps/worker importer file except worker-production* | 0 | rewires only | seams: pre-1..pre-11 as each lands |
-| pre-18 rewire-worker-production | opus | worker-production.composition.ts + its 2 tests | 0 | rewires only | seams from **17 packages** — last lane standing |
-| coordinator | — | boundary-edge-baseline.json (serialized), GONE rows | 7 | 0/0/0 +7 stale | web-1 lane owns the directory |
+| Lane                             | Model  | Packages (owned globs)                                                                                                            | Rows | D/T/V          | Blockers                                                                                                                                                                                    |
+| -------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------- | ---- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| pre-1 identity-organization-auth | sonnet | modules/{identity,organization,auth}/server                                                                                       | 92   | 89/0/3         | identity's auth-row: coordinate with server cross-feature drive (§3d)                                                                                                                       |
+| pre-2 langy                      | sonnet | modules/langy/process                                                                                                             | 58   | 51/0/7         | —                                                                                                                                                                                           |
+| pre-3 ops-authz-log-metric       | sonnet | modules/{ops,authz,log,metric}/server + modules/share/process (rewire-only)                                                       | 67   | 53/0/14        | log/metric V-rows are consumed only by worker-production (pre-18 gates their deletion); share's test rewire gates on this lane's own authz seam; log's trace-importing test waits on pre-14 |
+| pre-4 experiment-cluster         | sonnet | modules/{experiment,prompt,topic,coding-agent,github,presence,agent}/server                                                       | 58   | 45/0/13        | experiment/coding-agent phase-2 rewires wait on pre-8 (workflow) and pre-14 (trace) seams                                                                                                   |
+| pre-5 evaluation-model-provider  | opus   | modules/{evaluation,model-provider,evaluator}/server                                                                              | 46   | 19/1/26        | evaluation's workflow-importing service waits on pre-8                                                                                                                                      |
+| pre-6 automation-notification    | opus   | modules/{automation,notification}/server                                                                                          | 44   | 17/0/27        | —                                                                                                                                                                                           |
+| pre-7 gateway-webhook            | opus   | modules/{gateway,webhook}/server                                                                                                  | 42   | 30/0/12        | gateway.app's analytics import waits on pre-8                                                                                                                                               |
+| pre-8 analytics-workflow         | opus   | modules/{analytics,workflow}/server + modules/{monitor,dashboard}/server (rewire-only)                                            | 45   | 32/0/13        | monitor build's evaluator import waits on pre-5                                                                                                                                             |
+| pre-9 dataset-stored-object      | sonnet | modules/{dataset,stored-object}/server                                                                                            | 36   | 21/0/15        | —                                                                                                                                                                                           |
+| pre-10 small-tails               | sonnet | modules/{api-key,entitlement,data-privacy,platform-health,user,role,hosted-mcp,feature-flag,data-retention}/server                | 35   | 23/0/12        | —                                                                                                                                                                                           |
+| pre-11 enterprise                | opus   | enterprise/modules/{governance,billing,licensing,sso,scim,managed-provider,audit-log}/server + enterprise/packages/composition/** | 120  | 71/1/48        | composition rewires of webhook names wait on pre-7                                                                                                                                          |
+| pre-12 project                   | sonnet | modules/project/process                                                                                                           | 10   | 4/0/6          | **BLOCKED**: uncommitted work in this checkout under modules/project/process                                                                                                                |
+| pre-13 scenario-suite            | opus   | modules/{scenario,suite}/server                                                                                                   | 41   | 25/0/16        | **BLOCKED**: live idempotency lanes own both trees                                                                                                                                          |
+| pre-14 trace                     | opus   | modules/trace/process                                                                                                             | 136  | 89/3/44        | **BLOCKED**: a different human's session owns modules/trace                                                                                                                                 |
+| pre-15 rewire-tasks-api          | sonnet | apps/tasks importer files, 3 apps/api files, prisma seed                                                                          | 0    | rewires only   | seams: pre-1,3,5,8,9,10,11,12,13                                                                                                                                                            |
+| pre-16 rewire-worker-trace       | sonnet | the ~28 apps/worker files that import trace/scenario/suite                                                                        | 0    | rewires only   | seams: pre-4,5,6,8,9,13,**14**                                                                                                                                                              |
+| pre-17 rewire-worker-platform    | sonnet | every other apps/worker importer file except worker-production*                                                                   | 0    | rewires only   | seams: pre-1..pre-11 as each lands                                                                                                                                                          |
+| pre-18 rewire-worker-production  | opus   | worker-production.composition.ts + its 2 tests                                                                                    | 0    | rewires only   | seams from **17 packages** — last lane standing                                                                                                                                             |
+| coordinator                      | —      | boundary-edge-baseline.json (serialized), GONE rows                                                                               | 7    | 0/0/0 +7 stale | web-1 lane owns the directory                                                                                                                                                               |
 
 Row coverage: 92+58+67+58+46+44+42+45+36+35+120+10+41+136 = 830 in package
-lanes, +7 coordinator = **837**. (Each manifest also *lists* its packages'
+lanes, +7 coordinator = **837**. (Each manifest also _lists_ its packages'
 GONE rows so nothing is invisible; acting on them stays the coordinator's.) Rewire lanes own zero rows by design — every
 row belongs to exactly one package lane, so none is orphaned by a rewire lane
 failing; it is merely delayed.
@@ -276,55 +277,55 @@ failing; it is merely delayed.
 Each row's key names its package; each package belongs to exactly one lane.
 The per-package totals (D/T/V/G as measured today[^classify]):
 
-| Package | Rows | D | T | V | G | Lane |
-|---|---|---|---|---|---|---|
-| modules/trace/process | 136 | 89 | 3 | 44 | 0 | pre-14 |
-| modules/identity/process | 64 | 61 | 0 | 2 | 1 | pre-1 (G→coord) |
-| enterprise/modules/governance/process | 60 | 25 | 0 | 35 | 0 | pre-11 |
-| modules/langy/process | 58 | 51 | 0 | 7 | 0 | pre-2 |
-| modules/ops/process | 52 | 45 | 0 | 7 | 0 | pre-3 |
-| enterprise/modules/billing/process | 44 | 34 | 1 | 9 | 0 | pre-11 |
-| modules/automation/process | 34 | 12 | 0 | 22 | 0 | pre-6 |
-| modules/scenario/process | 30 | 18 | 0 | 12 | 0 | pre-13 |
-| modules/experiment/process | 27 | 25 | 0 | 2 | 0 | pre-4 |
-| modules/model-provider/process | 27 | 9 | 1 | 16 | 1 | pre-5 (G→coord) |
-| modules/analytics/process | 24 | 18 | 0 | 6 | 0 | pre-8 |
-| modules/gateway/process | 22 | 16 | 0 | 6 | 0 | pre-7 |
-| modules/organization/process | 22 | 20 | 0 | 1 | 1 | pre-1 (G→coord) |
-| modules/stored-object/process | 22 | 13 | 0 | 8 | 1 | pre-9 (G→coord) |
-| modules/workflow/process | 21 | 14 | 0 | 7 | 0 | pre-8 |
-| modules/webhook/process | 20 | 14 | 0 | 6 | 0 | pre-7 |
-| modules/evaluation/process | 17 | 8 | 0 | 9 | 0 | pre-5 |
-| modules/dataset/process | 15 | 8 | 0 | 7 | 0 | pre-9 |
-| modules/suite/process | 12 | 7 | 0 | 4 | 1 | pre-13 (G→coord) |
-| modules/api-key/process | 11 | 7 | 0 | 4 | 0 | pre-10 |
-| modules/notification/process | 10 | 5 | 0 | 5 | 0 | pre-6 |
-| modules/project/process | 10 | 4 | 0 | 6 | 0 | pre-12 |
-| enterprise/modules/licensing/process | 9 | 5 | 0 | 3 | 1 | pre-11 (G→coord) |
-| modules/coding-agent/process | 9 | 8 | 0 | 1 | 0 | pre-4 |
-| modules/topic/process | 9 | 7 | 0 | 2 | 0 | pre-4 |
-| modules/auth/process | 8 | 8 | 0 | 0 | 0 | pre-1 |
-| modules/entitlement/process | 8 | 4 | 0 | 4 | 0 | pre-10 |
-| modules/authz/process | 7 | 4 | 0 | 3 | 0 | pre-3 |
-| modules/github/process | 7 | 2 | 0 | 5 | 0 | pre-4 |
-| modules/data-privacy/process | 6 | 3 | 0 | 3 | 0 | pre-10 |
-| modules/log/process | 5 | 3 | 0 | 2 | 0 | pre-3 |
-| modules/platform-health/process | 5 | 5 | 0 | 0 | 0 | pre-10 |
-| enterprise/modules/scim/process | 3 | 3 | 0 | 0 | 0 | pre-11 |
-| enterprise/modules/sso/process | 3 | 2 | 0 | 0 | 1 | pre-11 (G→coord) |
-| modules/evaluator/process | 3 | 2 | 0 | 1 | 0 | pre-5 |
-| modules/metric/process | 3 | 1 | 0 | 2 | 0 | pre-3 |
-| enterprise/modules/managed-provider/process | 2 | 1 | 0 | 1 | 0 | pre-11 |
-| modules/agent/process | 2 | 2 | 0 | 0 | 0 | pre-4 |
-| modules/presence/process | 2 | 1 | 0 | 1 | 0 | pre-4 |
-| modules/prompt/process | 2 | 0 | 0 | 2 | 0 | pre-4 |
-| enterprise/modules/audit-log/process | 1 | 1 | 0 | 0 | 0 | pre-11 |
-| modules/data-retention/process | 1 | 1 | 0 | 0 | 0 | pre-10 |
-| modules/feature-flag/process | 1 | 1 | 0 | 0 | 0 | pre-10 |
-| modules/hosted-mcp/process | 1 | 1 | 0 | 0 | 0 | pre-10 |
-| modules/role/process | 1 | 1 | 0 | 0 | 0 | pre-10 |
-| modules/user/process | 1 | 0 | 0 | 1 | 0 | pre-10 |
-| **Total** | **837** | **569** | **5** | **256** | **7** | |
+| Package                                     | Rows    | D       | T     | V       | G     | Lane             |
+| ------------------------------------------- | ------- | ------- | ----- | ------- | ----- | ---------------- |
+| modules/trace/process                       | 136     | 89      | 3     | 44      | 0     | pre-14           |
+| modules/identity/process                    | 64      | 61      | 0     | 2       | 1     | pre-1 (G→coord)  |
+| enterprise/modules/governance/process       | 60      | 25      | 0     | 35      | 0     | pre-11           |
+| modules/langy/process                       | 58      | 51      | 0     | 7       | 0     | pre-2            |
+| modules/ops/process                         | 52      | 45      | 0     | 7       | 0     | pre-3            |
+| enterprise/modules/billing/process          | 44      | 34      | 1     | 9       | 0     | pre-11           |
+| modules/automation/process                  | 34      | 12      | 0     | 22      | 0     | pre-6            |
+| modules/scenario/process                    | 30      | 18      | 0     | 12      | 0     | pre-13           |
+| modules/experiment/process                  | 27      | 25      | 0     | 2       | 0     | pre-4            |
+| modules/model-provider/process              | 27      | 9       | 1     | 16      | 1     | pre-5 (G→coord)  |
+| modules/analytics/process                   | 24      | 18      | 0     | 6       | 0     | pre-8            |
+| modules/gateway/process                     | 22      | 16      | 0     | 6       | 0     | pre-7            |
+| modules/organization/process                | 22      | 20      | 0     | 1       | 1     | pre-1 (G→coord)  |
+| modules/stored-object/process               | 22      | 13      | 0     | 8       | 1     | pre-9 (G→coord)  |
+| modules/workflow/process                    | 21      | 14      | 0     | 7       | 0     | pre-8            |
+| modules/webhook/process                     | 20      | 14      | 0     | 6       | 0     | pre-7            |
+| modules/evaluation/process                  | 17      | 8       | 0     | 9       | 0     | pre-5            |
+| modules/dataset/process                     | 15      | 8       | 0     | 7       | 0     | pre-9            |
+| modules/suite/process                       | 12      | 7       | 0     | 4       | 1     | pre-13 (G→coord) |
+| modules/api-key/process                     | 11      | 7       | 0     | 4       | 0     | pre-10           |
+| modules/notification/process                | 10      | 5       | 0     | 5       | 0     | pre-6            |
+| modules/project/process                     | 10      | 4       | 0     | 6       | 0     | pre-12           |
+| enterprise/modules/licensing/process        | 9       | 5       | 0     | 3       | 1     | pre-11 (G→coord) |
+| modules/coding-agent/process                | 9       | 8       | 0     | 1       | 0     | pre-4            |
+| modules/topic/process                       | 9       | 7       | 0     | 2       | 0     | pre-4            |
+| modules/auth/process                        | 8       | 8       | 0     | 0       | 0     | pre-1            |
+| modules/entitlement/process                 | 8       | 4       | 0     | 4       | 0     | pre-10           |
+| modules/authz/process                       | 7       | 4       | 0     | 3       | 0     | pre-3            |
+| modules/github/process                      | 7       | 2       | 0     | 5       | 0     | pre-4            |
+| modules/data-privacy/process                | 6       | 3       | 0     | 3       | 0     | pre-10           |
+| modules/log/process                         | 5       | 3       | 0     | 2       | 0     | pre-3            |
+| modules/platform-health/process             | 5       | 5       | 0     | 0       | 0     | pre-10           |
+| enterprise/modules/scim/process             | 3       | 3       | 0     | 0       | 0     | pre-11           |
+| enterprise/modules/sso/process              | 3       | 2       | 0     | 0       | 1     | pre-11 (G→coord) |
+| modules/evaluator/process                   | 3       | 2       | 0     | 1       | 0     | pre-5            |
+| modules/metric/process                      | 3       | 1       | 0     | 2       | 0     | pre-3            |
+| enterprise/modules/managed-provider/process | 2       | 1       | 0     | 1       | 0     | pre-11           |
+| modules/agent/process                       | 2       | 2       | 0     | 0       | 0     | pre-4            |
+| modules/presence/process                    | 2       | 1       | 0     | 1       | 0     | pre-4            |
+| modules/prompt/process                      | 2       | 0       | 0     | 2       | 0     | pre-4            |
+| enterprise/modules/audit-log/process        | 1       | 1       | 0     | 0       | 0     | pre-11           |
+| modules/data-retention/process              | 1       | 1       | 0     | 0       | 0     | pre-10           |
+| modules/feature-flag/process                | 1       | 1       | 0     | 0       | 0     | pre-10           |
+| modules/hosted-mcp/process                  | 1       | 1       | 0     | 0       | 0     | pre-10           |
+| modules/role/process                        | 1       | 1       | 0     | 0       | 0     | pre-10           |
+| modules/user/process                        | 1       | 0       | 0     | 1       | 0     | pre-10           |
+| **Total**                                   | **837** | **569** | **5** | **256** | **7** |                  |
 
 A lane regenerates its exact row list from the baseline with the one-liner in
 its manifest; the seven G rows are listed by key in §4's coordinator note and

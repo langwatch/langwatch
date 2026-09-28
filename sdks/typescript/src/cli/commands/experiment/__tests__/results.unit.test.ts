@@ -1,3 +1,5 @@
+import { stripVTControlCharacters } from "node:util";
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import {
@@ -285,10 +287,9 @@ describe("experimentResultsCommand()", () => {
         // Strip ANSI colour codes: whether chalk colours here depends on the
         // environment (vitest propagates FORCE_COLOR from a colour terminal),
         // and `\b1\b` never matches when the digit sits inside an escape code.
-        const printed = logSpy.mock.calls
-          .map((c: unknown[]) => String(c[0]))
-          .join("\n")
-          .replace(/\[[0-9;]*m/g, "");
+        const printed = stripVTControlCharacters(
+          logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n"),
+        );
         expect(printed).toMatch(/\b1\b/);
         expect(printed).toMatch(/\b2\b/);
         expect(printed).not.toContain("hello world");

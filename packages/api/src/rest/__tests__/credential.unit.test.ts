@@ -11,12 +11,15 @@ import {
   resolvePersonalCaller,
   type RestCredentialPrincipal,
 } from "@langwatch/api/rest";
-import type { Context } from "hono";
+import { Context } from "hono";
 import { describe, expect, it } from "vitest";
 
 /** A context that answers only what the middleware installed. */
-const contextWith = (variables: Record<string, unknown>): Context =>
-  ({ get: (key: string) => variables[key] }) as unknown as Context;
+const contextWith = (variables: Record<string, unknown>): Context => {
+  const context = new Context(new Request("http://localhost/api/project"));
+  for (const [key, value] of Object.entries(variables)) context.set(key, value);
+  return context;
+};
 
 const PROJECT = { id: "project-1", slug: "p", teamId: "team-1" };
 

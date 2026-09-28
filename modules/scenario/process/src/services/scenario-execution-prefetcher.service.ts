@@ -1,4 +1,5 @@
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -56,6 +57,8 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   modelProviders: ModelProviderApi;
   secrets: SecretApi;
   traces: TraceApi;
+  /** Mints the one agent sandbox key a code-agent run carries. */
+  apiKeys: Pick<ApiKeyApi, "getOrMintAgentSandboxKey">;
   voiceTargets: VoiceTargetReader | null;
 };
 
@@ -90,6 +93,8 @@ export class ScenarioExecutionPrefetcherService {
       lookups,
       modelParameters,
       traces: options.traces,
+      projects: options.projects,
+      apiKeys: options.apiKeys,
     });
     const runSecrets = ScenarioRunSecretsService.create(options.secretCipher);
 

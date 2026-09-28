@@ -63,10 +63,12 @@ export class ExperimentWorkbenchForbiddenError extends HandledError {
 export class ExperimentRunLoopUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
 
-  constructor(capability: string) {
+  /** `process` names the process that composed no loop, as the retired refusal did. */
+  constructor({ capability, process }: { capability: string; process?: string }) {
     super("service_unavailable", `This deployment has no ${capability}.`, {
       httpStatus: 503,
       fault: "platform",
+      meta: { ...(process === undefined ? {} : { process }), capability },
     });
     this.name = "ExperimentRunLoopUnavailableError";
   }

@@ -56,6 +56,15 @@ const managedBindingRowSchema = z
   })
   .strict();
 const assignableRoleRowSchema = z.object({ id: z.string(), permissions: z.unknown() }).strict();
+const scopeOrganizationRowsSchema = z.array(scopeOrganizationRowSchema);
+const scopeTeamRowsSchema = z.array(scopeTeamRowSchema);
+const scopeProjectRowsSchema = z.array(scopeProjectRowSchema);
+const groupMemberRowsSchema = z.array(groupMemberRowSchema);
+const userGroupRowsSchema = z.array(userGroupRowSchema);
+const nullableOrganizationRoleRowSchema = organizationRoleRowSchema.nullable();
+const nullableManagedBindingRowSchema = managedBindingRowSchema.nullable();
+const managedBindingRowsSchema = z.array(managedBindingRowSchema);
+const assignableRoleRowsSchema = z.array(assignableRoleRowSchema);
 
 export type AuthzBindingDatabase = {
   apiKey: Delegate;
@@ -150,9 +159,9 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
         : [],
     ]);
 
-    const organizationRows = z.array(scopeOrganizationRowSchema).parse(organizations);
-    const teamRows = z.array(scopeTeamRowSchema).parse(teams);
-    const projectRows = z.array(scopeProjectRowSchema).parse(projects);
+    const organizationRows = scopeOrganizationRowsSchema.parse(organizations);
+    const teamRows = scopeTeamRowsSchema.parse(teams);
+    const projectRows = scopeProjectRowsSchema.parse(projects);
 
     return [
       ...organizationRows.map((row): AuthzBindingScopeRow => ({
@@ -196,7 +205,7 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
       select: { groupId: true, userId: true },
     });
 
-    return z.array(groupMemberRowSchema).parse(rows);
+    return groupMemberRowsSchema.parse(rows);
   }
 
   async findUserGroups({
@@ -216,7 +225,7 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
       },
     });
 
-    return z.array(userGroupRowSchema).parse(rows);
+    return userGroupRowsSchema.parse(rows);
   }
 
   async findOrganizationRole({
@@ -230,7 +239,7 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
       where: { organizationId, userId },
       select: { role: true },
     });
-    const membership = organizationRoleRowSchema.nullable().parse(storedMembership);
+    const membership = nullableOrganizationRoleRowSchema.parse(storedMembership);
 
     return membership?.role ?? null;
   }
@@ -285,7 +294,7 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
       },
     });
 
-    return managedBindingRowSchema.nullable().parse(row);
+    return nullableManagedBindingRowSchema.parse(row);
   }
 
   async findDirectUserBindings({
@@ -321,7 +330,7 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
       },
     });
 
-    return z.array(managedBindingRowSchema).parse(rows);
+    return managedBindingRowsSchema.parse(rows);
   }
 
   async findAssignableRoles({
@@ -344,6 +353,6 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
       select: { id: true, permissions: true },
     });
 
-    return z.array(assignableRoleRowSchema).parse(rows);
+    return assignableRoleRowsSchema.parse(rows);
   }
 }

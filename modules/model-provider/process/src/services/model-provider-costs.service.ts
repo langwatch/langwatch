@@ -8,6 +8,7 @@ import {
   type ModelCost,
   type ModelCostDeleteInput,
   type ModelCostEstimateInput,
+  type ModelCostListRow,
   type ModelCostWriteInput,
 } from "@langwatch/model-provider-contract";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -48,6 +49,16 @@ export class ModelProviderCostsService {
 
   list(input: { projectId: string }): Promise<ModelCost[]> {
     return this.catalogue.listCosts(input);
+  }
+
+  /** The stored rules first, so they shadow the static rate that names the same model. */
+  async listWithCatalogue(input: { projectId: string }): Promise<ModelCostListRow[]> {
+    const stored = await this.list(input);
+    const catalogue = this.options.catalog
+      .staticCostRates()
+      .map((rate) => ({ ...rate, projectId: "" as const }));
+
+    return [...stored, ...catalogue];
   }
 
   async upsert(input: ModelCostWriteInput): Promise<ModelCost> {

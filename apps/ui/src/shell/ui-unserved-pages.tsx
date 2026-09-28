@@ -24,7 +24,5 @@ const unservedPage = async () => ({ default: UiUnservedPage });
  * entry here dead, which `every-route-page-is-declared` fails on.
  */
 export const uiUnservedPageLoaders: UiPageLoaderRegistry = {
-  "pages/[project]/automations/activity": unservedPage,
   "pages/[project]/evaluations/[id]/edit/choose": unservedPage,
-  "pages/[project]/analytics/custom/index": unservedPage,
 };

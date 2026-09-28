@@ -144,7 +144,7 @@ export class PromptCopyService {
   private deriveBaseHandle(source: VersionedPrompt): string {
     const candidate = source.handle ?? source.name;
 
-    return handleSchema.safeParse(candidate).success ? candidate : toHandleSlug(candidate);
+    return handleSchema.validate(candidate) ? candidate : toHandleSlug(candidate);
   }
 
   /**

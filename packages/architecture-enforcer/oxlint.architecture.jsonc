@@ -70,6 +70,9 @@
     "langwatch/web-imports-server-shaped-value": "error",
     "langwatch/zod-internals": "error",
     "langwatch/zod-object-composition": "error",
+    "langwatch/zod-object-intersection": "error",
+    "langwatch/zod-schema-per-call": "error",
+    "langwatch/zod-validate-for-boolean": "error",
   },
   "overrides": [
     {

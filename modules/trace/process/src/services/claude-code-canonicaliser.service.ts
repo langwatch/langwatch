@@ -1,15 +1,16 @@
 import { ATTR_KEYS, CLAUDE_CODE_LLM_REQUEST_SPAN_NAME } from "@langwatch/trace-contract";
 
+import {
+  type AttributeCanonicaliser,
+  type ExtractorContext,
+  type LogExtractorContext,
+  takeAttribute,
+} from "../rules/canonical-attributes.rules.ts";
 import { asNumber } from "../rules/canonical-guard.rules.ts";
 import {
   claudeCacheWritesLongLived,
   isConversationalQuerySource,
 } from "../rules/claude-code-call-policy.rules.ts";
-import type {
-  AttributeCanonicaliser,
-  ExtractorContext,
-  LogExtractorContext,
-} from "./canonical-attributes.service.ts";
 import { ClaudeCodeResponseService } from "./claude-code-response.service.ts";
 
 const claudeCodeResponseService = ClaudeCodeResponseService.create();
@@ -161,7 +162,7 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
   }
 
   private liftUserPrompt(ctx: LogExtractorContext): void {
-    const prompt = asString(ctx.bag.attrs.take("prompt"));
+    const prompt = asString(takeAttribute(ctx.bag.attrs, "prompt"));
     const sessionId = asString(ctx.bag.attrs.get("session.id"));
 
     let fired = false;

@@ -393,18 +393,29 @@ function drawWindow(dst, dw, dh, src, sw, sh, win, border, scratchRef) {
   const xs = planAxis(outW, (x0 - win.left) * step, step, sw);
   const ys = planAxis(outH, (y0 - win.top) * step, step, sh);
 
-  let rowMin = sh;
-  let rowMax = 0;
-  for (let i = 0; i < ys.idx.length; i++) {
-    const r = ys.idx[i];
-    if (r < rowMin) rowMin = r;
-    if (r > rowMax) rowMax = r;
-  }
-  const rows = rowMax - rowMin + 1;
+  const { rowMin, rows } = sourceRowSpan(ys.idx, sh);
   const need = rows * outW * 3;
   if (scratchRef.buf.length < need) scratchRef.buf = new Float32Array(need);
   const scratch = scratchRef.buf;
 
+  resampleRows({ scratch, src, sw, xs, rowMin, rows, outW });
+  compositeColumns({ dst, dw, scratch, ys, rowMin, outW, outH, x0, y0, win, border });
+}
+
+/** The first source row any output row reads, and how many rows it spans. */
+function sourceRowSpan(idx, sh) {
+  let rowMin = sh;
+  let rowMax = 0;
+  for (let i = 0; i < idx.length; i++) {
+    const r = idx[i];
+    if (r < rowMin) rowMin = r;
+    if (r > rowMax) rowMax = r;
+  }
+  return { rowMin, rows: rowMax - rowMin + 1 };
+}
+
+/** The horizontal pass: each source row resampled to the window's width. */
+function resampleRows({ scratch, src, sw, xs, rowMin, rows, outW }) {
   const xt = xs.taps;
   for (let r = 0; r < rows; r++) {
     const srow = (rowMin + r) * sw * 4;
@@ -428,11 +439,43 @@ function drawWindow(dst, dw, dh, src, sw, sh, win, border, scratchRef) {
       scratch[d + 2] = c;
     }
   }
+}
 
-  const yt = ys.taps;
-  const bw = border ? border.width : 0;
+/** One output pixel's colour, reused across pixels so the hot loop allocates nothing. */
+const pixel = new Float64Array(3);
+
+/** The vertical pass for one pixel, read out of the row-resampled scratch into `pixel`. */
+function sampleColumn(scratch, ys, base, rowMin, outW, x) {
+  let a = 0;
+  let b = 0;
+  let c = 0;
+  for (let k = 0; k < ys.taps; k++) {
+    const w = ys.wgt[base + k];
+    if (w === 0) continue;
+    const p = (ys.idx[base + k] - rowMin) * outW * 3 + x * 3;
+    a += scratch[p] * w;
+    b += scratch[p + 1] * w;
+    c += scratch[p + 2] * w;
+  }
+  pixel[0] = a;
+  pixel[1] = b;
+  pixel[2] = c;
+}
+
+/** Tints `pixel` toward the hairline where it falls on the window's edge. */
+function tintEdge(cov, sd, border) {
+  const ring = (cov - clamp(0.5 - (sd + border.width), 0, 1)) * border.opacity;
+  if (ring <= 0.002) return;
+  pixel[0] = lerp(pixel[0], border.color[0], ring);
+  pixel[1] = lerp(pixel[1], border.color[1], ring);
+  pixel[2] = lerp(pixel[2], border.color[2], ring);
+}
+
+/** The vertical pass, masked to the rounded window and blended over `dst`. */
+function compositeColumns({ dst, dw, scratch, ys, rowMin, outW, outH, x0, y0, win, border }) {
+  const hasEdge = border ? border.width > 0 : false;
   for (let y = 0; y < outH; y++) {
-    const base = y * yt;
+    const base = y * ys.taps;
     const py = y0 + y + 0.5;
     const drow = (y0 + y) * dw;
     for (let x = 0; x < outW; x++) {
@@ -441,32 +484,14 @@ function drawWindow(dst, dw, dh, src, sw, sh, win, border, scratchRef) {
       const cov = clamp(0.5 - sd, 0, 1);
       if (cov <= 0.002) continue;
 
-      let a = 0;
-      let b = 0;
-      let c = 0;
-      for (let k = 0; k < yt; k++) {
-        const w = ys.wgt[base + k];
-        if (w === 0) continue;
-        const p = (ys.idx[base + k] - rowMin) * outW * 3 + x * 3;
-        a += scratch[p] * w;
-        b += scratch[p + 1] * w;
-        c += scratch[p + 2] * w;
-      }
-
-      if (bw > 0) {
-        const ring = (cov - clamp(0.5 - (sd + bw), 0, 1)) * border.opacity;
-        if (ring > 0.002) {
-          a = lerp(a, border.color[0], ring);
-          b = lerp(b, border.color[1], ring);
-          c = lerp(c, border.color[2], ring);
-        }
-      }
+      sampleColumn(scratch, ys, base, rowMin, outW, x);
+      if (hasEdge) tintEdge(cov, sd, border);
 
       const d = (drow + x0 + x) * 4;
       const keep = 1 - cov;
-      dst[d + 0] = clamp(clamp(a, 0, 255) * cov + dst[d + 0] * keep, 0, 255);
-      dst[d + 1] = clamp(clamp(b, 0, 255) * cov + dst[d + 1] * keep, 0, 255);
-      dst[d + 2] = clamp(clamp(c, 0, 255) * cov + dst[d + 2] * keep, 0, 255);
+      dst[d + 0] = clamp(clamp(pixel[0], 0, 255) * cov + dst[d + 0] * keep, 0, 255);
+      dst[d + 1] = clamp(clamp(pixel[1], 0, 255) * cov + dst[d + 1] * keep, 0, 255);
+      dst[d + 2] = clamp(clamp(pixel[2], 0, 255) * cov + dst[d + 2] * keep, 0, 255);
     }
   }
 }
@@ -936,8 +961,8 @@ function merge(base, over) {
   return out;
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+/** The timeline, resolved against where it lives, and the source's probed metadata. */
+async function readTimeline(args) {
   const timelinePath = args._[0];
   if (!timelinePath) {
     console.error("usage: polish-recording.mjs <timeline.json> [options]");
@@ -958,22 +983,24 @@ async function main() {
 
   const input = rel(cfg.input);
   const output = args.out ? path.resolve(args.out) : rel(cfg.output);
-  const meta = await probe(input);
+  return { cfg, asset, input, output, meta: await probe(input) };
+}
 
+/** Source, page and output sizes, and the page-to-source scale. */
+function frameGeometry(cfg, meta) {
   const srcW = meta.width;
   const srcH = meta.height;
   const pageW = cfg.page?.width ?? srcW;
   const pageH = cfg.page?.height ?? srcH;
-  const sx = srcW / pageW;
-  const sy = srcH / pageH;
-
   const outW = cfg.size?.width ?? srcW;
   const outH = cfg.size?.height ?? srcH;
-  const fps = cfg.fps;
   if (outW % 2 || outH % 2) throw new Error("output width and height must be even");
+  return { srcW, srcH, pageW, pageH, sx: srcW / pageW, sy: srcH / pageH, outW, outH };
+}
 
-  // Beats may be timed against the raw take or against the finished cut.
-  const beats = cfg.beats
+/** Beats may be timed against the raw take or against the finished cut. */
+function scaledBeats(cfg, { sx, sy }) {
+  return cfg.beats
     .map((b) => ({
       ...b,
       t: b.t != null ? b.t : mapCutTime(cfg.cut, b.tRaw),
@@ -982,8 +1009,10 @@ async function main() {
       zoomAt: b.zoomAt ? { x: b.zoomAt.x * sx, y: b.zoomAt.y * sy } : null,
     }))
     .toSorted((a, b) => a.t - b.t);
+}
 
-  const cursorCfg = {
+function cursorConfig(cfg, { pageW, pageH, sx, sy }) {
+  return {
     ...cfg.cursor,
     start: {
       x: (cfg.cursor.start.x ?? pageW * 0.5) * sx,
@@ -991,15 +1020,278 @@ async function main() {
       hidden: !!cfg.cursor.start.hidden,
     },
   };
+}
 
+async function loadSprites({ args, cfg, asset, geo }) {
   const bgPath = args.background ? path.resolve(args.background) : asset(cfg.frame.background);
   const [background, arrowBmp, pointerBmp] = await Promise.all([
-    loadImageCover(bgPath, outW, outH),
+    loadImageCover(bgPath, geo.outW, geo.outH),
     rasterize(asset(cfg.cursor.arrow), cfg.cursor.size),
     rasterize(asset(cfg.cursor.pointer), cfg.cursor.size),
   ]);
-  const arrow = buildSprite(arrowBmp, cfg.cursor.hotspot.arrow, cfg.cursor.shadow);
-  const pointer = buildSprite(pointerBmp, cfg.cursor.hotspot.pointer, cfg.cursor.shadow);
+  return {
+    background,
+    arrow: buildSprite(arrowBmp, cfg.cursor.hotspot.arrow, cfg.cursor.shadow),
+    pointer: buildSprite(pointerBmp, cfg.cursor.hotspot.pointer, cfg.cursor.shadow),
+  };
+}
+
+function logPacing(pacing, srcDuration, duration) {
+  if (!pacing.freezes.length) return;
+  const list = pacing.freezes
+    .map((f) => `${f.c.toFixed(2)}${f.d > 0 ? "+" : ""}${f.d.toFixed(2)}`)
+    .join(" ");
+  console.log(`  pacing: ${srcDuration.toFixed(2)}s -> ${duration.toFixed(2)}s  [${list}]`);
+}
+
+/**
+ * The output frames to render. `--preview` is stated in seconds of the result,
+ * so the range has to be mapped back through the pacing before it becomes a
+ * trim on the source.
+ */
+function outputRange({ args, pacing, duration, srcDuration, fps }) {
+  const preview = args.preview ? args.preview.split(":").map(Number) : null;
+  const outStart = preview ? Math.max(0, preview[0]) : 0;
+  const outEnd = preview ? Math.min(preview[1], duration) : duration;
+  return {
+    preview,
+    outStart,
+    srcStart: pacing.srcOf(outStart),
+    srcEnd: Math.min(srcDuration, pacing.srcOf(outEnd) + 2 / fps),
+    frames: Math.max(1, Math.round((outEnd - outStart) * fps)),
+  };
+}
+
+/**
+ * The graph always ends in `fps`, and the output always states `-r`. A bare
+ * `setpts` before the end leaves ffmpeg guessing the rate from timestamps,
+ * and it guesses the source's rate, silently dropping frames.
+ */
+function decodeGraph(cut, range, fps) {
+  const graph = cut ? cutFilter(cut) : "[0:v]null[s];";
+  if (!range.preview) return `${graph}[s]fps=${fps}[out]`;
+  return (
+    `${graph}[s]trim=start=${range.srcStart}:end=${range.srcEnd},setpts=PTS-STARTPTS[p];` +
+    `[p]fps=${fps}[out]`
+  );
+}
+
+/**
+ * An ffmpeg child with its stderr kept. `close` is attached now, not after the
+ * loop: a process that has already closed never emits `close` again, and
+ * awaiting it then would let node exit silently.
+ */
+function spawnFfmpeg(argv, stdio) {
+  const child = spawn("ffmpeg", argv, { stdio });
+  const errors = [];
+  child.stderr.on("data", (c) => errors.push(c));
+  return { child, errors, done: once(child, "close") };
+}
+
+function decoderArgs({ input, graph, fps }) {
+  return [
+    "-v",
+    "error",
+    "-i",
+    input,
+    "-filter_complex",
+    graph,
+    "-map",
+    "[out]",
+    "-r",
+    String(fps),
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgba",
+    "-",
+  ];
+}
+
+function encoderArgs({ output, geo, fps, crf, cpuUsed }) {
+  return [
+    "-v",
+    "error",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgba",
+    "-s",
+    `${geo.outW}x${geo.outH}`,
+    "-r",
+    String(fps),
+    "-i",
+    "-",
+    "-an",
+    "-c:v",
+    "libvpx-vp9",
+    "-b:v",
+    "0",
+    "-crf",
+    String(crf),
+    "-deadline",
+    "good",
+    "-cpu-used",
+    String(cpuUsed),
+    "-row-mt",
+    "1",
+    "-pix_fmt",
+    "yuv420p",
+    "-y",
+    output,
+  ];
+}
+
+/**
+ * The source is pulled, not iterated: a frozen stretch asks for the same
+ * source frame over several output frames, so the decoder only advances
+ * when the output clock has moved past the next source frame.
+ */
+function sourceReader(stream, bytes) {
+  const source = readFrames(stream, bytes)[Symbol.asyncIterator]();
+  const state = { index: -1, frame: null, drained: false };
+  return {
+    state,
+    async advanceTo(want) {
+      while (!state.drained && state.index < want) {
+        const next = await source.next();
+        if (next.done) {
+          state.drained = true;
+          break;
+        }
+        state.frame = next.value;
+        state.index++;
+      }
+      return state.frame;
+    },
+  };
+}
+
+// Two candidate positions: the window centred in the frame, and the window
+// placed so the focus point is dead centre. `follow` blends them, and both are
+// straight functions of the zoom, so the path has no kink. Clamping the window
+// against the recording's edge put a kink in one axis: the page tilted and snapped back.
+function windowAt({ cam, scene }) {
+  const { cfg, geo } = scene;
+  const scale = scene.baseScale * cam.z;
+  const winW = geo.srcW * scale;
+  const winH = geo.srcH * scale;
+  const left = lerp((geo.outW - winW) / 2, geo.outW / 2 - cam.cx * scale, cfg.frame.follow);
+  const top = lerp((geo.outH - winH) / 2, geo.outH / 2 - cam.cy * scale, cfg.frame.follow);
+  return {
+    left,
+    top,
+    scale,
+    cx: left + winW / 2,
+    cy: top + winH / 2,
+    hw: winW / 2,
+    hh: winH / 2,
+    r: cfg.frame.radius * scale,
+  };
+}
+
+function renderFrame({ scene, frame, t }) {
+  const { cfg, geo, cursor } = scene;
+  const { outW, outH } = geo;
+  const win = windowAt({ cam: scene.cameraAt(t), scene });
+  const { left, top, scale } = win;
+
+  const dst = Buffer.allocUnsafe(outW * outH * 4);
+  scene.background.copy(dst);
+  drawShadow(dst, outW, outH, win, cfg.frame.shadow);
+  drawWindow(dst, outW, outH, frame, geo.srcW, geo.srcH, win, cfg.frame.border, scene.scratchRef);
+
+  for (const r of cursor.ripples(t, cfg.click)) {
+    drawRipple(
+      dst,
+      outW,
+      outH,
+      left + r.x * scale,
+      top + r.y * scale,
+      r.radius,
+      r.fill,
+      r.stroke,
+      cfg.click.strokeWidth,
+      cfg.click.color,
+    );
+  }
+
+  const c = cursor.at(t);
+  if (c.alpha > 0.002) {
+    const sprite = c.hand ? scene.pointer : scene.arrow;
+    drawSprite(dst, outW, outH, sprite, left + c.x * scale, top + c.y * scale, c.scale, c.alpha);
+  }
+  return dst;
+}
+
+/** Renders every frame in the range into the encoder; answers how many it wrote. */
+async function encodeFrames({ scene, range, reader, encoder, fps }) {
+  let n = 0;
+  const started = Date.now();
+  for (let i = 0; i < range.frames; i++) {
+    const t = range.outStart + i / fps;
+    const want = Math.max(0, Math.round((scene.pacing.srcOf(t) - range.srcStart) * fps));
+    const frame = await reader.advanceTo(want);
+    if (!frame) break;
+    if (!encoder.stdin.write(renderFrame({ scene, frame, t }))) await once(encoder.stdin, "drain");
+    n++;
+    if (n % 60 === 0) {
+      const rate = n / ((Date.now() - started) / 1000);
+      process.stderr.write(`\r  frame ${n}  ${rate.toFixed(1)} fps  ${(n / fps).toFixed(1)}s`);
+    }
+  }
+  return n;
+}
+
+async function awaitCoders({ decoder, encoder, drained }) {
+  encoder.child.stdin.end();
+  if (!drained) {
+    decoder.child.stdout.destroy();
+    decoder.child.kill("SIGKILL");
+  }
+  const [decCode] = await decoder.done;
+  const [encCode] = await encoder.done;
+  process.stderr.write("\r".padEnd(60) + "\r");
+
+  if (drained && decCode !== 0) {
+    throw new Error(`decoder failed\n${Buffer.concat(decoder.errors).toString("utf8")}`);
+  }
+  if (encCode !== 0) {
+    throw new Error(`encoder failed\n${Buffer.concat(encoder.errors).toString("utf8")}`);
+  }
+}
+
+async function reportOutput(output, frames) {
+  const result = await probe(output);
+  const size = fs.statSync(output).size;
+  console.log(
+    `${path.relative(process.cwd(), output)}  ` +
+      `${result.duration.toFixed(2)}s  ${(size / 1024 / 1024).toFixed(2)} MB  ` +
+      `${result.width}x${result.height}  ${frames} frames`,
+  );
+}
+
+async function writeStills(args, output) {
+  if (!args.stills) return;
+  const dir = args["stills-dir"]
+    ? path.resolve(args["stills-dir"])
+    : path.join(path.dirname(output), "stills");
+  fs.mkdirSync(dir, { recursive: true });
+  for (const s of args.stills.split(",").map((v) => v.trim())) {
+    const file = path.join(dir, `t${s.replace(".", "_")}.png`);
+    await run("ffmpeg", ["-v", "error", "-ss", s, "-i", output, "-frames:v", "1", "-y", file]);
+  }
+  console.log(`stills: ${path.relative(process.cwd(), dir)}`);
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const { cfg, asset, input, output, meta } = await readTimeline(args);
+  const geo = frameGeometry(cfg, meta);
+  const fps = cfg.fps;
+  const beats = scaledBeats(cfg, geo);
+  const cursorCfg = cursorConfig(cfg, geo);
+  const sprites = await loadSprites({ args, cfg, asset, geo });
 
   const srcDuration = cfg.cut
     ? cfg.cut.segments.reduce((a, seg) => a + segmentDuration(cfg.cut, seg), 0)
@@ -1010,234 +1302,32 @@ async function main() {
   const pacing = buildPacing(beats, cfg.pace, cursorCfg);
   for (const b of beats) b.t = pacing.timeOf(b);
   const duration = srcDuration + pacing.total;
-  if (pacing.freezes.length) {
-    const list = pacing.freezes
-      .map((f) => `${f.c.toFixed(2)}${f.d > 0 ? "+" : ""}${f.d.toFixed(2)}`)
-      .join(" ");
-    console.log(`  pacing: ${srcDuration.toFixed(2)}s -> ${duration.toFixed(2)}s  [${list}]`);
-  }
+  logPacing(pacing, srcDuration, duration);
 
-  const cameraAt = buildCameraTrack(beats, cfg.zoom, duration, srcW / 2, srcH / 2);
-  const cursor = buildCursorTrack(beats, cursorCfg);
+  const scene = {
+    cfg,
+    geo,
+    pacing,
+    ...sprites,
+    cameraAt: buildCameraTrack(beats, cfg.zoom, duration, geo.srcW / 2, geo.srcH / 2),
+    cursor: buildCursorTrack(beats, cursorCfg),
+    baseScale: cfg.frame.fit === "native" ? 1 : (geo.outW * cfg.frame.fit) / geo.srcW,
+    scratchRef: { buf: new Float32Array(1) },
+  };
 
-  const baseScale = cfg.frame.fit === "native" ? 1 : (outW * cfg.frame.fit) / srcW;
-  const follow = cfg.frame.follow;
-
-  // ------------------------------------------------------------- ffmpeg pair
-  // `--preview` is stated in seconds of the result, so the range has to be
-  // mapped back through the pacing before it becomes a trim on the source.
-  const preview = args.preview ? args.preview.split(":").map(Number) : null;
-  const outStart = preview ? Math.max(0, preview[0]) : 0;
-  const outEnd = preview ? Math.min(preview[1], duration) : duration;
-  const srcStart = pacing.srcOf(outStart);
-  const srcEnd = Math.min(srcDuration, pacing.srcOf(outEnd) + 2 / fps);
-  const frames = Math.max(1, Math.round((outEnd - outStart) * fps));
-
-  // The graph always ends in `fps`, and the output always states `-r`. A bare
-  // `setpts` before the end leaves ffmpeg guessing the rate from timestamps,
-  // and it guesses the source's rate, silently dropping frames.
-  let graph = cfg.cut ? cutFilter(cfg.cut) : "[0:v]null[s];";
-  if (preview) {
-    graph += `[s]trim=start=${srcStart}:end=${srcEnd},setpts=PTS-STARTPTS[p];`;
-    graph += `[p]fps=${fps}[out]`;
-  } else {
-    graph += `[s]fps=${fps}[out]`;
-  }
-
-  const dec = spawn(
-    "ffmpeg",
-    [
-      "-v",
-      "error",
-      "-i",
-      input,
-      "-filter_complex",
-      graph,
-      "-map",
-      "[out]",
-      "-r",
-      String(fps),
-      "-f",
-      "rawvideo",
-      "-pix_fmt",
-      "rgba",
-      "-",
-    ],
-    { stdio: ["ignore", "pipe", "pipe"] },
-  );
-  const decErr = [];
-  dec.stderr.on("data", (c) => decErr.push(c));
-  // Attached now, not after the loop: a process that has already closed never
-  // emits `close` again, and awaiting it then would let node exit silently.
-  const decDone = once(dec, "close");
-
+  const range = outputRange({ args, pacing, duration, srcDuration, fps });
+  const graph = decodeGraph(cfg.cut, range, fps);
+  const decoder = spawnFfmpeg(decoderArgs({ input, graph, fps }), ["ignore", "pipe", "pipe"]);
   fs.mkdirSync(path.dirname(output), { recursive: true });
-  const enc = spawn(
-    "ffmpeg",
-    [
-      "-v",
-      "error",
-      "-f",
-      "rawvideo",
-      "-pix_fmt",
-      "rgba",
-      "-s",
-      `${outW}x${outH}`,
-      "-r",
-      String(fps),
-      "-i",
-      "-",
-      "-an",
-      "-c:v",
-      "libvpx-vp9",
-      "-b:v",
-      "0",
-      "-crf",
-      String(args.crf ?? cfg.quality.crf),
-      "-deadline",
-      "good",
-      "-cpu-used",
-      String(cfg.quality.cpuUsed),
-      "-row-mt",
-      "1",
-      "-pix_fmt",
-      "yuv420p",
-      "-y",
-      output,
-    ],
-    { stdio: ["pipe", "ignore", "pipe"] },
-  );
-  const encErr = [];
-  enc.stderr.on("data", (c) => encErr.push(c));
-  const encDone = once(enc, "close");
+  const crf = args.crf ?? cfg.quality.crf;
+  const encoderArgv = encoderArgs({ output, geo, fps, crf, cpuUsed: cfg.quality.cpuUsed });
+  const encoder = spawnFfmpeg(encoderArgv, ["pipe", "ignore", "pipe"]);
 
-  // -------------------------------------------------------------- frame loop
-  const srcBytes = srcW * srcH * 4;
-  const outBytes = outW * outH * 4;
-  const scratchRef = { buf: new Float32Array(1) };
-  let n = 0;
-  const started = Date.now();
-
-  // The source is pulled, not iterated: a frozen stretch asks for the same
-  // source frame over several output frames, so the decoder only advances
-  // when the output clock has moved past the next source frame.
-  const source = readFrames(dec.stdout, srcBytes)[Symbol.asyncIterator]();
-  let srcIdx = -1;
-  let frame = null;
-  let drained = false;
-
-  for (let i = 0; i < frames; i++) {
-    const t = outStart + i / fps;
-    const want = Math.max(0, Math.round((pacing.srcOf(t) - srcStart) * fps));
-    while (!drained && srcIdx < want) {
-      const next = await source.next();
-      if (next.done) {
-        drained = true;
-        break;
-      }
-      frame = next.value;
-      srcIdx++;
-    }
-    if (!frame) break;
-    const cam = cameraAt(t);
-    const scale = baseScale * cam.z;
-    const winW = srcW * scale;
-    const winH = srcH * scale;
-
-    // Two candidate positions: the window centred in the frame, and the
-    // window placed so the focus point is dead centre. `follow` blends them,
-    // and both are straight functions of the zoom, so the path has no kink.
-    // Clamping the window against the recording's edge (the old approach)
-    // put a kink in one axis, which read as the page tilting and snapping back.
-    const left = lerp((outW - winW) / 2, outW / 2 - cam.cx * scale, follow);
-    const top = lerp((outH - winH) / 2, outH / 2 - cam.cy * scale, follow);
-
-    const win = {
-      left,
-      top,
-      scale,
-      cx: left + winW / 2,
-      cy: top + winH / 2,
-      hw: winW / 2,
-      hh: winH / 2,
-      r: cfg.frame.radius * scale,
-    };
-
-    const dst = Buffer.allocUnsafe(outBytes);
-    background.copy(dst);
-    drawShadow(dst, outW, outH, win, cfg.frame.shadow);
-    drawWindow(dst, outW, outH, frame, srcW, srcH, win, cfg.frame.border, scratchRef);
-
-    for (const r of cursor.ripples(t, cfg.click)) {
-      drawRipple(
-        dst,
-        outW,
-        outH,
-        left + r.x * scale,
-        top + r.y * scale,
-        r.radius,
-        r.fill,
-        r.stroke,
-        cfg.click.strokeWidth,
-        cfg.click.color,
-      );
-    }
-
-    const c = cursor.at(t);
-    if (c.alpha > 0.002) {
-      drawSprite(
-        dst,
-        outW,
-        outH,
-        c.hand ? pointer : arrow,
-        left + c.x * scale,
-        top + c.y * scale,
-        c.scale,
-        c.alpha,
-      );
-    }
-
-    if (!enc.stdin.write(dst)) await once(enc.stdin, "drain");
-    n++;
-    if (n % 60 === 0) {
-      const rate = n / ((Date.now() - started) / 1000);
-      process.stderr.write(`\r  frame ${n}  ${rate.toFixed(1)} fps  ${(n / fps).toFixed(1)}s`);
-    }
-  }
-
-  enc.stdin.end();
-  if (!drained) {
-    dec.stdout.destroy();
-    dec.kill("SIGKILL");
-  }
-  const [decCode] = await decDone;
-  const [encCode] = await encDone;
-  process.stderr.write("\r".padEnd(60) + "\r");
-
-  if (drained && decCode !== 0) {
-    throw new Error(`decoder failed\n${Buffer.concat(decErr).toString("utf8")}`);
-  }
-  if (encCode !== 0) throw new Error(`encoder failed\n${Buffer.concat(encErr).toString("utf8")}`);
-
-  const result = await probe(output);
-  const size = fs.statSync(output).size;
-  console.log(
-    `${path.relative(process.cwd(), output)}  ` +
-      `${result.duration.toFixed(2)}s  ${(size / 1024 / 1024).toFixed(2)} MB  ` +
-      `${result.width}x${result.height}  ${n} frames`,
-  );
-
-  if (args.stills) {
-    const dir = args["stills-dir"]
-      ? path.resolve(args["stills-dir"])
-      : path.join(path.dirname(output), "stills");
-    fs.mkdirSync(dir, { recursive: true });
-    for (const s of args.stills.split(",").map((v) => v.trim())) {
-      const file = path.join(dir, `t${s.replace(".", "_")}.png`);
-      await run("ffmpeg", ["-v", "error", "-ss", s, "-i", output, "-frames:v", "1", "-y", file]);
-    }
-    console.log(`stills: ${path.relative(process.cwd(), dir)}`);
-  }
+  const reader = sourceReader(decoder.child.stdout, geo.srcW * geo.srcH * 4);
+  const frames = await encodeFrames({ scene, range, reader, encoder: encoder.child, fps });
+  await awaitCoders({ decoder, encoder, drained: reader.state.drained });
+  await reportOutput(output, frames);
+  await writeStills(args, output);
 }
 
 main().catch((err) => {

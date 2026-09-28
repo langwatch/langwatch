@@ -6,10 +6,18 @@ import type {
   StartExperimentRunInput,
 } from "@langwatch/experiment-contract";
 
-import type { WorkflowEvaluationRequestedEventData } from "../eventing/experiment-run-events.process.ts";
+import type {
+  AbortRequestedEventData,
+  CellFinishedEventData,
+  ExperimentRunCompletedEventData,
+  WorkflowEvaluationRequestedEventData,
+} from "../eventing/experiment-run-events.process.ts";
 import { ExperimentExecution } from "./experiment.service.ts";
 
 type ExperimentRunCommandSender = { send(data: unknown): Promise<unknown> };
+
+/** A command's payload: its event's data inside the envelope every command carries. */
+type Enveloped<Data> = Data & { tenantId: string; occurredAt: number };
 
 function isSender(value: unknown): value is ExperimentRunCommandSender {
   if (typeof value !== "object" || value === null || !("send" in value)) return false;
@@ -50,8 +58,19 @@ export class ExperimentRunCommandDispatcherService extends ExperimentExecution {
     await this.#send("recordEvaluatorResult", input);
   }
 
-  async completeExperimentRun(input: CompleteExperimentRunInput): Promise<void> {
+  /** Completes a run; the execution manager also names its outcome. */
+  async completeExperimentRun(
+    input: CompleteExperimentRunInput | Enveloped<ExperimentRunCompletedEventData>,
+  ): Promise<void> {
     await this.#send("completeExperimentRun", input);
+  }
+
+  async failExperimentCell(input: Enveloped<CellFinishedEventData>): Promise<void> {
+    await this.#send("failExperimentCell", input);
+  }
+
+  async abortExperimentRun(input: Enveloped<AbortRequestedEventData>): Promise<void> {
+    await this.#send("abortExperimentRun", input);
   }
 
   async computeRunMetrics(input: ComputeExperimentRunMetricsCommandData): Promise<void> {

@@ -193,6 +193,17 @@ describe("given the reader may manage secrets", () => {
   });
 });
 
+describe("given the application lends a project switcher", () => {
+  it("shows it in the header, just before Add Secret", () => {
+    const host = new FakeSecretHost({ projectSwitcher: <button>Web App project</button> });
+    renderWithSecretHost(<SecretsScreen />, host);
+
+    const switcher = screen.getByRole("button", { name: "Web App project" });
+    const addSecret = screen.getByRole("button", { name: /Add Secret/ });
+    expect(switcher.nextElementSibling?.contains(addSecret)).toBe(true);
+  });
+});
+
 describe("given the reader may only view secrets", () => {
   /** @scenario Permission gate on managing secrets */
   it("offers no Add action and no row menu", () => {

@@ -52,7 +52,6 @@ function application(options: { enterprise: boolean }) {
     assertCustomRolesAllowed: vi.fn(refuse("Custom roles require an Enterprise plan")),
     assertAuditLogsAllowed: vi.fn(refuse("Audit logs require an Enterprise plan")),
     assertScimAllowed: vi.fn(async () => undefined),
-    assertTeamRoleChangeWithinSeatLimits: vi.fn(async () => undefined),
   } satisfies OrganizationPlanGate;
 
   const organizations = {

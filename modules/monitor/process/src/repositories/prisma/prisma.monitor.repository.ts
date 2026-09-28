@@ -2,7 +2,6 @@ import {
   enabledGuardrailMonitorSchema,
   monitorMappingsInputSchema,
   monitorSchema,
-  monitorSummarySchema,
   monitorWithEvaluatorSchema,
   type EnabledGuardrailMonitor,
   type Monitor,
@@ -109,7 +108,7 @@ export class PrismaMonitorRepository
       select: summarySelect,
     });
 
-    return rows.map((row) => monitorSummarySchema.parse(row));
+    return rows;
   }
 
   async findEnabledGuardrails(
@@ -150,6 +149,7 @@ export class PrismaMonitorRepository
 
     return row ? [mapMonitorWithEvaluator(row)] : [];
   }
+
   async findAllByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]> {
     if (input.monitorIds.length === 0) return [];
 

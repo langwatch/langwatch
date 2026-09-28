@@ -122,6 +122,24 @@ export const uiLegacyRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
     redirect: { from: "/governance/departments", to: "/governance/people" },
   },
   {
+    // Anomaly rules left the inventory's tabs; the pinned tab falls back to Catalog.
+    path: "/governance/anomaly-rules",
+    redirect: {
+      from: "/governance/anomaly-rules",
+      to: "/governance/inventory",
+      pinParams: { tab: "anomaly-rules" },
+    },
+  },
+  {
+    // Exact match only: /governance/users/:id keeps its own detail route.
+    path: "/governance/users",
+    redirect: {
+      from: "/governance/users",
+      to: "/governance/people",
+      pinParams: { tab: "people" },
+    },
+  },
+  {
     path: "/settings/gateway/*",
     redirect: { from: "/settings/gateway", to: "/gateway" },
   },
@@ -249,8 +267,13 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         children: [
           { path: "/settings", page: "pages/settings" },
           {
+            // Role Bindings became the Roles page's assignments tab.
             path: "/settings/role-bindings",
-            page: "pages/settings/role-bindings",
+            redirect: {
+              from: "/settings/role-bindings",
+              to: "/settings/roles",
+              pinParams: { tab: "assignments" },
+            },
           },
           {
             path: "/settings/annotation-scores",
@@ -289,8 +312,17 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/settings/security",
           },
           {
+            // Members, Teams, Groups and SCIM became the Directory and its tabs.
+            path: "/settings/directory",
+            page: "pages/settings/directory",
+          },
+          {
             path: "/settings/groups",
-            page: "pages/settings/groups",
+            redirect: {
+              from: "/settings/groups",
+              to: "/settings/directory",
+              pinParams: { tab: "groups" },
+            },
           },
           {
             path: "/settings/connect",
@@ -305,8 +337,13 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/settings/license",
           },
           {
+            // The old `tab` named a cut of the people; it travels as `people`.
             path: "/settings/members",
-            page: "pages/settings/members",
+            redirect: {
+              from: "/settings/members",
+              to: "/settings/directory",
+              renameParams: { tab: "people" },
+            },
           },
           {
             path: "/settings/model-costs",
@@ -334,7 +371,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           },
           {
             path: "/settings/scim",
-            page: "pages/settings/scim",
+            redirect: { from: "/settings/scim", to: "/settings/directory" },
           },
           {
             path: "/settings/secrets",
@@ -346,7 +383,11 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           },
           {
             path: "/settings/teams",
-            page: "pages/settings/teams",
+            redirect: {
+              from: "/settings/teams",
+              to: "/settings/directory",
+              pinParams: { tab: "teams" },
+            },
           },
           {
             path: "/settings/teams/:team",
@@ -386,10 +427,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           {
             path: "/governance/inventory/:id",
             page: "pages/governance/ingestion-source-detail.enterprise",
-          },
-          {
-            path: "/governance/anomaly-rules",
-            page: "pages/governance/anomaly-rules.enterprise",
           },
           {
             path: "/governance/people",
@@ -448,11 +485,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             // breakdown, model mix) defers to a follow-up.
             path: "/governance/teams/:id",
             page: "pages/governance/teams/[id]",
-          },
-          {
-            // View-all users listing - bird's-eye `View all users →` lands here.
-            path: "/governance/users",
-            page: "pages/governance/users",
           },
           {
             // Per-user detail - single-row scoped view keyed off the
@@ -575,10 +607,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           },
 
           {
-            // The declared "overview", "automations", "alerts" and
-            // "schedules" screens now come from @langwatch/automation-browser
-            // (automation.web.ts); this row has no matching AutomationSection
-            // and no screen renders it — see the batch-a handoff.
             path: "/:project/automations/activity",
             page: "pages/[project]/automations/activity",
           },

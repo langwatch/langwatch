@@ -38,15 +38,14 @@ export class DatasetNamingService {
   }
 
   async findNextAvailableName(input: DatasetNameInput): Promise<string> {
-    const parsed = datasetNameInputSchema.parse(input);
-    const baseName = parsed.proposedName.trim();
-    if ((await this.validateDatasetName(parsed)).available) {
+    const baseName = input.proposedName.trim();
+    if ((await this.validateDatasetName(input)).available) {
       return baseName;
     }
 
     for (let index = 2; index < MAX_NAME_CANDIDATES; index += 1) {
       const candidate = `${baseName} ${index}`;
-      const check = await this.validateDatasetName({ ...parsed, proposedName: candidate });
+      const check = await this.validateDatasetName({ ...input, proposedName: candidate });
       if (check.available) {
         return candidate;
       }

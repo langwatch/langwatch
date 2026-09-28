@@ -49,6 +49,7 @@ func passingDeps(fake *fakeRunner, captures []Capture, diffs []Diff) Deps {
 		AllocateRedis: func(context.Context) (RedisAllocation, error) {
 			return RedisAllocation{Base: 3, Candidate: 4}, nil
 		},
+		Detach: func(commandSpec, string) error { return nil },
 	}
 }
 
@@ -75,6 +76,26 @@ func TestExecuteCapturesEveryRouteAndEveryFlowOnBothRefs(t *testing.T) {
 	}
 	if handed.Viewport.Width != 1440 {
 		t.Fatalf("viewport: %+v", handed.Viewport)
+	}
+}
+
+// @scenario A side captures its routes on several pages at once
+func TestTheRunnerIsHandedTheConfiguredConcurrency(t *testing.T) {
+	var handed RunnerPlan
+	deps := passingDeps(&fakeRunner{}, nil, nil)
+	deps.Capture = func(_ context.Context, plan RunnerPlan, _ CaptureOptions) (RunnerStream, error) {
+		handed = plan
+		return RunnerStream{}, nil
+	}
+	config := testConfig()
+	config.Concurrency = Concurrency{Routes: 4, Flows: 3}
+
+	if _, err := Execute(context.Background(), Request{Options: testOptions(t), Config: config, Deps: deps}, Streams{Out: io.Discard, Err: io.Discard}); err != nil {
+		t.Fatal(err)
+	}
+
+	if handed.Concurrency != (Concurrency{Routes: 4, Flows: 3}) {
+		t.Fatalf("concurrency: %+v", handed.Concurrency)
 	}
 }
 
@@ -244,7 +265,7 @@ func TestSeedPostsTracesAndADatasetThroughTheCandidateAPI(t *testing.T) {
 	if len(result.TraceIDs) != 2 || !result.DatasetOK {
 		t.Fatalf("result: %+v", result)
 	}
-	if len(calls) != 3 || calls[0].path != "/api/collector" || calls[2].path != "/api/dataset" {
+	if len(calls) < 3 || calls[0].path != "/api/collector" || calls[2].path != "/api/dataset" {
 		t.Fatalf("calls: %+v", calls)
 	}
 	for _, call := range calls {
@@ -304,4 +325,30 @@ func mutatingCommands(commands []string) []string {
 		}
 	}
 	return out
+}
+
+// @scenario "A runner that cannot launch its browser stops the run before any stack boots"
+func TestAMissingBrowserStopsTheRunBeforeAnyStackBoots(t *testing.T) {
+	fake := &fakeRunner{}
+	deps := passingDeps(fake, nil, nil)
+	started := 0
+	deps.Start = func(context.Context, Stack, string) (func(), error) {
+		started++
+		return func() {}, nil
+	}
+	deps.Preflight = func(context.Context, string) error { return errors.New("cannot launch chromium") }
+
+	_, err := Execute(context.Background(), Request{Options: testOptions(t), Config: testConfig(), Deps: deps}, Streams{Out: io.Discard, Err: io.Discard})
+
+	if err == nil || !strings.Contains(err.Error(), "cannot launch chromium") {
+		t.Fatalf("err = %v, want the preflight failure", err)
+	}
+	if started != 0 {
+		t.Fatalf("%d stacks started after a failed preflight", started)
+	}
+	for _, command := range fake.rendered() {
+		if strings.HasPrefix(command, "git worktree add") {
+			t.Fatalf("a worktree was checked out after a failed preflight: %v", fake.rendered())
+		}
+	}
 }

@@ -1185,6 +1185,9 @@ const healthReport = z.object({ status: z.enum(["healthy", "unhealthy"]) });
 const MONITORED =
   "the deployment's own monitoring key is compared by the door; a monitor is not a tenant, so there is no permission to ask of it";
 
+/** What each door handed its handler, read back by the test that drove it. */
+const platformHealthHanded: { actor: unknown; scope: unknown }[] = [];
+
 const platformHealth = defineRestRouter(PlatformHealthApi)
   .withNamespace("platform-health")
   .withVersion(VERSION)
@@ -1196,11 +1199,7 @@ const platformHealth = defineRestRouter(PlatformHealthApi)
   .withDocs({ summary: "Report whether the platform is working" })
   .handle(async ({ app, actor, scope }) => {
     const report = await app.check();
-
-    // The literals are the proof the door named no tenant: a handler on a
-    // scoped door could not answer these.
-    expect(actor).toBeNull();
-    expect(scope).toBeNull();
+    platformHealthHanded.push({ actor, scope });
 
     return report.status === "healthy"
       ? ({ status: 200, body: report } as const)
@@ -1211,6 +1210,7 @@ const platformHealth = defineRestRouter(PlatformHealthApi)
 function platformHealthApp(
   options: { status?: "healthy" | "unhealthy"; tenanted?: boolean } = {},
 ): { app: Hono; identify: ReturnType<typeof vi.fn> } {
+  platformHealthHanded.length = 0;
   // The door compares this deployment's monitoring key and names it; it
   // resolves no tenant, and no permission is asked of what it resolved.
   const identify = vi.fn(() =>
@@ -1250,6 +1250,7 @@ describe("a family behind a deployment's own secret", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: "healthy" });
     expect(identify).toHaveBeenCalledTimes(1);
+    expect(platformHealthHanded).toEqual([{ actor: null, scope: null }]);
   });
 
   /** @scenario "A family behind a deployment secret names no tenant" */
@@ -2025,6 +2026,8 @@ const OWNER_IN_HANDLER =
 // The shape of `/api/files/:id` behind the browser session the upload pages
 // carry: the person is the door's, the owning project is the handler's, and
 // the answer is a stream the handler opened.
+const filesHanded: { actor: unknown; scope: unknown }[] = [];
+
 const files = defineRestRouter(FilesApi)
   .withNamespace("stored-object")
   .withVersion(VERSION)
@@ -2035,11 +2038,7 @@ const files = defineRestRouter(FilesApi)
   .withAccess(deferredScope({ reason: OWNER_IN_HANDLER }))
   .withRawResponse({ produces: "application/octet-stream" })
   .handle(async ({ app, actor, scope, input }) => {
-    // The literals are the proof the scope was deferred: a handler on a
-    // resolved door could not answer these.
-    expect(scope).toBeNull();
-    expect(actor).toEqual({ type: "user", id: "user-1" });
-
+    filesHanded.push({ actor, scope });
     const row = await app.read({ id: input.id });
 
     return {
@@ -2060,6 +2059,7 @@ const fileApplication: FilesApi = {
 };
 
 function filesApp(options: { identified?: boolean } = {}): Hono {
+  filesHanded.length = 0;
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => {
@@ -2087,6 +2087,8 @@ describe("a family behind a browser session", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("X-Owner")).toBe("project-9");
     await expect(response.text()).resolves.toBe("bytes-of-object-1");
+    // The scope stays deferred: the handler, not the door, finds the owning project.
+    expect(filesHanded).toEqual([{ actor: { type: "user", id: "user-1" }, scope: null }]);
   });
 
   /** @scenario "A family behind a browser session serves the person the cookie identified" */
@@ -2393,6 +2395,8 @@ const InstanceApi = moduleApi<InstanceApi>()("organization");
 
 // The shape of the self-hosted setup door: the operator's own key, which
 // creates the first organization and so names no tenant of its own.
+const instanceSetupHanded: { actor: unknown }[] = [];
+
 const instanceSetup = defineRestRouter(InstanceApi)
   .withNamespace("instance")
   .withVersion(VERSION)
@@ -2403,8 +2407,7 @@ const instanceSetup = defineRestRouter(InstanceApi)
   .withAccess(anyAuthenticated({ reason: "the instance administrator key is the whole gate" }))
   .withOutput(z.object({ id: z.string(), scope: z.null() }))
   .handle(async ({ app, input, scope, actor }) => {
-    // The literals are the proof the key named no tenant.
-    expect(actor).toBeNull();
+    instanceSetupHanded.push({ actor });
 
     const created = await app.createOrganization({ name: input.name });
 
@@ -2413,6 +2416,7 @@ const instanceSetup = defineRestRouter(InstanceApi)
   .build();
 
 function instanceSetupApp(options: { tenanted?: boolean } = {}): Hono {
+  instanceSetupHanded.length = 0;
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => {
@@ -2446,6 +2450,7 @@ describe("a family behind the instance administrator's own key", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ id: "organization-9", scope: null });
+    expect(instanceSetupHanded).toEqual([{ actor: null }]);
   });
 
   /** @scenario "A family behind the instance administrator's own key names no tenant" */

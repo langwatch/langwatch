@@ -60,7 +60,10 @@ export class ExperimentWorkflowLinkService {
     }
   }
 
-  async saveWithWorkflow(input: ExperimentWizardSaveInput): Promise<Experiment> {
+  async saveWithWorkflow(
+    input: ExperimentWizardSaveInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<Experiment> {
     const state = input.workbenchState as LegacyWorkbenchState;
 
     let workflowId = input.dsl.workflow_id;
@@ -78,26 +81,30 @@ export class ExperimentWorkflowLinkService {
       });
     }
 
-    const workflowName = `${name} - Workflow`;
-    if (!workflowId) {
-      const workflow = await this.options.workflowAuthoring.create({
-        projectId: input.projectId,
-        name: workflowName,
-        icon: input.dsl.icon,
-        description: input.dsl.description,
-      });
+    const dsl = { ...input.dsl, name: `${name} - Workflow` };
+    const commitMessage = input.commitMessage ?? "Autosaved";
+    const autoSaved = !input.commitMessage;
 
+    if (workflowId) {
+      await this.options.workflowAuthoring.saveVersion(
+        {
+          projectId: input.projectId,
+          workflowId,
+          dsl: { ...dsl, workflow_id: workflowId },
+          autoSaved,
+          commitMessage,
+          setAsLatestVersion: true,
+        },
+        by,
+      );
+    } else {
+      // The first graph is version one, an autosave unless committed, as on main.
+      const workflow = await this.options.workflowAuthoring.create(
+        { projectId: input.projectId, dsl, commitMessage, autoSaved },
+        by,
+      );
       workflowId = workflow.id;
     }
-
-    await this.options.workflowAuthoring.saveVersion({
-      projectId: input.projectId,
-      workflowId,
-      dsl: { ...input.dsl, workflow_id: workflowId, name: workflowName },
-      autoSaved: !input.commitMessage,
-      commitMessage: input.commitMessage ?? "Autosaved",
-      setAsLatestVersion: true,
-    });
 
     const experimentId = input.experimentId ?? generate("experiment").toString();
 

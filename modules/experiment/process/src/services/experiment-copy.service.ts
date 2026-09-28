@@ -68,15 +68,17 @@ export class ExperimentCopyService {
       });
     }
 
-    return this.copyWorkflowExperiment({ experiment, input });
+    return this.copyWorkflowExperiment({ experiment, input, by });
   }
 
   private async copyWorkflowExperiment({
     experiment,
     input,
+    by,
   }: {
     experiment: Experiment;
     input: ExperimentCopyInput;
+    by: Readonly<{ id: string }>;
   }): Promise<ExperimentCopied> {
     if (!experiment.workflowId) {
       throw new ExperimentWorkflowNotFoundError(experiment.id);
@@ -122,13 +124,16 @@ export class ExperimentCopyService {
       throw new Error("Failed to create workflow");
     }
 
-    await this.options.workflowAuthoring.saveVersion({
-      projectId: input.projectId,
-      workflowId,
-      dsl,
-      autoSaved: false,
-      commitMessage: `Copied from ${sourceWorkflow.name}`,
-    });
+    await this.options.workflowAuthoring.saveVersion(
+      {
+        projectId: input.projectId,
+        workflowId,
+        dsl,
+        autoSaved: false,
+        commitMessage: `Copied from ${sourceWorkflow.name}`,
+      },
+      by,
+    );
 
     const experimentName = experiment.name ?? experiment.slug;
     const newExperiment = await this.options.experiments.save({

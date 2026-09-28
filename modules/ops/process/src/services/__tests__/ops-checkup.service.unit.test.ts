@@ -100,7 +100,11 @@ function service() {
         }),
       },
       mail: {
-        getMailDelivery: async () => ({ provider: "smtp", smtpConfigured: true }),
+        getMailDelivery: async () => ({
+          provider: "smtp",
+          smtpConfigured: true,
+          misconfigured: false,
+        }),
         verifySmtp: async () => {
           throw new Error("535 authentication failed");
         },

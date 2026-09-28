@@ -41,6 +41,34 @@ Feature: visualdiff catches regressions and reports its own coverage
       And a failure both refs share is not
 
     @unit
+    Scenario: A random id in the final path never reads as a redirect
+      Given the base ends on "/p/experiments/workbench/MIHy1lTc" and the candidate on "/p/experiments/workbench/YMcoGt8s"
+      When the row is classified
+      Then it is not a "redirect" finding
+
+    @unit
+    Scenario: A base redirecting an operator screen to governance is expected
+      Given the base ends on "/governance" and the candidate on "/ops/backoffice/users"
+      When the row is classified
+      Then it is "intended-restore", naming the base's redirect
+      And a redirect not listed as expected is still a "redirect" finding
+
+    @unit
+    Scenario: The join offer's throttle is noise, not a finding
+      Given the candidate's join offer answers 429 after the run's many page loads
+      When the runner records the screen's failures
+      Then neither the 429 nor the browser's console line for it is recorded
+      And any other status of the join offer, or a 429 anywhere else, still is
+
+    @unit
+    Scenario: The passkey offer is declined before every screenshot and photographed once at sign-in
+      Given main raises the passkey offer on every screen
+      When a side signs in
+      Then the offer is photographed as the "sign-in" flow, an error when it never shows
+      And every later capture declines it before its screenshot
+      And a replayed baseline keeps the "sign-in" capture whatever flows the plan names
+
+    @unit
     Scenario: The findings stream and the report classify alike
       Given the same captures streamed to findings.jsonl and built into the report
       Then every screen has the same class in both
@@ -79,6 +107,27 @@ Feature: visualdiff catches regressions and reports its own coverage
       Given main declares "/[project]/traces/[trace]" and "/[project]/datasets/[id]"
       And visualdiff.yaml renders "/{slug}/traces/{trace}" filled from the seeded trace id
       Then the trace route is covered and the dataset route is uncovered
+
+    @unit
+    Scenario: Each stack seeds the entities its dynamic routes open and keeps its own ids
+      Given a stack that answers the dataset, experiment, evaluator, monitor, graph, virtual key and budget REST routes
+      When the run seeds that stack
+      Then each entity's id the stack generated fills that side's route placeholder
+      And the monitor is posted with the seeded evaluator's id and the budget with the seeded virtual key's id
+
+    @unit
+    Scenario: An entity a stack refuses is a warning, not a dead run
+      Given a stack that refuses the evaluator
+      When the run seeds that stack
+      Then the seed still succeeds with the other entities' ids
+      And a warning names the monitor as not seeded because the evaluator was not
+
+    @unit
+    Scenario: A side renders the ids its own seed generated, and a resumed run keeps them
+      Given the seed generated a dataset id
+      When the run hands the runner its plan
+      Then that side's fixtures carry the dataset id over the static fixtures
+      And the seeded marker records the ids, so a resumed run renders the same ones
 
     @unit
     Scenario: A candidate screen's declared path wins over its key
@@ -132,3 +181,97 @@ Feature: visualdiff catches regressions and reports its own coverage
       Given the candidate is HEAD and tracked files have uncommitted changes
       When a run starts
       Then stderr warns that the candidate renders the last commit without them
+
+    @unit
+    Scenario: A runner that cannot launch its browser stops the run before any stack boots
+      Given Playwright's browser is not installed for the runner
+      When a run starts
+      Then it fails before any worktree is checked out or stack started, naming the install command
+
+  Rule: A run spends its time on screens, not on waiting
+
+    @unit
+    Scenario: A request that never reports back does not hold later captures to the deadline
+      Given a request that reports neither finished nor failed
+      When the page navigates away, or the request is older than eight seconds
+      Then the settle no longer waits on it
+      And a settle that runs to its deadline logs the requests still in flight
+
+    @unit
+    Scenario: A side whose first routes all hit the settle deadline warns loudly
+      Given each of a side's first five routes runs to the settle deadline
+      Then stderr carries one warning naming what was still in flight
+      And no warning when any one of them settled
+
+    @unit
+    Scenario: A side captures its routes on several pages at once
+      Given visualdiff.yaml sets concurrency routes to 4
+      When a side captures its routes
+      Then four pages of one signed-in session each take the next route as they free up
+      And a candidate whose shell does not render stops every page taking another route
+
+    @unit
+    Scenario: Flows run side by side, and the one editing the project runs last
+      Given a flow whose steps edit the project settings
+      When a side captures its flows
+      Then the other flows run concurrency flows at a time
+      And the project-editing flow runs alone once they are done
+
+  Rule: A run reuses what the last one built
+
+    @unit
+    Scenario: Each side reuses one worktree between runs and prepares it only when its tree changed
+      Given a run on haven whose sides checked out into .visualdiff/worktrees/base and .visualdiff/worktrees/candidate
+      When the next run starts
+      Then it moves each worktree to its commit in place instead of adding a new one
+      And it skips the install and generated files when the commit's tree matches the last finished prepare
+      And a worktree another live or kept run holds is not shared; that run gets one of its own
+      And teardown destroys both stacks in the background and removes no persistent worktree
+      And gc never collects the persistent worktrees
+
+    @unit
+    Scenario: A baseline is keyed on what changes a capture, and replays only what it covers
+      Given a cached baseline for the base commit
+      When a route is added, the scheduling changes or a day passes
+      Then the key is the same
+      And a settle, fixture, viewport or capture source change moves it
+      And a plan with a route or flow step the baseline never recorded renders the base live
+
+    @unit
+    Scenario: The candidate captures while the base is still booting
+      Given both sides boot live and the first edition is the one the seed wrote
+      When the candidate is ready and seeded
+      Then the runner starts it at once and opens the base when its pending file arrives
+      And the run adopts the base's address and fixtures once capture ends
+      And a base that never comes up stops the runner with its reason
+
+  Rule: A finished run shows its screens on the branch's pull request
+
+    @unit
+    Scenario: A run's screens are chosen by what changed most, then what broke, then the key pages
+      Given a run with changed routes, candidate failures and the configured key pages
+      When its screens are selected for the pull request
+      Then the changed routes come first, the largest diff first
+      And the candidate's failures follow, the worst class first
+      And the key pages fill what is left, up to publish.screens
+
+    @unit
+    Scenario: A screen that could leak a secret or a local path is never published
+      Given a screen whose text on either side holds a key, a token or a local file path
+      When its screens are selected for the pull request
+      Then that screen is left out
+
+    @unit
+    Scenario: The PR comment carries the run, its counts and a gallery gh uploads
+      Given the selected screens
+      When the comment is rendered
+      Then it carries the marker, the run id, both commits and the counts by class
+      And each screen shows the candidate beside a readable base, or the candidate alone when the passkey offer covers the base
+
+    @unit
+    Scenario: Each run edits the PR's one marked comment in place
+      Given the branch's open pull request
+      When a run publishes
+      Then it posts the comment with its images attached through gh, each scaled to publish.width and cut at publish.maxHeight
+      And when the PR already carries the marked comment, that comment takes the posted body and the post is deleted
+      And with no open PR, gh signed out, or -no-publish, it logs why and posts nothing

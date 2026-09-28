@@ -34,16 +34,25 @@ not be completed — the same ladder as `apidiff`.
 
 ## What a run does
 
-1. `git worktree add --detach` for each ref, into `.visualdiff/<timestamp>/`.
+1. Checks each ref out. On the haven path each side has one persistent
+   worktree, `.visualdiff/worktrees/{base,candidate}`, moved to the ref's
+   commit in place (`git checkout --detach --force`), so `node_modules`,
+   generated files, built dists and Vite's cache stay warm between runs; a
+   worktree another live or `-keep` run holds is not shared, and that run
+   gets `.visualdiff/<timestamp>/<side>` of its own. With `-no-haven`,
+   `git worktree add --detach` into `.visualdiff/<timestamp>/`.
 2. Brings each ref's worktree up as its own stack. Wherever `haven` is on
-   PATH (the default - see "Booting through haven" below), each ref's fresh
-   worktree is prepared first - install, generated files, the built
-   workspace packages the api and worker import a dist from, and the
-   developer's own `.env` copied in (see "Preparing a fresh worktree" below)
-   - and only then does it become a `haven up --agent --detach` stack under
+   PATH (the default - see "Booting through haven" below), each worktree is
+   prepared first - install, generated files, the built workspace packages
+   the api and worker import a dist from (a monolith runs only the install
+   and `prisma generate`: haven's own `dev:app` builds the rest), and the
+   developer's own `.env` copied in (see "Preparing a fresh worktree" below).
+   A persistent worktree skips the install and generated files when its
+   commit's tree matches the last prepare that finished
+   (`.visualdiff/worktrees/<side>.prepared`) - and only then does it become a `haven up --agent --detach` stack under
      its own run-scoped slug, with haven's own automatic prep doing migrate and
      seed. With `-no-haven`, visualdiff provisions the old way instead:
-     `pnpm install --offline` and `pnpm run start:prepare:files` in each
+     `pnpm install --prefer-offline` and `pnpm run start:prepare:files` in each
      worktree, then each ref's stack starts on its own ports - the base at
      `-base-port` (5670 by default), the candidate ten above it, so the two can
      never collide. A modular checkout runs `dev:ui`, `dev:api` and
@@ -51,17 +60,22 @@ not be completed — the same ladder as `apidiff`.
      ClickHouse and provisioning steps skipped, because both refs share your
      local databases and the older ref must not re-apply its own migration set
      over them.
-3. Polls both stacks until they answer, then seeds a handful of traces and one
-   dataset through the **candidate's** API, so the fixtures exist in the shape
-   the newer code writes.
+3. Polls both stacks until they answer, then seeds each through its own API.
+   On haven, when both sides boot live and the first edition is the seeded
+   one, the candidate is captured as soon as it is up: the base boots and
+   seeds meanwhile, and reaches the runner through `base-side.json`.
 4. Runs `@langwatch/visual-diff-runner` (Playwright) over both stacks: every
-   route, then every flow, screenshotting as it goes and diffing each pair -
+   route across `concurrency.routes` pages of one signed-in session, then the
+   flows `concurrency.flows` at a time (a flow that edits the project runs
+   last, alone), screenshotting as it goes and diffing each pair on worker
+   threads -
    appending one line to `findings.jsonl` as each screen's comparison is
    decided (see "Findings stream and recapture" below), not only at the end.
 5. Writes `report.html`, `findings.md` and `findings.json` into the run
    directory.
 6. Tears both stacks down. On the haven path: `haven destroy` for exactly the
-   two slugs this run started, then both worktrees are removed. With
+   two slugs this run started, detached into `teardown.log` so the run exits
+   at once; a run-scoped worktree is removed after its destroy. With
    `-no-haven`: both stacks are killed by process group through
    `dev/scripts/kill-dev-tree.sh`, the ports are verified free, and both
    worktrees are removed - on every exit path, including a failed boot,
@@ -76,8 +90,11 @@ base will be replayed from a baseline or rendered live. It starts nothing.
 **Baselines.** Booting the base is most of a run's cost, and the base does
 not move while you fix your branch. Each live base pass is cached under
 `.visualdiff/baselines/<commit>-<edition>-<hash>/` (captures plus
-screenshots). The hash covers the configuration, viewport, the runner's own
-source and the UTC day, because seeded dates render as text. A run whose
+screenshots). The hash covers what changes a capture: the viewport, the
+settle and fixtures configuration and the runner sources that capture,
+settle and diff (`captureSources` in baseline.go). Its `meta.json` lists the
+routes and flow steps it recorded; a plan it does not cover renders the base
+live and replaces it. A run whose
 every edition has a baseline never checks out or boots the base at all: only
 the candidate stack comes up. `-refresh-baseline` re-renders and replaces
 it; `-no-baseline` neither reads nor writes one.
@@ -193,27 +210,27 @@ One classifier (`classify.go`) decides every screen, for the report,
 that applies wins, and every row keeps both screenshots so a person can
 overrule it. The finding classes fail the run (exit 1):
 
-| Class               | Rule                                                                        |
-| ------------------- | --------------------------------------------------------------------------- |
-| `missing-candidate` | the base captured the screen and the candidate never did                    |
-| `missing-base`      | the candidate captured the screen and the base never did - nothing compared |
-| `broken-both`       | the route or flow step fails on both refs                                   |
-| `regression`        | the candidate fails, or logs a console error, where the base does not      |
-| `not-found`         | the candidate shows its not-found page where the base renders the screen   |
-| `blank`             | the candidate page has no text at all, on any route or step                 |
-| `redirect`          | the candidate ends on a different path (ids masked) than the base           |
-| `api-error`         | a 4xx, 5xx or failed `/api/` or tRPC request the base does not make         |
-| `controls`          | a button, link, heading, tab or form field one side has and the other lacks |
+| Class               | Rule                                                                            |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `missing-candidate` | the base captured the screen and the candidate never did                        |
+| `missing-base`      | the candidate captured the screen and the base never did - nothing compared     |
+| `broken-both`       | the route or flow step fails on both refs                                       |
+| `regression`        | the candidate fails, or logs a console error, where the base does not           |
+| `not-found`         | the candidate shows its not-found page where the base renders the screen        |
+| `blank`             | the candidate page has no text at all, on any route or step                     |
+| `redirect`          | the candidate ends on a different path (ids masked) than the base               |
+| `api-error`         | a 4xx, 5xx or failed `/api/` or tRPC request the base does not make             |
+| `controls`          | a button, link, heading, tab or form field one side has and the other lacks     |
 | `uncovered`         | a route either ref declares that `visualdiff.yaml` neither renders nor excludes |
 
 The informational classes are reported and never fail it:
 
-| Class              | Rule                                                        |
-| ------------------ | ----------------------------------------------------------- |
+| Class              | Rule                                                                 |
+| ------------------ | -------------------------------------------------------------------- |
 | `intended-restore` | the base has no such screen, or fails, and the candidate renders one |
-| `copy`             | the same controls with different words                     |
-| `changed`          | a pixel difference over 2% none of the rules explains      |
-| `noise`            | under 2% different with nothing else wrong                 |
+| `copy`             | the same controls with different words                               |
+| `changed`          | a pixel difference over 2% none of the rules explains                |
+| `noise`            | under 2% different with nothing else wrong                           |
 
 Text evidence comes from each screen's accessibility tree
 (`page.locator("body").ariaSnapshot()`), compared with dates, times,
@@ -234,11 +251,28 @@ the run seeds deterministically (the traces, today); dynamic routes with no
 seeded entity stay uncovered, loudly. Configured routes neither ref declares
 are listed as stale.
 
+## Publishing to the pull request
+
+A finished run shows its screens on the open pull request of the checked-out
+branch (`gh pr list --head <branch>`), in one comment marked
+`<!-- visualdiff:screens -->` that each run edits in place: gh uploads images
+only by posting, so the run posts the comment with `gh pr comment --attach`,
+copies the posted body (its images now uploaded assets) over the marked
+comment, and deletes the post. The comment carries the run id, both commits,
+the counts by class and up to `publish.screens` screens: the largest changes,
+then the candidate's failures, then `publish.keyPages`. The base is shown
+beside the candidate only where it is readable. Each image is scaled to
+`publish.width` and cut at `publish.maxHeight`. A screen whose text on either
+side looks like a key, a token or a local file path is never published.
+`-no-publish` skips it, and so does a branch with no open PR or a gh that is
+not signed in; a failed publish never changes the run's exit code.
+
 ## Cleaning up
 
 Every run first collects what dead runs left behind (`visualdiff gc` does
 the same on its own): a run directory whose `pid` names no live process
-loses its haven stacks (and with them their databases), its worktrees and,
+loses its haven stacks (and with them their databases), its own worktrees
+(never the persistent `.visualdiff/worktrees`) and,
 except for the newest one whose report may still be open, its directory.
 Registered `visualdiff-*` stacks no run owns are destroyed, then `git
 worktree prune` runs. A `-keep` run is left alone unless `gc -kept`.
@@ -352,13 +386,24 @@ life of the page, so counting it means never settling. A fixed sleep instead
 either photographs a half-rendered page or wastes minutes across two hundred
 routes.
 
+The runner holds the requests themselves, not a count. A main-frame navigation
+forgets the previous document's requests, and a request older than eight
+seconds is treated as a poll, so one request that never reports back can no
+longer hold every later capture to the deadline (run 10 lost an hour to it).
+A settle that reaches its deadline logs the requests still in flight, and a
+side whose first five routes all reach it prints one loud warning. Telemetry
+(`/api/rum/v1/traces`) is ignored, and the join offer's 429 is noise: its
+allowance is a product constant a run's page loads exceed. Main raises the
+passkey offer on every screen, so every capture declines it before its
+screenshot; sign-in photographs it once as the `sign-in` flow.
+
 ## Layout
 
 ```text
 tools/visualdiff/                    the Go CLI: boot, wait, seed, classify, report, teardown
 tools/visualdiff/haven.go            the haven boot path: slugs, up, readiness, teardown, worktree prepare
 tools/visualdiff/findings_stream.go  findings.jsonl: the live tracker, the file writer, run+recapture's shared capture path
-tools/visualdiff/catalogue.go        the module guess, from apps/ui/src/features/catalogue.json
+tools/visualdiff/catalogue.go        the module guess, from modules/catalogue.json
 tools/visualdiff/recapture.go        `visualdiff recapture`: replays named routes against a -keep run's own stacks
 tools/havenrun/                      what visualdiff and apidiff share to boot through haven
 cmd/visualdiff/main.go               the entry point

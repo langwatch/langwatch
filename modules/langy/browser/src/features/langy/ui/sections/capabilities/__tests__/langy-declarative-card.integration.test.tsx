@@ -6,13 +6,12 @@
  * @see specs/langy/langy-capability-cards.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { CliResultDigest } from "@langwatch/langy-contract";
+import type { CapabilityBodyWidget, CliResultDigest } from "@langwatch/langy-contract";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
 import type * as rechartsModule from "recharts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CapabilityBodyWidget } from "../../../../../../model/langy-capability-catalog.ts";
 import {
   LangyHostApi,
   LangyHostProvider,

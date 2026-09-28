@@ -42,12 +42,14 @@ function renderSettingsSidebar({
   isEnterprise = true,
   hasOpsAccess = false,
   isOpsAdmin = false,
+  permissions = ["organization:view", "auditLog:view", "triggers:view", "sso:view"],
 }: {
   pathname?: string;
   isLiteMember?: boolean;
   isEnterprise?: boolean;
   hasOpsAccess?: boolean;
   isOpsAdmin?: boolean;
+  permissions?: string[];
 } = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -56,7 +58,7 @@ function renderSettingsSidebar({
           organization: ORGANIZATION,
           organizations: [ORGANIZATION],
           pathname,
-          permissions: ["organization:view", "auditLog:view", "triggers:view"],
+          permissions,
           plan: { isEnterprise, isLoading: false, isLiteMember },
           opsAccess: { hasAccess: hasOpsAccess, isAdmin: isOpsAdmin },
           commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
@@ -132,19 +134,103 @@ describe("the settings shell in a new navigation mode", () => {
       renderSettingsSidebar();
 
       expect(screen.getByText("Organization")).toBeInTheDocument();
-      expect(screen.getByText("Access")).toBeInTheDocument();
+      expect(screen.getByText("People & access")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "General" })).toHaveAttribute("href", "/settings");
-      expect(screen.getByRole("link", { name: "Members" })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
         "href",
-        "/settings/members",
+        "/settings/directory",
       );
+    });
+
+    /** @scenario The You section comes first and is about the reader */
+    it("puts the reader's Profile and Security pages first", () => {
+      renderSettingsSidebar();
+
+      const links = within(screen.getByTestId("sidebar-scroll-region"))
+        .getAllByRole("link")
+        .map((link) => link.textContent?.trim());
+      const groupButtons = screen
+        .getAllByRole("button", { name: /^Collapse / })
+        .map((button) => button.textContent?.trim());
+
+      expect(groupButtons[0]).toBe("You");
+      expect(links.slice(0, 2)).toEqual(["Profile", "Security"]);
+      expect(groupButtons.indexOf("You")).toBeLessThan(groupButtons.indexOf("Organization"));
+    });
+
+    /** @scenario The personal pages ask for no organization permission */
+    it("keeps Profile and Security when every organization permission is denied", () => {
+      renderSettingsSidebar({ permissions: [] });
+
+      expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute(
+        "href",
+        "/settings/profile",
+      );
+      expect(screen.getByRole("link", { name: "Security" })).toHaveAttribute(
+        "href",
+        "/settings/security",
+      );
+    });
+
+    it("keeps Authentication as one Organization entry, lit on its provider page", () => {
+      renderSettingsSidebar({ pathname: "/settings/authentication/provider" });
+
+      const organizationGroup = screen.getByRole("button", {
+        name: "Collapse Organization",
+      }).parentElement;
+      const authentication = within(organizationGroup!).getByRole("link", {
+        name: /^Authentication/,
+      });
+      expect(authentication).toHaveAttribute("href", "/settings/authentication");
+      expect(authentication).toHaveAttribute("aria-current", "page");
+      expect(screen.queryByRole("link", { name: "Identity Provider" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Connectors" })).not.toBeInTheDocument();
+    });
+
+    /** @scenario The access group is named for people and holds the organization's pages */
+    it("keeps authentication with the organization and consolidates people access", () => {
+      renderSettingsSidebar();
+
+      const organizationGroup = screen.getByRole("button", {
+        name: "Collapse Organization",
+      }).parentElement;
+      const peopleGroup = screen.getByRole("button", {
+        name: "Collapse People & access",
+      }).parentElement;
+
+      expect(
+        within(organizationGroup!).getByRole("link", { name: /^Authentication/ }),
+      ).toHaveAttribute("href", "/settings/authentication");
+      expect(within(peopleGroup!).getByRole("link", { name: "Directory" })).toHaveAttribute(
+        "href",
+        "/settings/directory",
+      );
+      expect(within(peopleGroup!).getByRole("link", { name: /^Roles/ })).toHaveAttribute(
+        "href",
+        "/settings/roles",
+      );
+      for (const name of ["Members", "Groups", "Access", "Role Bindings"]) {
+        expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+      }
+    });
+
+    it("lights Directory and Roles on the old addresses that forward onto them", () => {
+      renderSettingsSidebar({ pathname: "/settings/members" });
+      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      cleanup();
+
+      renderSettingsSidebar({ pathname: "/settings/role-bindings" });
+      expect(screen.getByRole("link", { name: /^Roles/ })).toHaveAttribute("aria-current", "page");
     });
 
     /** @scenario "Enterprise entries carry a quiet grey pill" */
     it("marks the enterprise entries with a grey pill in a hairline border", () => {
       renderSettingsSidebar();
 
-      expect(screen.getByRole("link", { name: "Groups" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /^Roles/ })).toBeInTheDocument();
       const pills = screen.getAllByText("ENT");
       expect(pills.length).toBeGreaterThanOrEqual(1);
       // The hairline border is pinned on the shared chip style itself:
@@ -160,11 +246,11 @@ describe("the settings shell in a new navigation mode", () => {
       // A folded group reads "Expand <name>", so none of them means all open.
       expect(screen.queryAllByRole("button", { name: /^Expand / })).toEqual([]);
       expect(screen.getAllByRole("button", { name: /^Collapse / }).length).toBeGreaterThan(1);
-      expect(screen.getByRole("link", { name: "Members" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Directory" })).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Collapse Access" }));
+      await user.click(screen.getByRole("button", { name: "Collapse People & access" }));
 
-      expect(screen.queryByRole("link", { name: "Members" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Directory" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Collapse Organization" })).toHaveAttribute(
         "aria-expanded",
         "true",
@@ -174,11 +260,11 @@ describe("the settings shell in a new navigation mode", () => {
       unmount();
       renderSettingsSidebar();
 
-      expect(screen.getByRole("button", { name: "Expand Access" })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: "Expand People & access" })).toHaveAttribute(
         "aria-expanded",
         "false",
       );
-      expect(screen.queryByRole("link", { name: "Members" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Directory" })).not.toBeInTheDocument();
       expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
     });
 
@@ -198,7 +284,7 @@ describe("the settings shell in a new navigation mode", () => {
 
       const scrollRegion = screen.getByTestId("sidebar-scroll-region");
       expect(scrollRegion).not.toContainElement(screen.getByRole("link", { name: /^Back/ }));
-      expect(scrollRegion).toContainElement(screen.getByRole("link", { name: "Members" }));
+      expect(scrollRegion).toContainElement(screen.getByRole("link", { name: "Directory" }));
     });
 
     /** @scenario "The pages are cut at the rule as they scroll under the way back" */
@@ -223,7 +309,7 @@ describe("the settings shell in a new navigation mode", () => {
 
       expect(entries.filter((entry) => entry === "API Keys")).toHaveLength(1);
       expect(entries.indexOf("API Keys")).toBe(entries.indexOf("General") + 1);
-      expect(entries.indexOf("API Keys")).toBeLessThan(entries.indexOf("Members"));
+      expect(entries.indexOf("API Keys")).toBeLessThan(entries.indexOf("Directory"));
     });
 
     /** @scenario The menu marks the page that is open */
@@ -265,7 +351,7 @@ describe("the settings shell in a new navigation mode", () => {
 
       const groupLabels = screen
         .getAllByText(
-          /^(Organization|Access|AI Infrastructure|Data Controls|Project|Ops|Backoffice)$/,
+          /^(You|Organization|People & access|AI Infrastructure|Data Controls|Project|Ops|Backoffice)$/,
         )
         .map((node) => node.textContent);
 

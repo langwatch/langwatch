@@ -4,7 +4,14 @@ import { dirname } from "node:path";
 import type { Browser, BrowserContext, Page, Request, Response } from "playwright";
 import { chromium } from "playwright";
 
-import type { CaptureMessage, PlanSide, SettleConfig, Viewport } from "./protocol";
+import { isExpectedThrottle, isThrottleConsoleError } from "./noise";
+import {
+  note,
+  type CaptureMessage,
+  type PlanSide,
+  type SettleConfig,
+  type Viewport,
+} from "./protocol";
 import { StepRecorder } from "./recorder";
 import { InFlightTracker, shouldIgnoreRequest } from "./settle";
 
@@ -37,77 +44,124 @@ export const contextOptions = ({
   ...(storageState === undefined ? {} : { storageState }),
 });
 
+/** LOADING_WAIT_MILLIS bounds the wait for skeletons after the network settles. */
+const LOADING_WAIT_MILLIS = 5000;
+
+/** SCREENSHOT_TIMEOUT_MILLIS covers a tall page, which the context's default timeout does not. */
+const SCREENSHOT_TIMEOUT_MILLIS = 20_000;
+
+/** SettleOutcome is how one settle ended, for the caller's deadline alarm. */
+export interface SettleOutcome {
+  expired: boolean;
+  inFlight: string[];
+  stillLoading: boolean;
+}
+
+/** isDocumentLoad is a navigation of the main frame: the previous document's requests are over. */
+const isDocumentLoad = ({ request, page }: { request: Request; page: Page }): boolean => {
+  if (!request.isNavigationRequest()) return false;
+  return request.frame() === page.mainFrame();
+};
+
 /** Side is one running stack, with its page and everything that page reported. */
 export class Side {
   private readonly recorder = new StepRecorder();
-  private tracker: InFlightTracker;
+  private readonly tracker: InFlightTracker<Request>;
 
   constructor(
     readonly name: string,
     readonly baseUrl: string,
-    readonly browser: Browser,
-    readonly context: BrowserContext,
     readonly page: Page,
-    private readonly settle: SettleConfig,
+    settle: SettleConfig,
   ) {
-    this.tracker = new InFlightTracker(settle, Date.now());
+    this.tracker = new InFlightTracker<Request>(settle, Date.now());
     page.on("request", (request: Request) => {
-      this.tracker.started({ url: request.url(), resourceType: request.resourceType() });
-    });
-    page.on("requestfinished", (request: Request) => {
-      this.tracker.settled({
+      const now = Date.now();
+      if (isDocumentLoad({ request, page })) this.tracker.navigated(now);
+      this.tracker.started({
+        key: request,
         url: request.url(),
         resourceType: request.resourceType(),
-        now: Date.now(),
+        now,
       });
     });
+    page.on("requestfinished", (request: Request) => {
+      this.tracker.settled({ key: request, now: Date.now() });
+    });
     page.on("requestfailed", (request: Request) => {
+      this.tracker.settled({ key: request, now: Date.now() });
       const url = request.url();
-      const resourceType = request.resourceType();
-      this.tracker.settled({ url, resourceType, now: Date.now() });
-      if (shouldIgnoreRequest({ url, resourceType })) return;
+      if (shouldIgnoreRequest({ url, resourceType: request.resourceType() })) return;
       this.recorder.failedRequest(
-        `FAIL ${request.method()} ${this.relative(request.url())} ${request.failure()?.errorText ?? ""}`,
+        `FAIL ${request.method()} ${this.relative(url)} ${request.failure()?.errorText ?? ""}`,
       );
     });
     page.on("response", (response: Response) => {
       const request = response.request();
-      if (response.status() < 400) return;
+      const status = response.status();
+      if (status < 400) return;
       const url = request.url();
-      const resourceType = request.resourceType();
-      if (shouldIgnoreRequest({ url, resourceType })) return;
-      this.recorder.failedRequest(
-        `${response.status()} ${request.method()} ${this.relative(request.url())}`,
-      );
+      if (shouldIgnoreRequest({ url, resourceType: request.resourceType() })) return;
+      if (isExpectedThrottle({ url, status })) return;
+      this.recorder.failedRequest(`${status} ${request.method()} ${this.relative(url)}`);
     });
     page.on("console", (message) => {
-      if (message.type() === "error") this.recorder.consoleError(message.text());
+      if (message.type() !== "error") return;
+      const text = message.text();
+      const { url } = message.location();
+      if (isThrottleConsoleError({ text, url })) return;
+      this.recorder.consoleError(text);
     });
     page.on("pageerror", (error) => {
       this.recorder.consoleError(`pageerror: ${String(error.message)}`);
     });
   }
 
+  /** goto opens a path on this side; the tracker forgets the document it leaves. */
+  async goto(path: string): Promise<void> {
+    this.tracker.navigated(Date.now());
+    await this.page.goto(this.baseUrl + path, { waitUntil: "commit", timeout: 20_000 });
+  }
+
   relative(url: string): string {
     return url.replace(this.baseUrl, "").slice(0, 160);
   }
 
-  async waitUntilQuiet(): Promise<void> {
-    this.tracker = this.tracker.restart(Date.now());
+  async waitUntilQuiet(): Promise<SettleOutcome> {
+    this.tracker.begin(Date.now());
+    let expired = false;
     for (;;) {
       const decision = this.tracker.decide(Date.now());
+      expired = decision.expired;
       if (decision.quiet || decision.expired) break;
       await this.page.waitForTimeout(50);
     }
-    await this.page
+    const inFlight = expired ? this.tracker.inFlight(Date.now()) : [];
+    if (expired) {
+      note({
+        text: `${this.name} settle deadline at ${this.relative(this.page.url())}; still in flight: ${inFlight.map((url) => this.relative(url)).join(", ") || "none"}`,
+        err: process.stderr,
+      });
+    }
+    const stillLoading = await this.page
       .waitForFunction(
         (selector: string) => document.querySelectorAll(selector).length === 0,
         LOADING_SELECTOR,
-        { timeout: Math.min(this.settle.deadlineMillis, 15_000) },
+        { timeout: LOADING_WAIT_MILLIS },
       )
-      .catch(() => undefined);
+      .then(
+        () => false,
+        () => true,
+      );
+    if (stillLoading) {
+      note({
+        text: `${this.name} still loading at ${this.relative(this.page.url())}`,
+        err: process.stderr,
+      });
+    }
     await this.page.addStyleTag({ content: FREEZE_CSS }).catch(() => undefined);
     await this.page.evaluate(() => document.fonts?.ready).catch(() => undefined);
+    return { expired, inFlight, stillLoading };
   }
 
   /** drain hands back everything reported since the last drain, and forgets it. */
@@ -148,15 +202,49 @@ export class Side {
         path: file,
         animations: "disabled",
         mask,
+        timeout: SCREENSHOT_TIMEOUT_MILLIS,
         clip: { x: 0, y: 0, width: viewport.width, height: MAX_SCREENSHOT_HEIGHT },
       });
       return;
     }
-    await this.page.screenshot({ path: file, fullPage: true, animations: "disabled", mask });
+    await this.page.screenshot({
+      path: file,
+      fullPage: true,
+      animations: "disabled",
+      mask,
+      timeout: SCREENSHOT_TIMEOUT_MILLIS,
+    });
   }
 }
 
-export const openSide = async ({
+/**
+ * SideBrowser is one stack's browser and its one signed-in context. Every page
+ * it opens is its own Side, with its own tracker and recorder, so pages capture
+ * at once without reading each other's requests.
+ */
+export class SideBrowser {
+  constructor(
+    readonly definition: PlanSide,
+    private readonly browser: Browser,
+    private readonly context: BrowserContext,
+    private readonly settle: SettleConfig,
+  ) {}
+
+  get name(): string {
+    return this.definition.name;
+  }
+
+  async openPage(): Promise<Side> {
+    const page = await this.context.newPage();
+    return new Side(this.definition.name, this.definition.baseUrl, page, this.settle);
+  }
+
+  async close(): Promise<void> {
+    await this.browser.close().catch(() => undefined);
+  }
+}
+
+export const openSideBrowser = async ({
   side,
   viewport,
   settle,
@@ -168,7 +256,7 @@ export const openSide = async ({
   settle: SettleConfig;
   storageState?: string;
   frozenTime?: number;
-}): Promise<Side> => {
+}): Promise<SideBrowser> => {
   const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
   const context = await browser.newContext(contextOptions({ viewport, storageState }));
   if (frozenTime !== undefined) await context.clock.setFixedTime(frozenTime);
@@ -180,8 +268,7 @@ export const openSide = async ({
     }
   });
   context.setDefaultTimeout(10_000);
-  const page = await context.newPage();
-  return new Side(side.name, side.baseUrl, browser, context, page, settle);
+  return new SideBrowser(side, browser, context, settle);
 };
 
 /** captureMessage assembles one protocol capture from a side's current state. */

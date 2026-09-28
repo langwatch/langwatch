@@ -1499,6 +1499,18 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 	}
 	peeked = peeked[:n]
 
+	// OpenAI clients write `model` after `input`, so a large body can carry it
+	// past the window; the whole body is materialized for the provider anyway.
+	if n == peekSize && app.PeekModel(peeked) == "" {
+		rest, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeError(clog.Get(r.Context()), w, r.Context(),
+				herr.New(r.Context(), bodyReadErrorCode(err), herr.M{"message": err.Error()}))
+			return nil, nil, func() {}, false
+		}
+		peeked = append(peeked, rest...)
+	}
+
 	buf := bodyPool.Get().(*bytes.Buffer)
 	body := io.MultiReader(bytes.NewReader(peeked), r.Body)
 

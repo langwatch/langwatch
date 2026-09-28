@@ -6,26 +6,38 @@
 
 import { fetchValidatedDestination } from "@langwatch/egress/ssrf/fenced-fetch";
 import { createSsrfUrlValidator } from "@langwatch/egress/ssrf/url-validator";
-import { ChildProcessJobDataSchema, type ChildProcessJobData } from "@langwatch/scenario-contract";
 import {
-  createChildProcessLogger,
   decodeScenarioEgressPolicy,
-  createVoiceTransportRegistry,
-  executeScenarioChild,
-  flushScenarioOtelTraces,
-  formatScenarioChildError,
-  HttpNlpFetchChannel,
   SCENARIO_EGRESS_POLICY_ENV,
-  type ScenarioHttp,
-  type ScenarioHttpResponse,
+  ScenarioChildJobSchema,
+  type ScenarioChildJob,
+} from "@langwatch/scenario-contract";
+// The one import this program still takes from the scenario module: the voice transports stay
+// with the live voice session there until it spawns a child of its own (Alex, 2026-09-28).
+import {
+  createSerializedVoiceAgentAdapter,
+  createVoiceTransportRegistry,
 } from "@langwatch/scenario-process/scenario-child";
 
+import { HttpNlpFetchChannel } from "./channels/http/http.nlp-fetch.channel.ts";
+import type {
+  ScenarioHttp,
+  ScenarioHttpResponse,
+} from "./channels/http/http.serialized-http-agent.channel.ts";
 import {
+  createChildProcessLogger,
   readScenarioChildEnvironment,
   readScenarioChildVoiceEnvironment,
   scenarioChildEnvironmentSource,
   type ScenarioChildEnvironment,
 } from "./config.ts";
+import { runAgentTestTurn } from "./services/agent-test-turn.service.ts";
+import {
+  executeScenarioChild,
+  flushScenarioOtelTraces,
+  formatScenarioChildError,
+  type ScenarioChildRuntime,
+} from "./services/scenario-child-execution.service.ts";
 
 const source = scenarioChildEnvironmentSource;
 const environment = readScenarioChildEnvironment({
@@ -59,7 +71,7 @@ class WorkerScenarioChildHttp implements ScenarioHttp {
   }
 }
 
-function readJobDataFromStdin(): Promise<ChildProcessJobData> {
+function readJobDataFromStdin(): Promise<ScenarioChildJob> {
   return new Promise((resolve, reject) => {
     let data = "";
     process.stdin.setEncoding("utf8");
@@ -68,7 +80,7 @@ function readJobDataFromStdin(): Promise<ChildProcessJobData> {
     });
     process.stdin.on("end", () => {
       try {
-        resolve(ChildProcessJobDataSchema.parse(JSON.parse(data)));
+        resolve(ScenarioChildJobSchema.parse(JSON.parse(data)));
       } catch (error) {
         reject(new Error(`Failed to parse job data: ${formatScenarioChildError(error)}`));
       }
@@ -90,19 +102,28 @@ function readTelemetryEnvironment(): { langwatchEndpoint: string; langwatchApiKe
   return { langwatchEndpoint, langwatchApiKey };
 }
 
+function readRuntime(): ScenarioChildRuntime {
+  const voiceTransports = createVoiceTransportRegistry(readScenarioChildVoiceEnvironment(source));
+
+  return {
+    ...readTelemetryEnvironment(),
+    verbose: environment.verbose,
+    httpPort: new WorkerScenarioChildHttp(environment),
+    logger,
+    nlpTimeouts: HttpNlpFetchChannel.timeoutsFromEnvironment(source),
+    voiceAgents: (data) => createSerializedVoiceAgentAdapter({ data, registry: voiceTransports }),
+  };
+}
+
+/** One agent-test turn, or a whole simulation: the job says which. */
+function runJob(job: ScenarioChildJob): Promise<unknown> {
+  if ("kind" in job) return runAgentTestTurn({ job, runtime: readRuntime() });
+
+  return executeScenarioChild({ jobData: job, runtime: readRuntime() });
+}
+
 async function main(): Promise<void> {
-  const jobData = await readJobDataFromStdin();
-  const result = await executeScenarioChild({
-    jobData,
-    runtime: {
-      ...readTelemetryEnvironment(),
-      verbose: environment.verbose,
-      httpPort: new WorkerScenarioChildHttp(environment),
-      logger,
-      nlpTimeouts: HttpNlpFetchChannel.timeoutsFromEnvironment(source),
-      voiceTransports: createVoiceTransportRegistry(readScenarioChildVoiceEnvironment(source)),
-    },
-  });
+  const result = await runJob(await readJobDataFromStdin());
 
   // The result line is the last thing the child says. Exit once it is written
   // rather than wait for the event loop to drain: the run's adapters and the

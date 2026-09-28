@@ -70,10 +70,6 @@ export const publicAppConfigProjectionDefinition = Config.define((c) => ({
   },
   identity: {
     passkeys: c.env("PASSKEYS_ENABLED", z.enum(["off", "on"]).optional().default("off")),
-    router: c.env(
-      "IDENTITY_ROUTER_V2",
-      z.enum(["off", "shadow", "enforce"]).optional().default("off"),
-    ),
   },
   licensePaymentUrl: c.env("STRIPE_LICENSE_PAYMENT_LINK_URL", z.string().min(1).optional()),
   hideDevIndicator: c.env("HIDE_DEV_INDICATOR", onOff),
@@ -140,7 +136,6 @@ export type PublicAppConfigSource = Readonly<{
   LANGWATCH_NLP_LAMBDA_CONFIG?: string;
   LANGEVALS_ENDPOINT?: string;
   PASSKEYS_ENABLED?: string;
-  IDENTITY_ROUTER_V2?: string;
   STRIPE_LICENSE_PAYMENT_LINK_URL?: string;
 }> &
   Readonly<Record<string, unknown>>;
@@ -239,7 +234,7 @@ function projectPublicAppConfig(
     }),
     auth: {
       passkeys: config.identity.passkeys === "on",
-      identityFrontDoor: config.identity.router === "enforce",
+      identityFrontDoor: true,
       authProvider: config.authProviderName ?? config.authProvider,
     },
     authz: { demoProjectSlug: config.demoProjectSlug },

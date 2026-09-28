@@ -91,7 +91,7 @@ Skills tell the agent to install and use the `langwatch` CLI — it covers docs 
 
 ### 5. Every improvement has a test
 
-Each skill has scenario tests using Claude Code against fixture codebases. The testing pattern mirrors what's already in `mcp/typescript/tests/scenario-openai.test.ts`.
+Each skill has scenario tests using Claude Code against fixture codebases. The testing pattern mirrors what's already in `mcp/typescript/tests/openai.scenario.test.ts`.
 
 ### 6. Dev skills write code, platform skills use the CLI
 

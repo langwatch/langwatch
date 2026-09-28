@@ -5,6 +5,7 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { InstantEvalClassifierNotConfiguredError } from "@langwatch/instant-eval-contract";
 import {
   type ExplorerInstantEvalProgress,
   type TraceApi,
@@ -34,7 +35,15 @@ const PROGRESS: ExplorerInstantEvalProgress = {
 function harness() {
   const getExplorerEvalRun = vi.fn<TraceApi["getExplorerEvalRun"]>(async () => PROGRESS);
   const cancelExplorerEvalRun = vi.fn<TraceApi["cancelExplorerEvalRun"]>(async () => PROGRESS);
-  const app = createApiFixture<TraceApi>({ getExplorerEvalRun, cancelExplorerEvalRun });
+  // A released project on a deployment with no judge, refused by the run service.
+  const estimateExplorerEvalRun = vi.fn<TraceApi["estimateExplorerEvalRun"]>(async () => {
+    throw new InstantEvalClassifierNotConfiguredError();
+  });
+  const app = createApiFixture<TraceApi>({
+    getExplorerEvalRun,
+    cancelExplorerEvalRun,
+    estimateExplorerEvalRun,
+  });
   const permissions: string[] = [];
   const trpc = initTRPC.context<TestContext>().create();
   const members: TrpcRuntimeMembers<TestContext> = {
@@ -115,6 +124,25 @@ describe("given the traces.instantEval router", () => {
 
       expect(cancelExplorerEvalRun).toHaveBeenCalledWith({ ...RUN, requestedByUserId: "reader-1" });
       expect(permissions).toEqual(["analytics:manage"]);
+    });
+  });
+
+  describe("when the deployment has no judge for a released project", () => {
+    /** @scenario "A missing classifier opens the model popover and the phrase search runs" */
+    it("refuses the estimate with the handled code the Explorer's popover reads", async () => {
+      const { caller } = harness();
+
+      await expect(
+        caller.estimate({
+          projectId: "project-1",
+          target: "traces",
+          filter: "",
+          window: { from: 1_000, to: 2_000 },
+          question: { instructions: "the user is annoyed" },
+        }),
+      ).rejects.toMatchObject({
+        cause: { code: "instant_eval_classifier_not_configured", httpStatus: 403 },
+      });
     });
   });
 });

@@ -102,8 +102,9 @@ fixed); `200-500` shrank 13→3 (experiments, me/project, groups,
 organization ×4, model-defaults, model-providers ×2 all answer now).
 
 **Still crashing, attributed:**
+
 - Webhooks ×2 (200→500): `#dependencies.assertEndpointsEntitled is not a
-  function` — webhook module never got its members (b383462d96 family).
+function` — webhook module never got its members (b383462d96 family).
   Lane `webhook-members-green` spawned.
 - POST /api/scenarios (401→500): strict `scenarioSchema.parse(row)` rejects
   the `callerVoice` COLUMN the module rewrite never learned — every scenario
@@ -114,6 +115,7 @@ organization ×4, model-defaults, model-providers ×2 all answer now).
 - Analytics family ×4 (401→500): parked, debt-5 lane territory.
 
 **New causes, triaged:**
+
 - `status-class-mismatch:200-402` ×5 + `:201-402` ×1 (groups, organization
   family): the entitlement module now answers `enterprise_plan_required`
   (feature MANAGEMENT_API) where main served the same key 200. These ops

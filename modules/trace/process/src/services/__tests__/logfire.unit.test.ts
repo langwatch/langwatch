@@ -2,8 +2,10 @@ import type { CanonicalAttributes } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { CanonicalSpanStore } from "../canonical-attributes.service.ts";
-import type { ExtractorContext } from "../canonical-attributes.service.ts";
+import {
+  canonicalSpanStore,
+  type ExtractorContext,
+} from "../../rules/canonical-attributes.rules.ts";
 import { LogfireCanonicaliserService } from "../logfire-canonicaliser.service.ts";
 import { createExtractorContext, parseJsonStringAttrs } from "./test-helpers.ts";
 
@@ -18,7 +20,7 @@ function createLogfireContext(
   }));
 
   const parsed = parseJsonStringAttrs(attrs);
-  const bag = CanonicalSpanStore.create({
+  const bag = canonicalSpanStore({
     spanAttributes: parsed as CanonicalAttributes,
     events: normalizedEvents,
   });

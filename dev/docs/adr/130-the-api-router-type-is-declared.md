@@ -28,7 +28,7 @@ export type X = AppRouter;
 
 that one import loaded **11,583 files and allocated 4.59 GB** — 97.5% of what checking the whole of `apps/api` costs. Stubbing `AppRouter` to `AnyTRPCRouter` took `apps/ui` from 19,320 files / 7.83 GB of heap to 10,126 files / 4.00 GB. Half of the browser application's typecheck was the API application, arriving through one type import.
 
-Two things make this expensive here rather than merely untidy. Every workspace package resolves to **source**, not to built declarations, so a first-party dependency is parsed, bound and checked again inside every consuming project — a type seam is the only thing standing between a consumer and the whole graph. And the router type is instantiated in one uncached go at each consumer rather than incrementally beside the code that builds it, which is why the isolated probe reported *more* instantiations than `apps/api` itself does.
+Two things make this expensive here rather than merely untidy. Every workspace package resolves to **source**, not to built declarations, so a first-party dependency is parsed, bound and checked again inside every consuming project — a type seam is the only thing standing between a consumer and the whole graph. And the router type is instantiated in one uncached go at each consumer rather than incrementally beside the code that builds it, which is why the isolated probe reported _more_ instantiations than `apps/api` itself does.
 
 ```
   BEFORE                                   the whole application, to name a type
@@ -72,11 +72,11 @@ This lands in stages, and the first stage is done:
 
 Measured on the same probe, before and after, cold and uncapped:
 
-| probe: one `import type { AppRouter }` | Files | Symbols | Types | Instantiations | Memory used |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| before stage 1 | 11,583 | 8,074,894 | 3,760,147 | 14,630,697 | 4.59 GB |
-| after stage 1 | 11,292 | 7,575,835 | 3,510,447 | 13,300,931 | 4.25 GB |
-| **saved** | **−291 (−2.5%)** | **−499k (−6.2%)** | **−250k (−6.6%)** | **−1.33M (−9.1%)** | **−0.34 GB (−7.4%)** |
+| probe: one `import type { AppRouter }` |            Files |           Symbols |             Types |     Instantiations |          Memory used |
+| -------------------------------------- | ---------------: | ----------------: | ----------------: | -----------------: | -------------------: |
+| before stage 1                         |           11,583 |         8,074,894 |         3,760,147 |         14,630,697 |              4.59 GB |
+| after stage 1                          |           11,292 |         7,575,835 |         3,510,447 |         13,300,931 |              4.25 GB |
+| **saved**                              | **−291 (−2.5%)** | **−499k (−6.2%)** | **−250k (−6.6%)** | **−1.33M (−9.1%)** | **−0.34 GB (−7.4%)** |
 
 Wall-clock is not quoted: the machine was between load 20 and load 64 throughout, and ADR-100 already records that timings under that are contention. `Files`, `Symbols`, `Types`, `Instantiations` and `Memory used` are load-independent.
 
@@ -88,11 +88,11 @@ Wall-clock is not quoted: the machine was between load 20 and load 64 throughout
 
 Measured on `apps/ui` itself, cold and uncapped, one run at a time:
 
-| `apps/ui` | Files | Lines | Identifiers | Symbols | Types | Instantiations | Memory used | Check time |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| before stage 1b | 19,011 | 2,569,715 | 3,085,366 | 11,420,847 | 4,807,123 | 19,583,709 | 7.63 GB | 294.1 s |
-| after stage 1b | 10,101 | 1,314,208 | 1,532,599 | 5,534,379 | 1,824,181 | 8,015,665 | 4.05 GB | 18.4 s |
-| **saved** | **−8,910 (−47%)** | **−49%** | **−50%** | **−5.89M (−52%)** | **−2.98M (−62%)** | **−11.57M (−59%)** | **−3.58 GB (−47%)** | **−94%** |
+| `apps/ui`       |             Files |     Lines | Identifiers |           Symbols |             Types |     Instantiations |         Memory used | Check time |
+| --------------- | ----------------: | --------: | ----------: | ----------------: | ----------------: | -----------------: | ------------------: | ---------: |
+| before stage 1b |            19,011 | 2,569,715 |   3,085,366 |        11,420,847 |         4,807,123 |         19,583,709 |             7.63 GB |    294.1 s |
+| after stage 1b  |            10,101 | 1,314,208 |   1,532,599 |         5,534,379 |         1,824,181 |          8,015,665 |             4.05 GB |     18.4 s |
+| **saved**       | **−8,910 (−47%)** |  **−49%** |    **−50%** | **−5.89M (−52%)** | **−2.98M (−62%)** | **−11.57M (−59%)** | **−3.58 GB (−47%)** |   **−94%** |
 
 `tsc --listFiles` on the browser project now reports **0** files under `apps/api/src` and **0** under `@elevenlabs/elevenlabs-js`, down from 118 and 2,606. This lands almost exactly on the `AnyTRPCRouter`-stub bound measured before stage 1 (10,126 files / 4.00 GB) — because the browser now names no router type at all, rather than a cheap one. Check time is quoted here despite ADR-100 only because the change is a factor of sixteen; the file and memory counts are the evidence.
 
@@ -102,13 +102,13 @@ Stage 2 is still the fix. It is now the fix for `apps/api`'s own consumers and f
 
 ## Rationale / Trade-offs
 
-Stage 1 was expected to be "the cheap 80%". It is not, and the measurement is the reason to write this down rather than to keep going by feel. It removed what a composition opens *beyond* what its record names — adapters, repositories, `@aws-sdk/client-s3`, `@langwatch/eventing/server`, `@langwatch/prompt-process` and the rest — and that is 7% of the heap. Everything else stayed, because the record still names `ReturnType<typeof create*TrpcRouter>`, that factory still lives in a mount module, and the mount still imports its feature's server barrel. `app-trpc.features.ts` imports the same mounts directly in any case, so the mounts were never removable by moving a type.
+Stage 1 was expected to be "the cheap 80%". It is not, and the measurement is the reason to write this down rather than to keep going by feel. It removed what a composition opens _beyond_ what its record names — adapters, repositories, `@aws-sdk/client-s3`, `@langwatch/eventing/server`, `@langwatch/prompt-process` and the rest — and that is 7% of the heap. Everything else stayed, because the record still names `ReturnType<typeof create*TrpcRouter>`, that factory still lives in a mount module, and the mount still imports its feature's server barrel. `app-trpc.features.ts` imports the same mounts directly in any case, so the mounts were never removable by moving a type.
 
 After stage 1 the remaining graph is still 11,292 files, of which 3,746 are workspace source and the rest arrive through those: `@elevenlabs/elevenlabs-js` 2,606, `@smithy/core` 518, `stripe` 261, `kysely` 251, `@openrouter/sdk` 245, three `@aws-sdk` clients 419 between them. None of it is reachable from a declared map, which is why stage 2 is the fix and stage 1 is only the ground it stands on.
 
 Explicit return types on the router factories (the fourth item above) were considered as an independent change and are not one. `createApiKeyTrpcRouter` returns `ApiKeyTrpcApi.create(...)`, whose own `static create` (`modules/api-key/process/src/transport/api-trpc/api-key.api.ts:176`) is generic over context, options and root types and declares no return type either; the type is built by a `createTrpcService(...).query(...).build()` chain. There is no return type to write by hand short of the procedure record itself — which is what the contract map is. Annotating the factories is therefore downstream of stage 2, not a warm-up for it.
 
-Annotating `ApiApplication.trpc` alone was also considered and rejected as a stopping point. It would replace an inference with an assignability check, which is worth having, but the annotation still has to *name* the record, so the graph does not shrink by a file.
+Annotating `ApiApplication.trpc` alone was also considered and rejected as a stopping point. It would replace an inference with an assignability check, which is worth having, but the annotation still has to _name_ the record, so the graph does not shrink by a file.
 
 The cost of the decision is a second place the wire contract is written: the map in the contract package, and the handler in the server package. The conformance test is what keeps them one contract rather than two — and the same split already exists, unguarded, in the thirty-eight web packages that hand-write a map today.
 

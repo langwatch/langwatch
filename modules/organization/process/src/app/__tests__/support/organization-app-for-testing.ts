@@ -7,6 +7,7 @@ import type { OrganizationSeatRepository } from "../../../repositories/organizat
 import type { InviteCreationThrottleService } from "../../../services/invite-creation-throttle.service.ts";
 import type { MemberProvenanceService } from "../../../services/member-provenance.service.ts";
 import type { PersonalTeamScopeReader } from "../../../services/personal-team-scope.service.ts";
+import type { SeatLimitNoticeService } from "../../../services/seat-limit-notice.service.ts";
 import {
   type OrganizationInfrastructure,
   ServerOrganizationApp,
@@ -47,6 +48,7 @@ export function organizationAppForTesting(setup: {
     seats: createApiFixture<OrganizationSeatLicense>({}, "seat licence"),
     plans: createApiFixture<OrganizationPlanGate>({}, "organization plan gate"),
     signals: createApiFixture<OrganizationSignals>({}, "organization signals"),
+    seatLimits: createApiFixture<SeatLimitNoticeService>({}, "seat-limit notices"),
     ceremony: createApiFixture<OrganizationCeremony>({}, "sign-up ceremony"),
     directory: createApiFixture<OrganizationDirectory>({}, "identity directory"),
     settingsSecrets: createApiFixture<OrganizationSettingsSecret>({}, "settings cipher"),

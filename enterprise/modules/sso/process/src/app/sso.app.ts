@@ -392,9 +392,15 @@ export class SsoApp implements SsoApiContract {
     return this.#gate.resolveProvider();
   }
 
-  getSignInProviderMounts(input: { baseUrl: string }): Promise<SignInProviderMounts> {
+  getSignInProviderMounts(input: {
+    baseUrl: string;
+    onMicrosoftProfile?: (profile: Record<string, unknown>) => Promise<void>;
+  }): Promise<SignInProviderMounts> {
     return Promise.resolve({
-      socialProviders: buildSocialProviders(this.#configuration),
+      socialProviders: buildSocialProviders(
+        this.#configuration,
+        input.onMicrosoftProfile ? { onMicrosoftProfile: input.onMicrosoftProfile } : {},
+      ),
       genericOAuthConfigs:
         buildGenericOAuthConfigs({ ...this.#configuration, baseUrl: input.baseUrl }) ?? [],
     });

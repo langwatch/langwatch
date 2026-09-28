@@ -2,16 +2,12 @@ import { AuthenticatedActorRequiredError } from "@langwatch/api";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
-  createSecretInputSchema,
-  deleteSecretInputSchema,
-  getSecretInputSchema,
   listSecretsInputSchema,
   MAX_SECRETS_PER_PROJECT,
   SecretDuplicateError,
   SecretLimitReachedError,
   SecretNotFoundError,
   SecretReservedNameError,
-  updateSecretInputSchema,
   type CreateReservedSecretInput,
   type CreateSecretInput,
   type DeleteSecretInput,
@@ -48,8 +44,7 @@ export class SecretService {
   }
 
   async list(input: ListSecretsInput): Promise<Secret[]> {
-    const parsed = listSecretsInputSchema.parse(input);
-    const rows = await this.options.repository.findAll({ projectId: parsed.projectId });
+    const rows = await this.options.repository.findAll({ projectId: input.projectId });
 
     return rows.filter((secret) => !this.reservedNames.has(secret.name));
   }
@@ -73,39 +68,35 @@ export class SecretService {
   }
 
   async get(input: GetSecretInput): Promise<Secret> {
-    const parsed = getSecretInputSchema.parse(input);
-
-    return this.getMutableSecret(parsed);
+    return this.getMutableSecret(input);
   }
 
   async create(input: Omit<CreateSecretInput, "actorId">, by?: SecretCaller): Promise<Secret> {
-    const parsed = createSecretInputSchema.omit({ actorId: true }).parse(input);
-    if (this.reservedNames.has(parsed.name)) {
-      throw new SecretReservedNameError(parsed.name);
+    if (this.reservedNames.has(input.name)) {
+      throw new SecretReservedNameError(input.name);
     }
 
-    const stored = await this.options.repository.count({ projectId: parsed.projectId });
+    const stored = await this.options.repository.count({ projectId: input.projectId });
     if (stored >= this.maximumPerProject) {
       throw new SecretLimitReachedError(this.maximumPerProject);
     }
 
     return this.options.repository.create({
-      projectId: parsed.projectId,
-      name: parsed.name,
-      encryptedValue: this.options.encryption.encrypt(parsed.value),
-      actorId: await this.getAttributedUserId(parsed.projectId, by),
+      projectId: input.projectId,
+      name: input.name,
+      encryptedValue: this.options.encryption.encrypt(input.value),
+      actorId: await this.getAttributedUserId(input.projectId, by),
     });
   }
 
   async update(input: Omit<UpdateSecretInput, "actorId">, by?: SecretCaller): Promise<Secret> {
-    const parsed = updateSecretInputSchema.omit({ actorId: true }).parse(input);
-    await this.getMutableSecret(parsed);
+    await this.getMutableSecret(input);
 
     return this.options.repository.update({
-      projectId: parsed.projectId,
-      id: parsed.id,
-      encryptedValue: this.options.encryption.encrypt(parsed.value),
-      actorId: await this.getAttributedUserId(parsed.projectId, by),
+      projectId: input.projectId,
+      id: input.id,
+      encryptedValue: this.options.encryption.encrypt(input.value),
+      actorId: await this.getAttributedUserId(input.projectId, by),
     });
   }
 
@@ -132,9 +123,16 @@ export class SecretService {
   }
 
   async delete(input: DeleteSecretInput): Promise<void> {
-    const parsed = deleteSecretInputSchema.parse(input);
-    await this.getMutableSecret(parsed);
-    await this.options.repository.delete({ projectId: parsed.projectId, id: parsed.id });
+    await this.getMutableSecret(input);
+    await this.options.repository.delete({ projectId: input.projectId, id: input.id });
+  }
+
+  private async getStoredValue(input: { projectId: string; name: string }): Promise<string> {
+    const rows = await this.options.repository.findAllValues({ projectId: input.projectId });
+    const stored = rows.find((row) => row.name === input.name);
+    if (!stored) throw new Error(`Project secret "${input.name}" vanished after a duplicate write`);
+
+    return this.options.encryption.decrypt(stored.encryptedValue);
   }
 
   /** A key bound to nobody writes as the first member of the project's team, as main did. */
@@ -156,14 +154,6 @@ export class SecretService {
    * A reserved row answers exactly as an absent one: a caller must not be able
    * to tell that a product-owned credential is there.
    */
-  private async getStoredValue(input: { projectId: string; name: string }): Promise<string> {
-    const rows = await this.options.repository.findAllValues({ projectId: input.projectId });
-    const stored = rows.find((row) => row.name === input.name);
-    if (!stored) throw new Error(`Project secret "${input.name}" vanished after a duplicate write`);
-
-    return this.options.encryption.decrypt(stored.encryptedValue);
-  }
-
   private async getMutableSecret(input: { projectId: string; id: string }): Promise<Secret> {
     const secret = await this.options.repository.findById({
       projectId: input.projectId,

@@ -8,6 +8,8 @@ import { lazyRoute, type LazyRouteModule } from "@langwatch/browser-host/navigat
 import type { RouteObject } from "react-router";
 
 import type { UiPageLoader, UiPageLoaderRegistry } from "./ui-feature-install.ts";
+import { withUiPageGuard } from "./ui-page-guard.tsx";
+import { UI_PAGE_FALLBACKS } from "./ui-page.tsx";
 import type { UiWebRouteParent } from "./ui-web-installation.ts";
 import type { SupplyModule, WebScreen } from "./web-module.ts";
 
@@ -47,7 +49,10 @@ export function installedModuleScreens(modules: readonly SupplyModule[]): UiModu
   return { loaders, routes: { project } };
 }
 
-/** A declared screen answers with a component, or the composition is wrong. */
+/**
+ * A declared screen answers with a component, or the composition is wrong. A
+ * screen that `requires` a grant renders behind the page guard, for every module.
+ */
 function screenLoader({
   page,
   screen,
@@ -62,7 +67,9 @@ function screenLoader({
     if (!isLazyRouteModule(loaded)) {
       throw new Error(`Screen ${JSON.stringify(page)} did not load a component.`);
     }
-    return loaded;
+    if (screen.requires === void 0) return loaded;
+    const guard = withUiPageGuard({ permission: screen.requires, fallbacks: UI_PAGE_FALLBACKS });
+    return { default: guard(loaded.default) };
   };
 }
 

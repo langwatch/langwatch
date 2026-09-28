@@ -22,7 +22,7 @@ const STORED_SCOPE_DECIDES =
 export const llmModelCostTrpcTransport = defineTrpcRouter(ModelProviderApi, llmModelCostTrpc)
   .procedure("getAllForProject")
   .withPermission("project:view")
-  .handle(({ app, input }) => app.listCosts(input))
+  .handle(({ app, input }) => app.listCostsWithCatalogue(input))
 
   .procedure("createOrUpdate")
   .serviceAuthorized({

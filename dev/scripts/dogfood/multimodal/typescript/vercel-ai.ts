@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { setupObservability } from "langwatch/observability/node";

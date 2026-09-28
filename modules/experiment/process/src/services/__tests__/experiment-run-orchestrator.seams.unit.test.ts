@@ -145,7 +145,7 @@ describe("given a run whose target is a connected agent", () => {
     const ports = createApiFixture<ExperimentRunCollaborators>(
       {
         attachments: createNoAttachmentsFixture(),
-        studio: { postEvent: async () => {} },
+        studio: { postStudioEvent: async () => {} },
       },
       "ports",
     );

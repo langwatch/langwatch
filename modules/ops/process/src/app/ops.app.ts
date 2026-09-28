@@ -49,7 +49,6 @@ import {
   type ExplicitCheckInput,
   type ProjectCheckupReport,
   OpsCapabilityUnavailableError,
-  type StartupNoticeState,
   type UsageReportAnswer,
   opsBrowserConfig,
   opsConfig,
@@ -1752,19 +1751,6 @@ export class OpsApp implements OpsApi {
       installAdmin: false,
       requestedBy: "checkup",
     });
-  }
-
-  getStartupNotice(_input: { organizationId: string }): Promise<StartupNoticeState> {
-    return this.#checkup.usageReports.getStartupNotice();
-  }
-
-  async dismissStartupNotice({
-    schemaVersion,
-  }: {
-    organizationId: string;
-    schemaVersion: number;
-  }): Promise<{ dismissed: boolean }> {
-    return { dismissed: await this.#checkup.usageReports.dismissStartupNotice({ schemaVersion }) };
   }
 
   /** The daily report's one send for `ops_usage_report`; never throws for a refusal. */

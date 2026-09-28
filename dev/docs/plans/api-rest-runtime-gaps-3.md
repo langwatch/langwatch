@@ -26,7 +26,7 @@ Three parts, run as three lanes in this order, one at a time, since they share `
 4. **The 405 guard.** A path the family serves with another method answers 405 with an `Allow` header, not 404 (automation
    asks for it; `versioned-routing.feature` has the scenario). Apply it per family at mount.
 5. **A union output.** stored-object's `createUpload` answers `existing | pending`. `withOutput` accepts `ZodObject | ZodArray |
-   ZodVoid | ZodUndefined`; widen it to a discriminated union whose members are objects, and publish `oneOf` with the
+ZodVoid | ZodUndefined`; widen it to a discriminated union whose members are objects, and publish `oneOf` with the
    discriminator.
 
 ## Part B: doors and addressing (LANDED `3f7db75a6b`)

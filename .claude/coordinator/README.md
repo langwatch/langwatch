@@ -22,12 +22,12 @@ Coordinator                                  Lane
 
 ## The files
 
-| File | What it is |
-| --- | --- |
-| `COORDINATOR.md` | Instructions for the coordinating agent |
-| `LANE.md` | Instructions for a lane, including the paste that starts one |
-| `manifest-template.md` | The task contract, written before a lane starts |
-| `handoff-template.md` | The snapshot, rewritten before a lane stops |
+| File                   | What it is                                                   |
+| ---------------------- | ------------------------------------------------------------ |
+| `COORDINATOR.md`       | Instructions for the coordinating agent                      |
+| `LANE.md`              | Instructions for a lane, including the paste that starts one |
+| `manifest-template.md` | The task contract, written before a lane starts              |
+| `handoff-template.md`  | The snapshot, rewritten before a lane stops                  |
 
 Shared rules the whole protocol depends on live once, in
 `.claude/skills/core/` - repository rules, testing rules, handoff rules. Nothing
@@ -63,10 +63,10 @@ architecture decision stops and records it rather than guessing.
 
 ## Relationship to dev/docs/plans/
 
-`dev/docs/plans/` holds the *content* of a drive - what is being migrated, the
+`dev/docs/plans/` holds the _content_ of a drive - what is being migrated, the
 counters, the module queue, the design. It keeps that role.
 
-This directory holds the *mechanism* - how agents are briefed, bounded and
+This directory holds the _mechanism_ - how agents are briefed, bounded and
 handed over, for any drive. `dev/docs/plans/coordinator-prompt.md` and
 `dev/docs/plans/lane-brief.md` were the first version of this mechanism, mixed
 in with the strict-feature-layout drive's content; they now point here for the

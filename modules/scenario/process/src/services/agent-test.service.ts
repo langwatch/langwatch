@@ -17,7 +17,6 @@ import { generate } from "@langwatch/ksuid";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import {
   AGENT_TEST_SCENARIO_ID,
   agentTestScenarioConfig,
@@ -31,6 +30,7 @@ import {
   type TargetConfig,
   type TestAgentRunInput,
   type TestAgentTurnInput,
+  type AgentTestTurnJob,
 } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { nowInstant } from "@langwatch/time";
@@ -42,7 +42,7 @@ import { nowInstant } from "@langwatch/time";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
-import type { AgentAdapterFactory } from "../app/scenario.app.ts";
+import type { AgentTestTurnChild } from "../app/scenario.app.ts";
 import {
   AgentTestPrefetchService,
   type AdapterRead,
@@ -62,45 +62,23 @@ export type AgentTestServiceOptions = {
   modelProviders: ModelProviderApi;
   simulations: SimulationService;
   config: ScenarioExecutionPrefetchConfig;
-  /** Builds the adapter that speaks to the agent under test. */
-  agentAdapters: AgentAdapterFactory;
+  /** Runs a turn in a fresh scenario child, where the agent's adapter is built and called. */
+  turns: AgentTestTurnChild;
+  /** The operator's nlpgo deadlines a code or workflow agent's turn answers inside. */
+  nlpTimeouts: AgentTestTurnJob["nlpTimeouts"];
   /** The platform's call-budget ceiling every kind of agent answers inside. */
   maxCallTimeoutMs: number;
 };
 
-/** The input of a single turn, as the adapters read it. */
-function oneTurnInput({ threadId, message }: { threadId: string; message: string }): AgentInput {
-  const userMessage = { role: "user" as const, content: message };
-
+/** The deadlines the child can carry: JSON has no NaN, and an unset one takes the default there. */
+function usableTimeouts({
+  engineCodeBlockTimeoutSeconds,
+  maxTimeoutMs,
+}: AgentTestTurnJob["nlpTimeouts"]): AgentTestTurnJob["nlpTimeouts"] {
   return {
-    threadId,
-    messages: [userMessage],
-    newMessages: [userMessage],
-    requestedRole: AgentRole.AGENT,
-    scenarioState: {} as AgentInput["scenarioState"],
-    scenarioConfig: {} as AgentInput["scenarioConfig"],
+    ...(Number.isFinite(engineCodeBlockTimeoutSeconds) ? { engineCodeBlockTimeoutSeconds } : {}),
+    ...(Number.isFinite(maxTimeoutMs) ? { maxTimeoutMs } : {}),
   };
-}
-
-/** The ceiling every kind of agent answers inside (ADR-128's call-budget
- * cap), so a turn never parks the request for as long as the agent takes. */
-async function withinCallDeadline<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      work,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => {
-          void work.catch(() => undefined);
-          reject(new AgentCallTimeoutError({ timeoutMs }));
-        }, timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timer) {
-      clearTimeout(timer);
-    }
-  }
 }
 
 const NOT_TESTABLE_REASON = "Only HTTP, code, workflow and connected agents can be tested this way";
@@ -231,21 +209,27 @@ export class AgentTestService {
       throw new AgentTestRefusedError({ reason: prefetch.error });
     }
 
-    const adapter = this.options.agentAdapters.build({
-      adapterData: prefetch.data.adapterData,
-      nlpServiceUrl: prefetch.data.nlpServiceUrl,
-      projectApiKey: prefetch.telemetry.apiKey,
-      parameters: input.params ?? {},
+    const answer = await this.options.turns.run({
+      job: {
+        kind: "agent-test-turn",
+        adapterData: prefetch.data.adapterData,
+        nlpServiceUrl: prefetch.data.nlpServiceUrl,
+        parameters: input.params ?? {},
+        message: input.message,
+        timeoutMs: this.options.maxCallTimeoutMs,
+        nlpTimeouts: usableTimeouts(this.options.nlpTimeouts),
+      },
+      environment: { labels: prefetch.data.scenario.labels, telemetry: prefetch.telemetry },
+      logContext: { projectId: input.projectId, scenarioId: AGENT_TEST_SCENARIO_ID },
     });
-    const startedAt = nowInstant().epochMilliseconds;
-    const output = await withinCallDeadline(
-      adapter.call(
-        oneTurnInput({ threadId: generate("scenario").toString(), message: input.message }),
-      ),
-      this.options.maxCallTimeoutMs,
-    );
+    if (answer.success) {
+      return { output: answer.output, durationMs: answer.durationMs, instance: null };
+    }
+    if (answer.timeoutMs !== undefined) {
+      throw new AgentCallTimeoutError({ timeoutMs: answer.timeoutMs });
+    }
 
-    return { output, durationMs: nowInstant().epochMilliseconds - startedAt, instance: null };
+    throw new Error(answer.error);
   }
 
   async #sendConnectedTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult> {

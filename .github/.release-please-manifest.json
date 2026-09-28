@@ -8,7 +8,7 @@
   "packages/ksuid": "2.0.2",
   "packages/ksuid-python": "1.0.1",
   "services/langevals": "3.1.0",
-  ".": "3.17.0",
+  ".": "3.18.0",
   "skills": "1.4.0",
   "plugins/langwatch": "1.2.0"
 }

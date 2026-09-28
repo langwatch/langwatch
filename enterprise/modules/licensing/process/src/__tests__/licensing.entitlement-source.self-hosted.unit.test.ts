@@ -30,8 +30,12 @@ const providerReturning = (plan: PlanInfo) =>
     mode: "self-hosted",
   });
 
-const resolve = (plan: PlanInfo) =>
-  providerReturning(plan).resolve({ organizationId: ORGANIZATION_ID });
+/** The plan a licence source grants; it always grants one, so no grant fails the test. */
+const resolve = async (plan: PlanInfo): Promise<PlanInfo> => {
+  const grant = await providerReturning(plan).resolve({ organizationId: ORGANIZATION_ID });
+  if (!grant.granted) throw new Error("a licence source always grants a plan");
+  return grant.plan;
+};
 
 describe("LicensingEntitlementSourceService in self-hosted mode", () => {
   describe("given the organization holds an Enterprise license with finite limits", () => {

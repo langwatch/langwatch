@@ -155,7 +155,7 @@ change and is a known manual step, not an oversight.
   pure function of the Prisma manifest plus its override, the same relationship
   the ClickHouse half already has between `derivedViews.ts` and
   `skippedTables.ts`.
-- **Per-user visibility.** A model whose *application* repository already
+- **Per-user visibility.** A model whose _application_ repository already
   restricts which rows a caller may read — Langy's conversations, visible to
   their owner plus anyone the owner shared with, never to every other project
   member — cannot rely on the catalog's tenant predicate alone: that predicate

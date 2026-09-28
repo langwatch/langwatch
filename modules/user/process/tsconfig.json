@@ -25,7 +25,13 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/enterprise-gateway/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../gateway/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
@@ -38,6 +44,9 @@
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/mail/tsconfig.declarations.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
@@ -59,6 +68,9 @@
     },
     {
       "path": "../../../packages/redis-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../stored-object/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"

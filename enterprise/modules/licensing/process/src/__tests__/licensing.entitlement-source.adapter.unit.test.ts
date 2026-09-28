@@ -63,9 +63,10 @@ describe("LicensingEntitlementSourceService", () => {
     const licensing = licensingFor();
     const source = LicensingEntitlementSourceService.create({ licensing, mode: "cloud" });
 
-    await expect(source.resolve({ organizationId: "organization-1" })).resolves.toBe(
-      UNLIMITED_PLAN,
-    );
+    await expect(source.resolve({ organizationId: "organization-1" })).resolves.toEqual({
+      granted: true,
+      plan: UNLIMITED_PLAN,
+    });
     expect(licensing.getSelfHostedPlan).not.toHaveBeenCalled();
   });
 
@@ -75,11 +76,14 @@ describe("LicensingEntitlementSourceService", () => {
     const source = LicensingEntitlementSourceService.create({ licensing, mode: "self-hosted" });
 
     await expect(source.resolve({ organizationId: "organization-1" })).resolves.toMatchObject({
-      type: "ENTERPRISE",
-      free: false,
-      maxMembers: 10,
-      maxMessagesPerMonth: UNLIMITED_PLAN.maxMessagesPerMonth,
-      canPublish: true,
+      granted: true,
+      plan: {
+        type: "ENTERPRISE",
+        free: false,
+        maxMembers: 10,
+        maxMessagesPerMonth: UNLIMITED_PLAN.maxMessagesPerMonth,
+        canPublish: true,
+      },
     });
     expect(licensing.getActivePlan).not.toHaveBeenCalled();
   });

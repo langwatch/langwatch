@@ -748,6 +748,13 @@ export interface IdentityApi {
   }): Promise<EmailIdentifierAdded>;
   /** Gives up a way in, demoting a primary first; the detach guard decides. */
   removeIdentifier(input: { userId: string; identifierId: string }): Promise<void>;
+  /**
+   * Moves a pre-3.17 Azure AD account onto the key better-auth 1.7 looks it up by, from the
+   * Microsoft id token claims of a sign-in; throws where the move fails, so the sign-in stops.
+   */
+  moveLegacyMicrosoftAccountKey(input: {
+    profile: Readonly<Record<string, unknown>>;
+  }): Promise<void>;
   /** When each sign-in method last minted a session, read from the user's sessions. */
   getMethodsLastUsed(input: { userId: string }): Promise<MethodsLastUsed>;
   /** Where an address signs in; `breakGlass` asks for the rate-limited local door (ADR-117). */

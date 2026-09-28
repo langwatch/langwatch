@@ -27,6 +27,7 @@ The other 17 installed modules (`annotation`, `authz`, `codingAgent`,
 `slices` map at all — see each section for what that means for that module.
 
 Legend for **Port difficulty**:
+
 - `mechanical` — leaves and handles map 1:1, ownership is unambiguous.
 - `needs-a-decision` — a collision, a missing wire, a secret declared as
   config, or an ownership question sits in the way of a pure rename.
@@ -47,7 +48,7 @@ Supplied by the deleted app config (`slices.agent`):
 | publicBaseUrl | `publicBaseUrl` (derived from `deploymentPublicBaseUrl`, i.e. `BASE_HOST`) | shared deployment fact, see below |
 | connected | `config.infrastructure.connectedAgents` | a top-level-only field never declared by any module contract — trace it before porting |
 
-Process half (`agent.app.ts`) declares its OWN `agentAppConfigSchema = z.object({ publicBaseUrl: z.url(), connected: agentServerConfigSchema.nullable(), httpTesting: z.boolean().optional() })` — note `agentServerConfigSchema` here is **not** this module's own contract schema name (`replicaCount`/`relayMaxPayloadMb` above); it is a *different* schema of the same name imported from elsewhere for `connected`. Confirm which `agentServerConfigSchema` resolves at that import before folding.
+Process half (`agent.app.ts`) declares its OWN `agentAppConfigSchema = z.object({ publicBaseUrl: z.url(), connected: agentServerConfigSchema.nullable(), httpTesting: z.boolean().optional() })` — note `agentServerConfigSchema` here is **not** this module's own contract schema name (`replicaCount`/`relayMaxPayloadMb` above); it is a _different_ schema of the same name imported from elsewhere for `connected`. Confirm which `agentServerConfigSchema` resolves at that import before folding.
 
 Port difficulty: needs-a-decision
 Notes: `replicaCount`/`relayMaxPayloadMb` (the contract's own leaves) are never referenced in the deleted app's `slices.agent` at all — dead declarations, or read some other way. Confirm before deleting.
@@ -91,11 +92,11 @@ Notes: declares nothing; nothing to port.
 
 Config leaves:
 | field | env spelling | schema | default | source |
-| pepper | API_KEY_PEPPER | z.string().optional() | — | contract |
+| ~~pepper~~ | ~~API_KEY_PEPPER~~ | retired 2026-09-28 | — | — |
 
-Secrets: none declared directly, but see note.
+Secrets: `ApiKeyApp.secrets` declares `API_KEY_PEPPER` plus the shared `credentialsSecret` and `sessionSecret`, first set wins (ruling above).
 
-Supplied by the deleted app config: **not present in `slices` at all.** `apiKeyPepper` is instead a top-level `apiConfigDefinition` field (`apiKeyServerConfigDefinition.pepper` referenced directly, line 193 of `apps/api/src/config.ts`), and the api's `resolveApiConfig` synthesizes its actual source value as `firstDefined(source, API_KEY_PEPPER_ENV_PRECEDENCE)` where `API_KEY_PEPPER_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]` is *itself* pre-substituted (`CREDENTIALS_SECRET` is synthesized first as `firstDefined(source, ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"])`). So the real precedence, unwound, is: `API_KEY_PEPPER` → `CREDENTIALS_SECRET` → `NEXTAUTH_SECRET`.
+Supplied by the deleted app config: **not present in `slices` at all.** `apiKeyPepper` is instead a top-level `apiConfigDefinition` field (`apiKeyServerConfigDefinition.pepper` referenced directly, line 193 of `apps/api/src/config.ts`), and the api's `resolveApiConfig` synthesizes its actual source value as `firstDefined(source, API_KEY_PEPPER_ENV_PRECEDENCE)` where `API_KEY_PEPPER_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]` is _itself_ pre-substituted (`CREDENTIALS_SECRET` is synthesized first as `firstDefined(source, ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"])`). So the real precedence, unwound, is: `API_KEY_PEPPER` → `CREDENTIALS_SECRET` → `NEXTAUTH_SECRET`.
 
 Process half (`api-key.app.ts`) uses `configSchema = apiKeyServerConfigSchema` directly — no separate app-level schema.
 
@@ -852,7 +853,7 @@ Notes: (1) the JSON blob's `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` fields ar
 
 ### Config-claims-secret collisions (boot-refusing under the new wall)
 
-- **`CREDENTIALS_SECRET`** (the manifest's named collision, confirmed): read as a raw secret handle by `github.app.ts` (`signingKey`), used as the fallback source for `secret`'s stored-object cipher key (`storedSecretEncryptionKey`, via `STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]`), AND as the second fallback for `api-key`'s pepper (`API_KEY_PEPPER_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]`, itself applied after `CREDENTIALS_SECRET`'s own fallback). Three different semantic purposes (GitHub App signing, stored-secret cipher key, API-key pepper) resolve from the same raw material through a layered fallback chain — `Secret.load(id)` has no fallback-chain primitive, so this cannot be a mechanical three-way rename. **Needs a decision**: either the fallback chain gets a new primitive, or each purpose gets its own env var and a migration note for deployments still relying on the shared default.
+- **`CREDENTIALS_SECRET`** (the manifest's named collision, confirmed): read as a raw secret handle by `github.app.ts` (`signingKey`), used as the fallback source for `secret`'s stored-object cipher key (`storedSecretEncryptionKey`, via `STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]`), AND as the second fallback for `api-key`'s pepper (`API_KEY_PEPPER_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]`, itself applied after `CREDENTIALS_SECRET`'s own fallback). Three different semantic purposes (GitHub App signing, stored-secret cipher key, API-key pepper) resolve from the same raw material through a layered fallback chain — `Secret.load(id)` has no fallback-chain primitive, so this cannot be a mechanical three-way rename. **Needs a decision**: either the fallback chain gets a new primitive, or each purpose gets its own env var and a migration note for deployments still relying on the shared default. **Ruled for the API-key pepper (Alex, 2026-09-28): main's chain.** The pepper resolves `API_KEY_PEPPER ?? CREDENTIALS_SECRET ?? NEXTAUTH_SECRET` through `@langwatch/secrets` (ADR-132), with no new primitive: `ApiKeyApp` declares the three handles (`API_KEY_PEPPER` plus the shared `credentialsSecret` and `sessionSecret`) and nests `into`, as `ScimApp` and `ScenarioApp` already do. When none resolves, the process refuses to boot with a named configuration error, never an empty-string pepper. The storage seed hashes its two Local Dev keys under the same chain, and the `API_KEY_PEPPER` config leaf in the api-key section below is retired (ARCHITECTURE.md §6).
 
 ### Env spellings read by two-or-more modules with the SAME meaning (shared-leaf candidates per §6 layer 3)
 

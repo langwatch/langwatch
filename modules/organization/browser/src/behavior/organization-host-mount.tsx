@@ -17,6 +17,7 @@ import {
   OrganizationHostApi,
   OrganizationHostProvider,
   type AuthenticationOverviewCard,
+  type DirectorySummaryBand,
   type OrganizationActor,
   type OrganizationDownload,
   type OrganizationFailureNotice,
@@ -55,6 +56,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
       navigate: (to: string) => void;
       failed: (failure: OrganizationFailureNotice) => void;
       overviewCards: readonly AuthenticationOverviewCard[];
+      directorySummary: DirectorySummaryBand | undefined;
     },
   ) {
     super();
@@ -144,6 +146,10 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
     return this.deps.overviewCards;
   }
 
+  directorySummary(): DirectorySummaryBand | undefined {
+    return this.deps.directorySummary;
+  }
+
   failed(failure: OrganizationFailureNotice): void {
     this.deps.failed(failure);
   }
@@ -177,6 +183,10 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
         .map(({ module, capability }) => ({ key: module, Card: lazy(capability.load) })),
     [declarations],
   );
+  const directorySummary = useMemo(() => {
+    const [lent] = declarations.declared("directorySummary");
+    return lent ? lazy(lent.capability.load) : void 0;
+  }, [declarations]);
 
   const host = useMemo(
     () =>
@@ -206,6 +216,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
         navigate: (to) => navigation.navigate(to),
         failed: (failure) => feedback.failed(failure),
         overviewCards,
+        directorySummary,
       }),
     [
       activeScope.organizationId,
@@ -224,6 +235,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
       route,
       navigation,
       overviewCards,
+      directorySummary,
     ],
   );
 

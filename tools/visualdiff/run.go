@@ -47,6 +47,8 @@ type Options struct {
 	// Resume continues a -keep run in RunDir: its prepared worktrees and
 	// running stacks are reused, and its fixtures are not seeded twice.
 	Resume bool
+	// NoPublish keeps the run's screens off its branch's pull request.
+	NoPublish bool
 }
 
 // Streams are where a run writes: the summary on Out, everything a person
@@ -61,11 +63,14 @@ type Streams struct {
 // lets a test assert that teardown happened after a failed capture without
 // booting anything.
 type Deps struct {
-	Run           runner
-	Start         func(ctx context.Context, stack Stack, logDir string) (func(), error)
-	Wait          func(ctx context.Context, urls []string, timeout time.Duration) error
-	Seed          func(ctx context.Context, request SeedRequest) (SeedResult, error)
-	Capture       func(ctx context.Context, plan RunnerPlan, options CaptureOptions) (RunnerStream, error)
+	Run     runner
+	Start   func(ctx context.Context, stack Stack, logDir string) (func(), error)
+	Wait    func(ctx context.Context, urls []string, timeout time.Duration) error
+	Seed    func(ctx context.Context, request SeedRequest) (SeedResult, error)
+	Capture func(ctx context.Context, plan RunnerPlan, options CaptureOptions) (RunnerStream, error)
+	// Preflight proves the runner can launch its browser before any stack
+	// boots, so a missing Playwright install fails in seconds, not minutes.
+	Preflight     func(ctx context.Context, root string) error
 	Listening     func(port int) bool
 	Layout        func(dir string) (Layout, error)
 	Now           func() time.Time
@@ -80,6 +85,9 @@ type Deps struct {
 	// prepare steps run - see CopyEnvFiles in haven.go. Tests supply their
 	// own so a fake root path never has to exist on disk.
 	CopyEnv func(ctx context.Context, root, dir string) (int, error)
+	// Detach starts a command that outlives the run, its output appended to
+	// log: the haven path's teardown, which nothing has to wait on.
+	Detach func(spec commandSpec, log string) error
 }
 
 // Request is everything Execute needs: what to run, what to render, and what
@@ -140,6 +148,7 @@ func (deps *Deps) fill() {
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
+	deps.fillPreflight()
 	if deps.Capture == nil {
 		deps.Capture = RunRunner
 	}
@@ -152,6 +161,30 @@ func (deps *Deps) fill() {
 	deps.fillHaven()
 }
 
+// prepareInfra proves the runner's browser launches, then (off haven) takes
+// ports and Redis databases; haven owns both on its own path.
+func prepareInfra(ctx context.Context, inputs portInfraInputs, options Options) error {
+	if err := inputs.deps.Preflight(ctx, options.Root); err != nil {
+		return err
+	}
+	if options.UseHaven {
+		return nil
+	}
+	return resolvePortBasedInfra(ctx, inputs)
+}
+
+// fillPreflight runs the real browser check only with the real runner, so a
+// test's fake capture never shells out.
+func (deps *Deps) fillPreflight() {
+	if deps.Preflight != nil {
+		return
+	}
+	deps.Preflight = func(context.Context, string) error { return nil }
+	if deps.Capture == nil {
+		deps.Preflight = RunnerPreflight
+	}
+}
+
 // fillHaven defaults the two dependencies only the haven path uses, split out
 // of fill so that function's cognitive complexity stays under the repository
 // limit.
@@ -161,6 +194,9 @@ func (deps *Deps) fillHaven() {
 	}
 	if deps.CopyEnv == nil {
 		deps.CopyEnv = CopyEnvFiles
+	}
+	if deps.Detach == nil {
+		deps.Detach = detachCommand
 	}
 }
 
@@ -211,16 +247,18 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 		writeBaselinePlan(streams.Out, options.Editions, baselines)
 		return result, nil
 	}
-	if !options.UseHaven {
-		// The haven path never reaches here at all: haven owns both the
-		// ports and each stack's Redis database.
-		if err := resolvePortBasedInfra(ctx, portInfraInputs{plan: &plan, deps: deps, stderr: streams.Err}); err != nil {
-			return result, err
-		}
+	if err := prepareInfra(ctx, portInfraInputs{plan: &plan, deps: deps, stderr: streams.Err}, options); err != nil {
+		return result, err
 	}
 	result.Plan = plan
 
-	run := &session{request: request, streams: streams, plan: plan, runID: plan.RunID}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	if err := claimWorktrees(&plan, options); err != nil {
+		return result, err
+	}
+	result.Plan = plan
+	run := &session{request: request, streams: streams, plan: plan, runID: plan.RunID, stagger: staggers(plan, options)}
 	// Registered first, so it runs last: the lanes (or the haven stacks) are
 	// stopped, and only then are the worktrees removed.
 	defer func() {
@@ -348,9 +386,15 @@ type session struct {
 	// havenSlugs are the stacks this run started, in order. Teardown destroys
 	// these and nothing else.
 	havenSlugs []string
+	// sideFixtures are the ids each side's seed generated, by stack name.
+	sideFixtures map[string]map[string]string
 	// logOffsets are each started stack's log size at its `haven up`, so a
 	// fatal line an earlier up of the same slug wrote is never read as this one's.
 	logOffsets map[string]int64
+	// stagger lets the candidate capture while the base still boots; the
+	// base arrives on baseArrival, ready and seeded, once it can (haven.go).
+	stagger     bool
+	baseArrival <-chan baseArrival
 }
 
 func (run *session) stopAll() {
@@ -440,36 +484,65 @@ func (run *session) editionStacks() []EditionStack {
 
 // seed posts the fixtures. Haven stacks each own their database, so every
 // live one is seeded; the port-based stacks share one, seeded once through
-// the candidate so the rows are in the shape the newer code writes.
+// the candidate so the rows are in the shape the newer code writes. The ids
+// each side generated are kept in the marker, so a resumed run renders them.
 func (run *session) seed(ctx context.Context) error {
 	options, deps := run.request.Options, run.request.Deps
 	marker := filepath.Join(options.RunDir, "seeded")
-	if _, err := os.Stat(marker); err == nil {
+	if recorded, err := os.ReadFile(marker); err == nil {
 		fmt.Fprintln(run.streams.Err, "seed: this run's stacks are already seeded")
+		run.sideFixtures = ReadSeededMarker(recorded)
 		return nil
 	}
-	if err := run.seedStacks(ctx, options, deps); err != nil {
+	fixtures, err := run.seedStacks(ctx, options, deps)
+	if err != nil {
 		return err
 	}
+	run.sideFixtures = fixtures
 	if err := os.MkdirAll(options.RunDir, 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(marker, nil, 0o600)
+	encoded, err := json.Marshal(fixtures)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(marker, encoded, 0o600)
 }
 
-// seedStacks posts the fixtures to each stack that owns a database.
-func (run *session) seedStacks(ctx context.Context, options Options, deps Deps) error {
+// seedStacks posts the fixtures to each stack that owns a database and
+// returns each side's seeded ids. A shared database gives both sides the
+// candidate's.
+func (run *session) seedStacks(ctx context.Context, options Options, deps Deps) (map[string]map[string]string, error) {
 	stacks := []*Stack{&run.plan.Candidate}
-	if options.UseHaven {
+	if options.UseHaven && run.baseArrival == nil {
 		stacks = run.liveStacks()
 	}
+	fixtures := map[string]map[string]string{}
 	for _, stack := range stacks {
 		seed := SeedRequest{APIURL: stack.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount}
-		if _, err := deps.Seed(ctx, seed); err != nil {
-			return fmt.Errorf("seed %s: %w", stack.Name, err)
+		result, err := deps.Seed(ctx, seed)
+		if err != nil {
+			return nil, fmt.Errorf("seed %s: %w", stack.Name, err)
 		}
+		for _, warning := range result.Warnings {
+			fmt.Fprintf(run.streams.Err, "seed %s: %s\n", stack.Name, warning)
+		}
+		fixtures[stack.Name] = result.Fixtures
 	}
-	return nil
+	if !options.UseHaven {
+		fixtures[run.plan.Base.Name] = fixtures[run.plan.Candidate.Name]
+	}
+	return fixtures, nil
+}
+
+// ReadSeededMarker reads the per-side fixtures a seed recorded. A marker an
+// older run left empty reads as no fixtures.
+func ReadSeededMarker(recorded []byte) map[string]map[string]string {
+	fixtures := map[string]map[string]string{}
+	if len(recorded) > 0 {
+		_ = json.Unmarshal(recorded, &fixtures)
+	}
+	return fixtures
 }
 
 // captureEditions seeds once, then runs one capture pass per edition on the
@@ -493,6 +566,7 @@ func (run *session) captureEditions(ctx context.Context, baselines map[Edition]B
 		total.Rows = append(total.Rows, rows...)
 		total.Findings += CountFindings(rows)
 	}
+	total.Plan = run.plan
 	return total, nil
 }
 
@@ -539,27 +613,34 @@ func (run *session) cacheBaseline(baseline Baseline, stream RunnerStream) {
 func (run *session) capture(ctx context.Context, edition Edition, baseline Baseline) (RunnerStream, error) {
 	options, config, deps := run.request.Options, run.request.Config, run.request.Deps
 	plan := run.plan
-	base := RunnerSide{Name: "base", BaseURL: plan.Base.URL()}
+	base := RunnerSide{Name: "base", BaseURL: plan.Base.URL(), Fixtures: run.sideFixtures[plan.Base.Name]}
 	if baseline.Cached {
 		base = RunnerSide{Name: "base", Replay: baseline.CapturesPath()}
 		fmt.Fprintf(run.streams.Err, "%s: base replayed from %s\n", edition, baseline.Dir)
 	}
 	runnerPlan := RunnerPlan{
-		Viewport:   options.Viewport,
-		Settle:     config.Settle,
-		Sides:      []RunnerSide{base, {Name: "candidate", BaseURL: plan.Candidate.URL()}},
-		OutDir:     filepath.Join(options.RunDir, "shots", string(edition)),
-		Slug:       options.Identity.Slug,
-		Routes:     config.Routes,
-		Credential: options.Identity,
-		FailFast:   options.FailFast,
-		FrozenTime: deps.Now().UnixMilli(),
-		Fixtures:   config.Fixtures,
-		Edition:    edition,
-		Stacks:     run.editionStacks(),
+		Viewport:    options.Viewport,
+		Settle:      config.Settle,
+		Sides:       []RunnerSide{base, {Name: "candidate", BaseURL: plan.Candidate.URL(), Fixtures: run.sideFixtures[plan.Candidate.Name]}},
+		OutDir:      filepath.Join(options.RunDir, "shots", string(edition)),
+		Slug:        options.Identity.Slug,
+		Routes:      config.Routes,
+		Credential:  options.Identity,
+		FailFast:    options.FailFast,
+		FrozenTime:  deps.Now().UnixMilli(),
+		Fixtures:    config.Fixtures,
+		Concurrency: config.Concurrency,
+		Edition:     edition,
+		Stacks:      run.editionStacks(),
 	}
 	if !options.RoutesOnly {
 		runnerPlan.Flows = config.Flows
+	}
+	var arrived <-chan baseArrival
+	if run.baseArrival != nil && !baseline.Cached {
+		pending := filepath.Join(options.RunDir, PendingBaseFile)
+		runnerPlan.Sides[0] = RunnerSide{Name: "base", Pending: pending}
+		arrived = run.forwardBase(ctx, pending)
 	}
 	findingsPath := filepath.Join(options.RunDir, FindingsFile)
 	stream, err := runWithFindings(ctx, findingsRunInputs{
@@ -568,6 +649,11 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 	})
 	if err != nil {
 		return stream, fmt.Errorf("capture %s: %w", edition, err)
+	}
+	if arrived != nil {
+		if err := run.adoptBase(ctx, arrived); err != nil {
+			return stream, err
+		}
 	}
 	return stream, nil
 }
@@ -699,13 +785,13 @@ func (steps *executor) addWorktree(ctx context.Context, stack Stack) error {
 }
 
 // PrepareCommands are the two steps a fresh worktree needs before it can
-// boot: an offline install (every version this run compares is already in the
-// store, so the network is not on the critical path) and the generated files
-// — Prisma client, evaluator types, SDK build — without which the stack does
-// not start at all.
+// boot: an install that prefers the store (the base ref's lockfile can pin a
+// version the candidate's install never fetched, so the network stays
+// available for those) and the generated files, Prisma client, evaluator
+// types, SDK build, without which the stack does not start at all.
 func PrepareCommands() []commandSpec {
 	return []commandSpec{
-		{name: "pnpm", args: []string{"install", "--offline"}},
+		{name: "pnpm", args: []string{"install", "--prefer-offline"}},
 		{name: "pnpm", args: []string{"run", "start:prepare:files"}},
 	}
 }
@@ -827,4 +913,17 @@ func RunRunner(ctx context.Context, plan RunnerPlan, options CaptureOptions) (Ru
 		return stream, fmt.Errorf("runner: %w", runErr)
 	}
 	return stream, nil
+}
+
+// RunnerPreflight launches and closes the runner's browser; its stderr names
+// the install command when Playwright's browser is missing.
+func RunnerPreflight(ctx context.Context, root string) error {
+	// #nosec G204 -- constant executable and constant args.
+	command := exec.CommandContext(ctx, "pnpm", "--silent", "--filter", RunnerPackage, "preflight")
+	command.Dir = root
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("runner preflight: %w\n%s", err, output)
+	}
+	return nil
 }

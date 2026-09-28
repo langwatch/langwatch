@@ -9,7 +9,7 @@ import { performance } from "node:perf_hooks";
 // handler's binding and dies in its temporal dead zone.
 import { pid } from "node:process";
 
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import {
   type Attributes,
   context as otelContext,
@@ -210,11 +210,11 @@ function assertNoReservedKeys(
 ): void {
   for (const key of Object.keys(payload)) {
     if (key.startsWith("__") && !CALLER_RESERVED_KEYS.has(key)) {
-      throw new GroupQueueError(
+      throw new GroupQueueError({
         queueName,
-        method,
-        `Payload key "${key}" is in the reserved __* namespace (queue machinery). User payloads must not start with "__" except __pipelineName / __jobType / __jobName.`,
-      );
+        operation: method,
+        message: `Payload key "${key}" is in the reserved __* namespace (queue machinery). User payloads must not start with "__" except __pipelineName / __jobType / __jobName.`,
+      });
     }
   }
 }
@@ -307,7 +307,7 @@ type CoalescedBatch<Payload> =
  * backpressure, and completion triggers the next dispatch.
  */
 export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
-  private readonly logger = createLogger("langwatch:group-queue");
+  private readonly logger: Logger;
   private readonly queueName: string;
   private readonly jobName: string;
   private readonly process: (payload: Payload, delivery?: JobDelivery) => Promise<void>;
@@ -402,8 +402,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       failures?: GroupQueueFailureClassifier;
       drainTimeoutMs?: number;
       policy?: GroupQueuePolicy;
+      logger?: Logger;
     },
   ) {
+    this.logger = options?.logger ?? createLogger("langwatch:group-queue");
     const {
       name,
       process,
@@ -591,11 +593,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
    */
   async send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void> {
     if (this.stagingClosed) {
-      throw new GroupQueueError(
-        this.queueName,
-        "send",
-        "Cannot send to queue after its drain has finished",
-      );
+      throw new GroupQueueError({
+        queueName: this.queueName,
+        operation: "send",
+        message: "Cannot send to queue after its drain has finished",
+      });
     }
     assertNoReservedKeys(payload as Record<string, unknown>, this.queueName, "send");
 
@@ -735,11 +737,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
 
   async sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void> {
     if (this.stagingClosed) {
-      throw new GroupQueueError(
-        this.queueName,
-        "sendBatch",
-        "Cannot send to queue after its drain has finished",
-      );
+      throw new GroupQueueError({
+        queueName: this.queueName,
+        operation: "sendBatch",
+        message: "Cannot send to queue after its drain has finished",
+      });
     }
 
     if (payloads.length === 0) {
@@ -2628,25 +2630,25 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       (groupId) => groupId === "__unknown__" || groupId === "__legacy_outbox__",
     );
     if (unresolved) {
-      throw new GroupQueueError(
-        this.queueName,
-        "registerPreflightGroups",
-        `Migration preflight refused unresolved group ${unresolved}`,
-      );
+      throw new GroupQueueError({
+        queueName: this.queueName,
+        operation: "registerPreflightGroups",
+        message: `Migration preflight refused unresolved group ${unresolved}`,
+      });
     }
     if (groupIds.some((groupId) => !groupId)) {
-      throw new GroupQueueError(
-        this.queueName,
-        "registerPreflightGroups",
-        "Migration preflight refused a pipeline with custom group routing",
-      );
+      throw new GroupQueueError({
+        queueName: this.queueName,
+        operation: "registerPreflightGroups",
+        message: "Migration preflight refused a pipeline with custom group routing",
+      });
     }
     if (!key.startsWith(`${this.queueName}:gq:`)) {
-      throw new GroupQueueError(
-        this.queueName,
-        "registerPreflightGroups",
-        "Migration preflight refused a dispatch scope outside the canonical queue slot",
-      );
+      throw new GroupQueueError({
+        queueName: this.queueName,
+        operation: "registerPreflightGroups",
+        message: "Migration preflight refused a dispatch scope outside the canonical queue slot",
+      });
     }
     await this.scripts.registerPreflightTargets({
       targetKey: key,
@@ -2663,11 +2665,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   async waitUntilPreflightIdle(): Promise<void> {
     const key = this.dispatchGroupAllowListKey;
     if (!key) {
-      throw new GroupQueueError(
-        this.queueName,
-        "waitUntilPreflightIdle",
-        "Queue has no preflight allow-list",
-      );
+      throw new GroupQueueError({
+        queueName: this.queueName,
+        operation: "waitUntilPreflightIdle",
+        message: "Queue has no preflight allow-list",
+      });
     }
     const deadline = nowInstant().epochMilliseconds + this.preflightDrainTimeoutMs;
     let reportedHeld = false;
@@ -2733,11 +2735,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         `blocked: ${namedGroups({ groupIds: state.blockedGroupIds, total: state.blocked })}`,
       );
     }
-    throw new GroupQueueError(
-      this.queueName,
-      "waitUntilPreflightIdle",
-      `Migration preflight work did not succeed on queue ${this.queueName} (${faults.join("; ")})`,
-    );
+    throw new GroupQueueError({
+      queueName: this.queueName,
+      operation: "waitUntilPreflightIdle",
+      message: `Migration preflight work did not succeed on queue ${this.queueName} (${faults.join("; ")})`,
+    });
   }
 
   async close(): Promise<void> {
@@ -2782,11 +2784,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
           shutdownTimer = setTimeout(
             () =>
               reject(
-                new GroupQueueError(
-                  this.queueName,
-                  "close",
-                  `Shutdown timed out after ${this.shutdownTimeoutMs}ms`,
-                ),
+                new GroupQueueError({
+                  queueName: this.queueName,
+                  operation: "close",
+                  message: `Shutdown timed out after ${this.shutdownTimeoutMs}ms`,
+                }),
               ),
             this.shutdownTimeoutMs,
           );

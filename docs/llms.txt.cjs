@@ -62,43 +62,35 @@ function generateTitleFromFilename(filename) {
     .join(" ");
 }
 
+// One direct page reference as its index line
+function navigationPageLine(page) {
+  const cleanPage = page.startsWith("/") ? page.substring(1) : page;
+  const { title, description } = extractFrontmatter(`${cleanPage}.mdx`);
+  const displayTitle = title || generateTitleFromFilename(path.basename(cleanPage));
+  const url = `https://langwatch.ai/docs/${cleanPage}.md`;
+  return description
+    ? `- [${displayTitle}](${url}): ${description}`
+    : `- [${displayTitle}](${url})`;
+}
+
 // Function to process navigation pages recursively
 function processNavigationPages(pages, level = 0, output = []) {
   const prefix = "#".repeat(Math.min(3 + level, 6)); // Start at ### and go up to ######
 
   pages.forEach((page, index) => {
-    const isLastItem = index === pages.length - 1;
     const nextItem = pages[index + 1];
     const isNextItemGroup = nextItem && typeof nextItem === "object" && nextItem.group;
 
     if (typeof page === "string") {
-      // It's a direct page reference
-      const cleanPage = page.startsWith("/") ? page.substring(1) : page;
-      const filePath = `${cleanPage}.mdx`;
-      const { title, description } = extractFrontmatter(filePath);
-      const displayTitle = title || generateTitleFromFilename(path.basename(cleanPage));
-      const url = `https://langwatch.ai/docs/${cleanPage}.md`;
-
-      if (description) {
-        output.push(`- [${displayTitle}](${url}): ${description}`);
-      } else {
-        output.push(`- [${displayTitle}](${url})`);
-      }
-
+      output.push(navigationPageLine(page));
       // Add spacing after page if next item is a group
-      if (isNextItemGroup) {
-        output.push("");
-      }
+      if (isNextItemGroup) output.push("");
     } else if (page.group && page.pages) {
-      // It's a group with nested pages
       output.push(`${prefix} ${page.group}`);
       output.push(""); // Add empty line after group title
       processNavigationPages(page.pages, level + 1, output);
-
       // Add spacing after group if not the last item
-      if (!isLastItem) {
-        output.push("");
-      }
+      if (index !== pages.length - 1) output.push("");
     }
   });
 
@@ -156,6 +148,19 @@ ${AGENT_REPORT_NOTE}
   console.log(`Root llms.txt file generated: ${rootOutputFile}`);
 }
 
+// A /snippets import's file content; undefined for any other import or a missing file
+function readSnippetImport(importPath) {
+  if (!importPath.startsWith("/snippets/")) return undefined;
+  const absoluteImportPath = path.join(process.cwd(), importPath.substring(1));
+  try {
+    if (fs.existsSync(absoluteImportPath)) return fs.readFileSync(absoluteImportPath, "utf8");
+    console.warn(`Warning: Import file not found: ${absoluteImportPath}`);
+  } catch (err) {
+    console.error(`Error reading import file ${absoluteImportPath}: ${err.message}`);
+  }
+  return undefined;
+}
+
 // Function to process imports in an MDX file
 function processImports(content, _filePath) {
   // Find all import statements
@@ -167,26 +172,9 @@ function processImports(content, _filePath) {
   let match;
   while ((match = importRegex.exec(content)) !== null) {
     const importName = match[1];
-    const importPath = match[2];
-
-    // Handle only imports from /snippets
-    if (importPath.startsWith("/snippets/")) {
-      const absoluteImportPath = path.join(process.cwd(), importPath.substring(1));
-
-      try {
-        if (fs.existsSync(absoluteImportPath)) {
-          // Read the imported file
-          const importedContent = fs.readFileSync(absoluteImportPath, "utf8");
-          imports[importName] = importedContent;
-          if (importName == "LLMsTxtProtip") {
-            imports[importName] = "";
-          }
-        } else {
-          console.warn(`Warning: Import file not found: ${absoluteImportPath}`);
-        }
-      } catch (err) {
-        console.error(`Error reading import file ${absoluteImportPath}: ${err.message}`);
-      }
+    const importedContent = readSnippetImport(match[2]);
+    if (importedContent !== undefined) {
+      imports[importName] = importName == "LLMsTxtProtip" ? "" : importedContent;
     }
   }
 

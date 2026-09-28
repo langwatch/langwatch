@@ -5,13 +5,13 @@ import { join } from "node:path";
  * Drift guard between the CLI's real command surface and the capability catalog.
  * @see specs/langy/langy-capability-cards.feature
  */
-import { DIGEST_STRATEGIES } from "@langwatch/langy-contract";
-import { describe, expect, it } from "vitest";
-
 import {
   CAPABILITY_CATALOG,
   CAPABILITY_SURFACES,
-} from "../../../../../model/langy-capability-catalog.ts";
+  DIGEST_STRATEGIES,
+} from "@langwatch/langy-contract";
+import { describe, expect, it } from "vitest";
+
 import { SURFACE_LABEL, SURFACE_PATH } from "../capability-registry.ts";
 
 const CLI_PROGRAM_PATH = join(

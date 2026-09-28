@@ -1,6 +1,6 @@
 /**
  * The policy spine every tRPC procedure runs through: ports, declared
- * authorization checks, the scope-lineage guard, and the mandatory builder.
+ * authorization checks and the scope-lineage guard.
  */
 import {
   type AuthzDeclaration,
@@ -11,20 +11,15 @@ import {
   type AuthzScopeLineageInput,
   type AuthzScopeLineageResult,
   BlankScopeIdError,
-  type DeclarationError,
   type DeclaredAuthzMiddleware,
   type DeclaredScopeId,
   declareAuthzMiddleware,
   type EnforcedScopeFields,
-  type NoPermissionOptions,
   type PermissionDecision,
   PermissionDeniedError,
   resolveDeclaredScope,
   SCOPE_TIER_FIELDS,
   type ScopeTierField,
-  type ValidatePermissionForInput,
-  type ViaFieldFor,
-  findAuthzDeclaration,
 } from "@langwatch/authz-contract";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger, type RequestContext } from "@langwatch/observability";
@@ -40,14 +35,10 @@ import {
 import { TRPCError } from "@trpc/server";
 import type {
   GetRawInputFn,
-  inferParser,
   MiddlewareResult,
   Overwrite,
-  Parser,
-  ProcedureBuilder,
   ProcedureType,
   Simplify,
-  UnsetMarker,
 } from "@trpc/server/unstable-core-do-not-import";
 
 import {
@@ -711,329 +702,6 @@ export function createScopeLineageGuard<TContext>(
         cause: denied,
       });
     };
-}
-
-// The permission procedure builder: declaration made mandatory by construction; .query
-// / .mutation / .subscription unavailable until declared
-
-type OverwriteIfDefined<TType, TWith> = UnsetMarker extends TType ? TWith : Simplify<TType & TWith>;
-
-/** Parameter shape for hand-written checks; what `next` answers is passed on, never read. */
-export type TrpcCheckMiddleware<TCheckContext, TInput> = (params: {
-  ctx: TCheckContext;
-  input: TInput;
-  next: () => unknown;
-}) => Promise<unknown>;
-
-/**
- * The process middlewares wrapped around every declared procedure. Opaque on
- * purpose: tRPC's middleware generics belong to the root that produced them,
- * and this module only ever hands them back to that same root's builders.
- */
-export type TrpcPolicyChainMiddlewares = Readonly<{
-  tracer: unknown;
-  logger: unknown;
-  handledError: unknown;
-  /** Refuses a request whose scope ids do not resolve to one organization. */
-  scopeLineageGuard(declaration: AuthzDeclaration | null): unknown;
-  /** The fail-closed backstop: refuses a procedure no check ever ran on. */
-  enforceCheck: unknown;
-  /** Writes the audit row for a mutation. */
-  auditMutations: unknown;
-}>;
-
-/**
- * Typescript hackery to force endpoints to set the input, declare a check middleware, and
- * ensure compatibility with inputs required
- */
-export interface PendingPermissionProcedureBuilder<
-  TCheckContext,
-  TContext,
-  TMeta,
-  TContextOverrides,
-  TInputIn,
-  TInputOut,
-  TOutputIn,
-  TOutputOut,
-  TCaller extends boolean,
-> {
-  // Mirrors tRPC core's procedureBuilder.input typing (v11 generics)
-  input: <$Parser extends Parser>(
-    schema: $Parser,
-  ) => PendingPermissionProcedureBuilder<
-    TCheckContext,
-    TContext,
-    TMeta,
-    TContextOverrides,
-    OverwriteIfDefined<TInputIn, inferParser<$Parser>["in"]>,
-    OverwriteIfDefined<TInputOut, inferParser<$Parser>["out"]>,
-    TOutputIn,
-    TOutputOut,
-    TCaller
-  >;
-  /**
-   * The custom-check escape hatch — only middleware branded by
-   * `declareAuthzMiddleware(...)` is accepted, so an undeclared function that
-   * flips `ctx.permissionChecked` is a compile error here, not a CI finding.
-   */
-  use: (
-    middleware: DeclaredAuthzMiddleware<TrpcCheckMiddleware<TCheckContext, TInputOut>>,
-  ) => ProcedureBuilder<
-    TContext,
-    TMeta,
-    TContextOverrides,
-    TInputIn,
-    TInputOut,
-    TOutputIn,
-    TOutputOut,
-    TCaller
-  >;
-  /**
-   * ADR-092 decision 25: declare the required permission, typed against the
-   * input; a missing or wrong-tier scope id is a compile error naming it.
-   */
-  permission<P extends AuthzPermission>(
-    permission: P & ValidateDeclaredPermission<P, TInputOut>,
-  ): ProcedureBuilder<
-    TContext,
-    TMeta,
-    TContextOverrides,
-    TInputIn,
-    TInputOut,
-    TOutputIn,
-    TOutputOut,
-    TCaller
-  >;
-  /**
-   * The derivation form, for a permission whose tier the input omits: `via`
-   * must name a field whose tier can derive one the permission is grantable
-   * at — written at the call site, never inferred.
-   */
-  permission<P extends AuthzPermission>(
-    permission: P,
-    options: { via: ViaFieldFor<P, TInputOut> },
-  ): ProcedureBuilder<
-    TContext,
-    TMeta,
-    TContextOverrides,
-    TInputIn,
-    TInputOut,
-    TOutputIn,
-    TOutputOut,
-    TCaller
-  >;
-  /**
-   * Any one of the permissions is enough. List the primary surface's
-   * permission first — the denial names it, so granting it resolves the
-   * refusal whichever feature the caller came through.
-   */
-  permissionAny<Ps extends readonly [AuthzPermission, ...AuthzPermission[]]>(
-    ...permissions: PermissionAnyArgs<Ps, TInputOut>
-  ): ProcedureBuilder<
-    TContext,
-    TMeta,
-    TContextOverrides,
-    TInputIn,
-    TInputOut,
-    TOutputIn,
-    TOutputOut,
-    TCaller
-  >;
-  /**
-   * Authenticated, deliberately unchecked. Every scope id the input carries
-   * must be individually allowed with a written reason: the legacy
-   * `skipPermissionCheck` runtime guard, moved to compile time.
-   */
-  noPermission(
-    options: DeclaredNoPermissionOptions<TInputOut>,
-  ): ProcedureBuilder<
-    TContext,
-    TMeta,
-    TContextOverrides,
-    TInputIn,
-    TInputOut,
-    TOutputIn,
-    TOutputOut,
-    TCaller
-  >;
-  /**
-   * The scope is data the handler loads at runtime, so the SERVICE performs
-   * the real authorization — this only moves WHERE the check happens, never
-   * whether one does.
-   */
-  authorizeInService(options: {
-    reason: string;
-    permissions: readonly AuthzPermission[];
-  }): ProcedureBuilder<
-    TContext,
-    TMeta,
-    TContextOverrides,
-    TInputIn,
-    TInputOut,
-    TOutputIn,
-    TOutputOut,
-    TCaller
-  >;
-}
-
-/**
- * `.permission()` reads its scope id from the validated input, so an input
- * must be declared first — `UnsetMarker` is tRPC's "no .input() yet".
- */
-type ValidateDeclaredPermission<P extends AuthzPermission, I> = UnsetMarker extends I
-  ? DeclarationError<"declare .input() before .permission() — the check reads its scope id from the validated input">
-  : ValidatePermissionForInput<P, I>;
-
-type PermissionAnyArgs<
-  Ps extends readonly [AuthzPermission, ...AuthzPermission[]],
-  I,
-> = UnsetMarker extends I
-  ? [
-      AuthzPermission &
-        DeclarationError<"declare .input() before .permissionAny() — the check reads its projectId from the validated input">,
-    ]
-  : I extends { projectId: string }
-    ? {
-        [K in keyof Ps]: Ps[K] & ValidatePermissionForInput<Ps[K] & AuthzPermission, I>;
-      }
-    : [
-        AuthzPermission &
-          DeclarationError<".permissionAny() checks at the project scope and needs a required 'projectId' in the input">,
-      ];
-
-type DeclaredNoPermissionOptions<I> = UnsetMarker extends I
-  ? { reason: string; allow?: undefined }
-  : NoPermissionOptions<I>;
-
-/**
- * The `.use()` surface every tRPC procedure builder shares. Named at the one
- * seam that applies process middlewares to a builder whose generics belong to
- * the caller, so nothing below needs `any`.
- */
-type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
-
-/** Installing a check requires the declaration brand; only `declareAuthzMiddleware` produces it */
-type InstallableCheck = DeclaredAuthzMiddleware<(params: never) => Promise<unknown>>;
-
-/**
- * `TCheckContext` is the request context a hand-written custom check
- * receives through `.use()` — the process's, named once here, so this
- * package never has to know what else rides on that context.
- */
-export function createPermissionProcedureBuilder<TCheckContext, TDeclaredContext>(
-  middlewares: TrpcPolicyChainMiddlewares,
-  checks: TrpcDeclaredAuthzMiddlewares<TDeclaredContext>,
-) {
-  const permissionProcedureBuilder = <
-    TContext,
-    TMeta,
-    TContextOverrides,
-    TInputIn,
-    TInputOut,
-    TOutputIn,
-    TOutputOut,
-    TCaller extends boolean,
-  >(
-    procedure: ProcedureBuilder<
-      TContext,
-      TMeta,
-      TContextOverrides,
-      TInputIn,
-      TInputOut,
-      TOutputIn,
-      TOutputOut,
-      TCaller
-    >,
-  ): PendingPermissionProcedureBuilder<
-    TCheckContext,
-    TContext,
-    TMeta,
-    TContextOverrides,
-    TInputIn,
-    TInputOut,
-    TOutputIn,
-    TOutputOut,
-    TCaller
-  > => {
-    /** The builder this call returns, named once at the tRPC type boundary. */
-    type Pending = PendingPermissionProcedureBuilder<
-      TCheckContext,
-      TContext,
-      TMeta,
-      TContextOverrides,
-      TInputIn,
-      TInputOut,
-      TOutputIn,
-      TOutputOut,
-      TCaller
-    >;
-
-    /** What every declaring method answers: the plain tRPC builder again. */
-    type Declared = ProcedureBuilder<
-      TContext,
-      TMeta,
-      TContextOverrides,
-      TInputIn,
-      TInputOut,
-      TOutputIn,
-      TOutputOut,
-      TCaller
-    >;
-
-    /**
-     * The one chain every entry point builds. Order is behaviour: the check
-     * must sit inside the error/tracing middlewares and before `enforceCheck`,
-     * which proves a check ran at all.
-     */
-    const withPermissionCheck = (check: InstallableCheck): Declared =>
-      (procedure as unknown as ChainableProcedure)
-        .use(middlewares.tracer)
-        .use(middlewares.logger)
-        .use(middlewares.handledError)
-        // Ahead of the check on purpose: a request mixing scope ids across
-        // organizations is refused before ANY declaration kind — declared,
-        // custom, or opted-out — can pass on one id while the handler acts on
-        // another. AuthZ owns the lineage decision; this is its tRPC adapter.
-        .use(middlewares.scopeLineageGuard(findAuthzDeclaration(check)))
-        .use(check)
-        .use(middlewares.enforceCheck)
-        .use(middlewares.auditMutations) as unknown as Declared;
-
-    const builder = {
-      input(input: Parser) {
-        // tRPC types `.input()` as a conditional on the input already accumulated,
-        // which never resolves for a forwarding procedure and lands on the
-        // framework's `TypeError<…>` branch. The cast is on the FORWARDING seam
-        // only — the parser reaching tRPC is the caller's own.
-        return permissionProcedureBuilder(
-          procedure.input(input as Parameters<typeof procedure.input>[0]),
-        );
-      },
-      use(middleware: DeclaredAuthzMiddleware<TrpcCheckMiddleware<TCheckContext, TInputOut>>) {
-        return withPermissionCheck(middleware);
-      },
-      permission(permission: AuthzPermission, options?: { via?: ScopeTierField }) {
-        return withPermissionCheck(checks.permission({ permission, via: options?.via }));
-      },
-      permissionAny(...permissions: [AuthzPermission, ...AuthzPermission[]]) {
-        return withPermissionCheck(checks.permissionAny(permissions));
-      },
-      noPermission(options: { reason: string; allow?: Record<string, string> }) {
-        return withPermissionCheck(checks.noPermission(options));
-      },
-      authorizeInService(options: { reason: string; permissions: readonly AuthzPermission[] }) {
-        return withPermissionCheck(checks.serviceAuthorized(options));
-      },
-    };
-
-    // tRPC v11 has no public extension point for a procedure builder's extra
-    // fluent methods. This is the sole audited structural boundary: every
-    // method above delegates to the same concrete builder and keeps its exact
-    // context, input, output, and caller generics.
-    return builder as Pending;
-  };
-
-  return permissionProcedureBuilder;
 }
 
 function middlewareList(value: unknown): readonly unknown[] {

@@ -3,6 +3,7 @@
  * Pins what the edit drawer sends: only changed text, the permission mode, and the bindings.
  */
 
+import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
@@ -146,7 +147,8 @@ describe("given a service key with all permissions", () => {
       await userEvent.setup().click(save());
       const sent = onSave.mock.calls[0]?.[0];
       expect(sent?.permissionMode).toBe("restricted");
-      expect(sent?.permissions?.length).toBeGreaterThan(0);
+      expect(sent?.permissions).toEqual(computePermissionsFromSelections(selections));
+      expect(sent?.permissions).toEqual(expect.arrayContaining(["sso:view", "sso:manage"]));
       expect(sent?.bindings).toEqual([{ role: "CUSTOM", scopeType: "PROJECT", scopeId: "proj-1" }]);
       expect(selections).toMatchInlineSnapshot(`
         {
@@ -168,6 +170,7 @@ describe("given a service key with all permissions", () => {
           "prompts": "write",
           "scenarios": "write",
           "secrets": "write",
+          "sso": "write",
           "team": "write",
           "traces": "write",
           "triggers": "write",

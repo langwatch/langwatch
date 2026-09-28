@@ -8,8 +8,8 @@ ordered build-speed levers. Nothing in Part II has landed; §10.2 is a patch to
 a file that was dirty in the shared checkout and is carried in
 `.claude/handoffs/ts-modernization.md` instead.
 
-Read Part I for *what moves* (manifests, the kill list). Read Part II for *what
-the configs and the builds should look like when it has moved*.
+Read Part I for _what moves_ (manifests, the kill list). Read Part II for _what
+the configs and the builds should look like when it has moved_.
 
 Part I's pilot: proven on a substitute subgraph (the requested
 `ksuid`/`handled-error` pair was dirty in the shared checkout at pilot time —
@@ -56,7 +56,7 @@ a Vitest typecheck — reads) points at a `dist/*.d.ts` that:
 - is `.gitignore`d, so a fresh clone has none until something builds it;
 - for the ~200 non-published packages, is written by nothing except each
   package's own `tsc -b tsconfig.build.json` — a step nothing outside
-  `pnpm build:types`/`pnpm typecheck` (which build it as a *dependency* of the
+  `pnpm build:types`/`pnpm typecheck` (which build it as a _dependency_ of the
   requesting project, not standing infrastructure) ever runs on its own.
 
 The fix: flip `types` (top-level and every `exports` condition) to the same
@@ -77,7 +77,7 @@ rebuilds a referenced project's declarations from source when its output is
 missing or stale, exactly as it does today. No TS 7.0.2-specific surprise was
 found for a composite project whose manifest points `types` at source.
 
-What *did* change, and is the actual payoff: a bare, editor-shaped check —
+What _did_ change, and is the actual payoff: a bare, editor-shaped check —
 `pnpm exec tsc --noEmit --ignoreConfig <file that imports the flipped
 package>` — resolved the import straight into the package's `.ts`/`.tsx`
 source (confirmed by seeing the source file's own internal errors under a
@@ -88,29 +88,30 @@ to read, on a clean clone) the prebuilt declaration.
 ## 3. Pilot subgraph (substituted — see why)
 
 The manifest's suggested pilot (`@langwatch/ksuid` or `@langwatch/handled-error`
-+ one consumer + one web package) was dirty in this shared checkout at pilot
-time (`packages/ksuid`, `packages/handled-error`, `packages/eventing`,
-`modules/user/browser/tsconfig.json`, and — not incidentally — `dev/scripts/ensure-built.mjs`
-and `packages/architecture-enforcer/src/workspace/tsconfig-references.ts`
-themselves were all mid-edit by another session). Per the shared-checkout rule,
-none of those were touched. A clean, equally representative substitute was used
-instead:
 
-| Role | Package | Why |
-|---|---|---|
-| Internal package, plain `.ts`, multiple subpath exports | `@langwatch/config` | Clean; `private: true`; 4 export subpaths, exactly the shape ksuid/handled-error have |
-| Consumer (typecheck only, no edit) | `@langwatch/ui-kernel` | Clean; depends on `@langwatch/config` |
+- one consumer + one web package) was dirty in this shared checkout at pilot
+  time (`packages/ksuid`, `packages/handled-error`, `packages/eventing`,
+  `modules/user/browser/tsconfig.json`, and — not incidentally — `dev/scripts/ensure-built.mjs`
+  and `packages/architecture-enforcer/src/workspace/tsconfig-references.ts`
+  themselves were all mid-edit by another session). Per the shared-checkout rule,
+  none of those were touched. A clean, equally representative substitute was used
+  instead:
+
+| Role                                                                                                   | Package                        | Why                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Internal package, plain `.ts`, multiple subpath exports                                                | `@langwatch/config`            | Clean; `private: true`; 4 export subpaths, exactly the shape ksuid/handled-error have                                          |
+| Consumer (typecheck only, no edit)                                                                     | `@langwatch/ui-kernel`         | Clean; depends on `@langwatch/config`                                                                                          |
 | Internal package, jsx, one subpath, **already carrying the `langwatch-declaration-source` workaround** | `@langwatch/authz-browser-kit` | Clean; its `./scope-picker` export already has the custom condition this plan expects to retire — a direct test of that theory |
-| Consumer (typecheck + test, no edit) | `@langwatch/api-key-browser` | Clean config files; imports `@langwatch/authz-browser-kit/scope-picker` |
+| Consumer (typecheck + test, no edit)                                                                   | `@langwatch/api-key-browser`   | Clean config files; imports `@langwatch/authz-browser-kit/scope-picker`                                                        |
 
 ### What was proven
 
 - `pnpm --filter @langwatch/config typecheck` and `@langwatch/ui-kernel
-  typecheck`: green before and after the flip, warm ~1-2s each (no measurable
+typecheck`: green before and after the flip, warm ~1-2s each (no measurable
   regression; these are `tsc -b` incremental builds, dominated by the
   `tsbuildinfo` cache, not by the manifest).
 - `pnpm --filter @langwatch/authz-browser-kit typecheck` and `@langwatch/api-key-browser
-  typecheck`: green before and after, in both the original state and the
+typecheck`: green before and after, in both the original state and the
   flipped state (`types`→src, `langwatch-declaration-source` condition
   removed).
 - `pnpm --filter @langwatch/authz-browser-kit test` (41 tests) and
@@ -171,18 +172,18 @@ live tree actually has is described below.
 
 ### `dev/scripts/ensure-built.mjs` — kill, with these exact call sites
 
-| File | Line(s) |
-|---|---|
-| `package.json` (root) | `"ensure:built": "node dev/scripts/ensure-built.mjs"` |
-| `apps/api/package.json` | `predev`, `pretest`, `pretest:unit` |
-| `apps/worker/package.json` | `predev`, `prebuild` (with `@langwatch/mail` arg), `pretest`, `pretest:unit`, `pretest:integration` |
-| `apps/ui/package.json` | `predev` |
-| `.github/workflows/langwatch-chart.yml:248` | `pnpm start:prepare:files && pnpm ensure:built` |
-| `.github/workflows/e2e-ci.yml:270` | same |
-| `.github/workflows/sdk-javascript-ci.yml:291` | same |
-| `.github/actions/prepare-generated-files/action.yml:72` | same, plus an explanatory comment at line 8 |
-| `apps/server/src/services/node-deps.ts:128-131` | names `"ensure:built"` as one of the scripts a workspace closure runs |
-| `apps/server/test/workspace-invariants.test.ts:422,443` | asserts the script exists and its command matches |
+| File                                                    | Line(s)                                                                                             |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `package.json` (root)                                   | `"ensure:built": "node dev/scripts/ensure-built.mjs"`                                               |
+| `apps/api/package.json`                                 | `predev`, `pretest`, `pretest:unit`                                                                 |
+| `apps/worker/package.json`                              | `predev`, `prebuild` (with `@langwatch/mail` arg), `pretest`, `pretest:unit`, `pretest:integration` |
+| `apps/ui/package.json`                                  | `predev`                                                                                            |
+| `.github/workflows/langwatch-chart.yml:248`             | `pnpm start:prepare:files && pnpm ensure:built`                                                     |
+| `.github/workflows/e2e-ci.yml:270`                      | same                                                                                                |
+| `.github/workflows/sdk-javascript-ci.yml:291`           | same                                                                                                |
+| `.github/actions/prepare-generated-files/action.yml:72` | same, plus an explanatory comment at line 8                                                         |
+| `apps/server/src/services/node-deps.ts:128-131`         | names `"ensure:built"` as one of the scripts a workspace closure runs                               |
+| `apps/server/test/workspace-invariants.test.ts:422,443` | asserts the script exists and its command matches                                                   |
 
 Its own header names exactly 4 targets: `langwatch` (sdks/typescript),
 `@langwatch/mcp-server`, `@langwatch/ksuid`, `@langwatch/mail`. Once
@@ -197,15 +198,15 @@ mail-only freshness check is strictly narrower.
 
 ### Declaration-group / `langwatch-declaration-source` machinery — inventory, do not delete without deciding §6
 
-| Artifact | Path | What it is |
-|---|---|---|
-| Generated group solution | `dev/tsconfig.web-declarations.json` | One merged composite project over ~15 named web packages (`langwatchDeclarationGroup.members` — agent, scenario, coding-agent, annotation, trace, langy, project, onboarding, prompt, model-provider, workflow, dataset, experiment, evaluator, analytics), `customConditions: ["langwatch-declaration-source"]` |
-| Generator support | `packages/architecture-enforcer/src/workspace/tsconfig-references.ts` | `GROUP_SOLUTION` const, `groupMemberDirectories()`, every `isGroupMember` branch (≈8 sites) |
-| Lint policy | `packages/architecture-enforcer/src/policies/quality/declaration-project-references.ts` | Reads `langwatchDeclarationGroup`, walks the declaration-producer graph including grouped packages |
-| Tests | `packages/architecture-enforcer/tests/tsconfig-references.unit.test.ts`, `packages/architecture-enforcer/tests/declaration-project-references.test.ts` | Exercise the group solution and the policy above |
-| Manifest condition | `langwatch-declaration-source` in **36** `package.json` files (`grep -rl` count on this branch) | Per-subpath override so the group's merged compile reads live source instead of a sibling's possibly-stale `dist` |
-| Doc | `dev/docs/best_practices/typescript.md:40-78` | Names and explains all of the above; needs a rewrite alongside whichever way §6 resolves |
-| Fallback readers (harmless either way) | `dev/scripts/generate-modules.mjs:26`, `packages/oxlint-rules/src/rules/design-system-export-collision.rule.mjs:34` | Both already do `descriptor?.["langwatch-declaration-source"] ?? descriptor?.default` — removing the condition falls through to `default` cleanly, no rule change needed |
+| Artifact                               | Path                                                                                                                                                   | What it is                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Generated group solution               | `dev/tsconfig.web-declarations.json`                                                                                                                   | One merged composite project over ~15 named web packages (`langwatchDeclarationGroup.members` — agent, scenario, coding-agent, annotation, trace, langy, project, onboarding, prompt, model-provider, workflow, dataset, experiment, evaluator, analytics), `customConditions: ["langwatch-declaration-source"]` |
+| Generator support                      | `packages/architecture-enforcer/src/workspace/tsconfig-references.ts`                                                                                  | `GROUP_SOLUTION` const, `groupMemberDirectories()`, every `isGroupMember` branch (≈8 sites)                                                                                                                                                                                                                      |
+| Lint policy                            | `packages/architecture-enforcer/src/policies/quality/declaration-project-references.ts`                                                                | Reads `langwatchDeclarationGroup`, walks the declaration-producer graph including grouped packages                                                                                                                                                                                                               |
+| Tests                                  | `packages/architecture-enforcer/tests/tsconfig-references.unit.test.ts`, `packages/architecture-enforcer/tests/declaration-project-references.test.ts` | Exercise the group solution and the policy above                                                                                                                                                                                                                                                                 |
+| Manifest condition                     | `langwatch-declaration-source` in **36** `package.json` files (`grep -rl` count on this branch)                                                        | Per-subpath override so the group's merged compile reads live source instead of a sibling's possibly-stale `dist`                                                                                                                                                                                                |
+| Doc                                    | `dev/docs/best_practices/typescript.md:40-78`                                                                                                          | Names and explains all of the above; needs a rewrite alongside whichever way §6 resolves                                                                                                                                                                                                                         |
+| Fallback readers (harmless either way) | `dev/scripts/generate-modules.mjs:26`, `packages/oxlint-rules/src/rules/design-system-export-collision.rule.mjs:34`                                    | Both already do `descriptor?.["langwatch-declaration-source"] ?? descriptor?.default` — removing the condition falls through to `default` cleanly, no rule change needed                                                                                                                                         |
 
 **The pilot proved removing the condition on one non-member dependency
 (`authz-web-kit`) is safe in isolation** (§4 — the TS6305 error it looked like
@@ -218,16 +219,16 @@ Every `package.json` `build` script on the workspace (checked to depth 4,
 covering `packages/*`, `modules/*/*`, `enterprise/modules/*/*`, `apps/*`,
 `sdks/*`, `mcp/*`):
 
-| Package | Script | Real artifact? |
-|---|---|---|
-| `packages/mail` | `tsc -p tsconfig.build.json` | Yes — Node loads the emitted `dist/*.js`; `.tsx` isn't loadable as-is |
-| `packages/ksuid` | `tsup && tsc -p tsconfig.publish.json` | Yes — npm publish |
-| `sdks/typescript` | `rm -rf dist && tsup` | Yes — npm publish (`langwatch`) |
-| `mcp/typescript` | `tsup && node build.js` | Yes — npm publish |
-| `apps/ui` | `vite build` | Yes — the deployed SPA |
-| `apps/server` | `node --experimental-transform-types scripts/build.ts` | Yes — the `npx @langwatch/server` CLI |
-| `apps/worker` | `node scripts/build-server.mjs` | Yes — the worker bundle |
-| `services/langyworker` | (bun compile, `build:binary`) | Yes — the sandboxed-tier binary |
+| Package                | Script                                                 | Real artifact?                                                        |
+| ---------------------- | ------------------------------------------------------ | --------------------------------------------------------------------- |
+| `packages/mail`        | `tsc -p tsconfig.build.json`                           | Yes — Node loads the emitted `dist/*.js`; `.tsx` isn't loadable as-is |
+| `packages/ksuid`       | `tsup && tsc -p tsconfig.publish.json`                 | Yes — npm publish                                                     |
+| `sdks/typescript`      | `rm -rf dist && tsup`                                  | Yes — npm publish (`langwatch`)                                       |
+| `mcp/typescript`       | `tsup && node build.js`                                | Yes — npm publish                                                     |
+| `apps/ui`              | `vite build`                                           | Yes — the deployed SPA                                                |
+| `apps/server`          | `node --experimental-transform-types scripts/build.ts` | Yes — the `npx @langwatch/server` CLI                                 |
+| `apps/worker`          | `node scripts/build-server.mjs`                        | Yes — the worker bundle                                               |
+| `services/langyworker` | (bun compile, `build:binary`)                          | Yes — the sandboxed-tier binary                                       |
 
 No `modules/*` or `enterprise/modules/*` package carries its own `build`
 script at all (all 0 hits) — confirming the ~7-artifact target is already the
@@ -245,9 +246,9 @@ do, are folded into one shared composite project" (`typescript.md:44-46`) — a
 constraint about the **shape of the dependency graph** among those ~15 web
 packages, independent of whether any package's manifest points `types` at
 `src` or `dist`. Flipping every manifest to source-first makes the
-`langwatch-declaration-source` *condition* redundant (it and `default` become
+`langwatch-declaration-source` _condition_ redundant (it and `default` become
 the same target everywhere), but it does **not** obviously remove the need for
-the *merged composite project* itself, if those packages still cyclically
+the _merged composite project_ itself, if those packages still cyclically
 import each other's types.
 
 Two live possibilities, and the codemod lane (or the coordinator) should pick,
@@ -258,7 +259,7 @@ not guess:
    drop the condition from all 36 manifests), and the group is not on the kill
    list after all.
 2. The "cycle" was itself a symptom of the same dist-first split (e.g. two
-   packages each importing the other's *type-only* re-export because neither
+   packages each importing the other's _type-only_ re-export because neither
    trusted the other's manifest to resolve to fresh source) → re-derive the
    actual dependency edges after the flip and the group may shrink or
    disappear on its own.
@@ -282,7 +283,7 @@ group only for cycles that measurably survive the kits.
 
 A generator that wrote each package's whole tsconfig family from package facts
 was designed here and **cancelled before implementation**. The user's ruling:
-configs are *dead simple and static* — a human reads and edits the file in
+configs are _dead simple and static_ — a human reads and edits the file in
 front of them, and it is short because the base carries everything shared, not
 because a script rewrites it. A generated config is a file nobody can reason
 about at the point of failure, and it makes every local exception an argument
@@ -340,11 +341,11 @@ patch carried in `.claude/handoffs/ts-modernization.md`.
 
 ## 9. Measured baseline
 
-| Measurement | Wall | CPU | Command |
-|---|---|---|---|
-| `pnpm typecheck`, tree as found (partially stale) | **56.6s** | 144s user, 267% cpu | `time pnpm run typecheck` |
-| `pnpm typecheck`, immediately re-run (warm) | **12.2s** | 40s user, 368% cpu | same, second run |
-| `pnpm build:types`, nothing to do | **0.59s** | 0.70s user | `time pnpm run build:types` |
+| Measurement                                       | Wall      | CPU                 | Command                     |
+| ------------------------------------------------- | --------- | ------------------- | --------------------------- |
+| `pnpm typecheck`, tree as found (partially stale) | **56.6s** | 144s user, 267% cpu | `time pnpm run typecheck`   |
+| `pnpm typecheck`, immediately re-run (warm)       | **12.2s** | 40s user, 368% cpu  | same, second run            |
+| `pnpm build:types`, nothing to do                 | **0.59s** | 0.70s user          | `time pnpm run build:types` |
 
 Three things that table says out loud:
 
@@ -383,21 +384,21 @@ manifests. Counting how many of them state each option is the whole audit,
 because an option restated identically in 170+ files is a base option that
 never got promoted:
 
-| Option | Files stating it | Values seen | Reading |
-|---|---|---|---|
-| `tsBuildInfoFile` | 403 | all under `dist/` | correct and must stay local |
-| `rootDir` / `outDir` | 377 / 376 | `.`/`src` and `dist` | local, but mechanical |
-| `verbatimModuleSyntax` | 178 | `true` ×178, `false` ×0 | **unanimous — belongs in the base** |
-| `noUncheckedIndexedAccess` | 176 | `true` ×176, `false` ×0 | **unanimous — belongs in the base** |
-| `rewriteRelativeImportExtensions` | 190 | `false` ×188, `true` ×2 | base states the minority value |
-| `noEmitOnError` / `composite` | 174 / 174 | `true` | build-config facts, stay local |
-| `declaration` / `declarationMap` / `emitDeclarationOnly` | 193 / 180 | `true` | build-config facts — and mostly deletable, §12 |
-| `noEmit` | 381 | `true` ×203, `false` ×178 | `true` is already in the base: 203 restatements are dead |
-| `target` | 23 | `es2023` ×13 (= base), `ES2022` ×8, `es2017` ×1 | 13 dead restatements, 9 real exceptions |
-| `lib` | 193 | mostly `["es2023","dom","dom.iterable"]` | genuinely local (browser vs node) |
-| `jsx` | 60 | `react-jsx` ×58, `preserve` ×2 | genuinely local |
-| `module` / `moduleResolution` | 25 / 12 | see §10.4 | genuinely local, and mostly wrong |
-| `strict`, `skipLibCheck`, `incremental`, `forceConsistentCasingInFileNames` | 10 / 9 / 9 / 7 | `true` | already in the base: all dead restatements |
+| Option                                                                      | Files stating it | Values seen                                     | Reading                                                  |
+| --------------------------------------------------------------------------- | ---------------- | ----------------------------------------------- | -------------------------------------------------------- |
+| `tsBuildInfoFile`                                                           | 403              | all under `dist/`                               | correct and must stay local                              |
+| `rootDir` / `outDir`                                                        | 377 / 376        | `.`/`src` and `dist`                            | local, but mechanical                                    |
+| `verbatimModuleSyntax`                                                      | 178              | `true` ×178, `false` ×0                         | **unanimous — belongs in the base**                      |
+| `noUncheckedIndexedAccess`                                                  | 176              | `true` ×176, `false` ×0                         | **unanimous — belongs in the base**                      |
+| `rewriteRelativeImportExtensions`                                           | 190              | `false` ×188, `true` ×2                         | base states the minority value                           |
+| `noEmitOnError` / `composite`                                               | 174 / 174        | `true`                                          | build-config facts, stay local                           |
+| `declaration` / `declarationMap` / `emitDeclarationOnly`                    | 193 / 180        | `true`                                          | build-config facts — and mostly deletable, §12           |
+| `noEmit`                                                                    | 381              | `true` ×203, `false` ×178                       | `true` is already in the base: 203 restatements are dead |
+| `target`                                                                    | 23               | `es2023` ×13 (= base), `ES2022` ×8, `es2017` ×1 | 13 dead restatements, 9 real exceptions                  |
+| `lib`                                                                       | 193              | mostly `["es2023","dom","dom.iterable"]`        | genuinely local (browser vs node)                        |
+| `jsx`                                                                       | 60               | `react-jsx` ×58, `preserve` ×2                  | genuinely local                                          |
+| `module` / `moduleResolution`                                               | 25 / 12          | see §10.4                                       | genuinely local, and mostly wrong                        |
+| `strict`, `skipLibCheck`, `incremental`, `forceConsistentCasingInFileNames` | 10 / 9 / 9 / 7   | `true`                                          | already in the base: all dead restatements               |
 
 Reproduce any row with:
 
@@ -420,11 +421,11 @@ running that package's own project with the flag forced:
 pnpm exec tsc -p <pkg>/tsconfig.json --<flag> --tsBuildInfoFile /tmp/probe.tsbuildinfo
 ```
 
-| Flag | Packages probed | New errors |
-|---|---|---|
-| `verbatimModuleSyntax` | config, observability, apps/server, scenario/server, sdks/typescript | **1, 0, 0, 1, 0** (`TS1484`) |
-| `noUncheckedIndexedAccess` | observability, apps/server, secrets, monitor/server | **0, 0, 0, 0** |
-| `isolatedModules` | config, annotation/server, design-system | **0, 0, 0** (`TS1205`) |
+| Flag                       | Packages probed                                                      | New errors                   |
+| -------------------------- | -------------------------------------------------------------------- | ---------------------------- |
+| `verbatimModuleSyntax`     | config, observability, apps/server, scenario/server, sdks/typescript | **1, 0, 0, 1, 0** (`TS1484`) |
+| `noUncheckedIndexedAccess` | observability, apps/server, secrets, monitor/server                  | **0, 0, 0, 0**               |
+| `isolatedModules`          | config, annotation/server, design-system                             | **0, 0, 0** (`TS1205`)       |
 
 Plus two static confirmations: `git grep -cE '^[[:space:]]*(export|import)[[:space:]]+[A-Za-z_$]+[[:space:]]*=[[:space:]]*require\('`
 and `git grep -c '^export = '` are both **0**, so `verbatimModuleSyntax` has no
@@ -453,12 +454,12 @@ assumption deserved a number rather than an assurance
 (`tsc -p <pkg>/tsconfig.json [--flags] --extendedDiagnostics`, on packages that
 state none of the three today):
 
-| Package | | Types | Instantiations | Memory | Total |
-|---|---|---|---|---|---|
-| `packages/observability` | base | 20,362 | 47,246 | 119,218K | 0.163s |
-| | +3 flags | 20,387 | 47,274 | 119,108K | 0.169s |
-| `modules/monitor/process` | base | 168,225 | 629,812 | 720,491K | 2.267s |
-| | +3 flags | 168,241 | 629,812 | 717,992K | 2.464s |
+| Package                   |          | Types   | Instantiations | Memory   | Total  |
+| ------------------------- | -------- | ------- | -------------- | -------- | ------ |
+| `packages/observability`  | base     | 20,362  | 47,246         | 119,218K | 0.163s |
+|                           | +3 flags | 20,387  | 47,274         | 119,108K | 0.169s |
+| `modules/monitor/process` | base     | 168,225 | 629,812        | 720,491K | 2.267s |
+|                           | +3 flags | 168,241 | 629,812        | 717,992K | 2.464s |
 
 Types move by 0.01-0.12%, instantiations on the larger package do not move at
 all, and **memory goes down slightly in both**. The apparent 8% on
@@ -520,11 +521,11 @@ liability worth auditing after wave one.
 The base is `module: preserve` + `moduleResolution: bundler`. Three classes,
 one recommendation:
 
-| Class | Who | What loads it | Verdict |
-|---|---|---|---|
-| Node-executed | `apps/api`, `apps/worker`, `apps/tasks`, `apps/server`, worker/tasks tooling | `node --experimental-transform-types src/*.entrypoint.ts`, with `"type": "module"` (213 of 215 manifests set it) | **keep `preserve`/`bundler`** |
-| Bundler-consumed | `apps/ui`, every `*-web`, `*-web-kit`, `packages/design-system` | vite / vitest / esbuild | **keep `preserve`/`bundler`** |
-| Published dual | `langwatch`, `@langwatch/ksuid`, `@langwatch/mcp-server` | tsup, then a stranger's resolver | **`nodenext` on the publish config only** (5 configs already state `node16`/`nodenext`) |
+| Class            | Who                                                                          | What loads it                                                                                                    | Verdict                                                                                 |
+| ---------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Node-executed    | `apps/api`, `apps/worker`, `apps/tasks`, `apps/server`, worker/tasks tooling | `node --experimental-transform-types src/*.entrypoint.ts`, with `"type": "module"` (213 of 215 manifests set it) | **keep `preserve`/`bundler`**                                                           |
+| Bundler-consumed | `apps/ui`, every `*-web`, `*-web-kit`, `packages/design-system`              | vite / vitest / esbuild                                                                                          | **keep `preserve`/`bundler`**                                                           |
+| Published dual   | `langwatch`, `@langwatch/ksuid`, `@langwatch/mcp-server`                     | tsup, then a stranger's resolver                                                                                 | **`nodenext` on the publish config only** (5 configs already state `node16`/`nodenext`) |
 
 The case for not churning the first class to `nodenext`: the repo already
 writes every relative import with its on-disk extension (§10.2), which is the
@@ -540,11 +541,11 @@ override should name its reason or go.
 
 ### 10.5 `erasableSyntaxOnly` — **not adoptable. Verdict: never.**
 
-| Construct | Count | Source |
-|---|---|---|
-| `enum` declarations | **13**, in 9 files | `git grep -nE '^[[:space:]]*(export[[:space:]]+)?(const[[:space:]]+)?enum[[:space:]]'` |
-| `namespace` declarations | **0** | same grep for `namespace` |
-| Parameter properties | **~1,848 files** (3,172 matching lines) | `git grep -A3 -nE 'constructor[[:space:]]*\('` filtered to `private|public|protected|readonly` parameters |
+| Construct                | Count                                   | Source                                                                                 |
+| ------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------- |
+| `enum` declarations      | **13**, in 9 files                      | `git grep -nE '^[[:space:]]*(export[[:space:]]+)?(const[[:space:]]+)?enum[[:space:]]'` |
+| `namespace` declarations | **0**                                   | same grep for `namespace`                                                              |
+| Parameter properties     | **~1,848 files** (3,172 matching lines) | `git grep -A3 -nE 'constructor[[:space:]]*\('` filtered to `private                    | public | protected | readonly` parameters |
 
 The enums are nine files away from gone and should go anyway (`as const` +
 a union is the house style already). Parameter properties are a different
@@ -561,19 +562,19 @@ answer is still no.
 Forced onto real build configs (`tsc -p <pkg>/tsconfig.build.json
 --isolatedDeclarations --outDir /tmp/...`):
 
-| Package | src files | Errors |
-|---|---|---|
-| `modules/trace/contract` | 118 | **1,855** |
-| `packages/design-system` | 139 | 238 |
-| `packages/eventing` | 255 | 126 |
-| `packages/config` | 30 | 123 |
-| `modules/annotation/process` | 43 | 54 |
-| `packages/ksuid` (published, tiny) | 16 | **4** |
+| Package                            | src files | Errors    |
+| ---------------------------------- | --------- | --------- |
+| `modules/trace/contract`           | 118       | **1,855** |
+| `packages/design-system`           | 139       | 238       |
+| `packages/eventing`                | 255       | 126       |
+| `packages/config`                  | 30        | 123       |
+| `modules/annotation/process`       | 43        | 54        |
+| `packages/ksuid` (published, tiny) | 16        | **4**     |
 
 The distribution in `trace/contract` is the whole story: `TS9013` 1,546,
 `TS9010` 275, `TS9039` 33. `TS9013` is "expression type cannot be inferred with
 isolatedDeclarations" — every `export const x = z.object({...})`. A contract
-package in this repo *is* a pile of Zod schemas, and annotating them by hand
+package in this repo _is_ a pile of Zod schemas, and annotating them by hand
 means writing out inferred Zod generics that are precisely what nobody should
 hand-write. Extrapolating the measured rate across ~16,000 source files puts
 the annotation cost in the tens of thousands.
@@ -588,7 +589,7 @@ not.
 ### 10.7 `skipLibCheck` and incremental hygiene
 
 `skipLibCheck: true` stays. The tradeoff is real and worth stating once: it
-suppresses errors *inside* `node_modules` `.d.ts` files, so a dependency
+suppresses errors _inside_ `node_modules` `.d.ts` files, so a dependency
 shipping broken types is discovered at use rather than at check. With
 `node_modules` holding hundreds of packages' declarations and the repo's own
 declarations about to stop being inputs at all (§12), turning it off buys
@@ -634,11 +635,11 @@ local; everything else comes from the base.
 
 ### 11.1 Which files exist
 
-| File | Who has it | Why |
-|---|---|---|
-| `tsconfig.json` | every package | the check root. `pnpm --filter <pkg> typecheck` is `tsc -b` against it |
-| `tsconfig.test.json` | only a package whose tests need types its source must not have (node types in a browser package, `vitest/globals`) — 15 today | widens the check root; `exclude: []`, extra `types` |
-| `tsconfig.build.json` | only a package that **emits an artifact** — after §12, that is `packages/mail`, `packages/ksuid` (publish), `sdks/typescript`, `mcp/typescript` | emit settings; nothing else needs one |
+| File                  | Who has it                                                                                                                                      | Why                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `tsconfig.json`       | every package                                                                                                                                   | the check root. `pnpm --filter <pkg> typecheck` is `tsc -b` against it |
+| `tsconfig.test.json`  | only a package whose tests need types its source must not have (node types in a browser package, `vitest/globals`) — 15 today                   | widens the check root; `exclude: []`, extra `types`                    |
+| `tsconfig.build.json` | only a package that **emits an artifact** — after §12, that is `packages/mail`, `packages/ksuid` (publish), `sdks/typescript`, `mcp/typescript` | emit settings; nothing else needs one                                  |
 
 That is the whole family. The 190 `tsconfig.build.json` files that exist today
 are declaration emitters for internal consumption, and §12 deletes them along
@@ -654,10 +655,10 @@ A plain node/contract package — four lines of options, all of them local facts
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals"],
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../plans/tsconfig.json" }]
+  "references": [{ "path": "../plans/tsconfig.json" }],
 }
 ```
 
@@ -727,10 +728,10 @@ have. It is a widening, never a second world:
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
-    "types": ["vitest/globals", "node"]
+    "types": ["vitest/globals", "node"],
   },
   "exclude": [],
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
 }
 ```
 
@@ -741,12 +742,12 @@ need nothing extra does not get one, and its `tsconfig.json` includes the tests.
 
 ### 12.1 Where dependency-ordered build chains exist today
 
-| Chain | Where | What it forces |
-|---|---|---|
-| `pnpm run build` = `build:types && pnpm -r --filter "!@langwatch/server" build` | root `package.json` | 45 contract declaration projects compile in dependency order **before any artifact starts**; then `pnpm -r` walks the artifact packages topologically |
-| `ensure-built.mjs` | `apps/api` (`predev`, `pretest`, `pretest:unit`), `apps/worker` (`predev`, `prebuild`, 3 × `pretest*`), `apps/ui` (`predev`), 4 CI workflows/actions, `apps/server/src/services/node-deps.ts`, its invariant test | every dev boot and every test run pays a cross-package freshness check |
-| `prepublish` / `prepublishOnly` | `sdks/typescript`, `mcp/typescript`, `packages/ksuid` | fine — these are the real tarballs |
-| `prebuild`/`pretest` = `pnpm run generate` | `sdks/typescript` | codegen, not a build chain; keep |
+| Chain                                                                           | Where                                                                                                                                                                                                             | What it forces                                                                                                                                        |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm run build` = `build:types && pnpm -r --filter "!@langwatch/server" build` | root `package.json`                                                                                                                                                                                               | 45 contract declaration projects compile in dependency order **before any artifact starts**; then `pnpm -r` walks the artifact packages topologically |
+| `ensure-built.mjs`                                                              | `apps/api` (`predev`, `pretest`, `pretest:unit`), `apps/worker` (`predev`, `prebuild`, 3 × `pretest*`), `apps/ui` (`predev`), 4 CI workflows/actions, `apps/server/src/services/node-deps.ts`, its invariant test | every dev boot and every test run pays a cross-package freshness check                                                                                |
+| `prepublish` / `prepublishOnly`                                                 | `sdks/typescript`, `mcp/typescript`, `packages/ksuid`                                                                                                                                                             | fine — these are the real tarballs                                                                                                                    |
+| `prebuild`/`pretest` = `pnpm run generate`                                      | `sdks/typescript`                                                                                                                                                                                                 | codegen, not a build chain; keep                                                                                                                      |
 
 Nothing else cascades: no `modules/*` or `enterprise/modules/*` package has a
 `build` script at all (Part I §5), and `apps/worker`'s esbuild bundler already
@@ -757,16 +758,16 @@ otherwise.
 
 ### 12.2 What each artifact actually needs
 
-| Artifact | Command | Needs another package built first? |
-|---|---|---|
-| `apps/ui` SPA | `vite build` | **no** — vite reads workspace TS source |
-| `apps/worker` bundle | `node scripts/build-server.mjs` (esbuild) | **no** — inlines workspace source; only `@langwatch/mail`'s JS is a real prerequisite |
-| `apps/server` CLI | `node --experimental-transform-types scripts/build.ts` | no |
-| `langwatch` (SDK) | `rm -rf dist && tsup` (`dts: true`) | **no** — tsup emits its own declarations from source |
-| `@langwatch/mcp-server` | `tsup && node build.js` (`dts: true`) | no |
-| `@langwatch/ksuid` | `tsup && tsc -p tsconfig.publish.json` | no |
-| `@langwatch/mail` | `tsc -p tsconfig.build.json` | no — and it is the one thing others need |
-| `services/langyworker` binary | `bun run scripts/build-binary.ts` | no |
+| Artifact                      | Command                                                | Needs another package built first?                                                    |
+| ----------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `apps/ui` SPA                 | `vite build`                                           | **no** — vite reads workspace TS source                                               |
+| `apps/worker` bundle          | `node scripts/build-server.mjs` (esbuild)              | **no** — inlines workspace source; only `@langwatch/mail`'s JS is a real prerequisite |
+| `apps/server` CLI             | `node --experimental-transform-types scripts/build.ts` | no                                                                                    |
+| `langwatch` (SDK)             | `rm -rf dist && tsup` (`dts: true`)                    | **no** — tsup emits its own declarations from source                                  |
+| `@langwatch/mcp-server`       | `tsup && node build.js` (`dts: true`)                  | no                                                                                    |
+| `@langwatch/ksuid`            | `tsup && tsc -p tsconfig.publish.json`                 | no                                                                                    |
+| `@langwatch/mail`             | `tsc -p tsconfig.build.json`                           | no — and it is the one thing others need                                              |
+| `services/langyworker` binary | `bun run scripts/build-binary.ts`                      | no                                                                                    |
 
 So `pnpm build:types` is a prerequisite of **nothing**. It is a typecheck
 artifact that the root `build` script runs out of habit. Once internal packages
@@ -802,14 +803,14 @@ ten call sites replaced by nothing (`predev`, `pretest`) or by a direct
 
 ## 13. Build speed: the levers, in order
 
-| # | Lever | Expected win | Cost / risk |
-|---|---|---|---|
-| 1 | **Get the tree green.** A failing project writes no `.tsbuildinfo` and is re-checked whole every run, with everything downstream of it | the gap between the 56.6s and 12.2s runs above is mostly this | none technically; it is other lanes' in-flight work |
-| 2 | **Delete internal declaration emit** (§12): 190 build projects, the `build:types` step, the web-declarations group | takes `build:types` (14.5-18.9s cold) off every build path entirely and removes 190 projects from the graph | needs Part I's manifest flip first |
-| 3 | **Flatten the contract graph** (`dev/docs/plans/contract-graph-flattening.md`) | depth 16 → 13 so far, 49 edges left; the build's floor is ~17 sequential compiles, and only the graph shortens it | slow, per-edge, architectural |
-| 4 | **Dead config elimination** (§10.1) | ~530 restatement lines now, ~1,400 after lever 2; no measurable compile win, a large readability one | mechanical |
-| 5 | `--builders` tuning | **none** — measured 18.9s at 4 builders vs 14.5s at 32. A chain cannot be parallelised | — |
-| 6 | `isolatedDeclarations` | would have been lever 2's alternative; lever 2 deletes the work instead of parallelising it | rejected, §10.6 |
+| #   | Lever                                                                                                                                  | Expected win                                                                                                      | Cost / risk                                         |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 1   | **Get the tree green.** A failing project writes no `.tsbuildinfo` and is re-checked whole every run, with everything downstream of it | the gap between the 56.6s and 12.2s runs above is mostly this                                                     | none technically; it is other lanes' in-flight work |
+| 2   | **Delete internal declaration emit** (§12): 190 build projects, the `build:types` step, the web-declarations group                     | takes `build:types` (14.5-18.9s cold) off every build path entirely and removes 190 projects from the graph       | needs Part I's manifest flip first                  |
+| 3   | **Flatten the contract graph** (`dev/docs/plans/contract-graph-flattening.md`)                                                         | depth 16 → 13 so far, 49 edges left; the build's floor is ~17 sequential compiles, and only the graph shortens it | slow, per-edge, architectural                       |
+| 4   | **Dead config elimination** (§10.1)                                                                                                    | ~530 restatement lines now, ~1,400 after lever 2; no measurable compile win, a large readability one              | mechanical                                          |
+| 5   | `--builders` tuning                                                                                                                    | **none** — measured 18.9s at 4 builders vs 14.5s at 32. A chain cannot be parallelised                            | —                                                   |
+| 6   | `isolatedDeclarations`                                                                                                                 | would have been lever 2's alternative; lever 2 deletes the work instead of parallelising it                       | rejected, §10.6                                     |
 
 The order matters: 2 makes 6 pointless and makes 3 cheaper to measure.
 

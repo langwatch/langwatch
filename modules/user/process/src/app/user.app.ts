@@ -1,12 +1,14 @@
 /** The User application: one object behind every user door this product opens. */
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
   type CliBootstrapResult,
   type GovernanceBudgetOverviewForUser,
   GovernanceRestApi,
   type PersonalUsageRollup,
 } from "@langwatch/enterprise-governance-contract";
+import { GatewayApi } from "@langwatch/gateway-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   IdentityVerificationExpiredError,
@@ -14,6 +16,7 @@ import {
   routesToOrganizationConnection,
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import type { EmailDelivery } from "@langwatch/mail";
 import { createLogger } from "@langwatch/observability";
 import { OpsApi, type AdminIdentity } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -25,6 +28,7 @@ import type {
 } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
+import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
 import type {
   ChangeOwnPasswordInput,
@@ -146,9 +150,9 @@ interface UserAppDependencies {
 }
 
 /** `PASSKEYS_ENABLED` has one owner, `auth`, so this module asks that peer
- * rather than redeclaring it; `publicBaseUrl` is the process's own fact. */
+ * rather than redeclaring it; `publicBaseUrl` and `mail` are the process's own. */
 type UserMembers = MembersRead<readonly ["prisma", "redis"]> &
-  Readonly<{ publicBaseUrl: string | undefined }>;
+  Readonly<{ publicBaseUrl: string | undefined; mail: EmailDelivery }>;
 
 /** The two flagged facts above, resolved once and threaded where `config` used to travel. */
 export type UserFacts = Readonly<{ passkeysEnabled: boolean; baseUrl: string | null }>;
@@ -162,22 +166,28 @@ type UserSetup = FeatureSetup<
 
 export class UserApp implements UserApi {
   static readonly contract = UserApi;
-  /** `publicBaseUrl` is named raw: the process answers it, no store does. */
-  static readonly reads = [...reads("prisma", "redis"), "publicBaseUrl"] as const;
+  /** `publicBaseUrl` and `mail` are named raw: the process answers them, no store does. */
+  static readonly reads = [...reads("prisma", "redis"), "publicBaseUrl", "mail"] as const;
   static readonly dependencies: {
     auth: typeof AuthApi;
     authz: typeof AuthzApi;
+    enterpriseGateway: typeof EnterpriseGatewayApi;
+    gateway: typeof GatewayApi;
     governance: typeof GovernanceRestApi;
     organizations: typeof OrganizationApi;
     ops: typeof OpsApi;
     projects: typeof ProjectApi;
+    storedObjects: typeof StoredObjectApi;
   } = {
     auth: AuthApi,
     authz: AuthzApi,
+    enterpriseGateway: EnterpriseGatewayApi,
+    gateway: GatewayApi,
     governance: GovernanceRestApi,
     organizations: OrganizationApi,
     ops: OpsApi,
     projects: ProjectApi,
+    storedObjects: StoredObjectApi,
   };
 
   static create(setup: UserSetup): UserApp {
@@ -185,6 +195,14 @@ export class UserApp implements UserApi {
       prisma: setup.members.prisma,
       redis: setup.members.redis,
       organizations: setup.dependencies.organizations,
+      enterpriseGateway: setup.dependencies.enterpriseGateway,
+      gateway: setup.dependencies.gateway,
+      auth: setup.dependencies.auth,
+      projects: setup.dependencies.projects,
+      governance: setup.dependencies.governance,
+      mail: setup.members.mail,
+      publicBaseUrl: setup.members.publicBaseUrl,
+      storedObjects: setup.dependencies.storedObjects,
     });
 
     return UserApp.#build({
@@ -414,26 +432,35 @@ export class UserApp implements UserApi {
 
     // The mailbox proof is the authority to enrol a credential, spent before
     // anything is hashed or written and bound to this exact address.
-    const proofClaimed = await this.#peers.auth.claimSignUpAddressProof({
-      token: input.addressProof,
-      email,
-    });
-    if (!proofClaimed) throw new IdentityVerificationExpiredError();
+    const addressConfirmed = await this.#claimSignUpProof({ token: input.addressProof, email });
 
     // Case-insensitive on purpose: rows written before the lowercasing above
     // may carry capitals, and minting a case-twin beside one would leave two
     // accounts answering for one person.
     if (await this.#users.emailIsTaken({ email })) throw new EmailAlreadyRegisteredError();
 
-    const created = await this.#users.createConfirmedCredentialUser({
+    const account = {
       name: input.name,
       email,
       passwordHash: await this.#members.passwords.hash({ password: input.password }),
-    });
+    };
+    const created = addressConfirmed
+      ? await this.#users.createConfirmedCredentialUser(account)
+      : await this.#users.createCredentialUser(account);
 
     this.#members.analytics.trackServerEvent({ userId: created.id, event: "signed_up" });
 
     return created;
+  }
+
+  /**
+   * Spends the sign-up proof and answers whether it confirmed the address. An unconfirmed
+   * proof counts only while the installation cannot send email (ADR-117, revision 2026-09-25).
+   */
+  async #claimSignUpProof(proof: { token: string; email: string }): Promise<boolean> {
+    if (await this.#peers.auth.claimSignUpAddressProof(proof)) return true;
+    if (await this.#peers.auth.claimUnconfirmedSignUpAddressProof(proof)) return false;
+    throw new IdentityVerificationExpiredError();
   }
 
   /** Whether this account can sign in with a password at all. */
@@ -1059,26 +1086,23 @@ export class UserApp implements UserApi {
   }
 
   async #changeFederatedPassword(input: ChangeOwnPasswordInput): Promise<void> {
-    const account = await this.#members.federatedPasswords.findDatabaseAccount({
-      userId: input.userId,
-    });
-
-    if (!account) throw new UserFederatedPasswordAccountMissingError(input.userId);
-
     const profile = await this.#users.findById({ id: input.userId });
-
-    // Nothing the caller sent causes an account with no address, and nothing
-    // they can send avoids it, so it degrades to the generic failure.
-    if (!profile?.email) throw new Error("the authenticated account carries no email address");
-
-    const result = await this.#members.federatedPasswords.changePassword({
-      email: profile.email,
-      providerUserId: account.providerAccountId,
+    const result = await this.#peers.auth.changeFederatedPassword({
+      userId: input.userId,
+      email: profile?.email ?? null,
       currentPassword: input.currentPassword,
       newPassword: input.newPassword,
     });
 
     if (result.outcome === "changed") return;
+    if (result.outcome === "no_federated_account") {
+      throw new UserFederatedPasswordAccountMissingError(input.userId);
+    }
+    // Nothing the caller sent causes an account with no address, and nothing
+    // they can send avoids it, so it degrades to the generic failure.
+    if (result.outcome === "no_address_on_record") {
+      throw new Error("the authenticated account carries no email address");
+    }
     if (result.outcome === "wrong_password") throw new UserPasswordIncorrectError();
     // The provider's policy rejected the NEW password, and its wording is the
     // only thing that says what to fix.

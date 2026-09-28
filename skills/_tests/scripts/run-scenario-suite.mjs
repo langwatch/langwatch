@@ -75,7 +75,15 @@ console.log(
 
 const child = spawn(
   "pnpm",
-  ["vitest", "run", `--maxWorkers=${args.workers}`, ...scenarioFiles, ...args.passthrough],
+  [
+    "vitest",
+    "run",
+    "--config",
+    "vitest.scenario.config.ts",
+    `--maxWorkers=${args.workers}`,
+    ...scenarioFiles,
+    ...args.passthrough,
+  ],
   {
     cwd: skillsDir,
     env: { ...process.env, SCENARIO_BATCH_RUN_ID: batchRunId },

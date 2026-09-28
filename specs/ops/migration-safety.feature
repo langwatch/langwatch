@@ -126,3 +126,10 @@ Feature: Migration safety
   Scenario: Every baselined name still names a migration on disk
     When a baselined name matches no migration
     Then the baseline test fails and names the entry
+
+  @unit
+  Scenario: A migration merged in from main is skipped only while it matches main's bytes
+    Given a migration listed in the committed from-main list with its git blob sha
+    When the scanner runs
+    Then that migration is not read
+    And the test fails and names the entry if its migration.sql no longer hashes to that sha

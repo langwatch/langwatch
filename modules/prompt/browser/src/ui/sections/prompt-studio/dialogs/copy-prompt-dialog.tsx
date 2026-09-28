@@ -34,7 +34,7 @@ export const CopyPromptDialog = ({
   const projects = host.copyTargets().map((target) => ({
     value: target.id,
     label: target.teamName ? `${target.teamName} / ${target.name}` : target.name,
-    hasCreatePermission: true,
+    hasCreatePermission: target.canCreate,
   }));
 
   return (

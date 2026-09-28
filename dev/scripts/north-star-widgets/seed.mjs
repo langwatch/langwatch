@@ -37,8 +37,7 @@ function assertSecureEndpoint(raw) {
   }
   const loopback = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
   const httpsOrLoopbackHttp =
-    url.protocol === "https:" ||
-    (url.protocol === "http:" && loopback.has(url.hostname));
+    url.protocol === "https:" || (url.protocol === "http:" && loopback.has(url.hostname));
   if (!httpsOrLoopbackHttp) {
     console.error(
       `Refusing to send LW_API_KEY over ${url.protocol} to ${url.host}. Use https:// (http:// is allowed only for localhost).`,
@@ -75,9 +74,7 @@ async function listExistingNames() {
     redirect: "error",
   });
   if (!res.ok) {
-    throw new Error(
-      `Failed to list existing widgets: ${res.status} ${await res.text()}`,
-    );
+    throw new Error(`Failed to list existing widgets: ${res.status} ${await res.text()}`);
   }
   const body = await res.json();
   return new Set((body.data ?? []).map((w) => w.name));

@@ -44,7 +44,6 @@ class InstallStandIn implements UsageReportInstall {
         createdAt: "2026-08-01T00:00:00.000Z",
         optionalMetricsOptOut: false,
         hostnameOptOut: false,
-        startupNoticeAcknowledgedSchemaVersion: 0,
       };
     }
     return this.identity.instanceId;
@@ -64,13 +63,6 @@ class InstallStandIn implements UsageReportInstall {
   }): Promise<void> {
     await this.getInstanceId();
     if (this.identity) this.identity = { ...this.identity, ...input };
-  }
-
-  async acknowledgeStartupNotice({ schemaVersion }: { schemaVersion: number }): Promise<void> {
-    await this.getInstanceId();
-    if (this.identity) {
-      this.identity = { ...this.identity, startupNoticeAcknowledgedSchemaVersion: schemaVersion };
-    }
   }
 }
 
@@ -231,32 +223,6 @@ describe("the usage report preview", () => {
       expect(preview.payload.instance_id).toBe(INSTANCE_ID_NOT_MINTED);
       expect(preview.disabled).toBe(true);
       expect(preview.nextReportAt).toBeNull();
-      expect(install.minted).toBe(0);
-    });
-  });
-});
-
-describe("the startup notice", () => {
-  describe("given a fresh self-hosted install", () => {
-    it("is due without minting an identity, and stays dismissed once dismissed", async () => {
-      const reports = service();
-
-      expect((await reports.getStartupNotice()).show).toBe(true);
-      expect(install.minted).toBe(0);
-
-      expect(
-        await reports.dismissStartupNotice({ schemaVersion: USAGE_REPORT_SCHEMA_VERSION }),
-      ).toBe(true);
-      expect((await reports.getStartupNotice()).show).toBe(false);
-    });
-  });
-
-  describe("given LangWatch Cloud", () => {
-    it("is never due and records no dismissal", async () => {
-      const reports = service({ isSaas: true });
-
-      expect((await reports.getStartupNotice()).show).toBe(false);
-      expect(await reports.dismissStartupNotice({ schemaVersion: 3 })).toBe(false);
       expect(install.minted).toBe(0);
     });
   });

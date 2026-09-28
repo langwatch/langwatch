@@ -6,8 +6,8 @@
 // Usage: node dev/scripts/print-resolved-versions.mjs [path/to/pnpm-lock.yaml]
 
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lockfilePath = process.argv[2]

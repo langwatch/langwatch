@@ -13,24 +13,19 @@ Feature: Audit logging
   @unit
   Scenario: Legacy agent audit identifiers are repaired without guessing
     Given legacy create and copy audit entries omit generated identifiers
-    When the explicit repair executes through the system migration runner
+    When the backfill task runs
     Then candidates are scoped to the audit project's one-minute creation window
     And copied agents also match the recorded source agent
     And only a unique candidate is linked
-    And ambiguous projects remain held rather than finalized
+    And an ambiguous entry is skipped and counted
     And a repeated pass does not rewrite repaired entries
 
   @unit
   Scenario: The legacy audit repair is explicitly invoked
-    When the task runs without --execute
-    Then it reports potential repairs without writing data or migration checkpoints
-    And ordinary API and worker startup do not register this migration
-
-  Scenario: Project-rooted repair uses project checkpoints and organization enrollment
-    Given a cloud organization is enrolled in a project-rooted migration
-    When the runner processes a project in that organization
-    Then enrollment is checked against the organization identifier
-    And execution and persisted migration state use the project identifier
+    When the task runs with --dry-run
+    Then it reports potential repairs without writing data
+    And without --dry-run it writes, as main's script did
+    And ordinary API and worker startup do not run it
 
   @unit
   Scenario: Entity history stays inside the requested project and action family

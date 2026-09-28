@@ -39,5 +39,3 @@ export * from "./ui/elements/dialogs/suite-context-menu.tsx";
 
 export * from "./ui/elements/pickers/scenario-picker.tsx";
 export * from "./ui/elements/pickers/target-picker.tsx";
-
-export * from "./__tests__/test-helpers.ts";

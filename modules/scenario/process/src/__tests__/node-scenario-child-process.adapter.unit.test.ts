@@ -5,7 +5,10 @@
  */
 import { EventEmitter } from "events";
 
-import type { ChildProcessJobData } from "@langwatch/scenario-contract";
+import {
+  VOICE_NONCE_REGISTER_MESSAGE,
+  type ChildProcessJobData,
+} from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../services/child-process-spawn.service.ts", () => ({
@@ -18,21 +21,30 @@ vi.mock("../services/child-process-spawn.service.ts", () => ({
 
 const stdinWrite = vi.fn();
 const stdinEnd = vi.fn();
+const childSend = vi.fn();
+const spawned: EventEmitter[] = [];
 
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(() => {
-    return Object.assign(new EventEmitter(), {
+    const child = Object.assign(new EventEmitter(), {
       pid: 123,
       stdin: { write: stdinWrite, end: stdinEnd, on: vi.fn() },
       stdout: new EventEmitter(),
       stderr: new EventEmitter(),
       kill: vi.fn(),
+      send: childSend,
     });
+    spawned.push(child);
+    return child;
   }),
 }));
 
 import { ScenarioExecutionPoolService, type ScenarioExecutionRunner } from "../index.ts";
-import { NodeScenarioChildService } from "../services/node-scenario-child.service.ts";
+import { MemoryVoiceNonceRepository } from "../repositories/memory/memory.voice-nonce.repository.ts";
+import {
+  NodeScenarioChildService,
+  type ScenarioChildProcessConfig,
+} from "../services/node-scenario-child.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 import { VoiceNonceRegistryService } from "../services/voice-nonce-registry.service.ts";
 
@@ -70,10 +82,84 @@ const jobData: ChildProcessJobData = {
   parameters: {},
 };
 
+const childConfig: ScenarioChildProcessConfig = {
+  packageRoot: "/app",
+  sourcePath: "/app/src/adapter.ts",
+  sourceRoots: ["/app/src"],
+  nodeEnv: "production",
+  isSaas: true,
+  egress: { blockLocal: true, allowedHosts: [] },
+  parentEnvironment: {},
+};
+
+function poolWith(jobData: ExecutionJobData): ScenarioExecutionPoolService {
+  const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
+  pool.connect(new NoopRunner());
+  pool.submit(jobData);
+  return pool;
+}
+
 describe("NodeScenarioChildService", () => {
   beforeEach(() => {
     stdinWrite.mockClear();
     stdinEnd.mockClear();
+    childSend.mockClear();
+    spawned.length = 0;
+  });
+
+  describe("given a phone run's child asking to register its stream nonce", () => {
+    it("registers it against that child, then acks", async () => {
+      const nonces = VoiceNonceRegistryService.create({
+        nonces: MemoryVoiceNonceRepository.create(),
+      });
+      const voiceJob: ExecutionJobData = {
+        ...job(),
+        target: { type: "voice", referenceId: "agent-1" },
+      };
+      const adapter = NodeScenarioChildService.create({
+        config: childConfig,
+        pool: poolWith(voiceJob),
+        nonces,
+      });
+      const session = adapter.start({
+        jobData: voiceJob,
+        environment: { labels: [], telemetry: { endpoint: "https://x.test", apiKey: "key" } },
+      });
+      void session.execute({
+        ...jobData,
+        target: { type: "voice", referenceId: "agent-1" },
+        adapterData: {
+          type: "voice",
+          agentId: "agent-1",
+          voiceTarget: {
+            transport: "phone",
+            agentId: "+14155550123",
+            credential: {
+              kind: "twilio",
+              accountSid: "AC1",
+              authToken: "twilio-token",
+              fromNumber: "+14155550100",
+            },
+            callDirection: "outbound",
+          },
+          callerEnv: {},
+          maxCallSeconds: 300,
+        },
+      });
+
+      spawned[0]?.emit("message", {
+        type: VOICE_NONCE_REGISTER_MESSAGE,
+        requestId: "r1",
+        nonce: "n1",
+      });
+
+      await vi.waitFor(() =>
+        expect(childSend).toHaveBeenCalledWith(
+          expect.objectContaining({ requestId: "r1", ok: true }),
+        ),
+      );
+      await expect(nonces.consume("n1")).resolves.toMatchObject({ ok: true });
+    });
   });
 
   describe("given a child process spawned from the pre-compiled bundle", () => {
@@ -95,7 +181,7 @@ describe("NodeScenarioChildService", () => {
           pool.submit(job());
           return pool;
         })(),
-        nonces: VoiceNonceRegistryService.create(),
+        nonces: VoiceNonceRegistryService.create({ nonces: MemoryVoiceNonceRepository.create() }),
       });
 
       const session = adapter.start({

@@ -32,7 +32,9 @@ export function formatScenarioSchema(): string {
     "A test suite reads like a dataset: it declares typed fields beyond the situation and the criteria, and every scenario filed in it carries one value per field. Declare them with `platform_create_test_suite` or `platform_update_test_suite`:",
   );
   lines.push("```json");
-  lines.push('{ "fields": [{ "identifier": "golden_sql", "type": "text" }, { "identifier": "row_limit", "type": "number" }] }');
+  lines.push(
+    '{ "fields": [{ "identifier": "golden_sql", "type": "text" }, { "identifier": "row_limit", "type": "number" }] }',
+  );
   lines.push("```");
   lines.push(
     "- **identifier**: lowercase letters, digits and underscores, starting with a letter. situation, criteria, name, input and output are reserved.",
@@ -51,8 +53,12 @@ export function formatScenarioSchema(): string {
   lines.push('  "evaluatorId": "<id from platform_list_evaluators>",');
   lines.push('  "required": true,');
   lines.push('  "mappings": {');
-  lines.push('    "output": { "type": "source", "sourceId": "trace", "path": ["tool_calls", "run_sql", "input"] },');
-  lines.push('    "expected_output": { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] }');
+  lines.push(
+    '    "output": { "type": "source", "sourceId": "trace", "path": ["tool_calls", "run_sql", "input"] },',
+  );
+  lines.push(
+    '    "expected_output": { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] }',
+  );
   lines.push("  }");
   lines.push("}] }");
   lines.push("```");
@@ -60,17 +66,15 @@ export function formatScenarioSchema(): string {
     "Each mapping names where one evaluator input reads its value. Read the evaluator's inputs from `platform_get_evaluator`; every required input needs a mapping before a run. The paths:",
   );
   lines.push(
-    "- **conversation**: `[\"first_user_message\"]`, `[\"last_agent_message\"]`, `[\"transcript\"]` (role: content lines) or `[\"messages\"]` (JSON)",
+    '- **conversation**: `["first_user_message"]`, `["last_agent_message"]`, `["transcript"]` (role: content lines) or `["messages"]` (JSON)',
   );
   lines.push(
-    "- **scenario**: `[\"situation\"]`, `[\"criteria\"]` or `[\"fields\", \"<identifier>\"]` (a field the suite declares; not on a run plan)",
+    '- **scenario**: `["situation"]`, `["criteria"]` or `["fields", "<identifier>"]` (a field the suite declares; not on a run plan)',
   );
   lines.push(
-    "- **trace**: `[\"contexts\"]` (the retrieved contexts of the run's traces) or `[\"tool_calls\", \"<toolName>\", \"input\" | \"output\"]` (the last matching tool call)",
+    '- **trace**: `["contexts"]` (the retrieved contexts of the run\'s traces) or `["tool_calls", "<toolName>", "input" | "output"]` (the last matching tool call)',
   );
-  lines.push(
-    '- a literal: `{ "type": "value", "value": "..." }`',
-  );
+  lines.push('- a literal: `{ "type": "value", "value": "..." }`');
   lines.push(
     "A scenario whose field is blank skips the evaluators that read it, with a reason. A trace with no such tool call or no contexts fails them, with a reason. The results come back under `results.evaluations` on `platform_get_simulation_run`.",
   );

@@ -9,6 +9,7 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   type InstantEvalActor,
   type InstantEvalJudgmentStatus,
+  InstantEvalClassifierNotConfiguredError,
   InstantEvalNotEnabledError,
   InstantEvalQueryInvalidError,
   type InstantEvalRunInput,
@@ -52,6 +53,8 @@ export interface InstantEvalRunPlan {
 export interface InstantEvalRunPeers {
   /** Whether this project may run Instant Evals at all. */
   isEnabled(input: { projectId: string }): Promise<boolean>;
+  /** Whether the flag alone is on for this project, whatever judge the deployment has. */
+  isReleased(input: { projectId: string }): Promise<boolean>;
   /** Whether this deployment provisioned a LangWatchQL identity at all. */
   isQueryIdentityAvailable(): boolean;
   /** The restricted tenant identity and protections this asker runs as. */
@@ -312,8 +315,13 @@ export class InstantEvalRunService {
     };
   }
 
+  /** Released but refused means the deployment has no judge, which the operator fixes. */
   async #assertEnabled(projectId: string): Promise<void> {
-    if (!(await this.peers.isEnabled({ projectId }))) throw new InstantEvalNotEnabledError();
+    if (await this.peers.isEnabled({ projectId })) return;
+    if (await this.peers.isReleased({ projectId })) {
+      throw new InstantEvalClassifierNotConfiguredError();
+    }
+    throw new InstantEvalNotEnabledError();
   }
 
   /** The row limit this run may have, or the refusal naming what lifts it. */

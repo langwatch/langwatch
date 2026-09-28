@@ -166,10 +166,10 @@ export const PiiIncompleteNotice: React.FC<{
 }> = ({ incomplete }) => {
   if (!incomplete) return null;
   return (
-    <Alert.Root status="warning" size="sm" variant="subtle" width="full">
+    <Alert.Root status="warning" size="sm" width="full">
       <Alert.Indicator />
       <Alert.Content>
-        <Alert.Description fontSize="sm">
+        <Alert.Description>
           Name and location redaction did not run for this span, so the content may still contain
           names or locations. Emails, card numbers, and other identifiers were still removed.
         </Alert.Description>

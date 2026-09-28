@@ -36,4 +36,6 @@ export const projectWeb = defineWebModule("project")
         default: (await import("./ui/sections/home/components/hero-ask-field.tsx")).HeroAskField,
       }),
     },
+    /** Main's project selector, lent to pages outside the navigation shell (§10). */
+    projectSwitcher: { load: () => import("./ui/blocks/project-switcher.tsx") },
   });

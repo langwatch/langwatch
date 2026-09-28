@@ -391,14 +391,11 @@ endif
 worktree:
 	@./dev/scripts/worktree.sh $(WORKTREE_ARG)
 
-# Describe the REST surface the API process actually mounts, and say how it
-# differs from the frozen document.
+# Check that every operation the frozen document lists is still served.
 #
-# The DOCUMENT IS FROZEN. `apps/api/src/features/discovery/openapi-document.json`
-# is served by three routes and both SDKs generate clients from it, so nothing
-# here writes it — not this target, not the task it runs. What the generator
-# produces goes to a scratch file, and the check prints what a person would
-# have to look at before replacing the artifact by hand.
+# The DOCUMENT IS FROZEN. `specs/api-reference/openapi-document.json` is served
+# by three routes and the SDKs generate clients from it, so nothing here
+# writes it; the check only reads it.
 #
 # All THREE clients are generated and committed. Go is named explicitly because
 # it was once missing from this target and drifted eight spec commits behind
@@ -408,7 +405,7 @@ worktree:
 # To regenerate the CLIENTS from the document as it stands, run the three
 # commands the output names.
 sync-all-openapi:
-	@pnpm --filter @langwatch/platform-api task openapi-check
+	@pnpm --filter @langwatch/platform-api run openapi:check
 	@echo ""
 	@echo "The frozen document was NOT written. To refresh the clients from it as it stands:"
 	@echo "    cd sdks/typescript && pnpm run generate:openapi-types"

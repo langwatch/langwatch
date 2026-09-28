@@ -5,9 +5,15 @@
 import { SIGNIN_ROUTING_REASON_CODES, signInMethodSchema } from "@langwatch/identity-contract";
 import { z } from "zod";
 
-/** A mail was asked for. The same answer whether or not one was needed. */
-export const frontDoorSentSchema = z.object({ sent: z.literal(true) }).strict();
-export type FrontDoorSent = z.infer<typeof frontDoorSentSchema>;
+/**
+ * A sign-up link was asked for. Where this installation cannot send email nothing is sent,
+ * and the answer carries the unconfirmed proof a password sign-up spends instead.
+ */
+export const signUpVerificationRequestSchema = z.discriminatedUnion("sent", [
+  z.object({ sent: z.literal(true) }).strict(),
+  z.object({ sent: z.literal(false), addressProof: z.string() }).strict(),
+]);
+export type SignUpVerificationRequest = z.infer<typeof signUpVerificationRequestSchema>;
 
 /** The own-address link went out; names the identifier its verifier is filed under. */
 export const frontDoorOwnAddressSentSchema = z

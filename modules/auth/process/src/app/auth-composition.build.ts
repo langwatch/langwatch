@@ -2,8 +2,8 @@
  * Auth module's ONE Better Auth instance. Ported from deleted composition;
  * absences are deliberate—each collaborator refuses by name if absent.
  */
-import type { AuthApi } from "@langwatch/auth-contract";
-import { AuthzGrantsService } from "@langwatch/authz-contract";
+import { AuthUnavailableError, type AuthApi } from "@langwatch/auth-contract";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
@@ -22,7 +22,7 @@ import {
   type SsoProviderConfigCipher,
 } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
-import { InviteNotFoundError } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserApi } from "@langwatch/user-contract";
@@ -33,11 +33,9 @@ import {
   BetterAuthAnnouncements,
   BetterAuthFederation,
   BetterAuthIdentityCeremonies,
-  BetterAuthPendingInvite,
   BetterAuthStorage,
   type BetterAuthAccountPin,
   type BetterAuthAccountRow,
-  type PendingOrganizationInvite,
 } from "../channels/better-auth.channel.ts";
 import {
   createBetterAuthTransport,
@@ -48,6 +46,7 @@ import {
 import { CredentialSessionGuard } from "../channels/http/http.credential-session-guard.channel.ts";
 import type { SignUpVerification } from "../channels/http/http.passkey-sign-up.channel.ts";
 import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.channel.ts";
+import type { PasswordResetMailChannel } from "../channels/password-reset-mail.channel.ts";
 import { MemoryBetterAuthSecondaryStorageRepository } from "../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisBetterAuthSecondaryStorageRepository } from "../repositories/redis/redis.better-auth-secondary-storage.repository.ts";
@@ -167,35 +166,6 @@ export class AbsentBetterAuthIdentityCeremonies extends BetterAuthIdentityCeremo
   async beforeAccountDelete(_account: BetterAuthAccountRow): Promise<void> {}
 }
 
-/**
- * The pending-invitation lookup, absent. Answers "no pending invite", which
- * sends an SSO auto-join down its default membership path.
- */
-export class AbsentBetterAuthPendingInvites extends BetterAuthPendingInvite {
-  static create(logger: Logger): AbsentBetterAuthPendingInvites {
-    return new AbsentBetterAuthPendingInvites(logger);
-  }
-
-  private constructor(private readonly logger: Logger) {
-    super();
-  }
-
-  async getPendingByOrganizationAndEmail(input: {
-    organizationId: string;
-    email: string;
-  }): Promise<PendingOrganizationInvite> {
-    this.logger.warn(
-      { organizationId: input.organizationId },
-      "No invitation service in this process: a domain auto-join applies the default membership rather than a pending invite",
-    );
-    throw new InviteNotFoundError();
-  }
-
-  async applyInvite(): Promise<void> {
-    throw new Error("This process composes no invitation service");
-  }
-}
-
 /** The announcements, over what this process actually holds. */
 export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
   static create(logger: Logger): LoggedBetterAuthAnnouncements {
@@ -284,97 +254,27 @@ export class AbsentSignUpVerification implements SignUpVerification {
 }
 
 /**
- * Nothing to write a grant with. Reached only from the SSO domain auto-join,
- * which runs only when {@link ModuleBetterAuthFederation} allows platform SSO —
- * and it answers that it does not.
+ * Main's reset mail: the link lands on this deployment's own reset page. With
+ * no public base URL there is no page to root it at, so it refuses by name: a
+ * reset link nobody can open is worse than a refusal an operator can read.
  */
-export class UnavailableBetterAuthGrants extends AuthzGrantsService {
-  static create(): UnavailableBetterAuthGrants {
-    return new UnavailableBetterAuthGrants();
+export function passwordResetSender(input: {
+  mail: PasswordResetMailChannel;
+  publicBaseUrl: string | undefined;
+  processName: string;
+}): (reset: { email: string; token: string }) => Promise<void> {
+  const { mail, publicBaseUrl, processName } = input;
+  if (!publicBaseUrl) {
+    const capability = "public base URL to root a password-reset link at";
+
+    return () => Promise.reject(new AuthUnavailableError({ capability, processName }));
   }
 
-  private unavailable(): Promise<never> {
-    return Promise.reject(
-      new Error("This process composes no grant writer for the Better Auth transport"),
-    );
-  }
-
-  attach(): Promise<never> {
-    return this.unavailable();
-  }
-  update(): Promise<never> {
-    return this.unavailable();
-  }
-  revoke(): Promise<never> {
-    return this.unavailable();
-  }
-  replace(): Promise<never> {
-    return this.unavailable();
-  }
-  offboard(): Promise<never> {
-    return this.unavailable();
-  }
-  invalidateOrganization(): Promise<never> {
-    return this.unavailable();
-  }
-  attachBindings(): Promise<never> {
-    return this.unavailable();
-  }
-  attachResourceGrant(): Promise<never> {
-    return this.unavailable();
-  }
-  revokeResourceGrants(): Promise<never> {
-    return this.unavailable();
-  }
-  changeBindingRole(): Promise<never> {
-    return this.unavailable();
-  }
-  revokeBindings(): Promise<never> {
-    return this.unavailable();
-  }
-  revokeBindingsWhere(): Promise<never> {
-    return this.unavailable();
-  }
-  retireDirectoryGrants(): Promise<never> {
-    return this.unavailable();
-  }
-  findDirectoryCausedChanges(): Promise<never> {
-    return this.unavailable();
-  }
-  offboardMember(): Promise<never> {
-    return this.unavailable();
-  }
-  defineRole(): Promise<never> {
-    return this.unavailable();
-  }
-  deleteRole(): Promise<never> {
-    return this.unavailable();
-  }
-  createBinding(): Promise<never> {
-    return this.unavailable();
-  }
-  updateBinding(): Promise<never> {
-    return this.unavailable();
-  }
-  deleteBinding(): Promise<never> {
-    return this.unavailable();
-  }
-  applyMemberBindings(): Promise<never> {
-    return this.unavailable();
-  }
-}
-
-/**
- * Password-reset mail, on a module that composes no gateway. Refuses by name
- * rather than resolving: a reset link nobody sends is worse than a refusal an
- * operator can read.
- */
-export function unconfiguredPasswordResetMail(): Promise<never> {
-  return Promise.reject(
-    new Error(
-      "This deployment composes no mail gateway behind sign-in, so it cannot send a password-reset link",
-    ),
-  );
+  return ({ email, token }) =>
+    mail.sendResetLink({
+      email,
+      resetUrl: `${publicBaseUrl}/auth/reset-password?token=${encodeURIComponent(token)}`,
+    });
 }
 
 /**
@@ -405,6 +305,12 @@ export type BuildBetterAuthOptions = Readonly<{
   redis: RedisConnection | null;
   /** The Auth application whose sessions this instance mints and revokes. */
   auth: AuthApi;
+  /** The grants ledger an SSO domain auto-join writes its organization binding to. */
+  grants: AuthzGrantsService;
+  /** Where a domain auto-join applies the pending invite an address already holds. */
+  organizations: Pick<OrganizationApi, "applyPendingInvite">;
+  /** Sends a requested reset link; see {@link passwordResetSender}. */
+  sendResetPassword: (reset: { email: string; token: string }) => Promise<void>;
   /** The same user directory the rest of this process serves from. */
   users: UserApi;
   /** Whose connections decide what a federated sign-in arrives into. */
@@ -464,14 +370,9 @@ export async function buildBetterAuth(
 
   logger.warn(
     {
-      absent: [
-        "identity-pipeline",
-        "password-reset-mail",
-        "pending-invitations",
-        "sign-in-router-shadow",
-      ],
+      absent: ["identity-pipeline", "sign-in-router-shadow"],
     },
-    "Better Auth composed by the auth module: it runs the stock Prisma storage engine, it cannot send a password-reset link, it applies no pending invitation on a domain auto-join and it runs no sign-in router shadow",
+    "Better Auth composed by the auth module: it runs the stock Prisma storage engine and it runs no sign-in router shadow",
   );
 
   const providerMounted = isNamedProviderMounted(options.signInProviders);
@@ -484,6 +385,7 @@ export async function buildBetterAuth(
 
   const { socialProviders, genericOAuthConfigs } = await options.sso.getSignInProviderMounts({
     baseUrl: identity.baseUrl,
+    onMicrosoftProfile: (profile) => options.identityApi.moveLegacyMicrosoftAccountKey({ profile }),
   });
 
   return createBetterAuthTransport({
@@ -520,10 +422,10 @@ export async function buildBetterAuth(
       localPasswords: options.localPasswords,
     }),
     identity: AbsentBetterAuthIdentityCeremonies.create(),
-    invites: AbsentBetterAuthPendingInvites.create(logger),
+    invites: options.organizations,
     announcements: LoggedBetterAuthAnnouncements.create(logger),
     shadow: OffSignInRouterShadow.create(),
-    authzGrants: UnavailableBetterAuthGrants.create(),
+    authzGrants: options.grants,
     arrivals: IdentitySsoArrivals.create(options.identityApi),
     ssoActivity: {
       record: (args) => options.identityApi.ssoActivity().record(args),
@@ -546,7 +448,7 @@ export async function buildBetterAuth(
         options.identityApi.ssoMigrationCallbacks().authorizeAndRecordAuthentication(args),
     },
     signUpVerification: options.signUpProofs ?? AbsentSignUpVerification.create(logger),
-    sendResetPassword: () => unconfiguredPasswordResetMail(),
+    sendResetPassword: options.sendResetPassword,
     signInLockout: options.signInLockout,
     addressRoutesToConnection: async ({ email }) =>
       signInRouting !== null &&

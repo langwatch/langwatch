@@ -190,7 +190,9 @@ jobs:
       # the tarball ships that source.
       - name: Build langwatch app (vite + sdk + mcp + generated types)
         run: >
-          pnpm run build:types
+          pnpm start:prepare:files
+          && pnpm ensure:built
+          && pnpm run build:types
           && pnpm --filter "@langwatch/ui..."
           --filter "@langwatch/platform-api..."
           --filter "@langwatch/worker..."

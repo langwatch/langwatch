@@ -229,9 +229,8 @@ function ResultsSection({ detail, isFirst }: { detail: RunDetail; isFirst: boole
           status={scenarioState.status}
           metCriteria={scenarioState.results?.metCriteria ?? []}
           unmetCriteria={scenarioState.results?.unmetCriteria ?? []}
-          inconclusiveCriteria={
-            scenarioState.results?.inconclusiveCriteria ?? []
-          }
+          inconclusiveCriteria={scenarioState.results?.inconclusiveCriteria ?? []}
+          criteria={scenarioState.results?.criteria}
           declaredCriteria={detail.scenarioData?.criteria ?? []}
           reasoning={scenarioState.results?.reasoning}
           error={scenarioState.results?.error}

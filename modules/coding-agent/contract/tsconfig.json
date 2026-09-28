@@ -6,20 +6,11 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
 
     "lib": ["es2023"],
-    "paths": {
-      "zod": ["../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod"]
-    },
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   "references": [
-    {
-      "path": "../../metric/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../log/contract/tsconfig.build.json"
-    },
     {
       "path": "tsconfig.build.json"
     },
@@ -28,6 +19,12 @@
     },
     {
       "path": "../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../metric/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

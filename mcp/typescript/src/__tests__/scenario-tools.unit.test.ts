@@ -6,10 +6,9 @@ vi.mock("../langwatch-api-scenarios.js", () => ({
 }));
 
 import { listScenarios, getScenario } from "../langwatch-api-scenarios.js";
-
-import { handleListScenarios } from "../tools/list-scenarios.js";
-import { handleGetScenario } from "../tools/get-scenario.js";
 import { formatScenarioSchema } from "../tools/discover-scenario-schema.js";
+import { handleGetScenario } from "../tools/get-scenario.js";
+import { handleListScenarios } from "../tools/list-scenarios.js";
 
 const mockListScenarios = vi.mocked(listScenarios);
 const mockGetScenario = vi.mocked(getScenario);

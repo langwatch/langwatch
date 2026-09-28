@@ -19,6 +19,7 @@ export type UiRootCapabilities = {
   authHost: Awaited<ReturnType<typeof auth.host.load>>;
   scope: Awaited<ReturnType<typeof organization.scope.load>>;
   organizationFacts: Awaited<ReturnType<typeof organization.organizationFacts.load>>;
+  copyTargets: Awaited<ReturnType<typeof organization.copyTargets.load>>;
   navigationHost: Awaited<ReturnType<typeof navigation.host.load>>;
   navigationChrome: Awaited<ReturnType<typeof navigation.chrome.load>>;
   commandBar: Awaited<ReturnType<typeof navigation.commandBar.load>>;
@@ -32,6 +33,7 @@ export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
     authHost,
     scope,
     organizationFacts,
+    copyTargets,
     navigationHost,
     navigationChrome,
     commandBar,
@@ -42,6 +44,7 @@ export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
     auth.host.load(),
     organization.scope.load(),
     organization.organizationFacts.load(),
+    organization.copyTargets.load(),
     navigation.host.load(),
     navigation.chrome.load(),
     navigation.commandBar.load(),
@@ -53,6 +56,7 @@ export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
     authHost,
     scope,
     organizationFacts,
+    copyTargets,
     navigationHost,
     navigationChrome,
     commandBar,

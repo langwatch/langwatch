@@ -40,18 +40,18 @@ quotes a customer a different number on a different page.
 
 ## Decision
 
-| Rule | Layer | Meaning |
-| --- | --- | --- |
-| `langwatch/temporal-only` | plugin | No `Date` in governed source: not `new Date`, `Date.now`, `Date.parse`, `Date.UTC`, nor a value typed `Date`. The Prisma seam, the two named conversion helpers and the time package keep theirs. |
-| `langwatch/id-generation-origin` | plugin | Ids are ksuids behind a kind prefix: no `nanoid`, no `uuid`, no `crypto.randomUUID()`. An `idempotencyKey` is not an id and is exempt. |
-| `langwatch/idempotency-key-is-stable` | plugin | An `idempotencyKey` is not minted where the request is built, because every attempt would then carry a different key. Derive it from the request's own content, or bind it once for the operation it identifies. |
-| `langwatch/environment-boundaries` | plugin | Only an app's `src/main.ts` or `src/config.ts` reads `process.env`; a module declares the key in its config schema and takes the parsed value. |
-| `langwatch/service-loads-its-own-config` | plugin | A service does not declare its own `loadConfig`/`resolveConfig`/`readConfig`; config is a named member of the argument `create` takes. See fc80f65635. |
-| `langwatch/plan-literals` | plugin | Two or more plan limit fields in one object outside `@langwatch/plans` is a second plan definition. |
-| `langwatch/require-fetch-timeout` | plugin | A `fetch` in a channel carries an abort signal, or it hangs as long as the peer holds the socket. |
-| `langwatch/no-boot-hook-outside-guard` | plugin | A process lifecycle listener is registered only by the boot guard: the `Server` for a long-running process, `bootNodeExecutable` for a one-shot. |
-| `langwatch/no-inline-dynamic-import` | plugin | No inline `import(…)`; a dependency is a top-level import. |
-| `langwatch/em-dash-in-copy` | plugin | No em dash in customer-facing copy. |
+| Rule                                     | Layer  | Meaning                                                                                                                                                                                                          |
+| ---------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `langwatch/temporal-only`                | plugin | No `Date` in governed source: not `new Date`, `Date.now`, `Date.parse`, `Date.UTC`, nor a value typed `Date`. The Prisma seam, the two named conversion helpers and the time package keep theirs.                |
+| `langwatch/id-generation-origin`         | plugin | Ids are ksuids behind a kind prefix: no `nanoid`, no `uuid`, no `crypto.randomUUID()`. An `idempotencyKey` is not an id and is exempt.                                                                           |
+| `langwatch/idempotency-key-is-stable`    | plugin | An `idempotencyKey` is not minted where the request is built, because every attempt would then carry a different key. Derive it from the request's own content, or bind it once for the operation it identifies. |
+| `langwatch/environment-boundaries`       | plugin | Only an app's `src/main.ts` or `src/config.ts` reads `process.env`; a module declares the key in its config schema and takes the parsed value.                                                                   |
+| `langwatch/service-loads-its-own-config` | plugin | A service does not declare its own `loadConfig`/`resolveConfig`/`readConfig`; config is a named member of the argument `create` takes. See fc80f65635.                                                           |
+| `langwatch/plan-literals`                | plugin | Two or more plan limit fields in one object outside `@langwatch/plans` is a second plan definition.                                                                                                              |
+| `langwatch/require-fetch-timeout`        | plugin | A `fetch` in a channel carries an abort signal, or it hangs as long as the peer holds the socket.                                                                                                                |
+| `langwatch/no-boot-hook-outside-guard`   | plugin | A process lifecycle listener is registered only by the boot guard: the `Server` for a long-running process, `bootNodeExecutable` for a one-shot.                                                                 |
+| `langwatch/no-inline-dynamic-import`     | plugin | No inline `import(…)`; a dependency is a top-level import.                                                                                                                                                       |
+| `langwatch/em-dash-in-copy`              | plugin | No em dash in customer-facing copy.                                                                                                                                                                              |
 
 Every plugin rule here is a candidate for oxlint configuration and is
 deliberately not written there yet: ADR-135 records the classification and the
@@ -77,7 +77,6 @@ review convention. The cost is a set of exemptions that have to be maintained
 by hand: the boundary helpers for `Date`, the config and boot paths for
 `process.env`, the CLI startup path for `import()`. An exemption list that
 grows is the signal the invariant is wrong, not that the rule is annoying.
-
 
 ## Amendment, 2026-09-17: `no-inline-dynamic-import` (ast-grep) deleted as a duplicate
 

@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   REFUSED_ADDRESS_PROOF,
+  UNCONFIRMED_ADDRESS_PROOF,
   createUserTestApp,
   createUserTestAuth,
   createUserTestInfrastructure,
@@ -74,6 +75,35 @@ describe("registering a credential account", () => {
       await expect(app.findById({ id: created.id })).resolves.toMatchObject({
         emailVerified: true,
       });
+    });
+  });
+
+  describe("when an unconfirmed proof is spent, where the installation cannot send email", () => {
+    /** @scenario "An installation that cannot send email signs up with a password and leaves the address unconfirmed" */
+    it("creates the account with its address unconfirmed", async () => {
+      const auth = createUserTestAuth();
+      const app = createUserTestApp({ dependencies: { auth } });
+
+      const created = await register(app, "Sam@Acme.com", {
+        addressProof: UNCONFIRMED_ADDRESS_PROOF,
+      });
+
+      expect(auth.claimUnconfirmedSignUpAddressProof).toHaveBeenCalledWith({
+        token: UNCONFIRMED_ADDRESS_PROOF,
+        email: "sam@acme.com",
+      });
+      await expect(app.findById({ id: created.id })).resolves.toMatchObject({
+        emailVerified: false,
+      });
+    });
+
+    it("never asks for an unconfirmed proof when a confirmed one was spent", async () => {
+      const auth = createUserTestAuth();
+      const app = createUserTestApp({ dependencies: { auth } });
+
+      await register(app);
+
+      expect(auth.claimUnconfirmedSignUpAddressProof).not.toHaveBeenCalled();
     });
   });
 

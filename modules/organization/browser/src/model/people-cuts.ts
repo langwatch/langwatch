@@ -5,8 +5,14 @@ export type PeopleCut = (typeof PEOPLE_CUTS)[number];
 /** The open cut lives in the address, so a link lands on the people it was sent about. */
 export const PEOPLE_CUT_PARAM = "people";
 
+/** The retired members page's tab names, carried across as the cut each became. */
+const RETIRED_TAB_CUTS: Readonly<Record<string, PeopleCut>> = {
+  invitations: "invited",
+  requests: "waiting",
+};
+
 export function parsePeopleCut(value: string | undefined): PeopleCut {
-  return PEOPLE_CUTS.find((cut) => cut === value) ?? "all";
+  return PEOPLE_CUTS.find((cut) => cut === value) ?? RETIRED_TAB_CUTS[value ?? ""] ?? "all";
 }
 
 /** Every cut carries its number, zero included: a quiet week is an answer. */

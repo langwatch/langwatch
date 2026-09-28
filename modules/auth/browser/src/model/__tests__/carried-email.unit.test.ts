@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { forgetCarriedEmail, readCarriedEmail, signUpHref } from "../carried-email.ts";
+import {
+  forgetCarriedEmail,
+  forgotPasswordHref,
+  readCarriedEmail,
+  signUpHref,
+} from "../carried-email.ts";
 
 /**
  * The address is carried in the URL FRAGMENT: it never reaches the server,
@@ -43,6 +48,20 @@ describe("given an address carried between the front door's two screens", () => 
       window.history.replaceState(null, "", signUpHref({ callbackUrl: "/", email }));
 
       expect(readCarriedEmail()).toBe(email);
+    });
+  });
+
+  describe("when the forgot-password link is built from the address just typed", () => {
+    it("carries it in the fragment and never in the query", () => {
+      const href = forgotPasswordHref({ email: "alex+reset@langwatch.ai" });
+
+      expect(href).toBe("/auth/forgot-password#email=alex%2Breset%40langwatch.ai");
+      window.history.replaceState(null, "", href);
+      expect(readCarriedEmail()).toBe("alex+reset@langwatch.ai");
+    });
+
+    it("links to the bare screen when no address was typed", () => {
+      expect(forgotPasswordHref({ email: "" })).toBe("/auth/forgot-password");
     });
   });
 

@@ -1,4 +1,4 @@
-// Screens ask application port; plan for Enterprise surfaces; no route reading.
+// Screens ask application port; plan for Enterprise surfaces; the query holds the open tab.
 
 import { createContext, useContext } from "react";
 
@@ -18,6 +18,11 @@ export type AuthzHostScope = {
 export type AuthzPlanReading = {
   isEnterprise: boolean;
   isLoading: boolean;
+};
+
+/** The query string the page was opened with: the Roles page keeps its open tab there. */
+export type AuthzRouteReading = {
+  query: Readonly<Record<string, string | undefined>>;
 };
 
 /** A short confirmation of something the reader just did. */
@@ -48,6 +53,14 @@ export abstract class AuthzHostApi {
 
   /** The plan tier that decides whether these pages are the feature or the pitch. */
   abstract plan(): AuthzPlanReading;
+
+  abstract route(): AuthzRouteReading;
+
+  /** Replaces the whole query string; a key left out is a key removed. */
+  abstract setQuery(
+    next: Readonly<Record<string, string | undefined>>,
+    options?: { replace?: boolean },
+  ): void;
 
   abstract succeeded(notice: AuthzSuccessNotice): void;
 

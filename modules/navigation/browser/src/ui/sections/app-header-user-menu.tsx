@@ -39,6 +39,12 @@ function accountMenuTitle(user: Pick<NavigationUser, "name" | "email">): string 
   return user.name ? `${user.name} (${email})` : email;
 }
 
+/** Who the menu belongs to: the name, else the email for a nameless account. */
+function userMenuLabel(user: Pick<NavigationUser, "name" | "email"> | null | undefined): string {
+  const who = user?.name ?? user?.email;
+  return who ? `Open user menu for ${who}` : "Open user menu";
+}
+
 export function AppHeaderUserMenu() {
   const host = useNavigationHost();
   const user = host.currentUser();
@@ -67,7 +73,7 @@ export function AppHeaderUserMenu() {
           minWidth="auto"
           height="auto"
           borderRadius="full"
-          aria-label={user?.name ? `Open user menu for ${user.name}` : "Open user menu"}
+          aria-label={userMenuLabel(user)}
         >
           <UserAvatar
             name={user?.name ?? void 0}

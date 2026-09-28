@@ -119,7 +119,7 @@ describe("<OnlineEvaluationsTable />", () => {
     expect(screen.getByText("↓ 6 pp")).toHaveAttribute("data-trend", "down");
     expect(screen.getByText("No data yet")).toHaveAttribute("data-trend", "neutral");
     expect(
-      screen.getByRole("img", { name: "Performance trend for Answer quality" }),
+      screen.getByRole("figure", { name: "Performance trend for Answer quality" }),
     ).toBeInTheDocument();
   });
 
@@ -217,7 +217,7 @@ describe("<OnlineEvaluationsTable />", () => {
 
     expect(
       screen
-        .getByRole("img", { name: "Performance trend for Answer quality" })
+        .getByRole("figure", { name: "Performance trend for Answer quality" })
         .querySelector("polyline"),
     ).toHaveAttribute("points", "3,19 56,19 109,19");
   });

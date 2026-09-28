@@ -104,6 +104,99 @@ const emptyRecordFor = (columns: EditorColumn[]): EditorRecord => ({
   ...Object.fromEntries(columns.map((c) => [c.name, ""])),
 });
 
+/** Replaces the record with the same id, or appends it when absent. */
+function upsertRecord(records: EditorRecord[], record: EditorRecord): EditorRecord[] {
+  const index = records.findIndex((r) => r.id === record.id);
+  if (index === -1) return [...records, record];
+  return records.map((existing, i) => (i === index ? { ...existing, ...record } : existing));
+}
+
+/**
+ * The records with one cell set. Typing into the trailing phantom row, or rows skipped
+ * past it, materializes empty records up to the edited row.
+ */
+function recordsWithCellValue({
+  records,
+  columns,
+  row,
+  columnName,
+  value,
+}: {
+  records: EditorRecord[];
+  columns: EditorColumn[];
+  row: number;
+  columnName: string;
+  value: string;
+}): EditorRecord[] {
+  const updatedRecords = [...records];
+  while (updatedRecords.length <= row) {
+    updatedRecords.push(emptyRecordFor(columns));
+  }
+  updatedRecords[row] = { ...updatedRecords[row]!, [columnName]: value };
+  return updatedRecords;
+}
+
+function recordBody({ id: _id, ...body }: EditorRecord): Record<string, string> {
+  return body;
+}
+
+/**
+ * Saved mode queues the change for sync. New (padded) records queue their full body
+ * so the sync creates them server-side too.
+ */
+function queueCellChange({
+  datasetChanges: current,
+  records,
+  updatedRecords,
+  row,
+  columnName,
+  value,
+}: {
+  datasetChanges: PendingSavedChanges[string] | undefined;
+  records: EditorRecord[];
+  updatedRecords: EditorRecord[];
+  row: number;
+  columnName: string;
+  value: string;
+}): PendingSavedChanges[string] {
+  const datasetChanges = { ...current };
+  const updatedRecord = updatedRecords[row]!;
+  for (const padded of updatedRecords.slice(records.length)) {
+    if (padded.id !== updatedRecord.id) datasetChanges[padded.id] = recordBody(padded);
+  }
+  datasetChanges[updatedRecord.id] =
+    row >= records.length
+      ? recordBody(updatedRecord)
+      : { ...datasetChanges[updatedRecord.id], [columnName]: value };
+  return datasetChanges;
+}
+
+function toggledIn<T>(values: Set<T>, value: T): Set<T> {
+  const next = new Set(values);
+  if (next.has(value)) {
+    next.delete(value);
+  } else {
+    next.add(value);
+  }
+  return next;
+}
+
+/** Drops one record's pending change, and the dataset's entry once it holds none. */
+function withoutPendingChange({
+  pendingSavedChanges,
+  dbDatasetId,
+  recordId,
+}: {
+  pendingSavedChanges: PendingSavedChanges;
+  dbDatasetId: string;
+  recordId: string;
+}): PendingSavedChanges {
+  const { [dbDatasetId]: current, ...rest } = pendingSavedChanges;
+  const { [recordId]: _removed, ...datasetChanges } = current ?? {};
+  if (Object.keys(datasetChanges).length === 0) return rest;
+  return { ...rest, [dbDatasetId]: datasetChanges };
+}
+
 export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
   return createStore<DatasetEditorStore>((set, get) => ({
     dbDatasetId: undefined,
@@ -131,15 +224,7 @@ export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
     },
 
     upsertExternalRecord: (record) => {
-      const { records } = get();
-      const index = records.findIndex((r) => r.id === record.id);
-      const updated = [...records];
-      if (index === -1) {
-        updated.push(record);
-      } else {
-        updated[index] = { ...updated[index], ...record };
-      }
-      set({ records: updated });
+      set({ records: upsertRecord(get().records, record) });
     },
 
     removeExternalRecord: (recordId) => {
@@ -151,47 +236,30 @@ export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
       const column = columns.find((c) => c.id === columnId);
       if (!column) return;
 
-      const updatedRecords = [...records];
-      // Pad up to the edited row (typing into the trailing phantom row, or
-      // rows skipped past it, materializes empty records)
-      while (updatedRecords.length <= row) {
-        updatedRecords.push(emptyRecordFor(columns));
-      }
-      const record = updatedRecords[row]!;
-      const updatedRecord: EditorRecord = { ...record, [column.name]: value };
-      updatedRecords[row] = updatedRecord;
-
+      const updatedRecords = recordsWithCellValue({
+        records,
+        columns,
+        row,
+        columnName: column.name,
+        value,
+      });
       if (!dbDatasetId) {
         set({ records: updatedRecords });
         return;
       }
 
-      // Saved mode: queue the change for sync. New (padded) records queue
-      // their full body so the sync creates them server-side too.
-      const datasetChanges = { ...pendingSavedChanges[dbDatasetId] };
-      for (let i = records.length; i < updatedRecords.length; i++) {
-        const padded = updatedRecords[i]!;
-        if (padded.id !== updatedRecord.id) {
-          const { id: _id, ...body } = padded;
-          datasetChanges[padded.id] = body;
-        }
-      }
-      const isNewRecord = row >= records.length;
-      datasetChanges[updatedRecord.id] = isNewRecord
-        ? (() => {
-            const { id: _id, ...body } = updatedRecord;
-            return body;
-          })()
-        : {
-            ...datasetChanges[updatedRecord.id],
-            [column.name]: value,
-          };
-
       set({
         records: updatedRecords,
         pendingSavedChanges: {
           ...pendingSavedChanges,
-          [dbDatasetId]: datasetChanges,
+          [dbDatasetId]: queueCellChange({
+            datasetChanges: pendingSavedChanges[dbDatasetId],
+            records,
+            updatedRecords,
+            row,
+            columnName: column.name,
+            value,
+          }),
         },
       });
     },
@@ -246,13 +314,7 @@ export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
     setSelectedCell: (cell) => set({ selectedCell: cell }),
 
     toggleRowSelection: (row) => {
-      const selectedRows = new Set(get().selectedRows);
-      if (selectedRows.has(row)) {
-        selectedRows.delete(row);
-      } else {
-        selectedRows.add(row);
-      }
-      set({ selectedRows });
+      set({ selectedRows: toggledIn(get().selectedRows, row) });
     },
 
     selectAllRows: (rowCount) => {
@@ -264,28 +326,19 @@ export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
     clearRowSelection: () => set({ selectedRows: new Set() }),
 
     toggleCellExpanded: (row, columnId) => {
-      const key = `${row}-${columnId}`;
-      const expandedCells = new Set(get().expandedCells);
-      if (expandedCells.has(key)) {
-        expandedCells.delete(key);
-      } else {
-        expandedCells.add(key);
-      }
-      set({ expandedCells });
+      set({ expandedCells: toggledIn(get().expandedCells, `${row}-${columnId}`) });
     },
 
     setRowHeightMode: (mode) => set({ rowHeightMode: mode, expandedCells: new Set() }),
 
     clearPendingChange: (dbDatasetId, recordId) => {
-      const pendingSavedChanges = { ...get().pendingSavedChanges };
-      const datasetChanges = { ...pendingSavedChanges[dbDatasetId] };
-      delete datasetChanges[recordId];
-      if (Object.keys(datasetChanges).length === 0) {
-        delete pendingSavedChanges[dbDatasetId];
-      } else {
-        pendingSavedChanges[dbDatasetId] = datasetChanges;
-      }
-      set({ pendingSavedChanges });
+      set({
+        pendingSavedChanges: withoutPendingChange({
+          pendingSavedChanges: get().pendingSavedChanges,
+          dbDatasetId,
+          recordId,
+        }),
+      });
     },
 
     setAutosave: (state, error) => set({ autosave: { state, error } }),

@@ -15,24 +15,19 @@ export interface VirtualAuthenticator {
  * lets a discoverable-credential request (no email, no allowCredentials)
  * find anything; `isUserVerified` auto-answers the fingerprint/PIN prompt.
  */
-export async function addVirtualAuthenticator(
-  page: Page,
-): Promise<VirtualAuthenticator> {
+export async function addVirtualAuthenticator(page: Page): Promise<VirtualAuthenticator> {
   const session = await page.context().newCDPSession(page);
   await session.send("WebAuthn.enable");
-  const { authenticatorId } = await session.send(
-    "WebAuthn.addVirtualAuthenticator",
-    {
-      options: {
-        protocol: "ctap2",
-        transport: "internal",
-        hasResidentKey: true,
-        hasUserVerification: true,
-        isUserVerified: true,
-        automaticPresenceSimulation: true,
-      },
+  const { authenticatorId } = await session.send("WebAuthn.addVirtualAuthenticator", {
+    options: {
+      protocol: "ctap2",
+      transport: "internal",
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      automaticPresenceSimulation: true,
     },
-  );
+  });
   return { authenticatorId, session };
 }
 

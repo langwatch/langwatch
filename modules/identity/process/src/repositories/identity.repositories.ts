@@ -6,6 +6,7 @@ import type { MfaFoldState } from "../eventing/mfa-enrollment-state.projection.t
 import type { ScimSyncFoldState } from "../eventing/scim-sync-state.projection.ts";
 import type { SsoConnectionFoldState } from "../eventing/sso-connection-state.projection.ts";
 import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";
+import type { IdentityAccountRekeyRepository } from "./identity-account-rekey.repository.ts";
 import type { IdentityBackfillRepository } from "./identity-backfill.repository.ts";
 import type { IdentityHeadsRepository } from "./identity-heads.repository.ts";
 import type { IdentityHistoryRepository } from "./identity-history.repository.ts";
@@ -52,6 +53,8 @@ export interface IdentityRepositories {
   readonly users: IdentityUsersRepository;
   /** The legacy half of the sign-in router's one per-user read (ADR-117). */
   readonly signInAccounts: IdentitySignInAccountsRepository;
+  /** The pre-3.17 Microsoft account key move a sign-in makes before better-auth's lookup. */
+  readonly accountRekey: IdentityAccountRekeyRepository;
   readonly newborn: IdentityNewbornRepository;
   readonly reservations: IdentityReservationRepository;
   readonly verification: IdentityVerificationRepository;

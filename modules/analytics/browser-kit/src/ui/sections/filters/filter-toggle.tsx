@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Button, HStack, Text } from "@chakra-ui/react";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import qs from "qs";
@@ -128,32 +128,27 @@ export function FilterToggleButton({
         backgroundColor={toggled ? "bg.muted" : undefined}
         onClick={onClick}
         minWidth="fit-content"
-        paddingRight={hasAnyFilters ? 1 : undefined}
       >
         <HStack gap={0}>
           <FilterIconWithBadge count={filterCount} />
           <Text paddingLeft={2}>{children}</Text>
-          {hasAnyFilters && onClear && (
-            <Tooltip content="Clear all filters" positioning={{ gutter: 0 }}>
-              <Button
-                as={Box}
-                role="button"
-                variant="plain"
-                width="fit-content"
-                minWidth={0}
-                display="flex"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClear?.();
-                }}
-                paddingX={2}
-              >
-                <X width={12} style={{ minWidth: "12px" }} />
-              </Button>
-            </Tooltip>
-          )}
         </HStack>
       </Button>
+      {hasAnyFilters && onClear && (
+        <Tooltip content="Clear all filters" positioning={{ gutter: 0 }}>
+          <Button
+            size="sm"
+            variant="plain"
+            width="fit-content"
+            minWidth={0}
+            paddingX={2}
+            aria-label="Clear all filters"
+            onClick={onClear}
+          >
+            <X width={12} style={{ minWidth: "12px" }} />
+          </Button>
+        </Tooltip>
+      )}
       {setNegateFilters && (
         <Tooltip content="Negate filters" positioning={{ gutter: 0 }}>
           <Button

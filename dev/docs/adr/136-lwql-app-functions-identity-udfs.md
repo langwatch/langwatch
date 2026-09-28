@@ -29,7 +29,7 @@ plus [specs/instant-evals/classifier.feature](../../../specs/instant-evals/class
 ## Context
 
 LWQL lets a customer query their traces with SQL, and the datasets it exposes
-are deliberately *metrics and dimensions*: counts, latencies, models, ids. The
+are deliberately _metrics and dimensions_: counts, latencies, models, ids. The
 text of a conversation is not in them. That is a correct default for analytics
 and a wall for everything else people want to do with production history: read
 a thread, export training data, and (next) ask a judge a question about every
@@ -52,7 +52,7 @@ Whatever this is, it cannot be a rewriter.
 
 An app function is two halves.
 
-**In the database**, a pure projection SQL UDF over the function's *key*
+**In the database**, a pure projection SQL UDF over the function's _key_
 arguments. The identity on the single key for almost all of them, `tuple(...)`
 for the one whose key is a pair. `conversation(x)` evaluates to `x`. The
 customer's SQL therefore runs verbatim, under the same row policy as any other
@@ -84,7 +84,7 @@ statement never runs. The alternatives were:
   syntax. This works, and was the fallback if the spike had failed. It is worse
   for the reason the whole feature exists: the caller is usually an agent
   writing SQL, and a value it has to ask for outside the SQL is a value it has
-  to learn a second grammar for. It also cannot say *which expression* is the
+  to learn a second grammar for. It also cannot say _which expression_ is the
   key without naming a column, so it cannot express
   `llm_readable_trace(concat(TraceId, ''), 8000)`.
 
@@ -175,7 +175,7 @@ ADR-159 records that the app self-provisions the whole LangWatchQL access model
 on every deployment. App functions run under that same app-owned path: they are
 SQL provisioned by the application at boot, not config. There is no XML form of
 `CREATE FUNCTION` for a SQL UDF; the only config-time UDF form,
-`user_defined_executable_functions_config`, is for *executable* UDFs that fork
+`user_defined_executable_functions_config`, is for _executable_ UDFs that fork
 a process per call, which is not what this is.
 
 So they are SQL-provisioned by the application on every deployment, applied by
@@ -216,11 +216,11 @@ which is already what the thread read's own `LIMIT 1000` allows.
 
 Three ceilings, three behaviours, all reported:
 
-| Ceiling | Behaviour | Reported as |
-|---|---|---|
-| `maxHydratedBytes` (32 MB) | trailing rows dropped | `RESULT_TRUNCATED`, `meta.ceiling = "hydratedBytes"` |
-| `maxHydratedValueBytes` (4 MB) | that value cut on a UTF-8 boundary | `APP_FUNCTION_VALUE_TRUNCATED` |
-| a key naming nothing | that cell is null | `APP_FUNCTION_UNRESOLVED_KEYS` |
+| Ceiling                        | Behaviour                          | Reported as                                          |
+| ------------------------------ | ---------------------------------- | ---------------------------------------------------- |
+| `maxHydratedBytes` (32 MB)     | trailing rows dropped              | `RESULT_TRUNCATED`, `meta.ceiling = "hydratedBytes"` |
+| `maxHydratedValueBytes` (4 MB) | that value cut on a UTF-8 boundary | `APP_FUNCTION_VALUE_TRUNCATED`                       |
+| a key naming nothing           | that cell is null                  | `APP_FUNCTION_UNRESOLVED_KEYS`                       |
 
 `maxHydratedBytes` is a second, much larger ceiling rather than a raised
 `maxResultBytes` because the two bound different things: the database returns a
@@ -297,7 +297,7 @@ judge, and that text is normally an extraction function. So the validator admits
 an extraction call inside an eval call and nothing else: not an eval inside an
 eval, not an extraction inside an extraction, not an eval inside an extraction.
 The database makes this work on its own — two identity UDFs compose to the
-identity, so the column carries the *inner* function's key — and the hydration
+identity, so the column carries the _inner_ function's key — and the hydration
 stage runs the extraction first and judges what it produced. Deeper nesting has
 nowhere to run: hydration reads one key per column and computes one value from
 it, so a second extraction inside the first would have no key of its own.
@@ -337,7 +337,7 @@ reason §5 already gives. `instant_eval_query_budget_exceeded` (422) refuses a
 synchronous query whose estimated tokens exceed the per-query budget, before
 anything is sent, and its remediation says to run the statement as a job.
 `instant_eval_classifier_unavailable` (503, `provider` fault) is the case where
-*nothing* was judged; a query where some texts went unjudged answers normally
+_nothing_ was judged; a query where some texts went unjudged answers normally
 with null cells and an `INSTANT_EVAL_SKIPPED` diagnostic naming the reasons.
 Gating is a product flag on the project **and** a configured classifier on the
 deployment, together: publishing a function as available where nothing can
@@ -357,7 +357,7 @@ plan, and each one is pinned by a test built from the captured response:
   accepts only levels the question actually offered, which is what keeps the
   reading correct if the keys ever become the criteria themselves.
 - **A score holds at most ten levels.** Eleven is refused with `Too many score
-  levels. Must have at most 10 levels.`, so `eval_score(text, 'x', 0, 10)` is
+levels. Must have at most 10 levels.`, so `eval_score(text, 'x', 0, 10)` is
   refused by the validator where it was written rather than once per row at the
   provider. The ceiling is published through the classifier's limits, so there
   is one number rather than two that can disagree.

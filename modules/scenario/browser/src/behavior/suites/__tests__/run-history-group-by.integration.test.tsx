@@ -8,7 +8,6 @@ import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import {
   computeGroupSummary,
   GroupRow,
-  makeScenarioRunData,
   type RunGroup,
   RunHistoryFilters,
   type RunHistoryFilterValues,
@@ -16,6 +15,8 @@ import {
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { makeScenarioRunData } from "./run-history-fixtures.ts";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),

@@ -1,37 +1,48 @@
 /**
- * A stored cost rule as the settings table reads it: `null` ("no rate set")
- * converts once here to "absent" for the cell. A family-local copy; the old
- * module survives for `LLMModelCostDrawer`.
+ * A listed cost as the settings table and the cost drawer read it: a stored rule's `null` ("no
+ * rate set") converts once here to "absent" for the cell, and a catalogue rate carries no id,
+ * scope or timestamps, which is how the table tells it from a stored rule.
  */
 
 import type { WireOf } from "@langwatch/api/web";
-import type { ModelCost as StoredModelCost } from "@langwatch/model-provider-contract";
+import type {
+  ModelCost as StoredModelCost,
+  ModelCostListRow,
+} from "@langwatch/model-provider-contract";
 
 /** A cost rule as the browser receives it: its instants are ISO strings. */
 type ModelCost = WireOf<StoredModelCost>;
+type ListedCost = WireOf<ModelCostListRow>;
 
-export type LLMModelCostRow = Omit<
-  ModelCost,
-  | "projectId"
-  | "inputCostPerToken"
-  | "outputCostPerToken"
-  | "cacheReadCostPerToken"
-  | "cacheCreationCostPerToken"
-  | "cacheCreation1hCostPerToken"
-> & {
-  projectId?: string;
-  inputCostPerToken?: number;
-  outputCostPerToken?: number;
-  cacheReadCostPerToken?: number;
-  cacheCreationCostPerToken?: number;
-  cacheCreation1hCostPerToken?: number;
-};
+export type LLMModelCostRow = Partial<
+  Pick<ModelCost, "id" | "organizationId" | "scopeType" | "scopeId" | "createdAt" | "updatedAt">
+> &
+  Pick<ModelCost, "model" | "regex"> & {
+    projectId?: string;
+    inputCostPerToken?: number;
+    outputCostPerToken?: number;
+    cacheReadCostPerToken?: number;
+    cacheCreationCostPerToken?: number;
+    cacheCreation1hCostPerToken?: number;
+  };
 
 function absent(rate: number | null): number | undefined {
   return rate ?? undefined;
 }
 
-export function toLLMModelCostRow(cost: ModelCost): LLMModelCostRow {
+export function toLLMModelCostRow(cost: ListedCost): LLMModelCostRow {
+  if (!("id" in cost)) {
+    return {
+      model: cost.model,
+      regex: cost.regex,
+      inputCostPerToken: cost.inputCostPerToken,
+      outputCostPerToken: cost.outputCostPerToken,
+      cacheReadCostPerToken: cost.cacheReadCostPerToken,
+      cacheCreationCostPerToken: cost.cacheCreationCostPerToken,
+      cacheCreation1hCostPerToken: cost.cacheCreation1hCostPerToken,
+    };
+  }
+
   return {
     ...cost,
     projectId: cost.projectId ?? undefined,

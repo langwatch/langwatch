@@ -23,10 +23,20 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "catalog:",
+    "@ai-sdk/provider": "^3.0.13",
     "@elevenlabs/elevenlabs-js": "catalog:",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
     "@langwatch/egress": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/scenario": "catalog:",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/scenario-process": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/api-logs": "catalog:",
     "@opentelemetry/context-async-hooks": "catalog:",
@@ -41,9 +51,16 @@
     "@opentelemetry/sdk-trace-node": "catalog:",
     "@opentelemetry/semantic-conventions": "catalog:",
     "@prisma/client": "catalog:",
-    "pino": "catalog:"
+    "ai": "catalog:",
+    "jsonpath-plus": "catalog:",
+    "langwatch": "workspace:*",
+    "pino": "catalog:",
+    "undici": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/config": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "esbuild": "catalog:",
     "typescript": "catalog:",

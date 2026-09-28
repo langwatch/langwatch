@@ -52,6 +52,8 @@ export type PromptCopyTarget = {
   name: string;
   slug: string;
   teamName?: string;
+  /** Whether the reader may create prompts there; a closed target is greyed, not hidden. */
+  canCreate: boolean;
 };
 
 /**

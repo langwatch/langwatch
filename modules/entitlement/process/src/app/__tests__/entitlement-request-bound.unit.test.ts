@@ -157,7 +157,7 @@ describe("EntitlementApp.requestBound", () => {
         organization: createApiFixture<OrganizationApi>({}),
         project: createApiFixture<ProjectApi>({}),
         licensing: createApiFixture<LicensingApi>({
-          resolve: async () => free,
+          resolve: async () => ({ granted: true, plan: free }),
         }),
       })
       .boot();

@@ -20,13 +20,12 @@
     "start": "pnpm -s run start:prepare:db && node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
     "predev": "node ../../dev/scripts/ensure-built.mjs",
     "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
-    "task": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/tasks/tasks.entrypoint.ts",
     "typecheck": "tsc -b tsconfig.test.json",
     "pretest": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
     "test": "vitest run",
     "pretest:unit": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
     "test:stress": "vitest run --exclude '**/node_modules/**' src/__tests__/collector.stress.test.ts",
-    "check:gateway-control-plane": "node --experimental-transform-types scripts/check-gateway-control-plane.ts"
+    "openapi:check": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail && vitest run src/__tests__/openapi-document-drift.integration.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "catalog:",
@@ -130,8 +129,8 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/role-process": "workspace:*",
-    "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/scenario-child": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/scenario-process": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",
     "@langwatch/secret-process": "workspace:*",

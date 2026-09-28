@@ -3,7 +3,7 @@ Feature: The published OpenAPI document is generated from the module declaration
   I want the document to describe the routes the installed modules declare
   So that a generated call does not 404 against an operation the document promised
 
-  # The document at apps/api/src/features/discovery/openapi-document.json is a
+  # The document at specs/api-reference/openapi-document.json is a
   # FROZEN artifact: three routes serve it and both SDKs generate clients from
   # it. Its first producer read a doors table and composed the whole API
   # process over stand-in collaborators that refused if a handler reached them,
@@ -182,6 +182,17 @@ Feature: The published OpenAPI document is generated from the module declaration
       Then the operation publishes that shape as its JSON request body
 
   Rule: a documented operation no declaration publishes fails the check
+
+    # The checker boots the api over memory stores, composes the application
+    # every process serves, and matches each documented operation against its
+    # route table. Accepted gaps live in openapi-unserved-baseline.json.
+
+    @integration
+    Scenario: Every operation the committed document lists is answered by the composed API
+      Given the committed document and the checker's baseline
+      When the check runs against the composed api application
+      Then every documented operation outside the baseline has a route
+      And no baseline entry names an operation that is served again
 
     @unit
     Scenario: A documented operation with no declaration behind it is reported as removed

@@ -13,15 +13,7 @@ import {
 } from "@langwatch/agent-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
-import type { SuiteTarget } from "@langwatch/suite-contract";
-
-/** What this module reads about an agent, and nothing more. */
-export type ConnectedTargetAgent = {
-  id: string;
-  name: string;
-  type: string;
-  ownerUserId?: string | null;
-};
+import type { ConnectedTargetAgent, SuiteTarget } from "@langwatch/suite-contract";
 
 /** The row a name-and-environment reference is resolved against. */
 type ConnectedAgentRow = {
@@ -137,7 +129,6 @@ export class ConnectedTargetService {
     );
   }
 }
-
 
 /**
  * One target with its `<name>@<environment>` reference replaced by an agent

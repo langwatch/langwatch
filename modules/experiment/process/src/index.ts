@@ -44,20 +44,13 @@ export {
   buildStripScoreEvaluatorIds,
   shouldStripScore,
 } from "./eventing/experiment-evaluator-score-filter.process.ts";
-export { ExperimentConnectedDispatch } from "./services/experiment-connected-cell.service.ts";
-export {
-  ExperimentConnectedAgentOwnership,
-  type ExperimentConnectedAgentSubject,
-} from "./services/experiment-run-driver.service.ts";
 
-export { ExperimentEvaluationReporting } from "./services/experiment-run-storage.service.ts";
 export type {
   ExperimentRunProgressFailure,
   ExperimentRunProgressState,
   ExperimentRunProgressSummary,
 } from "./repositories/experiment-run-progress.repository.ts";
 export { ExperimentSandboxCredential } from "./services/experiment-run-sandbox-key.service.ts";
-export { ExperimentStudioDispatch } from "./services/experiment-cell-execution.service.ts";
 
 export type {
   ExperimentRunCollaborators,

@@ -82,9 +82,15 @@ const samlSubjectImplementation = {
 
 type SocialProviders = NonNullable<BetterAuthOptions["socialProviders"]>;
 
+/** What a social provider calls out to while a sign-in is in flight. */
+export type SocialProviderHooks = Readonly<{
+  /** Given the Microsoft id token claims before better-auth's lookup; a throw stops the sign-in. */
+  onMicrosoftProfile?: (profile: Record<string, unknown>) => Promise<void>;
+}>;
+
 /** Each configured social provider, with the profile fields its API names. */
 const socialProviderImplementation = {
-  execute(configuration: SocialProviderConfiguration): SocialProviders {
+  execute(configuration: SocialProviderConfiguration, hooks: SocialProviderHooks): SocialProviders {
     const socialProviders: SocialProviders = {};
     for (const provider of findConfiguredSocialProviders(configuration)) {
       if (provider.key === "google") {
@@ -122,13 +128,16 @@ const socialProviderImplementation = {
           clientId: provider.clientId,
           clientSecret: provider.clientSecret,
           tenantId: provider.tenantId,
-          mapProfileToUser: (profile) => ({
-            name: fallbackName(profile as Record<string, unknown>),
-            email:
-              (profile as { email?: string }).email ??
-              (profile as { mail?: string }).mail ??
-              (profile as { userPrincipalName?: string }).userPrincipalName,
-          }),
+          mapProfileToUser: async (profile) => {
+            await hooks.onMicrosoftProfile?.({ ...profile });
+            return {
+              name: fallbackName(profile as Record<string, unknown>),
+              email:
+                (profile as { email?: string }).email ??
+                (profile as { mail?: string }).mail ??
+                (profile as { userPrincipalName?: string }).userPrincipalName,
+            };
+          },
         };
       }
     }
@@ -410,8 +419,9 @@ export function isSamlSub(sub: unknown): boolean {
 
 export function buildSocialProviders(
   configuration: SocialProviderConfiguration,
+  hooks: SocialProviderHooks = {},
 ): NonNullable<BetterAuthOptions["socialProviders"]> {
-  return socialProviderImplementation.execute(configuration);
+  return socialProviderImplementation.execute(configuration, hooks);
 }
 
 export function parseIssuerUrl(issuer: string, envName: string): URL {

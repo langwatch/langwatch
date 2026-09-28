@@ -1,6 +1,8 @@
 import type {
   JoinRequestJoining,
   JoinRequestAdmitted,
+  LimitCheckResult,
+  LimitType,
   OrganizationInvite,
   OrganizationInviteValidation,
   OrganizationListedInvite,
@@ -96,13 +98,8 @@ export type OrganizationPlanUser = Readonly<{
 /** Which seat kind a role change is asking the organization to spend. */
 export type OrganizationSeatChangeType = string;
 
-/** What a seat check answers when it refuses. */
-export type OrganizationSeatDecision = Readonly<{
-  allowed: boolean;
-  limitType?: string;
-  current?: number;
-  max?: number;
-}>;
+/** What a seat check answers, counts included: the `licenseEnforcement.*` answer. */
+export type OrganizationSeatDecision = LimitCheckResult;
 
 /**
  * The seat and plan gates on a membership write. Deliberately two methods rather than the
@@ -114,7 +111,7 @@ export interface OrganizationSeatLicense {
    * throws, since only the caller knows how to turn a refusal into a named error. */
   checkLimit(input: {
     organizationId: string;
-    resource: "members" | "membersLite";
+    resource: LimitType;
     user?: OrganizationPlanUser | undefined;
   }): Promise<OrganizationSeatDecision>;
 
@@ -363,11 +360,11 @@ export interface OrganizationInvitations {
   maskAddress(email: string): string;
   /** PENDING / ACCEPTED / EXPIRED / REVOKED, expiry included. */
   displayStatus(invite: OrganizationInvitationsStatusFacts): string;
-  /** Tells the organization's administrators a seat limit was reached. */
+  /** Records that a refused invitation reached a seat limit, for billing's ops alert. */
   notifySeatLimitReached(
     input: Readonly<{
       organizationId: string;
-      limitType: string;
+      limitType: LimitType;
       current: number;
       max: number;
     }>,
@@ -388,13 +385,6 @@ export interface OrganizationPlanGate {
   assertCustomRolesAllowed: (input: Readonly<{ organizationId: string }>) => Promise<void>;
   assertAuditLogsAllowed(input: Readonly<{ organizationId: string }>): Promise<void>;
   assertScimAllowed(input: Readonly<{ organizationId: string }>): Promise<void>;
-  /**
-   * Refuses a built-in team-role change that would push the organization past
-   * the member seats its licence covers. Throws.
-   */
-  assertTeamRoleChangeWithinSeatLimits(
-    input: Readonly<{ organizationId: string; teamId: string; userId: string }>,
-  ): Promise<void>;
 }
 
 /**

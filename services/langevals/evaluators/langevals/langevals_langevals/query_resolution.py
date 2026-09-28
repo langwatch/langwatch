@@ -1,13 +1,12 @@
 import litellm
 from litellm.cost_calculator import completion_cost
 from litellm.utils import get_max_tokens
-from litellm import Choices, Message
 from litellm.files.main import ModelResponse
 from litellm.utils import trim_messages
 from pydantic import Field
 from typing import List, Optional, Literal, cast
-import json
 
+from langevals_core.tool_calls import read_tool_call_arguments
 from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     BaseEvaluator,
@@ -135,9 +134,11 @@ class QueryResolutionEvaluator(
             },
         )
         response = cast(ModelResponse, response)
-        choice = cast(Choices, response.choices[0])
-        arguments = json.loads(
-            cast(Message, choice.message).tool_calls[0].function.arguments
+        arguments = read_tool_call_arguments(
+            response,
+            "query_resolution_evaluator",
+            required=["reasoning", "queries_total", "queries_answered"],
+            model=self.settings.model,
         )
 
         cost = completion_cost(completion_response=response, prompt=prompt)

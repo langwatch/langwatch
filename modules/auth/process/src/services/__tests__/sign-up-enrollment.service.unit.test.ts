@@ -14,12 +14,14 @@ const OKTA: SignInMethod = { id: "okta", kind: "federated", connectionId: "conn_
 function enrollment({
   decision,
   proofHolds = true,
+  unconfirmedProofHolds = false,
   taken = false,
   defaults = [PASSWORD, PASSKEY],
   passwordAllowed = true,
 }: {
   decision: RoutingDecision;
   proofHolds?: boolean;
+  unconfirmedProofHolds?: boolean;
   taken?: boolean;
   defaults?: readonly SignInMethod[];
   passwordAllowed?: boolean;
@@ -27,6 +29,7 @@ function enrollment({
   const asked: { routed: (string | null)[]; takenFor: string[] } = { routed: [], takenFor: [] };
   const service = SignUpEnrollmentService.create({
     validateAddressProof: async () => proofHolds,
+    validateUnconfirmedAddressProof: async () => unconfirmedProofHolds,
     route: async ({ identifier }) => {
       asked.routed.push(identifier);
       return decision;
@@ -57,6 +60,25 @@ describe("SignUpEnrollmentService", () => {
         service.getEnrollment({ email: "sam@example.com", addressProof: "stale" }),
       ).rejects.toMatchObject({ code: "auth_no_address_to_confirm" });
       expect(asked.routed).toEqual([]);
+    });
+  });
+
+  describe("when only an unconfirmed proof holds, where the installation cannot send email", () => {
+    /** @scenario "An installation that cannot send email signs up with a password and leaves the address unconfirmed" */
+    it("offers the default methods without the passkey", async () => {
+      const { service } = enrollment({
+        decision: UNKNOWN,
+        proofHolds: false,
+        unconfirmedProofHolds: true,
+      });
+
+      await expect(
+        service.getEnrollment({ email: "sam@example.com", addressProof: "unconfirmed" }),
+      ).resolves.toEqual({
+        outcome: "enroll",
+        methodSet: [PASSWORD],
+        reasonCode: "no_domain_match",
+      });
     });
   });
 

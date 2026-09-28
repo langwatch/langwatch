@@ -4,7 +4,7 @@ Supersedes `dev/docs/plans/unserved-documented-operations-2026-09-14.md`.
 
 > **Correction, 2026-09-16 (later the same day): the counts below are not
 > evidence.** Every Sep-16 run — r4, r5 and r6 — exited 2 with `CREDENTIAL
-> LOST`, and r5 is the run this document was written from. r4 lost the project
+LOST`, and r5 is the run this document was written from. r4 lost the project
 > key before the first probe; r5 and r6 lost the **organization key** partway
 > through, on the base. apidiff's own verdict says what that means: "this run's
 > counts are not comparable with any other run: probes made after the loss
@@ -26,7 +26,7 @@ Supersedes `dev/docs/plans/unserved-documented-operations-2026-09-14.md`.
 > Reading them the other way round inverts every finding.
 
 **The method changed, and it is stronger.** The Sep-12 and Sep-14 measurements
-diffed two OpenAPI *documents*. This one diffs two *running instances*: an
+diffed two OpenAPI _documents_. This one diffs two _running instances_: an
 `apidiff run` booted `origin/main` (`7b5e10e7ae`) and the branch
 (`395125a55e`) side by side and probed the union, so an operation counted
 absent here was actually requested and actually not answered — a published
@@ -42,19 +42,19 @@ committed without `@langwatch/browser-trpc`. r8 and r9 are the first runs
 since Sep 14 whose credentials all survived, so their counts are the first that
 mean anything.
 
-| | r6 (invalid) | r8 | r9 |
-| --- | ---: | ---: | ---: |
-| differing operations | 94 | 89 | **81** |
-| distinct causes | 24 | 21 | 17 |
+|                      | r6 (invalid) |  r8 |     r9 |
+| -------------------- | -----------: | --: | -----: |
+| differing operations |           94 |  89 | **81** |
+| distinct causes      |           24 |  21 |     17 |
 
 Closed, each confirmed by a run rather than by reading the code:
 
-| cause | closed by |
-| --- | --- |
-| `status-class-mismatch:401-200` / `401-201` (5) | nothing — they were the dead organization credential, and vanished once the SCIM probe stopped deleting the user it hangs off |
-| `permission-diff:404-500` (2) | scenarios throwing `ScenarioNotFoundError` instead of downgrading it |
-| `not-found-as-500:404-500` (3), `status-class-mismatch:200-500` (1), `mutation-not-visible` (1) | `SuiteService.testSuiteToSuite` no longer handing a test-suite row to the strict suite schema |
-| `handled-refusal-degraded:403-500` (2) | `AnalyticsApp` implementing `assertCustomChartPlaygroundEnabled` over the peer APIs it already held |
+| cause                                                                                           | closed by                                                                                                                     |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `status-class-mismatch:401-200` / `401-201` (5)                                                 | nothing — they were the dead organization credential, and vanished once the SCIM probe stopped deleting the user it hangs off |
+| `permission-diff:404-500` (2)                                                                   | scenarios throwing `ScenarioNotFoundError` instead of downgrading it                                                          |
+| `not-found-as-500:404-500` (3), `status-class-mismatch:200-500` (1), `mutation-not-visible` (1) | `SuiteService.testSuiteToSuite` no longer handing a test-suite row to the strict suite schema                                 |
+| `handled-refusal-degraded:403-500` (2)                                                          | `AnalyticsApp` implementing `assertCustomChartPlaygroundEnabled` over the peer APIs it already held                           |
 
 Two classes that are **not** defects, checked against the transcripts rather
 than assumed:
@@ -86,11 +86,11 @@ silently decide how much ClickHouse every simulation read scans.
 
 ## Totals
 
-| | Sep 12 | Sep 14 | Sep 16 |
-| --- | ---: | ---: | ---: |
-| union operations | — | — | 340 |
-| probed | — | — | 210 |
-| genuinely unserved | 70 | 65 | **44 probed-and-absent** |
+|                    | Sep 12 | Sep 14 |                   Sep 16 |
+| ------------------ | -----: | -----: | -----------------------: |
+| union operations   |      — |      — |                      340 |
+| probed             |      — |      — |                      210 |
+| genuinely unserved |     70 |     65 | **44 probed-and-absent** |
 
 The Sep-16 number is not the same measurement as the earlier two and should not
 be read as a burn-down against them: it counts operations the run actually
@@ -162,12 +162,12 @@ Four operations survive the correction above and are real. The branch answers
 `500`/`503` with `{"code":"internal_error","message":"An unknown error
 occurred"}` where main answered the code the caller can act on:
 
-| operation | main | branch |
-| --- | --- | --- |
-| `GET /api/scenarios/{id}` | 404 | **500** |
-| `GET /api/test-suites/{id}` | 404 | **500** |
-| `DELETE /api/test-suites/{id}` | 200 | **500** |
-| `GET /api/simulation-runs` | 200 | **503** |
+| operation                      | main | branch  |
+| ------------------------------ | ---- | ------- |
+| `GET /api/scenarios/{id}`      | 404  | **500** |
+| `GET /api/test-suites/{id}`    | 404  | **500** |
+| `DELETE /api/test-suites/{id}` | 200  | **500** |
+| `GET /api/simulation-runs`     | 200  | **503** |
 
 The cause is the one `dev/docs/best_practices/error-handling.md` already names:
 these routes throw plain `Error` subclasses — `ScenarioRestNotThereError
@@ -212,16 +212,16 @@ the house rule replaced.
 
 Classes as defined in the Sep-14 document.
 
-| module / family | count | class | note |
-| --- | ---: | :---: | --- |
-| scim | 18 | A | **not a gap** — emitted at enterprise tier (verified today). `scim.app.ts:175` already refuses `plan_not_entitled` per organization, which is the intended shape: mounted, and refused per-org. |
-| governance | 7 | B | `governance.server.ts` exists but exports worker factories, not a `defineServerModule` installer, so the generator skips it at every tier. Its package also carries 3 unresolved imports (`@ee/event-sourcing/…` ×2, `~/generated/prisma/client`). Module conversion. |
-| dataset direct-upload | 5 | D | recipe at `b383462d96^`. The branch adds `/api/stored-objects/storedObjects.*`; confirm whether the upload flow moved there deliberately before porting. |
-| langy control | 4 | B/C | needs `withTransportFacts` bindings the process refuses to boot without; the branch adds `/api/langy/conversations`, so confirm this is not a deliberate redesign before porting. |
-| scenario-events | 3 | C | **Blocked on the same decision as `/api/simulation-runs`** — see the section above. `createScenarioEventsRest` is a factory taking `simulations`, `scenarioTabs` and `broadcast`, the same infrastructure-bag members no process can supply, so `extractInlineMedia` is not the only thing holding it. Original note: Closer than Sep 14 recorded: `ScenarioApp` **already holds** `simulations`, `scenarioTabs` and `broadcast` (scenario.app.ts:105-127, wired from `setup.members`), and `platformUrl` is already `ScenarioApi`'s. Only `extractInlineMedia` is unaccounted for — and the walk it names lives in `modules/trace/process/src/services/content/trace-content-extraction.service.ts`, inside **trace**, while the transport's comment says it is "the stored-objects vertical's". Scenario depends on neither. Blocked on where that walk belongs, not on wiring. |
-| gateway providers | 4 | — | **closed** (`60708e784f`). Main's four were tombstones: 410 `gateway_provider_bindings_gone` naming the model-provider address that replaced them. The code and its customer copy were already ported and thrown by nobody; the branch now declares the four routes and throws it. |
-| `/api/track_event` | 1 | — | **closed** (`f0aa34828c`). Not blocked after all: the alias was shaped to forward through a member nobody implemented, but the monolith shared a service between the two addresses rather than forwarding. Both routes now declare over one handler body. |
-| teams | — | C | listed Sep 14 (9 operations); **not** among today's probed-and-absent set. Re-measure before acting. |
+| module / family       | count | class | note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------- | ----: | :---: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| scim                  |    18 |   A   | **not a gap** — emitted at enterprise tier (verified today). `scim.app.ts:175` already refuses `plan_not_entitled` per organization, which is the intended shape: mounted, and refused per-org.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| governance            |     7 |   B   | `governance.server.ts` exists but exports worker factories, not a `defineServerModule` installer, so the generator skips it at every tier. Its package also carries 3 unresolved imports (`@ee/event-sourcing/…` ×2, `~/generated/prisma/client`). Module conversion.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| dataset direct-upload |     5 |   D   | recipe at `b383462d96^`. The branch adds `/api/stored-objects/storedObjects.*`; confirm whether the upload flow moved there deliberately before porting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| langy control         |     4 |  B/C  | needs `withTransportFacts` bindings the process refuses to boot without; the branch adds `/api/langy/conversations`, so confirm this is not a deliberate redesign before porting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| scenario-events       |     3 |   C   | **Blocked on the same decision as `/api/simulation-runs`** — see the section above. `createScenarioEventsRest` is a factory taking `simulations`, `scenarioTabs` and `broadcast`, the same infrastructure-bag members no process can supply, so `extractInlineMedia` is not the only thing holding it. Original note: Closer than Sep 14 recorded: `ScenarioApp` **already holds** `simulations`, `scenarioTabs` and `broadcast` (scenario.app.ts:105-127, wired from `setup.members`), and `platformUrl` is already `ScenarioApi`'s. Only `extractInlineMedia` is unaccounted for — and the walk it names lives in `modules/trace/process/src/services/content/trace-content-extraction.service.ts`, inside **trace**, while the transport's comment says it is "the stored-objects vertical's". Scenario depends on neither. Blocked on where that walk belongs, not on wiring. |
+| gateway providers     |     4 |   —   | **closed** (`60708e784f`). Main's four were tombstones: 410 `gateway_provider_bindings_gone` naming the model-provider address that replaced them. The code and its customer copy were already ported and thrown by nobody; the branch now declares the four routes and throws it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `/api/track_event`    |     1 |   —   | **closed** (`f0aa34828c`). Not blocked after all: the alias was shaped to forward through a member nobody implemented, but the monolith shared a service between the two addresses rather than forwarding. Both routes now declare over one handler body.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| teams                 |     — |   C   | listed Sep 14 (9 operations); **not** among today's probed-and-absent set. Re-measure before acting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 ## Checks
 

@@ -43,12 +43,8 @@ describe("error remediation registry", () => {
     it("says a personal development agent is visible only to its owner and how to share it", () => {
       const tips = remediation("agent_environment_unresolved").tips ?? [];
 
-      expect(
-        tips.some((tip) => tip.includes("visible only to its owner")),
-      ).toBe(true);
-      expect(
-        tips.some((tip) => tip.includes("LANGWATCH_AGENT_ENVIRONMENT")),
-      ).toBe(true);
+      expect(tips.some((tip) => tip.includes("visible only to its owner"))).toBe(true);
+      expect(tips.some((tip) => tip.includes("LANGWATCH_AGENT_ENVIRONMENT"))).toBe(true);
     });
   });
 

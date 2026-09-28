@@ -165,4 +165,20 @@ describe("given a file outside the governed roots", () => {
       expect(report(code)).toHaveLength(1);
     });
   });
+
+  describe("when a production cast is an audited boundary", () => {
+    const COMPOSE = "packages/api/src/trpc/compose.ts";
+    const CAST = "const router = composed as unknown as TrpcRouterDeclaration<Api, Contract>;";
+
+    /** @scenario "An audited production boundary is exempt by file and target" */
+    it("reports nothing for that file's audited target", () => {
+      expect(report(CAST, COMPOSE)).toEqual([]);
+    });
+
+    /** @scenario "An audited production boundary is exempt by file and target" */
+    it("still reports another target in that file, and the same target elsewhere", () => {
+      expect(report("const x = y as unknown as T;", COMPOSE)).toHaveLength(1);
+      expect(report(CAST)).toHaveLength(1);
+    });
+  });
 });

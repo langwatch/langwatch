@@ -23,7 +23,7 @@ export class MemoryVoiceNonceHandoffChannel implements VoiceSocketReceiver {
   ) {}
 
   registerNonce = async (input: { nonce: string }): Promise<void> => {
-    this.registry.register({ nonce: input.nonce, child: this.child });
+    await this.registry.register({ nonce: input.nonce, child: this.child });
   };
 
   raceUpgradeRefusal = <T>(promise: Promise<T>): Promise<T> => promise;

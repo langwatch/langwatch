@@ -153,23 +153,15 @@ describe("scenario run CSV serializers", () => {
         },
       });
 
-      const criteriaRows = parse(
-        serializeRunsToCriteriaCsv({ runs: [run], includeHeader: true }),
-      );
-      expect(
-        criteriaRows.map((row) => [row.criterion, row.met, row.inconclusive]),
-      ).toEqual([
+      const criteriaRows = parse(serializeRunsToCriteriaCsv({ runs: [run], includeHeader: true }));
+      expect(criteriaRows.map((row) => [row.criterion, row.met, row.inconclusive])).toEqual([
         ["stays polite", "true", "false"],
         ["names the refund window", "false", "false"],
         ["opens a ticket", "false", "true"],
       ]);
 
-      const fullRow = parse(
-        serializeRunsToFullCsv({ runs: [run], includeHeader: true }),
-      )[0]!;
-      expect(JSON.parse(fullRow.run_inconclusive_criteria!)).toEqual([
-        "opens a ticket",
-      ]);
+      const fullRow = parse(serializeRunsToFullCsv({ runs: [run], includeHeader: true }))[0]!;
+      expect(JSON.parse(fullRow.run_inconclusive_criteria!)).toEqual(["opens a ticket"]);
       expect(JSON.parse(fullRow.run_unmet_criteria!)).toEqual([
         "names the refund window",
         "opens a ticket",

@@ -4,10 +4,8 @@ type GetAllResponse = {
   "0"?: {
     result?: {
       data?: {
-        json?: {
-          teams?: { projects?: { slug?: string }[] }[];
-        }[];
-      };
+        teams?: { projects?: { slug?: string }[] }[];
+      }[];
     };
   };
 };
@@ -23,10 +21,10 @@ export async function getProjectSlug(page: Page): Promise<string> {
 
   const response = await page.request.get(
     "/api/trpc/organization.getAll?batch=1&input=" +
-      encodeURIComponent(JSON.stringify({ "0": { json: {} } })),
+      encodeURIComponent(JSON.stringify({ "0": {} })),
   );
   const data = (await response.json().catch(() => null)) as GetAllResponse | null;
-  const orgs = data?.["0"]?.result?.data?.json ?? [];
+  const orgs = data?.["0"]?.result?.data ?? [];
   for (const org of orgs) {
     for (const team of org.teams ?? []) {
       const slug = (team.projects ?? [])[0]?.slug;

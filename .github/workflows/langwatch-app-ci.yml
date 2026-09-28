@@ -700,6 +700,10 @@ jobs:
       - name: Run @langwatch/scenario-process tests
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/scenario-process run test
+      # the scenario child program: agent adapters, turn execution, the bundle it spawns from.
+      - name: Run @langwatch/scenario-child tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/scenario-child run test
       # the suite and run-plan forms.
       - name: Run @langwatch/suite-browser tests
         if: matrix.app == 'platform-api'
@@ -1040,7 +1044,7 @@ jobs:
         run: >-
           pnpm --filter @langwatch/architecture-enforcer lint --
           --no-declarations
-          --policies application-boundaries,browser-kit-exports,declaration-project-references,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams
+          --policies application-boundaries,browser-kit-exports,declaration-project-references,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams
 
       # THE GATE. Oxlint over the whole governed tree, and a non-zero exit
       # fails the job. A config error and a lint violation both surface here.
@@ -1130,24 +1134,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh feature-parity
 
-  # The frozen OpenAPI document against the surface the API process mounts.
+  # The frozen OpenAPI document against the routes the API process answers.
   #
-  # This replaces `openapi-completeness`, which was deleted at the deployment
-  # cutover along with the generator it read. The check is not the same one and
-  # deliberately so. The old pair asserted that every documented operation
-  # carried a body, parameters and a success response; this one asserts the
-  # fact those presupposed — that the operation is still SERVED.
+  # `specs/api-reference/openapi-document.json` is frozen: three routes serve
+  # it and the SDKs generate clients from it, so this job never writes it. The
+  # check boots the api over memory stores, composes its application and
+  # matches every documented operation against the route table.
   #
-  # `apps/api/src/features/discovery/openapi-document.json` is frozen: three
-  # routes serve it and both SDKs generate clients from it, so this job never
-  # writes it. The task describes the mounted surface into a scratch file and
-  # diffs the two.
-  #
-  # ONE direction fails: an operation the document lists that no route on the
-  # process answers. An integrator generated a client from it, and the call now
-  # 404s. Operations served and undocumented are printed and never failed on,
-  # because the document is frozen and every route added since the freeze is
-  # one of them — failing there would make this a wall rather than a signal.
+  # ONE direction fails: an operation the document lists that no route
+  # answers, since a client generated from it would 404. Accepted gaps sit in
+  # `specs/api-reference/openapi-unserved-baseline.json`, and an entry that is
+  # served again fails too, so the baseline only shrinks. Operations served and
+  # undocumented are reported and never failed on.
   openapi-drift:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
@@ -1165,12 +1163,12 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/platform-api..."
+          install: "@langwatch/platform-api... @langwatch/ui..."
 
       - uses: ./.github/actions/prepare-generated-files
 
       - name: Check the frozen OpenAPI document against the served surface
-        run: pnpm --filter @langwatch/platform-api run task openapi-check
+        run: pnpm --filter @langwatch/platform-api run openapi:check
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -1280,8 +1278,11 @@ jobs:
           --filter "@langwatch/worker..."
           --filter "@langwatch/ui..."
 
-      - name: Build mcp-server
-        run: pnpm --filter @langwatch/mcp-server run build
+      # build:types reads the generated Prisma client and the SDK's
+      # declarations, so the generated files and the four dist-resolving
+      # packages (SDK, mcp-server, ksuid, mail) come first.
+      - name: Prepare files
+        run: pnpm start:prepare:files && pnpm ensure:built
 
       # apps/api and apps/worker declare no build — they run from source through
       # tsx. What is built here is the browser bundle the API process serves,
@@ -1300,7 +1301,7 @@ jobs:
           SMOKE_BROWSER_CHANNEL: chrome
         run: |
           node --test scripts/__tests__/smoke-boot.browser.test.mjs
-          pnpm exec vite preview --port 4173 --outDir dist/client &
+          pnpm exec vite preview --configLoader runner --port 4173 --outDir dist/client &
           PREVIEW_PID=$!
           trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
           for i in $(seq 1 30); do
@@ -1335,6 +1336,9 @@ jobs:
 
       - name: Test extract-failures.sh
         run: bash .github/scripts/__tests__/extract-failures.test.sh
+
+      - name: Test vitest-changed-files.sh
+        run: bash .github/scripts/__tests__/vitest-changed-files.test.sh
 
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
@@ -1444,8 +1448,7 @@ jobs:
           cat apps/api/test-failures.txt
 
   langwatch-app-complete:
-    needs:
-      [
+    needs: [
         changes,
         # `affected` decides test-unit's matrix, and test-unit is an allowed
         # skip. So if this job failed and were not named here, test-unit would

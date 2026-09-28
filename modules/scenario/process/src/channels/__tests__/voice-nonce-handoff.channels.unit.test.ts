@@ -2,25 +2,28 @@
  * @see specs/features/agents/voice-phone.feature
  */
 
-import type { ChildProcess } from "node:child_process";
+import { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 
-import { describe, expect, it, vi } from "vitest";
-
-import { VoiceNonceRegistryService } from "../../services/voice-nonce-registry.service.ts";
 import {
-  handleVoiceNonceRegisterMessage,
   isVoiceMediaUpgradeRefusedMessage,
   isVoiceNonceRegisterAckMessage,
   isVoiceNonceRegisterMessage,
-  raceAgainstUpgradeRefusal,
-  requestNonceRegistration,
   VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE,
   VOICE_NONCE_REGISTER_ACK_MESSAGE,
   VOICE_NONCE_REGISTER_MESSAGE,
-  VoiceMediaUpgradeRefusedError,
   type VoiceNonceRegisterAckMessage,
   type VoiceNonceRegisterMessage,
+} from "@langwatch/scenario-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { MemoryVoiceNonceRepository } from "../../repositories/memory/memory.voice-nonce.repository.ts";
+import { VoiceNonceRegistryService } from "../../services/voice-nonce-registry.service.ts";
+import {
+  handleVoiceNonceRegisterMessage,
+  raceAgainstUpgradeRefusal,
+  requestNonceRegistration,
+  VoiceMediaUpgradeRefusedError,
   VoiceNonceRegistrationFailedError,
   VoiceNonceRegistrationNoChannelError,
   VoiceNonceRegistrationTimeoutError,
@@ -147,48 +150,44 @@ describe("requestNonceRegistration", () => {
 });
 
 describe("handleVoiceNonceRegisterMessage", () => {
+  const message = {
+    type: VOICE_NONCE_REGISTER_MESSAGE,
+    requestId: "req-1",
+    nonce: "n1",
+  } as const;
+
   describe("given a registry that accepts the registration", () => {
-    it("registers the nonce against the sending child and acks ok", () => {
-      const registry = VoiceNonceRegistryService.create();
-      const child = {} as ChildProcess;
-      const ack = handleVoiceNonceRegisterMessage({
-        message: {
-          type: VOICE_NONCE_REGISTER_MESSAGE,
-          requestId: "req-1",
-          nonce: "n1",
-        },
+    it("registers the nonce against the sending child, then acks ok", async () => {
+      const registry = VoiceNonceRegistryService.create({
+        nonces: MemoryVoiceNonceRepository.create(),
+      });
+      const child = new ChildProcess();
+
+      const ack = await handleVoiceNonceRegisterMessage({
+        message,
         child,
         registry,
       });
 
-      expect(ack).toEqual({
-        type: VOICE_NONCE_REGISTER_ACK_MESSAGE,
-        requestId: "req-1",
-        ok: true,
-      });
-      // The registration is real, not merely reported: a subsequent consume
-      // resolves to the exact child that registered it (AC from the brief:
-      // "the parent registers the nonce such that a subsequent consume(nonce)
-      // on the real registry returns the child").
-      expect(registry.consume("n1")).toEqual({ ok: true, child });
+      expect(ack).toEqual({ type: VOICE_NONCE_REGISTER_ACK_MESSAGE, requestId: "req-1", ok: true });
+      // The registration is real, not merely reported: consuming it answers this child.
+      await expect(registry.consume("n1")).resolves.toEqual({ ok: true, child });
     });
   });
 
-  describe("given a registry that throws", () => {
-    it("acks with ok:false and the thrown reason, without letting the error propagate", () => {
-      const registry = {
-        register: vi.fn(() => {
-          throw new Error("registry exploded");
-        }),
-      };
-      const child = {} as ChildProcess;
-      const ack = handleVoiceNonceRegisterMessage({
-        message: {
-          type: VOICE_NONCE_REGISTER_MESSAGE,
-          requestId: "req-1",
-          nonce: "n1",
+  describe("given a registry whose store fails", () => {
+    it("acks with ok:false and the reason, without letting the error propagate", async () => {
+      const registry = VoiceNonceRegistryService.create({
+        nonces: {
+          store: () => Promise.reject(new Error("store unreachable")),
+          take: () => Promise.resolve({ taken: false }),
+          discard: () => Promise.resolve(),
         },
-        child,
+      });
+
+      const ack = await handleVoiceNonceRegisterMessage({
+        message,
+        child: new ChildProcess(),
         registry,
       });
 
@@ -196,7 +195,7 @@ describe("handleVoiceNonceRegisterMessage", () => {
         type: VOICE_NONCE_REGISTER_ACK_MESSAGE,
         requestId: "req-1",
         ok: false,
-        error: "registry exploded",
+        error: "store unreachable",
       });
     });
   });

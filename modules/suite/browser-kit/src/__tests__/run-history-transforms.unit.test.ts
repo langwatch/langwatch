@@ -15,7 +15,7 @@ import {
   groupRunsByTargetKey,
   resolveOriginLabel,
 } from "../model/run-history-transforms.ts";
-import { makeBatchRun, makeScenarioRunData } from "./test-helpers.ts";
+import { makeBatchRun, makeScenarioRunData } from "./run-history-fixtures.ts";
 
 describe("groupRunsByTargetKey()", () => {
   describe("when the same agent ran on two sets of parameters", () => {

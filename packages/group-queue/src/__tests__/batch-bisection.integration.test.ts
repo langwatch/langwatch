@@ -62,6 +62,15 @@ type BisectingQueue = {
   }) => Promise<void>;
 };
 
+/** The bisector is private; driving it directly pins its contract for any root shape. */
+function processBatchBisecting(
+  queue: GroupQueueProcessor<TestPayload>,
+  args: Parameters<BisectingQueue["processBatchBisecting"]>[0],
+): Promise<void> {
+  const bisect: BisectingQueue["processBatchBisecting"] = Reflect.get(queue, "processBatchBisecting");
+  return bisect.call(queue, args);
+}
+
 const ROUTING_LABELS = {
   queue_name: "q",
   pipeline_name: "p",
@@ -483,7 +492,7 @@ describe("GroupQueueProcessor — batch bisection", () => {
         stagedJobId: `job-${i}`,
       }));
 
-      await (queue as unknown as BisectingQueue).processBatchBisecting({
+      await processBatchBisecting(queue, {
         entries,
         attempt: 1,
         routingLabels: ROUTING_LABELS,
@@ -524,7 +533,7 @@ describe("GroupQueueProcessor — batch bisection", () => {
       }));
 
       await expect(
-        (queue as unknown as BisectingQueue).processBatchBisecting({
+        processBatchBisecting(queue, {
           entries,
           attempt: 1,
           routingLabels: ROUTING_LABELS,

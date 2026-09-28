@@ -3,21 +3,24 @@
  */
 
 import {
-  CLI_COLLECTION_VERBS,
-  type CliResultDigest,
-  cardKindFor,
-  cliVerbTone,
-  type MeasuredCardKind,
-} from "@langwatch/langy-contract";
-
-import {
   CAPABILITY_CATALOG,
+  CAPABILITY_VERB_WORDING,
+  CLI_COLLECTION_VERBS,
   type CapabilityBodyWidget,
   type CapabilityCatalogEntry,
   type CapabilityIconName,
   type CapabilitySurface,
-} from "./langy-capability-catalog.ts";
-import { type CliCommand, parseCliToolName, type LangyFeatureMap } from "./langy-feature-map.ts";
+  capabilityNoun,
+  type CliCommand,
+  type CliResultDigest,
+  cardKindFor,
+  cliVerbTone,
+  type MeasuredCardKind,
+  parseCliToolName,
+  wordCapabilityProgress,
+} from "@langwatch/langy-contract";
+
+import { type LangyFeatureMap } from "./langy-feature-map.ts";
 
 /** Visual tone of the shared capability-card shell. */
 export type CapabilityTone = "read" | "created" | "updated" | "removed";
@@ -192,65 +195,9 @@ export function buildResourceHref({
   return buildSurfaceHref({ surface, projectSlug, resourceId });
 }
 
-/**
- * How a CLI verb READS, in both tenses. `past` titles a SETTLED write card ("New
- * evaluator", "Delete trigger"); `present` titles a RUNNING one ("Creating evaluator").
- */
-const VERB_WORDING: Record<string, { past: string; present: string }> = {
-  search: { past: "", present: "Searching" },
-  query: { past: "", present: "Searching" },
-  list: { past: "", present: "Listing" },
-  versions: { past: "", present: "Listing" },
-  "list-runs": { past: "", present: "Listing" },
-  records: { past: "", present: "Listing" },
-  get: { past: "", present: "Loading" },
-  show: { past: "", present: "Loading" },
-  view: { past: "", present: "Loading" },
-  status: { past: "", present: "Checking" },
-  health: { past: "", present: "Checking" },
-  results: { past: "", present: "Loading" },
-  tail: { past: "", present: "Loading" },
-  export: { past: "", present: "Exporting" },
-  download: { past: "", present: "Downloading" },
-  create: { past: "New", present: "Creating" },
-  init: { past: "New", present: "Creating" },
-  add: { past: "Add to", present: "Adding to" },
-  upload: { past: "Upload to", present: "Uploading to" },
-  update: { past: "Update", present: "Updating" },
-  set: { past: "Set", present: "Updating" },
-  unset: { past: "Reset", present: "Updating" },
-  rotate: { past: "Rotate", present: "Rotating" },
-  rename: { past: "Rename", present: "Updating" },
-  assign: { past: "Assign", present: "Updating" },
-  restore: { past: "Restore", present: "Restoring" },
-  sync: { past: "Sync", present: "Syncing" },
-  push: { past: "Push", present: "Pushing" },
-  pull: { past: "Pull", present: "Pulling" },
-  duplicate: { past: "Duplicate", present: "Duplicating" },
-  delete: { past: "Delete", present: "Deleting" },
-  remove: { past: "Delete", present: "Deleting" },
-  archive: { past: "Delete", present: "Deleting" },
-  revoke: { past: "Delete", present: "Deleting" },
-  run: { past: "Run", present: "Running" },
-};
-
 /** `create` → "New", `delete`/`archive`/`revoke` → "Delete", etc. */
 function verbLabel(verb: string): string {
-  return VERB_WORDING[verb]?.past ?? "";
-}
-
-/**
- * Wording for a resource the catalog has never heard of — the version-skew fallback.
- * The command's own resource word is the only truth available, so it is humanised
- * as-is: `virtual-keys` → "virtual keys".
- */
-function humanizeResource(resource: string): {
-  singular: string;
-  plural: string;
-} {
-  const singular = resource.replace(/[_-]/g, " ").trim();
-  const plural = singular.endsWith("s") ? singular : `${singular}s`;
-  return { singular, plural };
+  return CAPABILITY_VERB_WORDING[verb]?.past ?? "";
 }
 
 /** Sentence-case a wording fragment for the overline. */
@@ -404,7 +351,7 @@ export function resolveCliCapability(
     render,
     tone,
     body,
-    noun: humanizeResource(command.resource),
+    noun: capabilityNoun(command.resource),
   };
 }
 
@@ -447,15 +394,6 @@ function cliOverline({ command, tone, noun }: CliCapability): string {
   return noun.singular;
 }
 
-/**
- * `search` → "Searching", `create` → "Creating". The present-tense twin of
- * {@link verbLabel}, read off the same {@link VERB_WORDING} row so the two
- * tenses can never drift.
- */
-function progressVerb(verb: string): string {
-  return VERB_WORDING[verb]?.present ?? "Working on";
-}
-
 /** A capability call that is still in flight, worded for its in-progress card. */
 export interface CapabilityProgress {
   surface: CapabilitySurface;
@@ -473,12 +411,12 @@ export function resolveCapabilityProgress(
   featureMap?: Pick<LangyFeatureMap, "featureForCliCommand">,
 ): CapabilityProgress | null {
   const cli = resolveCliCapability(rawName, featureMap);
-  if (!cli) return null;
-  const noun = CLI_COLLECTION_VERBS.has(cli.command.verb) ? cli.noun.plural : cli.noun.singular;
+  const progress = wordCapabilityProgress(rawName);
+  if (!cli || progress.outcome === "none") return null;
   return {
     surface: cli.surface,
     overline: capitalize(cli.noun.plural),
-    headline: `${progressVerb(cli.command.verb)} ${noun}`,
+    headline: progress.headline,
   };
 }
 

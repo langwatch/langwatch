@@ -36,7 +36,7 @@ await createApp({ role: "api" })
   .withTransports(apiDoors())
   .withEventing(producersOnly())
   .boot({
-    config: apiModuleConfig(config),   // the existing 153-line map, now type-checked
+    config: apiModuleConfig(config), // the existing 153-line map, now type-checked
     platform,
     repositories: {
       relational: "postgres",
@@ -276,9 +276,9 @@ await createApp({ role: "api" })
   .withSecrets(secrets)
   .withEncryption(cipher)
   .withObservability((o) => o.withLogging(pino).withTracing(otel()).withMetrics(otel()))
-  .withTransportAuth((a) => a
-    .withStaticTokens({ cron, langyInternal, instanceAdmin })
-    .withBrowserSession(session))
+  .withTransportAuth((a) =>
+    a.withStaticTokens({ cron, langyInternal, instanceAdmin }).withBrowserSession(session),
+  )
   .boot();
 
 // apps/worker - the same, minus the doors. That IS the difference between the roles.
@@ -325,13 +325,13 @@ The difficulty at fifty is not the count, it is knowing where each thing belongs
 Five categories, one question each, and exactly one field per category in the
 supply so nothing free-floats:
 
-| the module needs | it declares | the process supplies it as |
-| --- | --- | --- |
-| state it owns | a repository | a **store** kind |
-| another module's capability | `static dependencies` | installing that module, or `provide` |
-| a process facility | `reads(...)` | `facilities` |
-| a setting | a config slice | `config` |
-| messages to something it does not own | a channel | a **channel** kind |
+| the module needs                      | it declares           | the process supplies it as           |
+| ------------------------------------- | --------------------- | ------------------------------------ |
+| state it owns                         | a repository          | a **store** kind                     |
+| another module's capability           | `static dependencies` | installing that module, or `provide` |
+| a process facility                    | `reads(...)`          | `facilities`                         |
+| a setting                             | a config slice        | `config`                             |
+| messages to something it does not own | a channel             | a **channel** kind                   |
 
 And at that size the supply is not hand-written. `boot({})` and the compiler
 prints the whole index in one pass - measured on the generated 49-module graph:
@@ -420,7 +420,7 @@ both were wrong, on measurement:
 
 - `idempotency` and `rateLimiter` are members 11 and 12 of the fourteen. The api
   derives each from the member record already - `apiIdempotencyLedger({ config,
-  members })`, `apiRateLimiter({ config, members })` - so a builder call would be
+members })`, `apiRateLimiter({ config, members })` - so a builder call would be
   a second place to supply what a member already carries.
 - Neither fails open. Idempotency is opt-in PER ROUTE, and a route that opts in
   where the runtime has no port throws at mount: "declares itself replayable

@@ -43,6 +43,8 @@ const ROLE = "tasks";
 const SYNTHETIC_ENVIRONMENT: Readonly<Record<string, string>> = {
   NODE_ENV: "test",
   BASE_HOST: "http://langwatch.test",
+  // The API-key pepper chain refuses a boot where none of its secrets is set.
+  API_KEY_PEPPER: "synthetic-api-key-pepper",
 };
 
 function unreachable<Client extends object>(name: string): Client {
@@ -148,6 +150,7 @@ describe("the tasks process installation", () => {
       const names = runtime.tasks(isTask).map((task) => task.name);
       expect(names).toEqual([
         "backfill-annotations-to-clickhouse",
+        "agent-audit-log-ids-backfill",
         "clear-stale-pending-sso-setup",
         "slack-alert",
         "report-schedule-backfill",

@@ -6,15 +6,14 @@ import { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { Socket } from "node:net";
 
-import { describe, expect, it, vi } from "vitest";
-
 import {
-  createVoiceSocketReceiver,
-  handOffVoiceSocket,
   isVoiceMediaSocketMessage,
   VOICE_MEDIA_SOCKET_MESSAGE,
   type VoiceMediaSocketMessage,
-} from "../voice-socket-handoff.channels.ts";
+} from "@langwatch/scenario-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { createVoiceSocketReceiver, handOffVoiceSocket } from "../voice-socket-handoff.channels.ts";
 
 function message(): VoiceMediaSocketMessage {
   return {

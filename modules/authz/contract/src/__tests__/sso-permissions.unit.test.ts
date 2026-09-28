@@ -22,7 +22,7 @@ describe("given a custom role holding only the single sign-on permissions", () =
     /** @scenario "A role holding only the single sign-on permissions can do only that" */
     it("reaches single sign-on and directory provisioning, and nothing else", () => {
       for (const permission of IT_ADMIN_ROLE) {
-        expect(authzPermissionSchema.safeParse(permission).success).toBe(true);
+        expect(authzPermissionSchema.validate(permission)).toBe(true);
         expect(permissionSatisfiedBy({ granted: IT_ADMIN_ROLE, requested: permission })).toBe(true);
       }
 

@@ -107,20 +107,9 @@ export class OrganizationMemberRoleService {
         user: actingUser ?? undefined,
       });
       if (!result.allowed) {
-        // The counts ride along only when the decision carried them: a port
-        // that refused without them must not report a limit of `undefined`
-        // as if it were a number the customer could read.
-        throw new MemberSeatLimitReachedError(
-          result.limitType !== undefined && result.current !== undefined && result.max !== undefined
-            ? {
-                meta: {
-                  limitType: result.limitType,
-                  current: result.current,
-                  max: result.max,
-                },
-              }
-            : {},
-        );
+        throw new MemberSeatLimitReachedError({
+          meta: { limitType: result.limitType, current: result.current, max: result.max },
+        });
       }
     }
 
@@ -140,6 +129,35 @@ export class OrganizationMemberRoleService {
     // cache to age out before it is true, and re-enabling must not leave the
     // person locked out for the same window.
     await this.dependencies.grantCache.invalidateOrganization({ organizationId });
+  }
+
+  /**
+   * Main's seat guard on a Lite Member's team-role change (organization.ts:699-730): moving
+   * them off a custom role that granted more than viewing costs a Lite Member seat.
+   */
+  async assertTeamRoleChangeWithinSeatLimits(params: {
+    organizationId: string;
+    teamId: string;
+    userId: string;
+  }): Promise<void> {
+    const { organizationId, teamId, userId } = params;
+    const currentTeamBindings = await this.repo.findTeamRoleBindings({
+      organizationId,
+      userId,
+      teamIds: [teamId],
+    });
+    const grantedPermissions = await findCustomRolePermissionGrants({
+      repository: this.repo,
+      organizationId,
+      currentTeamBindings,
+    });
+
+    await this.dependencies.seats.assertRoleChangeAllowed({
+      organizationId,
+      currentRole: "EXTERNAL",
+      userPermissions: grantedPermissions.length > 0 ? grantedPermissions : undefined,
+      role: "EXTERNAL",
+    });
   }
 
   /**

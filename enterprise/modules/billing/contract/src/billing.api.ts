@@ -4,7 +4,12 @@ import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Instant } from "@langwatch/time";
 
-import type { BillingPricingModel, SubscriptionPlanInput, USAGE_UNKNOWN } from "./billing-types.ts";
+import type {
+  BillingPricingModel,
+  ResourceLimitNotifierInput,
+  SubscriptionPlanInput,
+  USAGE_UNKNOWN,
+} from "./billing-types.ts";
 import type {
   ConnectedAddCommitRequest,
   ConnectedBillingAccountView,
@@ -101,6 +106,11 @@ export interface BillingApi {
     maxMonthlyUsageLimit: number;
     meter: "traces" | "events";
   }): Promise<{ sent: boolean; notificationId?: string; sentAt?: Instant }>;
+  /**
+   * Main's `usageLimits.notifyResourceLimitReached`: the ops Slack alert for a reached seat limit,
+   * SaaS only, at most once a day per organization and limit. Never throws.
+   */
+  notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void>;
   /** The organization's pricing model column, which is empty for organizations never migrated. */
   getPricingModel(input: {
     organizationId: string;

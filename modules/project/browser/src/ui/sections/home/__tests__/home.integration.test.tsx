@@ -84,7 +84,7 @@ import {
   type ProjectHomeProject,
   type ProjectHomeUser,
 } from "../../../../model/project-home-host.ts";
-import { HomePage } from "../home-screen.tsx";
+import { HomePage, HomeScreen } from "../home-screen.tsx";
 
 /**
  * The narrowest host the page can be drawn against. The composition is
@@ -263,6 +263,72 @@ describe("HomePage composition", () => {
 
       expect(screen.queryByText(/Considering LangWatch/)).toBeNull();
       expect(screen.queryByText("Request a demo")).toBeNull();
+    });
+  });
+});
+
+/** The stub, told where a project switch asked to land and whether the scope is still resolving. */
+class ReturningHomeHost extends StubProjectHomeHost {
+  readonly visited: string[] = [];
+
+  constructor(private readonly options: { returnTo: string | undefined; isLoading: boolean }) {
+    super();
+  }
+
+  override returnTo(): string | undefined {
+    return this.options.returnTo;
+  }
+
+  override isLoading(): boolean {
+    return this.options.isLoading;
+  }
+
+  override navigate(to?: string): void {
+    if (to !== void 0) this.visited.push(to);
+  }
+}
+
+function renderHomeRoute(host: ReturningHomeHost) {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <ProjectHomeHostProvider value={host}>
+        <HomeScreen />
+      </ProjectHomeHostProvider>
+    </ChakraProvider>,
+  );
+}
+
+describe("the home route after a project switch", () => {
+  describe("given a safe return_to and a resolved scope", () => {
+    it("lands back on the page the switch came from, drawing no home", () => {
+      const host = new ReturningHomeHost({ returnTo: "/settings/secrets", isLoading: false });
+      renderHomeRoute(host);
+
+      expect(host.visited).toEqual(["/settings/secrets"]);
+      expect(screen.queryByTestId("traces-overview")).toBeNull();
+    });
+  });
+
+  describe("given a safe return_to while the scope is still resolving", () => {
+    it("waits, so the switch is remembered before the page it returns to reads it", () => {
+      const host = new ReturningHomeHost({ returnTo: "/settings/secrets", isLoading: true });
+      renderHomeRoute(host);
+
+      expect(host.visited).toEqual([]);
+    });
+  });
+
+  describe.each([
+    ["an address on another site", "//evil.example/settings"],
+    ["an absolute URL", "https://evil.example/"],
+    ["no return_to at all", undefined],
+  ])("given %s", (_label, returnTo) => {
+    it("stays on the home and draws it", () => {
+      const host = new ReturningHomeHost({ returnTo, isLoading: false });
+      renderHomeRoute(host);
+
+      expect(host.visited).toEqual([]);
+      expect(screen.getByTestId("traces-overview")).toBeInTheDocument();
     });
   });
 });

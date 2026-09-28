@@ -2,9 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const standaloneCalls: [string, Record<string, unknown>][] = [];
 const clusterCalls: [unknown, Record<string, unknown>][] = [];
+const connectionsMade: FakeConnection[] = [];
 
 class FakeConnection {
   readonly handlers = new Map<string, (...args: unknown[]) => void>();
+  constructor() {
+    connectionsMade.push(this);
+  }
   on(event: string, handler: (...args: unknown[]) => void) {
     this.handlers.set(event, handler);
     return this;
@@ -43,6 +47,7 @@ describe("RedisConnectionService", () => {
   beforeEach(() => {
     standaloneCalls.length = 0;
     clusterCalls.length = 0;
+    connectionsMade.length = 0;
   });
 
   describe("given the module has only been imported", () => {
@@ -166,18 +171,18 @@ describe("RedisConnectionService", () => {
     it("reports connection lifecycle events", () => {
       const logger = createLoggerSpy();
 
-      const connection = new RedisConnectionService({ logger }).connect({
-        url: "redis://localhost:6379",
-      }) as unknown as FakeConnection;
+      new RedisConnectionService({ logger }).connect({ url: "redis://localhost:6379" });
+      expect(connectionsMade).toHaveLength(1);
+      const connection = connectionsMade[0];
 
-      connection.emit("ready");
+      connection?.emit("ready");
       expect(logger.info).toHaveBeenCalledWith(
         { mode: "standalone", db: 0 },
         "ready to accept commands",
       );
 
       const error = new Error("boom");
-      connection.emit("error", error);
+      connection?.emit("error", error);
       expect(logger.error).toHaveBeenCalledWith({ mode: "standalone", db: 0, error }, "error");
     });
 

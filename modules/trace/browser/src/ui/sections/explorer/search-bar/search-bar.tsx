@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { useFilterStore } from "@langwatch/trace-browser-kit";
@@ -39,6 +40,7 @@ import { AskAiButton } from "../ai/ask-ai-button.tsx";
 import { useInstantEvalRuns } from "../hooks/use-instant-eval-runs.ts";
 import { useTraceFacets } from "../hooks/use-trace-facets.ts";
 import { InstantEvalConfirmDialog } from "../instant-eval-confirm-dialog.tsx";
+import { InstantEvalRefusalPopover } from "../instant-eval-refusal-popover.tsx";
 import { ActiveSearchEditor } from "./active-search-editor.tsx";
 import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail.tsx";
 import { FloatingAiBar } from "./floating-ai-bar.tsx";
@@ -141,7 +143,7 @@ export const SearchBar: React.FC = () => {
   // Gate the inline Ask AI composer on having at least one model provider configured.
   // The AI mode submits requests against the user's own keys; with none enabled the
   // request would 4xx.
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
   const { hasEnabledProviders, isLoading: isLoadingProviders } = useModelProvidersSettings({
     projectId: project?.id,
   });
@@ -251,14 +253,23 @@ export const SearchBar: React.FC = () => {
     setAiAutoSubmitSeed(null);
   }, []);
 
-  // Enter on a sentence. The router answers with what the sentence is; a
-  // `langy` answer takes the same door as the button. A search that ran
-  // without the model that shapes it says so in the strip under the bar.
-  // A judgement goes to the cost rule: reused run, auto-start under the
-  // threshold, the dialog above it, and the phrase search behind every refusal.
-  const instantEval = useInstantEvalRoute();
+  // Enter on a sentence: the router answers what it is, a `langy` answer takes the button's door,
+  // and a judgement goes to the cost rule (specs/traces-v2/instant-eval-search.feature). While the
+  // flag read is in flight the submit counts as available: a server refusal then says why, so a
+  // slow flag read never hides a feature the project actually has.
+  const { enabled: instantEvalsReleased, isLoading: instantEvalsFlagLoading } = useFeatureFlag(
+    "release_instant_evals",
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: !!project?.id && !!organization?.id,
+    },
+  );
+  const isInstantEvalAvailable = instantEvalsReleased || instantEvalsFlagLoading;
+  const instantEval = useInstantEvalRoute({ isInstantEvalAvailable });
   const { submitSearch, isRouting } = useSubmitSearch({
     isLangyAvailable: langyRoutesAsk,
+    isInstantEvalAvailable,
     isSamplePreview,
     onLangy: askLangyFromSearch,
     onInstantEval: instantEval.onInstantEvalRoute,
@@ -326,6 +337,11 @@ export const SearchBar: React.FC = () => {
       data-spotlight="search-bar"
     >
       <SyntaxHelpDrawerHost />
+      {/* Anchored to a point at the bar's bottom-left: an anchor around the editor would remount
+          the popover on every keystroke. */}
+      <InstantEvalRefusalPopover refusal={instantEval.refusal} onClose={instantEval.dismissRefusal}>
+        <Box position="absolute" left={3} bottom={0} width="1px" height="1px" aria-hidden="true" />
+      </InstantEvalRefusalPopover>
       <InstantEvalConfirmDialog
         confirmation={instantEval.confirmation}
         isStarting={instantEval.isStarting}

@@ -24,6 +24,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {

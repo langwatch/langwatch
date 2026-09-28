@@ -1,6 +1,6 @@
 /**
- * What a browser installs when it installs authz: the RBAC settings family
- * — Roles and Role Bindings.
+ * What a browser installs when it installs authz: the Roles settings page,
+ * whose assignments tab /settings/role-bindings now redirects to.
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
@@ -18,11 +18,5 @@ export const authzWeb = defineWebModule("authz")
       within: "settings",
       label: "Roles",
       load: () => import("./ui/sections/roles.screen.tsx"),
-    },
-    "pages/settings/role-bindings": {
-      path: "/settings/role-bindings",
-      within: "settings",
-      label: "Role Bindings",
-      load: () => import("./ui/sections/role-bindings.screen.tsx"),
     },
   });

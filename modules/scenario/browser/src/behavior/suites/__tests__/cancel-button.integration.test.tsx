@@ -5,16 +5,12 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import {
-  makeBatchRun,
-  makeScenarioRunData,
-  makeSummary,
-  RunRow,
-  ScenarioTargetRow,
-} from "@langwatch/suite-browser-kit";
+import { RunRow, ScenarioTargetRow } from "@langwatch/suite-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "./run-history-fixtures.ts";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),

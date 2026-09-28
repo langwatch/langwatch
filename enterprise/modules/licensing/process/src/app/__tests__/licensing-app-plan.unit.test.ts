@@ -38,11 +38,17 @@ describe("the installed licensing application's plan operation", () => {
       secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
     });
     expect(await app.resolve({ organizationId: "paid" })).toMatchObject({
-      type: "ENTERPRISE",
-      free: false,
+      granted: true,
+      plan: { type: "ENTERPRISE", free: false },
     });
-    expect(await app.resolve({ organizationId: "unlicensed" })).toMatchObject({ free: true });
-    expect(await app.resolve({ organizationId: "tampered" })).toMatchObject({ free: true });
+    expect(await app.resolve({ organizationId: "unlicensed" })).toMatchObject({
+      granted: true,
+      plan: { free: true },
+    });
+    expect(await app.resolve({ organizationId: "tampered" })).toMatchObject({
+      granted: true,
+      plan: { free: true },
+    });
     expect(getOrganizationLicense.mock.calls).toEqual([["paid"], ["unlicensed"], ["tampered"]]);
   });
 });

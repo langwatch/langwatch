@@ -2,7 +2,7 @@ import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData, TraceProcessingEvent } from "@langwatch/trace-contract";
 
-import type { TraceTenantBroadcast } from "../app/trace.members.ts";
+import type { TraceTenantBroadcast } from "../channels/trace-tenant-broadcast.channel.ts";
 
 const logger = createLogger("langwatch:trace-processing:trace-update-broadcast");
 
@@ -34,7 +34,11 @@ export function createTraceUpdateBroadcastHandler(
         traceId,
       });
 
-      await deps.broadcast.broadcastToTenant(tenantId, payload, "trace_updated");
+      await deps.broadcast.broadcastToTenant({
+        tenantId,
+        event: payload,
+        eventType: "trace_updated",
+      });
 
       logger.debug({ tenantId, traceId }, "Broadcasted trace update");
     } catch (error) {

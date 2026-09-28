@@ -221,3 +221,12 @@ Feature: Organization authentication settings
       Then its organization policies remain available for password sign-ins
       And the page explains that single sign-on is not required
       And activating or removing a connection does not change the saved policies
+
+  Rule: the Authentication pages share one rail
+
+    @integration
+    Scenario: The Authentication pages share main's rail
+      Given an administrator on any of Overview, Identity provider or Connectors
+      When the page renders
+      Then a rail lists Overview, Identity provider and Connectors in that order
+      And the page the reader is on is marked as the current entry

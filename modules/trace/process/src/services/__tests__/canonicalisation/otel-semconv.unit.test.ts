@@ -891,4 +891,54 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       expect(result.attributes["gen_ai.output.type"]).toBe("json");
     });
   });
+
+  describe("given standard agent and tool spans from no known vendor", () => {
+    const typeOf = (spanAttributes: Record<string, unknown>) =>
+      canonicalisation.canonicalizeSpanAttributes({
+        spanAttributes,
+        events: [],
+        span: internalSpan,
+      }).attributes["langwatch.span.type"];
+
+    /** @scenario "OTel GenAI agent and tool spans are typed by their operation" */
+    it("types an invoke_agent span as an agent, even with a model and agent name", () => {
+      expect(
+        typeOf({
+          "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.agent.name": "support-agent",
+          "gen_ai.request.model": "gpt-5-mini",
+        }),
+      ).toBe("agent");
+    });
+
+    /** @scenario "OTel GenAI agent and tool spans are typed by their operation" */
+    it("types an execute_tool span as a tool", () => {
+      expect(
+        typeOf({ "gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": "lookup_order" }),
+      ).toBe("tool");
+    });
+
+    /** @scenario "OTel GenAI agent and tool spans are typed by their operation" */
+    it("still types a chat span as a model call", () => {
+      expect(typeOf({ "gen_ai.operation.name": "chat", "gen_ai.request.model": "gpt-5" })).toBe(
+        "llm",
+      );
+    });
+
+    /** @scenario "OTel GenAI agent and tool spans are typed by their operation" */
+    it("keeps the error of a failed tool span", () => {
+      const result = canonicalisation.canonicalizeSpanAttributes({
+        spanAttributes: {
+          "gen_ai.operation.name": "execute_tool",
+          "exception.type": "TimeoutError",
+          "exception.message": "order service timed out",
+        },
+        events: [],
+        span: internalSpan,
+      });
+
+      expect(result.attributes["langwatch.span.type"]).toBe("tool");
+      expect(result.attributes["error.type"]).toBe("TimeoutError");
+    });
+  });
 });

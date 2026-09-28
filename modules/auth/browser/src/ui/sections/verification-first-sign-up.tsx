@@ -60,6 +60,8 @@ export function VerificationFirstSignUp() {
   const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
   // The single-use proof `user.register` spends; only where no account stands behind the address.
   const [addressProof, setAddressProof] = useState<string | null>(null);
+  // False where the installation cannot send email: the proof confirms nobody's address.
+  const [addressConfirmed, setAddressConfirmed] = useState(true);
   const [accountIsReady, setAccountIsReady] = useState(false);
   const [welcomeBackEmail, setWelcomeBackEmail] = useState<string | null>(null);
   const showsAllSocial = useShowsAllSocialMethods();
@@ -119,7 +121,13 @@ export function VerificationFirstSignUp() {
 
   const sendTo = async (email: string) => {
     try {
-      await requestVerification.mutateAsync({ email });
+      const result = await requestVerification.mutateAsync({ email });
+      if (!result.sent) {
+        // No link can be mailed here, so the password step comes straight away.
+        setAddressConfirmed(false);
+        await resolveEnrollment(email, result.addressProof);
+        return;
+      }
       setSentTo(email);
     } catch (failure) {
       // Not a refusal, a wrong door: the address has an account, so the screen
@@ -172,6 +180,7 @@ export function VerificationFirstSignUp() {
   if (failedLink) {
     return (
       <PostLinkRoutingFailure
+        addressConfirmed={addressConfirmed}
         error={proofEnrollment.failure}
         onRetry={() => resolveEnrollment(failedLink.email, failedLink.addressProof)}
       />
@@ -183,6 +192,7 @@ export function VerificationFirstSignUp() {
       <MethodChoice
         verifiedEmail={verifiedEmail}
         addressProof={addressProof}
+        addressConfirmed={addressConfirmed}
         enrollment={enrollment}
         lastUsedMethodId={lastUsedMethodId}
         callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
@@ -395,6 +405,7 @@ const noPasskeyOnThisStep = () => undefined;
 function MethodChoice({
   verifiedEmail,
   addressProof,
+  addressConfirmed,
   enrollment,
   lastUsedMethodId,
   callbackUrl,
@@ -402,6 +413,8 @@ function MethodChoice({
 }: {
   verifiedEmail: string;
   addressProof: string;
+  /** False when the proof stands for an address no link confirmed. */
+  addressConfirmed: boolean;
   enrollment: SignUpEnrollment;
   lastUsedMethodId: string | null;
   callbackUrl: string;
@@ -409,10 +422,17 @@ function MethodChoice({
 }) {
   return (
     <AuthCard title="Choose how to sign in">
-      <HStack gap={3}>
-        <SuccessPulse label="Email address confirmed" />
-        <Text data-testid="verified-address">{verifiedEmail} is confirmed.</Text>
-      </HStack>
+      {addressConfirmed ? (
+        <HStack gap={3}>
+          <SuccessPulse label="Email address confirmed" />
+          <Text data-testid="verified-address">{verifiedEmail} is confirmed.</Text>
+        </HStack>
+      ) : (
+        <Text data-testid="unconfirmed-address">
+          This installation does not send email, so {verifiedEmail} is not confirmed. Choose a
+          password to finish.
+        </Text>
+      )}
       {enrollment ? (
         <SignInMethodPicker
           // Every way in EXCEPT a passkey. This step belongs to an account
@@ -562,14 +582,18 @@ async function nextStepForProof({
 
 /** The address is confirmed but where it signs in could not be decided: retry, offer nothing. */
 function PostLinkRoutingFailure({
+  addressConfirmed,
   error,
   onRetry,
 }: {
+  addressConfirmed: boolean;
   error: unknown;
   onRetry: () => Promise<void>;
 }) {
   return (
-    <AuthCard title="Your email is confirmed">
+    <AuthCard
+      title={addressConfirmed ? "Your email is confirmed" : "Create your LangWatch account"}
+    >
       <div data-testid="post-link-routing-failure" hidden />
       {error ? (
         <HandledErrorAlert error={error} fallbackTitle="Couldn't check how you should sign in" />

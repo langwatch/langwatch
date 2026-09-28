@@ -17,9 +17,11 @@ import { TopicApi } from "@langwatch/topic-contract";
 import { traceSummaryDataSchema, type TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryTraceTenantBroadcastChannel } from "../../channels/memory/memory.trace-tenant-broadcast.channel.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
+import type { TraceRepositories } from "../../repositories/trace.repositories.ts";
 import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { composeTraceAppDependencies } from "../trace-composition.build.ts";
@@ -107,14 +109,19 @@ function unreachablePeers() {
 type Composed = {
   withClickHouse?: boolean;
   summaryStore?: FoldProjectionStore<TraceSummaryData>;
+  repositories?: TraceRepositories;
 };
 
-function compose({ withClickHouse = true, summaryStore }: Composed) {
+function compose({
+  withClickHouse = true,
+  summaryStore,
+  repositories = MemoryTraceRepositories.create(),
+}: Composed) {
   const peers = unreachablePeers();
   const refuse = () => Promise.reject(new Error("no datastore in this test"));
 
   return composeTraceAppDependencies({
-    repositories: MemoryTraceRepositories.create(),
+    repositories,
     ...(withClickHouse ? { resolveClickHouseClient: refuse } : {}),
     ...(summaryStore ? { summaryStore } : {}),
     storedObjects: createApiFixture<StoredObjectApi>(),
@@ -137,6 +144,7 @@ function compose({ withClickHouse = true, summaryStore }: Composed) {
       },
       cleanupTenantEmitter: () => undefined,
     },
+    tenantBroadcast: MemoryTraceTenantBroadcastChannel.create(),
     protections: {
       authz: peers.authz,
       projects: peers.projects,
@@ -188,8 +196,21 @@ describe("composeTraceAppDependencies summary reader", () => {
     await expect(treeOf(compose({ summaryStore: store })).findSummary(LOOKUP)).resolves.toBeNull();
   });
 
-  it("answers null on a process that folds no trace projections", async () => {
+  it("answers null while the trace has no summary row", async () => {
     await expect(treeOf(compose({})).findSummary(LOOKUP)).resolves.toBeNull();
+  });
+
+  it("reads the trace_summaries row through the composed app when no store is handed in", async () => {
+    const repositories = MemoryTraceRepositories.create();
+    await repositories.summaryProjection.upsert({
+      data: FOLDED,
+      tenantId: "project-1",
+      retentionDays: 30,
+    });
+    const app = createTraceAppHarness({ traces: { tree: compose({ repositories }).traces.tree } });
+
+    await expect(app.findSummary(LOOKUP)).resolves.toEqual(FOLDED);
+    await expect(app.findSummary({ ...LOOKUP, projectId: "project-2" })).resolves.toBeNull();
   });
 
   it("refuses the tree read by name on a process that composed no ClickHouse", () => {

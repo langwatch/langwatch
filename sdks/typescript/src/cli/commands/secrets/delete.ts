@@ -25,7 +25,7 @@ export const deleteSecretCommand = async (id: string): Promise<CommandResult | v
   const spinner = createSpinner(`Deleting secret "${id}"...`).start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/v1/secret/${encodeURIComponent(id)}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/secrets/${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",

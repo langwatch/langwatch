@@ -25,6 +25,12 @@ export interface InstantEvalResultsOptions {
   cursor?: string;
 }
 
+const matchedFilterOf = (options: InstantEvalResultsOptions): boolean | undefined => {
+  if (options.matched) return true;
+  if (options.unmatched) return false;
+  return undefined;
+};
+
 export const resultsInstantEvalCommand = async (
   id: string,
   options: InstantEvalResultsOptions,
@@ -51,7 +57,7 @@ export const resultsInstantEvalCommand = async (
     process.exit(1);
   }
 
-  const isMatched = options.matched || (options.unmatched ? false : undefined);
+  const isMatched = matchedFilterOf(options);
   const limit = readCountFlag({
     raw: options.limit,
     flag: "--limit",

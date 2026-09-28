@@ -3,13 +3,17 @@
 import type { CanonicalEvent } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
+import {
+  type AttributeCanonicaliser,
+  type ExtractorContext,
+  takeEventsByNames,
+} from "../rules/canonical-attributes.rules.ts";
 import { extractOutputMessages, recordValueType } from "../rules/canonical-extraction.rules.ts";
 import { isRecord, parseJsonSafely } from "../rules/canonical-guard.rules.ts";
 import {
   extractSystemInstructionFromMessages,
-  stripSystemMessages,
+  stripLiftedSystemMessage,
 } from "../rules/canonical-message.rules.ts";
-import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 /** Strands emits one event name for each message role. */
 const ROLE_EVENT_NAMES = [
@@ -145,7 +149,7 @@ export class StrandsCanonicaliserService implements AttributeCanonicaliser {
    */
   private canonicaliseInputMessages(ctx: ExtractorContext): void {
     const inputMessages: unknown[] = [];
-    for (const event of ctx.bag.events.takeAllByNames(ROLE_EVENT_NAMES)) {
+    for (const event of takeEventsByNames(ctx.bag.events, ROLE_EVENT_NAMES)) {
       const role = event.name.split(".")[1];
       const content = extractStrandsContent(event.attributes);
       if (content !== void 0) {
@@ -167,7 +171,7 @@ export class StrandsCanonicaliserService implements AttributeCanonicaliser {
       }
     }
 
-    const chatMessages = stripSystemMessages(inputMessages);
+    const chatMessages = stripLiftedSystemMessage(inputMessages);
     if (chatMessages.length > 0) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMessages);
       ctx.recordRule(`${this.id}:events->gen_ai.input.messages`);

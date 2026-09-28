@@ -31,6 +31,10 @@ export interface PlanSide {
   baseUrl: string;
   /** replay names a cached captures.jsonl this side is read from instead of rendered. */
   replay?: string;
+  /** pending names the file this side's address arrives in once its stack is up. */
+  pending?: string;
+  /** fixtures are the ids this side's seed generated; they win over the plan's. */
+  fixtures?: Record<string, string>;
 }
 
 export interface Credential {
@@ -57,6 +61,13 @@ export interface Plan {
   frozenTime?: number;
   /** fixtures fill a route's {name} placeholders with seeded ids. */
   fixtures?: Record<string, string>;
+  /** concurrency is how many pages each side captures routes and flows on at once. */
+  concurrency?: Concurrency;
+}
+
+export interface Concurrency {
+  routes?: number;
+  flows?: number;
 }
 
 export interface CaptureMessage {

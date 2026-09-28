@@ -61,6 +61,12 @@ Feature: Custom role permission editing
     When the roles page renders
     Then neither the management surface nor the sales block is shown
 
+  @integration
+  Scenario: An Enterprise organization's plan reaches the roles page
+    Given an organization on the Enterprise plan
+    When the roles page's host reads the plan
+    Then the plan reads as Enterprise and the management surface is offered
+
   @unit
   Scenario: A plan still arriving is neither Enterprise nor refused
     When the application answers the plan question

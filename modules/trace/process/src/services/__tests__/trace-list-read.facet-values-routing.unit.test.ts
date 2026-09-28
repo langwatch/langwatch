@@ -6,6 +6,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryTraceTenantBroadcastChannel } from "../../channels/memory/memory.trace-tenant-broadcast.channel.ts";
 import { CLICKHOUSE_FACET_CATALOG } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { MemoryNullTraceListRepository } from "../../repositories/memory/memory.null-trace-list.repository.ts";
 import { TraceListService } from "../trace-list-read.service.ts";
@@ -19,6 +20,7 @@ function makeService() {
     findSpanAttributeValues: vi.fn().mockResolvedValue(emptyResult),
   });
   const service = TraceListService.create({
+    discoverUpdates: MemoryTraceTenantBroadcastChannel.create(),
     facets: CLICKHOUSE_FACET_CATALOG,
     repository,
     evaluations: undefined as never,

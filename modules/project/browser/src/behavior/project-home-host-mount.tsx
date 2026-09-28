@@ -35,6 +35,7 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
   private readonly deployment_: ProjectHomeDeployment;
   private readonly reducedMotion_: boolean;
   private readonly navigateOf: (to: string) => void;
+  private readonly returnTo_: string | undefined;
 
   constructor(options: {
     project: ProjectHomeProject | undefined;
@@ -47,6 +48,7 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
     deployment: ProjectHomeDeployment;
     reducedMotion: boolean;
     navigateOf: (to: string) => void;
+    returnTo: string | undefined;
   }) {
     super();
     this.project_ = options.project;
@@ -59,6 +61,7 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
     this.deployment_ = options.deployment;
     this.reducedMotion_ = options.reducedMotion;
     this.navigateOf = options.navigateOf;
+    this.returnTo_ = options.returnTo;
   }
 
   project(): ProjectHomeProject | undefined {
@@ -113,6 +116,10 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
   navigate(to: string): void {
     this.navigateOf(to);
   }
+
+  override returnTo(): string | undefined {
+    return this.returnTo_;
+  }
 }
 
 /**
@@ -121,7 +128,8 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
  * is what `mounts.load` resolves.
  */
 export default function ProjectHomeHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation } = useUiCapabilities();
+  const { session, navigation, route } = useUiCapabilities();
+  const returnTo = route.reading().query.return_to;
   const deployment = useUiDeployment();
   const reducedMotion = useReducedMotion();
   const { organization: scopeOrg, project: scopeProject, status } = session.snapshot().scope;
@@ -163,6 +171,7 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
         },
         reducedMotion,
         navigateOf: (to) => navigation.navigate(to),
+        returnTo,
       }),
     [
       projectId,
@@ -179,6 +188,7 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
       deployment.demoProjectSlug,
       reducedMotion,
       navigation,
+      returnTo,
     ],
   );
   return <ProjectHomeHostProvider value={host}>{children}</ProjectHomeHostProvider>;

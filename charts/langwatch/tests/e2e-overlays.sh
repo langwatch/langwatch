@@ -652,6 +652,9 @@ test_size_overlays() {
 # "no untriaged workloads" check below — that is deliberate.
 HARDENED_WORKLOADS=(
   "templates/app/deployment.yaml"
+  # The pre-upgrade migration Job runs the app image with the app's own
+  # security contexts and never calls the Kubernetes API.
+  "templates/app/migrate-pre-roll-job.yaml"
   "templates/workers/deployment.yaml"
   "templates/langwatch_nlp/deployment.yaml"
   "templates/langevals/deployment.yaml"

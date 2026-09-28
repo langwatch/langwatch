@@ -44,7 +44,7 @@ export const signIn: Action = async (context) => {
     await context.side.waitUntilQuiet();
     await fillField({ context, target: "password", value: credential.password });
   }
-  await clickText({ context, text: "Sign in" });
+  await clickText({ context, text: String.raw`/^\s*(sign in|log in)\s*$/i` });
   await context.snapshot("after sign in");
 };
 

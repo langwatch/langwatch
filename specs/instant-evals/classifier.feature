@@ -82,7 +82,24 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     Given a text estimated at twice its budget
     When it is prepared for the classifier
     Then it is cut to the budget on a character boundary
+    And the cut keeps the text's opening and its ending, with a marker naming what was left out
     And the verdict records that the text was cut
+
+  # Judged text measured 2.0 to 3.3 bytes per input token against the live
+  # API (JSON-heavy traces densest). Cut at four, or at the 2.7 average used
+  # for pricing, a dense transcript is refused as too large and never judged.
+  @unit
+  Scenario: A text is cut at the densest ratio judged text has shown
+    Given a text longer than its budget
+    When it is prepared for the classifier
+    Then its length in bytes is at most the budget times the densest measured bytes per token
+
+  @unit @regression
+  Scenario: A long transcript that tokenises densely is judged on the first send
+    Given a long support transcript with tool calls, at the densest measured bytes per token
+    When it is judged
+    Then one request is sent
+    And the verdict comes back with the row marked truncated
 
   @unit
   Scenario: A question list that leaves no room for text is refused before it is sent
@@ -141,8 +158,16 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
   Scenario: A text the classifier refuses as too large is cut once and retried
     Given a classifier refusing the text as past its token cap, then answering
     When a question is asked
-    Then the text is sent again at three quarters of its length
+    Then the text is sent again at no more than three quarters of its length, keeping its opening and its ending
     And the verdict comes back
+
+  @unit @regression
+  Scenario: The too-large retry cuts enough for a text denser than any measured
+    Given a long transcript that tokenises denser than the densest measured ratio
+    And a classifier that refuses any state past its token cap
+    When it is judged
+    Then the retry is cut to the budget at a ratio below any measured
+    And the verdict comes back instead of a too-large skip
 
   @unit
   Scenario: A text refused twice as too large is skipped rather than cut again

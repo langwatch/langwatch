@@ -28,14 +28,14 @@
 
 ## Where a new document goes
 
-| It is | Put it in |
-| --- | --- |
-| A decision about architecture | `adr/`, numbered, checked against `main` for collisions |
-| A convention other people must follow | `best_practices/` |
-| A plan for work about to start or in flight | `plans/` |
-| An investigation, comparison or record of something finished | `research/` |
-| A procedure someone runs against a live system | `runbooks/` |
-| Behaviour the product must have | not here at all: write a `.feature` file in `specs/` |
+| It is                                                        | Put it in                                               |
+| ------------------------------------------------------------ | ------------------------------------------------------- |
+| A decision about architecture                                | `adr/`, numbered, checked against `main` for collisions |
+| A convention other people must follow                        | `best_practices/`                                       |
+| A plan for work about to start or in flight                  | `plans/`                                                |
+| An investigation, comparison or record of something finished | `research/`                                             |
+| A procedure someone runs against a live system               | `runbooks/`                                             |
+| Behaviour the product must have                              | not here at all: write a `.feature` file in `specs/`    |
 
 ## Also see
 

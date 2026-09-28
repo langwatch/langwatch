@@ -97,6 +97,7 @@ function buildFixture(trackedPaths: string[]): string {
         "apps/ui/",
         "apps/worker/",
         "packages/",
+        "modules/",
         "dev/scripts/",
         "apps/server/dist/",
         "apps/server/src/",

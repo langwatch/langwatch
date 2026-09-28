@@ -9,15 +9,13 @@ import {
 
 describe("Secret contract", () => {
   it("accepts upper-snake-case names only", () => {
-    expect(secretNameSchema.safeParse("OPENAI_API_KEY").success).toBe(true);
-    expect(secretNameSchema.safeParse("openai-key").success).toBe(false);
+    expect(secretNameSchema.validate("OPENAI_API_KEY")).toBe(true);
+    expect(secretNameSchema.validate("openai-key")).toBe(false);
   });
 
   it("enforces the value ceiling", () => {
-    expect(secretValueSchema.safeParse("x".repeat(MAX_SECRET_VALUE_LENGTH)).success).toBe(true);
-    expect(secretValueSchema.safeParse("x".repeat(MAX_SECRET_VALUE_LENGTH + 1)).success).toBe(
-      false,
-    );
+    expect(secretValueSchema.validate("x".repeat(MAX_SECRET_VALUE_LENGTH))).toBe(true);
+    expect(secretValueSchema.validate("x".repeat(MAX_SECRET_VALUE_LENGTH + 1))).toBe(false);
   });
 
   /** @scenario "Secret values never leave the boundary" */

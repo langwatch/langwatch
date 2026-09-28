@@ -5,10 +5,17 @@ import type {
   VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
+import { getActiveTraceId } from "@langwatch/observability/tracing";
+import { z } from "zod";
 
 import { isAllowedAuthOrigin } from "../rules/auth-origin.rules.ts";
 import { sessionPollOf, type AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { presentedSessionCookie } from "../rules/session-cookie.rules.ts";
+import {
+  isSignInCallbackPath,
+  signInErrorRedirectOf,
+  signInFailureLocation,
+} from "../rules/sign-in-callback-failure.rules.ts";
 
 const logger = createLogger("langwatch:auth");
 
@@ -97,9 +104,95 @@ export class AuthDoorService {
     // Better Auth counts the caller the platform resolved, never one a header claims.
     const stated = requestStatingCaller({ request, caller: ClientAddress.resolvedFor(request) });
 
-    return bornFinalized
+    const answered = await (bornFinalized
       ? this.deps.runWithIdentityBirth(() => betterAuth.handler(stated))
-      : betterAuth.handler(stated);
+      : betterAuth.handler(stated));
+    // Each acts on a different status (a 3xx to the error page, a 5xx on a callback).
+    const errorPageUrl = `${baseUrl}/auth/error`;
+    const traceId = getActiveTraceId();
+    return landFailedSignInCallback({
+      response: withholdInternalSignInError({ response: answered, errorPageUrl, traceId }),
+      pathname: new URL(request.url).pathname,
+      errorPageUrl,
+      traceId,
+    });
+  }
+}
+
+/**
+ * A redirect to the sign-in error screen keeps its code only when a screen has words for it;
+ * anything else is sent the generic code, and its real cause is logged here with the trace id
+ * (specs/identity/sso-signin-error-boundary.feature).
+ */
+function withholdInternalSignInError({
+  response,
+  errorPageUrl,
+  traceId,
+}: {
+  response: Response;
+  errorPageUrl: string;
+  traceId: string | undefined;
+}): Response {
+  const redirect = signInErrorRedirectOf({
+    status: response.status,
+    location: response.headers.get("location"),
+    errorPageUrl,
+    traceId,
+  });
+  if (redirect.kind === "pass") return response;
+
+  logger.error(
+    { code: redirect.code, description: redirect.description, traceId: traceId ?? null },
+    "a sign-in failed for a reason we have not written down; the person was sent a generic refusal",
+  );
+  const headers = new Headers(response.headers);
+  headers.set("location", redirect.location);
+  return new Response(response.body, { status: response.status, headers });
+}
+
+/**
+ * A server error on a sign-in callback, sent to the sign-in error screen rather than a blank
+ * page: the callback is a browser navigation. Every other auth route keeps its status, because
+ * its callers read it (specs/identity/sso-signin-error-boundary.feature).
+ */
+async function landFailedSignInCallback({
+  response,
+  pathname,
+  errorPageUrl,
+  traceId,
+}: {
+  response: Response;
+  pathname: string;
+  errorPageUrl: string;
+  traceId: string | undefined;
+}): Promise<Response> {
+  if (response.status < 500 || !isSignInCallbackPath({ pathname })) return response;
+
+  logger.error(
+    {
+      status: response.status,
+      path: pathname,
+      traceId: traceId ?? null,
+      cause: await readCauseCode(response),
+    },
+    "a sign-in callback failed on the server; the person was sent a generic refusal",
+  );
+  return new Response(null, {
+    status: 302,
+    headers: { location: signInFailureLocation({ errorPageUrl, traceId }) },
+  });
+}
+
+const errorBodySchema = z.object({ code: z.string() });
+
+/** Better Auth's error `code`, for the log only: its message can hold an address. */
+async function readCauseCode(response: Response): Promise<string> {
+  const unreadable = "unreadable";
+  try {
+    const parsed = errorBodySchema.safeParse(JSON.parse(await response.text()));
+    return parsed.success ? parsed.data.code.slice(0, 100) : unreadable;
+  } catch {
+    return unreadable;
   }
 }
 

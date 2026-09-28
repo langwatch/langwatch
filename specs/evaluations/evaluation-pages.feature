@@ -184,6 +184,13 @@ Feature: The evaluators and online evaluations pages
     When I ask which projects I could replicate into
     Then none of that team's projects are listed
 
+  @integration
+  Scenario: Each replication target is graded by my own permissions in that project
+    Given I may manage evaluations in one of my projects and only view them in another
+    When I ask which projects I could replicate into
+    Then both projects are listed
+    And only the one whose own permissions grant it is open to me
+
   @unit
   Scenario: The API snippets name this installation's own endpoint
     Given I am running LangWatch somewhere other than the hosted service

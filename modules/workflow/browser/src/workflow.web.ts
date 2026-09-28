@@ -6,9 +6,14 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const workflowWeb = defineWebModule("workflow")
+  .withHosts({
+    requires: ["WorkflowHostApi"],
+    mounts: { WorkflowHostApi: { load: () => import("./behavior/workflow-host-mount.tsx") } },
+  })
   .withScreens({
     "pages/[project]/workflows": {
       load: () => import("./ui/sections/workflows/workflows-screen.tsx"),
+      requires: "workflows:view",
     },
     "pages/[project]/studio/[workflow]": {
       load: () => import("./ui/sections/workflows/studio-screen.tsx"),

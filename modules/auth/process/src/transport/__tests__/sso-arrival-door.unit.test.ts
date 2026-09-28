@@ -12,14 +12,13 @@ import type {
   SsoMigrationAccountLinkDecision,
   SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
-import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import { UserNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
-  BetterAuthPendingInvite,
 } from "../../channels/better-auth.channel.ts";
 import type { BetterAuthHookCollaborators } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import {
@@ -61,7 +60,7 @@ function collaboratorsFor(
 ): BetterAuthHookCollaborators {
   return {
     federation: createApiFixture<BetterAuthFederation>(),
-    invites: createApiFixture<BetterAuthPendingInvite>(),
+    invites: createApiFixture<Pick<OrganizationApi, "applyPendingInvite">>(),
     announcements: createApiFixture<BetterAuthAnnouncements>(),
     authzGrants: createApiFixture<AuthzGrantsService>(),
     arrivals: createApiFixture<SsoArrivalApi>({ admit }),

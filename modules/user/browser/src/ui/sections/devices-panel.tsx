@@ -1,6 +1,9 @@
-import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { Laptop, Monitor, Server, Smartphone } from "lucide-react";
-import { useState } from "react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import type {
+  CliSessionCard,
+  PersonalIngestionKeyListing,
+} from "@langwatch/enterprise-governance-contract";
+import { type ReactNode, useState } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
 import {
@@ -8,35 +11,65 @@ import {
   useShowErrorToast,
 } from "../../behavior/personal-workspace-feedback.ts";
 import { usePersonalContext } from "../../behavior/use-personal-context.ts";
-import { readableDate } from "../../model/display-formatters.ts";
-import { formatRelativeTime } from "../../model/relative-time.ts";
+import { type GroupedIngestionKeys, groupKeysBySession } from "../../model/credential-grouping.ts";
+import { DeviceCard, IngestionKeyRow, OtherKeysCard } from "../blocks/credential-cards.tsx";
 import { InstallCliCard } from "../blocks/install-cli-card.tsx";
+import { WebSessionsPanel } from "./web-sessions-panel.tsx";
 
 /**
- * Signed-in CLI devices panel (revoke access).
+ * Where this person is signed in, what each CLI sign-in exports with, and the
+ * way to take either away. Keys a session minted sit on its card, the rest
+ * under "Other keys". Spec: specs/ai-gateway/governance/sessions-and-devices.feature.
  */
 export function DevicesPanel() {
-  // `organizationId` falls back to a placeholder while loading, so it is
-  // never falsy and cannot gate anything — `ready` is what actually says
-  // the session has arrived; without it, loading would render as "No devices signed in".
+  // `organizationId` is a placeholder while loading; `ready` is what gates.
   const { organizationId, ready } = usePersonalContext();
   const [pendingRevokeId, setPendingRevokeId] = useState<number | null>(null);
+  const [pendingRevokeKeyId, setPendingRevokeKeyId] = useState<string | null>(null);
   const [isPendingRevokeAll, setIsPendingRevokeAll] = useState(false);
 
   const sessionsQuery = api.personalSessions.list.useQuery({ organizationId }, { enabled: ready });
-  const revocation = useDeviceRevocation({
+  const keysQuery = api.ingestionKey.list.useQuery({ organizationId }, { enabled: ready });
+  const revocation = useCredentialRevocation({
     organizationId,
     isReady: ready,
     onDeviceRevoked: () => setPendingRevokeId(null),
     onEveryDeviceRevoked: () => setIsPendingRevokeAll(false),
+    onKeyRevoked: () => setPendingRevokeKeyId(null),
   });
 
+  // Both lists gate the empty state: a key minted from the tile is still something to see.
   const sessions = sessionsQuery.data ?? [];
-  const isLoadingDevices = !ready || sessionsQuery.isLoading;
+  const grouped = groupKeysBySession({ sessions, keys: keysQuery.data ?? [] });
+
+  const renderKeyRow = (key: PersonalIngestionKeyListing) => (
+    <IngestionKeyRow
+      key={key.apiKeyId}
+      ingestionKey={key}
+      isPendingRevoke={pendingRevokeKeyId === key.apiKeyId}
+      isRevoking={revocation.isRevokingKey && pendingRevokeKeyId === key.apiKeyId}
+      onRequestRevoke={() => setPendingRevokeKeyId(key.apiKeyId)}
+      onCancelRevoke={() => setPendingRevokeKeyId(null)}
+      onConfirmRevoke={() => revocation.revokeKey(key.apiKeyId)}
+    />
+  );
+
+  const isLoading = !ready || sessionsQuery.isLoading || keysQuery.isLoading;
+  const hasFailed = sessionsQuery.isError || keysQuery.isError;
+  const isEmpty = sessions.length === 0 && grouped.orphanKeys.length === 0;
 
   return (
     <VStack align="stretch" gap={4}>
-      {sessions.length > 1 && !isPendingRevokeAll && (
+      <WebSessionsPanel />
+
+      {isPendingRevokeAll && (
+        <RevokeAllConfirmation
+          isRevoking={revocation.isRevokingEveryDevice}
+          onCancel={() => setIsPendingRevokeAll(false)}
+          onConfirm={revocation.revokeEveryDevice}
+        />
+      )}
+      {!isPendingRevokeAll && sessions.length > 1 && (
         <HStack justify="end">
           <Button
             size="sm"
@@ -49,69 +82,111 @@ export function DevicesPanel() {
         </HStack>
       )}
 
-      {isPendingRevokeAll && (
-        <RevokeAllConfirmation
-          isRevoking={revocation.isRevokingEveryDevice}
-          onCancel={() => setIsPendingRevokeAll(false)}
-          onConfirm={revocation.revokeEveryDevice}
-        />
-      )}
-
-      {isLoadingDevices && (
+      {isLoading && (
         <Text fontSize="sm" color="fg.muted" paddingY={8}>
           Loading devices…
         </Text>
       )}
-      {!isLoadingDevices && sessions.length === 0 && <NoDevicesState />}
-      {!isLoadingDevices && sessions.length > 0 && (
-        <VStack align="stretch" gap={2}>
-          {sessions.map((session) => (
-            <DeviceRow
-              key={session.sessionStartedAtMs}
-              session={session}
-              isPendingRevoke={pendingRevokeId === session.sessionStartedAtMs}
-              isRevoking={
-                revocation.isRevokingDevice && pendingRevokeId === session.sessionStartedAtMs
-              }
-              onRequestRevoke={() => setPendingRevokeId(session.sessionStartedAtMs)}
-              onCancelRevoke={() => setPendingRevokeId(null)}
-              onConfirmRevoke={() => revocation.revokeDevice(session.sessionStartedAtMs)}
-            />
-          ))}
-        </VStack>
+      {!isLoading && hasFailed && (
+        <CredentialsUnavailable
+          onRetry={() => {
+            void sessionsQuery.refetch();
+            void keysQuery.refetch();
+          }}
+        />
+      )}
+      {!isLoading && !hasFailed && isEmpty && <NoDevicesState />}
+      {!isLoading && !hasFailed && !isEmpty && (
+        <CredentialCards
+          sessions={sessions}
+          grouped={grouped}
+          pendingRevokeId={pendingRevokeId}
+          isRevokingDevice={revocation.isRevokingDevice}
+          onRequestRevoke={setPendingRevokeId}
+          onCancelRevoke={() => setPendingRevokeId(null)}
+          onConfirmRevoke={revocation.revokeDevice}
+          renderKeyRow={renderKeyRow}
+        />
+      )}
+    </VStack>
+  );
+}
+
+/** One card per signed-in device holding the keys it minted, then the keys no session is behind. */
+function CredentialCards({
+  sessions,
+  grouped,
+  pendingRevokeId,
+  isRevokingDevice,
+  onRequestRevoke,
+  onCancelRevoke,
+  onConfirmRevoke,
+  renderKeyRow,
+}: {
+  sessions: CliSessionCard[];
+  grouped: GroupedIngestionKeys;
+  pendingRevokeId: number | null;
+  isRevokingDevice: boolean;
+  onRequestRevoke: (sessionStartedAtMs: number) => void;
+  onCancelRevoke: () => void;
+  onConfirmRevoke: (sessionStartedAtMs: number) => void;
+  renderKeyRow: (key: PersonalIngestionKeyListing) => ReactNode;
+}) {
+  return (
+    <VStack align="stretch" gap={2}>
+      {sessions.map((session) => (
+        <DeviceCard
+          key={session.sessionStartedAtMs}
+          session={session}
+          isPendingRevoke={pendingRevokeId === session.sessionStartedAtMs}
+          isRevoking={isRevokingDevice && pendingRevokeId === session.sessionStartedAtMs}
+          onRequestRevoke={() => onRequestRevoke(session.sessionStartedAtMs)}
+          onCancelRevoke={onCancelRevoke}
+          onConfirmRevoke={() => onConfirmRevoke(session.sessionStartedAtMs)}
+        >
+          {(grouped.keysBySession.get(session.sessionStartedAtMs) ?? []).map(renderKeyRow)}
+        </DeviceCard>
+      ))}
+      {grouped.orphanKeys.length > 0 && (
+        <OtherKeysCard>{grouped.orphanKeys.map(renderKeyRow)}</OtherKeysCard>
       )}
     </VStack>
   );
 }
 
 /**
- * Taking one device's access away, or every device's. Both land the same way:
- * the tokens are cleared, the list is asked again, and the person is told how
- * many credentials stopped working.
+ * Taking one device's access away, every device's, or one key's. A device
+ * revoke retires the keys it minted, so both lists are asked again after each,
+ * and the person is told how much stopped working.
  */
-function useDeviceRevocation({
+function useCredentialRevocation({
   organizationId,
   isReady,
   onDeviceRevoked,
   onEveryDeviceRevoked,
+  onKeyRevoked,
 }: {
   organizationId: string;
   isReady: boolean;
   onDeviceRevoked: () => void;
   onEveryDeviceRevoked: () => void;
+  onKeyRevoked: () => void;
 }) {
   const toaster = usePersonalToaster();
   const showErrorToast = useShowErrorToast();
   const utils = api.useUtils();
-  const refreshList = () => void utils.personalSessions.list.invalidate({ organizationId });
+  const refreshLists = () => {
+    void utils.personalSessions.list.invalidate({ organizationId });
+    void utils.ingestionKey.list.invalidate({ organizationId });
+  };
 
   const revokeMutation = api.personalSessions.revoke.useMutation({
     onSuccess: (result) => {
-      refreshList();
+      refreshLists();
       onDeviceRevoked();
       toaster.create({
         title: "Device revoked",
-        description: `Cleared ${tokenCount(result.revokedTokens)}. The CLI on that device will fail on its next request.`,
+        description: `Cleared ${tokenCount(result.revokedTokens)} and ${keyCount(result.revokedKeys)}. The CLI on that device will fail on its next request.`,
         type: "success",
       });
     },
@@ -120,20 +195,34 @@ function useDeviceRevocation({
 
   const revokeAllMutation = api.personalSessions.revokeAll.useMutation({
     onSuccess: (result) => {
-      refreshList();
+      refreshLists();
       onEveryDeviceRevoked();
       toaster.create({
         title: "All devices revoked",
-        description: `Cleared ${tokenCount(result.revokedTokens)} across every device. You'll need to re-run \`langwatch login\` on each.`,
+        description: `Cleared ${tokenCount(result.revokedTokens)} and ${keyCount(result.revokedKeys)} across every device. You'll need to re-run \`langwatch login\` on each.`,
         type: "success",
       });
     },
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't revoke the devices" }),
   });
 
+  const revokeKeyMutation = api.ingestionKey.revoke.useMutation({
+    onSuccess: () => {
+      refreshLists();
+      onKeyRevoked();
+      toaster.create({
+        title: "Ingestion key revoked",
+        description: "Anything still exporting with that token is refused from now on.",
+        type: "success",
+      });
+    },
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't revoke the key" }),
+  });
+
   return {
     isRevokingDevice: revokeMutation.isPending,
     isRevokingEveryDevice: revokeAllMutation.isPending,
+    isRevokingKey: revokeKeyMutation.isPending,
     revokeDevice: (sessionStartedAtMs: number) => {
       if (!isReady) return;
       revokeMutation.mutate({ organizationId, sessionStartedAtMs });
@@ -142,15 +231,20 @@ function useDeviceRevocation({
       if (!isReady) return;
       revokeAllMutation.mutate({ organizationId });
     },
+    revokeKey: (apiKeyId: string) => {
+      if (!isReady) return;
+      revokeKeyMutation.mutate({ organizationId, apiKeyId });
+    },
   };
 }
 
 const tokenCount = (count: number): string => `${count} token${count === 1 ? "" : "s"}`;
 
+const keyCount = (count: number): string => `${count} key${count === 1 ? "" : "s"}`;
+
 /**
  * Taking every device's access away at once, the account-takeover recovery
- * move. It is asked for twice because it signs the person out everywhere,
- * including wherever they are reading this.
+ * move. It is asked for twice because it signs the person out everywhere.
  */
 function RevokeAllConfirmation({
   isRevoking,
@@ -172,8 +266,8 @@ function RevokeAllConfirmation({
       borderColor="red.emphasized"
     >
       <Text fontSize="xs" color="red.fg" flex={1}>
-        Revoke every device on your account? You'll need to re-run <code>langwatch login</code> on
-        each device after this.
+        Revoke every device on your account? Their ingestion keys stop with them, and you'll need to
+        re-run <code>langwatch login</code> on each device after this.
       </Text>
       <Button size="xs" variant="ghost" onClick={onCancel} disabled={isRevoking}>
         Cancel
@@ -182,6 +276,25 @@ function RevokeAllConfirmation({
         Confirm revoke all
       </Button>
     </HStack>
+  );
+}
+
+/** A failed read is not an empty one: a key that could not be read is still live. */
+function CredentialsUnavailable({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={6}>
+      <VStack align="start" gap={2}>
+        <Text fontSize="sm" fontWeight="medium">
+          Could not load your devices and keys
+        </Text>
+        <Text fontSize="sm" color="fg.muted">
+          Anything already signed in keeps working. Try again to see the current list.
+        </Text>
+        <Button size="xs" variant="outline" onClick={onRetry}>
+          Try again
+        </Button>
+      </VStack>
+    </Box>
   );
 }
 
@@ -206,100 +319,3 @@ function NoDevicesState() {
     </VStack>
   );
 }
-
-function DeviceRow({
-  session,
-  isPendingRevoke,
-  isRevoking,
-  onRequestRevoke,
-  onCancelRevoke,
-  onConfirmRevoke,
-}: {
-  session: {
-    sessionStartedAtMs: number;
-    deviceLabel: string;
-    hostname: string | null;
-    uname: string | null;
-    platform: string | null;
-    lastSeenMs: number;
-    expiresAtMs: number;
-  };
-  isPendingRevoke: boolean;
-  isRevoking: boolean;
-  onRequestRevoke: () => void;
-  onCancelRevoke: () => void;
-  onConfirmRevoke: () => void;
-}) {
-  const Icon = platformIcon(session.platform);
-  const sub = [session.hostname, session.uname].filter(Boolean).join(" · ");
-
-  return (
-    <VStack
-      align="stretch"
-      gap={2}
-      borderWidth="1px"
-      borderColor={isPendingRevoke ? "red.emphasized" : "border.muted"}
-      borderRadius="sm"
-      padding={3}
-    >
-      <HStack gap={3}>
-        <Box>
-          <Icon size={20} />
-        </Box>
-        <VStack align="start" gap={0} flex={1}>
-          <HStack gap={2}>
-            <Text fontSize="sm" fontWeight="medium">
-              {session.deviceLabel}
-            </Text>
-            {session.platform && (
-              <Badge variant="surface" size="sm" colorPalette="gray">
-                {session.platform}
-              </Badge>
-            )}
-          </HStack>
-          {sub && (
-            <Text fontSize="xs" color="fg.muted">
-              {sub}
-            </Text>
-          )}
-          <Text fontSize="xs" color="fg.muted">
-            Last used {formatRelativeTime(session.lastSeenMs)} · Expires{" "}
-            {fmtAbsolute(session.expiresAtMs)}
-          </Text>
-        </VStack>
-        {!isPendingRevoke && (
-          <Button size="sm" variant="outline" colorPalette="red" onClick={onRequestRevoke}>
-            Revoke
-          </Button>
-        )}
-      </HStack>
-      {isPendingRevoke && (
-        <HStack gap={2} paddingY={2} paddingX={3} backgroundColor="red.subtle" borderRadius="sm">
-          <Text fontSize="xs" color="red.fg" flex={1}>
-            Revoke this device? The CLI on {session.hostname ?? "this device"} will start failing
-            immediately.
-          </Text>
-          <Button size="xs" variant="ghost" onClick={onCancelRevoke} disabled={isRevoking}>
-            Cancel
-          </Button>
-          <Button size="xs" colorPalette="red" onClick={onConfirmRevoke} loading={isRevoking}>
-            Confirm revoke
-          </Button>
-        </HStack>
-      )}
-    </VStack>
-  );
-}
-
-const fmtAbsolute = (ms: number | null | undefined): string =>
-  !ms ? "—" : readableDate(ms).toLocaleString();
-
-const platformIcon = (platform: string | null) => {
-  if (!platform) return Server;
-  const p = platform.toLowerCase();
-  if (p.includes("darwin") || p.includes("mac")) return Laptop;
-  if (p.includes("linux")) return Monitor;
-  if (p.includes("win")) return Laptop;
-  if (p.includes("ios") || p.includes("android")) return Smartphone;
-  return Server;
-};

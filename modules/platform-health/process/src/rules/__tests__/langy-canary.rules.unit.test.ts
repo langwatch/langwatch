@@ -8,10 +8,13 @@ describe("classifyLangyCanaryOutcome", () => {
   it("names a completed turn with text healthy", () => {
     expect(
       classifyLangyCanaryOutcome({
-        succeeded: true,
-        outcome: "completed",
-        text: "Hi!",
-        error: null,
+        kind: "settled",
+        settlement: {
+          succeeded: true,
+          outcome: "completed",
+          text: "Hi!",
+          error: null,
+        },
       }),
     ).toEqual({ healthy: true });
   });
@@ -21,10 +24,13 @@ describe("classifyLangyCanaryOutcome", () => {
   it("names a failed turn turn_failed", () => {
     expect(
       classifyLangyCanaryOutcome({
-        succeeded: false,
-        outcome: "failed",
-        text: null,
-        error: "boom",
+        kind: "settled",
+        settlement: {
+          succeeded: false,
+          outcome: "failed",
+          text: null,
+          error: "boom",
+        },
       }),
     ).toEqual({ healthy: false, reason: "turn_failed" });
   });
@@ -33,7 +39,10 @@ describe("classifyLangyCanaryOutcome", () => {
   /** @scenario "A stopped turn is turn_failed" */
   it("names a stopped turn turn_failed, whatever text it carries", () => {
     expect(
-      classifyLangyCanaryOutcome({ succeeded: true, outcome: "stopped", text: "Hi", error: null }),
+      classifyLangyCanaryOutcome({
+        kind: "settled",
+        settlement: { succeeded: true, outcome: "stopped", text: "Hi", error: null },
+      }),
     ).toEqual({ healthy: false, reason: "turn_failed" });
   });
 
@@ -42,10 +51,13 @@ describe("classifyLangyCanaryOutcome", () => {
   it("names a completed turn with only whitespace empty_reply", () => {
     expect(
       classifyLangyCanaryOutcome({
-        succeeded: true,
-        outcome: "completed",
-        text: "  \n",
-        error: null,
+        kind: "settled",
+        settlement: {
+          succeeded: true,
+          outcome: "completed",
+          text: "  \n",
+          error: null,
+        },
       }),
     ).toEqual({ healthy: false, reason: "empty_reply" });
   });
@@ -54,6 +66,17 @@ describe("classifyLangyCanaryOutcome", () => {
   /** @scenario "A turn that never settled is timeout" */
   it("names a turn that never settled timeout", () => {
     expect(classifyLangyCanaryOutcome(null)).toEqual({ healthy: false, reason: "timeout" });
+    expect(classifyLangyCanaryOutcome({ kind: "stopped" })).toEqual({
+      healthy: false,
+      reason: "timeout",
+    });
+  });
+
+  /** @scenario "A turn that asks the user a question is healthy" */
+  it("names a turn that answered with a question card and waits on the user healthy", () => {
+    expect(
+      classifyLangyCanaryOutcome({ kind: "awaiting_user", question: "What would you like to do?" }),
+    ).toEqual({ healthy: true });
   });
 });
 

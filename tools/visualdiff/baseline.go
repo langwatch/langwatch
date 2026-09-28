@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -17,26 +18,73 @@ import (
 	"time"
 )
 
-// A baseline is one base commit's captures for one edition, kept under
-// .visualdiff/baselines so a later run against the same base replays them
-// instead of booting and rendering the base again. Its key covers everything
-// that decides what a capture looks like: the commit, the edition, the
-// configuration, the viewport, the runner's own source and the UTC day, since
-// seeded dates render as text.
+// A baseline is one base commit's captures for one edition, replayed instead
+// of booting the base again. Its key covers what decides how a capture looks
+// (commit, edition, viewport, settle, fixtures, captureSources); routes and
+// flows are not in it: its meta lists what it holds, and a plan it does not
+// cover renders the base live (BaselineMeta.Covers).
 const (
 	BaselinesDir     = "baselines"
 	BaselineCaptures = "captures.jsonl"
 	BaselineMetaFile = "meta.json"
-	baselineFormat   = "2"
+	baselineFormat   = "3"
 	runnerSourceDir  = "tools/visualdiff/runner/src"
 )
 
-// BaselineMeta is what a baseline records beside its captures.
+// captureSources are the runner sources, under runnerSourceDir, whose change
+// changes a capture. Scheduling, pairing and the protocol are left out.
+var captureSources = []string{"capture.ts", "settle.ts", "noise.ts", "diff.ts", "screens.ts", "sign-in.ts", "flows"}
+
+// BaselineMeta is what a baseline records beside its captures: Routes and
+// Flows (flow id to its steps' hash) are what it can answer.
 type BaselineMeta struct {
-	BaseRef    string    `json:"baseRef"`
-	BaseCommit string    `json:"baseCommit"`
-	Edition    Edition   `json:"edition"`
-	CreatedAt  time.Time `json:"createdAt"`
+	BaseRef    string            `json:"baseRef"`
+	BaseCommit string            `json:"baseCommit"`
+	Edition    Edition           `json:"edition"`
+	CreatedAt  time.Time         `json:"createdAt"`
+	Routes     []string          `json:"routes,omitempty"`
+	Flows      map[string]string `json:"flows,omitempty"`
+}
+
+// Covers reports whether a baseline holds every route the plan renders and
+// every flow it runs, each flow with the same steps.
+func (meta BaselineMeta) Covers(routes []string, flows map[string]string) bool {
+	held := map[string]bool{}
+	for _, route := range meta.Routes {
+		held[route] = true
+	}
+	for _, route := range routes {
+		if !held[route] {
+			return false
+		}
+	}
+	for id, steps := range flows {
+		if meta.Flows[id] != steps {
+			return false
+		}
+	}
+	return true
+}
+
+// flowHashes names each flow's steps by a hash, so a flow edited since the
+// baseline was recorded is never replayed.
+func flowHashes(flows []Flow) map[string]string {
+	hashes := make(map[string]string, len(flows))
+	for _, flow := range flows {
+		encoded, _ := json.Marshal(flow.Steps)
+		sum := sha256.Sum256(encoded)
+		hashes[flow.ID] = hex.EncodeToString(sum[:8])
+	}
+	return hashes
+}
+
+// readBaselineMeta reads a present baseline's meta, or the zero meta.
+func readBaselineMeta(dir string) BaselineMeta {
+	var meta BaselineMeta
+	if content, err := os.ReadFile(filepath.Join(dir, BaselineMetaFile)); err == nil { // #nosec G304 -- inside the tool's own baseline cache.
+		_ = json.Unmarshal(content, &meta)
+	}
+	return meta
 }
 
 // Baseline is one resolved cache slot. Cached means this run replays it;
@@ -66,21 +114,25 @@ type baselineKeyInputs struct {
 	config   *Config
 	viewport Viewport
 	root     string
-	day      time.Time
 }
 
 // BaselineKey derives the cache slot name. Any input changing means a new
 // slot, never a stale replay.
 func BaselineKey(inputs baselineKeyInputs) (string, error) {
 	digest := sha256.New()
-	fmt.Fprintf(digest, "format=%s\nviewport=%s\nday=%s\n", baselineFormat, inputs.viewport, inputs.day.UTC().Format(time.DateOnly))
-	encoded, err := json.Marshal(inputs.config)
+	fmt.Fprintf(digest, "format=%s\nviewport=%s\n", baselineFormat, inputs.viewport)
+	encoded, err := json.Marshal(struct {
+		Settle   Settle            `json:"settle"`
+		Fixtures map[string]string `json:"fixtures"`
+	}{inputs.config.Settle, inputs.config.Fixtures})
 	if err != nil {
 		return "", err
 	}
 	digest.Write(encoded)
-	if err := hashTree(digest, filepath.Join(inputs.root, runnerSourceDir)); err != nil {
-		return "", err
+	for _, source := range captureSources {
+		if err := hashTree(digest, filepath.Join(inputs.root, runnerSourceDir, source)); err != nil {
+			return "", err
+		}
 	}
 	commit := inputs.commit
 	if len(commit) > 12 {
@@ -89,10 +141,13 @@ func BaselineKey(inputs baselineKeyInputs) (string, error) {
 	return fmt.Sprintf("%s-%s-%s", commit, inputs.edition, hex.EncodeToString(digest.Sum(nil))[:12]), nil
 }
 
-// hashTree folds every non-test source file under dir into digest, in a
-// stable order.
+// hashTree folds every non-test source file under dir (or dir itself, when
+// it is one file) into digest, in a stable order; a missing path adds nothing.
 func hashTree(digest io.Writer, dir string) error {
 	files, err := runnerSources(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("hash runner source: %w", err)
 	}
@@ -101,7 +156,7 @@ func hashTree(digest io.Writer, dir string) error {
 		if err != nil {
 			return err
 		}
-		rel, _ := filepath.Rel(dir, file)
+		rel, _ := filepath.Rel(filepath.Dir(dir), file)
 		if _, err := fmt.Fprintf(digest, "%s\n%s", rel, content); err != nil {
 			return err
 		}
@@ -170,19 +225,27 @@ func resolveBaselines(ctx context.Context, inputs baselineInputs) (map[Edition]B
 		return nil, err
 	}
 	now := inputs.deps.Now()
+	wanted := flowHashes(inputs.config.Flows)
+	if options.RoutesOnly {
+		wanted = nil
+	}
 	for _, edition := range options.Editions {
 		key, err := BaselineKey(baselineKeyInputs{
 			commit: commit, edition: edition, config: inputs.config,
-			viewport: options.Viewport, root: options.Root, day: now,
+			viewport: options.Viewport, root: options.Root,
 		})
 		if err != nil {
 			return nil, err
 		}
 		baseline := Baseline{
-			Dir:  filepath.Join(options.Root, ".visualdiff", BaselinesDir, key),
-			Meta: BaselineMeta{BaseRef: options.BaseRef, BaseCommit: commit, Edition: edition, CreatedAt: now.UTC()},
+			Dir: filepath.Join(options.Root, ".visualdiff", BaselinesDir, key),
+			Meta: BaselineMeta{
+				BaseRef: options.BaseRef, BaseCommit: commit, Edition: edition, CreatedAt: now.UTC(),
+				Routes: inputs.config.Routes, Flows: wanted,
+			},
 		}
-		baseline.Cached = !options.RefreshBaseline && baseline.Present()
+		baseline.Cached = !options.RefreshBaseline && baseline.Present() &&
+			readBaselineMeta(baseline.Dir).Covers(inputs.config.Routes, wanted)
 		baselines[edition] = baseline
 	}
 	return baselines, nil

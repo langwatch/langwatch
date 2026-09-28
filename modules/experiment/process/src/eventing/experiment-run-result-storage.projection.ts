@@ -6,6 +6,7 @@ import {
 } from "@langwatch/eventing";
 import { Temporal, toDate } from "@langwatch/time";
 
+import { hasExperiment } from "../rules/experiment-run-key.rules.ts";
 import { normalizeDurationMs } from "./experiment-run-duration.process.ts";
 import {
   type EvaluatorResultEvent,
@@ -84,6 +85,8 @@ export class ExperimentRunResultStorageMapProjection
   override options: MapProjectionOptions<TargetResultEvent | EvaluatorResultEvent> = {
     groupKeyFn: (event) =>
       `experiment:${event.data.experimentId}:result:${event.data.runId}:item:${event.data.index}`,
+    // A run without an experiment stores no rows, as main skipped its ClickHouse writes (§9).
+    enqueue: { filter: (event) => hasExperiment(event.data.experimentId) },
   };
 
   private constructor(deps: { store: AppendStore<ClickHouseExperimentRunResultRecord> }) {

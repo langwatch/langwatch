@@ -30,12 +30,4 @@ export const checkupTrpcTransport = defineTrpcRouter(OpsApi, checkupTrpc)
   .withFacts(opsOperatorFact)
   .withPermission("organization:manage")
   .handle(({ app, input }, operator) => app.setUsageReportSwitches({ ...input, operator }))
-
-  .procedure("startupNotice")
-  .withPermission("organization:manage")
-  .handle(({ app, input }) => app.getStartupNotice(input))
-
-  .procedure("dismissStartupNotice")
-  .withPermission("organization:manage")
-  .handle(({ app, input }) => app.dismissStartupNotice(input))
   .build();

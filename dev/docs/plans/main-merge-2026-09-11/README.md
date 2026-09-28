@@ -24,14 +24,14 @@ Produced by `git merge-tree --write-tree --name-only HEAD origin/main`, which
 does the whole merge in memory and touches neither the index nor the working
 tree. Re-run it to refresh; it is safe with agents working in the checkout.
 
-| Category | Count | What it means | File |
-| --- | --- | --- | --- |
-| content | 456 | Both sides changed the same lines. Real judgment. | `content.txt` |
-| file location | 453 | main **added** a file inside a directory this branch renamed. Git names the destination it suggests. Mechanical. | `file-location.txt` |
-| modify/delete | 374 | main **deleted** a file this branch modified. Decide whether main's deletion should win. | `modify-delete.txt` |
-| rename/delete | 48 | This branch renamed a file main deleted. | `rename-delete.txt` |
-| directory rename split | 14 | This branch split one directory into several, so git cannot place main's additions. One decision per directory. | `directory-rename-split.txt` |
-| rename/rename | 2 | Both sides renamed, differently. | `rename-rename.txt` |
+| Category               | Count | What it means                                                                                                    | File                         |
+| ---------------------- | ----- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| content                | 456   | Both sides changed the same lines. Real judgment.                                                                | `content.txt`                |
+| file location          | 453   | main **added** a file inside a directory this branch renamed. Git names the destination it suggests. Mechanical. | `file-location.txt`          |
+| modify/delete          | 374   | main **deleted** a file this branch modified. Decide whether main's deletion should win.                         | `modify-delete.txt`          |
+| rename/delete          | 48    | This branch renamed a file main deleted.                                                                         | `rename-delete.txt`          |
+| directory rename split | 14    | This branch split one directory into several, so git cannot place main's additions. One decision per directory.  | `directory-rename-split.txt` |
+| rename/rename          | 2     | Both sides renamed, differently.                                                                                 | `rename-rename.txt`          |
 
 Content conflicts cluster by area, which is what makes this parallelisable:
 
@@ -74,11 +74,11 @@ Those three are the whole of the exposure, because "took ours" is the resolution
 that silently discards main's change - the shape that half-reverted six PRs last
 time. They were read by hand, and **all three were dropping real work**:
 
-| File | What the replayed answer discarded |
-| --- | --- |
+| File                              | What the replayed answer discarded                                                                                                                            |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `scenario-run-parameter.error.ts` | `ScenarioFieldUnknownError`, a new `HandledError` with code `scenario_field_unknown`, thrown when a scenario is saved with a field its suite does not declare |
-| `scenario-run.ts` | `PENDING_EVALUATION`, a new run status for a finished conversation whose attached evaluators have not been recorded yet |
-| `infra/docker/Dockerfile` | two `COPY` lines for `platform/app/src/server/scenarios/{suite-fields,evaluator-attachments}.ts` |
+| `scenario-run.ts`                 | `PENDING_EVALUATION`, a new run status for a finished conversation whose attached evaluators have not been recorded yet                                       |
+| `infra/docker/Dockerfile`         | two `COPY` lines for `platform/app/src/server/scenarios/{suite-fields,evaluator-attachments}.ts`                                                              |
 
 `ScenarioFieldUnknownError`, `scenario_field_unknown` and `PENDING_EVALUATION`
 each appear **zero times** on this branch. They are two features main shipped
@@ -208,16 +208,16 @@ reason: it is small, it is the last of it, and it wants a settled tree.
 
 So it becomes the tail of the sequence rather than a parallel track:
 
-| # | Area | Why here |
-| --- | --- | --- |
-| 1 | `docs/` | pilot - most mechanical, cannot break a boot |
-| 2 | `sdks/typescript` | 56 content conflicts, self-contained |
-| 3 | `modules/analytics` | 24 content conflicts |
-| 4 | `modules/scenario` | 75 content conflicts, the heaviest |
-| 5 | `enterprise/modules` | 43 content conflicts |
-| 6 | `modules/gateway` | 5 conflicts **and** 31 ports/adapters files - one pass |
-| 7 | `modules/workflow` | 2 conflicts **and** 11 ports/adapters files - one pass |
-| 8 | `modules/langy` | 6 conflicts **and** 1 ports/adapters file - one pass |
+| #   | Area                 | Why here                                               |
+| --- | -------------------- | ------------------------------------------------------ |
+| 1   | `docs/`              | pilot - most mechanical, cannot break a boot           |
+| 2   | `sdks/typescript`    | 56 content conflicts, self-contained                   |
+| 3   | `modules/analytics`  | 24 content conflicts                                   |
+| 4   | `modules/scenario`   | 75 content conflicts, the heaviest                     |
+| 5   | `enterprise/modules` | 43 content conflicts                                   |
+| 6   | `modules/gateway`    | 5 conflicts **and** 31 ports/adapters files - one pass |
+| 7   | `modules/workflow`   | 2 conflicts **and** 11 ports/adapters files - one pass |
+| 8   | `modules/langy`      | 6 conflicts **and** 1 ports/adapters file - one pass   |
 
 Steps 6 to 8 are the only ones where a lane does both jobs, and they are last
 because by then the tree is settled and the merge is behind them.
@@ -227,12 +227,12 @@ because by then the tree is settled and the merge is behind them.
 The 2026-09-10 handover is stale on this and overstates it badly. Measured at
 `a08cbd27b8`:
 
-| Item | Handover said | Actually |
-| --- | --- | --- |
-| REST doors without a `mount:` | 11 | the doors file is **gone** - declarations drive it |
-| `api-production.composition.ts` | 4,300 lines | **183 lines** |
-| persistence under ports/adapters | 551 files | **43**, in gateway, workflow and langy only |
-| legacy REST seam | 5 files | `api-rest.security.ts` and `app-rest/index.ts` gone; `app-trpc.sse.ts` and 5 `createAppRestSecurity` importers remain |
+| Item                             | Handover said | Actually                                                                                                              |
+| -------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------- |
+| REST doors without a `mount:`    | 11            | the doors file is **gone** - declarations drive it                                                                    |
+| `api-production.composition.ts`  | 4,300 lines   | **183 lines**                                                                                                         |
+| persistence under ports/adapters | 551 files     | **43**, in gateway, workflow and langy only                                                                           |
+| legacy REST seam                 | 5 files       | `api-rest.security.ts` and `app-rest/index.ts` gone; `app-trpc.sse.ts` and 5 `createAppRestSecurity` importers remain |
 
 Separately, and **not** part of this sequence: the composition v2 seam work
 (`dev/docs/plans/composition-v2-queue.md`, tasks T1 to T3). That is a different

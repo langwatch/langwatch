@@ -6,8 +6,10 @@
 
 import {
   useUiCapabilities,
+  useUiCopyTargets,
   useUiRpc,
   useUiScope,
+  type UiCopyTargets,
   type UiFeedback,
   type UiNavigation,
   type UiSession,
@@ -42,6 +44,7 @@ class CapabilityAgentManagementHost implements AgentManagementHost {
       navigation: UiNavigation;
       feedback: UiFeedback;
       session: UiSession;
+      lent: UiCopyTargets;
       openDrawer: (drawer: string, props?: Record<string, unknown>) => void;
       refreshAgentLimit: () => Promise<void>;
     },
@@ -55,9 +58,13 @@ class CapabilityAgentManagementHost implements AgentManagementHost {
     return this.deps.agents;
   }
 
-  /** No capability carries the org/team/project graph the copy picker offers. */
+  /** Organization's lent targets, graded as main graded agents; no answer yet is none. */
   copyTargets(): readonly AgentCopyTarget[] {
-    return [];
+    return (this.deps.lent.targets("evaluations:manage") ?? []).map((target) => ({
+      label: target.label,
+      value: target.projectId,
+      hasCreatePermission: target.mayCreate,
+    }));
   }
 
   route(): AgentRouteReading {
@@ -132,6 +139,7 @@ class CapabilityAgentManagementHost implements AgentManagementHost {
 export default function AgentManagementHostMount({ children }: { children?: ReactNode }) {
   const { navigation, route, feedback, session } = useUiCapabilities();
   const rpc = useUiRpc();
+  const lent = useUiCopyTargets();
   const scopeHost = useUiScope().scopeHost();
   const hostProject = scopeHost?.project();
   const { openDrawer } = useDrawer();
@@ -151,10 +159,11 @@ export default function AgentManagementHostMount({ children }: { children?: Reac
         navigation,
         feedback,
         session,
+        lent,
         openDrawer: (drawer, props) => openDrawer(drawer, props),
         refreshAgentLimit: () => Promise.resolve(),
       }),
-    [hostProject, agents, reading, route, navigation, feedback, session, openDrawer],
+    [hostProject, agents, reading, route, navigation, feedback, session, lent, openDrawer],
   );
 
   return <AgentManagementHostProvider value={host}>{children}</AgentManagementHostProvider>;

@@ -61,6 +61,10 @@ export interface InstantEvalClassifierLimits {
   readonly reserveTokens: number;
   /** Transcripts tokenise denser than prose; measured, not the generic four. */
   readonly bytesPerInputToken: number;
+  /** The densest judged text measured; a text is cut to fit at this ratio. */
+  readonly fitBytesPerInputToken: number;
+  /** Below any judged text measured; the too-large retry cuts at this ratio. */
+  readonly retryBytesPerInputToken: number;
 }
 
 /** The shipped classifier's caps, measured against the live API. */
@@ -71,6 +75,8 @@ export const INSTANT_EVAL_CLASSIFIER_LIMITS: InstantEvalClassifierLimits = {
   maxScoreLevels: 10,
   reserveTokens: 768,
   bytesPerInputToken: 2.7,
+  fitBytesPerInputToken: 2,
+  retryBytesPerInputToken: 1.5,
 };
 
 /** Whether a judgement was made, declined, or attempted and lost. */

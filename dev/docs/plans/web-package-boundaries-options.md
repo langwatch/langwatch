@@ -7,14 +7,14 @@ and `grep` over `modules/*/web/src`; the rule logic was read from
 `packages/oxlint-rules/src/rules/package-boundaries.rule.mjs` and
 `packages/architecture-enforcer/src/policies/`.
 
-**The question, in the requester's words:** *"installing the frontend should not
-be imported by another package, but any package could use the hooks"* — and
+**The question, in the requester's words:** _"installing the frontend should not
+be imported by another package, but any package could use the hooks"_ — and
 ideally no circular package imports at all.
 
 **The one-paragraph answer.** Those are two separate problems, and the evidence
 says they barely overlap. The ~84 lint findings are almost entirely healthy
 parts-sharing under pre-convention export names — fixing them is a mechanical
-rename that kills **zero** cycles. The cycles live in the *legal* `surfaces/*`
+rename that kills **zero** cycles. The cycles live in the _legal_ `surfaces/*`
 import graph: one strongly connected component of 14 packages, held together by
 (a) platform capabilities parked inside feature packages (a typed tRPC facade
 in `workflow-web` alone accounts for 66 cross-package imports) and (b) genuine
@@ -46,10 +46,10 @@ means extraction and a handful of directional decisions, not a new export tier.
   web packages — a traversal-order-dependent sample, not a count of distinct
   cycles. Running the same DFS today reports **26**, of which **3 are
   contract-package cycles** (see §5, option C): `scenario-contract ↔
-  suite-contract`, a five-contract ring through
+suite-contract`, a five-contract ring through
   `evaluation → experiment → dataset → annotation → trace → evaluation`, and a
   five-contract ring through `scenario → automation → monitor → evaluation →
-  experiment → scenario`.
+experiment → scenario`.
 - **Hubs.** Out-degree: trace-web 12, scenario-web 8, experiment-web and
   workflow-web 7 each. In-degree: model-provider-web, trace-web and
   workflow-web 8 each, prompt-web 6.
@@ -58,7 +58,7 @@ The most consequential measurement in this investigation:
 
 > **The ~84 violation imports, taken alone, form no cycle at all.** Building
 > the import graph from only the violating (non-`surfaces/`) imports yields an
-> acyclic graph. Building it from only the *legal* `surfaces/<id>` imports
+> acyclic graph. Building it from only the _legal_ `surfaces/<id>` imports
 > yields a 13-package strongly connected component (everything above except
 > agent). Fixing every lint finding therefore removes exactly one package from
 > the ring and leaves the other thirteen cyclic.
@@ -74,7 +74,7 @@ Three layers enforce related but not identical rules today:
 1. **`langwatch/package-boundaries`** (oxlint, severity `error`,
    `packages/oxlint-rules/src/rules/package-boundaries.rule.mjs`). For
    web → web imports it allows exactly two shapes: a subpath matching
-   `./surfaces/<id>` (`webSurfaceImport`, allowed from *any* web package with
+   `./surfaces/<id>` (`webSurfaceImport`, allowed from _any_ web package with
    no declaration required), and an exact specifier declared in
    `apps/ui/src/features/catalogue.json` under a frontend feature whose `root`
    equals the importing module's feature name (`declaredWebDependency`). A
@@ -95,28 +95,28 @@ Three layers enforce related but not identical rules today:
    these; on this branch they are live findings the strict-layout drive is
    working through.
 
-Neither the oxlint rule nor the manifest policy checks *direction*: two
+Neither the oxlint rule nor the manifest policy checks _direction_: two
 packages may each legally import the other's `surfaces/*`, and nothing anywhere
 enforces acyclicity of the cross-package web graph (the "acyclic" guarantees in
-ADR-004 cover the app → feature → platform layering and the *private* feature
+ADR-004 cover the app → feature → platform layering and the _private_ feature
 graph inside one package, not the graph between web packages).
 
 ### 1.3 The convention that half-exists — and what `surfaces/` actually means
 
 Export census across the 35 web packages (276 subpath exports today):
 
-| Tier | Count | Examples |
-| --- | --- | --- |
-| `./surfaces/*` | 183 | `workflow-web/surfaces/workflow-api`, `analytics-web/surfaces/period-selector` |
-| Flat named entries | 70 | `./simulations`, `./drawers`, `./run-formatters`, `./agent-client` |
-| Bare root `.` | 15 | `presence-web`, `share-web`, `feature-flag-web` |
-| `./testing` | 5 | suite-web, annotation-web, … |
-| `./screens/*` | 2 | (the ADR-004 owner-only form — barely adopted) |
-| `./hooks/*` | 1 | onboarding-web (not a real tier) |
+| Tier               | Count | Examples                                                                       |
+| ------------------ | ----- | ------------------------------------------------------------------------------ |
+| `./surfaces/*`     | 183   | `workflow-web/surfaces/workflow-api`, `analytics-web/surfaces/period-selector` |
+| Flat named entries | 70    | `./simulations`, `./drawers`, `./run-formatters`, `./agent-client`             |
+| Bare root `.`      | 15    | `presence-web`, `share-web`, `feature-flag-web`                                |
+| `./testing`        | 5     | suite-web, annotation-web, …                                                   |
+| `./screens/*`      | 2     | (the ADR-004 owner-only form — barely adopted)                                 |
+| `./hooks/*`        | 1     | onboarding-web (not a real tier)                                               |
 
 Two facts that correct the brief's framing:
 
-- **`surfaces/` is the *shared* tier, not the private one.** ADR-004
+- **`surfaces/` is the _shared_ tier, not the private one.** ADR-004
   (`packages/architecture-enforcer/adrs/004-frontend-feature-boundaries.md`)
   defines `screens/<name>` as owner-only and `surfaces/<name>` as "a narrow
   controlled cross-feature contribution"; the spec
@@ -138,7 +138,7 @@ Two facts that correct the brief's framing:
   (`src/model/...`, `src/ui/sections/...`, `src/behavior/...`); only trace-web
   has physical `src/surfaces/` directories (4), plus one in workflow-web
   (`surfaces/code-agent` — which is also the only surface source file that
-  imports another web package). ADR-004's surface *closure* rules (no stores,
+  imports another web package). ADR-004's surface _closure_ rules (no stores,
   no transport, no fetch) are consequently unenforced in practice and already
   broken by design: `workflow-web/surfaces/workflow-api` is a typed tRPC
   client whose source comments call itself "ADR-004's one governed-closure
@@ -160,29 +160,29 @@ those apart from private internals.
 
 Reproduced exactly by simulating the rule's logic over `modules/*/web/src`:
 **84 findings** (68 in production source, 16 in test files), every one of them
-importing a subpath the target package *does declare* in its `exports`
+importing a subpath the target package _does declare_ in its `exports`
 (sealed-exports violations among these: zero). Per edge and entry, with what
 the entry actually exports (read from the entry files):
 
-| Edge | Entry | Count | What it is | Class |
-| --- | --- | --- | --- | --- |
-| scenario → suite | `run-formatters` | 24 (19p+5t) | pure model: status labels/config, polling interval, run-history transforms, output-field state; plus one `ui/sections` filter bar | **part** (model) |
-| scenario → suite | `run-cards` | 13 (5p+8t) | presentational cards/rows/sections: scenario-grid-card, simulation-card, run-row, batch-section, status icons | **part** (presentational) |
-| scenario → suite | `run-dialogs` | 7 (6p+1t) | prop-driven dialog components + context menu + NowProvider (not registry drawers) | **part** (interactive) |
-| scenario → suite | `run-history-store` | 3 (2p+1t) | behavior stores: use-run-history-store, use-auto-expansion, use-scroll-to-batch | **shared state** |
-| scenario → suite | `suite-pickers` | 2 | scenario-picker, target-picker elements | **part** |
-| scenario → suite | `suite-form` | 1 | use-suite-form hook + form types | **part** (behavior) |
-| trace → presence | bare root | 14 (13p+1t) | avatars, markers, presence sections **and** usePresenceStore/selectors, preferences store, tab-session id | **part** (~9) + **shared state** (~5) |
-| trace → annotation | `annotation-form` | 4 | form body/score blocks + model types | **part** |
-| trace → annotation | `annotation-chips` | 1 | three chip elements | **part** |
-| trace → annotation | `annotation-card` | 1 | one card block | **part** |
-| trace → share | `share-links` | 2 | pure model: shareUrlForToken, copyShareLink, expiry | **part** (model) |
-| trace → share | `share-link-views` | 2 | create-form, row, list, dialog-body components | **part** |
-| trace → suite | `run-formatters` | 1 | as above | **part** (model) |
-| workflow → agent | `agent-editors` | 4 | the entry exports whole drawers, but all four sites import only three pure model functions (`buildCodeConfig`, `DEFAULT_CODE`, `getCodeFromConfig`); three of the four sites are re-exports (`workflow/web/src/index.ts:48`, `code-agent.ts`, `surfaces/code-agent/index.ts` — the last being the tree's only surface-closure breach) | **part** (model, mis-bundled inside a drawer-heavy entry) |
-| workflow → agent | `agent-http-editor` | 1 | HTTP test-panel components + messagesToJson model | **part** |
-| scenario → agent | `agent-client` | 3 | typed API facade (`agentApi`), client types, `agentHasDevTunnel` | **transport client** |
-| ops → feature-flag | `experiment-catalogue` | 1 | operator catalogue sections + experiments dialog + watermark | **part** (operator console composition) |
+| Edge               | Entry                  | Count       | What it is                                                                                                                                                                                                                                                                                                                            | Class                                                     |
+| ------------------ | ---------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| scenario → suite   | `run-formatters`       | 24 (19p+5t) | pure model: status labels/config, polling interval, run-history transforms, output-field state; plus one `ui/sections` filter bar                                                                                                                                                                                                     | **part** (model)                                          |
+| scenario → suite   | `run-cards`            | 13 (5p+8t)  | presentational cards/rows/sections: scenario-grid-card, simulation-card, run-row, batch-section, status icons                                                                                                                                                                                                                         | **part** (presentational)                                 |
+| scenario → suite   | `run-dialogs`          | 7 (6p+1t)   | prop-driven dialog components + context menu + NowProvider (not registry drawers)                                                                                                                                                                                                                                                     | **part** (interactive)                                    |
+| scenario → suite   | `run-history-store`    | 3 (2p+1t)   | behavior stores: use-run-history-store, use-auto-expansion, use-scroll-to-batch                                                                                                                                                                                                                                                       | **shared state**                                          |
+| scenario → suite   | `suite-pickers`        | 2           | scenario-picker, target-picker elements                                                                                                                                                                                                                                                                                               | **part**                                                  |
+| scenario → suite   | `suite-form`           | 1           | use-suite-form hook + form types                                                                                                                                                                                                                                                                                                      | **part** (behavior)                                       |
+| trace → presence   | bare root              | 14 (13p+1t) | avatars, markers, presence sections **and** usePresenceStore/selectors, preferences store, tab-session id                                                                                                                                                                                                                             | **part** (~9) + **shared state** (~5)                     |
+| trace → annotation | `annotation-form`      | 4           | form body/score blocks + model types                                                                                                                                                                                                                                                                                                  | **part**                                                  |
+| trace → annotation | `annotation-chips`     | 1           | three chip elements                                                                                                                                                                                                                                                                                                                   | **part**                                                  |
+| trace → annotation | `annotation-card`      | 1           | one card block                                                                                                                                                                                                                                                                                                                        | **part**                                                  |
+| trace → share      | `share-links`          | 2           | pure model: shareUrlForToken, copyShareLink, expiry                                                                                                                                                                                                                                                                                   | **part** (model)                                          |
+| trace → share      | `share-link-views`     | 2           | create-form, row, list, dialog-body components                                                                                                                                                                                                                                                                                        | **part**                                                  |
+| trace → suite      | `run-formatters`       | 1           | as above                                                                                                                                                                                                                                                                                                                              | **part** (model)                                          |
+| workflow → agent   | `agent-editors`        | 4           | the entry exports whole drawers, but all four sites import only three pure model functions (`buildCodeConfig`, `DEFAULT_CODE`, `getCodeFromConfig`); three of the four sites are re-exports (`workflow/web/src/index.ts:48`, `code-agent.ts`, `surfaces/code-agent/index.ts` — the last being the tree's only surface-closure breach) | **part** (model, mis-bundled inside a drawer-heavy entry) |
+| workflow → agent   | `agent-http-editor`    | 1           | HTTP test-panel components + messagesToJson model                                                                                                                                                                                                                                                                                     | **part**                                                  |
+| scenario → agent   | `agent-client`         | 3           | typed API facade (`agentApi`), client types, `agentHasDevTunnel`                                                                                                                                                                                                                                                                      | **transport client**                                      |
+| ops → feature-flag | `experiment-catalogue` | 1           | operator catalogue sections + experiments dialog + watermark                                                                                                                                                                                                                                                                          | **part** (operator console composition)                   |
 
 **Totals: ~73 reusable parts (category 2), ~11 shared state / transport clients
 (a third category the brief anticipated), and 0 whole feature surfaces
@@ -197,7 +197,7 @@ Two supporting observations:
 
 - `modules/suite/README.md` states suite-web's charter as owning "the reusable
   scenario-run card, message preview, status configuration, and completion
-  treatment" — suite-web *is by design* a parts library (it has no `screens/`,
+  treatment" — suite-web _is by design_ a parts library (it has no `screens/`,
   no `surfaces/`, and depends only on two contract packages; it sits outside
   the SCC). The 50 scenario → suite findings are a consumer using a leaf parts
   library through the wrong door, not coupling.
@@ -205,7 +205,7 @@ Two supporting observations:
   frontend feature in `apps/ui/src/features/catalogue.json` declares all six
   suite-web entries (and agent-web's `agent-editors`/`agent-client`/
   `agent-http-editor`) under `uses.surfaces`. The findings exist because both
-  allowlist mechanisms key on the *frontend feature root* (`simulations`), and
+  allowlist mechanisms key on the _frontend feature root_ (`simulations`), and
   no catalogue feature has root `scenario` — so `modules/scenario/browser` can
   never be allowlisted for the same imports as the mechanism stands. The
   module-level sibling of an already-approved host-level dependency is what is
@@ -239,7 +239,7 @@ table, the SCC is held together by four distinguishable causes:
   analytics-web's model; `format-money` in workflow-web and analytics-web.
 
 **What-if, measured:** moving just the generic set out of workflow, analytics,
-trace and model-provider deletes five edges *entirely* (analytics → workflow,
+trace and model-provider deletes five edges _entirely_ (analytics → workflow,
 model-provider → workflow, langy → workflow, experiment → model-provider,
 scenario → analytics — 44 import statements) and thins most others. The
 14-package SCC **still survives** — extraction is necessary pressure relief but
@@ -317,7 +317,7 @@ rewrite the 84 import sites, update the catalogue's `uses.surfaces` strings.
   cross-feature edges visible in review, which is the point of ADR-004's
   catalogue.
 - **Effect on the 84:** → 0.
-- **Effect on the cycles:** **none.** Proven in §1.1 — and it *legalizes* the
+- **Effect on the cycles:** **none.** Proven in §1.1 — and it _legalizes_ the
   agent↔scenario pair rather than removing it. This option is the relabel the
   brief suspected. It is still worth doing, because an inconsistent convention
   is unenforceable and every future package will copy whichever shape it sees
@@ -350,7 +350,7 @@ no `-web-kit` invention is needed.
   moving things with ≥2 consuming features and no feature-domain vocabulary in
   their types.
 
-**B2 — a parts package per cluster.** suite-web *is* this pattern, already
+**B2 — a parts package per cluster.** suite-web _is_ this pattern, already
 working: a leaf parts library (contracts-only dependencies) under the scenario
 product area. Creating one for the studio cluster is the big-bang version of
 the §3.2 problem and should not be attempted as a first move.
@@ -410,7 +410,7 @@ package-level cycles; users see nothing. The honest costs over a year:
 - **It is not actually "nothing".** The boundary-edge baseline's 78 web → web
   manifest entries all expire **2026-10-01** with `enforceExpiry: true`, growth
   refused, and later expiries refused. Doing nothing means CI fails in two
-  weeks, so option E in practice means *amending the baseline policy* — a
+  weeks, so option E in practice means _amending the baseline policy_ — a
   structural decision wearing a different hat. Meanwhile the 84 oxlint findings
   and the 26 `package-cycle` findings have no baseline file at all; they are
   live errors this branch's drive is expected to pay down.
@@ -422,7 +422,7 @@ package-level cycles; users see nothing. The honest costs over a year:
   has only grown (agent joined it via one 3-import edge). A baseline without a
   direction rule ratchets nothing.
 - If the team genuinely decides the SCC is acceptable, the coherent version of
-  E is to *change the rule to say so* (drop the manifest cross-feature check
+  E is to _change the rule to say so_ (drop the manifest cross-feature check
   for surfaces-only deps, delete the expiring entries) rather than to keep a
   baseline that misdescribes intent. That is a legitimate position; it should
   be taken explicitly or not at all.
@@ -452,7 +452,7 @@ Sequenced:
    Alongside the renames, give the manifest layer a way to say what the oxlint
    layer already allows (a `uses` declaration per module web package, or teach
    `manifests.ts` the surfaces allowance) so the corresponding
-   boundary-edge-baseline entries can be *deleted* rather than expiring red.
+   boundary-edge-baseline entries can be _deleted_ rather than expiring red.
 2. **Second — extraction (B1), `workflow-api` first.** One new
    `packages/browser-trpc` (contract-typed tRPC facade; contracts-only
    dependencies) plus moving the generic UI pieces into

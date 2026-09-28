@@ -70,3 +70,18 @@ Feature: Invitation acceptance and role recomputation
     Given payment-pending invitations bought on one subscription
     When that subscription's checkout is approved
     Then each becomes a pending invitation with a fresh expiry and its invitation email is sent
+
+  # main's organization.ts:699-730: a Lite Member's team-role change costs a
+  # Lite Member seat when it takes away a custom role granting more than viewing.
+  @unit
+  Scenario: A Lite Member's team-role change is weighed against the seat their custom role held
+    Given a Lite Member holding a custom role that grants more than viewing on a team
+    When their team role is changed to a built-in role
+    Then the change is weighed as a move to a Lite Member seat
+
+  @unit
+  Scenario: A Lite Member's team-role change is refused when no Lite Member seat is left
+    Given a Lite Member holding a custom role that grants more than viewing on a team
+    And the organization has no Lite Member seat left
+    When their team role is changed to a built-in role
+    Then it is refused as a resource limit exceeded

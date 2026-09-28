@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TraceFailureNotice } from "../../../behavior/trace-host.ts";
 import {
+  AgentActionsMenu,
   SETUP_SURFACES,
   type SetupSurface,
   SetupWithAgentButton,
@@ -244,6 +245,36 @@ describe("SetupWithAgentButton", () => {
           expect.objectContaining({ type: "success" }),
         ),
       );
+    });
+
+    /** @scenario The install line stands in until the skill arrives */
+    it("stands the skill's install line in for a surface that hands only the skill", async () => {
+      const user = userEvent.setup();
+      const writeText = vi.fn(() => Promise.resolve());
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText },
+        configurable: true,
+      });
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <AgentActionsMenu
+            triggerLabel="Onboard your agent"
+            langy={null}
+            copy={{
+              skill: "tracing",
+              label: "Copy a prompt for your coding agent",
+              hint: "Paste it into your coding agent",
+              copiedTitle: "Prompt copied",
+            }}
+            docs={{ href: "https://docs.langwatch.ai", label: "Read the guide", hint: "Docs" }}
+          />
+        </ChakraProvider>,
+      );
+
+      await user.click(screen.getByRole("button", { name: /onboard your agent/i }));
+      await user.click(await screen.findByText("Copy a prompt for your coding agent"));
+
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith(setupAgentPrompt("traces")));
     });
 
     /** @scenario Copying the prompt confirms and survives a denied clipboard */

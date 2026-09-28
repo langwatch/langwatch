@@ -24,8 +24,8 @@ export const accountIdentifierSchema = z
   .strict();
 export type AccountIdentifier = z.infer<typeof accountIdentifierSchema>;
 
-/** RFC 7636 §4.2: the S256 challenge, 43 characters from the unreserved set. */
-export const identifierCodeChallengeSchema = z.string().regex(/^[A-Za-z0-9._~-]{43}$/);
+/** RFC 7636 §4.2: the S256 challenge, base64url of a SHA-256 digest (43 characters, no padding). */
+export const identifierCodeChallengeSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 
 export const emailIdentifierAddedSchema = z.object({ identifierId: z.string() }).strict();
 export type EmailIdentifierAdded = z.infer<typeof emailIdentifierAddedSchema>;

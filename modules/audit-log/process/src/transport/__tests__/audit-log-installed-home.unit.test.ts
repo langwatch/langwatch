@@ -2,6 +2,7 @@
  * @vitest-environment node
  * @see modules/audit-log/specs/audit-log.feature
  */
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { AnnotationApi, AnnotationQueueDetail } from "@langwatch/annotation-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import { SessionReader } from "@langwatch/api/rest";
@@ -109,6 +110,7 @@ type Owners = Readonly<{
   dataset: DatasetApi;
   monitor: MonitorApi;
   annotation: AnnotationApi;
+  agent: AgentApi;
 }>;
 
 function owners(): Owners {
@@ -141,6 +143,7 @@ function owners(): Owners {
     annotation: createApiFixture<AnnotationApi>({
       getQueue: async ({ queueId }) => ({ ...queueFixture, id: queueId ?? queueFixture.id }),
     }),
+    agent: createApiFixture<AgentApi>({}),
   };
 }
 

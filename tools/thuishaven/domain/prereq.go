@@ -449,6 +449,9 @@ type PrereqStatus struct {
 	// embeds Prereq, which has a Detail of its own (the paragraph a human
 	// reads), and a second field of that name silently shadows it.
 	Observed string
+	// Platform is the GOOS this status was planned for, so the install command
+	// a report prints is the one for that platform.
+	Platform string
 }
 
 // Chosen is the candidate to install for an entry the developer picked. It is
@@ -472,7 +475,7 @@ func PlanPrereqs(found map[string]Found, skipped map[string]bool, goos string) [
 }
 
 func planOne(p Prereq, found map[string]Found, skipped map[string]bool, goos string) PrereqStatus {
-	st := PrereqStatus{Prereq: p, State: PrereqMissing}
+	st := PrereqStatus{Prereq: p, State: PrereqMissing, Platform: goos}
 	if p.DarwinOnly && goos != "darwin" {
 		st.State = PrereqNotApplicable
 		st.Observed = "macOS only"

@@ -1,9 +1,6 @@
-import {
-  LIMIT_TYPE_DISPLAY_LABELS,
-  type LimitType,
-  limitTypes,
-} from "../index.ts";
 import { describe, expect, it } from "vitest";
+
+import { LIMIT_TYPE_DISPLAY_LABELS, type LimitType, limitTypes } from "../index.ts";
 
 describe("LIMIT_TYPE_DISPLAY_LABELS", () => {
   it("provides a display label for every LimitType", () => {

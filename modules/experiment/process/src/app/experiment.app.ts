@@ -4,10 +4,12 @@ import { on, type EventEmitter } from "node:events";
  * The experiment feature's application: what both of its doors call.
  */
 import { AgentApi } from "@langwatch/agent-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi, type Dataset } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import {
@@ -73,6 +75,8 @@ import {
   type ExperimentUsageCount,
   type ExperimentCopied,
   type ExperimentCopyInput,
+  experimentConfig,
+  type ExperimentServerConfig,
   type ExperimentEvaluationsListInput,
   type ExperimentEvaluationsListPage,
   type ExperimentIdOrSlugInput,
@@ -85,6 +89,8 @@ import { MonitorApi } from "@langwatch/monitor-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
+import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { SuiteApi } from "@langwatch/suite-contract";
 import {
   WorkflowApi,
   type StudioWorkflow,
@@ -169,12 +175,13 @@ export type ExperimentWorkflowAuthoring = Readonly<{
   create(
     input: Readonly<{
       projectId: string;
-      name: string;
-      icon?: string | null;
-      description?: string | null;
+      dsl: StudioWorkflow;
+      commitMessage: string;
+      autoSaved: boolean;
     }>,
+    by: Readonly<{ id: string }>,
   ): Promise<Readonly<{ id: string }>>;
-  saveVersion(input: ExperimentWorkflowVersionInput): Promise<void>;
+  saveVersion(input: ExperimentWorkflowVersionInput, by: Readonly<{ id: string }>): Promise<void>;
   copyWithDatasets(
     input: ExperimentWorkflowCopyInput,
   ): Promise<Readonly<{ workflowId: string; dsl: StudioWorkflow }>>;
@@ -238,8 +245,8 @@ const NO_RUNS: ExperimentRunAggregate = { runsCount: 0, lastRunAt: null };
 type ExperimentSetup = FeatureSetup<
   typeof ExperimentApp.dependencies,
   MembersRead<readonly ["prisma", "clickhouse", "redis", "logger"]> &
-    Readonly<{ publicBaseUrl: string | undefined }>,
-  undefined
+    Readonly<{ publicBaseUrl: string | undefined; processName: string; isSaas: boolean }>,
+  ExperimentServerConfig
 >;
 
 export class ExperimentApp implements ExperimentApi {
@@ -260,14 +267,25 @@ export class ExperimentApp implements ExperimentApi {
     retention: DataRetentionApi,
     /** Owns the project's custom model cost rules the optimizer log prices against. */
     modelProviders: ModelProviderApi,
+    /** Where a run's evaluator results are reported as evaluations. */
+    evaluation: EvaluationApi,
+    /** Mints the sandbox key a run lends the code it executes. */
+    apiKeys: ApiKeyApi,
+    /** Owns the rule refusing a run against someone else's personal agent. */
+    suite: SuiteApi,
+    /** Reads a row's stored attachment for the target it is dispatched to. */
+    storedObjects: StoredObjectApi,
   };
+  static readonly config = experimentConfig;
   static readonly reads = [
     ...reads("prisma", "clickhouse", "redis", "logger"),
     "publicBaseUrl",
+    "processName",
+    "isSaas",
   ] as const;
 
   static create(setup: ExperimentSetup): ExperimentApp {
-    const { members, dependencies } = setup;
+    const { members, dependencies, config } = setup;
     const commands = ExperimentRunCommandDispatcherService.create();
     const built = buildExperimentInfrastructure({
       prisma: members.prisma,
@@ -276,6 +294,13 @@ export class ExperimentApp implements ExperimentApi {
       logger: members.logger,
       execution: commands,
       publicBaseUrl: members.publicBaseUrl,
+      processName: members.processName,
+      runConcurrency: config.runConcurrency,
+      attachmentEgress: {
+        blockLocal: config.blockLocalHttpCalls,
+        allowedHosts: config.allowedProxyHosts,
+        verifyTls: members.isSaas,
+      },
       dependencies,
     });
     return new ExperimentApp({
@@ -727,8 +752,11 @@ export class ExperimentApp implements ExperimentApi {
   }
 
   /** Saves the wizard's setup, writing a version of its graph into the experiment's workflow. */
-  saveWithWorkflow(input: ExperimentWizardSaveInput): Promise<Experiment> {
-    return this.#workflowLinks.saveWithWorkflow(input);
+  saveWithWorkflow(
+    input: ExperimentWizardSaveInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<Experiment> {
+    return this.#workflowLinks.saveWithWorkflow(input, by);
   }
 
   /** Publishes a wizard experiment's evaluator as a monitor, refusing one not ready to be. */
@@ -804,21 +832,25 @@ export class ExperimentApp implements ExperimentApi {
 
   // ── Studio writes ──────────────────────────────────────────────
 
-  /** Creates the workflow a new wizard experiment writes its versions into. */
+  /** Creates the workflow a new wizard experiment writes into, its first graph as version one. */
   createWorkflow(
     input: Readonly<{
       projectId: string;
-      name: string;
-      icon?: string | null;
-      description?: string | null;
+      dsl: StudioWorkflow;
+      commitMessage: string;
+      autoSaved: boolean;
     }>,
+    by: Readonly<{ id: string }>,
   ): Promise<Readonly<{ id: string }>> {
-    return this.#dependencies.workflowAuthoring.create(input);
+    return this.#dependencies.workflowAuthoring.create(input, by);
   }
 
   /** Writes a workflow version, autosaved or committed. */
-  saveWorkflowVersion(input: ExperimentWorkflowVersionInput): Promise<void> {
-    return this.#dependencies.workflowAuthoring.saveVersion(input);
+  saveWorkflowVersion(
+    input: ExperimentWorkflowVersionInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<void> {
+    return this.#dependencies.workflowAuthoring.saveVersion(input, by);
   }
 
   /** Copies a workflow, and optionally its datasets, into another project. */

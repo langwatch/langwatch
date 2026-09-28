@@ -11,6 +11,7 @@ import type {
   OnlineEvaluationPerformance,
 } from "@langwatch/evaluation-contract";
 import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
 import type { MonitorRepositories } from "../../repositories/monitor.repositories.ts";
@@ -110,6 +111,7 @@ export function createMonitorTestApp(
         input.permissions ?? createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
       evaluators: createApiFixture<EvaluatorApi>(),
       evaluation: createApiFixture<EvaluationApi>(),
+      workflows: createApiFixture<WorkflowApi>(),
     },
     infrastructure: {
       evaluators: input.evaluators ?? new FakeMonitorEvaluators(),

@@ -1,7 +1,7 @@
 /**
- * Authz's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability, so the module mounts it, not the
- * application. ARCHITECTURE.md §10.1.
+ * Authz's answer to the port its screens declare: each method projects a
+ * `@langwatch/browser-host` capability or the plan it reads itself, so the
+ * module mounts it, not the application. ARCHITECTURE.md §10.1.
  */
 
 import {
@@ -18,11 +18,10 @@ import {
   type AuthzFailureNotice,
   type AuthzHostScope,
   type AuthzPlanReading,
+  type AuthzRouteReading,
   type AuthzSuccessNotice,
 } from "../model/authz-host.ts";
-
-/** No capability carries the plan tier yet, so the enterprise gate reads closed. */
-const NO_PLAN: AuthzPlanReading = { isEnterprise: false, isLoading: false };
+import { authzApi } from "./authz-api.ts";
 
 class CapabilityAuthzHost extends AuthzHostApi {
   constructor(
@@ -30,6 +29,9 @@ class CapabilityAuthzHost extends AuthzHostApi {
       organizationId: string | undefined;
       session: UiSession;
       feedback: UiFeedback;
+      plan: AuthzPlanReading;
+      route: AuthzRouteReading;
+      setQuery: AuthzHostApi["setQuery"];
     },
   ) {
     super();
@@ -44,7 +46,18 @@ class CapabilityAuthzHost extends AuthzHostApi {
   }
 
   plan(): AuthzPlanReading {
-    return NO_PLAN;
+    return this.deps.plan;
+  }
+
+  route(): AuthzRouteReading {
+    return this.deps.route;
+  }
+
+  setQuery(
+    next: Readonly<Record<string, string | undefined>>,
+    options?: { replace?: boolean },
+  ): void {
+    this.deps.setQuery(next, options);
   }
 
   succeeded(notice: AuthzSuccessNotice): void {
@@ -62,11 +75,30 @@ class CapabilityAuthzHost extends AuthzHostApi {
  * is what `mounts.load` resolves.
  */
 export default function AuthzHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback } = useUiCapabilities();
+  const { session, feedback, route } = useUiCapabilities();
+  const { query } = route.reading();
   const { organizationId } = useUiScope().activeScope();
+  // The same question, gate and cache entry as the navigation's plan reading.
+  const usage = authzApi.limits.getUsage.useQuery(
+    { organizationId: organizationId ?? "" },
+    { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
+  );
+  const planType = usage.data?.activePlan.type;
+  const plan = useMemo(
+    () => ({ isEnterprise: planType === "ENTERPRISE", isLoading: usage.isLoading }),
+    [planType, usage.isLoading],
+  );
   const host = useMemo(
-    () => new CapabilityAuthzHost({ organizationId: organizationId ?? void 0, session, feedback }),
-    [organizationId, session, feedback],
+    () =>
+      new CapabilityAuthzHost({
+        organizationId: organizationId ?? void 0,
+        session,
+        feedback,
+        plan,
+        route: { query },
+        setQuery: (next, options) => route.setQuery(next, options),
+      }),
+    [organizationId, session, feedback, plan, query, route],
   );
   return <AuthzHostProvider value={host}>{children}</AuthzHostProvider>;
 }

@@ -1,4 +1,8 @@
-import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
+import {
+  type CanonicalAttributeStore,
+  type ExtractorContext,
+  takeAttribute,
+} from "./canonical-attributes.rules.ts";
 
 export const CODEX_EVENT_NAME_PREFIX = "codex.";
 export const CODEX_PROVIDER_KEY = "openai_codex";
@@ -39,12 +43,9 @@ export type CanonicalLift = readonly [string, string | number | null];
 
 export const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function extractConversationId(attrs: {
-  get: (key: string) => unknown;
-  take: (key: string) => unknown;
-}): string | null {
+export function extractConversationId(attrs: CanonicalAttributeStore): string | null {
   const sessionId = asString(attrs.get("thread.id"));
-  const turnId = asString(attrs.take("turn.id"));
+  const turnId = asString(takeAttribute(attrs, "turn.id"));
   return sessionId !== null && UUID_SHAPE.test(sessionId) ? sessionId : turnId;
 }
 
@@ -53,12 +54,12 @@ export function computeNonCachedInput({
   cacheRead,
   cacheCreation,
 }: {
-  attrs: { get: (key: string) => unknown; take: (key: string) => unknown };
+  attrs: CanonicalAttributeStore;
   cacheRead: number | null;
   cacheCreation: number | null;
 }): number | null {
   const own = asNumber(attrs.get("codex.turn.token_usage.non_cached_input_tokens"));
-  const whole = asNumber(attrs.take("codex.turn.token_usage.input_tokens"));
+  const whole = asNumber(takeAttribute(attrs, "codex.turn.token_usage.input_tokens"));
   if (own !== null) {
     return own;
   }

@@ -74,6 +74,14 @@ export const suiteTargetSchema = suiteTargetBaseSchema.superRefine((target, cont
 });
 export type SuiteTarget = z.infer<typeof suiteTargetSchema>;
 
+/** What a run's ownership check reads about one agent it targets, and nothing more. */
+export type ConnectedTargetAgent = {
+  id: string;
+  name: string;
+  type: string;
+  ownerUserId?: string | null;
+};
+
 /** Browser and transport callers use the same target parser as the service boundary. */
 export function parseSuiteTargets(value: unknown): SuiteTarget[] {
   return z.array(suiteTargetSchema).parse(value);

@@ -94,7 +94,7 @@ func (selection GCSelection) protects(state RunState) bool {
 }
 
 // ScanRuns reads every run directory under <root>/.visualdiff, skipping the
-// baseline cache.
+// baseline cache and the persistent worktrees, which outlive every run.
 func ScanRuns(root string, alive func(pid int) bool) ([]RunState, error) {
 	parent := filepath.Join(root, ".visualdiff")
 	entries, err := os.ReadDir(parent)
@@ -106,7 +106,7 @@ func ScanRuns(root string, alive func(pid int) bool) ([]RunState, error) {
 	}
 	var states []RunState
 	for _, entry := range entries {
-		if entry.IsDir() && entry.Name() != BaselinesDir {
+		if entry.IsDir() && entry.Name() != BaselinesDir && entry.Name() != WorktreesDir {
 			states = append(states, readRunState(filepath.Join(parent, entry.Name()), alive))
 		}
 	}

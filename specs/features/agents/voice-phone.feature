@@ -337,6 +337,50 @@ Feature: Voice agents: reach an agent by phone
     Then the child receives the socket handle and the bytes read during the upgrade
 
   # ---------------------------------------------------------------------------
+  # Door hardening: Redis nonces (ARCHITECTURE.md §8, Alex 2026-09-28)
+  # ---------------------------------------------------------------------------
+  # Nonces live in Redis, single-use and 60 seconds long; the child stays on the worker
+  # that spawned it, which is the only one Twilio dials back. The X-Twilio-Signature
+  # check is deferred (Alex, 2026-09-28).
+
+  @unit
+  Scenario: The media door refuses a plain request on the media path
+    Given the voice media door is running
+    When a request without an upgrade arrives on a Twilio media path
+    Then it answers not found and the scenario is never asked to accept it
+
+  @unit
+  Scenario: A nonce registered on another worker is refused here
+    Given two workers sharing one nonce store
+    And a nonce registered to a child on the first worker
+    When the upgrade for that nonce arrives on the second worker
+    Then the second worker closes it with forbidden
+
+  @unit
+  Scenario: A stored nonce is taken once, then reads as absent
+    Given a nonce stored for an owner
+    When it is taken twice
+    Then the first take answers the owner and the second answers nothing
+
+  @unit
+  Scenario: A stored nonce not taken within its lifetime is gone
+    Given a nonce stored for 60 seconds
+    When it is taken after 60 seconds
+    Then the take answers nothing
+
+  @integration
+  Scenario: Redis hands a nonce to exactly one of two racing upgrades
+    Given a nonce stored in Redis for an owner
+    When two takes race for it
+    Then exactly one take answers the owner
+
+  @integration
+  Scenario: Redis keeps a nonce for 60 seconds at most
+    Given a nonce stored in Redis with the registry's lifetime
+    When its time to live is read
+    Then it is at most 60 seconds
+
+  # ---------------------------------------------------------------------------
   # cloudflared comes from the image's PATH (Alex, 2026-09-28)
   # ---------------------------------------------------------------------------
   # The scenario SDK opens its quick tunnel with a bare-command spawn, a PATH

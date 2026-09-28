@@ -6,8 +6,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// Trace's lent menu reaches a skill-prompt query these scenarios never open;
+// only its trigger's own label and ordering are asserted.
 vi.mock("../../../../../behavior/lent-peers.tsx", () => ({
   InlineCommandPalette: () => <input placeholder="ask" />,
+  AgentActionsMenu: ({ trigger }: { trigger: React.ReactNode }) => trigger,
 }));
 
 const askLangy = vi.fn();
@@ -17,14 +20,6 @@ vi.mock("@langwatch/langy-browser-kit", () => ({
     reach.hasTraces
       ? [{ label: "Compare two runs", icon: () => null, prompt: "compare two runs" }]
       : [{ label: "Show me around", icon: () => null, prompt: "show me around" }],
-}));
-
-// AgentActionsMenu (trace/web) reaches a tRPC-backed skill-prompt query this
-// test does not exercise — the menu never opens in these two scenarios, only
-// its trigger's own label and ordering are asserted.
-vi.mock("@langwatch/trace-browser/surfaces/setup-with-agent-button", () => ({
-  AgentActionsMenu: ({ trigger }: { trigger: React.ReactNode }) => trigger,
-  setupAgentPrompt: () => "",
 }));
 
 vi.mock("../dev/home-dev-state.ts", () => ({ useHomeDevState: () => null }));

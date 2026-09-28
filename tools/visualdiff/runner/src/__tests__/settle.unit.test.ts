@@ -1,40 +1,43 @@
 import { describe, expect, it } from "vitest";
 
-import { InFlightTracker, shouldIgnoreRequest } from "../settle";
+import { InFlightTracker, LONG_LIVED_MILLIS, shouldIgnoreRequest } from "../settle";
 
-const settings = { quietMillis: 500, deadlineMillis: 20_000 };
+const settings = { quietMillis: 500, deadlineMillis: 8000 };
+
+const request = (url: string) => ({ key: url, url, resourceType: "fetch" });
 
 describe("Feature: Visual diff between two refs", () => {
   describe("given a page with requests in flight", () => {
     describe("when the runner settles", () => {
       /** @scenario The runner settles on the in-flight request count rather than a fixed wait */
       it("stays busy until the count reaches zero and the quiet window passes", () => {
-        const tracker = new InFlightTracker(settings, 0);
-        tracker.started({ url: "http://app/api/traces", resourceType: "fetch" });
+        const tracker = new InFlightTracker<string>(settings, 0);
+        tracker.started({ ...request("http://app/api/traces"), now: 0 });
 
-        expect(tracker.decide(10_000).quiet).toBe(false);
+        expect(tracker.decide(4000).quiet).toBe(false);
 
-        tracker.settled({ url: "http://app/api/traces", resourceType: "fetch", now: 10_000 });
+        tracker.settled({ key: "http://app/api/traces", now: 4000 });
 
-        expect(tracker.decide(10_100).quiet).toBe(false);
-        expect(tracker.decide(10_500).quiet).toBe(true);
+        expect(tracker.decide(4100).quiet).toBe(false);
+        expect(tracker.decide(4500).quiet).toBe(true);
       });
 
       /** @scenario The runner settles on the in-flight request count rather than a fixed wait */
       it("gives up at the settle deadline rather than hanging", () => {
-        const tracker = new InFlightTracker(settings, 0);
-        tracker.started({ url: "http://app/api/poll", resourceType: "fetch" });
+        const tracker = new InFlightTracker<string>(settings, 0);
+        tracker.started({ ...request("http://app/api/poll"), now: 0 });
 
-        expect(tracker.decide(19_999).expired).toBe(false);
-        expect(tracker.decide(20_000)).toEqual({ quiet: false, expired: true });
+        expect(tracker.decide(7999).expired).toBe(false);
+        expect(tracker.decide(8000)).toEqual({ quiet: false, expired: true });
       });
 
-      it("never counts below zero when a response arrives without its request", () => {
-        const tracker = new InFlightTracker(settings, 0);
+      it("ignores a response that arrives without its request", () => {
+        const tracker = new InFlightTracker<string>(settings, 0);
 
-        tracker.settled({ url: "http://app/api/x", resourceType: "fetch", now: 100 });
+        tracker.settled({ key: "http://app/api/x", now: 100 });
 
-        expect(tracker.inFlight).toBe(0);
+        expect(tracker.inFlight(100)).toEqual([]);
+        expect(tracker.decide(500).quiet).toBe(true);
       });
     });
   });
@@ -52,6 +55,7 @@ describe("Feature: Visual diff between two refs", () => {
           { url: "http://app/src/app.tsx?t=1757160000000", resourceType: "script" },
           { url: "http://app/node_modules/.vite/deps/react.js", resourceType: "script" },
           { url: "http://app/src/x.tsx?hot-update", resourceType: "script" },
+          { url: "http://app/api/rum/v1/traces", resourceType: "fetch" },
         ];
 
         for (const request of ignored) {
@@ -64,26 +68,58 @@ describe("Feature: Visual diff between two refs", () => {
 
       /** @scenario The runner ignores server-sent events and Vite hot updates while settling */
       it("settles while an event stream is still open", () => {
-        const tracker = new InFlightTracker(settings, 0);
+        const tracker = new InFlightTracker<string>(settings, 0);
 
-        tracker.started({ url: "http://app/api/runs/stream", resourceType: "fetch" });
+        tracker.started({ ...request("http://app/api/runs/stream"), now: 0 });
 
-        expect(tracker.inFlight).toBe(0);
+        expect(tracker.inFlight(0)).toEqual([]);
         expect(tracker.decide(600).quiet).toBe(true);
       });
     });
   });
 
   describe("given a new settle window", () => {
-    describe("when the tracker restarts", () => {
-      it("carries the in-flight count and resets the deadline", () => {
-        const tracker = new InFlightTracker(settings, 0);
-        tracker.started({ url: "http://app/api/traces", resourceType: "fetch" });
+    describe("when the tracker begins it", () => {
+      it("keeps the requests still in flight and resets the deadline", () => {
+        const tracker = new InFlightTracker<string>(settings, 0);
+        tracker.started({ ...request("http://app/api/traces"), now: 0 });
 
-        const restarted = tracker.restart(19_000);
+        tracker.begin(7000);
 
-        expect(restarted.inFlight).toBe(1);
-        expect(restarted.decide(20_000).expired).toBe(false);
+        expect(tracker.inFlight(7000)).toEqual(["http://app/api/traces"]);
+        expect(tracker.decide(8000).expired).toBe(false);
+      });
+    });
+  });
+
+  describe("given a request that never reports back", () => {
+    describe("when the page navigates away", () => {
+      /** @scenario A request that never reports back does not hold later captures to the deadline */
+      it("forgets it, so the next screen settles on its own requests", () => {
+        const tracker = new InFlightTracker<string>(settings, 0);
+        tracker.started({ ...request("http://app/api/automations/lost"), now: 0 });
+
+        tracker.navigated(1000);
+        tracker.begin(1000);
+
+        expect(tracker.decide(1500)).toEqual({ quiet: true, expired: false });
+      });
+    });
+
+    describe("when it is older than the long-lived age", () => {
+      /** @scenario A request that never reports back does not hold later captures to the deadline */
+      it("stops waiting on it and lists it as long-lived", () => {
+        const tracker = new InFlightTracker<string>(
+          { quietMillis: 500, deadlineMillis: 20_000 },
+          0,
+        );
+        tracker.started({ ...request("http://app/api/poll"), now: 0 });
+
+        expect(tracker.decide(LONG_LIVED_MILLIS - 1).quiet).toBe(false);
+        expect(tracker.decide(LONG_LIVED_MILLIS + 499).quiet).toBe(false);
+        expect(tracker.decide(LONG_LIVED_MILLIS + 500).quiet).toBe(true);
+        expect(tracker.longLived(LONG_LIVED_MILLIS)).toEqual(["http://app/api/poll"]);
+        expect(tracker.inFlight(LONG_LIVED_MILLIS)).toEqual([]);
       });
     });
   });

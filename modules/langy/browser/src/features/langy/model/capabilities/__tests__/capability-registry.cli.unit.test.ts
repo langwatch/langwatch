@@ -1,7 +1,10 @@
-import { CLI_SUBRESOURCE_VERBS, extractPlatformUrl } from "@langwatch/langy-contract";
+import {
+  CAPABILITY_CATALOG,
+  CLI_SUBRESOURCE_VERBS,
+  extractPlatformUrl,
+} from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
-import { CAPABILITY_CATALOG } from "../../../../../model/langy-capability-catalog.ts";
 import { FEATURES } from "../../../../../model/shared/langy/feature-map.ts";
 import {
   buildResourceHref,

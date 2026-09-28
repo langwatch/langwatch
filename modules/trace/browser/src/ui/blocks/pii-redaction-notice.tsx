@@ -20,10 +20,10 @@ export function PIIRedactionAlert({ children }: { children?: React.ReactNode }) 
   const settingsHref = "/settings/data-privacy";
 
   return (
-    <Alert.Root status="info" size="sm" variant="subtle" width="full">
+    <Alert.Root status="info" size="sm" width="full">
       <Alert.Indicator />
       <Alert.Content>
-        <Alert.Description fontSize="sm">
+        <Alert.Description>
           {children ??
             "Some content was redacted by this project's privacy settings (PII or secrets redaction)."}{" "}
           Review your privacy settings under{" "}

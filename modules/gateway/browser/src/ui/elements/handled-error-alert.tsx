@@ -1,12 +1,9 @@
 /** Inline failure alert for a panel that is still broken. Pending registry integration. */
 
-import { Box, HStack, Stack, Text } from "@chakra-ui/react";
+import { Alert } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";
 
 import { UNKNOWN_ERROR_DESCRIPTION } from "../../model/describe-error.ts";
-
-const HAIRLINE =
-  "color-mix(in srgb, var(--chakra-colors-red-solid) 26%, var(--chakra-colors-border-muted))";
 
 export interface HandledErrorAlertProps {
   /** Any error, handled or not. Renders nothing when there is none. */
@@ -21,25 +18,14 @@ export function HandledErrorAlert({ error, title, fallbackTitle }: HandledErrorA
   if (error === null || error === void 0) return null;
 
   return (
-    <Box
-      role="alert"
-      borderWidth="1px"
-      borderColor={HAIRLINE}
-      borderRadius="md"
-      paddingX={4}
-      paddingY={3}
-    >
-      <HStack gap={3} alignItems="flex-start">
-        <Box color="red.fg" display="flex" flexShrink={0} marginTop="2px">
-          <AlertCircle size={16} aria-hidden />
-        </Box>
-        <Stack gap={1}>
-          <Text fontWeight="medium">{title ?? fallbackTitle ?? "Something went wrong"}</Text>
-          <Text fontSize="sm" color="fg.muted">
-            {UNKNOWN_ERROR_DESCRIPTION}
-          </Text>
-        </Stack>
-      </HStack>
-    </Box>
+    <Alert.Root status="error" role="alert">
+      <Alert.Indicator>
+        <AlertCircle aria-hidden />
+      </Alert.Indicator>
+      <Alert.Content>
+        <Alert.Title>{title ?? fallbackTitle ?? "Something went wrong"}</Alert.Title>
+        <Alert.Description>{UNKNOWN_ERROR_DESCRIPTION}</Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
   );
 }

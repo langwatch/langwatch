@@ -1,5 +1,6 @@
 /** Builds OrganizationInfrastructure from prisma, encryption, logger, redis, and config. */
 import type { AuthzApi, OrganizationUserRole } from "@langwatch/authz-contract";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -14,10 +15,11 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
-import {
-  OrganizationCapabilityUnavailableError,
-  type OrganizationInvite,
-  type OrganizationPendingInviteApplied,
+import type {
+  LimitCheckResult,
+  LimitType,
+  OrganizationInvite,
+  OrganizationPendingInviteApplied,
 } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -39,6 +41,10 @@ import { InviteSendThrottleService } from "../services/invite-send-throttle.serv
 import { InviteService } from "../services/invite.service.ts";
 import { PersonalWorkspaceDiagnosticsService } from "../services/personal-workspace-diagnostics.service.ts";
 import { PersonalWorkspaceIdentityService } from "../services/personal-workspace-identity.service.ts";
+import {
+  type SeatLimitReached,
+  SeatLimitNoticeService,
+} from "../services/seat-limit-notice.service.ts";
 import { TeamIdentityService } from "../services/team-identity.service.ts";
 import type { OrganizationInfrastructure } from "./organization.app.ts";
 import type {
@@ -60,19 +66,12 @@ import type {
   OrganizationSignals,
 } from "./organization.members.ts";
 
-/** What a seat decision answers when every field is known. */
-type OrganizationSeatAnswer = Readonly<{
-  allowed: boolean;
-  limitType: "members" | "membersLite";
-  current: number;
-  max: number;
-}>;
-
 /** Seat licence over the same plan and membership counts; all fields answered. */
 class EntitlementOrganizationSeatLicense {
   static create(options: {
     plans: Pick<EntitlementApi, "getActivePlan">;
     memberships: OrganizationSeatRepository;
+    notices: Pick<SeatLimitNoticeService, "reached">;
   }): EntitlementOrganizationSeatLicense {
     return new EntitlementOrganizationSeatLicense(options);
   }
@@ -81,14 +80,16 @@ class EntitlementOrganizationSeatLicense {
     private readonly options: {
       plans: Pick<EntitlementApi, "getActivePlan">;
       memberships: OrganizationSeatRepository;
+      /** A refused role change is recorded before it is thrown, as main's guard did. */
+      notices: Pick<SeatLimitNoticeService, "reached">;
     },
   ) {}
 
   async checkLimit(input: {
     organizationId: string;
-    resource: "members" | "membersLite";
+    resource: LimitType;
     user?: OrganizationPlanUser | undefined;
-  }): Promise<OrganizationSeatAnswer> {
+  }): Promise<LimitCheckResult> {
     const plan = await this.activePlan(input.organizationId, input.user);
     const max = this.allowance(plan, input.resource);
     if (plan.overrideAddingLimitations) {
@@ -141,6 +142,12 @@ class EntitlementOrganizationSeatLicense {
     const max = this.allowance(input.plan, resource);
     const current = await this.seatsTaken(input.organizationId, resource);
     if (current >= max) {
+      this.options.notices.reached({
+        organizationId: input.organizationId,
+        limitType: resource,
+        current,
+        max,
+      });
       throw new LimitExceededError(resource, current, max);
     }
   }
@@ -158,11 +165,11 @@ class EntitlementOrganizationSeatLicense {
     });
   }
 
-  private allowance(plan: Plan, resource: "members" | "membersLite"): number {
+  private allowance(plan: Plan, resource: LimitType): number {
     return resource === "members" ? plan.maxMembers : plan.maxMembersLite;
   }
 
-  private seatsTaken(organizationId: string, resource: "members" | "membersLite"): Promise<number> {
+  private seatsTaken(organizationId: string, resource: LimitType): Promise<number> {
     return resource === "members"
       ? this.options.memberships.getMemberCount(organizationId)
       : this.options.memberships.getMembersLiteCount(organizationId);
@@ -231,7 +238,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     baseHost: string;
     identity: Pick<IdentityApi, "verifiedEmailsOf">;
     userDirectory: PrismaOrganizationUserDirectoryRepository;
-    logger: Pick<Logger, "warn">;
+    notices: Pick<SeatLimitNoticeService, "record">;
   }): InviteServiceOrganizationInvitations {
     return new InviteServiceOrganizationInvitations(options);
   }
@@ -244,7 +251,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
       baseHost: string;
       identity: Pick<IdentityApi, "verifiedEmailsOf">;
       userDirectory: PrismaOrganizationUserDirectoryRepository;
-      logger: Pick<Logger, "warn">;
+      notices: Pick<SeatLimitNoticeService, "record">;
     },
   ) {}
 
@@ -372,15 +379,9 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     return resolveInviteDisplayStatus(invite);
   }
 
-  /** No mail gateway is composed on this process (D11's "absent is supported" state), so the
-   * seat-limit notice has nowhere to send: logged rather than silently dropped. */
-  async notifySeatLimitReached(
-    input: Readonly<{ organizationId: string; limitType: string; current: number; max: number }>,
-  ): Promise<void> {
-    this.options.logger.warn(
-      { organizationId: input.organizationId, limitType: input.limitType },
-      "no mail gateway is composed, so this organization's administrators were not told it reached its seat limit",
-    );
+  /** Recorded as organization's seat-limit event; the worker tells billing's ops alert. */
+  notifySeatLimitReached(input: SeatLimitReached): Promise<void> {
+    return this.options.notices.record(input);
   }
 
   findUserIdByEmail(input: Readonly<{ email: string }>): Promise<string | null> {
@@ -419,9 +420,8 @@ class LoggedOrganizationPromptSeed implements OrganizationPromptSeed {
 }
 
 /**
- * Both Enterprise plan gates, over the ONE plan application this process
- * resolves every allowance through. SCIM and the seat guard are read out of
- * stores this process does not hold, so both refuse by name.
+ * The Enterprise plan gates, over the ONE plan application this process
+ * resolves every allowance through.
  */
 function organizationPlanGate(options: {
   plans: Pick<EntitlementApi, "getActivePlan">;
@@ -436,18 +436,8 @@ function organizationPlanGate(options: {
       assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.RBAC),
     assertAuditLogsAllowed: ({ organizationId }) =>
       assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS),
-    assertScimAllowed: () =>
-      Promise.reject(
-        new OrganizationCapabilityUnavailableError(
-          "Enterprise plan store, so it cannot confirm this organization carries SCIM",
-        ),
-      ),
-    assertTeamRoleChangeWithinSeatLimits: () =>
-      Promise.reject(
-        new OrganizationCapabilityUnavailableError(
-          "Enterprise seat licence, so it cannot authorize a member role change",
-        ),
-      ),
+    assertScimAllowed: ({ organizationId }) =>
+      assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.SCIM),
   };
 }
 
@@ -482,19 +472,15 @@ function organizationSignals(logger: Logger): OrganizationSignals {
  * project goes through the project application rather than a second creation
  * path, so it writes the same rows the project surface writes.
  */
-function organizationCeremony(options: { projects: ProjectApi }): OrganizationCeremony {
+function organizationCeremony(options: {
+  projects: ProjectApi;
+  governance: Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">;
+}): OrganizationCeremony {
   return {
-    /**
-     * The standard AI-tool catalogue is an Enterprise governance capability.
-     * Non-fatal at the call site — the portal's own read provisions the same
-     * set — so this refuses by name and the ceremony carries on.
-     */
-    ensureDefaultAiToolCatalog: () =>
-      Promise.reject(
-        new OrganizationCapabilityUnavailableError(
-          "Enterprise governance service, so it seeded no standard AI tool catalogue",
-        ),
-      ),
+    /** Main's onboarding seeded it; non-fatal at the call site. */
+    ensureDefaultAiToolCatalog: async ({ organizationId }) => {
+      await options.governance.aiToolEnsureDefaultCatalog({ organizationId });
+    },
     createProject: async (input) => {
       const project = await options.projects.create(
         {
@@ -568,7 +554,7 @@ function organizationDirectory(options: {
 function organizationInvitations(input: {
   prisma: ProcessMembers["prisma"];
   redis: RedisConnection;
-  logger: Logger;
+  notices: Pick<SeatLimitNoticeService, "record">;
   baseHost: string;
   identity: Pick<IdentityApi, "verifiedEmailsOf">;
   entitlement: Pick<EntitlementApi, "getActivePlan">;
@@ -598,7 +584,7 @@ function organizationInvitations(input: {
     baseHost: input.baseHost,
     identity: input.identity,
     userDirectory: PrismaOrganizationUserDirectoryRepository.create(input.prisma),
-    logger: input.logger,
+    notices: input.notices,
   });
 }
 
@@ -620,10 +606,13 @@ export function buildOrganizationInfrastructure(input: {
     entitlement: Pick<EntitlementApi, "getActivePlan" | "requestBound">;
     permissions: AuthzApi;
     roles: InviteAssignableRoles;
+    governance: Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">;
   };
 }): OrganizationInfrastructure {
   const { prisma, logger, dependencies } = input;
   const baseHost = input.publicBaseUrl ?? "";
+  const signals = organizationSignals(logger);
+  const seatLimits = SeatLimitNoticeService.create({ signals });
 
   return {
     identities: PersonalWorkspaceIdentityService.create(),
@@ -638,12 +627,13 @@ export function buildOrganizationInfrastructure(input: {
     seats: EntitlementOrganizationSeatLicense.create({
       plans: dependencies.entitlement,
       memberships: PrismaOrganizationSeatRepository.create(prisma),
+      notices: seatLimits,
     }),
     seatCounts: PrismaOrganizationSeatRepository.create(prisma),
     invitations: organizationInvitations({
       prisma,
       redis: input.redis,
-      logger,
+      notices: seatLimits,
       baseHost,
       identity: dependencies.identity,
       entitlement: dependencies.entitlement,
@@ -659,8 +649,12 @@ export function buildOrganizationInfrastructure(input: {
     // Identity owns the join-request ledger; this feature serves its door.
     joinRequests: identityJoinRequests(dependencies.identity),
     plans: organizationPlanGate({ plans: dependencies.entitlement }),
-    signals: organizationSignals(logger),
-    ceremony: organizationCeremony({ projects: dependencies.projects }),
+    signals,
+    seatLimits,
+    ceremony: organizationCeremony({
+      projects: dependencies.projects,
+      governance: dependencies.governance,
+    }),
     directory: organizationDirectory({
       identity: dependencies.identity,
       userDirectory: PrismaOrganizationUserDirectoryRepository.create(prisma),

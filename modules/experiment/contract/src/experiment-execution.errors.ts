@@ -17,3 +17,16 @@ export class EvaluatorNoInputsResolvedError extends HandledError {
     this.name = "EvaluatorNoInputsResolvedError";
   }
 }
+
+/** A cell whose worker stopped mid-cell, failed by the run's stall wake so the run can complete. */
+export class ExperimentCellLostError extends HandledError {
+  declare readonly code: "experiment_cell_lost";
+
+  constructor() {
+    super("experiment_cell_lost", "This cell was lost when its worker stopped; run it again.", {
+      httpStatus: 500,
+      fault: "platform",
+    });
+    this.name = "ExperimentCellLostError";
+  }
+}

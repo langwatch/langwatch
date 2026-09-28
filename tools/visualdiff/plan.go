@@ -66,6 +66,9 @@ type Stack struct {
 	// once its ui and backend lanes are reported listening. Empty until then
 	// and always empty on the port-based path.
 	HavenURL string
+	// Persistent marks Dir as the side's reusable worktree (worktrees.go):
+	// checked out in place, prepared only when its key changed, never removed.
+	Persistent bool
 }
 
 // URL is the origin the runner drives: the routed app hostname on the haven

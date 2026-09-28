@@ -30,12 +30,12 @@ export type SavedWorkbenchChartDefinitionUpdate = Readonly<{
 }>;
 
 /**
- * What the install-wide usage report counts here (ADR-156, section 10): the
- * charts built in the chart builder, lifetime. Saved workbench charts share
- * the table but are another product and are not counted.
+ * Lifetime chart counts. `builderCharts` is the usage report's (ADR-156, §10);
+ * `charts` adds saved workbench charts, as onboarding's checklist counts them.
  */
 export interface DashboardUsageCount {
   readonly builderCharts: number;
+  readonly charts: number;
 }
 
 /** Flat operations a door or a peer calls once the dashboard app is composed. */

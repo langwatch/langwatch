@@ -22,7 +22,7 @@ export const CopyExperimentDialog = ({
   }) => void;
 }) => {
   const { project } = useOrganizationTeamProject();
-  const copyTargets = useWorkflowHost().copyTargets();
+  const copyTargets = useWorkflowHost().copyTargets({ permission: "evaluations:manage" });
   const [selectedProjectId, setSelectedProjectId] = useState<string[]>([]);
   const [copyDatasets, setCopyDatasets] = useState(false);
 

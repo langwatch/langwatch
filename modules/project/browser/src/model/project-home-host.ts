@@ -104,6 +104,11 @@ export abstract class ProjectHomeHost {
 
   /** Sends the reader somewhere else in the application. */
   abstract navigate(to: string): void;
+
+  /** The address's `return_to`, unchecked: where a project switch asked to land after home. */
+  returnTo(): string | undefined {
+    return void 0;
+  }
 }
 
 const ProjectHomeHostContext = createContext<ProjectHomeHost | undefined>(void 0);

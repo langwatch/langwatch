@@ -8,6 +8,7 @@ import {
   isConnectedAgentStale,
   type Agent,
   type AgentIdsInput,
+  type AgentCreationWindowInput,
   type AgentProjectInput,
   type ConnectedAgentsEnvironmentInput,
   type ConnectedAgentsInput,
@@ -234,6 +235,23 @@ export class MemoryAgentRepository implements AgentRepository {
 
   async touchLastSeenAt(input: AgentPresenceInput): Promise<void> {
     this.#save({ ...this.#get(input), lastSeenAt: toDate(input.at) });
+  }
+
+  async findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]> {
+    const from = toDate(input.from).getTime();
+    const to = toDate(input.to).getTime();
+
+    return [...this.#agents.values()]
+      .filter(
+        (agent) =>
+          agent.projectId === input.projectId &&
+          agent.createdAt.getTime() >= from &&
+          agent.createdAt.getTime() <= to &&
+          (input.copiedFromAgentId === void 0 ||
+            agent.copiedFromAgentId === input.copiedFromAgentId),
+      )
+      .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+      .map((agent) => agent.id);
   }
 
   #get(input: GetAgentInput): Agent {

@@ -1,7 +1,9 @@
+import type { Server } from "http";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { initConfig } from "../config.js";
 import type { ApiKeyVerifier } from "../http-security.js";
-import type { Server } from "http";
 
 /** Standard headers required by the MCP Streamable HTTP protocol for POST requests */
 const MCP_POST_HEADERS = {

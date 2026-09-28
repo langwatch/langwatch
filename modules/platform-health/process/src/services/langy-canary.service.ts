@@ -42,9 +42,9 @@ function abortedPromise(signal: AbortSignal): Promise<{ aborted: true }> {
 }
 
 /**
- * Sends one real greeting turn as the key's owner and holds until it settles, inside one budget.
- * Single flight per caller; a `timeout` keeps the caller's slot one further budget, because the
- * abandoned turn is still running (specs/platform-health.feature).
+ * Sends one real greeting turn as the key's owner and holds until it settles or waits on the user,
+ * inside one budget. Single flight per caller; a `timeout` keeps the caller's slot one further
+ * budget, because the abandoned turn is still running (specs/platform-health.feature).
  */
 export class LangyCanaryService {
   readonly #inFlight = new Map<string, Promise<LangyCanaryOutcome>>();
@@ -145,12 +145,19 @@ export class LangyCanaryService {
           ...started,
           userId: session.user.id,
           signal: budget.signal,
+          shouldSettleOnUserWait: true,
         }),
         aborted,
       ]);
-      const settlement = "kind" in wait && wait.kind === "settled" ? wait.settlement : null;
+      const settled = "kind" in wait ? wait : null;
+      if (settled?.kind === "awaiting_user") {
+        logger.info(
+          { ...started, question: settled.question },
+          "Langy canary turn is waiting on the user",
+        );
+      }
       return {
-        ...classifyLangyCanaryOutcome(settlement),
+        ...classifyLangyCanaryOutcome(settled),
         ...started,
         durationMs: this.clock.now() - startedAt,
       };

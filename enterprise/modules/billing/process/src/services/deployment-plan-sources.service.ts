@@ -4,6 +4,7 @@ import {
   UNLIMITED_PLAN,
 } from "@langwatch/enterprise-licensing-contract";
 import type {
+  EntitlementGrant,
   EntitlementSource,
   Plan,
   PlanEnricher,
@@ -106,7 +107,10 @@ class SubscriptionEntitlementSource implements EntitlementSource {
 
   private constructor(private readonly plans: SaaSPlanProviderService) {}
 
-  async resolve(input: ResolvePlanInput): Promise<Plan> {
-    return this.plans.getActivePlan(input.organizationId, input.user);
+  async resolve(input: ResolvePlanInput): Promise<EntitlementGrant> {
+    return {
+      granted: true,
+      plan: await this.plans.getActivePlan(input.organizationId, input.user),
+    };
   }
 }

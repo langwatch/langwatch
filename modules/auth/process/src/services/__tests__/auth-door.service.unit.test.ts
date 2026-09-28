@@ -174,4 +174,68 @@ describe("AuthDoorService", () => {
       expect(world.verifyBrowserSession).not.toHaveBeenCalled();
     });
   });
+
+  describe("when a sign-in callback fails on the server", () => {
+    /** @scenario "A sign-in callback that fails on the server lands on the error screen" */
+    it("redirects the browser to the error screen with the generic code", async () => {
+      const world = door({
+        betterAuth: async () => ({
+          handler: async () =>
+            Response.json(
+              { code: "INTERNAL_SERVER_ERROR", message: "rekey failed" },
+              { status: 500 },
+            ),
+        }),
+      });
+
+      const answered = await world.service.betterAuthHandshake(
+        new Request(`${BASE_URL}/api/auth/callback/microsoft?code=c&state=s`),
+      );
+
+      expect(answered.status).toBe(302);
+      const location = new URL(answered.headers.get("location") ?? "");
+      expect(`${location.origin}${location.pathname}`).toBe(`${BASE_URL}/auth/error`);
+      expect(location.searchParams.get("error")).toBe("sign_in_failed");
+    });
+  });
+
+  describe("when a sign-in is redirected to the error screen", () => {
+    /** @scenario "An internal code never travels" */
+    it("sends an unwritten code as the generic one and keeps an admitted one", async () => {
+      const redirectingTo = (location: string) =>
+        door({
+          betterAuth: async () => ({
+            handler: async () => new Response(null, { status: 302, headers: { location } }),
+          }),
+        });
+      const callback = () => new Request(`${BASE_URL}/api/auth/sso/callback/conn_1?code=c`);
+
+      const internal = await redirectingTo(
+        `${BASE_URL}/auth/error?error=SSO_USER_RESOLUTION_REQUIRES_NATIVE_TRANSACTIONS`,
+      ).service.betterAuthHandshake(callback());
+      const admitted = await redirectingTo(
+        `${BASE_URL}/auth/error?error=SSO_PROVIDER_NOT_ALLOWED`,
+      ).service.betterAuthHandshake(callback());
+
+      expect(new URL(internal.headers.get("location") ?? "").searchParams.get("error")).toBe(
+        "sign_in_failed",
+      );
+      expect(new URL(admitted.headers.get("location") ?? "").searchParams.get("error")).toBe(
+        "SSO_PROVIDER_NOT_ALLOWED",
+      );
+    });
+  });
+
+  describe("when an auth route that is not a callback fails on the server", () => {
+    /** @scenario "A server error on an auth route that is not a callback keeps its status" */
+    it("answers with the server error itself", async () => {
+      const world = door({
+        betterAuth: async () => ({ handler: async () => new Response(null, { status: 500 }) }),
+      });
+
+      const answered = await world.service.betterAuthHandshake(signIn());
+
+      expect(answered.status).toBe(500);
+    });
+  });
 });

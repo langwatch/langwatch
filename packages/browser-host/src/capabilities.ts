@@ -7,6 +7,7 @@
 import { createContext, useContext } from "react";
 
 import type { UiAnalytics } from "./analytics.ts";
+import { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget } from "./copy-targets.ts";
 import { NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
 import { UiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
@@ -15,6 +16,7 @@ import type { UiFeatureApiTransport } from "./transport.ts";
 
 /** Scope is a capability of its own; this file stays the one ports barrel. */
 export { UiScope, type UiActiveScope };
+export { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget };
 
 /** The composition never filled this port, and something asked it to work. */
 export class UiCapabilityUnavailableError extends Error {
@@ -314,6 +316,8 @@ export type UiCapabilities = {
    * inert destination either way, exactly as `useUiSlots` does.
    */
   analytics?: UiAnalytics;
+  /** Where the reader could replicate a thing to. Absent reads as no answer. */
+  copyTargets?: UiCopyTargets;
   /**
    * What installed modules declared through `withCapabilities`. Optional:
    * absent reads as nothing declared, exactly as `slots` does.
@@ -366,6 +370,8 @@ export type UiCapabilityResolution = {
   rpc?: UiRpc;
   /** The scope that same live host resolved, beside the session it came with. */
   scope?: UiScope;
+  /** The copy targets that same live host read, over the same organization graph. */
+  copyTargets?: UiCopyTargets;
   /**
    * The default only a live host can build — absent for a composition
    * that declared no session source, when the refusal below is the honest answer.
@@ -384,10 +390,12 @@ export function resolveUiCapabilities({
   route,
   rpc,
   scope,
+  copyTargets,
   session,
 }: UiCapabilityResolution): UiCapabilities {
   return {
     analytics: install.analytics,
+    copyTargets: install.copyTargets ?? copyTargets,
     declarations: install.declarations,
     deployment: install.deployment ?? PRODUCTION_UI_DEPLOYMENT,
     documentTitle: install.documentTitle ?? documentTitle,
@@ -451,8 +459,12 @@ export function useUiCapabilities(): UiCapabilities {
   return capabilities;
 }
 
-/** What a composition's session read yields: the two capabilities together. */
-export type UiSessionCapabilities = { session: UiSession; scope: UiScope };
+/** What a composition's session read yields; copy targets only where organization lent them. */
+export type UiSessionCapabilities = {
+  session: UiSession;
+  scope: UiScope;
+  copyTargets?: UiCopyTargets;
+};
 
 /**
  * A composition's live session, built where the transport is — declared as a
@@ -480,4 +492,9 @@ export const UNAVAILABLE_UI_SCOPE: UiScope = new UnavailableUiScope();
  */
 export function useUiScope(): UiScope {
   return useOptionalUiCapabilities()?.scope ?? UNAVAILABLE_UI_SCOPE;
+}
+
+/** Where this reader could replicate a thing to; absent where no lender is installed. */
+export function useUiCopyTargets(): UiCopyTargets {
+  return useOptionalUiCapabilities()?.copyTargets ?? ABSENT_UI_COPY_TARGETS;
 }

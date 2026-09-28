@@ -1,9 +1,11 @@
 import { mintRunToken, signFrame } from "@langwatch/langy-process/streaming/langy-frame-auth";
 /** LangyTurnRelayAdapter succeeds runTurn's streaming role as a SECURITY boundary: verifies
  * frames, pins to turn, dedups replays, and fans to live buffer + durable event log. */
+import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LangyResourceLinkLookup } from "../../langy-live-turn.repository.ts";
+import { LangyTurnHandoffRedisRepository } from "../redis.langy-turn-handoff.repository.ts";
 import {
   type LangyRelayBuffer,
   type LangyRelayConversations,
@@ -157,8 +159,6 @@ function makeRelay(
     resourceLinks,
     ...(over.resolveResourceUrl ? { resolveResourceUrl: over.resolveResourceUrl } : {}),
     baseHost: "https://app.langwatch.ai",
-    resolveCapabilityProgress: (name) =>
-      name === "langwatch.trace.search" ? { headline: "Searching traces" } : null,
   });
   return {
     relay,
@@ -317,6 +317,7 @@ describe("LangyTurnRelayAdapter", () => {
 
 describe("LangyTurnRelayAdapter", () => {
   describe("given a LangWatch capability tool call", () => {
+    /** @scenario "A capability's sub-status shows while a step runs" */
     it("emits a present-continuous sub-status on start and clears it on end", async () => {
       const { relay, buffer } = makeRelay();
       await relay.handle(
@@ -1165,6 +1166,64 @@ describe("LangyTurnRelayAdapter", () => {
         // Re-queried because the first null was NOT cached (the bug this fixes).
         expect(conversations.findRunToken).toHaveBeenCalledTimes(2);
       });
+    });
+  });
+});
+
+/** A relay over the live handoff row, the way the process composes it. */
+async function relayOverParkedHandoff({ parkedUnder }: { parkedUnder: string }) {
+  const handoff = LangyTurnHandoffRedisRepository.create({ redis: memoryRedisDouble() });
+  await handoff.stash({
+    projectId: parkedUnder,
+    conversationId: IDENTITY.conversationId,
+    turnId: IDENTITY.turnId,
+    actorUserId: IDENTITY.userId,
+    prompt: "hello",
+    system: "be helpful",
+    credentials: {
+      llmVirtualKey: "virtual-key",
+      langwatchEndpoint: "https://langwatch.example",
+      gatewayBaseUrl: "https://gateway.example/v1",
+      organizationId: "organization-1",
+    },
+    runToken: RUN_TOKEN,
+    permitReserved: false,
+  });
+  const buffer = fakeBuffer();
+  const relay = RedisLangyTurnRelayRepository.create({
+    conversations: fakeConversations(null),
+    buffer,
+    reserveFrameNonce: async () => true,
+    handoff,
+    resourceLinks: fakeResourceLinks(),
+    baseHost: "https://app.langwatch.ai",
+  });
+  return { relay, buffer };
+}
+
+describe("LangyTurnRelayAdapter", () => {
+  describe("given the turn's handoff is parked under the frame's own project", () => {
+    /** @scenario "A frame signed with its own project's handoff token is applied" */
+    it("authenticates the frame against the handoff's run token", async () => {
+      const { relay, buffer } = await relayOverParkedHandoff({ parkedUnder: IDENTITY.projectId });
+
+      const out = await relay.handle(frame({ type: "delta", text: "hi" }));
+
+      expect(out).toEqual({ status: "applied" });
+      expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given the turn's handoff is parked under another project", () => {
+    /** @scenario "A frame whose handoff belongs to another project is rejected" */
+    it("rejects the frame as carrying no run token and buffers nothing", async () => {
+      const { relay, buffer } = await relayOverParkedHandoff({ parkedUnder: "proj-other" });
+
+      const out = await relay.handle(frame({ type: "delta", text: "hi" }));
+
+      expect(out).toEqual({ status: "rejected", reason: "no-run-token" });
+      expect(buffer.appendChunk).not.toHaveBeenCalled();
+      expect(relay.pinnedTurn).toBeNull();
     });
   });
 });

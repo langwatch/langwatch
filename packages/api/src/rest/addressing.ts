@@ -34,7 +34,7 @@ export type VersionStatus = "stable" | "latest" | "preview";
 export type HttpMethod = "get" | "head" | "post" | "put" | "delete" | "patch";
 
 /** A family's Hono app as a mount target. */
-export type MountableRestApp = Hono<any, any, any>;
+export type MountableRestApp = Hono;
 
 /** The dated management API version, bumped centrally for breaking changes. */
 export const MANAGEMENT_API_VERSION = "2026-08-07";

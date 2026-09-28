@@ -2,6 +2,7 @@ import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type {
   EvaluatorAttachment,
+  RunActor,
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
   ScenarioTestSuiteIdInput,
@@ -12,6 +13,7 @@ import type {
 
 import type {
   CompleteSuiteRunItemCommandData,
+  ConnectedTargetAgent,
   CreateSuiteCommand,
   RecordSuiteRunItemStartedCommandData,
   RegradeSuiteRunItemCommandData,
@@ -100,6 +102,15 @@ export interface SuiteApi {
     projectId: string;
     attachments: readonly Pick<EvaluatorAttachment, "evaluatorId">[];
   }): Promise<Map<string, EvaluatorWithFields>>;
+  /**
+   * Refuses a run when one of its connected agents is someone else's personal development agent,
+   * throwing `AgentOwnerOnlyError` naming the owner; no actor refuses any personal agent.
+   * Main's `assertConnectedAgentsRunnable`, which the experiment run also calls.
+   */
+  assertConnectedAgentsRunnable(input: {
+    agents: readonly ConnectedTargetAgent[];
+    actor: RunActor | undefined;
+  }): Promise<void>;
   /**
    * The platform's own address for one suite resource, from the project's
    * slug and the path already resolved — the three suite REST declarations

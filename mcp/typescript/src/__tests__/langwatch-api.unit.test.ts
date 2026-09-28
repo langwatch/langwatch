@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
 import { initConfig } from "../config.js";
 
 const TEST_ENDPOINT = "https://test.langwatch.ai";
@@ -527,7 +528,12 @@ describe("langwatch-api", () => {
         error = await createEvaluator({
           name: "Relevancy",
           config: { evaluatorType: "ragas/answer_relevancy" },
-        }).catch((caught: Error) => caught);
+        }).then(
+          () => {
+            throw new Error("expected the evaluator create to be refused");
+          },
+          (caught: Error) => caught,
+        );
       });
 
       /** @scenario A rejection over MCP carries the accepted types */

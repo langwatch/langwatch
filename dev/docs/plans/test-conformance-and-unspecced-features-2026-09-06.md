@@ -20,7 +20,7 @@ Python suites were not measured — see "Not measured" at the end).
 - `dev/docs/adr/010-e2e-testing-strategy.md` (E2E deprioritized; `/browser-test` is the
   primary verification tier; a 5-10 test stable suite is the only persisted E2E)
 - ADR-008, -009, -015, -028, -097 — all describe the **product's** "Scenario" agent-testing
-  feature (AG-UI events, trace judging, turn config UI), not conventions for how *we* write
+  feature (AG-UI events, trace judging, turn config UI), not conventions for how _we_ write
   vitest tests. Read and correctly excluded as out of scope.
 - `packages/test-harness/README.md` does not exist; `packages/test-harness/src/` does (a
   vitest utility package — `mock-specifier-scan`, `integration-module-graph` — whose own
@@ -31,22 +31,22 @@ Python suites were not measured — see "Not measured" at the end).
 Fourteen rules, each greppable (with noted precision limits), extracted from the sources
 above:
 
-| # | Rule | Source |
-|---|------|--------|
-| 1 | Every `*.test.ts`/`*.test.tsx` file carries `.unit.`, `.integration.`, or `.e2e.` before `.test.` | `TESTING_PHILOSOPHY.md` language table; `CLAUDE.md` "`.integration.test.ts` still states a test LEVEL" |
-| 2 | Nested `describe("given …")` / `describe("when …")` BDD structure, not flat `it()` with GWT only in comments | `TESTING_PHILOSOPHY.md` "BDD-Style Test Structure"; `CLAUDE.md` row "Flat test structure with GWT comments" |
-| 3 | No "should" in `it`/`test` titles | `TESTING_PHILOSOPHY.md` "No 'Should' in Test Names"; `CLAUDE.md` row "Using 'should' in test descriptions" |
-| 4 | Every `@unit`/`@integration`/`@e2e`/`@regression` scenario (not `@unimplemented`) is bound to exactly one test via a `@scenario "<title>"` JSDoc | `TESTING_PHILOSOPHY.md` "Binding scenarios to tests"; enforced today by `check-feature-parity.ts` |
-| 5 | Assert on `error.code`, not `.message` prose, once an error may have crossed a process/worker/serialization boundary | `CLAUDE.md` row "Asserting on error message prose in tests" |
-| 6 | A `@regression` test for a runtime crash must execute the crashing path, not just diff a generated string | `CLAUDE.md` row "Writing string-assertion 'regression tests' for runtime bugs" |
-| 7 | Datastore-touching integration tests tear down via a shared helper (`cleanupTestRows`), not ad hoc raw deletes | Inferred from `CLAUDE.md`'s database rows and the `startTestClickHouseEndpoints` convention — **weakest-sourced rule, not written verbatim anywhere** |
-| 8 | No hand-rolled vitest config; every package config carries the RAM guardrails (`pool: "vmForks"`, `isolate: false`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) | `CLAUDE.md` rows "Running `npx vitest`/`npm exec vitest` directly" and "Hand-rolling a throwaway `vitest.*.config.ts`" |
-| 9 | `// @vitest-environment jsdom` docblock on every file that renders via `@testing-library/react` | `CLAUDE.md` row "Writing a jsdom config because the repo 'has no jsdom environment'" |
-| 10 | No `vi.mock("...")` referencing a path that no longer exists on disk | `CLAUDE.md`/lane-common "vi.mock paths in tests must be updated too"; memory `vi-mock-paths-invisible-to-rename-planners` |
-| 11 | No "value-echo" tests (`expect(X).toBe(X)`) | Memory `no-value-echo-tests`; consistent with "Test Behavior, Not Implementation" |
-| 12 | `expectX`/`assertX` custom helpers are accepted house style, not a violation | Memory `lint-fixes-keep-assertions` — noted, not measured |
-| 13 | Single expectation per test where practical | `TESTING_PHILOSOPHY.md` "Single Expectation Per Test" |
-| 14 | Outer `describe` uses MDN-style naming (`name()`, `Name`, `<Name/>`, `useName()`) | `TESTING_PHILOSOPHY.md` "Describe Block Naming" |
+| #   | Rule                                                                                                                                                                                                                            | Source                                                                                                                                                |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Every `*.test.ts`/`*.test.tsx` file carries `.unit.`, `.integration.`, or `.e2e.` before `.test.`                                                                                                                               | `TESTING_PHILOSOPHY.md` language table; `CLAUDE.md` "`.integration.test.ts` still states a test LEVEL"                                                |
+| 2   | Nested `describe("given …")` / `describe("when …")` BDD structure, not flat `it()` with GWT only in comments                                                                                                                    | `TESTING_PHILOSOPHY.md` "BDD-Style Test Structure"; `CLAUDE.md` row "Flat test structure with GWT comments"                                           |
+| 3   | No "should" in `it`/`test` titles                                                                                                                                                                                               | `TESTING_PHILOSOPHY.md` "No 'Should' in Test Names"; `CLAUDE.md` row "Using 'should' in test descriptions"                                            |
+| 4   | Every `@unit`/`@integration`/`@e2e`/`@regression` scenario (not `@unimplemented`) is bound to exactly one test via a `@scenario "<title>"` JSDoc                                                                                | `TESTING_PHILOSOPHY.md` "Binding scenarios to tests"; enforced today by `check-feature-parity.ts`                                                     |
+| 5   | Assert on `error.code`, not `.message` prose, once an error may have crossed a process/worker/serialization boundary                                                                                                            | `CLAUDE.md` row "Asserting on error message prose in tests"                                                                                           |
+| 6   | A `@regression` test for a runtime crash must execute the crashing path, not just diff a generated string                                                                                                                       | `CLAUDE.md` row "Writing string-assertion 'regression tests' for runtime bugs"                                                                        |
+| 7   | Datastore-touching integration tests tear down via a shared helper (`cleanupTestRows`), not ad hoc raw deletes                                                                                                                  | Inferred from `CLAUDE.md`'s database rows and the `startTestClickHouseEndpoints` convention — **weakest-sourced rule, not written verbatim anywhere** |
+| 8   | No hand-rolled vitest config; every package config carries the RAM guardrails (`pool: "vmForks"`, `isolate: false`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) | `CLAUDE.md` rows "Running `npx vitest`/`npm exec vitest` directly" and "Hand-rolling a throwaway `vitest.*.config.ts`"                                |
+| 9   | `// @vitest-environment jsdom` docblock on every file that renders via `@testing-library/react`                                                                                                                                 | `CLAUDE.md` row "Writing a jsdom config because the repo 'has no jsdom environment'"                                                                  |
+| 10  | No `vi.mock("...")` referencing a path that no longer exists on disk                                                                                                                                                            | `CLAUDE.md`/lane-common "vi.mock paths in tests must be updated too"; memory `vi-mock-paths-invisible-to-rename-planners`                             |
+| 11  | No "value-echo" tests (`expect(X).toBe(X)`)                                                                                                                                                                                     | Memory `no-value-echo-tests`; consistent with "Test Behavior, Not Implementation"                                                                     |
+| 12  | `expectX`/`assertX` custom helpers are accepted house style, not a violation                                                                                                                                                    | Memory `lint-fixes-keep-assertions` — noted, not measured                                                                                             |
+| 13  | Single expectation per test where practical                                                                                                                                                                                     | `TESTING_PHILOSOPHY.md` "Single Expectation Per Test"                                                                                                 |
+| 14  | Outer `describe` uses MDN-style naming (`name()`, `Name`, `<Name/>`, `useName()`)                                                                                                                                               | `TESTING_PHILOSOPHY.md` "Describe Block Naming"                                                                                                       |
 
 A rule requiring `packages/test-harness/README.md` conventions was considered and dropped —
 the file doesn't exist.
@@ -89,7 +89,7 @@ given/when.
 
 **oxlint feasibility: partial.** A custom rule can flag "a `describe()` with `it()`/`test()`
 children but no nested `describe()` at all" mechanically. It cannot judge whether a nested
-title is *semantically* a precondition vs. an action — only whether it starts with the
+title is _semantically_ a precondition vs. an action — only whether it starts with the
 literal word `given `/`when `. Recommend `langwatch/describe-nesting`.
 
 #### 3. No "should" in test titles — **0 real violations**
@@ -248,7 +248,7 @@ Recommend `langwatch/no-value-echo-assertion`.
 #### 13. Single expectation per test — **aggregate ratio ~1.96 expects per `it`/`test`, repo-wide; no reliable per-test count without AST**
 
 79,434 total `expect()` calls over 40,438 total `it()`/`test()` calls. This aggregate can't
-say how many *individual* tests have 2+ direct expects vs. one `expectX` helper wrapping
+say how many _individual_ tests have 2+ direct expects vs. one `expectX` helper wrapping
 several, or one `.toMatchObject()` covering several properties (both idiomatic, not
 violations). A real count needs an AST pass per `it()` callback body.
 
@@ -259,7 +259,7 @@ more natural than in integration tests.
 
 #### 14. MDN-style outer describe naming — **folded into rule 2, not separately measured**
 
-Same file set, same AST-walk requirement (find the *outermost* describe, check its title
+Same file set, same AST-walk requirement (find the _outermost_ describe, check its title
 against the four permitted shapes) as rule 2. `describe("ApiApplication HTTP failures", ...)`
 from rule 2's snippet is a borderline case worth a second look by hand — "HTTP failures"
 reads as a condition, arguably belongs as a nested `given`/`when` describe rather than the
@@ -295,7 +295,7 @@ unmeasured.
 
 - `packages/architecture-enforcer/src/feature-catalogue.ts` reads
   `modules/catalogue.json` — 53 entries, each `{ id, root, classification:
-  core|enterprise, subjects: string[] }`. This is the canonical feature list.
+core|enterprise, subjects: string[] }`. This is the canonical feature list.
 - `packages/architecture-enforcer/src/check-feature-parity.ts` (1,890 lines) already solves
   "does this scenario have a test": discovers `.feature` files, parses scenarios + tags,
   finds `@scenario "<title>"` annotations above test declarations across TS/Go/Python/
@@ -304,7 +304,7 @@ unmeasured.
   `@unimplemented` escape hatch for tracked gaps. **Per project memory, its authoritative
   output is the `✗ THIS RUN FAILS: <reasons>` summary line — not a `grep -c` count.**
 - `packages/architecture-enforcer/src/boundary-edge-baseline.json` is the existing precedent for
-  a *ratchet* baseline: `{ version, edges: [{ kind, from, to, expires }] }` — exactly the
+  a _ratchet_ baseline: `{ version, edges: [{ kind, from, to, expires }] }` — exactly the
   shape a stage-2 unspecced-surfaces baseline should reuse.
 - **Nothing today answers the reverse direction** — "does this code have a scenario." The
   parity checker is scenario-first (walk specs, then find tests); a surface-first check
@@ -316,16 +316,16 @@ unmeasured.
 The task hypothesized `transport/`, `screens/`, `surfaces/`, `processes/`, `subscribers/` as
 surface locations — verified against real directories, not assumed:
 
-| Surface kind | Path | Convention |
-|---|---|---|
-| tRPC | `<root>/server/src/transport/api-trpc/*.ts` | `.query("name", …)` / `.mutation("name", …)` |
-| REST | `<root>/server/src/transport/api-rest/*.ts` | some routes carry `operationId`; many only a `.withDocs({ description })` string, no stable id |
-| Screen | `<root>/web/src/screens/**/*.screen.tsx` | one file per screen |
-| Surface | `<root>/web/src/surfaces/<name>/` (or flat file) | one directory/file per surface |
-| Process | `<root>/server/src/processes/*.process.ts` | one file per scheduled/cron process |
-| Subscriber | `<root>/server/src/subscribers/*.subscriber.ts` | one file per event subscriber |
+| Surface kind | Path                                             | Convention                                                                                     |
+| ------------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| tRPC         | `<root>/server/src/transport/api-trpc/*.ts`      | `.query("name", …)` / `.mutation("name", …)`                                                   |
+| REST         | `<root>/server/src/transport/api-rest/*.ts`      | some routes carry `operationId`; many only a `.withDocs({ description })` string, no stable id |
+| Screen       | `<root>/web/src/screens/**/*.screen.tsx`         | one file per screen                                                                            |
+| Surface      | `<root>/web/src/surfaces/<name>/` (or flat file) | one directory/file per surface                                                                 |
+| Process      | `<root>/server/src/processes/*.process.ts`       | one file per scheduled/cron process                                                            |
+| Subscriber   | `<root>/server/src/subscribers/*.subscriber.ts`  | one file per event subscriber                                                                  |
 
-These live *inside* each package's `server/src`/`web/src`, alongside (not instead of) the
+These live _inside_ each package's `server/src`/`web/src`, alongside (not instead of) the
 top-level `contract/server/web` package split. **Gap found in passing:** REST route
 identity is inconsistent — unlike tRPC's always-present procedure names, many REST routes
 have no stable `operationId`, only a free-text description. A real implementation of this
@@ -351,7 +351,7 @@ visibility for gradual catch-up, not a strict gate.
 
 **What this does not do yet, by design**: fold in `check-feature-parity`'s actual
 `@scenario`-to-test binding graph as a second, higher-confidence signal (a scenario whose
-prose doesn't mention a surface's literal name, but whose *bound test* calls that surface,
+prose doesn't mention a surface's literal name, but whose _bound test_ calls that surface,
 should still count as specced). The prototype stayed dependency-free; a real implementation
 inside `packages/architecture-enforcer` should import `discoverFeatureFiles` and
 `findScenarioAnnotations` directly rather than re-parsing specs from scratch.
@@ -372,23 +372,23 @@ total unspecced:          135  (11.3%)
 
 **Top 15 packages by unspecced count:**
 
-| Feature | Unspecced / Total | Spec files matched |
-|---|---|---|
-| governance | 19 / 102 | 4 |
-| user | 18 / 34 | 1 |
-| gateway | 15 / 44 | 2 |
-| scim | 14 / 22 | 1 |
-| organization | 8 / 85 | 8 |
-| sso | 8 / 11 | 1 |
-| suite | 7 / 39 | 22 |
-| billing | 6 / 14 | 12 |
-| onboarding | 5 / 5 | 0 |
-| dataset | 3 / 37 | 13 |
-| entitlement | 3 / 4 | 1 |
-| evaluator | 3 / 22 | 20 |
-| github | 3 / 6 | 2 |
-| project | 3 / 12 | 7 |
-| trace | 3 / 69 | 39 |
+| Feature      | Unspecced / Total | Spec files matched |
+| ------------ | ----------------- | ------------------ |
+| governance   | 19 / 102          | 4                  |
+| user         | 18 / 34           | 1                  |
+| gateway      | 15 / 44           | 2                  |
+| scim         | 14 / 22           | 1                  |
+| organization | 8 / 85            | 8                  |
+| sso          | 8 / 11            | 1                  |
+| suite        | 7 / 39            | 22                 |
+| billing      | 6 / 14            | 12                 |
+| onboarding   | 5 / 5             | 0                  |
+| dataset      | 3 / 37            | 13                 |
+| entitlement  | 3 / 4             | 1                  |
+| evaluator    | 3 / 22            | 20                 |
+| github       | 3 / 6             | 2                  |
+| project      | 3 / 12            | 7                  |
+| trace        | 3 / 69            | 39                 |
 
 `user`, `scim`, `sso`, `gateway`, `governance` matching only 1-4 spec files against 11-102
 surfaces each is the strongest real signal in this run — the packages most worth a human
@@ -398,28 +398,28 @@ coverage — see limitations below.
 
 **Top 20 individual unspecced surfaces** (full 135 in `run-output.txt`):
 
-| Feature | Kind | Surface | Suggested scenario title |
-|---|---|---|---|
-| analytics | trpc | `feedbacks` | Feature: analytics — lists feedback for a chart |
-| annotation | trpc | `delete` (annotation-score) | Feature: annotation — deletes an annotation score |
-| annotation | trpc | `deleteById` | Feature: annotation — deletes an annotation by id |
-| authz | screen | `roles` | Feature: authz — views and edits the roles screen |
-| automation | trpc | `upsert` | Feature: automation — creates or updates an automation |
-| dashboard | trpc | `batchUpdateLayouts` | Feature: dashboard — batch-updates graph layouts |
-| dataset | trpc | `getAllByexperimentIdGroup` | Feature: dataset — lists batch records by experiment id group |
-| dataset | trpc | `upsert` | Feature: dataset — creates or updates a dataset |
-| dataset | rest | Archive a dataset (soft-delete) | Feature: dataset — archives a dataset via REST |
-| entitlement | trpc | `getAggregatedCostsForOrganization` | Feature: entitlement — reports aggregated organization costs |
-| entitlement | trpc | `getUsage` | Feature: entitlement — reports usage against limits |
-| entitlement | trpc | `checkAndSendUsageLimitNotification` | Feature: entitlement — sends a usage-limit notification |
-| evaluation | trpc | `warmupLambda` | Feature: evaluation — warms up the evaluator Lambda |
-| evaluator | trpc | `getCopies` | Feature: evaluator — lists copies of an evaluator |
-| evaluator | trpc | `pushToCopies` | Feature: evaluator — pushes changes to evaluator copies |
-| evaluator | trpc | `getHistory` | Feature: evaluator — lists an evaluator's history |
-| experiment | trpc | `commitWorkbenchVersion` | Feature: experiment — commits a workbench version |
-| experiment | screen | `evaluation-wizard-redirect` | Feature: experiment — redirects from the evaluation wizard screen |
-| gateway | trpc | `list` (gateway-budget) | Feature: gateway — lists gateway budgets |
-| gateway | trpc | `reset` (gateway-budget) | Feature: gateway — resets a gateway budget |
+| Feature     | Kind   | Surface                              | Suggested scenario title                                          |
+| ----------- | ------ | ------------------------------------ | ----------------------------------------------------------------- |
+| analytics   | trpc   | `feedbacks`                          | Feature: analytics — lists feedback for a chart                   |
+| annotation  | trpc   | `delete` (annotation-score)          | Feature: annotation — deletes an annotation score                 |
+| annotation  | trpc   | `deleteById`                         | Feature: annotation — deletes an annotation by id                 |
+| authz       | screen | `roles`                              | Feature: authz — views and edits the roles screen                 |
+| automation  | trpc   | `upsert`                             | Feature: automation — creates or updates an automation            |
+| dashboard   | trpc   | `batchUpdateLayouts`                 | Feature: dashboard — batch-updates graph layouts                  |
+| dataset     | trpc   | `getAllByexperimentIdGroup`          | Feature: dataset — lists batch records by experiment id group     |
+| dataset     | trpc   | `upsert`                             | Feature: dataset — creates or updates a dataset                   |
+| dataset     | rest   | Archive a dataset (soft-delete)      | Feature: dataset — archives a dataset via REST                    |
+| entitlement | trpc   | `getAggregatedCostsForOrganization`  | Feature: entitlement — reports aggregated organization costs      |
+| entitlement | trpc   | `getUsage`                           | Feature: entitlement — reports usage against limits               |
+| entitlement | trpc   | `checkAndSendUsageLimitNotification` | Feature: entitlement — sends a usage-limit notification           |
+| evaluation  | trpc   | `warmupLambda`                       | Feature: evaluation — warms up the evaluator Lambda               |
+| evaluator   | trpc   | `getCopies`                          | Feature: evaluator — lists copies of an evaluator                 |
+| evaluator   | trpc   | `pushToCopies`                       | Feature: evaluator — pushes changes to evaluator copies           |
+| evaluator   | trpc   | `getHistory`                         | Feature: evaluator — lists an evaluator's history                 |
+| experiment  | trpc   | `commitWorkbenchVersion`             | Feature: experiment — commits a workbench version                 |
+| experiment  | screen | `evaluation-wizard-redirect`         | Feature: experiment — redirects from the evaluation wizard screen |
+| gateway     | trpc   | `list` (gateway-budget)              | Feature: gateway — lists gateway budgets                          |
+| gateway     | trpc   | `reset` (gateway-budget)             | Feature: gateway — resets a gateway budget                        |
 
 ### 2.5 What this prototype cannot measure precisely
 
@@ -427,8 +427,8 @@ coverage — see limitations below.
   a surface's name actually exercises it, versus mentioning it in passing. This produces
   false "specced" results more often than false "unspecced" ones, given the generous match
   rule — meaning the true unspecced count is likely **higher** than 135, not lower. A
-  precise version needs `check-feature-parity`'s actual binding graph (does the *bound
-  test* call this surface?), which is knowable but not attempted here.
+  precise version needs `check-feature-parity`'s actual binding graph (does the _bound
+  test_ call this surface?), which is knowable but not attempted here.
 - **REST surface identity is unstable** without `operationId` everywhere — see 2.2.
 - **Directory-name spec matching is approximate** — `onboarding`'s 0-matched-files result is
   the clearest example of the heuristic missing real coverage rather than proving an
@@ -448,7 +448,7 @@ coverage — see limitations below.
    `packages/architecture-enforcer/src/`, in the same shape as `boundary-edge-baseline.json`
    (`{ version, surfaces: [{ feature, kind, name, file, expires }] }`). Every
    currently-unspecced surface gets an entry with an expiry date. CI fails only when: (a) a
-   *new* unspecced surface appears in a package touched by the PR that isn't already in the
+   _new_ unspecced surface appears in a package touched by the PR that isn't already in the
    baseline, or (b) a baseline entry's `expires` date passes unrenewed. Same shrink-over-time
    discipline as `LEGACY_UNBOUND`, scoped to touched files so it doesn't demand a big-bang
    spec-writing effort.
@@ -507,7 +507,7 @@ already uses correctly for the integration lane's `poolOptions`-adjacent setting
 > (`string | number`), `poolOptions.forks.isolate` is the top-level `isolate`,
 > `maxForks`/`maxThreads` are `maxWorkers`, and `singleFork`/`singleThread` are
 > `maxWorkers: 1`. `minForks`/`minThreads` and `useAtomics` have no replacement.
-> The pool *names* and worker classes this section verified are unaffected - it is
+> The pool _names_ and worker classes this section verified are unaffected - it is
 > only the nesting that changed.
 > https://v4.vitest.dev/guide/migration#pool-rework
 
@@ -521,7 +521,7 @@ Re-verified with a narrower, more precise grep than Part 1 used:
   is aspirational, not implemented, in every one of the 147 vitest configs.
 - **The integration lane's guardrails ARE real and correctly applied.** Read
   `apps/worker/vitest.integration.config.ts`, `packages/clickhouse-client/
-  vitest.integration.config.ts`, `packages/prisma-client/vitest.integration.config.ts` in
+vitest.integration.config.ts`, `packages/prisma-client/vitest.integration.config.ts` in
   full: each sets `pool: "forks"` + `fileParallelism: false` exactly as documented. The
   gap is specifically the **unit lane** (`vitest.config.ts`, not `.integration.config.ts`).
 - **Every unit-lane `test:unit` script is a bare `vitest run`** (checked `apps/ui`,
@@ -535,19 +535,20 @@ Re-verified with a narrower, more precise grep than Part 1 used:
   `.github/workflows/langwatch-app-ci.yml` sets `VITEST_MAX_WORKERS: "4"` (commented
   "physical core count on GitHub-hosted ubuntu runners"). This is a genuine Vitest-recognized
   environment override — confirmed via `packages/test-harness/src/
-  integration-file-concurrency.ts`'s own doc comment, which describes exactly this
-  mechanism (and why the integration lane has to actively *withdraw* it to keep
+integration-file-concurrency.ts`'s own doc comment, which describes exactly this
+  mechanism (and why the integration lane has to actively _withdraw_ it to keep
   `fileParallelism: false` from being silently defeated). So **CI caps worker count; local
   does not** — the inverse of what you'd want if RAM is the constraint you're guarding
   against locally (per-agent-worktree contention), since CI runs one job per matter on a
   dedicated runner while local is exactly the "several agents on one machine" scenario
-  `CLAUDE.md` describes elsewhere. Neither CI nor local caps *per-worker memory*
+  `CLAUDE.md` describes elsewhere. Neither CI nor local caps _per-worker memory_
   (`poolOptions.vmForks.memoryLimit`) — `VITEST_MAX_WORKERS` bounds worker count, not the RSS
   each worker can grow to before Vitest recycles it.
 
 ### 3.4 What "optimal" looks like, given the above — proposal, not applied
 
 **Local (unit lane, all 147 `vitest.config.ts` / equivalents):**
+
 - Add `pool: "vmForks"`, `isolate: false`, `poolOptions: { vmForks: { memoryLimit: "512MB" } }`
   to a genuinely shared base — today there is no shared base config to edit once (each
   package's config is a standalone `defineConfig({...})` object per the post-lane-split
@@ -566,6 +567,7 @@ Re-verified with a narrower, more precise grep than Part 1 used:
   of scope for a config change alone.
 
 **CI (`test-unit` job in `langwatch-app-ci.yml`):**
+
 - Keep `VITEST_MAX_WORKERS: "4"` (correctly sized to the runner's physical cores already).
 - Add the same `poolOptions.vmForks.memoryLimit` ceiling to the shared config so a single
   runaway suite recycles its worker instead of pushing the whole job toward the runner's
@@ -586,7 +588,7 @@ would surface as a silent no-op in those two packages rather than a clear error.
 
 - Whether `poolOptions.vmForks.memoryLimit` accepts a percentage string (`"50%"`) or only an
   absolute byte count / `"512MB"`-style string in this exact v5.0.0 build — the type is
-  `number | null` at the `PoolTask` level, which is the *resolved* internal shape after
+  `number | null` at the `PoolTask` level, which is the _resolved_ internal shape after
   Vitest parses whatever the user-facing config accepted; the user-facing parser for that
   string wasn't traced in this pass.
 - Whether `apps/ui`'s Playwright-adjacent `e2e/langy/*.scenario.test.ts` suites (excluded

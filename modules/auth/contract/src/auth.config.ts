@@ -43,6 +43,11 @@ export const authServerConfig = Config.define((c) => ({
   idpSimulatorUrl: c.env("LANGWATCH_IDPSIM_URL", z.string().optional()),
   /** D09: this deployment issues its own passwords beside a federated provider. */
   localPasswords: c.env("LOCAL_PASSWORDS_ENABLED", onOffSwitch),
+  /**
+   * The Auth0 Machine-to-Machine app a password change goes through; absent,
+   * the login app's `AUTH0_CLIENT_ID` stands in, as main's did.
+   */
+  auth0ManagementClientId: c.env("AUTH0_MGMT_CLIENT_ID", z.string().min(1).optional()),
   /** The shared leaves sso reads too: which provider is named and its public half. */
   signInProviders,
 }));
@@ -82,7 +87,7 @@ export const authWebConfigSchema = z.strictObject({
 
 export type AuthWebConfig = z.infer<typeof authWebConfigSchema>;
 
-/** The sign-in router is off in every process, so the identifier-first screens never front. */
+/** The identifier-first screens are the only sign-in front door (ADR-117, bake end). */
 export const authBrowserConfig = defineBrowserConfig({
   schema: authWebConfigSchema,
   project: (config: AuthServerConfig) => {
@@ -90,7 +95,7 @@ export const authBrowserConfig = defineBrowserConfig({
       config.signInProviders.authProvider ?? config.signInProviders.legacyProvider;
     return {
       passkeys: config.passkeysEnabled,
-      identityFrontDoor: false,
+      identityFrontDoor: true,
       ...(authProvider ? { authProvider } : {}),
     };
   },

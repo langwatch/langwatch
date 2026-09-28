@@ -85,12 +85,4 @@ describe("what the install remembers about its own reporting", () => {
     expect(row?.lastReportError).toBe("connect_unreachable");
     expect((await repository.findRow())?.lastReportError).toBe("connect_unreachable");
   });
-
-  it("mints the identity when an administrator dismisses the startup notice", async () => {
-    const { service, repository } = identity();
-
-    await service.acknowledgeStartupNotice(3);
-
-    expect((await repository.findRow())?.startupNoticeAcknowledgedSchemaVersion).toBe(3);
-  });
 });

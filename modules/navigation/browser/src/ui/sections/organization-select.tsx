@@ -1,8 +1,8 @@
 /** Organization control (top bar). Uses NavigationOrganization; localStorage through host. */
 
-import { Button, Portal, Text } from "@chakra-ui/react";
+import { Button, HStack, Portal, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Building2, Check, ChevronsUpDown } from "lucide-react";
 
 import { useProductFlagsByOrganization } from "../../behavior/use-product-flags-by-organization.ts";
 import { useNavigationHost, type NavigationOrganization } from "../../model/navigation-host.ts";
@@ -34,10 +34,15 @@ export function OrganizationSelect({ activeProductId }: { activeProductId: Produ
   if (!organization) return null;
 
   if (!isMultiOrg) {
+    // Deliberate: bare muted text where a control could sit reads as a switcher that failed to
+    // render. The mark and the weight of a name make it a statement of which organization this is.
     return (
-      <Text fontSize="13px" color="fg.muted" whiteSpace="nowrap">
-        {organization.name}
-      </Text>
+      <HStack gap={1.5} color="fg.muted" whiteSpace="nowrap">
+        <Building2 size={13} aria-hidden />
+        <Text fontSize="13px" fontWeight="medium" color="fg">
+          {organization.name}
+        </Text>
+      </HStack>
     );
   }
 

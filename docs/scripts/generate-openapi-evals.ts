@@ -1,5 +1,7 @@
 import { writeFileSync } from "node:fs";
 
+import { readObjectLiteral, type Literal } from "./ts-object-literal.ts";
+
 /**
  * Generates openapi-evals.json from AVAILABLE_EVALUATORS: fetches
  * evaluators.generated.ts from langwatch/langevals and builds the OpenAPI
@@ -9,24 +11,70 @@ import { writeFileSync } from "node:fs";
 const EVALUATORS_URL =
   "https://raw.githubusercontent.com/langwatch/langevals/main/ts-integration/evaluators.generated.ts";
 
+/** The part of one catalogue entry this script reads. */
 type EvaluatorDefinition = {
   name: string;
   description: string;
-  category: string;
-  docsUrl?: string;
-  isGuardrail: boolean;
   requiredFields: string[];
   optionalFields: string[];
   settings: Record<string, { description?: string; default: unknown }>;
-  envVars: string[];
-  result: {
-    score?: { description: string };
-    passed?: { description: string };
-    label?: { description: string };
-  };
 };
 
 type AvailableEvaluators = Record<string, EvaluatorDefinition>;
+
+type LiteralObject = { [key: string]: Literal };
+
+const isLiteralObject = (value: Literal): value is LiteralObject =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const objectAt = (value: Literal, where: string): LiteralObject => {
+  if (!isLiteralObject(value)) throw new Error(`${where} is not an object`);
+  return value;
+};
+
+const stringAt = (value: Literal, where: string): string => {
+  if (typeof value !== "string") throw new Error(`${where} is not a string`);
+  return value;
+};
+
+const stringsAt = (value: Literal, where: string): string[] => {
+  if (!Array.isArray(value)) throw new Error(`${where} is not a list`);
+  return value.map((item, index) => stringAt(item, `${where}[${index}]`));
+};
+
+const settingAt = (value: Literal, where: string): { description?: string; default: unknown } => {
+  const setting = objectAt(value, where);
+  const description = setting.description;
+  return description === undefined
+    ? { default: setting.default }
+    : { description: stringAt(description, `${where}.description`), default: setting.default };
+};
+
+/** One catalogue entry, checked field by field against what this script reads. */
+const evaluatorAt = (value: Literal, slug: string): EvaluatorDefinition => {
+  const entry = objectAt(value, slug);
+  const settings = objectAt(entry.settings, `${slug}.settings`);
+  return {
+    name: stringAt(entry.name, `${slug}.name`),
+    description: stringAt(entry.description, `${slug}.description`),
+    requiredFields: stringsAt(entry.requiredFields, `${slug}.requiredFields`),
+    optionalFields: stringsAt(entry.optionalFields, `${slug}.optionalFields`),
+    settings: Object.fromEntries(
+      Object.entries(settings).map(([key, setting]) => [
+        key,
+        settingAt(setting, `${slug}.settings.${key}`),
+      ]),
+    ),
+  };
+};
+
+/** The catalogue object literal, read as data and checked; nothing in it is ever run. */
+const parseAvailableEvaluators = (objectStr: string): AvailableEvaluators => {
+  const catalogue = objectAt(readObjectLiteral(objectStr), "AVAILABLE_EVALUATORS");
+  return Object.fromEntries(
+    Object.entries(catalogue).map(([slug, entry]) => [slug, evaluatorAt(entry, slug)]),
+  );
+};
 
 const toTitleCase = (str: string): string => {
   return str
@@ -344,35 +392,7 @@ const generateOpenAPISpec = async (): Promise<void> => {
   const endIndex = closingBraceEnd({ content, startIndex });
   const objectStr = content.slice(startIndex, endIndex);
 
-  // Convert the TypeScript object literal to JSON-compatible format
-  // This is a simplified conversion - we'll evaluate it in a safer way
-  let jsonStr = objectStr
-    // Remove template literal backticks and convert to regular strings
-    .replace(/`([^`]*)`/g, (_, p1) => JSON.stringify(p1.trim()))
-    // Convert property names without quotes to quoted
-    .replace(/(\s)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
-    // Handle trailing commas (remove them)
-    .replace(/,(\s*[}\]])/g, "$1");
-
-  // Parse the JSON
-  let evaluators: AvailableEvaluators;
-  try {
-    evaluators = JSON.parse(jsonStr);
-  } catch {
-    // If direct parsing fails, try a different approach - evaluate as JS
-    console.log("Direct JSON parsing failed, trying alternative parsing method...");
-
-    // Use Function constructor to safely evaluate the object
-    // First, we need to extract just the object without the export statement
-    const evalStr = `return ${objectStr}`;
-    try {
-      const fn = new Function(evalStr);
-      evaluators = fn();
-    } catch (e2) {
-      console.error("Failed to parse AVAILABLE_EVALUATORS:", e2);
-      throw new Error("Could not parse AVAILABLE_EVALUATORS object");
-    }
-  }
+  const evaluators = parseAvailableEvaluators(objectStr);
 
   console.log(`Found ${Object.keys(evaluators).length} evaluators`);
 

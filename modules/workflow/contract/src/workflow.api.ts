@@ -29,6 +29,7 @@ import type {
   Workflow,
   WorkflowEvaluatorFields,
   WorkflowRunAnswer,
+  WorkflowRunOrigin,
   WorkflowVersion,
   WorkflowVersionHistoryEntry,
   WorkflowVersionHistoryMode,
@@ -277,6 +278,10 @@ export interface WorkflowApi {
     projectId: string;
     event: StudioClientEvent;
     onEvent: (event: StudioServerEvent) => void;
+    /** Asked before and during every read; absent means the run cannot be stopped. */
+    isAborted?: () => Promise<boolean>;
+    /** Who started the run, as the engine attributes it; `workflow` when absent. */
+    origin?: WorkflowRunOrigin;
   }): Promise<void>;
   /** Where an unexpected studio failure is reported. Best effort. */
   reportStudioFailure(error: unknown, context: { projectId: string }): void;

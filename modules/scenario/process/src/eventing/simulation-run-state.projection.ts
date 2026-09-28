@@ -26,6 +26,8 @@ import {
   SimulationRunStartedEventSchema,
   SimulationTextMessageEndEventSchema,
   SimulationTextMessageStartEventSchema,
+  deriveCriteriaLists,
+  type ScenarioCriterionResult,
   type ScenarioEvaluationResult,
   type SimulationMessageSnapshotEvent,
   type SimulationRunAgentInstanceRecordedEvent,
@@ -176,6 +178,8 @@ export interface SimulationRunStateData {
   UnmetCriteria: string[];
   /** Criteria the judge could not decide; each is also in UnmetCriteria. */
   InconclusiveCriteria: string[];
+  /** Each criterion with its status and reasoning, as the SDK sent it. Stored as `Criteria.*`. */
+  Criteria: ScenarioCriterionResult[];
   Error: string | null;
   /**
    * One result per evaluator that ran on the scenario, in the order they
@@ -400,6 +404,7 @@ export class SimulationRunStateFoldProjection
       MetCriteria: [],
       UnmetCriteria: [],
       InconclusiveCriteria: [],
+      Criteria: [],
       Error: null,
       Evaluations: [],
       DurationMs: null,
@@ -642,6 +647,12 @@ export class SimulationRunStateFoldProjection
     if (state.FinishedAt != null) return state;
 
     const results = event.data.results;
+    const lists = deriveCriteriaLists({
+      criteria: results?.criteria,
+      metCriteria: results?.metCriteria,
+      unmetCriteria: results?.unmetCriteria,
+      inconclusiveCriteria: results?.inconclusiveCriteria,
+    });
     const verdict = results?.verdict ?? null;
     const judgeStatus = SimulationRunStateFoldProjection.finishedStatusOf({
       explicitStatus: event.data.status,
@@ -661,9 +672,10 @@ export class SimulationRunStateFoldProjection
       Status: settled.status,
       Verdict: settled.verdict,
       Reasoning: results?.reasoning ?? null,
-      MetCriteria: results?.metCriteria ?? [],
-      UnmetCriteria: results?.unmetCriteria ?? [],
-      InconclusiveCriteria: results?.inconclusiveCriteria ?? [],
+      MetCriteria: lists.metCriteria,
+      UnmetCriteria: lists.unmetCriteria,
+      InconclusiveCriteria: lists.inconclusiveCriteria,
+      Criteria: results?.criteria ?? [],
       Error: results?.error ?? null,
       // A scenario run from code sends its evaluations with the finished
       // event. An evaluated event that folded before this one (business time

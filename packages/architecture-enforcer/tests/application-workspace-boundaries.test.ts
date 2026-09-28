@@ -148,6 +148,18 @@ describe("application workspace classification", () => {
     expect(policy("application-layout")).toHaveLength(2);
   });
 
+  /** @scenario "The scenario child is the one standalone program beside the application roots" */
+  it("admits the standalone scenario child and still refuses any other unknown app", () => {
+    writeManifest("apps/scenario-child/package.json", { name: "@langwatch/scenario-child" });
+    write("apps/scenario-child/src/main.ts", "export {};");
+    writeManifest("apps/scratch/package.json", { name: "@langwatch/scratch" });
+    write("apps/scratch/src/index.ts", "export {};");
+
+    expect(policy("application-layout").map(({ file }) => file)).toEqual([
+      "apps/scratch/package.json",
+    ]);
+  });
+
   it("uses the repository application ADR instead of requiring duplicate local records", () => {
     application("server");
 

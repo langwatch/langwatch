@@ -11,6 +11,8 @@ import {
   MemberSeatLimitReachedError,
   OrganizationNotFoundError,
   isOrganizationApiCustomRole,
+  type LimitType,
+  limitTypeSchema,
   type OrganizationApiCreateInvitationsInput,
   type OrganizationApiInviteScope,
   type OrganizationCaller,
@@ -24,6 +26,7 @@ import {
   type OrganizationUserRole,
 } from "@langwatch/organization-contract";
 import { toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import type {
   OrganizationInvitations,
@@ -32,6 +35,13 @@ import type {
   OrganizationSignals,
 } from "../app/organization.members.ts";
 import type { InviteCreationThrottleService } from "./invite-creation-throttle.service.ts";
+
+/** The allowance a seat refusal carries in its `meta`. */
+const seatLimitMetaSchema = z.object({
+  limitType: limitTypeSchema,
+  current: z.number(),
+  max: z.number(),
+});
 
 /** What the ceremony needs beside the invitation service itself. */
 export interface OrganizationInvitationDoorDependencies {
@@ -342,22 +352,14 @@ export class OrganizationInvitationDoorService {
 /** The seat facts behind a refusal, whichever layer raised it. */
 function extractSeatLimit(
   error: unknown,
-): Readonly<{ limitType: string; current: number; max: number }> | null {
+): Readonly<{ limitType: LimitType; current: number; max: number }> | null {
   if (!HandledError.isHandled(error)) return null;
   if (error.code !== "resource_limit_exceeded" && error.code !== "member_seat_limit_reached") {
     return null;
   }
 
-  const meta = error.meta as Readonly<{ limitType?: unknown; current?: unknown; max?: unknown }>;
-  if (
-    typeof meta.limitType !== "string" ||
-    typeof meta.current !== "number" ||
-    typeof meta.max !== "number"
-  ) {
-    return null;
-  }
-
-  return { limitType: meta.limitType, current: meta.current, max: meta.max };
+  const meta = seatLimitMetaSchema.safeParse(error.meta);
+  return meta.success ? meta.data : null;
 }
 
 function inviteOnWire(invite: OrganizationInvite): OrganizationInviteCreated["invite"] {

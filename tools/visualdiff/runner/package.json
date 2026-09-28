@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "capture": "tsx src/main.ts",
+    "preflight": "tsx src/preflight.ts",
     "typecheck": "tsc -b",
     "test": "vitest run"
   },

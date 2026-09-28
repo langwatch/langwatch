@@ -7,6 +7,7 @@ export {
   type LegacySsoAccessQuery,
 } from "./auth.api.ts";
 export * from "./auth.errors.ts";
+export * from "./federated-password.ts";
 export * from "./account-lockout.ts";
 export * from "./auth-cli-device-flow.schemas.ts";
 export * from "./browser-session.ts";
@@ -15,6 +16,7 @@ export * from "./front-door.responses.ts";
 export * from "./front-door.schemas.ts";
 export { authTrpc } from "./auth.trpc.ts";
 export * from "./sign-in-security.ts";
+export * from "./sign-in-error-codes.ts";
 export { signInSecurityTrpc } from "./sign-in-security.trpc.ts";
 export * from "./session-bound.ts";
 export * from "./sso-matching.ts";

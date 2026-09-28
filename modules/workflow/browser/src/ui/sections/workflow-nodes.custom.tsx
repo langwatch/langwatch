@@ -44,7 +44,7 @@ const LatestComponentVersionCheck = ({ node }: { node: NodeProps<Node<Custom>> }
   return (
     <>
       {node?.data.isCustom && !currentVersion?.isPublishedVersion && (
-        <Alert.Root padding="4px">
+        <Alert.Root size="sm">
           <Alert.Indicator />
           <Alert.Content>
             <Text>Version outdated</Text>

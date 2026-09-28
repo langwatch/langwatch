@@ -8,6 +8,7 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { monitorServer } from "../../monitor.server.ts";
@@ -33,6 +34,7 @@ function process(role: "api" | "worker") {
       authz: createApiFixture<AuthzApiContract>({ hasProjectPermission: async () => true }),
       evaluator: createApiFixture<EvaluatorApi>(),
       evaluation: createApiFixture<EvaluationApi>(),
+      workflow: createApiFixture<WorkflowApi>(),
     });
 }
 

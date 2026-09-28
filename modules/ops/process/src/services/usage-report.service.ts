@@ -8,7 +8,6 @@ import {
   INSTANCE_ID_NOT_MINTED,
   USAGE_REPORT_EVENT,
   USAGE_REPORT_SCHEMA_VERSION,
-  type StartupNoticeState,
   type UsageReportPreview,
   type UsageReportSwitches,
 } from "@langwatch/ops-contract";
@@ -16,7 +15,6 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { type Instant, Temporal } from "@langwatch/time";
 
 import type { UsageReportChannel } from "../channels/usage-report.channel.ts";
-import { startupNoticeState } from "../rules/startup-notice.rules.ts";
 import { nextNoonUtc } from "../rules/usage-report-schedule.rules.ts";
 import type { UsageReportCollectionService } from "./usage-report-collection.service.ts";
 
@@ -33,7 +31,6 @@ export type UsageReportInstall = Pick<
   | "getConnectDeployment"
   | "recordUsageReportOutcome"
   | "setUsageReportSwitches"
-  | "acknowledgeStartupNotice"
 >;
 
 /** Each switch a change names is an opt-out. */
@@ -182,24 +179,6 @@ export class UsageReportService {
   async setSwitches(input: UsageReportSwitchChange): Promise<UsageReportPreview> {
     await this.deps.install.setUsageReportSwitches(input);
     return this.preview();
-  }
-
-  /** Whether the notice is due. Reads the identity row and never mints it. */
-  async getStartupNotice(): Promise<StartupNoticeState> {
-    const [identity] = this.deps.isSaas ? [] : await this.deps.install.findInstanceIdentity();
-    return startupNoticeState({
-      isSaas: this.deps.isSaas,
-      usageReportsDisabled: this.deps.disabled,
-      acknowledgedSchemaVersion: identity?.startupNoticeAcknowledgedSchemaVersion,
-      schemaVersion: USAGE_REPORT_SCHEMA_VERSION,
-    });
-  }
-
-  /** The dismissal outlives the browser, so it is written to the install's own identity row. */
-  async dismissStartupNotice({ schemaVersion }: { schemaVersion: number }): Promise<boolean> {
-    if (this.deps.isSaas) return false;
-    await this.deps.install.acknowledgeStartupNotice({ schemaVersion });
-    return true;
   }
 }
 

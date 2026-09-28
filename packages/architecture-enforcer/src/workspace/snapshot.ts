@@ -37,6 +37,12 @@ const APPLICATION_PACKAGES: readonly {
   { role: "tasks", path: "tasks", name: "@langwatch/tasks" },
 ];
 
+/**
+ * Programs under apps/ that are neither a composition root nor a shared library: the scenario
+ * child is spawned per run and owns its own logic (dev/docs/ARCHITECTURE.md §1, Alex 2026-09-28).
+ */
+const STANDALONE_PROGRAMS = new Set(["scenario-child"]);
+
 const ENTERPRISE_COMPOSITION_PACKAGES: readonly {
   role: EnterpriseCompositionRole;
   name: string;
@@ -225,6 +231,7 @@ function discoverApplications(discovery: Discovery): void {
 
   for (const directory of directories(applicationsRoot)) {
     if (APPLICATION_PACKAGES.some(({ path }) => path === directory)) continue;
+    if (STANDALONE_PROGRAMS.has(directory)) continue;
 
     const unexpectedManifest = join(applicationsRoot, directory, "package.json");
     if (!existsSync(unexpectedManifest) || directory === "shared") continue;
@@ -233,7 +240,8 @@ function discoverApplications(discovery: Discovery): void {
       policy: "application-layout",
       file: unexpectedManifest,
       message: `Unknown application workspace apps/${directory}.`,
-      allowed: "The fixed application roots are ui, api, worker, server, and tasks.",
+      allowed:
+        "The fixed application roots are ui, api, worker, server, and tasks, beside the standalone scenario-child program.",
     });
   }
 

@@ -7,9 +7,9 @@ describe("data-retention contract", () => {
   it("accepts only the indefinite sentinel or aligned retention values", () => {
     // Acceptance stated as acceptance. `parse(0)).toBe(0)` passed for any
     // schema that lets 0 through, which is every schema that does not reject it.
-    expect(retentionDaysInputSchema.safeParse(0).success).toBe(true);
-    expect(retentionDaysInputSchema.safeParse(49).success).toBe(true);
-    expect(retentionDaysInputSchema.safeParse(42).success).toBe(false);
+    expect(retentionDaysInputSchema.validate(0)).toBe(true);
+    expect(retentionDaysInputSchema.validate(49)).toBe(true);
+    expect(retentionDaysInputSchema.validate(42)).toBe(false);
   });
 
   /** @scenario "Resolve retention through the scope cascade" */

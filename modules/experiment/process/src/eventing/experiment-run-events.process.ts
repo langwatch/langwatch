@@ -1,9 +1,13 @@
 import { EventSchema } from "@langwatch/eventing";
 import { experimentRunEventingTargetSchema as targetSchema } from "@langwatch/experiment-contract";
-import type { SerializedHandledError } from "@langwatch/handled-error";
+import {
+  type SerializedHandledError,
+  serializedHandledErrorSchema,
+} from "@langwatch/handled-error";
 import { z } from "zod";
 
 import { EXPERIMENT_RUN_EVENT_TYPES } from "../rules/experiment-run-event-types.rules.ts";
+import { experimentRunPlanSchema } from "./experiment-run-plan.schemas.ts";
 
 /**
  * Base metadata for experiment run events.
@@ -23,6 +27,8 @@ export const experimentRunStartedEventDataSchema = z.object({
   workflowVersionId: z.string().nullable().optional(),
   total: z.number(),
   targets: z.array(targetSchema),
+  /** What the run executes; absent on a run from before the pipeline drove runs. */
+  plan: experimentRunPlanSchema.optional(),
 });
 
 export const experimentRunStartedEventSchema = z.object({
@@ -140,6 +146,10 @@ export const experimentRunCompletedEventDataSchema = z.object({
   experimentId: z.string(),
   finishedAt: z.number().nullable().optional(),
   stoppedAt: z.number().nullable().optional(),
+  /** Absent on runs completed before the pipeline drove runs. */
+  outcome: z.enum(["finished", "stopped", "failed"]).optional(),
+  /** Why a run failed before any cell ran: a workflow evaluation the worker couldn't prepare. */
+  error: serializedHandledErrorSchema.optional(),
 });
 
 export const experimentRunCompletedEventSchema = z.object({
@@ -152,9 +162,43 @@ export const experimentRunCompletedEventSchema = z.object({
 export type ExperimentRunCompletedEventData = z.infer<typeof experimentRunCompletedEventDataSchema>;
 export type ExperimentRunCompletedEvent = z.infer<typeof experimentRunCompletedEventSchema>;
 
-/**
- * Union of all experiment run processing event types.
- */
+/** One cell's terminal: every cell finishes exactly once, whatever happened to it. */
+export const cellFinishedEventDataSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  ordinal: z.number().int().nonnegative(),
+  phase: z.union([z.literal(1), z.literal(2)]),
+  outcome: z.enum(["succeeded", "failed", "stopped", "skipped"]),
+  error: serializedHandledErrorSchema.optional(),
+});
+
+export const cellFinishedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.CELL_FINISHED),
+  data: cellFinishedEventDataSchema,
+  metadata: experimentRunEventMetadataSchema.optional(),
+});
+
+export type CellFinishedEventData = z.infer<typeof cellFinishedEventDataSchema>;
+export type CellFinishedEvent = z.infer<typeof cellFinishedEventSchema>;
+
+/** A run was asked to stop; the manager honours it and sends no further cell. */
+export const abortRequestedEventDataSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  requestedBy: z.string().nullable(),
+});
+
+export const abortRequestedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.ABORT_REQUESTED),
+  data: abortRequestedEventDataSchema,
+  metadata: experimentRunEventMetadataSchema.optional(),
+});
+
+export type AbortRequestedEventData = z.infer<typeof abortRequestedEventDataSchema>;
+export type AbortRequestedEvent = z.infer<typeof abortRequestedEventSchema>;
+
 export const workflowEvaluationRequestedEventDataSchema = z.object({
   runId: z.string(),
   experimentId: z.string(),
@@ -189,4 +233,6 @@ export type ExperimentRunProcessingEvent =
   | EvaluatorResultEvent
   | TraceMetricsComputedEvent
   | ExperimentRunCompletedEvent
-  | WorkflowEvaluationRequestedEvent;
+  | WorkflowEvaluationRequestedEvent
+  | CellFinishedEvent
+  | AbortRequestedEvent;

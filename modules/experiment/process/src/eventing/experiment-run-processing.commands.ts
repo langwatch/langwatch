@@ -1,7 +1,14 @@
 import { defineCommand } from "@langwatch/eventing";
 
+import {
+  EXPERIMENT_RUN_COMMAND_TYPES,
+  EXPERIMENT_RUN_EVENT_TYPES,
+  EXPERIMENT_RUN_EVENT_VERSIONS,
+} from "../rules/experiment-run-event-types.rules.ts";
 import { makeExperimentRunKey } from "../rules/experiment-run-key.rules.ts";
 import {
+  abortRequestedEventDataSchema,
+  cellFinishedEventDataSchema,
   evaluatorResultEventDataSchema,
   experimentRunCompletedEventDataSchema,
   experimentRunStartedEventDataSchema,
@@ -17,7 +24,7 @@ import {
 export const StartExperimentRunCommand = defineCommand({
   commandType: "lw.experiment_run.start",
   eventType: "lw.experiment_run.started",
-  eventVersion: "2025-02-01",
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.STARTED,
   aggregateType: "experiment_run",
   schema: experimentRunStartedEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
@@ -109,7 +116,7 @@ export const ComputeExperimentRunMetricsCommand = defineCommand({
 export const CompleteExperimentRunCommand = defineCommand({
   commandType: "lw.experiment_run.complete",
   eventType: "lw.experiment_run.completed",
-  eventVersion: "2025-02-01",
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
   aggregateType: "experiment_run",
   schema: experimentRunCompletedEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
@@ -135,4 +142,46 @@ export const RequestWorkflowEvaluationCommand = defineCommand({
     "payload.workflow.id": d.workflowId,
   }),
   makeJobId: (d) => `${d.tenantId}:${d.runId}:workflow-evaluation`,
+});
+
+/** One cell's terminal, keyed so a cell failed as lost that later finishes is dropped. */
+export const cellFinishedIdentity = (d: {
+  tenantId: string;
+  runId: string;
+  ordinal: number;
+  phase: number;
+}): string => `${d.tenantId}:${d.runId}:cell:${d.ordinal}:${d.phase}:finished`;
+
+/** The stall wake's verdict on a cell whose worker never finished it (spec section 4). */
+export const FailExperimentCellCommand = defineCommand({
+  commandType: EXPERIMENT_RUN_COMMAND_TYPES.FAIL_CELL,
+  eventType: EXPERIMENT_RUN_EVENT_TYPES.CELL_FINISHED,
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.CELL_FINISHED,
+  aggregateType: "experiment_run",
+  schema: cellFinishedEventDataSchema,
+  aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
+  idempotencyKey: cellFinishedIdentity,
+  spanAttributes: (d) => ({
+    "payload.run.id": d.runId,
+    "payload.experiment.id": d.experimentId,
+    "payload.cell.ordinal": d.ordinal,
+    "payload.cell.phase": d.phase,
+  }),
+  makeJobId: cellFinishedIdentity,
+});
+
+/** A request to stop a run; the Redis flag is the fast signal, this is the durable record. */
+export const AbortExperimentRunCommand = defineCommand({
+  commandType: EXPERIMENT_RUN_COMMAND_TYPES.ABORT,
+  eventType: EXPERIMENT_RUN_EVENT_TYPES.ABORT_REQUESTED,
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.ABORT_REQUESTED,
+  aggregateType: "experiment_run",
+  schema: abortRequestedEventDataSchema,
+  aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
+  idempotencyKey: (d) => `${d.tenantId}:${d.runId}:abort`,
+  spanAttributes: (d) => ({
+    "payload.run.id": d.runId,
+    "payload.experiment.id": d.experimentId,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.runId}:abort`,
 });

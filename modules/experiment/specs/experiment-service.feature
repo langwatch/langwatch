@@ -98,6 +98,19 @@ Feature: Experiment service boundary
     Then experiment_workflow_not_found is reported with status 404 and no version is written
 
   @unit
+  Scenario: A new wizard experiment's first save creates its workflow with one version
+    Given a wizard experiment with no workflow yet
+    When the wizard saves it
+    Then its workflow is created with the wizard's graph as its first version, attributed to the caller
+    And no second version is written
+
+  @unit
+  Scenario: A wizard experiment's later save writes a version into its existing workflow
+    Given a wizard experiment whose workflow resolves in the project
+    When the wizard saves it again without a commit message
+    Then one autosaved version is written into that workflow, attributed to the caller
+
+  @unit
   Scenario: A wizard experiment without an evaluator is not saved as a monitor
     Given a wizard experiment whose graph has no evaluator node
     When it is saved as a monitor

@@ -1,4 +1,4 @@
-import { isReplyTextPart } from "@langwatch/trace-contract";
+import { isReplyTextPart } from "@langwatch/trace-contract/transcript";
 
 import {
   isInjectedContextOnly,

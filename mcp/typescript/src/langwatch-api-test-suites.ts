@@ -1,10 +1,7 @@
-import { makeRequest } from "./langwatch-api.js";
 import type { RunParameters, RunPlanRunResult } from "./langwatch-api-run-plans.js";
+import { makeRequest } from "./langwatch-api.js";
 import type { RunPlanTargetWire } from "./schemas/run-plan.js";
-import type {
-  EvaluatorAttachmentWire,
-  SuiteField,
-} from "./schemas/suite-fields.js";
+import type { EvaluatorAttachmentWire, SuiteField } from "./schemas/suite-fields.js";
 
 /**
  * Client for `/api/v1/test-suites`. A test suite groups scenarios by
@@ -48,11 +45,7 @@ export async function createTestSuite(data: {
   fields?: SuiteField[];
   evaluators?: EvaluatorAttachmentWire[];
 }): Promise<TestSuite> {
-  return makeRequest(
-    "POST",
-    "/api/v1/test-suites",
-    data,
-  ) as Promise<TestSuite>;
+  return makeRequest("POST", "/api/v1/test-suites", data) as Promise<TestSuite>;
 }
 
 /** Retrieves a test suite with the scenarios filed in it. */

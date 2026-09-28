@@ -144,17 +144,7 @@ export function AddOverrideDrawer({
   // (a grandfathered paid value, or indefinite for a non-admin), surface it as
   // a read-only legacy option so the user sees the truth and isn't forced to
   // coerce it. Absent from Add mode — new policies only pick allowed values.
-  const legacyDays =
-    isEditing &&
-    editTarget &&
-    initialRetentionState({
-      days: editTarget.retentionDays,
-      presets,
-      isEnterprise,
-      isPlatformAdmin,
-    }).preset === LEGACY_PRESET_VALUE
-      ? editTarget.retentionDays
-      : null;
+  const legacyDays = legacyRetentionDays({ editTarget, presets, isEnterprise, isPlatformAdmin });
 
   // Menu = [legacy?] + plan presets + [keep-forever (admin)] + [custom
   // (enterprise/self-hosted only)]. Paid orgs get neither custom nor
@@ -205,32 +195,8 @@ export function AddOverrideDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editTarget, isEnterprise, isPlatformAdmin]);
 
-  const resolvedDays = (() => {
-    // The legacy option is read-only: it can't be saved, only replaced by
-    // picking a real option, so it resolves to no valid value.
-    if (preset === LEGACY_PRESET_VALUE) return NaN;
-    if (preset === CUSTOM_PRESET_VALUE) {
-      const n = Number(customAmount);
-      if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return NaN;
-      return n * DAYS_PER_UNIT[customUnit];
-    }
-    return Number(preset);
-  })();
-
-  const daysValid =
-    // Indefinite (0) is only reachable via the admin-only preset; the route
-    // re-checks the capability, so the UI just needs to treat it as valid.
-    resolvedDays === INDEFINITE_RETENTION_DAYS ||
-    // Any curated preset (the plan menu) is a pre-vetted allowed value — no
-    // range check needed; that's the point of the fixed menu. Only the custom
-    // field (enterprise/self-hosted) needs the ≥49 floor + week alignment.
-    (preset !== CUSTOM_PRESET_VALUE && preset !== LEGACY_PRESET_VALUE) ||
-    (preset === CUSTOM_PRESET_VALUE &&
-      Number.isFinite(resolvedDays) &&
-      Number.isInteger(resolvedDays) &&
-      resolvedDays >= ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS &&
-      resolvedDays <= MAX_RETENTION_DAYS &&
-      resolvedDays % RETENTION_WEEK_DAYS === 0);
+  const resolvedDays = resolveRetentionDays({ preset, customAmount, customUnit });
+  const daysValid = isRetentionDaysValid({ preset, resolvedDays });
 
   const canSave = scopes.length > 0 && daysValid && !isSaving;
 
@@ -287,35 +253,12 @@ export function AddOverrideDrawer({
                 </Select.Content>
               </Select.Root>
               {preset === CUSTOM_PRESET_VALUE && (
-                <HStack gap={2} marginTop={2} align="start">
-                  <Input
-                    type="number"
-                    min={1}
-                    value={customAmount}
-                    onChange={(e) => setCustomAmount(e.target.value)}
-                    width="120px"
-                    placeholder="e.g. 8"
-                  />
-                  <Select.Root
-                    collection={retentionUnitCollection}
-                    value={[customUnit]}
-                    onValueChange={(details) => {
-                      const v = details.value[0] as RetentionUnit | undefined;
-                      if (v) setCustomUnit(v);
-                    }}
-                  >
-                    <Select.Trigger background="bg" width="140px">
-                      <Select.ValueText />
-                    </Select.Trigger>
-                    <Select.Content>
-                      {retentionUnitCollection.items.map((item) => (
-                        <Select.Item key={item.value} item={item}>
-                          {item.label}
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
-                  </Select.Root>
-                </HStack>
+                <CustomRetentionField
+                  amount={customAmount}
+                  unit={customUnit}
+                  onAmountChange={setCustomAmount}
+                  onUnitChange={setCustomUnit}
+                />
               )}
               <Field.HelperText>
                 {retentionHelperText({
@@ -367,6 +310,117 @@ export function AddOverrideDrawer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/** The stored value an edited policy keeps when the plan can no longer offer it. */
+function legacyRetentionDays({
+  editTarget,
+  presets,
+  isEnterprise,
+  isPlatformAdmin,
+}: {
+  editTarget: RetentionEditTarget | null | undefined;
+  presets: RetentionPreset[];
+  isEnterprise: boolean;
+  isPlatformAdmin: boolean;
+}): number | null {
+  if (!editTarget) return null;
+  const { preset } = initialRetentionState({
+    days: editTarget.retentionDays,
+    presets,
+    isEnterprise,
+    isPlatformAdmin,
+  });
+  return preset === LEGACY_PRESET_VALUE ? editTarget.retentionDays : null;
+}
+
+/** The day count the controls describe; NaN where they describe none. */
+function resolveRetentionDays({
+  preset,
+  customAmount,
+  customUnit,
+}: {
+  preset: string;
+  customAmount: string;
+  customUnit: RetentionUnit;
+}): number {
+  // The legacy option is read-only: it can't be saved, only replaced by
+  // picking a real option, so it resolves to no valid value.
+  if (preset === LEGACY_PRESET_VALUE) return NaN;
+  if (preset !== CUSTOM_PRESET_VALUE) return Number(preset);
+  const n = Number(customAmount);
+  if (!Number.isInteger(n) || n <= 0) return NaN;
+  return n * DAYS_PER_UNIT[customUnit];
+}
+
+/**
+ * Indefinite (0) is only reachable via the admin-only preset, and a curated preset is
+ * pre-vetted, so neither needs a range check. Only the custom field
+ * (enterprise/self-hosted) needs the floor, the ceiling and week alignment.
+ */
+function isRetentionDaysValid({
+  preset,
+  resolvedDays,
+}: {
+  preset: string;
+  resolvedDays: number;
+}): boolean {
+  if (resolvedDays === INDEFINITE_RETENTION_DAYS) return true;
+  if (preset === LEGACY_PRESET_VALUE) return false;
+  if (preset !== CUSTOM_PRESET_VALUE) return true;
+  return (
+    Number.isInteger(resolvedDays) &&
+    resolvedDays >= ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS &&
+    resolvedDays <= MAX_RETENTION_DAYS &&
+    resolvedDays % RETENTION_WEEK_DAYS === 0
+  );
+}
+
+/** The custom length: a whole number and its unit. */
+function CustomRetentionField({
+  amount,
+  unit,
+  onAmountChange,
+  onUnitChange,
+}: {
+  amount: string;
+  unit: RetentionUnit;
+  onAmountChange: (amount: string) => void;
+  onUnitChange: (unit: RetentionUnit) => void;
+}) {
+  return (
+    <HStack gap={2} marginTop={2} align="start">
+      <Input
+        type="number"
+        min={1}
+        value={amount}
+        onChange={(e) => onAmountChange(e.target.value)}
+        width="120px"
+        placeholder="e.g. 8"
+      />
+      <Select.Root
+        collection={retentionUnitCollection}
+        value={[unit]}
+        onValueChange={(details) => {
+          const picked = retentionUnitCollection.items.find(
+            (item) => item.value === details.value[0],
+          );
+          if (picked) onUnitChange(picked.value);
+        }}
+      >
+        <Select.Trigger background="bg" width="140px">
+          <Select.ValueText />
+        </Select.Trigger>
+        <Select.Content>
+          {retentionUnitCollection.items.map((item) => (
+            <Select.Item key={item.value} item={item}>
+              {item.label}
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+    </HStack>
   );
 }
 

@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Spec: specs/langy/langy-navigation-persistence.feature
+ * Spec: specs/langy/langy-navigation-persistence.feature, specs/langy/langy-mount-scope.feature
  *       specs/langy/langy-worker-prewarm.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -47,7 +47,7 @@ vi.mock("../../../../../behavior/use-langy-conversation-deep-link.ts", () => ({
   useLangyConversationDeepLink: () => undefined,
 }));
 
-import { useLangyStore } from "@langwatch/langy-browser-kit";
+import { useLangy, useLangyStore } from "@langwatch/langy-browser-kit";
 
 import {
   LangyHostApi,
@@ -183,6 +183,32 @@ const renderAt = (initialPath: string) => {
   return router;
 };
 
+/** A page that registers with the panel, as the experiment workbench does. */
+function LangyReadingPage() {
+  useLangy();
+  return <div>workbench page</div>;
+}
+
+/** The shape the application's router mounts: the layout is the route, with no children. */
+const renderRoutedAt = (initialPath: string) => {
+  const router = createMemoryRouter(
+    [
+      {
+        Component: ProjectLangyLayout,
+        children: [{ path: "/:project/experiments/workbench", Component: LangyReadingPage }],
+      },
+    ],
+    { initialEntries: [initialPath] },
+  );
+  render(
+    <ChakraProvider value={defaultSystem}>
+      <TestHost>
+        <RouterProvider router={router} />
+      </TestHost>
+    </ChakraProvider>,
+  );
+};
+
 const drawer = () => screen.queryByTestId("langy-drawer");
 const openLangy = () => userEvent.click(screen.getByRole("button", { name: "open-langy" }));
 
@@ -205,6 +231,16 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("ProjectLangyLayout", () => {
+  describe("given the router mounts the layout as a route with no children", () => {
+    /** @scenario A product page renders inside the Langy layout */
+    it("draws the routed page inside the Langy provider, beside the panel", () => {
+      renderRoutedAt("/demo/experiments/workbench");
+
+      expect(screen.getByText("workbench page")).toBeTruthy();
+      expect(drawer()).toBeTruthy();
+    });
+  });
+
   describe("given Langy is open on a project page", () => {
     /** @scenario The panel stays open when navigating between pages of the same project */
     it("stays open when navigating to another page of the same project", async () => {

@@ -309,6 +309,10 @@
     "./settings-card": {
       "types": "./dist/components/settings-card.d.ts",
       "default": "./src/components/settings-card.tsx"
+    },
+    "./section-navigation-frame": {
+      "types": "./dist/components/section-navigation-frame.d.ts",
+      "default": "./src/components/section-navigation-frame.tsx"
     }
   },
   "scripts": {

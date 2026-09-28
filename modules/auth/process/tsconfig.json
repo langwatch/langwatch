@@ -86,6 +86,9 @@
       "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/task/tsconfig.build.json"
     },
     {
@@ -96,9 +99,6 @@
     },
     {
       "path": "../../../packages/api-fixture/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

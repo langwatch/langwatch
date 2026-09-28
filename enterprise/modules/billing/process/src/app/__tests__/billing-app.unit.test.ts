@@ -9,6 +9,7 @@ import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.bi
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
 import type { SeatRetentionRules } from "../../services/billing-subscription-lifecycle.service.ts";
 import type { MeteredUsageWarningService } from "../../services/metered-usage-warning.service.ts";
+import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
 import { StripeWebhookSignatureService } from "../../services/stripe-webhook-signature.service.ts";
 import { type ConnectedBillingPeers, BillingApp } from "../billing.app.ts";
 
@@ -71,6 +72,7 @@ function billingApp({
   const repositories = MemoryBillingRepositories.create();
   const app = BillingApp.assemble({
     usageWarnings: createApiFixture<MeteredUsageWarningService>({}),
+    resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
     members: { isSaas, nodeEnvironment: "test" },
     repositories,
     config: { bankDetails: undefined, licensePaymentLinkId: undefined },
@@ -321,7 +323,7 @@ describe("the currency BillingApp detects", () => {
       const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
 
       expect(() => app.detectCurrency({ headers: {} })).toThrow(
-        expect.objectContaining({ status: 404 }),
+        expect.objectContaining({ code: "not_found", httpStatus: 404 }),
       );
     });
   });
@@ -333,7 +335,8 @@ describe("the subscription door BillingApp serves", () => {
       const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
 
       await expect(app.listInvoices({ organizationId: ACME })).rejects.toMatchObject({
-        status: 404,
+        code: "not_found",
+        httpStatus: 404,
       });
     });
   });

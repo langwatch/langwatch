@@ -3,6 +3,7 @@ package dashboard
 import (
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -50,7 +51,7 @@ func TestLogViewerSeverityChips(t *testing.T) {
 		// Counts come from everything loaded. Counting only what survives the
 		// filter would make every count read as the number shown, which is the
 		// one number already on the status line.
-		if !strings.Contains(script, "for (const line of lines) counts.set(") {
+		if !regexp.MustCompile(`for \(const line of lines\)\s*counts\.set\(`).MatchString(script) {
 			t.Error("counts should be tallied over the loaded lines, not the visible ones")
 		}
 	})

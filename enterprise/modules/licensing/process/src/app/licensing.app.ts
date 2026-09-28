@@ -15,11 +15,6 @@ import {
   type IssuedActivationCode,
   type LicensingApi as LicensingApiContract,
   licenseValidationError,
-  limitTypes,
-  type LicenseLimitCheck,
-  type LicensingCaller,
-  type LimitCheckResult,
-  type LimitType,
   type ConnectClassifyAnswer,
   type ConnectCredentialResolution,
   type ConnectedSeats,
@@ -56,7 +51,7 @@ import {
   type GenerateLicenseInput,
   type GenerateLicenseOutput,
 } from "@langwatch/enterprise-licensing-contract";
-import type { ResolvePlanInput } from "@langwatch/entitlement-contract";
+import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -133,23 +128,6 @@ export type LicensingInfrastructure = Readonly<{
   authProviderIsMounted: () => boolean;
   /** Records a signing failure; the customer never sees the diagnostic. */
   reportSigningFailure: (entry: Readonly<{ organizationId: string; error: Error }>) => void;
-  /** Whether one limit still admits another resource, for this caller. */
-  checkLimit: (input: LicenseLimitCheck) => Promise<LimitCheckResult>;
-  /**
-   * Tells operations a customer reached a ceiling. A second feature's
-   * capability, composed in rather than reached through a request: an alert is
-   * raised by the same deployment that answered the check.
-   */
-  notifyLimitReached: (
-    input: Readonly<{
-      organizationId: string;
-      limitType: LimitType;
-      current: number;
-      max: number;
-    }>,
-  ) => Promise<void>;
-  /** Swallows a notification failure into the process's error channel. */
-  reportError: (error: Error) => void;
   /**
    * The license registry (ADR-156). Only LangWatch Cloud composes one; an
    * install has no licenses to issue, and its operations refuse by name.
@@ -282,7 +260,7 @@ export class LicensingApp implements LicensingApiContract {
     const cryptography = NodeLicenseCryptographyService.create({ publicKey: config.publicKey });
     // Derived from the closed prisma member: the licence reads are live, the seat
     // counts are entitlement's own membership classification (peer, not owned
-    // here), and the mutation/enforcement ports refuse by name until a process
+    // here), and the mutation ports refuse by name until a process
     // composes them.
     const partial = LicensingInfrastructureService.create({ processName: "this process" });
     const infrastructure =
@@ -354,7 +332,7 @@ export class LicensingApp implements LicensingApiContract {
     return app;
   }
 
-  resolve(input: ResolvePlanInput): Promise<PlanInfo> {
+  resolve(input: ResolvePlanInput): Promise<EntitlementGrant> {
     return this.#entitlements.resolve(input);
   }
 
@@ -414,58 +392,6 @@ export class LicensingApp implements LicensingApiContract {
     const removed = await this.#service.removeLicense(organizationId);
     await this.#install.publishUpstream(organizationId);
     return removed;
-  }
-
-  /** Whether one limit still admits another resource, for this caller. */
-  checkLimit(input: LicenseLimitCheck): Promise<LimitCheckResult> {
-    return this.#runtime.checkLimit(input);
-  }
-
-  /**
-   * A client pre-check refused somebody. The limit is re-checked here, so a
-   * fabricated report raises nothing, and the notification is neither awaited
-   * nor allowed to fail the call: an unsent alert is operations' problem.
-   */
-  async reportLimitBlocked(input: LicenseLimitCheck): Promise<void> {
-    const result = await this.#runtime.checkLimit(input);
-
-    if (result.allowed) return;
-
-    void this.#runtime
-      .notifyLimitReached({
-        organizationId: input.organizationId,
-        limitType: input.limitType,
-        current: result.current,
-        max: result.max,
-      })
-      .catch((error: unknown) => this.reportError(error));
-  }
-
-  /**
-   * Every enforced limit at once, keyed by limit type. Which limits "every limit" means is the
-   * plan's business, not a door's: a screen that enumerated them itself would go stale the day
-   * a limit is added, and silently show one fewer.
-   */
-  async checkAllLimits(
-    input: Readonly<{ organizationId: string; user: LicensingCaller }>,
-  ): Promise<Record<LimitType, LimitCheckResult>> {
-    const results = await Promise.all(
-      limitTypes.map((limitType) =>
-        this.#runtime.checkLimit({
-          organizationId: input.organizationId,
-          limitType,
-          user: input.user,
-        }),
-      ),
-    );
-    return Object.fromEntries(
-      results.map((result: LimitCheckResult) => [result.limitType, result]),
-    ) as Record<LimitType, LimitCheckResult>;
-  }
-
-  /** Swallows a notification failure into the process's error channel. */
-  reportError(error: unknown): void {
-    this.#runtime.reportError(error instanceof Error ? error : new Error(String(error)));
   }
 
   inspectPlatformAccess(): Promise<PlatformLicenseAccess> {
@@ -658,10 +584,6 @@ export class LicensingApp implements LicensingApiContract {
     hostnameOptOut?: boolean;
   }): Promise<void> {
     return this.#identity.setReportSwitches(input);
-  }
-
-  acknowledgeStartupNotice({ schemaVersion }: { schemaVersion: number }): Promise<void> {
-    return this.#identity.acknowledgeStartupNotice(schemaVersion);
   }
 
   isConnectServiceEnabled(input: {
@@ -957,7 +879,6 @@ function unavailableConnectInstall({ version }: { version: string }): ConnectIns
     identity: {
       findRow: () => Promise.resolve(null),
       mint: () => Promise.reject(unavailable()),
-      acknowledgeStartupNotice: () => Promise.reject(unavailable()),
       setReportSwitches: () => Promise.reject(unavailable()),
       recordReport: () => Promise.reject(unavailable()),
     },

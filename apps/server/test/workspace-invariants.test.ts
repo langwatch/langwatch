@@ -118,6 +118,75 @@ function isWorkspaceMember(dir: string): boolean {
   });
 }
 
+/**
+ * Whether a distribution entry ships the path. The prefix compared against always ends in "/",
+ * so an entry of `langwatch` cannot be read as shipping `langwatch-something/package.json`.
+ */
+function isShippedBy({ shipped, relPath }: { shipped: string[]; relPath: string }): boolean {
+  return shipped.some((f) => relPath === f || relPath.startsWith(f.endsWith("/") ? f : `${f}/`));
+}
+
+const installRulesSchema = z.object({
+  pnpm: z.record(z.string(), z.unknown()).optional(),
+  resolutions: z.record(z.string(), z.unknown()).optional(),
+});
+
+const dependenciesSchema = z.object({
+  dependencies: z.record(z.string(), z.string()).optional(),
+  devDependencies: z.record(z.string(), z.string()).optional(),
+});
+
+/** Install rules a member carries that pnpm honours only in the root manifest. */
+function memberInstallRules(): string[] {
+  return trackedManifests()
+    .filter((manifest) => manifest !== "package.json")
+    .flatMap((manifest) => {
+      const pkg = installRulesSchema.parse(readJson(manifest));
+      const rules = Object.keys(pkg.pnpm ?? {}).map((key) => `${manifest}: pnpm.${key}`);
+      return pkg.resolutions === undefined ? rules : [...rules, `${manifest}: resolutions`];
+    });
+}
+
+/** Every workspace member's dependency on a package that lives in this repo, bar the SDK. */
+function memberInternalDependencies(): { manifest: string; name: string; spec: string }[] {
+  const internalNames = new Set(
+    trackedManifests()
+      .map((m) => readJson(m).name)
+      .filter((n): n is string => typeof n === "string"),
+  );
+  return trackedManifests()
+    .filter((manifest) => isWorkspaceMember(manifestDir(manifest)))
+    .flatMap((manifest) => {
+      const pkg = dependenciesSchema.parse(readJson(manifest));
+      return Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })
+        .filter(([name]) => internalNames.has(name) && name !== "langwatch")
+        .map(([name, spec]) => ({ manifest, name, spec }));
+    });
+}
+
+/**
+ * `extends` targets of shipped tsconfigs the tarball does not carry. Only tsconfigs the tarball
+ * carries count: one a package excludes on purpose extends nothing the end user needs.
+ */
+function unshippedExtendsTargets({
+  shipped,
+  tsconfigPaths,
+}: {
+  shipped: string[];
+  tsconfigPaths: string[];
+}): string[] {
+  return tsconfigPaths
+    .filter((tsconfigPath) => isShippedBy({ shipped, relPath: tsconfigPath }))
+    .flatMap((tsconfigPath) => {
+      const target = /"extends"\s*:\s*"([^"]+)"/.exec(
+        readFileSync(join(repoRoot, tsconfigPath), "utf8"),
+      )?.[1];
+      if (target === undefined) return [];
+      const shippedTarget = isShippedBy({ shipped, relPath: join(dirname(tsconfigPath), target) });
+      return shippedTarget ? [] : [`${tsconfigPath} -> ${target}`];
+    });
+}
+
 describe("the repo is a single pnpm workspace", () => {
   describe("when the lockfiles are counted", () => {
     /** @scenario The repo holds one lockfile */
@@ -210,21 +279,7 @@ describe("the repo is a single pnpm workspace", () => {
       // patchedDependencies, ...) and yarn-style `resolutions`. One left in
       // a member looks like an active pin and does nothing — which is
       // exactly how the six old roots drifted apart.
-      const offenders: string[] = [];
-      for (const manifest of trackedManifests()) {
-        if (manifest === "package.json") continue;
-        const pkg = readJson(manifest) as {
-          pnpm?: Record<string, unknown>;
-          resolutions?: Record<string, unknown>;
-        };
-        for (const key of Object.keys(pkg.pnpm ?? {})) {
-          offenders.push(`${manifest}: pnpm.${key}`);
-        }
-        if (pkg.resolutions !== undefined) {
-          offenders.push(`${manifest}: resolutions`);
-        }
-      }
-      expect(offenders).toEqual([]);
+      expect(memberInstallRules()).toEqual([]);
     });
 
     /** @scenario No project keeps a dependency rule that no longer applies */
@@ -264,32 +319,11 @@ describe("the repo is a single pnpm workspace", () => {
       // a package that lives in this repo must take the working copy. The
       // one exception is `langwatch` (the published SDK), consumed from
       // the registry on purpose (see "keeps the app on the published SDK").
-      const internalNames = new Set(
-        trackedManifests()
-          .map((m) => readJson(m).name)
-          .filter((n): n is string => typeof n === "string"),
-      );
-
-      const offenders: string[] = [];
-      let internalDepsSeen = 0;
-      for (const manifest of trackedManifests()) {
-        const dir = manifestDir(manifest);
-        if (!isWorkspaceMember(dir)) continue;
-        const pkg = readJson(manifest) as {
-          dependencies?: Record<string, string>;
-          devDependencies?: Record<string, string>;
-        };
-        for (const [name, spec] of Object.entries({
-          ...pkg.dependencies,
-          ...pkg.devDependencies,
-        })) {
-          if (!internalNames.has(name) || name === "langwatch") continue;
-          internalDepsSeen++;
-          if (!spec.startsWith("workspace:")) {
-            offenders.push(`${manifest}: ${name} -> ${spec}`);
-          }
-        }
-      }
+      const internalDependencies = memberInternalDependencies();
+      const internalDepsSeen = internalDependencies.length;
+      const offenders = internalDependencies
+        .filter(({ spec }) => !spec.startsWith("workspace:"))
+        .map(({ manifest, name, spec }) => `${manifest}: ${name} -> ${spec}`);
 
       // Guards the guard: zero internal dependencies found would mean the
       // scan is broken, not that the repo is clean.
@@ -343,13 +377,8 @@ describe("the repo is a single pnpm workspace", () => {
       // the missing file, before anything is built and long before the first
       // migration. The workspace definition ships, so the declaration always
       // reaches the end user whether or not the file it names does.
-      expect(patches.length).toBeGreaterThan(0);
-      for (const patch of patches) {
-        const covered = shipped.some(
-          (f) => patch === f || patch.startsWith(f.endsWith("/") ? f : `${f}/`),
-        );
-        expect(covered, `no distribution entry ships ${patch}`).toBe(true);
-      }
+      const unshipped = patches.filter((patch) => !isShippedBy({ shipped, relPath: patch }));
+      expect(unshipped, "patches no distribution entry ships").toEqual([]);
     });
 
     /** @scenario The published package carries every input its install reads */
@@ -359,26 +388,10 @@ describe("the repo is a single pnpm workspace", () => {
       // don't track as shipped — missing it crashes `prisma generate` at
       // first boot.
       const shipped = readShippedFiles();
-      const isShipped = (relPath: string): boolean =>
-        shipped.some((f) => relPath === f || relPath.startsWith(f.endsWith("/") ? f : `${f}/`));
-
       const tsconfigPaths = gitLsFiles("*tsconfig*.json");
       expect(tsconfigPaths.length).toBeGreaterThan(5);
 
-      const offenders: string[] = [];
-      for (const tsconfigPath of tsconfigPaths) {
-        // Only tsconfigs the tarball actually carries: one belonging to a
-        // package the distribution list excludes on purpose extends nothing
-        // the end user needs.
-        if (!isShipped(tsconfigPath)) continue;
-        const match = /"extends"\s*:\s*"([^"]+)"/.exec(
-          readFileSync(join(repoRoot, tsconfigPath), "utf8"),
-        );
-        if (!match) continue;
-        const targetRel = join(dirname(tsconfigPath), match[1]);
-        if (!isShipped(targetRel)) offenders.push(`${tsconfigPath} -> ${match[1]}`);
-      }
-      expect(offenders).toEqual([]);
+      expect(unshippedExtendsTargets({ shipped, tsconfigPaths })).toEqual([]);
     });
 
     /** @scenario Every project the lockfile mentions is resolvable */
@@ -396,15 +409,10 @@ describe("the repo is a single pnpm workspace", () => {
 
       // A member whose directory is absent installs without complaint and
       // fails much later, inside a migration.
-      for (const manifest of memberManifests) {
-        // Compare against a directory prefix that definitely ends in "/",
-        // so a distribution entry of `langwatch` cannot be read as shipping
-        // `langwatch-something/package.json`.
-        const covered = shipped.some(
-          (f) => manifest === f || manifest.startsWith(f.endsWith("/") ? f : `${f}/`),
-        );
-        expect(covered, `no distribution entry ships ${manifest}`).toBe(true);
-      }
+      const unshipped = memberManifests.filter(
+        (manifest) => !isShippedBy({ shipped, relPath: manifest }),
+      );
+      expect(unshipped, "member manifests no distribution entry ships").toEqual([]);
     });
   });
 

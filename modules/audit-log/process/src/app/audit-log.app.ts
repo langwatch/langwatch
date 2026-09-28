@@ -1,3 +1,4 @@
+import { AgentApi } from "@langwatch/agent-contract";
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import {
   AuditLogApi,
@@ -43,6 +44,7 @@ export class AuditLogApp implements AuditLogApi, AuditLogHomeApi {
     datasets: DatasetApi,
     monitors: MonitorApi,
     annotations: AnnotationApi,
+    agents: AgentApi,
   };
 
   readonly #entries: AuditLogService;

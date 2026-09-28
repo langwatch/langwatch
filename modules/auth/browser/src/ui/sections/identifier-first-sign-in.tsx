@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import { normalizeSignInErrorCode } from "@langwatch/auth-contract";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { useEffect, useRef, useState } from "react";
 
@@ -17,7 +18,6 @@ import {
   rememberPendingMethod,
 } from "../../model/last-used-method.ts";
 import { signInMethodActionLabel, signInMethodLabel } from "../../model/method-labels.ts";
-import { normalizeSignInErrorCode } from "../../model/sign-in-error-code.ts";
 import { signInGreeting } from "../../model/sign-in-greeting.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";

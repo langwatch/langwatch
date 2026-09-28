@@ -34,6 +34,15 @@ Feature: Physical application workspace boundaries
       And apps/server is the @langwatch/server package
       And platform/app no longer exists
 
+    # dev/docs/ARCHITECTURE.md §1: the one exception to "an app is main.ts + config.ts".
+    @unit
+    Scenario: The scenario child is the one standalone program beside the application roots
+      Given apps/scenario-child holds the program the scenario module spawns per run
+      And another unknown directory under apps holds a package manifest
+      When the application layout is checked
+      Then apps/scenario-child is not refused
+      And the other directory is refused as an unknown application workspace
+
     @unimplemented
     @architecture @packaging
     Scenario: The repository root is not the published server package

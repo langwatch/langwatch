@@ -41,6 +41,9 @@ export const promptUpdateTrpcInputSchema = createPromptUpdateTrpcInputSchema({
   demonstrationsSchema: nodeDatasetSchema,
 });
 
+export type PromptCreateTrpcInput = z.infer<typeof promptCreateTrpcInputSchema>;
+export type PromptUpdateTrpcInput = z.infer<typeof promptUpdateTrpcInputSchema>;
+
 export const promptTrpc = defineTrpcContract("prompts")
   .query("getAllPromptsForProject")
   .withInput(promptProjectTrpcInputSchema)

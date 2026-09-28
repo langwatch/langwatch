@@ -132,6 +132,8 @@ type RunnerPlan struct {
 	// and "today" render alike; Fixtures fill a route's {name} placeholders.
 	FrozenTime int64             `json:"frozenTime,omitempty"`
 	Fixtures   map[string]string `json:"fixtures,omitempty"`
+	// Concurrency is how many pages each side captures on at once.
+	Concurrency Concurrency `json:"concurrency,omitempty"`
 	// Edition and Stacks are read back by recapture, which sets the same
 	// edition on the same stacks before it renders again.
 	Edition Edition        `json:"edition,omitempty"`
@@ -144,4 +146,10 @@ type RunnerSide struct {
 	Name    string `json:"name"`
 	BaseURL string `json:"baseUrl"`
 	Replay  string `json:"replay,omitempty"`
+	// Pending names the file this side's address arrives in once its stack
+	// is ready (PendingBaseFile); the runner starts the other side meanwhile.
+	Pending string `json:"pending,omitempty"`
+	// Fixtures are the ids this side's seed generated; they fill a route's
+	// {name} over the plan's static fixtures.
+	Fixtures map[string]string `json:"fixtures,omitempty"`
 }

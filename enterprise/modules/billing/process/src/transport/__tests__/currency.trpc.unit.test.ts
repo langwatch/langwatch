@@ -5,6 +5,7 @@
  */
 import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import { Currency } from "@langwatch/enterprise-billing-contract";
+import { NotFoundError } from "@langwatch/handled-error";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -101,5 +102,27 @@ describe("when the caller has no session", () => {
     const anonymous = router.createCaller({ actor: null, headers: {} });
 
     await expect(anonymous.detectCurrency({})).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+});
+
+describe("given a deployment that serves no currency detection", () => {
+  const selfHosted = createTrpcRuntime<BillingTrpcTestContext>({
+    root: trpc,
+    procedure: trpc.procedure,
+    members: billingTrpcTestMembers(),
+  }).mount(
+    currencyTrpcTransport,
+    () => ({
+      detectCurrency: () => {
+        throw new NotFoundError("not_found", "Currency detection", "this deployment");
+      },
+    }),
+    { facts: [bindTrpcFact(currencyRequestHeadersFact, (ctx) => ctx.headers ?? null)] },
+  );
+
+  it("answers not found, as main's absent procedure did, rather than a server error", async () => {
+    const caller = selfHosted.createCaller({ actor: { id: "reader" }, headers: {} });
+
+    await expect(caller.detectCurrency({})).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

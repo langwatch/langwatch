@@ -89,6 +89,42 @@ export const carriedOverCellSchema = z.object({
   evaluatorResults: z.array(z.object({ evaluatorId: z.string(), result: z.unknown() })),
 });
 
+/** What subset of the evaluation a run executes; the request's and a run plan's `scope`. */
+export const executionScopeSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("full") }),
+  z.object({ type: z.literal("rows"), rowIndices: z.array(z.number()) }),
+  z.object({ type: z.literal("target"), targetId: z.string() }),
+  // Neither filter may be empty. Omitting `rowIndices` is how a caller
+  // asks for every row, so an empty list can only mean no rows, and an
+  // empty `targetIds` says the same about the columns. Either one reaches
+  // the engine as a run that reports success over zero cells.
+  z.object({
+    type: z.literal("target-rows"),
+    targetIds: z.array(z.string()).min(1),
+    rowIndices: z.array(z.number()).min(1).optional(),
+  }),
+  z.object({
+    type: z.literal("cell"),
+    targetId: z.string(),
+    rowIndex: z.number(),
+  }),
+  z.object({
+    type: z.literal("evaluator"),
+    targetId: z.string(),
+    rowIndex: z.number(),
+    evaluatorId: z.string(),
+    targetOutput: z.unknown().optional(),
+    traceId: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("evaluator-all-rows"),
+    targetId: z.string(),
+    evaluatorId: z.string(),
+    precomputedTargetOutputs: z.record(z.coerce.number(), z.unknown()),
+    traceIds: z.record(z.coerce.number(), z.string().optional()),
+  }),
+]);
+
 /**
  * Input to start an evaluation execution.
  * The frontend sends the full state to avoid autosave timing issues.
@@ -147,40 +183,7 @@ export const executionRequestSchema = z
     // Use shared schemas to avoid duplication and ensure consistency
     targets: z.array(targetConfigSchema),
     evaluators: z.array(evaluatorConfigSchema),
-    scope: z.discriminatedUnion("type", [
-      z.object({ type: z.literal("full") }),
-      z.object({ type: z.literal("rows"), rowIndices: z.array(z.number()) }),
-      z.object({ type: z.literal("target"), targetId: z.string() }),
-      // Neither filter may be empty. Omitting `rowIndices` is how a caller
-      // asks for every row, so an empty list can only mean no rows, and an
-      // empty `targetIds` says the same about the columns. Either one reaches
-      // the engine as a run that reports success over zero cells.
-      z.object({
-        type: z.literal("target-rows"),
-        targetIds: z.array(z.string()).min(1),
-        rowIndices: z.array(z.number()).min(1).optional(),
-      }),
-      z.object({
-        type: z.literal("cell"),
-        targetId: z.string(),
-        rowIndex: z.number(),
-      }),
-      z.object({
-        type: z.literal("evaluator"),
-        targetId: z.string(),
-        rowIndex: z.number(),
-        evaluatorId: z.string(),
-        targetOutput: z.unknown().optional(),
-        traceId: z.string().optional(),
-      }),
-      z.object({
-        type: z.literal("evaluator-all-rows"),
-        targetId: z.string(),
-        evaluatorId: z.string(),
-        precomputedTargetOutputs: z.record(z.coerce.number(), z.unknown()),
-        traceIds: z.record(z.coerce.number(), z.string().optional()),
-      }),
-    ]),
+    scope: executionScopeSchema,
     concurrency: z.number().min(1).max(24).optional(),
     /** Inline row data to evaluate instead of a saved or attached dataset (row-first). */
     data: z.array(z.record(z.string(), z.unknown())).max(EXPERIMENT_INLINE_ROWS_MAX).optional(),

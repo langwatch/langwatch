@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioTargetRow } from "../ui/elements/runs/scenario-target-row.tsx";
 import { cssRulesForElement } from "./emotion-test-css.ts";
-import { makeScenarioRunData } from "./test-helpers.ts";
+import { makeScenarioRunData } from "./run-history-fixtures.ts";
 
 const prefetchMock = vi.hoisted(() => vi.fn());
 

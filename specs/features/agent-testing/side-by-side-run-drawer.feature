@@ -88,9 +88,9 @@ Feature: The wide run detail drawer
   Scenario: Criteria the judge could not decide read apart from the failed ones
     Given a finished run whose judge met one criterion, missed one and could not decide one
     When the results are read
-    Then an "Inconclusive criteria" section reads between the failed and the passed sections
+    Then a "Could not check" section reads between the failed and the passed sections
     And the undecided criterion is listed there and not under "Failed criteria"
-    And its row carries a grey dashed circle
+    And its row carries an orange dashed circle
 
   @integration
   Scenario: The messages carry no heading and no line beside the results

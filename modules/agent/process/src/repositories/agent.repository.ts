@@ -11,6 +11,7 @@ import type {
   GetAgentInput,
   AgentProjectInput,
   AgentIdsInput,
+  AgentCreationWindowInput,
   ListAgentsInput,
   ConnectedAgentsInput,
   ConnectedAgentsEnvironmentInput,
@@ -63,4 +64,5 @@ export interface AgentRepository {
   registerConnected(input: RegisterPersistedAgentInput): Promise<Agent>;
   findByIdentityKey(input: { projectId: string; identityKey: string }): Promise<Agent[]>;
   touchLastSeenAt(input: AgentPresenceInput): Promise<void>;
+  findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]>;
 }

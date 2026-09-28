@@ -22,8 +22,7 @@ describe("given a plan that has not answered yet", () => {
     });
 
     const hrefs = result.current.flatMap((group) => group.items.map((item) => item.href));
-    expect(hrefs).not.toContain("/settings/groups");
-    expect(hrefs).not.toContain("/settings/scim");
+    expect(hrefs).not.toContain("/settings/roles");
   });
 });
 
@@ -35,7 +34,7 @@ describe("given an Enterprise plan that has answered", () => {
     });
 
     const hrefs = result.current.flatMap((group) => group.items.map((item) => item.href));
-    expect(hrefs).toContain("/settings/groups");
+    expect(hrefs).toContain("/settings/roles");
   });
 });
 
@@ -47,6 +46,6 @@ describe("given a plan that answered as not Enterprise", () => {
     });
 
     const hrefs = result.current.flatMap((group) => group.items.map((item) => item.href));
-    expect(hrefs).not.toContain("/settings/groups");
+    expect(hrefs).not.toContain("/settings/roles");
   });
 });

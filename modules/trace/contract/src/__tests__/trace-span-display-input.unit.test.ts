@@ -52,6 +52,24 @@ describe("buildDisplayInput", () => {
     });
   });
 
+  describe("given a chat-message input whose only system message comes later", () => {
+    /** @scenario "A system message later in the conversation stays in the input messages" */
+    it("still prepends the system prompt and keeps the later system turn", () => {
+      const out = buildDisplayInput({
+        input: chat([
+          { role: "user", content: "hi" },
+          { role: "system", content: "Retrieved context: opening hours 9 to 17" },
+        ]),
+        params: { "gen_ai.system_instructions": "be terse" },
+      });
+      expect(JSON.parse(out!)).toEqual([
+        { role: "system", content: "be terse" },
+        { role: "user", content: "hi" },
+        { role: "system", content: "Retrieved context: opening hours 9 to 17" },
+      ]);
+    });
+  });
+
   describe("given a span with no system instructions", () => {
     it("returns the chat transcript unchanged", () => {
       const out = buildDisplayInput({

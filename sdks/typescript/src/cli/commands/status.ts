@@ -620,7 +620,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       fn: () =>
         fetchCount({
           context,
-          url: `/api/v1/secret?projectId=${encodeURIComponent(credentials.projectId ?? "")}`,
+          url: `/api/v1/secrets?projectId=${encodeURIComponent(credentials.projectId ?? "")}`,
         }),
     },
   ];

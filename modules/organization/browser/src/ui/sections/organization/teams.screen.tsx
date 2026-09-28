@@ -1,5 +1,5 @@
 /**
- * The teams in an organization, at `/settings/teams`. A TEAM IS PROJECTS PLUS PEOPLE, and the
+ * The teams in an organization, the Directory's Teams tab. A TEAM IS PROJECTS PLUS PEOPLE, and the
  * list shows both: every project the team owns, and everybody bound to the team DIRECTLY.
  */
 
@@ -553,7 +553,7 @@ function ProjectSection({
                       {m.customRoleName ?? m.role}
                     </Badge>
                     {m.viaGroupName ? (
-                      <Link href="/settings/groups" fontSize="xs" color="purple.400">
+                      <Link href="/settings/directory?tab=groups" fontSize="xs" color="purple.400">
                         via {m.viaGroupName}
                       </Link>
                     ) : (
@@ -725,7 +725,7 @@ function TeamMemberRoleControls({
     return (
       <>
         {roleBadge}
-        <Link href="/settings/groups" fontSize="xs" color="purple.400">
+        <Link href="/settings/directory?tab=groups" fontSize="xs" color="purple.400">
           via {member.viaGroupName}
         </Link>
       </>

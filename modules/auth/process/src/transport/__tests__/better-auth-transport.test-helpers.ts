@@ -10,7 +10,6 @@ import type {
   SsoAuthenticationActivityApi,
   SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
-import { InviteNotFoundError } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 import { memoryAdapter } from "better-auth/adapters/memory";
 
@@ -66,11 +65,8 @@ export function betterAuthTransportFor(
       beforeAccountDelete: async () => undefined,
     } as never,
     invites: {
-      getPendingByOrganizationAndEmail: async () => {
-        throw new InviteNotFoundError();
-      },
-      applyInvite: async () => undefined,
-    } as never,
+      applyPendingInvite: async () => ({ applied: false }),
+    },
     announcements: {
       trackServerEvent: () => undefined,
       reportError: () => undefined,

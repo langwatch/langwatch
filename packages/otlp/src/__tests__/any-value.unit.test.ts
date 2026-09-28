@@ -19,7 +19,7 @@ describe("otlpAnyValueSchema", () => {
       ["an array", { arrayValue: { values: [{ stringValue: "a" }] } }],
       ["a kvlist", { kvlistValue: { values: [{ key: "k", value: { stringValue: "v" } }] } }],
     ])("accepts %s", (_label, value) => {
-      expect(otlpAnyValueSchema.safeParse(value).success).toBe(true);
+      expect(otlpAnyValueSchema.validate(value)).toBe(true);
     });
   });
 
@@ -39,7 +39,7 @@ describe("otlpAnyValueSchema", () => {
     });
 
     it("accepts an empty value, which carries nothing at all", () => {
-      expect(otlpAnyValueSchema.safeParse({}).success).toBe(true);
+      expect(otlpAnyValueSchema.validate({})).toBe(true);
     });
   });
 
@@ -83,7 +83,7 @@ describe("otlpAnyValueSchema", () => {
       ["an array that is not wrapped in values", { arrayValue: [{ stringValue: "a" }] }],
       ["a kvlist entry with no key", { kvlistValue: { values: [{ value: { intValue: 1 } }] } }],
     ])("rejects %s", (_label, value) => {
-      expect(otlpAnyValueSchema.safeParse(value).success).toBe(false);
+      expect(otlpAnyValueSchema.validate(value)).toBe(false);
     });
   });
 });
@@ -101,6 +101,6 @@ describe("otlpKeyValueSchema", () => {
     ["no value", { key: "service.name" }],
     ["a value that is not an AnyValue", { key: "service.name", value: "api" }],
   ])("rejects an entry with %s", (_label, entry) => {
-    expect(otlpKeyValueSchema.safeParse(entry).success).toBe(false);
+    expect(otlpKeyValueSchema.validate(entry)).toBe(false);
   });
 });

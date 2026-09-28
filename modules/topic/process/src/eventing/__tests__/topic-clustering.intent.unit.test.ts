@@ -230,16 +230,14 @@ describe("createTopicClusteringRunHandler", () => {
     /** @scenario A failure only the customer can fix is recorded without burning retries */
     it("records run_failed on the first attempt instead of retrying", async () => {
       const commands = makeCommands();
-      const runClusteringPage = vi
-        .fn()
-        .mockRejectedValue(
-          new ModelNotConfiguredError({
-            featureKey: "analytics.topic_clustering_llm",
-            role: "FAST",
-            featureDisplayName: "Topic clustering",
-            projectId: "project-1",
-          }),
-        );
+      const runClusteringPage = vi.fn().mockRejectedValue(
+        new ModelNotConfiguredError({
+          featureKey: "analytics.topic_clustering_llm",
+          role: "FAST",
+          featureDisplayName: "Topic clustering",
+          projectId: "project-1",
+        }),
+      );
       const run = createTopicClusteringRunHandler(
         makeDeps({
           runClusteringPage,
@@ -429,16 +427,14 @@ describe("run outcome metrics (ADR-054)", () => {
       const commands = makeCommands();
       const run = createTopicClusteringRunHandler(
         makeDeps({
-          runClusteringPage: vi
-            .fn()
-            .mockRejectedValue(
-              new ModelNotConfiguredError({
-                featureKey: "analytics.topic_clustering_llm",
-                role: "FAST",
-                featureDisplayName: "Topic clustering",
-                projectId: "project-1",
-              }),
-            ),
+          runClusteringPage: vi.fn().mockRejectedValue(
+            new ModelNotConfiguredError({
+              featureKey: "analytics.topic_clustering_llm",
+              role: "FAST",
+              featureDisplayName: "Topic clustering",
+              projectId: "project-1",
+            }),
+          ),
           commands,
           classifyError: () => ({
             code: "model_not_configured",

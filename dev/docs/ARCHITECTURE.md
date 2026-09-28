@@ -27,6 +27,11 @@ transport hosting, static serving, error formatting, lifecycle, signals,
 listeners, per-domain compositions, features trees — belongs to the framework
 packages below.
 
+`apps/scenario-child` is the one exception: a standalone program the scenario
+module spawns per run, which owns its own logic (adapters, turn execution) and
+reads the parent-child protocol from `@langwatch/scenario-contract` (Alex,
+2026-09-28).
+
 **The same code runs everywhere.** One `main.ts` per app, byte-identical
 across laptop, CI and production. Only the parsed environment differs. There
 is no dev-only branch anywhere in an app, because an app has nowhere to put
@@ -96,7 +101,7 @@ A module is one folder owning up to four workspace packages.
 `modules/catalogue.json` maps every subject to exactly one owning module.
 The owning module's process serves the subject's endpoints and runs its collection; another module's
 share crosses only as its `*Api` ops. Where main hosted a subject elsewhere (`traces.logCollection`),
-the port moves it to its owner — main decides *what*, the record decides *where* (Alex, 2026-09-25).
+the port moves it to its owner — main decides _what_, the record decides _where_ (Alex, 2026-09-25).
 A tRPC namespace belongs to one module: a procedure main hosted under another subject's namespace
 moves into its owner's namespace and the wire path moves with it (Alex, 2026-09-25).
 Operator views over enterprise subjects (license registry, self-hosted instances) live in an enterprise
@@ -172,11 +177,18 @@ document, is the authority on filenames):
   service = behaviour over both.
 - `eventing/` — one folder: the pipeline and everything it names (§9).
 - `transport/` — declarations only (§8).
-- `rules/` — pure functions and constants; no clock, no I/O.
+- `rules/` — pure functions and constants; no clock, no I/O. Value types (data
+  bags and the pure functions over them) live here too, not as `*Service`
+  classes and not in a new slot (Alex, 2026-09-28).
 - Ids: a new record's id is a KSUID with its resource prefix; ids minted before (nanoid, uuid) keep
   their format and stay accepted, since clients hold them as opaque strings (Alex, 2026-09-27).
 - No `utils/`, `ports/`, `adapters/`, `composition/`, `lib/`, `helpers/`,
   `domain/`.
+
+**A value is parsed once, where it enters untyped** (a transport, a channel's inbound message, a
+fold's stored payload) and travels as its `z.infer` type after that: a service does not re-parse what
+its transport or a peer's typed call handed it, and a Prisma repository does not parse columns Prisma
+already types (Alex, 2026-09-28).
 
 **An implementation never sees a raw client.** No prisma, no redis, no
 clickhouse in any `*Module` class. Raw clients cross into a module in exactly
@@ -896,6 +908,9 @@ a config object a module reads. Every refusal in both packages is a
    the night it landed).
    A shared secret follows the same rule: one exported `Secret.load` handle, and a double claim
    passes only when every claimant holds that same handle (Alex, 2026-09-25).
+   A fallback between secrets is declared, not configured: the owner declares each handle and nests
+   `into`, first answer wins. The API-key pepper is `API_KEY_PEPPER ?? CREDENTIALS_SECRET ??
+   NEXTAUTH_SECRET`, and the boot refuses when none answers (Alex, 2026-09-28).
 
 **Config is drilled, never ambient.** There is no async context and no
 dependency-injection container. The process config is one object composed of
@@ -1095,10 +1110,18 @@ never thinks about resolution at all. The per-module resolver adapters
   port by the role that owns the children. The module resolves the public address itself, in its own
   app with an async create and a close, in the worker role only; other roles read it as
   `{ unavailable }`. It is never a module writing `process.env` (Alex, 2026-09-28).
+- Voice runs in a scenario child, the live "Talk to it" session included: the parent authenticates,
+  audits and bounds the session, then hands the socket to a child built for that one session (stripped
+  environment, egress policy, that session's credentials). On shutdown the parent admits nothing new
+  and each child ends its call cleanly, recorded as interrupted; phone jobs requeue. Every worker opens
+  a quick tunnel to the door port alone; nonces live in Redis and upgrades carry Twilio's signature
+  (Alex, 2026-09-28).
+- The X-Twilio-Signature check on the media upgrade is deferred: the door admits on the nonce alone
+  until it returns (Alex, 2026-09-28).
 - A protocol whose handler must write the raw Node response itself (hosted MCP's SDK transports) is a
   declared raw HTTP door, `RawHttpProtocol` (`@langwatch/api`): exact paths, prefixes claiming a path and
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
-  close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
+close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
   `close` runs at shutdown, before the stores close (Alex, 2026-09-27).
 - The **process** mounts declarations; `boot()` opens the hosts. A module
   never mounts anything.
@@ -1165,13 +1188,22 @@ parsing with its own schema at the queue boundary — never `any`, never a rule 
 Per-payload routing (group key, score, coalesce size, dedup id) travels in one reserved `__routing` field on
 the job envelope; `withEvents([])` types a pipeline's events as `never`; a command's lane parse is its only
 validation, handed to `processCommand` (Alex, 2026-09-27).
+A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
+registers with `.on(eventSchema, handler)` (or reads its `.toPayload(schema, map)` view); no cast (Alex, 2026-09-27).
 Per-entity calendar work (a report's cron) is a keyed process manager on its owner's pipeline; the
 eventing `ScheduledJob` scheduler is retired, its table dropped a release after its code (Alex, 2026-09-26).
+An experiment run executes on its pipeline, never in a request: `StartRun` is a command, a process manager
+emits one cell intent per row and target, the worker runs each cell as a command appending its result
+events, and projections fold progress that SSE and polling read. Abort is a command the manager honours.
+The manager is the concurrency window: it sends N cell intents, then one per finished cell; phase 2 reads
+phase 1's outputs from the run's fold; a run without an experiment is keyed by runId (Alex, 2026-09-28).
+A cell intent carries only its ordinal and phase: `started` carries the scoped plan, the run's fold keeps
+it, and each cell reads its row, target and evaluators from the fold. The comparison set is planned from the
+run's configuration at start; each comparison cell decides from its own row's variant outputs whether it runs
+or finishes skipped, so the manager stays pure over counts (Alex, 2026-09-28).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
-A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
-registers with `.on(eventSchema, handler)` (or reads its `.toPayload(schema, map)` view); no cast (Alex, 2026-09-27).
 repositories. The process builds, registers and connects them one at a time in
 the order declared, so a later pipeline's `build` may read senders an earlier
 one's `connect` handed the app. Each still follows the role table below — the
@@ -1253,6 +1285,17 @@ time** — the api knows the deployment, which is how the browser gets its
 config without a second channel. Absent `dist/` (local dev, Vite owns the
 browser), it serves nothing.
 
+**A screen declares the grant it needs, and the router guards it** (ruled
+2026-09-28). A screen a viewer may be refused names the permission in its
+declaration, `.withScreens({ key: { load, requires: "workflows:view" } })`,
+and `installedModuleScreens` wraps what that loader resolves in
+`withUiPageGuard`, with the shell's one fallback trio, for every module. The
+screen never guards itself and the application names no page. The case that
+forced it: main wrapped the workflows list in
+`withPermissionGuard("workflows:view")`, and the move into
+`modules/workflow/browser` dropped it ("chrome/guard no longer travel"), so a
+viewer without the grant opened the list. specs/ui/ui-page-composition.feature.
+
 Drawers are URL-routed singletons with a navigation stack, opened through the
 host capability, registered through the declaration. One tRPC client for the
 whole browser.
@@ -1268,6 +1311,24 @@ the document — the failure that left 99 of 126 addresses drawing a spinner
 over a workspace graph that had already arrived. The hazard is the re-entry,
 not the shared key; a `queryFn` calling the transport under a `trpcQueryKey`
 is the normal shape. specs/ui/by-path-dispatch.feature.
+
+**A rail shared by pages of different modules is a design-system frame**
+(Alex, 2026-09-28). `@langwatch/design-system/section-navigation-frame` takes
+the links and the active one and holds no data; each owning page renders it
+with the same entries. The case: main's Authentication rail (Overview,
+Identity provider, Connectors) spans organization, sso and scim pages.
+
+**A switcher a page borrows is lent by the module that owns the choice**
+(Alex, 2026-09-28): project lends `projectSwitcher` through `withCapabilities`
+(§10.1), and a host mount answers `projectSwitcher()` from that declaration,
+never null. The case: settings/secrets lost main's project selector beside
+Add Secret because no module lent one.
+
+**A graph a peer borrows arrives already narrowed to the caller** (Alex,
+2026-09-28): the owner's service applies its own visibility rule before the
+graph leaves, and the borrower never re-filters it. The case: `organization.getAll`
+returns only the teams, and their projects, that the caller can open, so the
+project switcher lists them as they arrive.
 
 ### 10.1 Shared browser machinery (ruled 2026-09-18)
 
@@ -1412,8 +1473,10 @@ invented:
   The loader resolves a default-exported provider rendering
   `<SecretHostProvider value={host}>{children}</SecretHostProvider>`;
   `installedModuleHostMounts` collects every declared one in install order and
-  `createUiModuleHostStack` composes them into the root layout, below the
-  feature shell and below the router.
+  `createUiModuleHostStack` composes them inside the feature shell, below the
+  router, around both the page and the open drawer (`CurrentDrawer`): a drawer
+  reads the same hosts its screen does (moved out of the root layout in
+  cc00c8a30b, when drawers crashed without `ScenarioHostProvider`).
 
   Two constraints decided the position, and both rule out the alternative of
   wrapping the declaring module's own screen loaders:
@@ -1487,6 +1550,17 @@ invented:
   skin, and `langy-theme` travelling as theme data is the shape. The test is
   the consumer, not the purity: **many consumers → kit; the composition root
   → the slot.**
+
+  **Replicate targets are one capability organization lends** (Alex,
+  2026-09-28). The projects a reader could replicate a thing into, each graded
+  by the reader's own `authz.effectivePermissions` in that project (main's
+  `useProjectsForCopy`), are organization's `copyTargets` capability. The
+  shell loads it with `scope` and installs it as `UiCapabilities.copyTargets`
+  over the same organization graph; every host's `copyTargets()` projects
+  `useUiCopyTargets().targets(permission)` into its own port shape. No answer
+  yet is `undefined` on the capability, and `[]` only on an array port. The
+  case that forced it: six mounts (workflow, dataset, evaluator, monitor,
+  prompt, agent) answered `[]`, so every Replicate dialog offered nothing.
 
 - **One Analytics capability** wraps every instrumentation destination
   (posthog, gtag, browser tracing). Modules emit named events through it —
@@ -1574,6 +1648,15 @@ depend on `@langwatch/enterprise-licensing-contract` and
 `@langwatch/feature-flag-contract` and asks a core module for facts through its
 `*Api` only — a core module never grows a supply token for a tier context.
 
+**Seat limits are organization's to answer** (Alex, 2026-09-28).
+`licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`
+keep their wire path, but the contract and transport are organization's: it
+owns the membership rows a seat counts and already reads the plan through
+`EntitlementApi`. Licensing cannot depend on entitlement (it is entitlement's
+peer), so its members refused every call and `checkLimit` answered 500.
+A seat limit reached is organization's event; billing is told through its Api, by §9's
+subscriber on the owner's pipeline (Alex, 2026-09-28).
+
 ---
 
 ## 12. Errors
@@ -1606,6 +1689,10 @@ A raw client (Prisma, ClickHouse, ioredis, Stripe) is never cast into a test: it
 lives once in `@langwatch/test-harness`, throwing by name on anything unscripted, and every test
 uses that one (Alex, 2026-09-24). A module class with private members is built for real over its
 memory twins, or reached through its `*Api` with `createApiFixture` — never cast.
+A test proving how code handles a wrong-typed input may cast it, marked `// wrong-typed input: <why>`
+directly above; the marker, not the test's name, excuses that one cast (Alex, 2026-09-27).
+Production code has no marker: a cast only the compiler cannot prove is listed by file and target,
+with its reason, in the stand-in-cast rule's audited boundaries (Alex, 2026-09-28).
 
 The installation test is the same chain as production:
 
@@ -1613,8 +1700,6 @@ The installation test is the same chain as production:
 const runtime = await createApp({ role: "api" }) // no server: nothing to tear down
   .withModules([annotationProcessModule, traceProcessModule, presenceProcessModule])
   .withConfig({ annotation: {}, trace: {}, presence: {} })
-A test proving how code handles a wrong-typed input may cast it, marked `// wrong-typed input: <why>`
-directly above; the marker, not the test's name, excuses that one cast (Alex, 2026-09-27).
   .withStores(memoryStores()) // branded → memory tier everywhere
   .boot();
 
@@ -1738,6 +1823,8 @@ this document; all earlier composition ADRs are historical. When someone
 finds this document teaching something the tree refuses, the fix is a change
 to this file in the same commit as the code — an out-of-date architecture
 document is worse than none, because it reads authoritative.
+`typescript/no-misused-spread` is off in `packages/*/type-tests/**` only, where the spread is what
+the type test asserts (Alex, 2026-09-27).
 
 ## 18. Running work
 
@@ -1745,8 +1832,6 @@ Nx is the workspace task runner (ADR-150). It reads the workspace that
 already exists: projects come from `pnpm-workspace.yaml`, targets from each
 package's `scripts` block. No package carries a `project.json`, no script is
 an Nx executor, and Nx generates nothing — a module is still installed by
-`typescript/no-misused-spread` is off in `packages/*/type-tests/**` only, where the spread is what
-the type test asserts (Alex, 2026-09-27).
 editing `modules/catalogue.json` and running `pnpm generate:modules`. The
 whole configuration is `nx.json` at the root.
 

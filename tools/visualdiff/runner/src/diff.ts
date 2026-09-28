@@ -16,15 +16,14 @@ export interface PixelDiff {
  * Different heights are compared on the union canvas, padded white, not
  * cropped: cropping to the shorter one hides the section that was added.
  */
-export const diffScreenshots = ({
-  base,
-  candidate,
-  out,
-}: {
+/** DiffFiles names one screen's two screenshots and where its diff image goes. */
+export interface DiffFiles {
   base: string;
   candidate: string;
   out: string;
-}): PixelDiff | null => {
+}
+
+export const diffScreenshots = ({ base, candidate, out }: DiffFiles): PixelDiff | null => {
   if (!existsSync(base) || !existsSync(candidate)) return null;
   const first = PNG.sync.read(readFileSync(base));
   const second = PNG.sync.read(readFileSync(candidate));

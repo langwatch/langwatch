@@ -108,6 +108,21 @@ describe("LangyCanaryService", () => {
     expect(answer.headers.get("cache-control")).toBe("no-store");
   });
 
+  /** @scenario "A turn that asks the user a question is healthy" */
+  it("answers healthy as soon as the turn waits on the user, having asked to settle on it", async () => {
+    const settle = vi.fn(async (): Promise<LangyTurnSettlementWait> => ({
+      kind: "awaiting_user",
+      question: "Which project?",
+    }));
+    const { service } = canary({ settle });
+
+    const answer = await service.probe(KEY);
+
+    expect(answer.status).toBe(200);
+    expect(await answer.json()).toMatchObject({ status: "ok", turnId: "turn-1" });
+    expect(settle).toHaveBeenCalledWith(expect.objectContaining({ shouldSettleOnUserWait: true }));
+  });
+
   /** @scenario "A Langy turn that cannot start is turn_failed" */
   /** @scenario "A turn that cannot even start is turn_failed" */
   it("reports turn_failed when the start throws", async () => {

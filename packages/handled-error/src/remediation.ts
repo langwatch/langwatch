@@ -864,6 +864,13 @@ const registry = {
   instant_eval_already_finished: {
     tips: ["Read `meta.status`; the run reached that state before the cancel arrived"],
   },
+  instant_eval_classifier_not_configured: {
+    tips: [
+      "Instant Evals are on for this project, but the installation has no judge configured for its organization",
+      "Set JEV_API_KEY on the app and workers to judge with your own key, or connect the installation with a license that includes Instant Evals and keep hosted judging switched on for the organization",
+    ],
+    docsPath: "/self-hosting/connect",
+  },
   instant_eval_classifier_unavailable: {
     tips: [
       "The query itself was accepted and ran; judging the text it projected is what failed",

@@ -7,11 +7,7 @@
 import type { Instant } from "@langwatch/time";
 import type { MeUsage, UserAvatarMediaType, UserAvatarObjectRead } from "@langwatch/user-contract";
 
-/**
- * Where an uploaded avatar's bytes go. Owner: stored-object.
- * `StoredObjectApi.storeFromBytes` takes a delivery `audience` from the authz
- * vocabulary, which registers no avatar or user read permission.
- */
+/** Where an uploaded avatar's bytes go. Owner: stored-object (`storeFromBytes`). */
 export interface UserAvatarStorage {
   store(input: {
     projectId: string;
@@ -21,11 +17,7 @@ export interface UserAvatarStorage {
   }): Promise<{ id: string }>;
 }
 
-/**
- * The avatar bytes, by project and content-addressed id. Owner: stored-object.
- * `StoredObjectApi.readById` answers this, but hands an `AsyncIterable`
- * where this module's contract carries a `ReadableStream`.
- */
+/** The avatar bytes, by project and content-addressed id. Owner: stored-object (`readById`). */
 export interface UserAvatarObjects {
   findById(input: { projectId: string; id: string }): Promise<UserAvatarObjectRead>;
 }
@@ -56,41 +48,7 @@ export interface UserAnalytics {
   ): void;
 }
 
-/** What the identity provider can answer to a password change. */
-export type UserFederatedPasswordOutcome =
-  | { outcome: "changed" }
-  | { outcome: "wrong_password" }
-  /** The provider's own policy refused the new password; its wording. */
-  | { outcome: "weak_password"; message: string }
-  | { outcome: "insufficient_scope" }
-  | { outcome: "password_grant_not_enabled" }
-  | { outcome: "not_configured" }
-  | { outcome: "failed" };
-
-/**
- * The identity provider this deployment federates through. Owner: auth, which
- * resolves the provider but declares no operation over its tenant's
- * identities. Social identities are their upstream IdP's, never this one's.
- */
-export interface UserFederatedPasswords {
-  /** The provider's DATABASE identity, the only one whose password moves. */
-  findDatabaseAccount(input: {
-    userId: string;
-  }): Promise<Readonly<{ providerAccountId: string }> | null>;
-  changePassword(
-    input: Readonly<{
-      email: string;
-      providerUserId: string;
-      currentPassword: string;
-      newPassword: string;
-    }>,
-  ): Promise<UserFederatedPasswordOutcome>;
-}
-
-/**
- * The credentials a deactivation must end beside the browser sessions.
- * Owner: auth, which owns the cli-token subject but declares no revocation.
- */
+/** The credentials a deactivation must end beside the browser sessions. Owner: auth. */
 export interface UserCliCredentials {
   revokeForUser(input: { userId: string }): Promise<void>;
 }
@@ -137,9 +95,8 @@ export type UserBudgetDecision = Readonly<{
 }>;
 
 /**
- * The gateway governance stores behind /me. Owner: enterprise governance, as
- * `personalVirtualKeyList`;
- * `checkBudget` is a gateway service `GatewayApi` does not expose.
+ * The gateway reads behind /me: the default routing policy and personal keys
+ * from `EnterpriseGatewayApi`, the budget pre-check from `GatewayApi`.
  */
 export interface UserGatewayGovernance {
   /** The routing policy a personal workspace inherits by default, if any. */
@@ -179,8 +136,8 @@ export interface UserBudgetRequestMailer {
 
 /**
  * The organization's hidden governance project, where ingestion-source ledger
- * rows land. Owner: enterprise governance, which mints it and declares no
- * lookup. Absent where the organization never minted an ingestion source.
+ * rows land. Owner: project (`findInternal`). Absent where the organization
+ * never minted an ingestion source.
  */
 export interface UserGovernanceProjects {
   findGovernanceProject(input: {
@@ -188,11 +145,7 @@ export interface UserGovernanceProjects {
   }): Promise<Readonly<{ id: string }> | null>;
 }
 
-/**
- * One person's own AI usage, rolled up over a window. Owner: enterprise
- * governance, which declares `personalUsageSummary`, `personalUsageDailyBuckets`
- * and `personalUsageBreakdownByModel` — three calls where this reads one.
- */
+/** One person's own AI usage, rolled up over a window. Owner: governance (`personalUsage`). */
 export interface UserPersonalUsageReader {
   personalUsage(input: {
     personalProjectId: string;
@@ -208,7 +161,6 @@ export interface UserInfrastructure {
   passwords: UserPasswordHasher;
   rateLimit: UserRateLimiter;
   analytics: UserAnalytics;
-  federatedPasswords: UserFederatedPasswords;
   cliCredentials: UserCliCredentials;
   organizations: UserOrganizationDirectory;
   governanceProjects: UserGovernanceProjects;

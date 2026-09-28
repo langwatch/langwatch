@@ -245,12 +245,12 @@ export function SignUpCredentialForm({
         {submitError ? (
           <Alert.Root
             status="error"
+            variant="outline"
             borderStartWidth="4px"
             borderStartColor={"frontDoor.danger"}
-            color={"frontDoor.danger"}
           >
             <Alert.Content>
-              <Alert.Description>{submitError}</Alert.Description>
+              <Alert.Description color={"frontDoor.danger"}>{submitError}</Alert.Description>
             </Alert.Content>
           </Alert.Root>
         ) : null}

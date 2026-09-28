@@ -1,10 +1,13 @@
 import { EventEmitter } from "node:events";
 
+import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
   EventSourcing,
   EventStoreProducerOnly,
@@ -22,6 +25,7 @@ import type {
 } from "@langwatch/langy-process";
 import { LangyBlockMetricsOtelService, LangyPostgresService } from "@langwatch/langy-process";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import {
   createRecordingMeterProvider,
   type RecordingMeterProvider,
@@ -29,10 +33,13 @@ import {
 import type { OnboardingApi } from "@langwatch/onboarding-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { UserApi } from "@langwatch/user-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyApp } from "../app/langy.app.ts";
@@ -272,6 +279,13 @@ async function createApp(): Promise<LangyApp> {
       gateway: createApiFixture<GatewayApi>(),
       secrets: createApiFixture<SecretApi>(),
       experiments: createApiFixture<ExperimentApi>(),
+      agents: createApiFixture<AgentApi>(),
+      prompts: createApiFixture<PromptApi>(),
+      datasets: createApiFixture<DatasetApi>(),
+      workflows: createApiFixture<WorkflowApi>(),
+      monitors: createApiFixture<MonitorApi>(),
+      evaluators: createApiFixture<EvaluatorApi>(),
+      scenarios: createApiFixture<ScenarioApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       authz: createApiFixture<AuthzApi>(),

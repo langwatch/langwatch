@@ -11,14 +11,17 @@ the explicit result type is a native rule, and the ast-grep rows are gone.
 [banned verb prefixes](../../../specs/tooling/lint-banned-verb-prefix.feature),
 [overload by literal](../../../specs/tooling/lint-overload-by-literal.feature),
 [conditional type depth](../../../specs/tooling/lint-conditional-type-depth.feature),
-[Zod object composition](../../../specs/tooling/lint-zod-object-composition.feature)
+[Zod object composition](../../../specs/tooling/lint-zod-object-composition.feature),
+[Zod object intersection](../../../specs/tooling/lint-zod-object-intersection.feature),
+[Zod schema per call](../../../specs/tooling/lint-zod-schema-per-call.feature),
+[Zod validate for boolean](../../../specs/tooling/lint-zod-validate-for-boolean.feature)
 
 **Related:** [ADR-045: handled errors](./045-domain-errors-handled-boundary.md),
 [ADR-135: the toolchain](./135-lint-and-format-toolchain.md)
 
 ## Context
 
-ADR-045 settled what a failure *is*: a `HandledError` when we know the cause
+ADR-045 settled what a failure _is_: a `HandledError` when we know the cause
 and the caller can act on it, a plain `Error` otherwise. It did not settle how
 a call says which of the two it does, and the answer had drifted into the
 names. A codebase accumulates `tryFetchUser`, `requireProject`,
@@ -46,18 +49,21 @@ A rule lives in the lowest layer that can express it (ADR-135). Everything in
 this family needs the AST, so it is the plugin, except the explicit result
 type, which `typescript/explicit-module-boundary-types` states natively (ADR-135).
 
-| Rule | Layer | Meaning |
-| --- | --- | --- |
-| `langwatch/fallible-result-naming` | plugin | Only `find*` may answer with absence, and a repository answers `find*` where a service answers `get*` (ADR-146). |
-| `langwatch/banned-verb-prefix` | plugin | No `try*` or `require*` name: a value-returning `require` becomes `get`, one that answers nothing (void or asserts) becomes `assert`, a `try` is named for what it answers, and a `try` whose catch answers null loses the catch too. Was the prefix half of `fallible-result-naming` and `no-try-prefix`. |
-| `langwatch/condition-shape` | plugin | A test with more calls, logical operators or chained hops than the config allows (2, 3 and 3 workspace-wide), or a ternary inside a test: split into guard clauses or read the parts into named consts. |
-| `langwatch/overload-by-literal` | plugin | Two overloads differing only by a literal are two functions. |
-| `langwatch/conditional-type-depth` | plugin | A conditional type nested past the allowed depth states the shape instead of computing it. |
-| `langwatch/zod-object-composition` | plugin | Compose Zod objects by spreading `.shape`, and use `.safeExtend()` when refinements must survive. |
-| `langwatch/zod-internals` | plugin | No `._def` reads and no `instanceof ZodError`: both differ between the two installed Zod majors. |
-| `langwatch/refusal-is-a-handled-error` | plugin | A refusal is a thrown `HandledError`, never a hand-rendered error answer. |
-| `langwatch/stand-in-cast` | plugin | No cast through `unknown` or `any`. |
-| `langwatch/no-runtime-reflection` | plugin | No `Proxy`, `Reflect`, `Object.defineProperty` on a non-prototype, or `Object.setPrototypeOf` standing in for a real type. |
+| Rule                                   | Layer  | Meaning                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `langwatch/fallible-result-naming`     | plugin | Only `find*` may answer with absence, and a repository answers `find*` where a service answers `get*` (ADR-146).                                                                                                                                                                                           |
+| `langwatch/banned-verb-prefix`         | plugin | No `try*` or `require*` name: a value-returning `require` becomes `get`, one that answers nothing (void or asserts) becomes `assert`, a `try` is named for what it answers, and a `try` whose catch answers null loses the catch too. Was the prefix half of `fallible-result-naming` and `no-try-prefix`. |
+| `langwatch/condition-shape`            | plugin | A test with more calls, logical operators or chained hops than the config allows (2, 3 and 3 workspace-wide), or a ternary inside a test: split into guard clauses or read the parts into named consts.                                                                                                    |
+| `langwatch/overload-by-literal`        | plugin | Two overloads differing only by a literal are two functions.                                                                                                                                                                                                                                               |
+| `langwatch/conditional-type-depth`     | plugin | A conditional type nested past the allowed depth states the shape instead of computing it.                                                                                                                                                                                                                 |
+| `langwatch/zod-object-composition`     | plugin | Compose Zod objects by spreading `.shape`, and use `.safeExtend()` when refinements must survive.                                                                                                                                                                                                          |
+| `langwatch/zod-object-intersection`    | plugin | Two Zod objects compose into one object by spreading both shapes, never `.and()` or `z.intersection()`, which parse twice.                                                                                                                                                                                 |
+| `langwatch/zod-schema-per-call`        | plugin | A Zod schema is built once at module scope, never inside a loop, a per-row callback or a class method that parses with it.                                                                                                                                                                                 |
+| `langwatch/zod-validate-for-boolean`   | plugin | A Zod check read only for its flag is `.validate()`, never `.safeParse(…).success`, which builds a result it throws away.                                                                                                                                                                                  |
+| `langwatch/zod-internals`              | plugin | No `._def` reads and no `instanceof ZodError`: both differ between the two installed Zod majors.                                                                                                                                                                                                           |
+| `langwatch/refusal-is-a-handled-error` | plugin | A refusal is a thrown `HandledError`, never a hand-rendered error answer.                                                                                                                                                                                                                                  |
+| `langwatch/stand-in-cast`              | plugin | No cast through `unknown` or `any`.                                                                                                                                                                                                                                                                        |
+| `langwatch/no-runtime-reflection`      | plugin | No `Proxy`, `Reflect`, `Object.defineProperty` on a non-prototype, or `Object.setPrototypeOf` standing in for a real type.                                                                                                                                                                                 |
 
 The naming rules report one message id per fix, because the fix differs:
 nullable without `find`, service vocabulary on a repository, a `require`

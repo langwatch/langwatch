@@ -22,7 +22,7 @@ import (
 )
 
 // Boot orchestration constants, verified against dev/compose.dev.yml and
-// packages/prisma-client/prisma/seed.ts. The dev compose file publishes no
+// apps/tasks/src/storage-seed/storage-seed.ts. The dev compose file publishes no
 // host ports for postgres/clickhouse, so boot generates a ports/volumes
 // override file and brings the stack up under its own compose project.
 const (
@@ -69,7 +69,7 @@ const (
 	scimProbeTokenID = "apidiff-scim-token"
 )
 
-// Seeded credential defaults from packages/prisma-client/prisma/seed.ts.
+// Seeded credential defaults from apps/tasks/src/storage-seed/storage-seed.ts.
 const (
 	DefaultProjectKey = "sk-lw-local-development-key"
 	DefaultOrgKey     = "sk-lw-LocalDevPrivate1_LocalDevPrivateAccessTokenSecretFixedValue000000"

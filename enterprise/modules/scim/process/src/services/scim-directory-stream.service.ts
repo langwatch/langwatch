@@ -4,7 +4,7 @@
  * provisions once it is. Its payload is untyped at the boundary, and the replay
  * window lives here because one process remembers one set of deliveries.
  */
-import type { ScimDeliveryAdmission, ScimService } from "@langwatch/enterprise-scim-contract";
+import type { ScimDeliveryReceipt, ScimService } from "@langwatch/enterprise-scim-contract";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -13,6 +13,19 @@ import {
   verifyScimWebhookSignature,
 } from "../rules/scim-webhook-signature.rules.ts";
 import type { ScimConnectionRetirementService } from "./scim-connection-retirement.service.ts";
+
+/** Whether one delivery provisions anything, and whose directory, before anything is. */
+type ScimDeliveryAdmission =
+  | Readonly<{ status: "not-configured" | "unauthorized" | "forbidden" | "invalid-json" }>
+  | Readonly<{ status: "admitted"; organizationId: string; events: unknown[] }>;
+
+/** The refusal each unadmitted delivery earns, in the sentence Auth0's log has always read. */
+const REFUSALS = {
+  "not-configured": { status: 404, error: "Webhook not configured" },
+  unauthorized: { status: 401, error: "Unauthorized" },
+  forbidden: { status: 403, error: "Forbidden" },
+  "invalid-json": { status: 400, error: "Invalid JSON" },
+} as const satisfies Record<string, ScimDeliveryReceipt>;
 
 /** Deliveries already seen inside the freshness window, by their nonce. */
 class ScimWebhookReplayWindow {
@@ -89,6 +102,19 @@ export class ScimDirectoryStreamService {
     webhookSecret: () => string | undefined;
   }): ScimDirectoryStreamService {
     return new ScimDirectoryStreamService(scim, retirement, webhookSecret);
+  }
+
+  /** Admits one delivery and, once admitted, provisions its events into the credential's directory. */
+  async receive(delivery: {
+    body: string;
+    signature: string | null;
+    authorization: string | null;
+  }): Promise<ScimDeliveryReceipt> {
+    const admission = await this.admit(delivery);
+    if (admission.status !== "admitted") return REFUSALS[admission.status];
+
+    await this.relay({ organizationId: admission.organizationId, events: admission.events });
+    return { status: 200 };
   }
 
   /**

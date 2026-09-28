@@ -174,7 +174,7 @@ func (engine *probeEngine) entitledProbe(operation Operation) []Finding {
 
 // localDevLicenseSeedPath is where the checkout's own seed keeps the
 // pre-signed ENTERPRISE license it activates for entitledOrgID
-// (packages/prisma-client/prisma/seed.ts -> resolveSeedLicense). Main's own
+// (the apps/tasks storage-seed task). Main's own
 // mirror (platform/app/scripts/localDevLicense.ts) carries the identical
 // string — verified byte-for-byte when this pass was written — so reading it
 // once from the branch checkout is enough to activate BOTH sides' databases.

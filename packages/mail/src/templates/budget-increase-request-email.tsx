@@ -17,18 +17,20 @@ import { defineTemplate, renderMailTemplate } from "./registry.ts";
 export const budgetIncreaseRequestEmailProps = z.object({
   requesterEmail: z.email(),
   requesterName: z.string().min(1).optional(),
-  organizationName: z.string().min(1),
+  /** Blank where the organization carries no name; main rendered it blank rather than refusing. */
+  organizationName: z.string(),
   /**
    * Where the recipient goes to act on it. The deployment's public base URL
    * is the deployment's, so it arrives with the message rather than being
    * read out of this package's environment.
    */
   budgetsUrl: z.url(),
-  scope: z.string().min(1),
-  scopeId: z.string().min(1),
-  limitUsd: z.string().min(1),
-  spentUsd: z.string().min(1),
-  period: z.string().min(1).optional(),
+  /** The context fields may arrive blank, as main sent them: rendered blank, never refused. */
+  scope: z.string(),
+  scopeId: z.string(),
+  limitUsd: z.string(),
+  spentUsd: z.string(),
+  period: z.string().optional(),
   message: z.string().optional().describe("What the requester wrote, in their own words"),
 });
 
@@ -45,12 +47,13 @@ export const budgetIncreaseRequestEmailSubject = ({
 /**
  * Where the spend stands against the limit, as a share — the one relation
  * a reader would otherwise have to work out from the table's two numbers.
- * Nothing is said with no limit set: a share of nothing is not a fact.
+ * Nothing is said with no limit set or an amount blank: not a fact.
  */
 const trySpendShare = ({
   limitUsd,
   spentUsd,
 }: Pick<BudgetIncreaseRequestEmailProps, "limitUsd" | "spentUsd">): string | undefined => {
+  if (limitUsd.trim() === "" || spentUsd.trim() === "") return undefined;
   const limit = Number(limitUsd);
   const spent = Number(spentUsd);
   if (!Number.isFinite(limit) || !Number.isFinite(spent) || limit <= 0) return undefined;

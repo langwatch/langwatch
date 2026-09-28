@@ -1,5 +1,5 @@
 /**
- * What Settings, Checkup and the startup notice ask of the shell. The screen
+ * What Settings and Checkup ask of the shell. The screen
  * reads no session or router itself; the module mounts this port from
  * `@langwatch/browser-host` capabilities. ARCHITECTURE.md §3.4.
  */

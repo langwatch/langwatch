@@ -13,6 +13,7 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 - **inline-fix-links.md** - Links to settings from a working context open in a new tab
 - **ops-dashboard.md** - Ops surfaces: space is proportional to trouble; identifiers, dual-axis charts, cross-tenant controls
 - **list-table.md** - Shared look for resource index tables
+- **alerts-toasts-and-field-errors.md** - When to use an alert, a toast or a field error; the alert variants
 - **drawers.md** - URL-routed drawers
 - **async-processing-ui.md** - Poll/banner/read-gate pattern for a processing→ready/failed resource
 - **soft-delete-vs-archive.md** - When to archive vs hard-delete
@@ -41,8 +42,8 @@ layout:
 
 | Was                                                          | Read as                                                                                       |
 | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `platform/app/src/server/<feature>/**`                       | `modules/<feature>/server/src/**`                                                   |
-| `platform/app/src/{components,hooks,features}/**`            | `modules/<feature>/web/src/**`, or `apps/ui/src/**` for the shell                   |
+| `platform/app/src/server/<feature>/**`                       | `modules/<feature>/server/src/**`                                                             |
+| `platform/app/src/{components,hooks,features}/**`            | `modules/<feature>/web/src/**`, or `apps/ui/src/**` for the shell                             |
 | `platform/app/src/server/app-layer/**`, `src/runtime/app/**` | `apps/api/src/app/**` (the API's composition root)                                            |
 | `platform/app/src/workers.ts`, `src/runtime/worker/**`       | `apps/worker/src/app/**`                                                                      |
 | `platform/app/src/pages/**`                                  | `apps/ui/src/**` routes                                                                       |

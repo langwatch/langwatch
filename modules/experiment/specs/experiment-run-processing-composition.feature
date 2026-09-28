@@ -23,7 +23,7 @@ Feature: Composing durable experiment-run processing
   Scenario: Durable processing composes from one tenant-keyed client and one Redis
     Given a process that can route a tenant to its ClickHouse instance, and its own Redis
     When it composes durable experiment-run processing
-    Then the pipeline registers the same five commands the App registers
+    Then the pipeline registers the same eight commands the App registers
     And it registers the run-state fold and the run-item append the App registers
 
   @unit

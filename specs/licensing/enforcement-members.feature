@@ -318,6 +318,48 @@ Feature: Member Limit Enforcement with License
     And the error message contains "member limit reached"
 
   # ============================================================================
+  # Limit reads (licenseEnforcement.*, answered by organization)
+  # ============================================================================
+
+  @integration
+  Scenario: The members limit read answers the seats taken and the plan's allowance
+    Given the organization has 2 Full Members and 1 Lite Member
+    And the organization's plan allows 5 members
+    When the members limit is read
+    Then the answer is allowed with current 2 and max 5 for "members"
+
+  @unit
+  Scenario: Any member may read the members limit
+    Given I hold organization:view in the organization
+    When I read the members limit
+    Then I am answered allowed, current, max and the limit type
+
+  @unit
+  Scenario: Every enforced limit is answered at once, keyed by limit type
+    When every limit is read
+    Then the answer is keyed "members" and "membersLite"
+
+  @unit
+  Scenario: A blocked pre-check raises a limit notice once the server agrees
+    Given the organization has used every member seat
+    When a client reports its pre-check blocked somebody
+    Then a limit notice is raised with the current and max counts
+
+  @unit
+  Scenario: A fabricated blocked report raises nothing
+    Given the organization has a free member seat
+    When a client reports its pre-check blocked somebody
+    Then no limit notice is raised
+
+  @unit
+  Scenario: A limit notice that fails is reported, never thrown
+    Given the organization has used every member seat
+    And the limit notice cannot be sent
+    When a client reports its pre-check blocked somebody
+    Then the report succeeds
+    And the failure is reported to the error channel
+
+  # ============================================================================
   # Role Change Type Detection (Unit)
   # ============================================================================
 

@@ -1,3 +1,5 @@
+import type { Locator, Page } from "playwright";
+
 import type { Action, ActionContext } from "./context";
 import { argument, asRegExp, fillPath, scope } from "./context";
 
@@ -12,10 +14,7 @@ export const goTo = async ({
   path: string;
 }): Promise<void> => {
   const { side, slug } = context;
-  await side.page.goto(side.baseUrl + fillPath({ path, slug }), {
-    waitUntil: "commit",
-    timeout: 20_000,
-  });
+  await side.goto(fillPath({ path, slug }));
   await side.page.waitForLoadState("domcontentloaded", { timeout: 15_000 }).catch(() => undefined);
 };
 
@@ -117,6 +116,32 @@ export const wait: Action = async (context) => {
   await context.side.page.waitForTimeout(
     Number(argument({ context, name: "millis", fallback: "500" })),
   );
+};
+
+/** PASSKEY_OFFER is the dialog a password sign-in is offered a passkey in. */
+export const passkeyOffer = (page: Page): Locator =>
+  page.getByRole("dialog").filter({ hasText: "Sign in faster next time" });
+
+/**
+ * declinePasskeyOffer answers "Not now" when the offer shows within probeMillis.
+ * main shows it again on every screen, so every capture asks before its screenshot.
+ */
+export const declinePasskeyOffer = async ({
+  page,
+  probeMillis,
+}: {
+  page: Page;
+  probeMillis: number;
+}): Promise<boolean> => {
+  const dialog = passkeyOffer(page);
+  const shown = await dialog
+    .waitFor({ state: "visible", timeout: probeMillis })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return false;
+  await dialog.getByRole("button", { name: "Not now", exact: true }).click({ timeout: 3000 });
+  await dialog.waitFor({ state: "hidden", timeout: 5000 }).catch(() => undefined);
+  return true;
 };
 
 /** dismissTour clears the product tour, which otherwise covers every screen behind it. */

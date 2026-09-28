@@ -7,10 +7,10 @@ free. Do **not** turn on full compilation at these versions.
 
 The two headline numbers:
 
-| | measured |
-| --- | --- |
-| Build-time cost of full compilation | **+173 s** on a **10.5 s** baseline build (≈ 17x) |
-| Bail-out census | **606 bail-outs** against 4,548 functions compiled (11.8 %) |
+|                                     | measured                                                    |
+| ----------------------------------- | ----------------------------------------------------------- |
+| Build-time cost of full compilation | **+173 s** on a **10.5 s** baseline build (≈ 17x)           |
+| Bail-out census                     | **606 bail-outs** against 4,548 functions compiled (11.8 %) |
 
 Everything below comes from a command run on this checkout on 2026-09-17, in a
 scratch tree at `/Users/lw/.claude/jobs/4790ebf4/tmp/rc7`. No workspace file was
@@ -20,15 +20,15 @@ edited and nothing was installed into the workspace.
 
 Read from `node_modules`, not from the internet:
 
-| package | resolved version |
-| --- | --- |
-| `react` / `react-dom` | 19.2.8 |
-| `vite` | 8.1.2 — real `vite`, **not** a `rolldown-vite` alias; it depends on `rolldown@~1.1.3` directly |
-| `@vitejs/plugin-react` | 6.0.3 |
-| `@vitejs/plugin-react-oxc` | **absent, and not needed** |
-| `babel-plugin-react-compiler` | absent (1.0.0 is current) |
+| package                       | resolved version                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| `react` / `react-dom`         | 19.2.8                                                                                         |
+| `vite`                        | 8.1.2 — real `vite`, **not** a `rolldown-vite` alias; it depends on `rolldown@~1.1.3` directly |
+| `@vitejs/plugin-react`        | 6.0.3                                                                                          |
+| `@vitejs/plugin-react-oxc`    | **absent, and not needed**                                                                     |
+| `babel-plugin-react-compiler` | absent (1.0.0 is current)                                                                      |
 
-`@vitejs/plugin-react@6` *is* the oxc plugin. It has no `@babel/core`
+`@vitejs/plugin-react@6` _is_ the oxc plugin. It has no `@babel/core`
 dependency; JSX and Fast Refresh go through Vite's built-in oxc transform. The
 separate `@vitejs/plugin-react-oxc` package is not part of this toolchain.
 
@@ -48,9 +48,9 @@ and the README says `npm install -D @babel/core`, which today resolves 8.x.
 **That combination is broken.** Measured, same census, same files:
 
 | `@babel/core` | bail-outs |
-| --- | --- |
-| 7.29.7 | 569 |
-| 8.0.5 | 1,366 |
+| ------------- | --------- |
+| 7.29.7        | 569       |
+| 8.0.5         | 1,366     |
 
 The extra 797 are all one diagnostic —
 `(BuildHIR::lowerAssignment) Expected object property value to be an LVal, got: AssignmentPattern`
@@ -71,12 +71,12 @@ A/B/A/B to cancel drift. **Machine load average was 86–125 on 10 cores
 throughout** (three other agent sessions were compiling); absolute numbers are
 inflated, the ratio is the trustworthy part.
 
-| variant | runs (warm) |
-| --- | --- |
-| baseline, no compiler | 10.0 s, 10.5 s, 13.7 s, 18.2 s (cold first run: 40.7 s) |
-| compiler, `node_modules` + `.generated` excluded | 183.0 s, 185.1 s, 196.4 s |
-| compiler, README default filter (no `id` filter) | 297 s, 303 s |
-| compiler, `compilationMode: "annotation"` | 9.3 s, 13.1 s |
+| variant                                          | runs (warm)                                             |
+| ------------------------------------------------ | ------------------------------------------------------- |
+| baseline, no compiler                            | 10.0 s, 10.5 s, 13.7 s, 18.2 s (cold first run: 40.7 s) |
+| compiler, `node_modules` + `.generated` excluded | 183.0 s, 185.1 s, 196.4 s                               |
+| compiler, README default filter (no `id` filter) | 297 s, 303 s                                            |
+| compiler, `compilationMode: "annotation"`        | 9.3 s, 13.1 s                                           |
 
 Three things follow.
 
@@ -110,11 +110,11 @@ per-edit HMR tax.
 
 Clean rebuild of both, `.js` output only:
 
-| | raw | gzip -9 |
-| --- | --- | --- |
+|          | raw          | gzip -9     |
+| -------- | ------------ | ----------- |
 | baseline | 41,111,812 B | 8,878,128 B |
 | compiled | 43,478,674 B | 9,801,902 B |
-| delta | **+5.8 %** | **+10.4 %** |
+| delta    | **+5.8 %**   | **+10.4 %** |
 
 Memoization is not free at runtime either — it is cache slots and comparisons
 that have to be shipped.
@@ -132,17 +132,17 @@ preset's code filter. With `@babel/core@7.29.7`:
 
 Grouped by reason (build-run figures):
 
-| count | reason |
-| --- | --- |
-| 230 | Cannot access refs during render |
-| 113 | React Compiler skipped this component because React ESLint rules were disabled |
-| 67 | Existing memoization could not be preserved |
-| 40 | Use of incompatible library |
-| 36 | `TryStatement` with a `finally` clause |
-| 24 | value blocks inside `try`/`catch` |
-| 14 | `TryStatement` without a `catch` |
-| 16 | Rules-of-Hooks violations (3 kinds) |
-| 66 | long tail — 20 further reasons, ≤ 8 each |
+| count | reason                                                                         |
+| ----- | ------------------------------------------------------------------------------ |
+| 230   | Cannot access refs during render                                               |
+| 113   | React Compiler skipped this component because React ESLint rules were disabled |
+| 67    | Existing memoization could not be preserved                                    |
+| 40    | Use of incompatible library                                                    |
+| 36    | `TryStatement` with a `finally` clause                                         |
+| 24    | value blocks inside `try`/`catch`                                              |
+| 14    | `TryStatement` without a `catch`                                               |
+| 16    | Rules-of-Hooks violations (3 kinds)                                            |
+| 66    | long tail — 20 further reasons, ≤ 8 each                                       |
 
 ### The repo patterns the brief asked about
 
@@ -235,14 +235,14 @@ parsed at all. Annotation gating is strictly cheaper than path gating here.
 
 The riskiest compiled surfaces, and the suites that already cover them:
 
-| surface | suite |
-| --- | --- |
-| trace explorer facets and retained header (densest lint findings) | `pnpm --filter @langwatch/trace-browser test` |
-| prompt editor drawer (14 findings, drawer navigation stack) | `pnpm --filter @langwatch/prompt-browser test` |
-| react-hook-form screens (38 incompatible-library files) | `pnpm --filter @langwatch/annotation-browser test`, `pnpm --filter @langwatch/authz-browser test`, `pnpm --filter @langwatch/dataset-browser test` |
-| drawer singletons / `*-host.tsx` (66 preserved-memo sites) | `pnpm --filter @langwatch/ui test` |
-| virtualized tables (identity-sensitive rows) | `pnpm --filter @langwatch/dataset-browser test` |
-| end to end | `pnpm --filter @langwatch/ui test:e2e` |
+| surface                                                           | suite                                                                                                                                              |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| trace explorer facets and retained header (densest lint findings) | `pnpm --filter @langwatch/trace-browser test`                                                                                                      |
+| prompt editor drawer (14 findings, drawer navigation stack)       | `pnpm --filter @langwatch/prompt-browser test`                                                                                                     |
+| react-hook-form screens (38 incompatible-library files)           | `pnpm --filter @langwatch/annotation-browser test`, `pnpm --filter @langwatch/authz-browser test`, `pnpm --filter @langwatch/dataset-browser test` |
+| drawer singletons / `*-host.tsx` (66 preserved-memo sites)        | `pnpm --filter @langwatch/ui test`                                                                                                                 |
+| virtualized tables (identity-sensitive rows)                      | `pnpm --filter @langwatch/dataset-browser test`                                                                                                    |
+| end to end                                                        | `pnpm --filter @langwatch/ui test:e2e`                                                                                                             |
 
 Add one build-time assertion to whatever guards build duration, so a later
 flip from `annotation` to `all` cannot land silently.

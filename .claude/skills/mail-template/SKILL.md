@@ -34,7 +34,7 @@ details. Do not "fix" this.
 
 - **Adjacent JSX text splits.** `Message from {name}` renders `Message from <!-- -->Jane`,
   so a `toContain("Message from Jane")` fails. Interpolate the whole string:
-  `` {`Message from ${name}`} ``.
+  ``{`Message from ${name}`}``.
 - **No flexbox, no percentage-width `div`.** Outlook renders neither. Meters and columns
   are nested table cells — see `UsageLimitEmail`'s bar.
 - **`EmailContent` has no `text` field.** `renderMailTemplate` returns one and the tests

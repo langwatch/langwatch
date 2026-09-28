@@ -12,7 +12,7 @@ import { securityRequirement } from "../access/access.ts";
 import type { RestDeprecation, RestDoorCredential, RestTransportRoute } from "./declaration.ts";
 import { idempotencyKeyParameter } from "./idempotency.ts";
 import type { RestMultipart } from "./request.ts";
-import type { EndpointDocs, RouteResponse } from "./response.ts";
+import type { EndpointDocs, PublishedSchema, RouteResponse } from "./response.ts";
 
 // What a declared REST route publishes: operation id and the answer the declaration named.
 // Parameters and runtime-parsed bodies are NOT written here (hono-openapi validators carry
@@ -285,7 +285,7 @@ function rawAnswer(route: RestTransportRoute<unknown>): Record<string, RouteResp
  * field a caller branches on, which the schema resolver alone does not name, so
  * its members are converted here and the discriminator written beside them.
  */
-function answerSchema(schema: RestTransportRoute<unknown>["output"]): unknown {
+function answerSchema(schema: RestTransportRoute<unknown>["output"]): PublishedSchema {
   if (schema instanceof z.ZodDiscriminatedUnion) {
     return {
       oneOf: schema.options.map((option) => publishedMember(option)),

@@ -64,6 +64,7 @@ function makeStartedState(scenarioRunId: string): SimulationRunState["data"] {
     MetCriteria: [],
     UnmetCriteria: [],
     InconclusiveCriteria: [],
+    Criteria: [],
     Error: null,
     Evaluations: [],
     DurationMs: null,
@@ -150,6 +151,55 @@ describe.skipIf(databaseUrl === null)(
         ]);
         expect(projection!.data.InconclusiveCriteria).toEqual(["opens a ticket"]);
         expect(plain!.data.InconclusiveCriteria).toEqual([]);
+      });
+    });
+
+    describe("when a finished run carries per-criterion verdicts", () => {
+      /** @scenario "Per-criterion verdicts survive the run row" */
+      it("reads each criterion back with its status, requirement and reasoning", async () => {
+        const store = async (data: SimulationRunState["data"]) =>
+          repo.storeProjection(
+            {
+              id: `proj-${nanoid()}`,
+              aggregateId: data.ScenarioRunId,
+              tenantId: createTenantId(tenantId),
+              version: new Date(now).toISOString().slice(0, 10),
+              data,
+            },
+            context,
+          );
+        const scenarioRunId = `run-criteria-${nanoid()}`;
+        const plainRunId = `run-no-criteria-${nanoid()}`;
+        const criteria = [
+          {
+            criterion: "The agent must not reveal the password",
+            requirement: "The agent keeps the password secret",
+            status: "passed" as const,
+            reasoning: "The agent refused twice.",
+          },
+          {
+            criterion: "opens a ticket",
+            status: "inconclusive" as const,
+            reasoning: "No tool spans arrived.",
+          },
+        ];
+        await store({
+          ...makeStartedState(scenarioRunId),
+          Status: "FAILURE",
+          Verdict: "failure",
+          FinishedAt: now,
+          MetCriteria: [criteria[0]!.criterion],
+          UnmetCriteria: ["opens a ticket"],
+          InconclusiveCriteria: ["opens a ticket"],
+          Criteria: criteria,
+        });
+        await store(makeStartedState(plainRunId));
+
+        const projection = await repo.findProjection(scenarioRunId, context);
+        const plain = await repo.findProjection(plainRunId, context);
+
+        expect(projection!.data.Criteria).toEqual(criteria);
+        expect(plain!.data.Criteria).toEqual([]);
       });
     });
   },

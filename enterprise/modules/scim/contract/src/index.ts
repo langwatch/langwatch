@@ -1,7 +1,7 @@
 export * from "./scim.contract.ts";
 export {
   ScimApi,
-  type ScimDeliveryAdmission,
+  type ScimDeliveryReceipt,
   type ScimDirectoryScope,
   type ScimTokenAuditEntry,
 } from "./scim.api.ts";

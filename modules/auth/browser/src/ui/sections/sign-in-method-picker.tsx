@@ -67,7 +67,12 @@ export function SignInMethodPicker({
   return (
     <VStack width="full" align="stretch" gap={4} data-testid="method-picker">
       {guidance ? (
-        <Alert.Root status="info" borderStartWidth="4px" borderStartColor="colorPalette.solid">
+        <Alert.Root
+          status="info"
+          variant="outline"
+          borderStartWidth="4px"
+          borderStartColor="colorPalette.solid"
+        >
           <Alert.Content>
             <Alert.Title>{guidance.title}</Alert.Title>
             <Alert.Description>{guidance.describe}</Alert.Description>

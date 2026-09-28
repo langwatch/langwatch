@@ -9,8 +9,8 @@ vi.mock("../langwatch-api.js", async (importOriginal) => {
 });
 
 import { LangWatchApiError, makeRequest } from "../langwatch-api.js";
-import { handleExperimentStatus } from "../tools/run-experiment.js";
 import { deriveRunStatus, isTerminalStatus } from "../tools/experiment-run-status.js";
+import { handleExperimentStatus } from "../tools/run-experiment.js";
 
 const mockMakeRequest = vi.mocked(makeRequest);
 

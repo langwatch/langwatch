@@ -116,6 +116,7 @@ export class PrismaIdentityProjectionRepository implements StateProjectionStore<
 
     await this.releaseAddressLocks({ userId, state });
     await this.projectAccounts({ userId, state });
+    await this.projectAddressConfirmed({ userId, state });
 
     // Cursor last: it is the commit marker. A crash before this line leaves
     // rows a re-applied event overwrites idempotently; a crash after it is
@@ -238,6 +239,38 @@ export class PrismaIdentityProjectionRepository implements StateProjectionStore<
     for (const fact of linked) {
       await this.upsertLiveAccount(fact);
     }
+  }
+
+  /**
+   * `User.emailVerified` as the identifiers imply it: better-auth links a sign-on arrival only
+   * to a confirmed row, so a proven own address marks it. Only an `email` identifier counts,
+   * matched case-insensitively for rows written before normalisation, and it only moves to true.
+   */
+  private async projectAddressConfirmed({
+    userId,
+    state,
+  }: {
+    userId: string;
+    state: IdentityFoldState;
+  }): Promise<void> {
+    const proven = Object.values(state.identifiers).flatMap((fact) =>
+      fact.provider === "email" &&
+      (fact.state === "VERIFIED" || fact.state === "PRIMARY") &&
+      fact.value !== null
+        ? [fact.value]
+        : [],
+    );
+    if (proven.length === 0) return;
+    await this.prisma.user.updateMany({
+      where: {
+        id: userId,
+        AND: [
+          { OR: proven.map((value) => ({ email: { equals: value, mode: "insensitive" } })) },
+          { OR: [{ emailVerified: false }, { signupConfirmationPending: true }] },
+        ],
+      },
+      data: { emailVerified: true, signupConfirmationPending: false },
+    });
   }
 
   /**

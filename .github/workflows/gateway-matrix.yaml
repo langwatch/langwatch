@@ -18,7 +18,7 @@ name: gateway-matrix
 #   - services/aigateway/**          (gateway data plane)
 #   - pkg/**                         (shared HTTP/health helpers)
 #   - modules/gateway/  (control plane)
-#   - enterprise/modules/governance/process/src/processes/gateway-debit.process.ts
+#   - enterprise/modules/governance/process/src/eventing/gateway-debit.process.ts
 #     (the sole writer of gateway budget debits)
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only
@@ -54,7 +54,7 @@ on:
       - "go.mod"
       - "go.sum"
       - "modules/gateway/**"
-      - "enterprise/modules/governance/process/src/processes/gateway-debit.process.ts"
+      - "enterprise/modules/governance/process/src/eventing/gateway-debit.process.ts"
       - "apps/api/src/app/api-gateway*.composition.ts"
       - "charts/gateway/**"
       - ".github/workflows/gateway-matrix.yaml"
@@ -119,6 +119,8 @@ jobs:
        !(startsWith(github.head_ref, 'dependabot/') &&
          github.event.pull_request.user.login == 'dependabot[bot]'))
     env:
+      # The tasks and api config parses refuse a missing NODE_ENV.
+      NODE_ENV: "test"
       GATEWAY_URL: http://localhost:5563
       LW_BASE_URL: http://localhost:5560
       # Provider creds — set as repo/org secrets, NOT committed.
@@ -203,7 +205,13 @@ jobs:
       - name: Setup pnpm + Node
         uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/platform-api... @langwatch/tasks..."
+          install: "all"
+
+      # The tasks and api processes import the generated Prisma client and
+      # packages that resolve the SDK's built dist, which the shared action
+      # prepares (it runs `start:prepare:files` and `ensure:built`, which reach
+      # beyond the platform-api closure, hence the full install above).
+      - uses: ./.github/actions/prepare-generated-files
 
       - name: Apply DB migrations
         working-directory: apps/tasks
@@ -211,12 +219,19 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
         run: pnpm run task prisma-migrate
 
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        # The api refuses to boot without a 32-byte hex encryption key.
+        # Generated per run: a committed hex literal reads as a leaked key to the scanner.
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Start control plane (background)
         working-directory: apps/api
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
           REDIS_URL: redis://localhost:6379
           CLICKHOUSE_HOST: http://localhost:8123
+          # The api listens on API_PORT (6560 by default); the matrix calls LW_BASE_URL.
+          API_PORT: "5560"
         run: |
           pnpm start > /tmp/langwatch-dev.log 2>&1 &
           echo $! > /tmp/langwatch.pid

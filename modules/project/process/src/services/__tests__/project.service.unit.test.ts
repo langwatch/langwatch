@@ -566,7 +566,8 @@ describe("ProjectService", () => {
     });
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: "project_governance-project",
+        id: "governance-project",
+        slug: "application-roject",
         teamId: "team_1",
         name: "Application",
       }),
@@ -899,7 +900,7 @@ describe("ProjectService", () => {
     });
 
     expect(repository.create).toHaveBeenCalledWith(
-      expect.objectContaining({ slug: "governance-insights-govern" }),
+      expect.objectContaining({ slug: "governance-insights-roject" }),
     );
   });
 

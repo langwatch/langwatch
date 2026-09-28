@@ -1,12 +1,14 @@
 /**
  * Monitor's answer to the port its screen declares: every method projects a
- * `@langwatch/browser-host` capability. `copyTargets` reads honestly empty:
- * no org-graph capability exists yet. ARCHITECTURE.md §10.1.
+ * `@langwatch/browser-host` capability, `copyTargets` included: organization
+ * lends those. ARCHITECTURE.md §10.1.
  */
 
 import {
   useUiCapabilities,
+  useUiCopyTargets,
   useUiScope,
+  type UiCopyTargets,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
@@ -28,6 +30,7 @@ import {
 class CapabilityMonitorHost extends MonitorHostApi {
   private readonly hostScope: MonitorScope;
   private readonly session: UiSession;
+  private readonly lent: UiCopyTargets;
   private readonly navigation: UiNavigation;
   private readonly uiRoute: UiRoute;
   private readonly feedback: UiFeedback;
@@ -35,12 +38,14 @@ class CapabilityMonitorHost extends MonitorHostApi {
   constructor({
     hostScope,
     session,
+    lent,
     navigation,
     uiRoute,
     feedback,
   }: {
     hostScope: MonitorScope;
     session: UiSession;
+    lent: UiCopyTargets;
     navigation: UiNavigation;
     uiRoute: UiRoute;
     feedback: UiFeedback;
@@ -48,6 +53,7 @@ class CapabilityMonitorHost extends MonitorHostApi {
     super();
     this.hostScope = hostScope;
     this.session = session;
+    this.lent = lent;
     this.navigation = navigation;
     this.uiRoute = uiRoute;
     this.feedback = feedback;
@@ -61,9 +67,13 @@ class CapabilityMonitorHost extends MonitorHostApi {
     return this.session.hasPermission(permission);
   }
 
-  /** No org-graph capability exists yet; recorded gap, see the handoff. */
+  /** Organization's lent targets; no answer yet is no target (§10.1, array port). */
   copyTargets(): readonly MonitorCopyTarget[] {
-    return [];
+    return (this.lent.targets("evaluations:manage") ?? []).map((target) => ({
+      id: target.projectId,
+      name: target.label,
+      canCreate: target.mayCreate,
+    }));
   }
 
   timeZone(): string {
@@ -105,6 +115,7 @@ class CapabilityMonitorHost extends MonitorHostApi {
  */
 export default function MonitorHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
+  const lent = useUiCopyTargets();
   const scopeHost = useUiScope().scopeHost();
 
   const hostScope = useMemo<MonitorScope>(
@@ -113,8 +124,9 @@ export default function MonitorHostMount({ children }: { children?: ReactNode })
   );
 
   const host = useMemo(
-    () => new CapabilityMonitorHost({ hostScope, session, navigation, uiRoute: route, feedback }),
-    [hostScope, session, navigation, route, feedback],
+    () =>
+      new CapabilityMonitorHost({ hostScope, session, lent, navigation, uiRoute: route, feedback }),
+    [hostScope, session, lent, navigation, route, feedback],
   );
 
   return <MonitorHostProvider value={host}>{children}</MonitorHostProvider>;

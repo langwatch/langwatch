@@ -9,6 +9,8 @@ export * from "./derived-safe.ts";
 export * from "./registry.ts";
 export * from "./digest.ts";
 export * from "./tool-result.ts";
+export * from "./capability-catalog.ts";
+export * from "./capability-progress.ts";
 
 /**
  * The handled-error reading is zod-free and importable on its own

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
 import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
-import "@testing-library/jest-dom/vitest";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import "@testing-library/jest-dom/vitest";
 import { Temporal } from "@langwatch/time";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type AnnotationRow } from "../../../model/annotation-row.ts";
@@ -79,7 +80,7 @@ function renderTable(overrides: Partial<Parameters<typeof AnnotationTable>[0]> =
 }
 
 describe("annotation table presentation", () => {
-  it("renders review columns and controlled selection", () => {
+  it("renders review columns and controlled selection", async () => {
     const { onToggleRow } = renderTable();
 
     expect(screen.getByRole("columnheader", { name: "Date queued" })).toBeInTheDocument();
@@ -87,8 +88,29 @@ describe("annotation table presentation", () => {
     expect(screen.getByText("the answer")).toBeInTheDocument();
     expect(screen.getByText("yes")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Select trace trace-1" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select trace trace-1" }));
     expect(onToggleRow).toHaveBeenCalledWith("queue-item-1");
+  });
+
+  it("toggles from anywhere on the checkbox's padded target without opening the row", async () => {
+    const onRowClick = vi.fn();
+    const { onToggleRow } = renderTable({ onRowClick });
+    const target = screen.getByRole("checkbox", { name: "Select trace trace-1" }).closest("label");
+
+    expect(target).not.toBeNull();
+    await userEvent.click(target!);
+
+    expect(onToggleRow).toHaveBeenCalledWith("queue-item-1");
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it("opens the row when the row itself is clicked", async () => {
+    const onRowClick = vi.fn();
+    renderTable({ onRowClick });
+
+    await userEvent.click(screen.getByText("the question"));
+
+    expect(onRowClick).toHaveBeenCalledWith(row);
   });
 
   it("keeps row actions separate from row navigation", async () => {

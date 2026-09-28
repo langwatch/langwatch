@@ -26,7 +26,6 @@ import type {
   BlobSweepReport,
   RunBlobCleanupInput,
 } from "./blob-store.ts";
-import type { StartupNoticeState } from "./checkup-usage-report.ts";
 import type { CheckupAnswer, UsageReportAnswer } from "./checkup.trpc.ts";
 import type { CheckupResult, ExplicitCheckInput, ProjectCheckupReport } from "./checkup.ts";
 import type { Anomaly, AnomalyKind } from "./ops-anomaly.ts";
@@ -89,6 +88,7 @@ import type {
 } from "./ops-system-migration.ts";
 import type { ProductAnalyticsTarget } from "./ops.config.ts";
 import type {
+  OpsApiGetBadgeCountsOutput,
   OpsDoorAnswer,
   OpsEventLogSearchWindow,
   OpsExplainAnswer,
@@ -566,7 +566,7 @@ export interface OpsApi {
     credential: Readonly<{ token: string; projectId: string | null }> | null;
   }): Promise<OpsDoorAnswer>;
   findDashboardData(): DashboardData | null;
-  badgeCounts(): { blockedCount: number; dlqCount: number; computedAt: Date | null };
+  badgeCounts(): OpsApiGetBadgeCountsOutput;
   streamDashboard(input: StreamDashboardInput): AsyncIterable<DashboardData>;
   getQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo>;
   computeProjectionState(input: {
@@ -659,15 +659,10 @@ export interface OpsApi {
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
   }): Promise<UsageReportAnswer>;
-  getStartupNotice(input: { organizationId: string }): Promise<StartupNoticeState>;
   /** What `langwatch doctor` reads over a project key, which is never an install admin. */
   getProjectCheckup(input: { projectId: string }): Promise<ProjectCheckupReport>;
   /** The paid checks over a project key; refused on LangWatch Cloud. */
   runProjectCheckup(input: { projectId: string } & ExplicitCheckInput): Promise<CheckupResult>;
-  dismissStartupNotice(input: {
-    organizationId: string;
-    schemaVersion: number;
-  }): Promise<{ dismissed: boolean }>;
 }
 
 export const OpsApi = moduleApi<OpsApi>()("ops");

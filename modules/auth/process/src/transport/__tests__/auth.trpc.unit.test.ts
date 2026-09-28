@@ -46,6 +46,7 @@ const door: AuthApi = {
   sendMyAddressConfirmation,
   completeSignUpVerification,
   claimSignUpAddressProof: () => unreached("claimSignUpAddressProof"),
+  claimUnconfirmedSignUpAddressProof: () => unreached("claimUnconfirmedSignUpAddressProof"),
   getSignUpEnrollment,
   getMyAddressConfirmation,
   getPriorSession,
@@ -75,6 +76,7 @@ const door: AuthApi = {
   getSignInSecuritySettings: () => unreached("getSignInSecuritySettings"),
   saveSignInSecuritySettings: () => unreached("saveSignInSecuritySettings"),
   releaseHeldAccount: () => unreached("releaseHeldAccount"),
+  changeFederatedPassword: () => unreached("changeFederatedPassword"),
 };
 
 /** The front door reaches no session operation: naming one here would be a bug. */
@@ -217,12 +219,21 @@ describe("the signed-out front door", () => {
     });
 
     it("asks for a new account's link for the address the visitor typed", async () => {
-      requestNewAccountVerification.mockResolvedValue(undefined);
+      requestNewAccountVerification.mockResolvedValue({ sent: true });
 
       await expect(visitor.requestSignUpVerification({ email: "ana@acme.com" })).resolves.toEqual({
         sent: true,
       });
       expect(requestNewAccountVerification).toHaveBeenCalledWith({ email: "ana@acme.com" });
+    });
+
+    it("hands the screen the unconfirmed proof where no link could be sent", async () => {
+      requestNewAccountVerification.mockResolvedValue({ sent: false, addressProof: "proof-1" });
+
+      await expect(visitor.requestSignUpVerification({ email: "ana@acme.com" })).resolves.toEqual({
+        sent: false,
+        addressProof: "proof-1",
+      });
     });
   });
 

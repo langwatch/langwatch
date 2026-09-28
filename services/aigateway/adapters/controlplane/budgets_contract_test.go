@@ -158,7 +158,7 @@ func TestConfigWireProviderExclusions(t *testing.T) {
 // wire while the UI keeps displaying both as active.
 func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 	src := readControlPlaneSource(t,
-		"modules", "gateway", "server", "src", "services",
+		"modules", "gateway", "process", "src", "services",
 		"gateway-config-materialisation.service.ts")
 
 	for _, needle := range []string{
@@ -178,7 +178,7 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 	// the shared wire-rules module; read it there rather than off the
 	// materialiser, which now only calls through to it.
 	rulesSrc := readControlPlaneSource(t,
-		"modules", "gateway", "server", "src", "rules",
+		"modules", "gateway", "process", "src", "rules",
 		"gateway-config-wire.rules.ts")
 	for _, needle := range []string{
 		`provider_key: b.providerKey`,
@@ -231,7 +231,7 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 		"the Go constant is the wire name the control plane reads")
 
 	accumulation := readControlPlaneSource(t,
-		"modules", "trace", "server", "src", "services",
+		"modules", "trace", "process", "src", "services",
 		"trace-attribute-extraction.service.ts")
 	if !strings.Contains(accumulation, `"`+customertracebridge.AttrModelProviderID+`"`) {
 		t.Error("the accumulation allowlist dropped langwatch.model_provider_id, so the fold will never see the provider")
@@ -243,14 +243,14 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 		"the span attribute and the spend command field must name the same thing")
 
 	commands := readControlPlaneSource(t,
-		"modules", "gateway", "server", "src", "processes",
+		"modules", "gateway", "process", "src", "eventing",
 		"gateway-spend-commands.process.ts")
 	if !strings.Contains(commands, commandField+": z.string()") {
 		t.Error("the spend command schema no longer declares model_provider_id, so no debit can name a provider")
 	}
 
 	debits := readControlPlaneSource(t,
-		"enterprise", "modules", "governance", "server", "src", "processes",
+		"enterprise", "modules", "governance", "process", "src", "eventing",
 		"gateway-debit.process.ts")
 	if !regexp.MustCompile(commandField + `:\s*\w+\.` + commandField).MatchString(debits) {
 		t.Error("gateway-debit.process.ts no longer carries model_provider_id into the debit payload, so provider-filtered budgets stop accruing")

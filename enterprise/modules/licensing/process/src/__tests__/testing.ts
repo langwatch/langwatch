@@ -16,7 +16,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { planQuantities } from "@langwatch/plans";
 import { ScopedSecrets } from "@langwatch/secrets";
 
-import { LicensingApp, type LicensingInfrastructure } from "../app/licensing.app.ts";
+import { LicensingApp } from "../app/licensing.app.ts";
 import { type LicenseStorage, type StoredLicense } from "../app/licensing.members.ts";
 import { TEST_PUBLIC_KEY } from "./fixtures/license-keys.fixture.ts";
 
@@ -170,16 +170,7 @@ class TestLicenseStorage implements LicenseStorage {
   }
 }
 
-export function createTestLicensingApp(
-  checkLimit: LicensingInfrastructure["checkLimit"] = async () => ({
-    allowed: true,
-    current: 0,
-    max: 1,
-    limitType: "members",
-  }),
-  reportError: LicensingInfrastructure["reportError"] = () => {},
-  notifyLimitReached: LicensingInfrastructure["notifyLimitReached"] = async () => {},
-): Promise<LicensingApp> {
+export function createTestLicensingApp(): Promise<LicensingApp> {
   return LicensingApp.create({
     dependencies: {
       gateway: createApiFixture<GatewayApi>(),
@@ -192,9 +183,6 @@ export function createTestLicensingApp(
         platformSsoAllowed: async () => true,
         authProviderIsMounted: () => true,
         reportSigningFailure: () => {},
-        checkLimit,
-        notifyLimitReached,
-        reportError,
       },
       isSaas: false,
       serviceVersion: "test",

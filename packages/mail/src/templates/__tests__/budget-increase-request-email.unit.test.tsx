@@ -56,6 +56,35 @@ describe("sendBudgetIncreaseRequestEmail", () => {
       expect(call[0].content.html).toContain("ACME Corp");
     });
 
+    it("renders an organization that carries no name blank rather than refusing", async () => {
+      await sendBudgetIncreaseRequestEmail({ ...baseParams, organizationName: "" });
+
+      expect(sendEmail).toHaveBeenCalledTimes(1);
+    });
+
+    describe.each(["scope", "scopeId", "limitUsd", "spentUsd", "period"] as const)(
+      "when the %s arrives blank",
+      (field) => {
+        /** @scenario "A request whose scope, limit or spend is blank still emails the admin" */
+        it("still sends, rendering the field blank as main did", async () => {
+          await sendBudgetIncreaseRequestEmail({ ...baseParams, [field]: "" });
+
+          expect(sendEmail).toHaveBeenCalledTimes(1);
+        });
+      },
+    );
+
+    describe("when the limit and the spend arrive blank", () => {
+      it("renders each as a bare dollar sign and states no share of the limit", async () => {
+        await sendBudgetIncreaseRequestEmail({ ...baseParams, limitUsd: "", spentUsd: "" });
+
+        const html = vi.mocked(sendEmail).mock.calls[0]![0].content.html;
+        expect(html).toContain("Current limit");
+        expect(html).toContain("Spent so far");
+        expect(html).not.toContain("Of the limit");
+      });
+    });
+
     it("includes the spend / limit / period context", async () => {
       await sendBudgetIncreaseRequestEmail(baseParams);
 

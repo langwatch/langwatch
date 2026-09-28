@@ -356,7 +356,7 @@ account holds — and two answers:
   password screen the person cannot pass. The old behaviour was a dead end
   dressed as a form.
 - an identifier **an account does exist for** routes to a method screen
-  showing the methods *that account* holds, strongest-first, instead of
+  showing the methods _that account_ holds, strongest-first, instead of
   every method the instance offers. A passkey-only account no longer gets a
   password box that can only fail.
 
@@ -384,7 +384,7 @@ policy refuses the method  → picker (local)       method_not_*
   covers a wrong password and an address with no account alike
   (`server/better-auth/handled-errors.ts`,
   `specs/auth/sign-in-failure-messages.feature`). Knowing an account exists
-  is now cheap; knowing *which half of a submitted pair was wrong* is still
+  is now cheap; knowing _which half of a submitted pair was wrong_ is still
   never told, because that is what turns a credential-stuffing run from
   guessing pairs into guessing one field at a time.
 - **The lookup stays rate-limited.** `auth.route` keeps its per-address
@@ -395,8 +395,8 @@ policy refuses the method  → picker (local)       method_not_*
   (`specs/auth/password-reset.feature`). Reset sends mail to an address, and
   a mailer that answers differently for a registered address is an oracle
   with a delivery mechanism attached.
-- **The router still reads no secret.** It learns *that* an account exists
-  and *which kinds* of method it holds. It never reads a credential, a
+- **The router still reads no secret.** It learns _that_ an account exists
+  and _which kinds_ of method it holds. It never reads a credential, a
   hash, a passkey's material or a session.
 
 ### Revision (2026-08-25) — the method screen is ranked, and starts the ceremony
@@ -463,6 +463,33 @@ platform already holds a confirmed address for that person — so it is nudged
 from inside the app (`UnconfirmedAddressBanner`) and never demanded. This is
 the distinction the earlier "confirmation follows you in" experiment
 flattened, and flattening it is what made sign-up feel unguarded.
+
+### Revision (2026-09-25): an installation that cannot send email
+
+An installation with no email provider configured cannot prove an address, so
+the 2026-09-07 order would leave it with no way to create any account.
+
+On such an installation `auth.requestSignUpVerification` keeps every guard
+(caller and address rate limits, organization-managed domain refusal,
+confirmed-address refusal) and then mints an UNCONFIRMED address proof instead
+of mailing a link. The proof lives in its own token namespace, is single-use,
+bound to the normalized address and lives as long as a confirmed proof.
+
+- An address that already has an account is sent to log in, confirmed or not:
+  there is no link to wait for, so no account is mid-sign-up.
+- `user.register` claims a confirmed proof first. It accepts an unconfirmed
+  proof only while no email provider is configured, and the account is created
+  with `emailVerified` false.
+- A confirmed-proof check never accepts an unconfirmed proof, and the reverse.
+  Passkey sign-up requires a confirmed proof, so the screen offers a password
+  only; a passkey can be added from settings afterwards.
+- Features gated on a confirmed address stay closed for that account: domain
+  join requests and OAuth account linking.
+- `auth.sendMyAddressConfirmation` refuses with `auth_email_sending_unavailable`
+  and the settings screen offers no resend while no provider is configured.
+
+Once a provider is configured, outstanding unconfirmed proofs are refused and
+sign-up returns to the emailed link.
 
 ### 7. One flag, shadow-first, and the cutover
 

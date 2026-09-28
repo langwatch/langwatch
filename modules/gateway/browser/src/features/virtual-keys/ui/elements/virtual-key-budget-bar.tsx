@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box, VisuallyHidden } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -75,16 +75,14 @@ export function VirtualKeyBudgetBar({
 
   return (
     <Tooltip content={label}>
-      <Box
-        width="full"
-        cursor="help"
-        role="progressbar"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={Number.isFinite(limit) ? limit : undefined}
-        aria-valuenow={spent ?? undefined}
-        data-testid={`vk-budget-bar-${virtualKeyId}`}
-      >
+      <Box width="full" cursor="help" data-testid={`vk-budget-bar-${virtualKeyId}`}>
+        <VisuallyHidden>
+          <progress
+            aria-label={label}
+            max={Number.isFinite(limit) ? limit : undefined}
+            value={spent ?? undefined}
+          />
+        </VisuallyHidden>
         <MeterBar
           fillRatio={ratio}
           width="100%"

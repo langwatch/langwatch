@@ -1,7 +1,7 @@
 import { ConfigParseError, parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { assertAuthServerConfig, authServerConfig } from "../auth.config.ts";
+import { assertAuthServerConfig, authBrowserConfig, authServerConfig } from "../auth.config.ts";
 
 const read = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({ owners: [{ name: "auth", config: authServerConfig }], environment }).auth;
@@ -41,6 +41,16 @@ describe("auth server configuration", () => {
     });
   });
 
+  describe("given the browser config the served page carries", () => {
+    /** @scenario "The served page names the identifier-first screens as the sign-in front door" */
+    it("names the identifier-first screens as the front door with no switch set", () => {
+      expect(authBrowserConfig.project(read({})).identityFrontDoor).toBe(true);
+      expect(authBrowserConfig.project(read({ PASSKEYS_ENABLED: "on" })).identityFrontDoor).toBe(
+        true,
+      );
+    });
+  });
+
   describe("given only one half of the browser session identity is named", () => {
     /** @scenario "A cross-field rule refuses a half-configured feature at boot" */
     it("refuses the configuration and names both variables", () => {
@@ -54,6 +64,7 @@ describe("auth server configuration", () => {
             trustedIdpOrigins: undefined,
             idpSimulatorUrl: undefined,
             localPasswords: false,
+            auth0ManagementClientId: undefined,
             signInProviders: {
               authProvider: undefined,
               legacyProvider: undefined,

@@ -3,7 +3,7 @@
  */
 
 import { HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { Check, X } from "lucide-react";
+import { Check, CircleDashed, X } from "lucide-react";
 
 import { SimulationChip } from "./simulation-chip.tsx";
 
@@ -44,10 +44,16 @@ function CriteriaList({
 export function RunCriteriaChip({
   metCriteria,
   unmetCriteria,
+  inconclusiveCriteria = [],
 }: {
   metCriteria: string[];
   unmetCriteria: string[];
+  /** Criteria the test could not check; each is also among the unmet ones. */
+  inconclusiveCriteria?: string[];
 }) {
+  const inconclusive = new Set(inconclusiveCriteria);
+  const failedCriteria = unmetCriteria.filter((criterion) => !inconclusive.has(criterion));
+  const uncheckedCriteria = unmetCriteria.filter((criterion) => inconclusive.has(criterion));
   const met = metCriteria.length;
   const total = met + unmetCriteria.length;
   if (total === 0) return null;
@@ -64,8 +70,16 @@ export function RunCriteriaChip({
           {metCriteria.length > 0 && (
             <CriteriaList title="Met" color="green.fg" icon={Check} items={metCriteria} />
           )}
-          {unmetCriteria.length > 0 && (
-            <CriteriaList title="Unmet" color="red.fg" icon={X} items={unmetCriteria} />
+          {failedCriteria.length > 0 && (
+            <CriteriaList title="Unmet" color="red.fg" icon={X} items={failedCriteria} />
+          )}
+          {uncheckedCriteria.length > 0 && (
+            <CriteriaList
+              title="Could not check"
+              color="orange.500"
+              icon={CircleDashed}
+              items={uncheckedCriteria}
+            />
           )}
           <Text textStyle="2xs" color="fg.muted">
             {rate}% of success criteria met

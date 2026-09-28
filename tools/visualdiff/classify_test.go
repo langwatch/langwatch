@@ -163,3 +163,35 @@ func TestDatesIdsAndRelativeTimesNeverReadAsAChange(t *testing.T) {
 		t.Fatal("a side without a snapshot concludes nothing")
 	}
 }
+
+// @scenario "A random id in the final path never reads as a redirect"
+func TestARandomIDInTheFinalPathNeverReadsAsARedirect(t *testing.T) {
+	row := pair(
+		&Capture{URL: "http://base/local-dev-project/experiments/workbench/MIHy1lTc"},
+		&Capture{URL: "http://candidate/local-dev-project/experiments/workbench/YMcoGt8s"},
+	)
+
+	class, why := Classify(row)
+
+	if class == ClassRedirect {
+		t.Fatalf("got %s (%s)", class, why)
+	}
+	if got := finalPath("http://x/local-dev-project/settings"); got != "/local-dev-project/settings" {
+		t.Fatalf("a word segment was masked: %s", got)
+	}
+}
+
+// @scenario "A base redirecting an operator screen to governance is expected"
+func TestABaseRedirectingAnOperatorScreenToGovernanceIsExpected(t *testing.T) {
+	expected := pair(&Capture{URL: "http://base/governance"}, &Capture{URL: "http://candidate/ops/backoffice/users"})
+	class, why := Classify(expected)
+	if class != ClassIntendedRestore || class.IsFinding() {
+		t.Fatalf("got %s (%s)", class, why)
+	}
+	mustContain(t, why, "/ops/* to /governance")
+
+	other := pair(&Capture{URL: "http://base/settings/directory"}, &Capture{URL: "http://candidate/settings/teams"})
+	if class, why := Classify(other); class != ClassRedirect {
+		t.Fatalf("an unlisted redirect: got %s (%s)", class, why)
+	}
+}

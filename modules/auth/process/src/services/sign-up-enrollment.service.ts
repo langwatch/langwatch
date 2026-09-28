@@ -9,6 +9,8 @@ import {
 
 export interface SignUpEnrollmentServiceDeps {
   validateAddressProof(input: { token: string; email: string }): Promise<boolean>;
+  /** An unconfirmed proof, live only while the installation cannot send email. */
+  validateUnconfirmedAddressProof(input: { token: string; email: string }): Promise<boolean>;
   route(
     input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
   ): Promise<RoutingDecision>;
@@ -35,11 +37,19 @@ export class SignUpEnrollmentService {
     email: string;
     addressProof: string;
   }): Promise<SignUpEnrollment> {
-    if (!(await this.deps.validateAddressProof({ token: addressProof, email }))) {
-      throw new NoAddressToConfirmError();
+    const proof = { token: addressProof, email };
+    if (await this.deps.validateAddressProof(proof)) return this.decide({ email });
+
+    // Passkey sign-up requires a confirmed proof, so an unconfirmed one never enrols one.
+    if (await this.deps.validateUnconfirmedAddressProof(proof)) {
+      const decision = await this.decide({ email });
+      return {
+        ...decision,
+        methodSet: decision.methodSet.filter((method) => method.kind !== "passkey"),
+      };
     }
 
-    return this.decide({ email });
+    throw new NoAddressToConfirmError();
   }
 
   private async decide({ email }: { email: string }): Promise<SignUpEnrollment> {

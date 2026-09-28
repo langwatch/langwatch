@@ -10,14 +10,14 @@ Lands in PR #7631, on `feat/identity-auth`.
 
 ## What is actually there
 
-| | |
-| --- | --- |
-| Ledger writers, app layer | **1,278 lines** across 6 files |
-| Ledger ports, `@langwatch/identity-process` | **106 lines** across 5 files |
-| Write verbs to convert | **34** across 5 services |
-| Call sites of those verbs | **40** — 36 discard the return value |
-| Call sites that read the returned facts | **4** |
-| Call sites that depend on a synchronous throw | **2** (`tolerateRefusal`) |
+|                                               |                                      |
+| --------------------------------------------- | ------------------------------------ |
+| Ledger writers, app layer                     | **1,278 lines** across 6 files       |
+| Ledger ports, `@langwatch/identity-process`   | **106 lines** across 5 files         |
+| Write verbs to convert                        | **34** across 5 services             |
+| Call sites of those verbs                     | **40** — 36 discard the return value |
+| Call sites that read the returned facts       | **4**                                |
+| Call sites that depend on a synchronous throw | **2** (`tolerateRefusal`)            |
 
 The last rows are the whole reason this is tractable. The layer exists to give
 callers a synchronous answer, and 9 in 10 do not take it.
@@ -57,8 +57,8 @@ implements. Nothing calls it yet." That cannot be built as written.
 A `dispatch` that no longer decides has no events to hand it, so there is no
 comparison target. "The cursor moved past dispatch time" does not substitute: a
 command that legitimately states nothing never moves the cursor, and another
-command on the same lane can move it first. Without a target, *applied*,
-*refused* and *not yet* are one answer.
+command on the same lane can move it first. Without a target, _applied_,
+_refused_ and _not yet_ are one answer.
 
 So stage 1 is a **design** task, not an additive one: a per-command outcome the
 handler records (`{commandId, outcome}`) and dispatch reads. Build it as the
@@ -86,7 +86,7 @@ is the same defect class reaching a person:
   the queue dead-ended tells them an address is theirs when it is not.
 
 Reading what landed admits a third answer the old code could not represent —
-*not recorded yet* — so there is a new handled code for it,
+_not recorded yet_ — so there is a new handled code for it,
 `identity_verification_not_settled`, with the proof left unconsumed so "open the
 same link again" is real remediation. One new bound scenario; 58/58 in
 `identity-storage-adapter.feature`.
@@ -98,22 +98,22 @@ anybody, and it disappears in stage 3.
 This needed none of the rest of the plan, which is the argument for having done
 it first.
 
-### 3. Verbs return receipts — *wide but mechanical*
+### 3. Verbs return receipts — _wide but mechanical_
 
 Change the 32 verbs to validate, dispatch, and return `{ commandId, applied }`.
 Ten call sites need no edit at all — they already ignore the value. Guard calls
 come off the calling path here.
 
-*Touches:* 4 service files, ~12 call sites, their tests.
+_Touches:_ 4 service files, ~12 call sites, their tests.
 
-### 4. Stop the calling path appending — *narrow, high value*
+### 4. Stop the calling path appending — _narrow, high value_
 
 Three ledgers (mfa, join-request, sso-connection) append on the calling path
-*and* stage a command whose handler produces the same events. Identity and
+_and_ stage a command whose handler produces the same events. Identity and
 directory-sync already pass `waitedAppend: null`. Make it uniform: the queue is
 the only appender. `WaitedAppend` and its plumbing go.
 
-*Touches:* 3 ledger configs + the base class.
+_Touches:_ 3 ledger configs + the base class.
 
 One thing to state out loud before doing it: durability moves from "appended
 before return" to "enqueued before return". The timeout log line that currently
@@ -122,15 +122,15 @@ and a dropped queue job now loses a fact that used to be on disk —
 `consumeBackupCode` and `confirmMfa` included. Decide whether that is accepted,
 and fix the log line either way.
 
-### 5. Delete the provisional WRITE — keep the probe — *the risky one*
+### 5. Delete the provisional WRITE — keep the probe — _the risky one_
 
 `writeProvisionalHeads` goes. **`hasFolded` stays**, and an earlier version of
 this plan was wrong to bin it with them.
 
 Today `hasFolded` exists only to stop the attach guard deduping against a
 provisional row. Under the A1 decision it picks up a bigger job: it is the only
-thing that distinguishes *the fold has not run* from *this person genuinely
-holds nothing*. Every read surface needs that bit to say "still being set up"
+thing that distinguishes _the fold has not run_ from _this person genuinely
+holds nothing_. Every read surface needs that bit to say "still being set up"
 instead of rendering an empty state — so deleting the write is the change, and
 deleting the probe would leave every reader guessing.
 
@@ -158,20 +158,20 @@ Two corrections to what this stage claimed:
   join-before-create exists to prevent. Teach this surface the two-meanings
   distinction BEFORE the block comes off the door.
 
-*Touches:* `ledger.ts`, `birth.ts`, `guards.ts` + the heads port and its
+_Touches:_ `ledger.ts`, `birth.ts`, `guards.ts` + the heads port and its
 in-memory double, `identity-email.service.ts`, the join lookup, the sign-up
 screens, and the specs that describe them. **Do not compress this stage into
 another.**
 
-### 6. Delete the layer — *pure removal*
+### 6. Delete the layer — _pure removal_
 
 Five ports, five writers, five deps interfaces, the `ConvergentLedgerSpec`s,
 the sender-name maps, `StagedLedgerWriter`, `ConvergentLedgerWriter`. Nothing
 calls them by now.
 
-*Touches:* ~1,384 lines removed; `runtime.ts` composition shrinks.
+_Touches:_ ~1,384 lines removed; `runtime.ts` composition shrinks.
 
-### 7. Bind the spec, remove the debt — *required to call this done*
+### 7. Bind the spec, remove the debt — _required to call this done_
 
 Swap each `@unimplemented` for the tag named in the comment above it, add the
 `@scenario "<title>"` annotation on each covering test, and **delete the
@@ -183,7 +183,7 @@ must go; while it is there, the change is not finished.
 **~~The unfinished sign-up.~~** Answered 2026-09-10 — see stage 0. The door does
 not wait; the read surfaces carry the state. Questions 2 and 3 dissolved with it:
 there is no window on the door to size, and "the fold never landed" is now a
-thing a *screen* reports rather than a thing that strands a sign-up. The one
+thing a _screen_ reports rather than a thing that strands a sign-up. The one
 sub-question that survives is narrower and is in the spec as a scenario: what a
 waiting screen offers when the fold never lands — retry, or carry on without it.
 

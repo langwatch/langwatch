@@ -54,13 +54,13 @@ have paid for the discovery once per module.
 
 ## The tasks
 
-| # | Task | Manifest | Model | Depends on |
-| --- | --- | --- | --- | --- |
-| T1 | `application.ts` onto the member record | `.claude/manifests/cv2-application-member-record.md` | opus | - |
-| T2 | The peer seam - **verify the premise first, see below** | `.claude/manifests/cv2-peer-seam.md` | opus, then sonnet | T1 |
-| T3 | The REST credential object on a route | `.claude/manifests/cv2-rest-credential-object.md` | opus | T1 |
-| T4 | Delete the `port` word | `.claude/manifests/cv2-port-word.md` | sonnet | - |
-| T5 | Per-module conversion | one manifest per module, from the recipe | sonnet | T1, T2, T3 |
+| #   | Task                                                    | Manifest                                             | Model             | Depends on |
+| --- | ------------------------------------------------------- | ---------------------------------------------------- | ----------------- | ---------- |
+| T1  | `application.ts` onto the member record                 | `.claude/manifests/cv2-application-member-record.md` | opus              | -          |
+| T2  | The peer seam - **verify the premise first, see below** | `.claude/manifests/cv2-peer-seam.md`                 | opus, then sonnet | T1         |
+| T3  | The REST credential object on a route                   | `.claude/manifests/cv2-rest-credential-object.md`    | opus              | T1         |
+| T4  | Delete the `port` word                                  | `.claude/manifests/cv2-port-word.md`                 | sonnet            | -          |
+| T5  | Per-module conversion                                   | one manifest per module, from the recipe             | sonnet            | T1, T2, T3 |
 
 ### T1 - the one that matters
 

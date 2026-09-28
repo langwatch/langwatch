@@ -24,6 +24,9 @@ export const TEST_CREDENTIAL_ISSUER = "local:credential";
 /** The one proof the test auth refuses, as a spent or foreign proof is refused. */
 export const REFUSED_ADDRESS_PROOF = "refused-address-proof";
 
+/** The proof an installation that cannot send email mints: it proves nothing. */
+export const UNCONFIRMED_ADDRESS_PROOF = "unconfirmed-address-proof";
+
 /**
  * The auth peer a suite runs against; `provider` is what ADR-027 resolved,
  * `issuesOwnPasswords` the D09 switch, and `governedDomain` a domain an
@@ -42,7 +45,11 @@ export function createUserTestAuth(
     resolveAuthProvider: vi.fn(async () => provider),
     issuesOwnPasswords: vi.fn(() => issuesOwnPasswords),
     claimSignUpAddressProof: vi.fn(
-      async ({ token }: { token: string; email: string }) => token !== REFUSED_ADDRESS_PROOF,
+      async ({ token }: { token: string; email: string }) =>
+        token !== REFUSED_ADDRESS_PROOF && token !== UNCONFIRMED_ADDRESS_PROOF,
+    ),
+    claimUnconfirmedSignUpAddressProof: vi.fn(
+      async ({ token }: { token: string; email: string }) => token === UNCONFIRMED_ADDRESS_PROOF,
     ),
     route: vi.fn(async ({ identifier }: { identifier: string | null }): Promise<RoutingDecision> =>
       governedDomain !== undefined && identifier?.endsWith(`@${governedDomain}`)
@@ -128,10 +135,6 @@ export function createUserTestInfrastructure(
     passwords: new TestPasswordHasher(),
     rateLimit: vi.fn(async () => ({ allowed: true, resetAt: 0 })),
     analytics: { trackServerEvent: vi.fn() },
-    federatedPasswords: {
-      findDatabaseAccount: vi.fn(async () => null),
-      changePassword: vi.fn(async () => ({ outcome: "failed" as const })),
-    },
     cliCredentials: { revokeForUser: vi.fn(async () => undefined) },
     organizations: {
       findSupportContact: vi.fn(async () => null),

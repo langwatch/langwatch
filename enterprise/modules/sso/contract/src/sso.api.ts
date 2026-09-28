@@ -79,8 +79,14 @@ export interface SsoApi {
   providerIsMounted(): boolean;
   /** The provider a sign-in page should offer, or `"email"`. */
   resolveProvider(): Promise<string>;
-  /** The configured providers, with callbacks under Better Auth's own `baseUrl`. */
-  getSignInProviderMounts(input: { baseUrl: string }): Promise<SignInProviderMounts>;
+  /**
+   * The configured providers, with callbacks under Better Auth's own `baseUrl`. The Microsoft
+   * provider hands each sign-in's id token claims to `onMicrosoftProfile` before its lookup.
+   */
+  getSignInProviderMounts(input: {
+    baseUrl: string;
+    onMicrosoftProfile?: (profile: Record<string, unknown>) => Promise<void>;
+  }): Promise<SignInProviderMounts>;
 
   listConnections(
     input: ListSsoConnectionsInput,

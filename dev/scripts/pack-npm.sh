@@ -152,6 +152,9 @@ EXCLUDES=(
   # `Dockerfile` and `Dockerfile.<target>` rather than `Dockerfile*`: the star
   # form also matches any source file whose name merely starts with the word,
   # and every container file in the repo uses one of these two spellings.
+  # The langy agent's is claimed first: generate:langy-skills reads its COPY set
+  # during `start:prepare:files` on the end user's machine.
+  --include=Dockerfile.langyagent
   --exclude=Dockerfile
   --exclude=Dockerfile.*
   --exclude=.dockerignore
@@ -420,7 +423,7 @@ fi
 # which JSON.parse rejects outright.
 missing_extends=""
 while IFS= read -r -d '' tsconfig; do
-  extends_target="$(grep -o '"extends"[[:space:]]*:[[:space:]]*"[^"]*"' "$tsconfig" \
+  extends_target="$({ grep -o '"extends"[[:space:]]*:[[:space:]]*"[^"]*"' "$tsconfig" || true; } \
     | head -n1 | sed -E 's/.*"extends"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/')"
   [ -n "$extends_target" ] || continue
   # `test -e` resolves the "../.." in a relative extends target itself; no
@@ -510,6 +513,16 @@ node -e '
 ' "$STAGE"
 echo "→ linked workspace: dependencies of apps/server into $STAGE/node_modules for pnpm pack"
 
+# The manifest's `catalog:` specifiers resolve against the workspace catalogs,
+# and pnpm pack rewrites each to its concrete version only when the packing
+# directory carries them. Only the catalog sections are copied: the staged root
+# is not a workspace, and the file is outside `files`, so it never ships.
+if [ -f "$ROOT/pnpm-workspace.yaml" ]; then
+  awk '/^(catalog|catalogs):/ { keep = 1; print; next } /^[^[:space:]#]/ { keep = 0 } keep' \
+    "$ROOT/pnpm-workspace.yaml" > "$STAGE/pnpm-workspace.yaml"
+  echo "→ staged the workspace catalogs for pnpm pack to resolve catalog: specifiers"
+fi
+
 echo "→ running: pnpm pack $*"
 cd "$STAGE"
 # Always pack to an explicit destination OUTSIDE the staging dir, because the
@@ -568,14 +581,14 @@ fi
 # the filters keep the right things", and a single check that answered both
 # reported a deliberate strip as a too-broad exclude pattern.
 #
-# `$STAGE/node_modules` is the exception: it is the `workspace:` resolution
-# shim above, not part of the package (`files` names only `app`), so it is
-# excluded here rather than exempted below.
+# `$STAGE/node_modules` and `$STAGE/pnpm-workspace.yaml` are the exception:
+# they are the `workspace:` and `catalog:` resolution shims above, not part of
+# the package (`files` names only `app`), so they are excluded here.
 staged_all="$(mktemp)"
 in_tar="$(mktemp)"
 (cd "$STAGE" && find . \( -type f -o -type l \)) \
   | sed 's|^\./||' | grep -v '\.tgz$' \
-  | grep -v '^node_modules/' | sort > "$staged_all"
+  | grep -v '^node_modules/' | grep -vx 'pnpm-workspace.yaml' | sort > "$staged_all"
 # List once into a file rather than piping into `grep -q`. grep -q exits at the
 # first match, which SIGPIPEs tar; under `pipefail` that non-zero tar fails the
 # pipeline even though the match succeeded. It fires on linux and not macos,
@@ -597,11 +610,11 @@ echo "→ verified: the tarball carries every staged file"
 # Confirm the node_modules shim above did its job: pnpm resolved every
 # `workspace:` specifier to a real version rather than leaving the protocol
 # behind for a registry install to reject.
-if tar -xzO -f "$tarball" package/package.json 2>/dev/null | grep -q 'workspace:'; then
-  echo "✗ the tarball's package.json still names a workspace: specifier" >&2
+if tar -xzO -f "$tarball" package/package.json 2>/dev/null | grep -qE '"(workspace|catalog):'; then
+  echo "✗ the tarball's package.json still names a workspace: or catalog: specifier" >&2
   exit 1
 fi
-echo "→ verified: tarball package.json carries no workspace: specifiers"
+echo "→ verified: tarball package.json carries no workspace: or catalog: specifiers"
 
 # The lockfile is the whole reason for the staged layout (npm strips one at
 # the package ROOT), so its presence is asserted on every pack — not only in

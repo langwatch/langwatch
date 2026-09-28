@@ -407,6 +407,45 @@ function scoreOptionField(input: {
   return option.success ? option.data[input.field] : undefined;
 }
 
+/** One annotation's value under one of the annotation columns, or nothing for an unknown key. */
+function annotationColumn({
+  annotation,
+  traceId,
+  key,
+  subkey,
+  projectScores,
+}: {
+  annotation: TraceAnnotation;
+  traceId: string;
+  key: string;
+  subkey: string | undefined;
+  projectScores: AnnotationScore[] | undefined;
+}): unknown {
+  if (subkey && typeof annotation.scoreOptions === "object" && annotation.scoreOptions !== null) {
+    if (key === "score") {
+      return scoreOptionField({ scoreOptions: annotation.scoreOptions, subkey, field: "value" });
+    }
+    if (key === "score.reason") {
+      return scoreOptionField({ scoreOptions: annotation.scoreOptions, subkey, field: "reason" });
+    }
+  }
+  const scoreOptions = () =>
+    namedScoreOptions({ scoreOptions: annotation.scoreOptions, projectScores });
+  const keyMap = {
+    comment: () => annotation.comment,
+    is_thumbs_up: () => annotation.isThumbsUp,
+    author: () => annotation.user?.name ?? annotation.email ?? "",
+    score: scoreOptions,
+    "score.reason": scoreOptions,
+    expected_output: () => {
+      const suggestion = annotationSuggestedOutput({ annotation, traceId });
+      return suggestion.suggested ? suggestion.output : null;
+    },
+  };
+  const func = keyMap[key as keyof typeof keyMap];
+  return func ? func() : undefined;
+}
+
 /** An annotation's timestamp as `created_at` (ISO-8601, milliseconds); nothing when unreadable. */
 function createdAtField(value: unknown): { created_at?: string } {
   try {
@@ -658,47 +697,15 @@ export const TRACE_MAPPINGS = {
           .join("\n---\n");
       }
 
-      return annotations.map((annotation) => {
-        if (
-          subkey &&
-          typeof annotation.scoreOptions === "object" &&
-          annotation.scoreOptions !== null
-        ) {
-          if (key === "score") {
-            return scoreOptionField({
-              scoreOptions: annotation.scoreOptions,
-              subkey,
-              field: "value",
-            });
-          }
-          if (key === "score.reason") {
-            return scoreOptionField({
-              scoreOptions: annotation.scoreOptions,
-              subkey,
-              field: "reason",
-            });
-          }
-        }
-        const scoreOptions = () =>
-          namedScoreOptions({
-            scoreOptions: annotation.scoreOptions,
-            projectScores: data.annotationScoreOptions,
-          });
-        const keyMap = {
-          comment: () => annotation.comment,
-          is_thumbs_up: () => annotation.isThumbsUp,
-          author: () => annotation.user?.name ?? annotation.email ?? "",
-          score: scoreOptions,
-          "score.reason": scoreOptions,
-          expected_output: () =>
-            annotationSuggestedOutput({
-              annotation,
-              traceId: trace.trace_id,
-            }),
-        };
-        const func = keyMap[key as keyof typeof keyMap];
-        return func ? func() : undefined;
-      });
+      return annotations.map((annotation) =>
+        annotationColumn({
+          annotation,
+          traceId: trace.trace_id,
+          key,
+          subkey,
+          projectScores: data.annotationScoreOptions,
+        }),
+      );
     },
     expandable_by: "annotations.id",
   },

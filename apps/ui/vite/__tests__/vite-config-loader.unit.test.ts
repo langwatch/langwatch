@@ -101,15 +101,29 @@ describe("given the apps/ui Vite config", () => {
               plugin && "name" in plugin && plugin.name === "inject-development-public-config",
           );
         expect(inject).toBeDefined();
-        const html = await (
-          inject as unknown as { transformIndexHtml: (html: string) => string | Promise<string> }
-        ).transformIndexHtml("<html><head></head><body></body></html>");
+        const html = await transformIndexHtmlOf(inject)("<html><head></head><body></body></html>");
         const content = new RegExp(`name="${PUBLIC_APP_CONFIG_META_NAME}" content="([^"]+)"`).exec(
           html,
         )?.[1];
         expect(content).toBeDefined();
-        expect(parsePublicAppConfigMetaContent(content!).appBaseUrl).toBe("http://localhost:5560");
+        expect(parsePublicAppConfigMetaContent(content!).process?.appBaseUrl).toBe(
+          "http://localhost:5560",
+        );
       });
     });
   });
 });
+
+/** A plugin's `transformIndexHtml`, when it is declared as a plain function hook. */
+function transformIndexHtmlOf(plugin: unknown): (html: string) => Promise<string> {
+  if (typeof plugin !== "object" || plugin === null || !("transformIndexHtml" in plugin)) {
+    throw new Error("the plugin declares no transformIndexHtml hook");
+  }
+  const hook: unknown = plugin.transformIndexHtml;
+  if (typeof hook !== "function") throw new Error("transformIndexHtml is not a function hook");
+  return async (html) => {
+    const transformed: unknown = await Reflect.apply(hook, plugin, [html]);
+    if (typeof transformed !== "string") throw new Error("transformIndexHtml returned no HTML");
+    return transformed;
+  };
+}

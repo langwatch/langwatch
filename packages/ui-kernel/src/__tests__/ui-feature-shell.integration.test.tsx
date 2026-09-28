@@ -11,7 +11,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -85,7 +85,7 @@ afterEach(() => {
   dispose = void 0;
 });
 
-function renderShell(Shell: UiProviderShell, page: ReactNode, host?: QueryClient) {
+function renderShell(Shell: UiProviderShell, page: ReactNode, host?: QueryClient, entry = "/") {
   const inside = <Shell>{page}</Shell>;
   const router = createMemoryRouter(
     [
@@ -94,7 +94,7 @@ function renderShell(Shell: UiProviderShell, page: ReactNode, host?: QueryClient
         element: host ? <QueryClientProvider client={host}>{inside}</QueryClientProvider> : inside,
       },
     ],
-    { initialEntries: ["/"] },
+    { initialEntries: [entry] },
   );
   const view = render(<RouterProvider router={router} />);
   dispose = () => {
@@ -121,6 +121,31 @@ describe("given the shell apps/ui mounts around every routed page", () => {
       const view = renderShell(shell, <Page />);
 
       expect(view.getByTestId("who").textContent).toBe("user_1");
+    });
+  });
+
+  describe("when a drawer reads the host a module mounts", () => {
+    /** @scenario "A module's host is mounted above an open drawer too" */
+    it("renders the drawer inside the module host stack", async () => {
+      const ProbeHost = createContext<string | null>(null);
+      function ModuleHosts({ children }: { children?: ReactNode }) {
+        return <ProbeHost.Provider value="mounted">{children}</ProbeHost.Provider>;
+      }
+      function ProbeDrawer() {
+        return <div data-testid="drawer-host">{useContext(ProbeHost) ?? "missing"}</div>;
+      }
+      const shell = createUiFeatureShell({
+        sessionQueryKey: TEST_SESSION_QUERY_KEY,
+        apis: [],
+        capabilities: { session: new StubSession(), scope: new StubScope() },
+        transport: {} as UiFeatureApiTransport,
+        drawers: { probe: ProbeDrawer },
+        moduleHosts: ModuleHosts,
+      });
+
+      const view = renderShell(shell, <div />, void 0, "/?drawer.open=probe");
+
+      await waitFor(() => expect(view.getByTestId("drawer-host").textContent).toBe("mounted"));
     });
   });
 

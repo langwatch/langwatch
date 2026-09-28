@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import { agentResponseSchema } from "./agent-rest.schemas.ts";
@@ -101,6 +102,13 @@ export type ListAgentsInput = z.infer<typeof listAgentsQuerySchema>;
 export type AgentProjectInput = { projectId: string };
 export type AgentReferenceInput = { agentId: string; projectId: string };
 export type AgentIdsInput = { ids: string[]; projectId: string };
+/** Agents one project created in a window, archived ones included; optionally copies of one. */
+export type AgentCreationWindowInput = {
+  projectId: string;
+  from: Instant;
+  to: Instant;
+  copiedFromAgentId?: string;
+};
 export type AgentCopiesInput = { sourceAgentId: string; allowedProjectIds?: string[] };
 export type PushAgentCopiesInput = {
   sourceAgentId: string;

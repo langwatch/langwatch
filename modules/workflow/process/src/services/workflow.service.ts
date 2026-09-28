@@ -284,7 +284,7 @@ export class WorkflowService {
       workflowId: id,
       dsl: { ...command.dsl, workflow_id: id },
       commitMessage: command.commitMessage,
-      autoSaved: false,
+      autoSaved: command.autoSaved ?? false,
       authorId: command.authorId,
     });
     const published = command.publish

@@ -14,6 +14,7 @@ vi.mock("../langwatch-api-api-keys.js", () => ({
   revokeApiKey: vi.fn(),
 }));
 
+import { listApiKeys, createApiKey, revokeApiKey } from "../langwatch-api-api-keys.js";
 import {
   listProjects,
   getProject,
@@ -21,17 +22,14 @@ import {
   updateProject,
   archiveProject,
 } from "../langwatch-api-projects.js";
-
-import { listApiKeys, createApiKey, revokeApiKey } from "../langwatch-api-api-keys.js";
-
-import { handleListProjects } from "../tools/list-projects.js";
-import { handleGetProject } from "../tools/get-project.js";
-import { handleCreateProject } from "../tools/create-project.js";
-import { handleUpdateProject } from "../tools/update-project.js";
 import { handleArchiveProject } from "../tools/archive-project.js";
-import { handleListApiKeys } from "../tools/list-api-keys.js";
 import { handleCreateApiKey } from "../tools/create-api-key.js";
+import { handleCreateProject } from "../tools/create-project.js";
+import { handleGetProject } from "../tools/get-project.js";
+import { handleListApiKeys } from "../tools/list-api-keys.js";
+import { handleListProjects } from "../tools/list-projects.js";
 import { handleRevokeApiKey } from "../tools/revoke-api-key.js";
+import { handleUpdateProject } from "../tools/update-project.js";
 
 const mockListProjects = vi.mocked(listProjects);
 const mockGetProject = vi.mocked(getProject);

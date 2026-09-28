@@ -4,7 +4,7 @@
  * read, and each press landing on the command it names.
  */
 
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Call = { name: string; input: unknown };
@@ -207,6 +207,24 @@ describe("the single sign-on setup page", () => {
           "Where your people sign in, and everything it takes to put it in front of them.",
         ),
       ).toBeTruthy();
+    });
+  });
+
+  describe("given the page inside the Authentication section", () => {
+    /** @scenario "The Authentication pages share main's rail" */
+    it("frames it in main's rail with Identity provider as the current entry", () => {
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
+      const links = within(rail).getAllByRole("link");
+      expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+        ["Overview", "/settings/authentication"],
+        ["Identity provider", "/settings/authentication/provider"],
+        ["Connectors", "/settings/authentication/connectors"],
+      ]);
+      expect(
+        within(rail).getByRole("link", { name: "Identity provider" }).getAttribute("aria-current"),
+      ).toBe("page");
     });
   });
 

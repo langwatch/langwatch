@@ -46,7 +46,7 @@ describe("formSchema reasoning validation", () => {
       const values = buildDefaultFormValues({
         version: { configData: { llm: { reasoning: "high" } } },
       });
-      expect(formSchema.safeParse(values).success).toBe(true);
+      expect(formSchema.validate(values)).toBe(true);
     });
 
     /** @scenario Form schema accepts reasoning field with "low" value */
@@ -54,7 +54,7 @@ describe("formSchema reasoning validation", () => {
       const values = buildDefaultFormValues({
         version: { configData: { llm: { reasoning: "low" } } },
       });
-      expect(formSchema.safeParse(values).success).toBe(true);
+      expect(formSchema.validate(values)).toBe(true);
     });
 
     /** @scenario Form schema accepts reasoning field with "medium" value */
@@ -62,7 +62,7 @@ describe("formSchema reasoning validation", () => {
       const values = buildDefaultFormValues({
         version: { configData: { llm: { reasoning: "medium" } } },
       });
-      expect(formSchema.safeParse(values).success).toBe(true);
+      expect(formSchema.validate(values)).toBe(true);
     });
   });
 
@@ -70,7 +70,7 @@ describe("formSchema reasoning validation", () => {
     /** @scenario "Form schema accepts undefined reasoning" */
     it("accepts undefined reasoning", () => {
       const values = buildDefaultFormValues();
-      expect(formSchema.safeParse(values).success).toBe(true);
+      expect(formSchema.validate(values)).toBe(true);
       expect(values.version.configData.llm.reasoning).toBeUndefined();
     });
   });

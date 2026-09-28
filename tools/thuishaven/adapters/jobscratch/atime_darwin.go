@@ -4,6 +4,7 @@ package jobscratch
 
 import (
 	"io/fs"
+	"os"
 	"syscall"
 	"time"
 )
@@ -19,3 +20,6 @@ func accessTime(info fs.FileInfo) (time.Time, bool) {
 	}
 	return time.Unix(st.Atimespec.Sec, st.Atimespec.Nsec), true
 }
+
+// readFileNoAtime reads a record file. APFS does not move atime on read.
+func readFileNoAtime(path string) ([]byte, error) { return os.ReadFile(path) }

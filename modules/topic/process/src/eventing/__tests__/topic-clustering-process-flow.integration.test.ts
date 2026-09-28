@@ -8,14 +8,15 @@ import {
 } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "../../rules/topic-clustering-process.rules.ts";
 import type { TopicClusteringProcessingEvent } from "../../services/topic-events.service.ts";
 import type {
   TopicClusteringDispatchDeps,
   TopicClusteringOutcomeCommands,
 } from "../topic-clustering.intent.ts";
 import {
-  TOPIC_CLUSTERING_PROCESS_NAME,
-  TopicClusteringProcess,
+  buildTopicClusteringProcessEventView,
+  topicClusteringProcessManager,
 } from "../topic-clustering.process.ts";
 
 const PROJECT_ID = "project-1";
@@ -51,7 +52,7 @@ function toEnvelope(event: TopicClusteringProcessingEvent) {
     tenantId: String(event.tenantId),
     projectId: String(event.tenantId),
     processKey: String(event.aggregateId),
-    payload: TopicClusteringProcess.buildProcessEventView(event),
+    payload: buildTopicClusteringProcessEventView(event),
   };
 }
 
@@ -70,7 +71,7 @@ function harness(options?: {
   // boundary all included.
   const definition = buildProcessManager<TopicClusteringProcessingEvent>({
     name: TOPIC_CLUSTERING_PROCESS_NAME,
-    applier: TopicClusteringProcess.processManager({
+    applier: topicClusteringProcessManager({
       runPort:
         options?.runPort ??
         ({

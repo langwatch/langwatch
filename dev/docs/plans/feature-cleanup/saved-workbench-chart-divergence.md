@@ -4,7 +4,7 @@ Status: live one now tested; dead one still standing, with the map to remove it.
 
 ## What is there
 
-|                    | `platform/app/src/server/analytics/saved-workbench-charts/`                                         | `modules/dashboard/process/src/services/`                    |
+|                    | `platform/app/src/server/analytics/saved-workbench-charts/`                                         | `modules/dashboard/process/src/services/`                             |
 | ------------------ | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | File               | `savedWorkbenchChart.service.ts` (604 lines)                                                        | `saved-workbench-chart.service.ts` (268)                              |
 | Class              | `SavedWorkbenchChartService`                                                                        | `SavedWorkbenchChartService`                                          |

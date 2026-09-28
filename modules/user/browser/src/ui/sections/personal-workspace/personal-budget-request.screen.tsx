@@ -118,11 +118,11 @@ export function PersonalBudgetRequestScreen() {
         </HStack>
 
         {noOrg && (
-          <Alert.Root status="info" borderRadius="md">
+          <Alert.Root status="info">
             <Alert.Indicator />
             <Box>
               <Alert.Title>Personal account - no admin to email</Alert.Title>
-              <Alert.Description fontSize="sm">
+              <Alert.Description>
                 Budget-increase requests only apply to organization-managed accounts. Personal
                 accounts manage their own limits in Settings.
               </Alert.Description>
@@ -131,13 +131,13 @@ export function PersonalBudgetRequestScreen() {
         )}
 
         {!noOrg && submitState === "sent" && (
-          <Alert.Root status="success" borderRadius="md">
+          <Alert.Root status="success">
             <Alert.Indicator>
               <CheckCircle2 size={18} />
             </Alert.Indicator>
             <Box>
               <Alert.Title>Request sent</Alert.Title>
-              <Alert.Description fontSize="sm">
+              <Alert.Description>
                 We emailed {adminEmail ?? "your organization admin"} with the spend context. They'll
                 review and update the budget in Settings → AI Governance → Budgets.
               </Alert.Description>
@@ -146,13 +146,13 @@ export function PersonalBudgetRequestScreen() {
         )}
 
         {!noOrg && submitState !== "sent" && sendFailed && (
-          <Alert.Root status="error" borderRadius="md">
+          <Alert.Root status="error">
             <Alert.Indicator>
               <AlertTriangle size={18} />
             </Alert.Indicator>
             <Box>
               <Alert.Title>We couldn't send your request</Alert.Title>
-              <Alert.Description fontSize="sm">
+              <Alert.Description>
                 Try again, or{" "}
                 {adminEmail ? (
                   <>
@@ -193,13 +193,13 @@ export function PersonalBudgetRequestScreen() {
                 </VStack>
               </Box>
             ) : (
-              <Alert.Root status="warning" borderRadius="md">
+              <Alert.Root status="warning">
                 <Alert.Indicator>
                   <AlertTriangle size={18} />
                 </Alert.Indicator>
                 <Box>
                   <Alert.Title>No context attached</Alert.Title>
-                  <Alert.Description fontSize="sm">
+                  <Alert.Description>
                     The page was opened without a budget block context. You can still send a
                     free-form message - the admin will review and decide.
                   </Alert.Description>

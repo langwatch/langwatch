@@ -7,9 +7,6 @@ export {
   type LangyPostgresServiceOptions,
 } from "./services/langy-postgres.service.ts";
 export { langyServer } from "./langy.server.ts";
-export { type LangyNavigateProject } from "./app/langy.members.ts";
-export type { LangyNavigateResourceLocator } from "./app/langy.members.ts";
-export type { LangyNavigateResourceKind } from "./rules/langy-navigate-resources.rules.ts";
 export type { LangyDatabase } from "./repositories/prisma/langy-database.mapper.ts";
 export type { LangyTurnTechnicalMembers } from "./services/langy-turn.service.ts";
 export { type LangySessionKeyMetrics } from "./app/langy.members.ts";

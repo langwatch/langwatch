@@ -4,7 +4,6 @@ export * from "./model/foreign-turn-rehydration.ts";
 export * from "./model/langy-answer-segments.ts";
 export * from "./model/langy-activity-ownership.ts";
 export * from "./model/langy-capability-digest.ts";
-export * from "./model/langy-capability-catalog.ts";
 export * from "./model/langy-capability-registry.ts";
 export * from "./behavior/langy-chip-context.ts";
 export * from "./model/langy-choices-timeline.ts";

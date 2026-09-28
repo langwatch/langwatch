@@ -68,7 +68,7 @@ describe("listSecretsCommand()", () => {
 
     await listSecretsCommand();
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/secret?projectId=proj_123"),
+      expect.stringContaining("/api/v1/secrets?projectId=proj_123"),
       expect.objectContaining({ method: "GET", headers: expect.any(Object) }),
     );
   });
@@ -114,7 +114,7 @@ describe("getSecretCommand()", () => {
 
     await getSecretCommand("secret_abc");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/secret/secret_abc?projectId=proj_123"),
+      expect.stringContaining("/api/v1/secrets/secret_abc?projectId=proj_123"),
       expect.objectContaining({
         method: "GET",
       }),
@@ -151,7 +151,7 @@ describe("createSecretCommand()", () => {
 
     await createSecretCommand("MY_API_KEY", { value: "sk-123" });
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/secret"),
+      expect.stringContaining("/api/v1/secrets"),
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("MY_API_KEY"),
@@ -195,7 +195,7 @@ describe("updateSecretCommand()", () => {
 
     await updateSecretCommand("secret_abc", { value: "new-value" });
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/secret/secret_abc"),
+      expect.stringContaining("/api/v1/secrets/secret_abc"),
       expect.objectContaining({
         method: "PUT",
         body: JSON.stringify({
@@ -236,7 +236,7 @@ describe("deleteSecretCommand()", () => {
 
     await deleteSecretCommand("secret_abc");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/secret/secret_abc"),
+      expect.stringContaining("/api/v1/secrets/secret_abc"),
       expect.objectContaining({
         method: "DELETE",
         body: JSON.stringify({ projectId: "proj_123" }),

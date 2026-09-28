@@ -1,4 +1,4 @@
-import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
+import { AgentApi, INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import type { ProtocolConnection } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
@@ -10,7 +10,9 @@ import {
 } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 /**
@@ -96,12 +98,16 @@ import {
 } from "@langwatch/langy-contract";
 import type * as langyContractModule from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import { OnboardingApi } from "@langwatch/onboarding-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
+import { PromptApi } from "@langwatch/prompt-contract";
+import { ScenarioApi } from "@langwatch/scenario-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { UserApi } from "@langwatch/user-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 import type { Redis } from "ioredis";
 import type { z } from "zod";
 
@@ -133,6 +139,8 @@ import { LangyLocalWorkerService } from "../services/langy-local-worker.service.
 import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
 import { LangyMaintenanceService } from "../services/langy-maintenance.service.ts";
 import { LangyModelService } from "../services/langy-model.service.ts";
+import { LangyNavigateFallbackService } from "../services/langy-navigate-fallback.service.ts";
+import { LangyNavigateResourceLocatorService } from "../services/langy-navigate-resource-locator.service.ts";
 import { LangyPanelAccessService } from "../services/langy-panel-access.service.ts";
 import { LangyPanelConversationService } from "../services/langy-panel-conversation.service.ts";
 import { LangyPanelEgressService } from "../services/langy-panel-egress.service.ts";
@@ -248,8 +256,17 @@ export class LangyApp implements LangyApiContract {
     /** Langy's own gateway key: minted by the gateway, kept under a reserved project secret. */
     gateway: GatewayApi,
     secrets: SecretApi,
-    /** The saved workbench an away page's UI action is applied to. */
+    /** The saved workbench an away page's UI action is applied to, and a navigate's experiment. */
     experiments: ExperimentApi,
+    /** The agent a navigate with no remembered link opens, at the agent's own address. */
+    agents: AgentApi,
+    /** The resources a navigate with no remembered link opens, each looked up in its owner. */
+    prompts: PromptApi,
+    datasets: DatasetApi,
+    workflows: WorkflowApi,
+    monitors: MonitorApi,
+    evaluators: EvaluatorApi,
+    scenarios: ScenarioApi,
     /** Whether a failed turn belonged to guided onboarding, and where that failure is tracked. */
     onboarding: OnboardingApi,
     /** The platform default retention the analytics grain is written on. */
@@ -296,6 +313,21 @@ export class LangyApp implements LangyApiContract {
         gateway: setup.dependencies.gateway,
       }),
       uiActionSurface: LangyUiActionSurfaceService.create(setup.dependencies.featureFlags),
+      navigateFallback: LangyNavigateFallbackService.create({
+        projects: setup.dependencies.projects,
+        resources: LangyNavigateResourceLocatorService.create({
+          experiments: setup.dependencies.experiments,
+          agents: setup.dependencies.agents,
+          prompts: setup.dependencies.prompts,
+          datasets: setup.dependencies.datasets,
+          workflows: setup.dependencies.workflows,
+          monitors: setup.dependencies.monitors,
+          evaluators: setup.dependencies.evaluators,
+          scenarios: setup.dependencies.scenarios,
+          publicBaseUrl: setup.members.publicBaseUrl,
+        }),
+        publicBaseUrl: setup.members.publicBaseUrl,
+      }),
     });
     const commands = LangyConversationCommandSenders.create();
     const langy = adapter.build({

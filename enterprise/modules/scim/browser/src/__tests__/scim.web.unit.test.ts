@@ -26,11 +26,16 @@ describe("given a browser that installs scim", () => {
   });
 
   describe("when a screen the declaration names is asked for", () => {
-    it("answers with the SCIM component", async () => {
-      const screen = scimWeb.installation.screens["pages/settings/scim"];
+    it("answers with the Connectors component", async () => {
+      const screen = scimWeb.installation.screens["pages/settings/authentication/connectors"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
+    });
+
+    /** Directory sync became the Directory; its old address redirects there. */
+    it("declares no page for the retired SCIM address", () => {
+      expect(scimWeb.installation.screens).not.toHaveProperty("pages/settings/scim");
     });
   });
 });

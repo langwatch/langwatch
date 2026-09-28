@@ -136,11 +136,15 @@ jobs:
       # because the root `pnpm build` and the Docker image also run this
       # package's build and were paying a full SDK type check the
       # workspace-wide `typecheck` job had already done.
-      - name: Typecheck
-        run: pnpm run typecheck
-
+      #
+      # Build runs first: the typecheck's project references reach
+      # packages/observability, which imports this SDK through its built
+      # declarations, so a typecheck before the build cannot resolve them.
       - name: Build
         run: pnpm run build
+
+      - name: Typecheck
+        run: pnpm run typecheck
 
       - name: Run tests
         # Fork and Dependabot PRs don't receive repository secrets, so a
@@ -281,6 +285,7 @@ jobs:
           --filter "@langwatch/platform-api..."
           --filter "@langwatch/worker..."
           --filter "@langwatch/ui..."
+          --filter "@langwatch/tasks..."
           --filter "langwatch..."
 
       - name: Build mcp-server
@@ -290,6 +295,12 @@ jobs:
         working-directory: .
         run: pnpm start:prepare:files && pnpm ensure:built
 
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        # The api and worker refuse to boot without a 32-byte hex encryption key,
+        # and the seed hashes the project key under it, so it comes before the seed.
+        # Generated per run: a committed hex literal reads as a leaked key to the scanner.
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Setup database
         working-directory: .
         run: pnpm prisma:migrate
@@ -297,9 +308,9 @@ jobs:
       - name: Seed test project
         working-directory: .
         env:
-          # Seed the credential the SDK test process receives without putting
-          # LANGWATCH_API_KEY on the platform process itself.
-          HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-1234567890
+          # The e2e global setup probes the seed's DEFAULT_INGESTION_KEY, so
+          # the seed writes that key.
+          HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-local-development-key
         run: pnpm prisma:seed
 
       - name: Install goose
@@ -330,7 +341,8 @@ jobs:
           # once this step ends, which has already hidden one real regression
           # (a server-side 500 on the visibility poll shows up only as SDK
           # test timeouts). The failure step below tails these files.
-          NODE_ENV=production pnpm --filter @langwatch/platform-api start > /tmp/langwatch-server.log 2>&1 &
+          # The api listens on API_PORT (6560 by default); the SDK and the probe call 5560.
+          API_PORT=5560 NODE_ENV=production pnpm --filter @langwatch/platform-api start > /tmp/langwatch-server.log 2>&1 &
           # Start the worker process so the event-sourcing pipeline
           # consumes traces from Redis and writes them to ClickHouse
           pnpm --filter @langwatch/worker start > /tmp/langwatch-workers.log 2>&1 &
@@ -353,7 +365,7 @@ jobs:
           && (github.actor != 'dependabot[bot]'
            || github.event_name == 'pull_request_target')
         env:
-          LANGWATCH_API_KEY: sk-lw-1234567890
+          LANGWATCH_API_KEY: sk-lw-local-development-key
           # OpenAI traffic rides the LangWatch AI Gateway (virtual key +
           # gateway base URL). Step-scoped on purpose: the LangWatch app
           # booted above must not inherit a gateway base URL.

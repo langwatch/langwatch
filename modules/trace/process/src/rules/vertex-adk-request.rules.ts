@@ -1,6 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
-import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
+import { type ExtractorContext, takeAttribute } from "./canonical-attributes.rules.ts";
 import { recordValueType } from "./canonical-extraction.rules.ts";
 import { asNumber, isNonEmptyString, isRecord, parseJsonSafely } from "./canonical-guard.rules.ts";
 import { convertGeminiContent, extractSystemInstructionText } from "./gemini-content.rules.ts";
@@ -78,7 +78,7 @@ export function canonicaliseVertexAdkRequest(ctx: ExtractorContext): void {
   if (!isRecord(request)) {
     return;
   }
-  attrs.take(VERTEX_ADK_KEYS.LLM_REQUEST);
+  takeAttribute(attrs, VERTEX_ADK_KEYS.LLM_REQUEST);
 
   recordRequestModel(ctx, request);
   recordInputMessages(ctx, request.contents);

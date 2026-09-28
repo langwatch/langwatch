@@ -113,6 +113,27 @@ export class LangyTurnSettlementWaiterService {
     return null;
   }
 
+  private userWaitFromEvents(
+    events: LangyConversationTurnWireEvent[],
+    turnId: string,
+  ): LangyTurnSettlementWait | null {
+    for (const event of events) {
+      if (
+        event.type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED &&
+        event.data.turnId === turnId
+      ) {
+        const questions = event.data.questions ?? [];
+        return {
+          kind: "awaiting_user",
+          question: questions.map((question) => question.question).join("\n"),
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /** A user wait is answered only after the whole pass found no reply, so a reply always wins. */
   private async readSettlementFromFold(input: {
     langy: LangyTurnSettlementReader;
     projectId: string;
@@ -120,8 +141,10 @@ export class LangyTurnSettlementWaiterService {
     turnId: string;
     userId: string;
     signal: AbortSignal;
-  }): Promise<LangyTurnSettlement | null> {
+    shouldSettleOnUserWait?: boolean;
+  }): Promise<LangyTurnSettlementWait | null> {
     let cursor: LangyEventCursor = { acceptedAt: 0, eventId: "" };
+    let userWait: LangyTurnSettlementWait | null = null;
 
     while (!input.signal.aborted) {
       const page = await input.langy
@@ -144,11 +167,15 @@ export class LangyTurnSettlementWaiterService {
 
       const settlement = this.deriveSettlementFromEvents(page.events, input.turnId);
       if (settlement) {
-        return settlement;
+        return { kind: "settled", settlement };
+      }
+
+      if (input.shouldSettleOnUserWait) {
+        userWait ??= this.userWaitFromEvents(page.events, input.turnId);
       }
 
       if (!page.truncated) {
-        return null;
+        return userWait;
       }
 
       cursor = page.cursor;
@@ -236,6 +263,7 @@ export class LangyTurnSettlementWaiterService {
     userId: string;
     signal: AbortSignal;
     pollIntervalMs?: number;
+    shouldSettleOnUserWait?: boolean;
   }): Promise<LangyTurnSettlementWait> {
     const armed = this.armBufferWatch(input);
     let terminalSeen = armed.terminalSeen;
@@ -245,7 +273,7 @@ export class LangyTurnSettlementWaiterService {
       while (!input.signal.aborted) {
         const settlement = await this.readSettlementFromFold(input);
         if (settlement) {
-          return { kind: "settled", settlement };
+          return settlement;
         }
 
         const outcome = await this.waitForNextPoll(terminalSeen, pollMs, input.signal);

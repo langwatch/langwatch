@@ -42,29 +42,6 @@ export class PrismaInstanceIdentityRepository implements InstanceIdentityReposit
     }
   }
 
-  /**
-   * Mints where there is none: an install whose administrator is dismissing the
-   * notice about reporting is an install about to report, and the dismissal
-   * needs a row to live on.
-   */
-  async acknowledgeStartupNotice({
-    instanceId,
-    schemaVersion,
-  }: {
-    instanceId: string;
-    schemaVersion: number;
-  }): Promise<void> {
-    await this.prisma.instanceIdentity.upsert({
-      where: { id: ROW_ID },
-      create: {
-        id: ROW_ID,
-        instanceId,
-        startupNoticeAcknowledgedSchemaVersion: schemaVersion,
-      },
-      update: { startupNoticeAcknowledgedSchemaVersion: schemaVersion },
-    });
-  }
-
   async setReportSwitches({
     optionalMetricsOptOut,
     hostnameOptOut,
@@ -96,6 +73,5 @@ function rowOf(row: InstanceIdentity): InstanceIdentityRecord {
     lastReportError: row.lastReportError,
     optionalMetricsOptOut: row.optionalMetricsOptOut,
     hostnameOptOut: row.hostnameOptOut,
-    startupNoticeAcknowledgedSchemaVersion: row.startupNoticeAcknowledgedSchemaVersion,
   };
 }

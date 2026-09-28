@@ -19,10 +19,10 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
-      "path": "../../trace/contract/tsconfig.build.json"
+      "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/time/tsconfig.build.json"
+      "path": "../../trace/contract/tsconfig.build.json"
     }
   ]
 }

@@ -47,14 +47,12 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "catalog:",
-    "@ai-sdk/provider": "^3.0.13",
     "@clickhouse/client": "catalog:",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
-    "@langwatch/automation-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
@@ -91,12 +89,10 @@
     "ai": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
-    "jsonpath-plus": "catalog:",
     "langwatch": "workspace:*",
     "liquidjs": "catalog:",
     "nanoid": "catalog:",
     "papaparse": "catalog:",
-    "undici": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -109,8 +105,6 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/suite-process": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
-    "@opentelemetry/sdk-trace-base": "catalog:",
-    "@opentelemetry/sdk-trace-node": "catalog:",
     "@types/papaparse": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -45,7 +45,7 @@ import {
   type ScimReconciliationScope,
   type ScimServerConfig,
   type ScimService,
-  type ScimDeliveryAdmission,
+  type ScimDeliveryReceipt,
   type ScimDirectoryConnection,
   type ScimTokenAuditEntry,
   type ScimTokenEntitlement,
@@ -937,15 +937,11 @@ export class ScimApp implements ScimApiContract {
 
   // ── The directory's log stream ───────────────────────────────────────────
 
-  admitDirectoryDelivery(delivery: {
+  receiveDirectoryDelivery(delivery: {
     body: string;
     signature: string | null;
     authorization: string | null;
-  }): Promise<ScimDeliveryAdmission> {
-    return this.#webhook.admit(delivery);
-  }
-
-  relayDirectoryEvents(input: { organizationId: string; events: unknown[] }): Promise<void> {
-    return this.#webhook.relay(input);
+  }): Promise<ScimDeliveryReceipt> {
+    return this.#webhook.receive(delivery);
   }
 }

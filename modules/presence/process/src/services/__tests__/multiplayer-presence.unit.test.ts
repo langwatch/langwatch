@@ -180,10 +180,10 @@ describe("given a project several people are working in", () => {
         { pointer: "hand" },
       ]) {
         expect(
-          presenceUpdateInputSchema.safeParse({
+          presenceUpdateInputSchema.validate({
             ...heartbeat(alice, "tab-one", tracesAt("T1")),
             location: { ...tracesAt("T1"), ...rejected },
-          }).success,
+          }),
         ).toBe(false);
       }
     });

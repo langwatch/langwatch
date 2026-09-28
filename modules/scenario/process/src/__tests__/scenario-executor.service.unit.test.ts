@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
 import { MemoryScenarioCancellationChannel } from "../channels/memory/memory.scenario-cancellation.channel.ts";
+import { MemoryVoiceNonceRepository } from "../repositories/memory/memory.voice-nonce.repository.ts";
 import { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service.ts";
 import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
 import type { ScenarioService } from "../services/scenario.service.ts";
@@ -23,7 +24,7 @@ function harness({ langwatchEndpoint }: { langwatchEndpoint: string | undefined 
   const channel = MemoryScenarioCancellationChannel.create();
   const owned: string[] = [];
   const executor = ScenarioExecutorService.create({
-    voiceNonces: VoiceNonceRegistryService.create(),
+    voiceNonces: VoiceNonceRegistryService.create({ nonces: MemoryVoiceNonceRepository.create() }),
     peers: {
       ...scenarioExecutorPeers(),
       agents: createApiFixture<AgentApi>(),

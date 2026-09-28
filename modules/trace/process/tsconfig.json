@@ -143,9 +143,6 @@
       "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
     },
     {
-      "path": "../../data-privacy/process/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]

@@ -32,10 +32,10 @@ export function PrivacyDroppedNotice({ categories }: { categories?: string[] | n
   const itTheyWere = single ? "it was" : "they were";
 
   return (
-    <Alert.Root status="info" size="sm" variant="subtle" width="full">
+    <Alert.Root status="info" size="sm" width="full">
       <Alert.Indicator />
       <Alert.Content>
-        <Alert.Description fontSize="sm">
+        <Alert.Description>
           The {list} {wasWere} dropped by this project's privacy settings before {itTheyWere}{" "}
           stored, so {itThey} not shown here and cannot be recovered.
         </Alert.Description>

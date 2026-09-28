@@ -34,6 +34,9 @@ Read before building, not after:
   `dev/docs/best_practices/scoped-resources.md` — scope selection is always
   `ScopeChipPicker`, never a hand-rolled Select.
 - `dev/docs/best_practices/copywriting.md` — no abbreviations, no internals in copy.
+- `dev/docs/best_practices/alerts-toasts-and-field-errors.md`: alert versus toast versus
+  field error, which alert variant and size, and how toasts stack; never restyle an
+  alert at the call site.
 
 A component that a second module needs is published as a surface, not copied; see
 `.claude/skills/module/references/web-surface.md`. A component the whole product needs

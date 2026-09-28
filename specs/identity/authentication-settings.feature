@@ -177,15 +177,6 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then the link goes to the address "sam" is signed in as
     And no sign-up link is sent
 
-  # An installation with no email provider cannot send the link at all, so it
-  # neither offers one nor fails quietly when asked anyway (ADR-117).
-  @unit @integration
-  Scenario: Without a way to send email, the address confirmation nudge stays silent
-    Given the installation has no email provider configured
-    And my account's address is unconfirmed
-    Then no resend confirmation action is offered for it
-    And asking to send the confirmation anyway is refused with a named error
-
   # Attaching is not claiming. An unverified identifier blocks nobody, so
   # refusing here would buy no protection and would answer "does an account
   # exist for this address" to anybody holding an account. The check belongs

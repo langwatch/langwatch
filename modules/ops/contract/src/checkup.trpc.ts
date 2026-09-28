@@ -5,7 +5,7 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
-import { startupNoticeStateSchema, usageReportPreviewSchema } from "./checkup-usage-report.ts";
+import { usageReportPreviewSchema } from "./checkup-usage-report.ts";
 import { checkupResultSchema, explicitCheckInputSchema } from "./checkup.ts";
 
 const organizationInput = z.object({ organizationId: z.string().min(1) });
@@ -53,12 +53,4 @@ export const checkupTrpc = defineTrpcContract("checkup")
     }),
   )
   .withOutput(usageReportAnswer)
-
-  .query("startupNotice")
-  .withInput(organizationInput)
-  .withOutput(startupNoticeStateSchema)
-
-  .mutation("dismissStartupNotice")
-  .withInput(z.object({ ...organizationInput.shape, schemaVersion: z.number().int().min(1) }))
-  .withOutput(z.object({ dismissed: z.boolean() }))
   .build();

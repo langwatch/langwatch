@@ -183,13 +183,7 @@ export const ShellPageBody = ({
           hero's bloom) cannot wash them out; `docked` stays under every portaled overlay. */}
       <VStack width="full" gap={0} position="relative" zIndex="docked" data-part="page-banners">
         {(!deployment.hasNlpService || !deployment.hasLangevals) && (
-          <Alert.Root
-            status="warning"
-            width="full"
-            borderBottom="1px solid"
-            borderBottomColor="yellow.300"
-            borderTopLeftRadius="2xl"
-          >
+          <Alert.Root status="warning" width="full" borderTopLeftRadius="2xl">
             <Alert.Indicator />
             <Alert.Content>
               <Text>
@@ -205,10 +199,6 @@ export const ShellPageBody = ({
           <Alert.Root
             status={usage.data.messageLimitInfo.status === "exceeded" ? "error" : "warning"}
             width="full"
-            borderBottom="1px solid"
-            borderBottomColor={
-              usage.data.messageLimitInfo.status === "exceeded" ? "red.300" : "yellow.300"
-            }
           >
             <Alert.Indicator />
             <Alert.Content>
@@ -227,12 +217,7 @@ export const ShellPageBody = ({
           </Alert.Root>
         )}
         {usage.data && usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
-          <Alert.Root
-            status="warning"
-            width="full"
-            borderBottom="1px solid"
-            borderBottomColor="yellow.300"
-          >
+          <Alert.Root status="warning" width="full">
             <Alert.Indicator />
             <Alert.Content>
               <Text>
@@ -255,8 +240,6 @@ export const ShellPageBody = ({
           </Alert.Root>
         )}
 
-        {host.startupNotice()}
-
         {host.joinOffer({
           currentOrganizationId: isOrganizationLoading ? void 0 : (organization?.id ?? null),
         })}
@@ -267,20 +250,15 @@ export const ShellPageBody = ({
           <Alert.Root
             status="error"
             width="full"
-            border="1px solid"
-            borderColor="colorPalette.muted"
             marginX={4}
             marginTop={3}
-            borderRadius="lg"
             maxWidth="calc(100% - 22px)"
           >
             <Alert.Indicator />
             <Alert.Content>
               <HStack width="full" gap={4}>
                 <VStack align="start" gap={0} flex={1}>
-                  <Alert.Title fontWeight="bold">
-                    Sign in with your organization's single sign-on
-                  </Alert.Title>
+                  <Alert.Title>Sign in with your organization's single sign-on</Alert.Title>
                   <Text fontSize="sm">
                     Your organization requires single sign-on. Sign out, then sign in again by
                     entering your work email address.
@@ -330,11 +308,8 @@ export const ShellPageBody = ({
           <Alert.Root
             status="warning"
             width="full"
-            border="1px solid"
-            borderColor="colorPalette.muted"
             marginX={4}
             marginTop={3}
-            borderRadius="lg"
             maxWidth="calc(100% - 22px)"
           >
             <Alert.Indicator />

@@ -26,10 +26,7 @@ const driverWriteConflictSchema = z.object({
 });
 
 export function isSerializationConflict(error: unknown): boolean {
-  return (
-    prismaWriteConflictSchema.safeParse(error).success ||
-    driverWriteConflictSchema.safeParse(error).success
-  );
+  return prismaWriteConflictSchema.validate(error) || driverWriteConflictSchema.validate(error);
 }
 
 /**

@@ -16,10 +16,6 @@ export const opsWeb = defineWebModule("ops")
       },
     },
   })
-  // The install's one-time usage-report notice; the shell draws it where the page body starts.
-  .withCapabilities({
-    startupNotice: { load: () => import("./features/checkup/ui/sections/startup-notice.tsx") },
-  })
   .withScreens({
     // Placed by the application's settings table beside License and Connect.
     "pages/settings/checkup": {

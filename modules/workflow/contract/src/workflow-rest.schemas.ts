@@ -27,7 +27,6 @@ export const workflowRestDetailSchema = z.object({
   platformUrl: z.string().url(),
 });
 
-
 /** The one path parameter every item address of this family names. */
 export const workflowRestParamsSchema = z.object({ id: z.string().min(1) });
 

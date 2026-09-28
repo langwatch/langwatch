@@ -59,7 +59,7 @@ function composedFor(mode: "light" | "dark"): [string, ComponentType][] {
     );
     return Object.entries(composed).map(([name, story]): [string, ComponentType] => [
       `${file.replace("../src/", "")} → ${name}`,
-      story as unknown as ComponentType,
+      story,
     ]);
   });
 }

@@ -4,7 +4,6 @@ import {
   codingAgentPullRequestDetailSchema,
   codingAgentPullRequestUsageInputSchema,
   codingAgentPullRequestUsageSchema,
-  codingAgentSessionsListInputSchema,
   type CodingAgentContributorProject,
   type CodingAgentPersonalPullRequestUsage,
   type CodingAgentPullRequestDetail,
@@ -95,16 +94,15 @@ export class CodingAgentPullRequestReadService {
   ) {}
 
   async listForProject(input: { projectId: string }): Promise<CodingAgentSessionListRow[]> {
-    const parsed = codingAgentSessionsListInputSchema.parse(input);
     const toMs = this.dependencies.clock.nowMs();
     const rows = await this.dependencies.sessionReads.listRecent({
-      projectId: parsed.projectId,
+      projectId: input.projectId,
       fromMs: toMs - SESSIONS_LIST_WINDOW_MS,
       toMs,
       limit: SESSIONS_LIST_LIMIT,
     });
     const pullRequests = await this.dependencies.sessionListPullRequests.findForProject({
-      projectId: parsed.projectId,
+      projectId: input.projectId,
       sessions: rows,
     });
 

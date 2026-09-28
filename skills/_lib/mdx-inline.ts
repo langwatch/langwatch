@@ -1,11 +1,12 @@
 import fs from "fs";
 import path from "path";
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkMdx from "remark-mdx";
-import remarkFrontmatter from "remark-frontmatter";
-import remarkStringify from "remark-stringify";
+
 import type { Root, RootContent } from "mdast";
+import remarkFrontmatter from "remark-frontmatter";
+import remarkMdx from "remark-mdx";
+import remarkParse from "remark-parse";
+import remarkStringify from "remark-stringify";
+import { unified } from "unified";
 
 export interface InlineOptions {
   // When provided, partials referenced more than once collapse to a stub on
@@ -71,13 +72,9 @@ function parseFile(filePath: string): Root {
 
 const basename = (p: string) => path.basename(p, path.extname(p));
 
-function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Root {
-  if (stack.includes(filePath)) {
-    throw new Error(`Cyclic import detected: ${[...stack, filePath].join(" -> ")}`);
-  }
-  const tree = parseFile(filePath);
+/** Every default import in the file's ESM blocks, by local name, resolved against the file. */
+function collectImports(tree: Root, filePath: string): Map<string, string> {
   const dir = path.dirname(filePath);
-
   const imports = new Map<string, string>();
   for (const node of tree.children) {
     if (node.type !== "mdxjsEsm") continue;
@@ -90,48 +87,58 @@ function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Roo
       throw new Error(`Bad ESM block in ${filePath}: ${msg}`);
     }
   }
+  return imports;
+}
 
-  const out: RootContent[] = [];
-  for (const node of tree.children) {
-    if (node.type === "mdxjsEsm") continue;
-    if (node.type === "yaml") {
-      if (!opts.stripFrontmatter) out.push(node);
-      continue;
-    }
-    if (node.type === "mdxJsxFlowElement" && typeof node.name === "string") {
-      const target = imports.get(node.name);
-      if (!target) {
-        throw new Error(`<${node.name} /> in ${filePath} has no matching import`);
-      }
-      // Dedup only applies to repo-wide `_shared/` partials. Other imports
-      // (skill-local helpers, future per-skill components) must always inline
-      // in full so we don't drop real content from a composed skill.
-      const isSharedPartial = target.includes(`${path.sep}_shared${path.sep}`);
-      if (isSharedPartial && opts.excludeShared?.includes(basename(target))) {
-        continue;
-      }
-      if (isSharedPartial && opts.seenShared?.has(target)) {
-        out.push({
-          type: "paragraph",
-          children: [{ type: "text", value: `(see "${node.name}" above)` }],
-        });
-        continue;
-      }
-      if (isSharedPartial) opts.seenShared?.add(target);
-      const inlined = inlineTree(target, { ...opts, stripFrontmatter: true }, [...stack, filePath]);
-      out.push(...inlined.children);
-      continue;
-    }
-    if (node.type === "mdxJsxTextElement") {
-      throw new Error(
-        `Inline JSX <${(node as { name?: string }).name ?? "?"} /> in ${filePath} is not supported. ` +
-          `Use block-level JSX (on its own line).`,
-      );
-    }
-    out.push(node);
+type InlineContext = {
+  filePath: string;
+  imports: Map<string, string>;
+  opts: InlineOptions;
+  stack: string[];
+};
+
+/** A block-level `<Partial />` replaced by the imported file's content. */
+function inlineElement({ name, context }: { name: string; context: InlineContext }): RootContent[] {
+  const { filePath, imports, opts, stack } = context;
+  const target = imports.get(name);
+  if (!target) {
+    throw new Error(`<${name} /> in ${filePath} has no matching import`);
   }
+  // Dedup only applies to repo-wide `_shared/` partials. Other imports
+  // (skill-local helpers, future per-skill components) must always inline
+  // in full so we don't drop real content from a composed skill.
+  const isSharedPartial = target.includes(`${path.sep}_shared${path.sep}`);
+  if (isSharedPartial && opts.excludeShared?.includes(basename(target))) return [];
+  if (isSharedPartial && opts.seenShared?.has(target)) {
+    return [{ type: "paragraph", children: [{ type: "text", value: `(see "${name}" above)` }] }];
+  }
+  if (isSharedPartial) opts.seenShared?.add(target);
+  return inlineTree(target, { ...opts, stripFrontmatter: true }, [...stack, filePath]).children;
+}
 
-  return { ...tree, children: out };
+/** What one top-level node contributes to the inlined tree. */
+function inlineNode(node: RootContent, context: InlineContext): RootContent[] {
+  if (node.type === "mdxjsEsm") return [];
+  if (node.type === "yaml") return context.opts.stripFrontmatter ? [] : [node];
+  if (node.type === "mdxJsxFlowElement" && typeof node.name === "string") {
+    return inlineElement({ name: node.name, context });
+  }
+  if (node.type === "mdxJsxTextElement") {
+    throw new Error(
+      `Inline JSX <${(node as { name?: string }).name ?? "?"} /> in ${context.filePath} is not supported. ` +
+        `Use block-level JSX (on its own line).`,
+    );
+  }
+  return [node];
+}
+
+function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Root {
+  if (stack.includes(filePath)) {
+    throw new Error(`Cyclic import detected: ${[...stack, filePath].join(" -> ")}`);
+  }
+  const tree = parseFile(filePath);
+  const context: InlineContext = { filePath, imports: collectImports(tree, filePath), opts, stack };
+  return { ...tree, children: tree.children.flatMap((node) => inlineNode(node, context)) };
 }
 
 export function inlineMdx(sourceFile: string, opts: InlineOptions = {}): string {

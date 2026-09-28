@@ -34,13 +34,6 @@ export function getLangWatchTracerFromProvider(
 ): LangWatchTracer {
   const tracer = tracerProvider.getTracer(name, version);
 
-  /**
-   * ⚠️ Do not remove, or worse, move this declaration.
-   * It's required so the proxy handler can reference the proxyInstance
-   * without running afoul of JavaScript's temporal dead zone.
-   */
-  let proxyInstance: LangWatchTracer;
-
   const handler: ProxyHandler<LangWatchTracer> = {
     get(target, prop) {
       switch (prop) {
@@ -70,9 +63,7 @@ export function getLangWatchTracerFromProvider(
     },
   };
 
-  // See comment above about why.
-  proxyInstance = new Proxy(tracer, handler) as LangWatchTracer;
-  return proxyInstance;
+  return new Proxy(tracer, handler) as LangWatchTracer;
 }
 
 type SpanCallback = (span: LangWatchSpan, ...args: unknown[]) => unknown;

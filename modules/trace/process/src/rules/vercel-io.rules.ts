@@ -1,6 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
-import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
+import { type ExtractorContext, takeAttribute } from "./canonical-attributes.rules.ts";
 import { recordValueType } from "./canonical-extraction.rules.ts";
 import { isNonEmptyString, isRecord } from "./canonical-guard.rules.ts";
 import { extractSystemInstructionFromMessages } from "./canonical-message.rules.ts";
@@ -52,14 +52,14 @@ function hoistSystemInstruction(ctx: ExtractorContext): void {
 function canonicaliseInput(ctx: ExtractorContext): void {
   const { attrs } = ctx.bag;
   if (attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
-    attrs.take(ATTR_KEYS.AI_PROMPT_MESSAGES);
-    attrs.take(ATTR_KEYS.AI_PROMPT);
+    takeAttribute(attrs, ATTR_KEYS.AI_PROMPT_MESSAGES);
+    takeAttribute(attrs, ATTR_KEYS.AI_PROMPT);
     return;
   }
 
   setInputMessages(
     ctx,
-    attrs.take(ATTR_KEYS.AI_PROMPT_MESSAGES) ?? attrs.take(ATTR_KEYS.AI_PROMPT),
+    takeAttribute(attrs, ATTR_KEYS.AI_PROMPT_MESSAGES) ?? takeAttribute(attrs, ATTR_KEYS.AI_PROMPT),
   );
   hoistSystemInstruction(ctx);
 }
@@ -121,7 +121,7 @@ function setOutputMessages(
 function fallBackToResponseObject(ctx: ExtractorContext): void {
   if (ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] !== void 0) return;
 
-  const obj = ctx.bag.attrs.take(ATTR_KEYS.AI_RESPONSE_OBJECT);
+  const obj = takeAttribute(ctx.bag.attrs, ATTR_KEYS.AI_RESPONSE_OBJECT);
   const isSerialisableObject = isRecord(obj) || Array.isArray(obj);
   const serialised = isSerialisableObject ? JSON.stringify(obj) : void 0;
   const content = isNonEmptyString(obj) ? obj : serialised;
@@ -134,13 +134,15 @@ function fallBackToResponseObject(ctx: ExtractorContext): void {
 function canonicaliseOutput(ctx: ExtractorContext): void {
   const { attrs } = ctx.bag;
   if (attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)) {
-    attrs.take(ATTR_KEYS.AI_RESPONSE);
+    takeAttribute(attrs, ATTR_KEYS.AI_RESPONSE);
     return;
   }
 
-  const responseAttr = attrs.take(ATTR_KEYS.AI_RESPONSE);
+  const responseAttr = takeAttribute(attrs, ATTR_KEYS.AI_RESPONSE);
   const hasUsableResponse = isNonEmptyString(responseAttr) || isRecord(responseAttr);
-  const responseTextAttr = !hasUsableResponse ? attrs.take(ATTR_KEYS.AI_RESPONSE_TEXT) : void 0;
+  const responseTextAttr = !hasUsableResponse
+    ? takeAttribute(attrs, ATTR_KEYS.AI_RESPONSE_TEXT)
+    : void 0;
   const response = hasUsableResponse ? responseAttr : responseTextAttr;
   const parsedResponseText =
     responseTextAttr !== void 0 && (isRecord(responseTextAttr) || Array.isArray(responseTextAttr));

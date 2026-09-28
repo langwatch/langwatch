@@ -142,6 +142,7 @@ development stack; set LANGY_UNSAFE_HOST_ACCESS=0 to refuse`). An explicit
 `ENVIRONMENT` names anything outside `local`, `dev`, `development` and `test`
 keeps today's fail-closed behaviour unchanged — the same allowlist the manager
 enforces, so an unknown name fails closed on both sides.
+
 ## Amendment (2026-09-13): git runs without a card, the destructive forms still ask
 
 The decision above sent every git write to a permission card, so one run of a

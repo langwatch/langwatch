@@ -1,16 +1,25 @@
+import { z } from "zod";
+
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { type LangwatchApiClient } from "@/internal/api/client";
 import { isLangWatchHandledError } from "@/internal/api/errors";
 import { resolveEndpoint } from "@/internal/endpoint";
+import { type operations } from "@/internal/generated/openapi/api-client";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import { type Logger } from "@/logger";
 
-import { DatasetApiError, DatasetNotFoundError, DatasetPlanLimitError } from "./errors";
+import {
+  DatasetApiError,
+  DatasetNotFoundError,
+  DatasetPlanLimitError,
+  DatasetValidationError,
+} from "./errors";
 import { tracer } from "./tracing";
 import {
   type Dataset,
+  type DatasetColumnType,
   type DatasetEntry,
   type DatasetMetadata,
   type GetDatasetApiResponse,
@@ -28,6 +37,44 @@ import {
   type UploadResponse,
   type DatasetRecordResponse,
 } from "./types";
+
+type ApiColumnType = NonNullable<
+  operations["postApiDataset"]["requestBody"]["content"]["application/json"]["columnTypes"]
+>[number]["type"];
+
+/** Every column type the API accepts; `satisfies` keeps it in step with the generated contract. */
+const API_COLUMN_TYPES = {
+  string: "string",
+  boolean: "boolean",
+  number: "number",
+  date: "date",
+  list: "list",
+  json: "json",
+  spans: "spans",
+  rag_contexts: "rag_contexts",
+  chat_messages: "chat_messages",
+  annotations: "annotations",
+  evaluations: "evaluations",
+  image: "image",
+  file: "file",
+} as const satisfies { [Type in ApiColumnType]: Type };
+
+const apiColumnTypeSchema = z.enum(API_COLUMN_TYPES);
+
+/** The public `type` is a plain string; the API takes one of its column types, checked here. */
+function toApiColumnTypes(
+  columnTypes: DatasetColumnType[],
+): { name: string; type: ApiColumnType }[] {
+  return columnTypes.map(({ name, type }) => {
+    const parsed = apiColumnTypeSchema.safeParse(type);
+    if (!parsed.success) {
+      throw new DatasetValidationError(
+        `Column "${name}" has type "${type}", which is not one of: ${apiColumnTypeSchema.options.join(", ")}`,
+      );
+    }
+    return { name, type: parsed.data };
+  });
+}
 
 type DatasetServiceConfig = {
   langwatchApiClient: LangwatchApiClient;
@@ -79,18 +126,6 @@ export class DatasetService {
    */
   private extractErrorMessage(error: unknown, status: number): string {
     return formatApiErrorMessage({ error: error, options: { status } });
-  }
-
-  /**
-   * Wrapper for API calls to endpoints not yet in the generated OpenAPI types.
-   * Quarantines `as any` casts to a single location.
-   */
-  private async untypedRequest<M extends "GET" | "POST" | "PATCH" | "DELETE">(
-    method: M,
-    path: string,
-    options?: Record<string, unknown>,
-  ) {
-    return this.asResponseEnvelope((this.config.langwatchApiClient[method] as any)(path, options));
   }
 
   /**
@@ -183,14 +218,16 @@ export class DatasetService {
   async listDatasets(options?: ListDatasetsOptions): Promise<ListDatasetsApiResponse> {
     this.config.logger.debug("Listing datasets");
 
-    const response = await this.untypedRequest("GET", "/api/v1/dataset", {
-      params: {
-        query: {
-          page: options?.page,
-          limit: options?.limit,
+    const response = await this.asResponseEnvelope(
+      this.config.langwatchApiClient.GET("/api/v1/dataset", {
+        params: {
+          query: {
+            page: options?.page,
+            limit: options?.limit,
+          },
         },
-      },
-    });
+      }),
+    );
 
     return this.unwrapResponse<ListDatasetsApiResponse>(response, "list datasets");
   }
@@ -201,12 +238,14 @@ export class DatasetService {
   async createDataset(options: CreateDatasetOptions): Promise<DatasetMetadata> {
     this.config.logger.debug(`Creating dataset: ${options.name}`);
 
-    const response = await this.untypedRequest("POST", "/api/v1/dataset", {
-      body: {
-        name: options.name,
-        columnTypes: options.columnTypes ?? [],
-      },
-    });
+    const response = await this.asResponseEnvelope(
+      this.config.langwatchApiClient.POST("/api/v1/dataset", {
+        body: {
+          name: options.name,
+          columnTypes: toApiColumnTypes(options.columnTypes ?? []),
+        },
+      }),
+    );
 
     return this.unwrapResponse<DatasetMetadata>(response, `create dataset "${options.name}"`);
   }
@@ -217,12 +256,17 @@ export class DatasetService {
   async updateDataset(slugOrId: string, options: UpdateDatasetOptions): Promise<DatasetMetadata> {
     this.config.logger.debug(`Updating dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest("PATCH", "/api/v1/dataset/{slugOrId}", {
-      params: {
-        path: { slugOrId },
-      },
-      body: options,
-    });
+    const response = await this.asResponseEnvelope(
+      this.config.langwatchApiClient.PATCH("/api/v1/dataset/{slugOrId}", {
+        params: {
+          path: { slugOrId },
+        },
+        body: {
+          name: options.name,
+          columnTypes: options.columnTypes && toApiColumnTypes(options.columnTypes),
+        },
+      }),
+    );
 
     return this.unwrapResponse<DatasetMetadata>(response, `update dataset "${slugOrId}"`, slugOrId);
   }
@@ -233,11 +277,13 @@ export class DatasetService {
   async deleteDataset(slugOrId: string): Promise<DatasetMetadata> {
     this.config.logger.debug(`Deleting dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest("DELETE", "/api/v1/dataset/{slugOrId}", {
-      params: {
-        path: { slugOrId },
-      },
-    });
+    const response = await this.asResponseEnvelope(
+      this.config.langwatchApiClient.DELETE("/api/v1/dataset/{slugOrId}", {
+        params: {
+          path: { slugOrId },
+        },
+      }),
+    );
 
     return this.unwrapResponse<DatasetMetadata>(response, `delete dataset "${slugOrId}"`, slugOrId);
   }
@@ -251,12 +297,14 @@ export class DatasetService {
   ): Promise<BatchCreateRecordsResponse> {
     this.config.logger.debug(`Creating ${entries.length} records in dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest("POST", "/api/v1/dataset/{slugOrId}/records", {
-      params: {
-        path: { slugOrId },
-      },
-      body: { entries },
-    });
+    const response = await this.asResponseEnvelope(
+      this.config.langwatchApiClient.POST("/api/v1/dataset/{slugOrId}/records", {
+        params: {
+          path: { slugOrId },
+        },
+        body: { entries },
+      }),
+    );
 
     return this.unwrapResponse<BatchCreateRecordsResponse>(
       response,
@@ -275,15 +323,13 @@ export class DatasetService {
   ): Promise<DatasetRecordResponse> {
     this.config.logger.debug(`Updating record ${recordId} in dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest(
-      "PATCH",
-      "/api/v1/dataset/{slugOrId}/records/{recordId}",
-      {
+    const response = await this.asResponseEnvelope(
+      this.config.langwatchApiClient.PATCH("/api/v1/dataset/{slugOrId}/records/{recordId}", {
         params: {
           path: { slugOrId, recordId },
         },
         body: { entry },
-      },
+      }),
     );
 
     return this.unwrapResponse<DatasetRecordResponse>(
@@ -299,12 +345,14 @@ export class DatasetService {
   async deleteRecords(slugOrId: string, recordIds: string[]): Promise<DeleteRecordsResponse> {
     this.config.logger.debug(`Deleting ${recordIds.length} records from dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest("DELETE", "/api/v1/dataset/{slugOrId}/records", {
-      params: {
-        path: { slugOrId },
-      },
-      body: { recordIds },
-    });
+    const response = await this.asResponseEnvelope(
+      this.config.langwatchApiClient.DELETE("/api/v1/dataset/{slugOrId}/records", {
+        params: {
+          path: { slugOrId },
+        },
+        body: { recordIds },
+      }),
+    );
 
     return this.unwrapResponse<DeleteRecordsResponse>(
       response,
@@ -324,15 +372,17 @@ export class DatasetService {
   ): Promise<ListRecordsApiResponse> {
     this.config.logger.debug(`Listing records for dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest("GET", "/api/v1/dataset/{slugOrId}/records", {
-      params: {
-        path: { slugOrId },
-        query: {
-          page: options?.page,
-          limit: options?.limit,
+    const response = await this.asResponseEnvelope(
+      this.config.langwatchApiClient.GET("/api/v1/dataset/{slugOrId}/records", {
+        params: {
+          path: { slugOrId },
+          query: {
+            page: options?.page,
+            limit: options?.limit,
+          },
         },
-      },
-    });
+      }),
+    );
 
     return this.unwrapResponse<ListRecordsApiResponse>(
       response,

@@ -8,7 +8,7 @@ Feature: Seed presets — a database that is ready to look at
   (ADR-064). One registry serves the whole CLI — `haven play --seed <preset>`
   seeds a throwaway PR sandbox from the same list (haven-play.feature).
 
-  # Every preset is env switches that packages/prisma-client/prisma/seed.ts
+  # Every preset is env switches that apps/tasks/src/storage-seed/storage-seed.ts
   # reads for itself, so no preset needs a running stack. The `traces` and
   # `mass` presets are RETIRED: their entire content was ingest steps
   # (seed:retention, seed:sample-traces, seed:realistic-platform, seed:mass)
@@ -20,7 +20,7 @@ Feature: Seed presets — a database that is ready to look at
   #
   # Behavior lives in tools/thuishaven `app/db.go` (the seedPresets registry,
   # retiredSeedPresets, DBSeed, DBReset, the live-stack ingest steps) plus
-  # packages/prisma-client/prisma/seed.ts. Bound by Go tests (`go test ./...`
+  # apps/tasks/src/storage-seed/storage-seed.ts. Bound by Go tests (`go test ./...`
   # in tools/thuishaven): `app/db_test.go` (TestDBSeed, TestDBReset). The full
   # ingest-through-the-collector path is only exercised manually, so those
   # scenarios stay `@unimplemented`. The parity checker

@@ -29,6 +29,15 @@ function groupIdsIn(gates: Partial<SettingsMenuGates>): string[] {
 
 describe("given a reader with no grants on a self-hosted deployment", () => {
   describe("when the menu is built", () => {
+    it("opens with the reader's own Profile and Security pages", () => {
+      const [first] = settingsMenu(EVERYTHING_CLOSED);
+      expect(first?.id).toBe("settings-you");
+      expect(first?.items.map((item) => item.href)).toEqual([
+        "/settings/profile",
+        "/settings/security",
+      ]);
+    });
+
     it("offers the license page rather than the subscription one", () => {
       expect(hrefsIn({})).toContain("/settings/license");
       expect(hrefsIn({})).not.toContain("/settings/subscription");
@@ -83,7 +92,11 @@ describe("given a lite member", () => {
     });
 
     it("keeps the pages that are not", () => {
-      expect(hrefsIn({ isLiteMember: true })).toContain("/settings/authentication");
+      const hrefs = hrefsIn({ isLiteMember: true, hasPermission: () => true });
+      expect(hrefs).toContain("/settings/profile");
+      expect(hrefs).toContain("/settings/security");
+      expect(hrefs).toContain("/settings/model-providers");
+      expect(hrefs).not.toContain("/settings/authentication");
     });
   });
 });
@@ -92,10 +105,33 @@ describe("given an enterprise plan", () => {
   describe("when the menu is built with the enterprise entries shown", () => {
     it("offers the enterprise access entries", () => {
       const hrefs = hrefsIn({ showEnterpriseNav: true });
-      expect(hrefs).toContain("/settings/groups");
       expect(hrefs).toContain("/settings/roles");
-      expect(hrefs).toContain("/settings/role-bindings");
-      expect(hrefs).toContain("/settings/scim");
+      expect(hrefs).not.toContain("/settings/role-bindings");
+    });
+
+    it("offers Directory on every plan, in place of Members, Teams, Groups and SCIM", () => {
+      for (const showEnterpriseNav of [false, true]) {
+        const hrefs = hrefsIn({ showEnterpriseNav });
+        expect(hrefs).toContain("/settings/directory");
+        for (const old of [
+          "/settings/members",
+          "/settings/teams",
+          "/settings/groups",
+          "/settings/scim",
+        ]) {
+          expect(hrefs).not.toContain(old);
+        }
+      }
+    });
+
+    it("offers Authentication only to a reader who may see single sign-on", () => {
+      expect(hrefsIn({ showEnterpriseNav: true })).not.toContain("/settings/authentication");
+      expect(
+        hrefsIn({ showEnterpriseNav: true, hasPermission: (p) => p === "sso:view" }),
+      ).toContain("/settings/authentication");
+      expect(hrefsIn({ hasPermission: (p) => p === "sso:view" })).not.toContain(
+        "/settings/authentication",
+      );
     });
 
     it("still withholds the audit log without the grant that reads it", () => {

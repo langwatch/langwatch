@@ -28,12 +28,12 @@ the classification differs between them.
 
 The worker has adopted half the mechanism and not the other half:
 
-| | api | worker |
-| --- | --- | --- |
-| `withModules(...)` | yes | 9 files |
-| `createProcess(...)` | yes | **0 files** |
-| `serverModules` (generated list) | yes | **0 files** |
-| hand-built module bags | none | **13 files** |
+|                                  | api  | worker       |
+| -------------------------------- | ---- | ------------ |
+| `withModules(...)`               | yes  | 9 files      |
+| `createProcess(...)`             | yes  | **0 files**  |
+| `serverModules` (generated list) | yes  | **0 files**  |
+| hand-built module bags           | none | **13 files** |
 
 So the worker declares modules the new way but still builds every collaborator by
 hand, from a member record it does not use, against a module list it does not
@@ -67,7 +67,7 @@ inversion ADR-144 decision 2 refuses, and the bag is what carries it.
 ## The falsification test, and its result
 
 The first draft rested on an unproven claim: that the worker root's
-constructions are *mostly* building things its modules should own. That was
+constructions are _mostly_ building things its modules should own. That was
 tested by classifying all 200 against a fixed rubric - (a) bag construction,
 (b) a module-owned collaborator, (c) genuine process wiring, (d) unclassifiable.
 
@@ -91,10 +91,10 @@ flipped the count, still leaves (a)+(b) ahead on lines.
 
 Two findings the first draft did not have:
 
-- **476 lines of the file (2055-2530) are class *implementations*, not
+- **476 lines of the file (2055-2530) are class _implementations_, not
   constructions.** `PrismaGovernanceOldestTeamAdapter`,
   `PrismaAutomationOrganizationPricingAdapter` and thirteen
-  `LoggedWorker<Module>Absence` classes are *defined* in the composition root,
+  `LoggedWorker<Module>Absence` classes are _defined_ in the composition root,
   not merely built there. That is stronger evidence than any construction count:
   a root that instantiates a module's collaborator knows too much about it, and
   a root that **implements** one has absorbed it.
@@ -120,8 +120,8 @@ Three things that look separate are the same thing:
 3. **The tree cannot reach zero dirty**, so the `origin/main` merge (85 commits
    behind, growing ~17/day) cannot start.
 
-All three are downstream of the same unanswered question: *how does a module get
-a collaborator that is not one of the fourteen canonical members?*
+All three are downstream of the same unanswered question: _how does a module get
+a collaborator that is not one of the fourteen canonical members?_
 
 ## Three answers, with their costs
 

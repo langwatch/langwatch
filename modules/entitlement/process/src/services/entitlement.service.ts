@@ -58,12 +58,12 @@ export class EntitlementService implements PlanProvider {
       return null;
     }
 
-    const plan = await source.resolve(input);
-    if (!plan || plan.free) {
+    const grant = await source.resolve(input);
+    if (!grant.granted || grant.plan.free) {
       return null;
     }
 
-    return plan;
+    return grant.plan;
   }
 
   private async resolveBaseline(input: ResolvePlanInput): Promise<Plan> {

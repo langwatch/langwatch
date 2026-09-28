@@ -29,8 +29,7 @@ import {
 } from "@langwatch/authz-browser-kit";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
-  retentionCategories,
-  type RetentionCategory,
+  type ScopeAssignment,
 } from "@langwatch/data-retention-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
@@ -38,12 +37,15 @@ import { useEffect, useState } from "react";
 
 import { dataRetentionApi } from "../../behavior/data-retention-api.ts";
 import {
+  removeRetentionScope,
+  retentionPolicySaver,
+} from "../../behavior/retention-policy-save.ts";
+import {
   RETENTION_SCOPE_QUERY_KEY,
   useDataRetentionHost,
   type DataRetentionHostApi,
 } from "../../model/data-retention-host.ts";
 import { BINDING_SCOPE_TIERS, SCOPE_ICON } from "../../model/retention-constants.ts";
-import { formatDays } from "../../model/retention-format.ts";
 import {
   groupRulesByScope,
   renderPolicyValue,
@@ -72,6 +74,33 @@ function storageDescriptionFor(scopeFilter: ReturnType<typeof resolveScopeFilter
   }
   if (scopeFilter.scopeType === "TEAM") return "How much space this team's data uses today.";
   return "How much space this project's data uses today.";
+}
+
+function storageScopeFor({
+  scopeFilter,
+  organizationId,
+  projectId,
+}: {
+  scopeFilter: ReturnType<typeof resolveScopeFilter>;
+  organizationId: string | undefined;
+  projectId: string;
+}): ScopeAssignment {
+  if (scopeFilter.kind === "specific") {
+    return { scopeType: scopeFilter.scopeType, scopeId: scopeFilter.scopeId };
+  }
+  if (organizationId) return { scopeType: "ORGANIZATION", scopeId: organizationId };
+  return { scopeType: "PROJECT", scopeId: projectId };
+}
+
+/**
+ * Configurable retention is a paid-plan feature: even an org admin on the free plan
+ * can't add overrides, so this gate and the plan's must both pass.
+ */
+function hasWritableScope(
+  available: { organization?: unknown; teams: unknown[]; projects: unknown[] } | undefined,
+): boolean {
+  if (!available) return false;
+  return !!available.organization || available.teams.length > 0 || available.projects.length > 0;
 }
 
 function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; projectId: string }) {
@@ -108,16 +137,11 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   // active filter to a concrete scope: a specific pick passes through; "all you
   // can see" resolves to the whole org (or just this project for a personal
   // account with no org).
-  const everythingScope = organizationId
-    ? { scopeType: "ORGANIZATION" as const, scopeId: organizationId }
-    : { scopeType: "PROJECT" as const, scopeId: projectId };
-  const storageScope =
-    resolvedScopeFilter.kind === "specific"
-      ? {
-          scopeType: resolvedScopeFilter.scopeType,
-          scopeId: resolvedScopeFilter.scopeId,
-        }
-      : everythingScope;
+  const storageScope = storageScopeFor({
+    scopeFilter: resolvedScopeFilter,
+    organizationId,
+    projectId,
+  });
 
   const storageDescription = storageDescriptionFor(resolvedScopeFilter);
 
@@ -219,47 +243,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   const snapshot = rulesQuery.data;
   const available = snapshot?.available;
   const canConfigureRetention = !!snapshot?.canConfigureRetention;
-  // Configurable retention is a paid-plan feature — even an org admin on
-  // the free plan can't add overrides. Both gates must pass.
-  const canWrite =
-    canConfigureRetention &&
-    !!available &&
-    (!!available.organization || available.teams.length > 0 || available.projects.length > 0);
-
-  const removeScopeGroup = async (group: RetentionScopeGroup) => {
-    const categories = (Object.keys(group.byCategory) as RetentionCategory[]).filter(
-      (category) => group.byCategory[category] !== undefined,
-    );
-    const results = await Promise.all(
-      categories.map((category) =>
-        removeForScope
-          .mutateAsync({
-            projectId,
-            scope: { scopeType: group.scopeType, scopeId: group.scopeId },
-            category,
-          })
-          .then(
-            () => ({ ok: true as const }),
-            (error: unknown) => ({ ok: false as const, error }),
-          ),
-      ),
-    );
-    void invalidate();
-    const failed = results.filter((result) => !result.ok);
-    if (failed.length === 0) {
-      host.succeeded({
-        title: categories.length === 1 ? "Override removed" : "Retention policy removed",
-      });
-    } else {
-      const firstError = failed.find(
-        (result): result is { ok: false; error: unknown } => !result.ok,
-      );
-      host.failed({
-        error: firstError?.error,
-        fallbackTitle: "Couldn't remove the retention policy",
-      });
-    }
-  };
+  const canWrite = canConfigureRetention && hasWritableScope(available);
 
   // Open the Add drawer in edit mode for a scope group. The drawer edits one
   // retention value applied to all categories, so we seed it with the group's
@@ -282,6 +266,17 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     setDrawerOpen(false);
     setEditTarget(null);
   };
+
+  const savePolicy = retentionPolicySaver({
+    projectId,
+    notices: host,
+    write: ({ scope, category, retentionDays }) =>
+      setForScope.mutateAsync({ projectId, scope, category, retentionDays }),
+    trigger: (category) => triggerUpdate.mutateAsync({ projectId, category }),
+    afterWrite: () => void invalidate(),
+    close: closeDrawer,
+    confirm: setPendingConfirm,
+  });
 
   const hierarchy = scopeHierarchyOf(filterAvailable);
   const filteredRules = (snapshot?.rules ?? []).filter((rule) =>
@@ -340,106 +335,15 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
         />
       )}
 
-      {snapshot && snapshot.rules.length === 0 && (
-        <Card.Root width="full">
-          <Card.Body>
-            <EmptyState.Root width="full">
-              <EmptyState.Content>
-                <EmptyState.Indicator>
-                  <DatabaseBackup size={24} />
-                </EmptyState.Indicator>
-                <VStack textAlign="center" gap={3}>
-                  <VStack textAlign="center" gap={1}>
-                    <EmptyState.Title>No retention policies</EmptyState.Title>
-                    <EmptyState.Description>
-                      Add a retention policy to override the platform default of{" "}
-                      {PLATFORM_DEFAULT_RETENTION_DAYS} days.
-                    </EmptyState.Description>
-                  </VStack>
-                  {canWrite && (
-                    <Button
-                      colorPalette="blue"
-                      variant="outline"
-                      onClick={() => setDrawerOpen(true)}
-                    >
-                      <Plus /> Add retention policy
-                    </Button>
-                  )}
-                </VStack>
-              </EmptyState.Content>
-            </EmptyState.Root>
-          </Card.Body>
-        </Card.Root>
-      )}
-      {snapshot && snapshot.rules.length > 0 && scopeGroups.length === 0 && (
-        <Card.Root width="full">
-          <Card.Body>
-            <Text fontSize="sm" color="fg.muted" textAlign="center">
-              No retention policies match the current scope filter.
-            </Text>
-          </Card.Body>
-        </Card.Root>
-      )}
-      {snapshot && snapshot.rules.length !== 0 && scopeGroups.length > 0 && (
-        <Card.Root width="full" overflow="hidden">
-          <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-            <Table.Root variant="line" size="md" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                  <Table.ColumnHeader>Policy</Table.ColumnHeader>
-                  <Table.ColumnHeader />
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {scopeGroups.map((group) => {
-                  const Icon = SCOPE_ICON[group.scopeType];
-                  return (
-                    <Table.Row key={`${group.scopeType}:${group.scopeId}`}>
-                      <Table.Cell>
-                        <HStack gap={2}>
-                          <Icon size={14} />
-                          <Text>{group.name}</Text>
-                          <Badge size="sm" colorPalette="gray">
-                            {group.scopeType.toLowerCase()}
-                          </Badge>
-                        </HStack>
-                      </Table.Cell>
-                      <Table.Cell>{renderPolicyValue(group.byCategory)}</Table.Cell>
-                      <Table.Cell textAlign="end">
-                        {canWrite && (
-                          <Menu.Root>
-                            <Menu.Trigger asChild>
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                aria-label={`Actions for ${group.name}`}
-                              >
-                                <MoreVertical size={14} />
-                              </Button>
-                            </Menu.Trigger>
-                            <Menu.Content>
-                              <Menu.Item value="edit" onClick={() => openEditForGroup(group)}>
-                                <Pencil size={14} /> Edit
-                              </Menu.Item>
-                              <Menu.Item
-                                value="remove"
-                                color="red.500"
-                                onClick={() => setRemoveTarget(group)}
-                              >
-                                <Trash2 size={14} /> Remove
-                              </Menu.Item>
-                            </Menu.Content>
-                          </Menu.Root>
-                        )}
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table.Root>
-          </Card.Body>
-        </Card.Root>
+      {snapshot && (
+        <RetentionPolicyList
+          ruleCount={snapshot.rules.length}
+          scopeGroups={scopeGroups}
+          canWrite={canWrite}
+          onAdd={() => setDrawerOpen(true)}
+          onEdit={openEditForGroup}
+          onRemove={setRemoveTarget}
+        />
       )}
 
       <RetroactiveProgressCard
@@ -472,132 +376,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
               currentProjectId={projectId}
             />
           )}
-          onSave={async ({ scopes, retentionDays, applyToExisting }) => {
-            const categories: RetentionCategory[] = [...retentionCategories];
-            const saveOverrides = async () => {
-              const pairs = scopes.flatMap((scope) =>
-                categories.map((category) => ({ scope, category })),
-              );
-              const results = await Promise.all(
-                pairs.map(({ scope, category }) =>
-                  setForScope.mutateAsync({ projectId, scope, category, retentionDays }).then(
-                    () => ({ ok: true as const, category }),
-                    (error: unknown) => ({ ok: false as const, category, error }),
-                  ),
-                ),
-              );
-              void invalidate();
-              return { pairs, results };
-            };
-
-            const reportSaveResults = ({
-              pairs,
-              results,
-            }: Awaited<ReturnType<typeof saveOverrides>>) => {
-              const failed = results.filter((result) => !result.ok);
-              if (failed.length === 0) {
-                host.succeeded({
-                  title:
-                    scopes.length === 1
-                      ? "Retention policy saved"
-                      : `Retention policy saved for ${scopes.length} scopes`,
-                });
-                return { success: true, failed: [] };
-              }
-              const firstError = failed.find(
-                (result): result is { ok: false; category: RetentionCategory; error: unknown } =>
-                  !result.ok,
-              );
-              // The partial count is an outcome, not an error headline: a
-              // recognised code overrides `fallbackTitle`, which would erase
-              // "Saved 7 of 9". Report the two things separately.
-              if (failed.length < pairs.length) {
-                host.succeeded({
-                  title: `Saved ${pairs.length - failed.length} of ${pairs.length} updates`,
-                });
-              }
-              host.failed({
-                error: firstError?.error,
-                fallbackTitle: "Couldn't save the retention policy",
-              });
-              return {
-                success: failed.length === 0,
-                failed: failed.map((result) => result.category),
-              };
-            };
-
-            if (!applyToExisting) {
-              const result = await saveOverrides();
-              const status = reportSaveResults(result);
-              if (status.success) closeDrawer();
-              return;
-            }
-
-            const savedScopeWiderThanCurrentProject = scopes.some(
-              (scope) => !(scope.scopeType === "PROJECT" && scope.scopeId === projectId),
-            );
-            setPendingConfirm({
-              retentionDays,
-              savedScopeWiderThanCurrentProject,
-              onConfirm: async () => {
-                const result = await saveOverrides();
-                const status = reportSaveResults(result);
-
-                const succeededCategories = Array.from(
-                  new Set(
-                    result.results.filter((entry) => entry.ok).map((entry) => entry.category),
-                  ),
-                );
-                if (succeededCategories.length > 0) {
-                  // The server resolves the cascade (PROJECT > TEAM >
-                  // ORGANIZATION > platform default), so saving an org/team
-                  // rule may not change what a project with a closer override
-                  // actually uses. The notice shows the value the server
-                  // actually applied, not the form value typed.
-                  const triggerResults = await Promise.all(
-                    succeededCategories.map((category) =>
-                      triggerUpdate.mutateAsync({ projectId, category }).then(
-                        (response) => ({
-                          ok: true as const,
-                          applied: response.appliedRetentionDays,
-                        }),
-                        (error: unknown) => ({ ok: false as const, error }),
-                      ),
-                    ),
-                  );
-                  const triggerFailed = triggerResults.filter((entry) => !entry.ok);
-                  if (triggerFailed.length === 0) {
-                    const appliedValues = Array.from(
-                      new Set(
-                        triggerResults
-                          .filter((entry): entry is { ok: true; applied: number } => entry.ok)
-                          .map((entry) => entry.applied),
-                      ),
-                    );
-                    const description =
-                      appliedValues.length === 1
-                        ? `Rewriting existing rows to ${formatDays(appliedValues[0]!)}.`
-                        : `Rewriting existing rows per category (${appliedValues
-                            .map(formatDays)
-                            .join(", ")}).`;
-                    host.succeeded({
-                      title: "Applying retention to existing data…",
-                      description,
-                    });
-                  } else {
-                    const firstError = triggerFailed.find(
-                      (entry): entry is { ok: false; error: unknown } => !entry.ok,
-                    );
-                    host.failed({
-                      error: firstError?.error,
-                      fallbackTitle: "Some retroactive updates failed",
-                    });
-                  }
-                }
-                if (status.success) closeDrawer();
-              },
-            });
-          }}
+          onSave={savePolicy}
         />
       )}
 
@@ -612,7 +391,13 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
         onCancel={() => setRemoveTarget(null)}
         onConfirm={async () => {
           if (!removeTarget) return;
-          await removeScopeGroup(removeTarget);
+          await removeRetentionScope({
+            group: removeTarget,
+            remove: ({ scope, category }) =>
+              removeForScope.mutateAsync({ projectId, scope, category }),
+            afterWrite: () => void invalidate(),
+            notices: host,
+          });
           setRemoveTarget(null);
         }}
       />
@@ -629,5 +414,122 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
         }}
       />
     </VStack>
+  );
+}
+
+type RetentionPolicyListProps = {
+  ruleCount: number;
+  scopeGroups: RetentionScopeGroup[];
+  canWrite: boolean;
+  onAdd: () => void;
+  onEdit: (group: RetentionScopeGroup) => void;
+  onRemove: (group: RetentionScopeGroup) => void;
+};
+
+/** The policies in scope: an invitation when none exist, a note when the filter hides them. */
+function RetentionPolicyList({
+  ruleCount,
+  scopeGroups,
+  canWrite,
+  onAdd,
+  onEdit,
+  onRemove,
+}: RetentionPolicyListProps) {
+  if (ruleCount === 0) {
+    return (
+      <Card.Root width="full">
+        <Card.Body>
+          <EmptyState.Root width="full">
+            <EmptyState.Content>
+              <EmptyState.Indicator>
+                <DatabaseBackup size={24} />
+              </EmptyState.Indicator>
+              <VStack textAlign="center" gap={3}>
+                <VStack textAlign="center" gap={1}>
+                  <EmptyState.Title>No retention policies</EmptyState.Title>
+                  <EmptyState.Description>
+                    Add a retention policy to override the platform default of{" "}
+                    {PLATFORM_DEFAULT_RETENTION_DAYS} days.
+                  </EmptyState.Description>
+                </VStack>
+                {canWrite && (
+                  <Button colorPalette="blue" variant="outline" onClick={onAdd}>
+                    <Plus /> Add retention policy
+                  </Button>
+                )}
+              </VStack>
+            </EmptyState.Content>
+          </EmptyState.Root>
+        </Card.Body>
+      </Card.Root>
+    );
+  }
+  if (scopeGroups.length === 0) {
+    return (
+      <Card.Root width="full">
+        <Card.Body>
+          <Text fontSize="sm" color="fg.muted" textAlign="center">
+            No retention policies match the current scope filter.
+          </Text>
+        </Card.Body>
+      </Card.Root>
+    );
+  }
+  return (
+    <Card.Root width="full" overflow="hidden">
+      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
+        <Table.Root variant="line" size="md" width="full">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader>Scope</Table.ColumnHeader>
+              <Table.ColumnHeader>Policy</Table.ColumnHeader>
+              <Table.ColumnHeader />
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {scopeGroups.map((group) => {
+              const Icon = SCOPE_ICON[group.scopeType];
+              return (
+                <Table.Row key={`${group.scopeType}:${group.scopeId}`}>
+                  <Table.Cell>
+                    <HStack gap={2}>
+                      <Icon size={14} />
+                      <Text>{group.name}</Text>
+                      <Badge size="sm" colorPalette="gray">
+                        {group.scopeType.toLowerCase()}
+                      </Badge>
+                    </HStack>
+                  </Table.Cell>
+                  <Table.Cell>{renderPolicyValue(group.byCategory)}</Table.Cell>
+                  <Table.Cell textAlign="end">
+                    {canWrite && (
+                      <Menu.Root>
+                        <Menu.Trigger asChild>
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            aria-label={`Actions for ${group.name}`}
+                          >
+                            <MoreVertical size={14} />
+                          </Button>
+                        </Menu.Trigger>
+                        <Menu.Content>
+                          <Menu.Item value="edit" onClick={() => onEdit(group)}>
+                            <Pencil size={14} /> Edit
+                          </Menu.Item>
+                          <Menu.Item value="remove" color="red.500" onClick={() => onRemove(group)}>
+                            <Trash2 size={14} /> Remove
+                          </Menu.Item>
+                        </Menu.Content>
+                      </Menu.Root>
+                    )}
+                  </Table.Cell>
+                </Table.Row>
+              );
+            })}
+          </Table.Body>
+        </Table.Root>
+      </Card.Body>
+    </Card.Root>
   );
 }

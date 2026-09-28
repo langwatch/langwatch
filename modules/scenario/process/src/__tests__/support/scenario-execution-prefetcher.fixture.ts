@@ -1,5 +1,6 @@
 import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
@@ -136,6 +137,10 @@ export interface ScenarioPrefetchFixture {
    */
   modelProviders?: ModelProviderApi;
   voiceTargets?: VoiceTargetReader;
+  /** The project's organization; absent, no sandbox key is minted, as main skipped it. */
+  organizationId?: string;
+  /** The sandbox-key mint; unconfigured, a call refuses by name. */
+  apiKeys?: Pick<ApiKeyApi, "getOrMintAgentSandboxKey">;
 }
 
 class TestScenarioSecretCipher implements ScenarioSecretCipher {
@@ -330,6 +335,7 @@ function workflowService(deps: ScenarioPrefetchFixture): WorkflowApi {
 
 function projectService(deps: ScenarioPrefetchFixture): ProjectApi {
   return createApiFixture<ProjectApi>({
+    findOrganizationId: async () => deps.organizationId,
     findById: async (projectId) => {
       const value = await deps.projectFetcher.findUnique(projectId);
       if (!value) return null;
@@ -444,6 +450,7 @@ export function createTestScenarioExecutionPrefetcherService(
       resolveIngestWaitTimeout: (input) =>
         deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs(input),
     }),
+    apiKeys: deps.apiKeys ?? createApiFixture<ApiKeyApi>({}),
     voiceTargets: deps.voiceTargets ?? {
       getVoiceTarget: async ({ agentId }) => ({
         type: "voice",

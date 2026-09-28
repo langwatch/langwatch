@@ -22,6 +22,7 @@ import type {
   RangeFacetDef,
 } from "#rules/trace-facet-registry.rules";
 
+import type { TraceTenantBroadcast } from "../channels/trace-tenant-broadcast.channel.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
 import type { FacetFilterResolver } from "../rules/trace-facet-filter.rules.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
@@ -60,14 +61,6 @@ const DISCOVER_CACHE = TraceTtlCacheService.create<CachedDiscover>(DISCOVER_TTL_
  * value cache for locks would mean half an hour of stale data after a refresher crash.
  */
 const DISCOVER_REFRESH_LOCK_CACHE = TraceTtlCacheService.create<number>(60_000);
-
-/**
- * Optional sink for "discover finished refreshing" pushes, registered once at bootstrap so the
- * service can fire and forget into the broadcast layer. A setter rather than a constructor
- * parameter, since the null repository and test factories do not want the dependency.
- */
-export type DiscoverBroadcaster = (tenantId: string) => void;
-let discoverBroadcaster: DiscoverBroadcaster | null = null;
 
 const discoverLogger = createLogger("langwatch:app-layer:traces:trace-list-discover");
 
@@ -209,26 +202,41 @@ function collectDiscoverOutcomes(settled: PromiseSettledResult<Outcome>[]): {
 }
 
 export class TraceDiscoverService {
-  private constructor(
-    private readonly repository: TraceListRead,
-    private readonly descriptors: TraceFacetDescriptorService,
-    private readonly facets: FacetCatalog,
-  ) {}
+  private readonly repository: TraceListRead;
+  private readonly descriptors: TraceFacetDescriptorService;
+  private readonly facets: FacetCatalog;
+  private readonly updates: TraceTenantBroadcast;
+
+  private constructor(deps: {
+    repository: TraceListRead;
+    descriptors: TraceFacetDescriptorService;
+    facets: FacetCatalog;
+    updates: TraceTenantBroadcast;
+  }) {
+    this.repository = deps.repository;
+    this.descriptors = deps.descriptors;
+    this.facets = deps.facets;
+    this.updates = deps.updates;
+  }
 
   static create({
     repository,
     topicNaming,
     facets,
+    updates,
   }: {
     repository: TraceListRead;
     topicNaming: TraceTopicNamingService;
     facets: FacetCatalog;
+    /** Where a finished background refresh tells the tenant's tabs to refetch. */
+    updates: TraceTenantBroadcast;
   }): TraceDiscoverService {
-    return new TraceDiscoverService(
+    return new TraceDiscoverService({
       repository,
-      TraceFacetDescriptorService.create({ repository, topicNaming, facets }),
+      descriptors: TraceFacetDescriptorService.create({ repository, topicNaming, facets }),
       facets,
-    );
+      updates,
+    });
   }
 
   /** Per-pod dedup of in-flight background refreshes. */
@@ -313,13 +321,18 @@ export class TraceDiscoverService {
           value: fresh,
           timestamp: nowInstant().epochMilliseconds,
         });
-        // SSE push to any browser subscribed for this tenant. Empty
-        // payload — the client refetches via tRPC and hits the warm
-        // cache. We swallow throws because broadcast errors should
-        // never bubble up into the user-facing path (the cache write
-        // already succeeded).
+        // SSE push to any browser subscribed for this tenant; the client refetches via tRPC and
+        // hits the warm cache. Throws are swallowed: the cache write already succeeded.
         try {
-          discoverBroadcaster?.(params.tenantId);
+          await this.updates.broadcastToTenant({
+            tenantId: params.tenantId,
+            event: JSON.stringify({
+              event: "discover_updated",
+              tenantId: params.tenantId,
+              timestamp: nowInstant().epochMilliseconds,
+            }),
+            eventType: "discover_updated",
+          });
         } catch (broadcastErr) {
           discoverLogger.warn(
             {
@@ -538,9 +551,5 @@ export class TraceDiscoverService {
       { tenantId: params.tenantId, totalMs, breakdown: taskTimings.slice(0, 20), taskCount },
       "Discover wall-clock exceeded 1.5s — per-task breakdown",
     );
-  }
-
-  static setDiscoverBroadcaster(fn: DiscoverBroadcaster | null): void {
-    discoverBroadcaster = fn;
   }
 }

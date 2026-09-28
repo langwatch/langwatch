@@ -5,6 +5,7 @@ export { EntitlementApi } from "./entitlement.api.ts";
 export type {
   BaselinePlanSource,
   AuthorizationContextResolver,
+  EntitlementGrant,
   EntitlementOperator,
   EntitlementSource,
   PlanEnricher,
@@ -13,6 +14,7 @@ export type {
   ResolvePlanInput,
 } from "./provider.ts";
 export {
+  entitlementGrantSchema,
   entitlementOperatorSchema,
   planProviderUserSchema,
   resolvePlanInputSchema,

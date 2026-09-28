@@ -35,6 +35,7 @@ import type {
   JoinRequestMine,
   JoinRequestPending,
 } from "./join-request.responses.ts";
+import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
   OrganizationInviteAccepted,
   OrganizationInviteCreated,
@@ -121,6 +122,12 @@ export type OrganizationRestMemberTeamBinding = Readonly<{
   customRoleId: string | null;
   customRoleName: string | null;
 }>;
+/** One member after a role or disabled-status change, and the teams it left without an admin. */
+export type OrganizationUpdatedMember = OrganizationRestMemberSummary &
+  Readonly<{
+    teams: OrganizationRestMemberTeamBinding[];
+    teamsLeftWithoutAdmin: { id: string; name: string }[];
+  }>;
 export type OrganizationProvisioningSummary = Readonly<{
   id: string;
   name: string;
@@ -273,6 +280,16 @@ export interface OrganizationApi {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationRestMemberSummary & { teams: OrganizationRestMemberTeamBinding[] }>;
+  /** Changes exactly one of a member's role or disabled status, and reads the member back. */
+  updateMember(
+    input: Readonly<{
+      organizationId: string;
+      userId: string;
+      role?: OrganizationUserRole;
+      disabled?: boolean;
+    }>,
+    by: OrganizationCaller | null,
+  ): Promise<OrganizationUpdatedMember>;
   createForProvisioning(input: { name: string; slug?: string }): Promise<{
     organization: { id: string; name: string };
     team: { id: string; slug: string; name: string };
@@ -621,6 +638,21 @@ export interface OrganizationApi {
    * included, disabled memberships excluded. The one count a licence and a plan read.
    */
   countMemberSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationMemberSeats>;
+  /** Whether one more of a limited resource fits the organization's plan, for this caller. */
+  checkLimit(
+    input: Readonly<{ organizationId: string; limitType: LimitType }>,
+    by: OrganizationCaller,
+  ): Promise<LimitCheckResult>;
+  /** Every enforced limit at once, keyed by limit type. */
+  checkAllLimits(
+    input: Readonly<{ organizationId: string }>,
+    by: OrganizationCaller,
+  ): Promise<Record<LimitType, LimitCheckResult>>;
+  /** A client pre-check refused somebody: re-checked, so a fabricated report raises nothing. */
+  reportLimitBlocked(
+    input: Readonly<{ organizationId: string; limitType: LimitType }>,
+    by: OrganizationCaller,
+  ): Promise<void>;
   /** Opens the invitations a completed seat checkout paid for, as main's billing webhook did. */
   approvePaymentPendingInvites(
     input: Readonly<{ subscriptionId: string; organizationId: string }>,

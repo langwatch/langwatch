@@ -10,7 +10,7 @@ export function runLoopOf(run: ExperimentV3RunLoop): {
   progress: ExperimentRunProgressRepository;
 } {
   if (!run.ports || !run.progress) {
-    throw new ExperimentRunLoopUnavailableError("experiment run loop");
+    throw new ExperimentRunLoopUnavailableError({ capability: "experiment run loop" });
   }
   return { ports: run.ports, progress: run.progress };
 }
@@ -21,7 +21,8 @@ export function runLoopOf(run: ExperimentV3RunLoop): {
  * gating that read on `ports` made every reader of a run a 503.
  */
 export function runProgressOf(run: ExperimentV3RunLoop): ExperimentRunProgressRepository {
-  if (!run.progress) throw new ExperimentRunLoopUnavailableError("experiment run progress store");
+  if (!run.progress)
+    throw new ExperimentRunLoopUnavailableError({ capability: "experiment run progress store" });
 
   return run.progress;
 }

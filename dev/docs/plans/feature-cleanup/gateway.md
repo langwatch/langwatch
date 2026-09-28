@@ -682,7 +682,7 @@ By entry point:
 
 | Entry                                   |  Importing files |
 | --------------------------------------- | ---------------: |
-| `@langwatch/gateway-process` (main)      | 151 import sites |
+| `@langwatch/gateway-process` (main)     | 151 import sites |
 | `./composition/gateway-audit`           |                5 |
 | `./composition/gateway-provider-labels` |                3 |
 | `./composition/gateway-change-events`   |                3 |

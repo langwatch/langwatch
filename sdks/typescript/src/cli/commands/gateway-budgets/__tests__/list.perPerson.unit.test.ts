@@ -1,3 +1,5 @@
+import { stripVTControlCharacters } from "node:util";
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 /**
@@ -64,7 +66,7 @@ async function renderedTable(rows: Record<string, unknown>[]): Promise<string> {
   } finally {
     spy.mockRestore();
   }
-  return lines.join("\n").replace(/\[[0-9;]*m/g, "");
+  return stripVTControlCharacters(lines.join("\n"));
 }
 
 beforeEach(() => vi.clearAllMocks());

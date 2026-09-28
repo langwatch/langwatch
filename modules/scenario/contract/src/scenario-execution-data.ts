@@ -461,3 +461,37 @@ export const ChildProcessJobDataSchema = z
     }
   });
 export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;
+
+/**
+ * One "test agent" turn, run in a scenario child like a simulation so the agent's adapter never
+ * runs in the process that serves the request. The child answers with one AgentTestTurnAnswer line.
+ */
+export const AgentTestTurnJobSchema = z.object({
+  kind: z.literal("agent-test-turn"),
+  adapterData: TargetAdapterDataSchema,
+  nlpServiceUrl: z.string(),
+  parameters: runParameterValuesSchema.default({}),
+  message: z.string(),
+  /** The call-budget ceiling the turn answers inside (ADR-128). */
+  timeoutMs: z.number().int().positive(),
+  /** The operator's nlpgo deadlines, as the parent read them; an absent one takes the default. */
+  nlpTimeouts: z.object({
+    engineCodeBlockTimeoutSeconds: z.number().optional(),
+    maxTimeoutMs: z.number().optional(),
+  }),
+});
+export type AgentTestTurnJob = z.infer<typeof AgentTestTurnJobSchema>;
+
+/** What a scenario child reads off stdin: one agent-test turn, or a simulation. */
+export const ScenarioChildJobSchema = z.union([AgentTestTurnJobSchema, ChildProcessJobDataSchema]);
+export type ScenarioChildJob = z.infer<typeof ScenarioChildJobSchema>;
+
+/**
+ * The last line a turn's child writes: the agent's output and how long the call took, or why it
+ * did not answer. `timeoutMs` is present only when the call deadline elapsed.
+ */
+export const AgentTestTurnAnswerSchema = z.union([
+  z.object({ success: z.literal(true), output: z.unknown(), durationMs: z.number() }),
+  z.object({ success: z.literal(false), error: z.string(), timeoutMs: z.number().optional() }),
+]);
+export type AgentTestTurnAnswer = z.infer<typeof AgentTestTurnAnswerSchema>;

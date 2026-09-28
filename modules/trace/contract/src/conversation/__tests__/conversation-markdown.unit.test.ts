@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildConversationMarkdownChunks,
@@ -68,5 +68,34 @@ describe("buildConversationMarkdownChunks", () => {
       expect(joined).toContain("# Conversation");
       expect(joined).toContain("out");
     });
+  });
+});
+
+describe("given a thread rendered as a transcript", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const render = () =>
+    joinConversationMarkdown(
+      buildConversationMarkdownChunks({
+        conversationId: "conv-1",
+        turns: [makeTurn({ timestamp: 1_700_000_000_000, output: "hi", assistantText: "hi" })],
+      }),
+    );
+
+  /** @scenario "A conversation transcript renders the same on every day" */
+  it("renders the same text on different days", () => {
+    vi.useFakeTimers({ now: 1_700_000_060_000 });
+    const soon = render();
+    vi.setSystemTime(1_800_000_000_000);
+    const later = render();
+
+    expect(later).toBe(soon);
+  });
+
+  /** @scenario "A conversation transcript renders the same on every day" */
+  it("heads each turn with its absolute start time", () => {
+    expect(render()).toContain("## Turn 1 · 2023-11-14T22:13:20.000Z ·");
   });
 });

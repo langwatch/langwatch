@@ -87,6 +87,21 @@ Feature: Canonical user lifecycle
     Then the personal project's API key is blank
     And the blank key is a valid personal context on the wire
 
+  # main's user.personalContext and user.personalBudget read the gateway's
+  # default routing policy, the caller's personal key and the budget check.
+  @unit
+  Scenario: The personal context names the default routing policy the gateway resolves
+    Given a member whose personal team inherits a default routing policy
+    When they read their personal context in that organization
+    Then the personal context names that routing policy
+
+  @unit
+  Scenario: The personal budget warns at the gateway's soft warning on the caller's own key
+    Given a member holding a personal gateway key whose budget is at a soft warning
+    When they read their personal budget in that organization
+    Then the gateway checks the budget against that key at no projected cost
+    And the personal budget answers a warning with the spend and the limit
+
   # main's user.personalUsage, budgetOverview and cliBootstrap, served from
   # Enterprise governance. personalUsage checked membership before reading.
   @unit
@@ -113,3 +128,20 @@ Feature: Canonical user lifecycle
     Given a member of the organization
     When the CLI asks for its bootstrap
     Then governance resolves the bootstrap for that member
+
+  # main's handler passed scope, scope id, limit, spend and period through
+  # unchecked, and its mail rendered each one blank rather than refusing.
+  @unit
+  Scenario: A request whose scope, limit or spend is blank still emails the admin
+    Given the page was opened with the scope, the scope ID, the limit or the spend left blank
+    When the user clicks "Send request"
+    Then the mutation resolves with the admin it was sent to
+    And the email renders that field blank, with no share of the limit stated
+
+  @unit
+  Scenario: A blank field does not hide a delivery failure
+    Given the page was opened with the limit and the spend left blank
+    And the server names no public base URL to link the budgets page
+    When the user clicks "Send request"
+    Then the mutation refuses the request as not delivered
+    And no email is sent

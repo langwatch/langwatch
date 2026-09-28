@@ -4,6 +4,11 @@
  * Spec: specs/identity/organization-authentication-settings.feature
  */
 import { Heading, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  SectionNavigationFrame,
+  type SectionNavigationLink,
+} from "@langwatch/design-system/section-navigation-frame";
+import { KeyRound, Plug, ShieldCheck } from "lucide-react";
 import { Suspense } from "react";
 
 import {
@@ -14,6 +19,17 @@ import {
 import { PermissionAlert } from "../../../../ui/elements/permission-alert.tsx";
 import { OrganizationPolicyCard } from "./organization-policy-card.tsx";
 
+/** Main's rail across the three Authentication pages (ARCHITECTURE.md §10). */
+const AUTHENTICATION_LINKS: readonly SectionNavigationLink[] = [
+  { label: "Overview", href: "/settings/authentication", icon: <ShieldCheck size={14} /> },
+  {
+    label: "Identity provider",
+    href: "/settings/authentication/provider",
+    icon: <KeyRound size={14} />,
+  },
+  { label: "Connectors", href: "/settings/authentication/connectors", icon: <Plug size={14} /> },
+];
+
 export default function AuthenticationSettingsScreen() {
   const host = useOrganizationHost();
   const { organizationId } = host.scope();
@@ -22,7 +38,15 @@ export default function AuthenticationSettingsScreen() {
     return <PermissionAlert permission={AUTHENTICATION_PAGE_PERMISSION} />;
   }
 
-  return <AuthenticationSettings host={host} organizationId={organizationId} />;
+  return (
+    <SectionNavigationFrame
+      label="Authentication"
+      links={AUTHENTICATION_LINKS}
+      activeHref="/settings/authentication"
+    >
+      <AuthenticationSettings host={host} organizationId={organizationId} />
+    </SectionNavigationFrame>
+  );
 }
 
 export function AuthenticationSettings({

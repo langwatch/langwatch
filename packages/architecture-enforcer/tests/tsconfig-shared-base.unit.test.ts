@@ -16,7 +16,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const BASE = join(REPO_ROOT, "tsconfig.base.json");
+/** tsconfig.base.json extends it, adding the TypeScript 7-only options. */
+const BASE = join(REPO_ROOT, "tsconfig.shared.json");
 
 /** The two project trees that are deliberately not workspace members. */
 const NON_MEMBER_PREFIXES = ["sdks/typescript/examples/", "dev/dogfood/"];
@@ -112,7 +113,7 @@ const subjects = execFileSync(
 )
   .split("\0")
   .filter((file) => file.length > 0 && !file.includes("node_modules/"))
-  .filter((file) => file !== "tsconfig.base.json")
+  .filter((file) => file !== "tsconfig.base.json" && file !== "tsconfig.shared.json")
   // Not a project of the workspace graph: it emits the published artefact under
   // the pinned sdk toolchain and deliberately inherits none of the repo's
   // options, which is what its own comment says and why it extends nothing.

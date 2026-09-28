@@ -1,7 +1,7 @@
 /**
- * Every workflow in the project, and the way to make another. A MOVE of
- * `platform/app`'s page: chrome/guard no longer travel. `LangyContextTarget`
- * does NOT travel since `@langwatch/langy-browser` is ungoverned.
+ * Every workflow in the project, and the way to make another. Its guard is
+ * declared in workflow.web.ts; `LangyContextTarget` does NOT travel since
+ * `@langwatch/langy-browser` is ungoverned.
  */
 
 import { Grid, Skeleton, Spacer, useDisclosure, VStack } from "@chakra-ui/react";

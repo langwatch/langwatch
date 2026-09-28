@@ -8,17 +8,11 @@
 // mounting it elsewhere is one modal, not a copy.
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
+import type { LimitType } from "@langwatch/organization-contract";
 import { useCallback } from "react";
 
 import { api } from "./organization-api.ts";
 import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
-
-/**
- * The seat levers a licence caps, written out here rather than imported from
- * `@langwatch/enterprise-licensing-contract`: this package is core and may not
- * depend on enterprise. `limitTypes` in that contract is the source of truth.
- */
-type LimitType = "members" | "membersLite";
 
 /** License enforcement: check and proceed with action or show upgrade modal. */
 export function useLicenseEnforcement(limitType: LimitType) {

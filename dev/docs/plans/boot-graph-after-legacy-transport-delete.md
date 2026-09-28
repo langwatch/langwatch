@@ -53,7 +53,7 @@ lane's work, not this one's.
 - The cut is at exports and mounts, not at implementations. Every transport file
   is intact; converting one is still a matter of rewriting that file and putting
   its export back.
-- Every absence is *named* through machinery that already existed
+- Every absence is _named_ through machinery that already existed
   (`ApiTrpcCollaboratorsAbsence`, `ApiAuthoringRestAbsenceReport`), not a new
   refusing twin.
 - `apps/tasks` is fully green, so `pnpm start:prepare:db` works again. The fix
@@ -107,16 +107,16 @@ is written in it — and it is blocked only on `@langwatch/api` publishing
 
 ## What needs binning, and what needs changing
 
-| Thing | Verdict |
-| --- | --- |
-| `apps/api/src/app/api-production.composition.ts` (~4200 lines) | **BIN.** It is the compose-era spine: 40+ `composedX` fields, a hand-rolled feature graph, and a 120-line literal that used to build the tRPC record. Every feature already declares its own server. This file should become `install(...)` over a list of feature servers. Nothing I did here moves it toward that — I only cut dead edges out of it. |
-| `apps/api/src/app-trpc/app-trpc.features.ts` | **BIN, after** it has served as the conversion checklist. The install model has no central namespace record. |
-| `apps/api/src/features/*/*-trpc.mount.ts` (21) | **BIN as they convert.** Each exists only because the process, not the feature, built the router. Under `defineTrpcRouter` the feature owns the declaration and there is no process-side mount file. |
-| `apps/api/src/features/*/*.composition.ts` + `.composition.types.ts` (~40 pairs) | **BIN.** The `.types.ts` split exists so importing a router type does not drag adapters in — a problem the install model does not have. |
-| `apps/api/src/api-rest.security.ts` | **REFACTOR.** The enforcement (7 middlewares) is good and should stay. The `create` / `projectPolicy` split, the `Envelope`/`"throw"` mode and the legacy body renderer are all legacy-builder artefacts. It should fill one port record for `createRestRuntime` and nothing else. |
-| `enterprise/packages/composition/api/src/trpc/*` (3 compositions) | **BIN.** They assemble feature transports on behalf of the process. Enterprise features should declare their own servers like every other module. |
-| `packages/api` — `createRestRouter`, `createTrpcRouter` | **ADD.** Everything above is blocked on these two. They are the highest-value thing in the repo right now. |
-| `security.createProjectVersionedApp` calls in ~30 REST transports | **CHANGE.** They load but cannot build. Each family converting to `defineRestRouter` removes one. |
+| Thing                                                                            | Verdict                                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/api/src/app/api-production.composition.ts` (~4200 lines)                   | **BIN.** It is the compose-era spine: 40+ `composedX` fields, a hand-rolled feature graph, and a 120-line literal that used to build the tRPC record. Every feature already declares its own server. This file should become `install(...)` over a list of feature servers. Nothing I did here moves it toward that — I only cut dead edges out of it. |
+| `apps/api/src/app-trpc/app-trpc.features.ts`                                     | **BIN, after** it has served as the conversion checklist. The install model has no central namespace record.                                                                                                                                                                                                                                           |
+| `apps/api/src/features/*/*-trpc.mount.ts` (21)                                   | **BIN as they convert.** Each exists only because the process, not the feature, built the router. Under `defineTrpcRouter` the feature owns the declaration and there is no process-side mount file.                                                                                                                                                   |
+| `apps/api/src/features/*/*.composition.ts` + `.composition.types.ts` (~40 pairs) | **BIN.** The `.types.ts` split exists so importing a router type does not drag adapters in — a problem the install model does not have.                                                                                                                                                                                                                |
+| `apps/api/src/api-rest.security.ts`                                              | **REFACTOR.** The enforcement (7 middlewares) is good and should stay. The `create` / `projectPolicy` split, the `Envelope`/`"throw"` mode and the legacy body renderer are all legacy-builder artefacts. It should fill one port record for `createRestRuntime` and nothing else.                                                                     |
+| `enterprise/packages/composition/api/src/trpc/*` (3 compositions)                | **BIN.** They assemble feature transports on behalf of the process. Enterprise features should declare their own servers like every other module.                                                                                                                                                                                                      |
+| `packages/api` — `createRestRouter`, `createTrpcRouter`                          | **ADD.** Everything above is blocked on these two. They are the highest-value thing in the repo right now.                                                                                                                                                                                                                                             |
+| `security.createProjectVersionedApp` calls in ~30 REST transports                | **CHANGE.** They load but cannot build. Each family converting to `defineRestRouter` removes one.                                                                                                                                                                                                                                                      |
 
 ## Where I stopped
 

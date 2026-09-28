@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { NoModelsConfiguredCallout } from "../no-models-configured-callout.tsx";
 
@@ -23,24 +23,17 @@ describe("NoModelsConfiguredCallout", () => {
   afterEach(() => cleanup());
 
   it("renders the standalone callout with a clickable row that opens settings in a new tab", () => {
-    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
     render(withProviders(<NoModelsConfiguredCallout />));
     const callout = screen.getByTestId("no-models-configured-callout");
     expect(callout).toBeInTheDocument();
     expect(screen.getByText(/No models configured/i)).toBeInTheDocument();
     expect(screen.getByTestId("no-models-configured-cta")).toBeInTheDocument();
     // Whole row is clickable (rchaves: 'clicking anywhere should take
-    // them to setup'). Rendered as a div with role=link rather than an
-    // anchor — the app's global anchor styles fragmented the rounded
-    // border. Clicking calls window.open with the target URL.
-    expect(callout.getAttribute("role")).toBe("link");
-    callout.click();
-    expect(openSpy).toHaveBeenCalledWith(
-      expect.stringMatching(/\/settings\/model-providers/),
-      "_blank",
-      "noopener,noreferrer",
-    );
-    openSpy.mockRestore();
+    // them to setup'): the row is itself the link to settings, in a new tab.
+    expect(callout.tagName).toBe("A");
+    expect(callout).toHaveAttribute("href", "/settings/model-providers");
+    expect(callout).toHaveAttribute("target", "_blank");
+    expect(callout).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("includes the surface-specific label when forFeatureLabel is provided", () => {

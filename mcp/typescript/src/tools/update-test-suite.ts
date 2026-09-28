@@ -4,10 +4,7 @@ import {
   type SuiteField,
   toWireAttachments,
 } from "../schemas/suite-fields.js";
-import {
-  formatEvaluatorAttachments,
-  formatSuiteFields,
-} from "./format-suite-details.js";
+import { formatEvaluatorAttachments, formatSuiteFields } from "./format-suite-details.js";
 
 /**
  * Handles the platform_update_test_suite MCP tool: updates any of name,

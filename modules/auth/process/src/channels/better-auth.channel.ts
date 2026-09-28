@@ -66,25 +66,6 @@ export type BetterAuthAccountRow = Readonly<{
 /** Whether the account-create ceremony pinned the row id Better Auth must write. */
 export type BetterAuthAccountPin = { pinned: true; data: { id: string } } | { pinned: false };
 
-/** A pending invitation for an address at a domain-matched organization. */
-export type PendingOrganizationInvite = Readonly<{
-  id: string;
-}>;
-
-/**
- * SSO auto-join invitation half. Pending invite wins over default membership
- * because its role/team assignments carry their own grants.
- */
-export abstract class BetterAuthPendingInvite {
-  /** Throws `InviteNotFoundError` when the address holds no pending invite there. */
-  abstract getPendingByOrganizationAndEmail(input: {
-    organizationId: string;
-    email: string;
-  }): Promise<PendingOrganizationInvite>;
-
-  abstract applyInvite(input: { userId: string; invite: PendingOrganizationInvite }): Promise<void>;
-}
-
 /**
  * Announcements from sign-up and session, fire-and-forget only. Throwing here
  * would fail the ceremony.

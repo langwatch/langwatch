@@ -10,7 +10,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { EmailContent, EmailDelivery } from "@langwatch/mail";
-import type { NotificationService } from "@langwatch/notification-contract";
+import type { MailDeliveryView, NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolvedSecrets } from "@langwatch/process-stores";
@@ -24,7 +24,13 @@ import { authServer } from "../../auth.server.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 
 /** A signed-out sign-up through the installed auth module, memory rows and a recording mailer. */
-async function bootAuth({ sent }: { sent: EmailContent[] }) {
+async function bootAuth({
+  sent,
+  mailDelivery = { provider: "smtp", smtpConfigured: true, misconfigured: false },
+}: {
+  sent: EmailContent[];
+  mailDelivery?: MailDeliveryView;
+}) {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }));
   return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
     .withModules([withMemoryRepositories(authServer)])
@@ -53,6 +59,7 @@ async function bootAuth({ sent }: { sent: EmailContent[] }) {
         trustedIdpOrigins: undefined,
         idpSimulatorUrl: undefined,
         localPasswords: false,
+        auth0ManagementClientId: undefined,
         signInProviders: NO_SIGN_IN_PROVIDERS,
       },
     })
@@ -71,7 +78,9 @@ async function bootAuth({ sent }: { sent: EmailContent[] }) {
       "audit-log": createApiFixture<AuditLogApi>(),
       entitlement: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
-      notification: createApiFixture<NotificationService>(),
+      notification: createApiFixture<NotificationService>({
+        getMailDelivery: async () => mailDelivery,
+      }),
       sso: createApiFixture<SsoApi>(),
       authz: createApiFixture<AuthzApi>(),
     })
@@ -89,6 +98,46 @@ describe("sign-up installation", () => {
         expect(sent).toHaveLength(1);
         expect(sent[0]?.to).toBe("sam@acme.com");
         expect(sent[0]?.html).toContain("https://app.acme.test/auth/signup?verify=");
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("when this installation has no email configured at all", () => {
+    /** @scenario "An installation that cannot send email signs up with a password and leaves the address unconfirmed" */
+    it("mails nothing and answers the unconfirmed proof a password sign-up spends", async () => {
+      const sent: EmailContent[] = [];
+      const runtime = await bootAuth({
+        sent,
+        mailDelivery: { smtpConfigured: false, misconfigured: false },
+      });
+      try {
+        const answer = await runtime
+          .service(AuthApi)
+          .requestNewAccountVerification({ email: "sam@acme.com" });
+
+        expect(answer).toEqual({ sent: false, addressProof: expect.any(String) });
+        expect(sent).toEqual([]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("when the email provider this installation names cannot be used", () => {
+    /** @scenario "A misconfigured email provider keeps sign-up on the mailed link" */
+    it("issues no unconfirmed proof and attempts the mailed link", async () => {
+      const sent: EmailContent[] = [];
+      const runtime = await bootAuth({
+        sent,
+        mailDelivery: { smtpConfigured: false, misconfigured: true },
+      });
+      try {
+        await expect(
+          runtime.service(AuthApi).requestNewAccountVerification({ email: "sam@acme.com" }),
+        ).resolves.toEqual({ sent: true });
+        expect(sent).toHaveLength(1);
       } finally {
         await runtime.stop();
       }

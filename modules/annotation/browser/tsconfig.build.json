@@ -42,7 +42,7 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../organization/browser/tsconfig.build.json"
+      "path": "../../organization/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

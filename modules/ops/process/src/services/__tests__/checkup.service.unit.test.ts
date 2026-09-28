@@ -97,7 +97,6 @@ function healthyDeps(overrides: Partial<CheckupFacts> = {}): CheckupFacts {
           lastReportAt: "2026-09-20T12:00:00.000Z",
           optionalMetricsOptOut: false,
           hostnameOptOut: false,
-          startupNoticeAcknowledgedSchemaVersion: 3,
         },
       ],
       getEndpoint: async () => "https://connect.langwatch.ai/v1/stats",
@@ -268,6 +267,65 @@ describe("CheckupService", () => {
     });
   });
 
+  describe("when REDIS_URL carries a password", () => {
+    const target = "redis://:s3cr3t-pass@langwatch-redis-master:6379";
+
+    /** @scenario "The Redis address is shown without its password" */
+    it("shows the host and port but never the password", async () => {
+      const answering = rowOf(
+        (
+          await CheckupService.create(
+            healthyDeps({ redis: { target, ready: async () => undefined } }),
+          ).cheap()
+        ).rows,
+        "redis",
+      );
+      const silent = rowOf(
+        (
+          await CheckupService.create(
+            healthyDeps({
+              redis: {
+                target,
+                ready: async () => {
+                  throw new Error(`connect ECONNREFUSED ${target}`);
+                },
+              },
+            }),
+          ).cheap()
+        ).rows,
+        "redis",
+      );
+
+      for (const verdict of [answering, silent]) {
+        expect(verdict.detail).toContain("langwatch-redis-master:6379");
+        expect(verdict.detail).not.toContain("s3cr3t-pass");
+      }
+      expect(answering.outcome).toBe("verified");
+      expect(silent.outcome).toBe("refused");
+    });
+
+    /** @scenario "The Redis address is shown without its password" */
+    it("masks a password that itself contains an @", async () => {
+      const verdict = rowOf(
+        (
+          await CheckupService.create(
+            healthyDeps({
+              redis: {
+                target: "redis://:left@right@langwatch-redis-master:6379",
+                ready: async () => undefined,
+              },
+            }),
+          ).cheap()
+        ).rows,
+        "redis",
+      );
+
+      expect(verdict.detail).toContain("//***@langwatch-redis-master:6379");
+      expect(verdict.detail).not.toContain("left");
+      expect(verdict.detail).not.toContain("right");
+    });
+  });
+
   describe("when the goose binary is absent", () => {
     /** @scenario "A ClickHouse install where the goose binary is absent leaves migrations not checked" */
     it("passes ClickHouse and leaves its migrations not checked", async () => {
@@ -303,7 +361,6 @@ describe("CheckupService", () => {
               lastReportError: "usage_report_refused_413",
               optionalMetricsOptOut: false,
               hostnameOptOut: false,
-              startupNoticeAcknowledgedSchemaVersion: 3,
             },
           ],
           getEndpoint: async () => "https://connect.langwatch.ai/v1/stats",

@@ -58,6 +58,7 @@ async function appFor(
       trustedIdpOrigins: undefined,
       idpSimulatorUrl: undefined,
       localPasswords: false,
+      auth0ManagementClientId: undefined,
       signInProviders: NO_SIGN_IN_PROVIDERS,
     },
     repositories: MemoryAuthRepositories.create(),

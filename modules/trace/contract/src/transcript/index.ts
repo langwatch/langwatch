@@ -7,3 +7,4 @@ export * from "./split-chat-for-panel.ts";
 export * from "./tool-result-body.ts";
 export * from "./transcript-text-extraction.ts";
 export * from "./types.ts";
+export * from "../trace-content-part.ts";

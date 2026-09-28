@@ -18,11 +18,11 @@ contract. Example, from the worker:
 
 ## Where the 982 are
 
-| location | findings |
-| -------- | -------- |
-| `apps/worker/` | 758 |
-| `enterprise/packages/composition/` | 222 |
-| **total** | **980** |
+| location                           | findings |
+| ---------------------------------- | -------- |
+| `apps/worker/`                     | 758      |
+| `enterprise/packages/composition/` | 222      |
+| **total**                          | **980**  |
 
 The worker's, by the module each import reaches into:
 
@@ -101,13 +101,13 @@ implementations directly, and two lanes in a row reported it in those words.
 
 ## What five lanes established
 
-| lane | scope | result |
-| ---- | ----- | ------ |
-| 1 | `apps/worker` alone | **+1** (removed 200 lines of genuinely dead code; no meter movement) |
-| 2 | `apps/worker` alone | −20 |
-| 3 | `apps/worker` **+** `modules/trace`, may extend `TraceApi` | **−1** on the worker |
-| 4 | `enterprise/packages` | 0 on the composition packages |
-| 5 | `enterprise/` both trees, told to skip these | −29 spent elsewhere, correctly |
+| lane | scope                                                      | result                                                               |
+| ---- | ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| 1    | `apps/worker` alone                                        | **+1** (removed 200 lines of genuinely dead code; no meter movement) |
+| 2    | `apps/worker` alone                                        | −20                                                                  |
+| 3    | `apps/worker` **+** `modules/trace`, may extend `TraceApi` | **−1** on the worker                                                 |
+| 4    | `enterprise/packages`                                      | 0 on the composition packages                                        |
+| 5    | `enterprise/` both trees, told to skip these               | −29 spent elsewhere, correctly                                       |
 
 Lane 3 is the informative one. It had exactly the permission the diagnosis said
 was missing, and the wall did not move.

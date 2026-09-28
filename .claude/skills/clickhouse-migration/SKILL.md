@@ -60,7 +60,7 @@ Every line of that is load-bearing:
   time, **Code 241** at merge time. This is the single most common ClickHouse outage in
   this repository's history.
 - **The down migration stays commented out**, under the words `To roll back, uncomment
-  and run manually.` A ClickHouse down migration is destructive and irreversible, so it
+and run manually.` A ClickHouse down migration is destructive and irreversible, so it
   is never something goose runs on its own; the way back from a bad release is the
   previous image on the migrated schema, which is what expand/contract guarantees.
 
@@ -127,7 +127,7 @@ The Go serverless renderer keeps its own copy of the LangWatchQL access model:
 behind per-tenant row filters and the caller-facing views the `langwatch_lwql` user may
 select from. It is asserted equal to the application's catalogue by
 `modules/analytics/process/src/rules/__tests__/manifestParity.unit.test.ts`, so a new
-queryable table or view without the matching entry fails CI — and a *missing* entry on a
+queryable table or view without the matching entry fails CI — and a _missing_ entry on a
 serverless installation is a query that refuses rather than a query that leaks.
 
 ## The scanner

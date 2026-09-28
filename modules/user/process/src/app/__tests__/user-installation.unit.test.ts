@@ -1,15 +1,28 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type {
+  EnterpriseGatewayApi,
+  PersonalVirtualKey,
+  RoutingPolicy,
+} from "@langwatch/enterprise-gateway-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { EmailDelivery } from "@langwatch/mail";
+import type {
+  OrganizationApi,
+  OrganizationSettings,
+  PersonalWorkspace,
+} from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { UserApi } from "@langwatch/user-contract";
 import { hash } from "bcrypt";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { userServer } from "../../user.server.ts";
 import {
@@ -36,19 +49,34 @@ function fakeUserRedis(): RedisConnection {
   return redisDouble({ incr: async () => 1, expire: async () => 1, ttl: async () => -1 });
 }
 
-function process(role: "api" | "worker") {
+function process(
+  role: "api" | "worker",
+  peers: Readonly<{
+    authz?: AuthzApi;
+    enterpriseGateway?: EnterpriseGatewayApi;
+    gateway?: GatewayApi;
+    organization?: OrganizationApi;
+  }> = {},
+) {
   return createApp({ role })
     .withModules([withMemoryRepositories(userServer)])
-    .withMembers({ passkeysEnabled: false, publicBaseUrl: undefined })
+    .withMembers({
+      passkeysEnabled: false,
+      publicBaseUrl: undefined,
+      mail: createApiFixture<EmailDelivery>(),
+    })
     .withRelational(fakeUserPrisma())
     .withKeyvalue(fakeUserRedis())
     .provide({
       auth: createUserTestAuth(),
-      authz: createApiFixture<AuthzApi>(),
+      authz: peers.authz ?? createApiFixture<AuthzApi>(),
+      "enterprise-gateway": peers.enterpriseGateway ?? createApiFixture<EnterpriseGatewayApi>(),
+      gateway: peers.gateway ?? createApiFixture<GatewayApi>(),
       governance: createApiFixture<GovernanceRestApi>(),
-      organization: createUserTestOrganizations(),
+      organization: peers.organization ?? createUserTestOrganizations(),
       ops: createUserTestOps(),
       project: createApiFixture<ProjectApi>(),
+      "stored-object": createApiFixture<StoredObjectApi>(),
     });
 }
 
@@ -126,3 +154,131 @@ describe("user app installation", () => {
     }
   });
 });
+
+describe("the /me gateway reads", () => {
+  const workspace: PersonalWorkspace = {
+    team: { id: "team-1", name: "Ada's workspace", slug: "ada", createdAtMs: 0 },
+    project: { id: "project-1", name: "Ada", slug: "ada", apiKey: "sk-lw-1", createdAtMs: 0 },
+  };
+  const organization = Object.assign(createUserTestOrganizations(), {
+    getPersonalWorkspace: vi.fn(async () => workspace),
+    getSettings: vi.fn(async (): Promise<OrganizationSettings> => ({
+      id: "org-1",
+      name: "Acme",
+      slug: "acme",
+      supportContact: "it@example.com",
+      presenceEnabled: false,
+      traceSharingEnabled: false,
+      primaryIntent: null,
+      s3Endpoint: null,
+      s3AccessKeyId: null,
+      s3Bucket: null,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    })),
+  });
+
+  /** @scenario "The personal context names the default routing policy the gateway resolves" */
+  it("names the first default routing policy enterprise gateway answers", async () => {
+    const findDefaultRoutingPolicies = vi.fn(async () => [
+      routingPolicy({ id: "policy-team", name: "Team default" }),
+      routingPolicy({ id: "policy-org", name: "Org default" }),
+    ]);
+    const runtime = await process("api", {
+      authz: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
+      enterpriseGateway: createApiFixture<EnterpriseGatewayApi>({ findDefaultRoutingPolicies }),
+      organization,
+    }).boot();
+
+    try {
+      const context = await runtime
+        .service(UserApi)
+        .getPersonalContext({ userId: "user-1", organizationId: "org-1" });
+
+      expect(context.routingPolicy).toEqual({ id: "policy-team", name: "Team default" });
+      expect(findDefaultRoutingPolicies).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        personalTeamId: "team-1",
+      });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The personal budget warns at the gateway's soft warning on the caller's own key" */
+  it("checks the caller's own key with the gateway and answers a warning", async () => {
+    const checkBudget = vi.fn(async () => ({
+      decision: "soft_warn" as const,
+      warnings: [],
+      blockReason: null,
+      blockedBy: [],
+      scopes: [
+        { scope: "PRINCIPAL", scopeId: "user-1", window: "MONTH", spentUsd: "85", limitUsd: "100" },
+      ],
+    }));
+    const personalVirtualKeyList = vi.fn(async () => [personalKey({ id: "vk-1" })]);
+    const runtime = await process("api", {
+      enterpriseGateway: createApiFixture<EnterpriseGatewayApi>({ personalVirtualKeyList }),
+      gateway: createApiFixture<GatewayApi>({ checkBudget }),
+      organization,
+    }).boot();
+
+    try {
+      const budget = await runtime
+        .service(UserApi)
+        .getPersonalBudget({ userId: "user-1", organizationId: "org-1" });
+
+      expect(budget).toMatchObject({ status: "warning", spentUsd: "85", limitUsd: "100" });
+      expect(personalVirtualKeyList).toHaveBeenCalledWith({
+        userId: "user-1",
+        organizationId: "org-1",
+      });
+      expect(checkBudget).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        teamId: "team-1",
+        projectId: "project-1",
+        virtualKeyId: "vk-1",
+        principalUserId: "user-1",
+        projectedCostUsd: 0,
+      });
+    } finally {
+      await runtime.stop();
+    }
+  });
+});
+
+function routingPolicy({ id, name }: { id: string; name: string }): RoutingPolicy {
+  return {
+    id,
+    organizationId: "org-1",
+    name,
+    description: null,
+    modelProviderIds: [],
+    modelAliases: {},
+    defaultModel: null,
+    policyRules: {},
+    isDefault: true,
+    createdAtMs: 0,
+    updatedAtMs: 0,
+    createdById: null,
+    updatedById: null,
+    scopes: [],
+  };
+}
+
+function personalKey({ id }: { id: string }): PersonalVirtualKey {
+  return {
+    id,
+    organizationId: "org-1",
+    name: "Ada's key",
+    description: null,
+    displayPrefix: "lw_vk_",
+    status: "ACTIVE",
+    principalUserId: "user-1",
+    routingPolicyId: null,
+    createdAtMs: 0,
+    updatedAtMs: 0,
+    lastUsedAtMs: null,
+    scopes: [],
+  };
+}

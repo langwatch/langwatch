@@ -1,4 +1,5 @@
 import IORedis, { type Redis } from "ioredis";
+import { createTestLogger, type TestLogLines } from "@langwatch/test-harness";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
@@ -55,29 +56,29 @@ describe("GroupQueueProcessor - failure logging", () => {
     await redis.quit();
   });
 
-  function createQueue(
-    processFn: (payload: TestPayload) => Promise<void>,
-  ): GroupQueueProcessor<TestPayload> {
+  function createQueue(processFn: (payload: TestPayload) => Promise<void>): {
+    queue: GroupQueueProcessor<TestPayload>;
+    lines: TestLogLines;
+  } {
     const definition = createQueueDefinition({ process: processFn });
-    const queue = new GroupQueueProcessor<TestPayload>(definition, redis);
+    const { logger, lines } = createTestLogger();
+    const queue = new GroupQueueProcessor<TestPayload>(definition, redis, {
+      logger: logger.child({}, { serializers: { error: serializeCause } }),
+    });
     queues.push(queue);
-    return queue;
+    return { queue, lines };
   }
 
-  /** The logger is a private field; the spy sees the raw log object before
-   *  pino serializes it, which is exactly the contract under test: the
-   *  Error INSTANCE must reach the logger, not a pre-flattened string. */
-  function spyOnLogger(queue: GroupQueueProcessor<TestPayload>, level: "warn" | "error") {
-    const logger = (queue as unknown as { logger: Record<string, unknown> }).logger;
-    return vi.spyOn(logger as never, level as never) as ReturnType<typeof vi.spyOn>;
+  /** A pre-flattened string passes through without a stack; only an Error INSTANCE yields one. */
+  function serializeCause(value: unknown): unknown {
+    return value instanceof Error ? { type: value.name, stack: value.stack } : value;
   }
 
-  function loggedObjectFor(
-    spy: ReturnType<typeof vi.spyOn>,
-    message: string,
-  ): Record<string, unknown> | undefined {
-    const call = spy.mock.calls.find((c: unknown[]) => c[1] === message);
-    return call?.[0] as Record<string, unknown> | undefined;
+  function loggedCauseStack(lines: TestLogLines, message: string): unknown {
+    const cause = lines.findLine("error", message)?.error;
+    return typeof cause === "object" && cause !== null && "stack" in cause
+      ? cause.stack
+      : undefined;
   }
 
   describe("given a handler that throws a retryable error", () => {
@@ -88,14 +89,12 @@ describe("GroupQueueProcessor - failure logging", () => {
       /** @scenario "A retried attempt that later succeeds leaves no error record" */
       it("leaves a warning for the failed attempt and nothing at error", async () => {
         let attempts = 0;
-        const queue = createQueue(async () => {
+        const { queue, lines } = createQueue(async () => {
           attempts += 1;
           if (attempts === 1) {
             throw new Error("Too many queries in flight");
           }
         });
-        const warnSpy = spyOnLogger(queue, "warn");
-        const errorSpy = spyOnLogger(queue, "error");
         await queue.waitUntilReady();
 
         await queue.send({ id: "job-1", groupId: "g1" });
@@ -107,11 +106,9 @@ describe("GroupQueueProcessor - failure logging", () => {
           { timeout: 15000, interval: 50 },
         );
 
+        expect(lines.findLine("warn", "Job attempt failed, re-staged with backoff")).toBeDefined();
         expect(
-          loggedObjectFor(warnSpy, "Job attempt failed, re-staged with backoff"),
-        ).toBeDefined();
-        expect(
-          loggedObjectFor(errorSpy, "Group blocked after exhausted retries, job re-staged"),
+          lines.findLine("error", "Group blocked after exhausted retries, job re-staged"),
         ).toBeUndefined();
       });
     });
@@ -124,10 +121,9 @@ describe("GroupQueueProcessor - failure logging", () => {
         function invalidPayloadHandlerForStackAssertion(): never {
           throw new NonRetryableGroupQueueError("bad payload");
         }
-        const queue = createQueue(async () => {
+        const { queue, lines } = createQueue(async () => {
           invalidPayloadHandlerForStackAssertion();
         });
-        const errorSpy = spyOnLogger(queue, "error");
         await queue.waitUntilReady();
 
         await queue.send({ id: "job-1", groupId: "g1" });
@@ -135,29 +131,18 @@ describe("GroupQueueProcessor - failure logging", () => {
         await vi.waitFor(
           () => {
             expect(
-              loggedObjectFor(errorSpy, "Group blocked after exhausted retries, job re-staged"),
+              lines.findLine("error", "Group blocked after exhausted retries, job re-staged"),
             ).toBeDefined();
           },
           { timeout: 5000, interval: 50 },
         );
 
-        const nonRetryable = loggedObjectFor(
-          errorSpy,
-          "Job failed with non-retryable error, skipping retries",
-        )!;
-        expect(nonRetryable.error).toBeInstanceOf(Error);
-        expect((nonRetryable.error as Error).stack ?? "").toContain(
-          "invalidPayloadHandlerForStackAssertion",
-        );
-
-        const blocked = loggedObjectFor(
-          errorSpy,
-          "Group blocked after exhausted retries, job re-staged",
-        )!;
-        expect(blocked.error).toBeInstanceOf(Error);
-        expect((blocked.error as Error).stack ?? "").toContain(
-          "invalidPayloadHandlerForStackAssertion",
-        );
+        expect(
+          loggedCauseStack(lines, "Job failed with non-retryable error, skipping retries"),
+        ).toContain("invalidPayloadHandlerForStackAssertion");
+        expect(
+          loggedCauseStack(lines, "Group blocked after exhausted retries, job re-staged"),
+        ).toContain("invalidPayloadHandlerForStackAssertion");
       });
     });
   });

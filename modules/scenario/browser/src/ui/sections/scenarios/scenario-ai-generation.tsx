@@ -305,9 +305,9 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
 function DefaultModelErrorBanner({ children }: { children: React.ReactNode }) {
   return (
-    <Alert.Root status="warning" fontSize="xs" alignItems="flex-start">
+    <Alert.Root status="warning" size="sm">
       <Alert.Indicator>
-        <Icon as={AlertTriangle} boxSize={3} />
+        <Icon as={AlertTriangle} />
       </Alert.Indicator>
       <Alert.Content gap={2}>
         <Alert.Description>{children}</Alert.Description>

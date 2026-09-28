@@ -37,7 +37,6 @@ import type {
   langyWorkerDispatchIntentSchema,
 } from "../eventing/langy-conversation-process.schemas.ts";
 import type { LangyLocalPresenceRepository } from "../repositories/langy-local-presence.repository.ts";
-import type { LangyNavigateResourceKind } from "../rules/langy-navigate-resources.rules.ts";
 import type { LocalCallDispatcherService } from "../services/langy-local-call-dispatcher.service.ts";
 import type { ControlRequestService } from "../services/langy-local-control-request.service.ts";
 import type { UserWaitService } from "../services/langy-local-user-wait.service.ts";
@@ -141,29 +140,6 @@ export interface LangyFrameAuth {
 /** Mints a KSUID for one of Langy's named id resources. */
 export interface LangyIds {
   generateId(resource: keyof typeof LANGY_ID_RESOURCES): string;
-}
-
-/**
- * The project half of a navigate address: every fallback URL is built under the
- * asking project's own slug, so the slug is read once, from the project the
- * turn belongs to, and never from anything the agent wrote.
- */
-export interface LangyNavigateProject {
-  /** The project's slug; throws `ProjectNotFoundError` when the project is missing. */
-  getSlug(projectId: string): Promise<string>;
-}
-
-/** Where a resource is read, or `unknown` when nothing in this project answers to the id. */
-export type LangyNavigateResourceLocation =
-  | { outcome: "located"; path: string }
-  | { outcome: "unknown" };
-
-export interface LangyNavigateResourceLocator {
-  locate(input: {
-    projectId: string;
-    kind: LangyNavigateResourceKind;
-    resourceId: string;
-  }): Promise<LangyNavigateResourceLocation>;
 }
 
 /** Counts minted/revoked/reaped as one series with operation labels so dashboards read

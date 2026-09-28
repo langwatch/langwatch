@@ -39,7 +39,7 @@ const ports = createApiFixture<ExperimentRunCollaborators>(
   {
     attachments: createNoAttachmentsFixture(),
     studio: {
-      postEvent: async ({
+      postStudioEvent: async ({
         event,
         onEvent,
       }: {
@@ -414,7 +414,7 @@ describe("given a personal development agent of another person", () => {
   const ownershipPorts = createApiFixture<ExperimentRunCollaborators>(
     {
       ...ports,
-      connectedAgentOwnership: { assertRunnable },
+      connectedAgentOwnership: { assertConnectedAgentsRunnable: assertRunnable },
     },
     "ports",
   );

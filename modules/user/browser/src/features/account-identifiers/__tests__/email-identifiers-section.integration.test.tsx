@@ -264,7 +264,7 @@ describe("when another address is added", () => {
     await waitFor(() =>
       expect(calls.add).toHaveBeenCalledWith(expect.objectContaining({ email: "sam@other.test" })),
     );
-    expect(calls.add.mock.calls[0]![0].codeChallenge).toMatch(/^[A-Za-z0-9._~-]{43}$/);
+    expect(calls.add.mock.calls[0]![0].codeChallenge).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(sessionStorage.length).toBe(1);
   });
 });
