@@ -228,6 +228,7 @@ function checkGooseBinary(): void {
 export const DEFAULT_CLICKHOUSE_WAIT_SECONDS = 180;
 
 const WAIT_RETRY_INTERVAL_MS = 2_000;
+const WAIT_PING_TIMEOUT_MS = 5_000;
 const WAIT_LOG_INTERVAL_MS = 10_000;
 
 /**
@@ -349,13 +350,17 @@ export async function waitForClickHouseReady({
   let lastLogAt: number | undefined;
 
   for (;;) {
-    // A hanging ping must not hold the boot much past the wait: each one is
-    // capped at the time left, but never below one retry interval. A zero
-    // wait's single attempt keeps the client's own request timeout.
+    // A hanging ping is abandoned after one attempt's timeout so the next
+    // attempt can reach a server that came up meanwhile, and never runs much
+    // past the wait. A zero wait's single attempt keeps the client's own
+    // request timeout.
     const failure = await pingFailure(
       ping,
       waitSeconds > 0
-        ? Math.max(deadline - now(), WAIT_RETRY_INTERVAL_MS)
+        ? Math.min(
+            WAIT_PING_TIMEOUT_MS,
+            Math.max(deadline - now(), WAIT_RETRY_INTERVAL_MS),
+          )
         : null,
     );
     if (!failure) return;

@@ -130,6 +130,29 @@ describe("waitForClickHouseReady", () => {
         );
       });
     });
+
+    describe("when the server answers the next attempt", () => {
+      /** @scenario "A hung ping is abandoned and retried" */
+      it("abandons the hung ping and succeeds on the retry", async () => {
+        let attempts = 0;
+        const outcome = waitForClickHouseReady({
+          displayUrl: redactUrl(SERVER_URL),
+          waitSeconds: 60,
+          ping: () => {
+            attempts += 1;
+            return attempts === 1
+              ? new Promise<void>(() => undefined)
+              : Promise.resolve();
+          },
+          log: () => undefined,
+        });
+
+        await vi.advanceTimersByTimeAsync(10_000);
+        await outcome;
+
+        expect(attempts).toBe(2);
+      });
+    });
   });
 
   describe("given ClickHouse answers with an authentication failure", () => {

@@ -25,6 +25,14 @@ Feature: Migrations wait for a ClickHouse that is still starting
     Then the migration step abandons the ping and fails
 
   @unit
+  Scenario: A hung ping is abandoned and retried
+    Given the first ClickHouse ping never answers
+    And ClickHouse answers the next attempt
+    When the migration step checks the server
+    Then it gives up on the hung ping after one attempt's timeout
+    And it succeeds on the retry within the wait
+
+  @unit
   Scenario: A server that answers with an error is not retried
     Given ClickHouse answers the check with an authentication failure
     When the migration step checks the server
