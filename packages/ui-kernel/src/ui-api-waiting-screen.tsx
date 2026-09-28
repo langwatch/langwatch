@@ -3,6 +3,8 @@
  * Spec: specs/ui/api-boot-wait.feature
  */
 
+import { FullLogo } from "@langwatch/design-system/full-logo";
+
 import "./ui-api-waiting.css";
 
 /** The one command that starts the API on a developer's own machine. */
@@ -30,6 +32,9 @@ export function UiApiWaitingScreen({
     <output className="lw-api-waiting" aria-live="polite" data-testid="api-waiting">
       <div className="lw-api-waiting-mesh" aria-hidden="true" />
       <div className="lw-api-waiting-body">
+        <div className="lw-api-waiting-logo" aria-hidden="true" data-testid="api-waiting-logo">
+          <FullLogo width={155} height={38} />
+        </div>
         <h1 className="lw-api-waiting-heading">
           {isDevelopment ? "Starting the API" : "Reconnecting"}
         </h1>

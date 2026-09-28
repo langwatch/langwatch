@@ -73,6 +73,12 @@
   text-align: center;
 }
 
+/* The product mark above the heading, the same one the loading screen shows. */
+.lw-api-waiting-logo {
+  display: flex;
+  margin-bottom: 18px;
+}
+
 .lw-api-waiting-heading {
   margin: 0;
   font-family: "Sentient", ui-serif, Georgia, "Times New Roman", serif;

@@ -48,3 +48,8 @@ Feature: The browser waits for an API that is still starting
     And the application is not running in development
     Then the waiting screen names no command
     And the waiting screen keeps polling
+
+  @integration
+  Scenario: The waiting screen carries the LangWatch logo
+    Given the reader is on the waiting screen
+    Then the waiting screen shows the LangWatch logo above what it is waiting for
