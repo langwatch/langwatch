@@ -52,7 +52,7 @@ describe("toHandleSlug", () => {
       "ünïcödé",
       "emoji 🎉 handle",
     ])("produces a handle the schema accepts: %j", (input) => {
-      expect(handleSchema.safeParse(toHandleSlug(input)).success).toBe(true);
+      expect(handleSchema.validate(toHandleSlug(input))).toBe(true);
     });
   });
 });

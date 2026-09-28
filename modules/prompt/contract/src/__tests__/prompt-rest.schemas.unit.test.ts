@@ -18,6 +18,6 @@ describe("the create-prompt request schema", () => {
     expect(example).toBeDefined();
     // The rule the shape cannot state: one of `prompt`/`messages` is required.
     expect(example).toHaveProperty("prompt");
-    expect(createPromptInputSchema.safeParse(example).success).toBe(true);
+    expect(createPromptInputSchema.validate(example)).toBe(true);
   });
 });

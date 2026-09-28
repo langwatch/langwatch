@@ -17,16 +17,16 @@ describe("Prompt contract", () => {
 
   /** @scenario invalid handles are rejected at the contract boundary */
   it("rejects invalid handles before persistence", () => {
-    expect(promptHandleSchema.safeParse("Invalid Handle").success).toBe(false);
-    expect(promptHandleSchema.safeParse("support-bot/v1").success).toBe(true);
+    expect(promptHandleSchema.validate("Invalid Handle")).toBe(false);
+    expect(promptHandleSchema.validate("support-bot/v1")).toBe(true);
   });
 
   it("requires a project and handle for creation", () => {
-    expect(
-      createPromptCommandSchema.safeParse({ projectId: "p1", handle: "support-bot" }).success,
-    ).toBe(true);
-    expect(
-      createPromptCommandSchema.safeParse({ projectId: "", handle: "support-bot" }).success,
-    ).toBe(false);
+    expect(createPromptCommandSchema.validate({ projectId: "p1", handle: "support-bot" })).toBe(
+      true,
+    );
+    expect(createPromptCommandSchema.validate({ projectId: "", handle: "support-bot" })).toBe(
+      false,
+    );
   });
 });

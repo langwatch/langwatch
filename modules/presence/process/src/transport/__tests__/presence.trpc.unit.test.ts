@@ -103,12 +103,12 @@ describe("when a browser session sends a heartbeat", () => {
 
   it("has no place on the wire for a claimed identity", () => {
     expect(
-      presenceTrpc.members.update.input.safeParse({
+      presenceTrpc.members.update.input.validate({
         projectId: "project-1",
         sessionId: "tab-1",
         location,
         user: { id: "user-alice", name: "Alice", image: null },
-      }).success,
+      }),
     ).toBe(false);
   });
 

@@ -29,7 +29,7 @@ describe("given a list requested with a cursor", () => {
 
   describe("when neither half is given", () => {
     it("lists from the newest run", () => {
-      expect(instantEvalListQuerySchema.safeParse({}).success).toBe(true);
+      expect(instantEvalListQuerySchema.validate({})).toBe(true);
     });
   });
 
@@ -57,9 +57,9 @@ describe("given a sample requested for a hundred rows", () => {
   describe("when the request is validated", () => {
     /** @scenario "A sample is bounded to twenty five rows" */
     it("refuses it as past the sample ceiling", () => {
-      expect(instantEvalSampleQuerySchema.safeParse({ n: "100" }).success).toBe(false);
+      expect(instantEvalSampleQuerySchema.validate({ n: "100" })).toBe(false);
       expect(
-        instantEvalSampleQuerySchema.safeParse({ n: String(INSTANT_EVAL_SAMPLE_CEILING) }).success,
+        instantEvalSampleQuerySchema.validate({ n: String(INSTANT_EVAL_SAMPLE_CEILING) }),
       ).toBe(true);
     });
   });
@@ -73,9 +73,9 @@ describe("given a results page requested with no bounds", () => {
       expect(parsed.limit).toBe(100);
       expect(parsed.matched).toBeUndefined();
       expect(
-        instantEvalResultsQuerySchema.safeParse({
+        instantEvalResultsQuerySchema.validate({
           limit: String(INSTANT_EVAL_RESULTS_CEILING + 1),
-        }).success,
+        }),
       ).toBe(false);
     });
   });

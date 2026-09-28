@@ -18,7 +18,7 @@ describe("given the plan catalogue", () => {
     it("accepts every plan", () => {
       const rejected = planCatalogue
         .all()
-        .filter((plan) => !planSchema.safeParse(plan).success)
+        .filter((plan) => !planSchema.validate(plan))
         .map((plan) => plan.type);
 
       expect(rejected).toEqual([]);

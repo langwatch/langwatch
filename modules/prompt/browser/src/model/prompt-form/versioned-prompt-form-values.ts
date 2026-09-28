@@ -45,7 +45,7 @@ export function versionedPromptToPromptConfigFormValues(
    * Invalid legacy handles are excluded from form values, forcing "draft"
    * status until the user resaves with a valid one.
    */
-  const isHandleValid = handleSchema.safeParse(shortHandle).success;
+  const isHandleValid = handleSchema.validate(shortHandle);
 
   return formSchema.parse({
     configId: prompt.id,

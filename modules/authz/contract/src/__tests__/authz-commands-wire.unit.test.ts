@@ -281,7 +281,7 @@ describe("the grants ledger's wire boundary", () => {
 
     it("refuses a role whose permission list holds an empty entry", () => {
       expect(
-        defineRoleCommandDataSchema.safeParse({
+        defineRoleCommandDataSchema.validate({
           tenantId: ORG,
           organizationId: ORG,
           commandId: "cmd_1",
@@ -293,7 +293,7 @@ describe("the grants ledger's wire boundary", () => {
             kind: "custom",
             occurredAtMs: 1_755_000_000_000,
           },
-        }).success,
+        }),
       ).toBe(false);
     });
   });

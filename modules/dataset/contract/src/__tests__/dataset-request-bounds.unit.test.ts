@@ -24,23 +24,22 @@ describe("dataset batch schemas", () => {
     ["datasetRestBatchCreateRecordsSchema", datasetRestBatchCreateRecordsSchema],
     ["datasetRestLegacyEntriesSchema", datasetRestLegacyEntriesSchema],
   ] as const)("%s refuses entries above the enterprise ceiling", (_name, schema) => {
-    expect(schema.safeParse({ entries: entries(ENTERPRISE_BATCH + 1) }).success).toBe(false);
-    expect(schema.safeParse({ entries: entries(ENTERPRISE_BATCH) }).success).toBe(true);
+    expect(schema.validate({ entries: entries(ENTERPRISE_BATCH + 1) })).toBe(false);
+    expect(schema.validate({ entries: entries(ENTERPRISE_BATCH) })).toBe(true);
   });
 
   it("datasetRestLegacyEntriesSchema refuses an empty entries array now", () => {
-    expect(datasetRestLegacyEntriesSchema.safeParse({ entries: [] }).success).toBe(false);
+    expect(datasetRestLegacyEntriesSchema.validate({ entries: [] })).toBe(false);
   });
 
   it("datasetRestDeleteRecordsSchema refuses recordIds above the enterprise ceiling", () => {
     const recordIds = (count: number) => Array.from({ length: count }, (_, i) => `r${i}`);
 
     expect(
-      datasetRestDeleteRecordsSchema.safeParse({ recordIds: recordIds(ENTERPRISE_BATCH + 1) })
-        .success,
+      datasetRestDeleteRecordsSchema.validate({ recordIds: recordIds(ENTERPRISE_BATCH + 1) }),
     ).toBe(false);
     expect(
-      datasetRestDeleteRecordsSchema.safeParse({ recordIds: recordIds(ENTERPRISE_BATCH) }).success,
+      datasetRestDeleteRecordsSchema.validate({ recordIds: recordIds(ENTERPRISE_BATCH) }),
     ).toBe(true);
   });
 
@@ -48,12 +47,10 @@ describe("dataset batch schemas", () => {
     const idEntries = (count: number) =>
       Array.from({ length: count }, (_, index) => ({ id: `row-${index}`, input: `row ${index}` }));
 
-    expect(
-      newDatasetEntriesSchema.safeParse({ entries: idEntries(ENTERPRISE_BATCH + 1) }).success,
-    ).toBe(false);
-    expect(
-      newDatasetEntriesSchema.safeParse({ entries: idEntries(ENTERPRISE_BATCH) }).success,
-    ).toBe(true);
+    expect(newDatasetEntriesSchema.validate({ entries: idEntries(ENTERPRISE_BATCH + 1) })).toBe(
+      false,
+    );
+    expect(newDatasetEntriesSchema.validate({ entries: idEntries(ENTERPRISE_BATCH) })).toBe(true);
   });
 
   it("datasetRecordApiDeleteManyInputSchema refuses recordIds above the enterprise ceiling", () => {

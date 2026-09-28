@@ -103,12 +103,12 @@ export function readFeatureCatalogue(
   const subjectOwners = new Map<string, string>();
 
   for (const [index, raw] of catalogueResult.data.features.entries()) {
-    if (!jsonObjectSchema.safeParse(raw).success) {
+    if (!jsonObjectSchema.validate(raw)) {
       violations.push(issue(path, `Feature catalogue entry ${index} must be an object.`));
       continue;
     }
 
-    if (!featureCatalogueEntryKeysSchema.safeParse(raw).success) {
+    if (!featureCatalogueEntryKeysSchema.validate(raw)) {
       violations.push(
         issue(
           path,

@@ -171,9 +171,9 @@ describe("AuthzGrantsService compatibility operations", () => {
     ).toEqual({ attached: ["binding_1"], duplicates: ["binding_2"] });
     // A count is a non-negative integer, which is the only thing this schema
     // decides; `parse(2)).toBe(2)` held for `z.unknown()` too.
-    expect(authzRevokeBindingsWhereOutputSchema.safeParse(2).success).toBe(true);
-    expect(authzRevokeBindingsWhereOutputSchema.safeParse(-1).success).toBe(false);
-    expect(authzRevokeBindingsWhereOutputSchema.safeParse(1.5).success).toBe(false);
+    expect(authzRevokeBindingsWhereOutputSchema.validate(2)).toBe(true);
+    expect(authzRevokeBindingsWhereOutputSchema.validate(-1)).toBe(false);
+    expect(authzRevokeBindingsWhereOutputSchema.validate(1.5)).toBe(false);
     for (const schema of [
       authzAttachResourceGrantOutputSchema,
       authzRevokeResourceGrantsOutputSchema,
@@ -184,13 +184,13 @@ describe("AuthzGrantsService compatibility operations", () => {
       authzDeleteRoleOutputSchema,
     ]) {
       expect(schema.parse(undefined)).toBeUndefined();
-      expect(schema.safeParse("not void").success).toBe(false);
+      expect(schema.validate("not void")).toBe(false);
     }
   });
 
   it("rejects ambiguous principals and invalid resource audiences", () => {
     expect(
-      authzAttachBindingsInputSchema.safeParse({
+      authzAttachBindingsInputSchema.validate({
         organizationId: "org_1",
         bindings: [
           {
@@ -204,10 +204,10 @@ describe("AuthzGrantsService compatibility operations", () => {
         ],
         actor,
         onDuplicate: "reject",
-      }).success,
+      }),
     ).toBe(false);
     expect(
-      authzAttachResourceGrantInputSchema.safeParse({
+      authzAttachResourceGrantInputSchema.validate({
         organizationId: "org_1",
         grantId: "grant_1",
         projectId: "project_1",
@@ -219,29 +219,29 @@ describe("AuthzGrantsService compatibility operations", () => {
         principal: { type: "anyone", id: "somebody" },
         scopeId: "trace_1",
         actor,
-      }).success,
+      }),
     ).toBe(false);
   });
 
   it("keeps the selector closed and tenancy exclusively top-level", () => {
     expect(
-      authzBindingFilterSchema.safeParse({
+      authzBindingFilterSchema.validate({
         userId: "user_1",
         id: { in: ["binding_1"], not: "binding_2" },
-      }).success,
+      }),
     ).toBe(true);
-    expect(authzBindingFilterSchema.safeParse({ organizationId: "org_other" }).success).toBe(false);
+    expect(authzBindingFilterSchema.validate({ organizationId: "org_other" })).toBe(false);
     expect(
-      authzBindingFilterSchema.safeParse({
+      authzBindingFilterSchema.validate({
         userId: "user_1",
         id: { startsWith: "binding" },
-      }).success,
+      }),
     ).toBe(false);
     expect(
-      authzBindingFilterSchema.safeParse({
+      authzBindingFilterSchema.validate({
         userId: "user_1",
         arbitraryDatabaseClause: true,
-      }).success,
+      }),
     ).toBe(false);
   });
 
@@ -256,34 +256,34 @@ describe("AuthzGrantsService compatibility operations", () => {
     // legacy-import migration emits it, so asserting its rejection here made
     // this a test of a vocabulary that had already moved on.
     expect(
-      authzAttachBindingsInputSchema.safeParse({
+      authzAttachBindingsInputSchema.validate({
         ...base,
         source: "hand-typed",
-      }).success,
+      }),
     ).toBe(false);
     expect(
-      authzAttachBindingsInputSchema.safeParse({
+      authzAttachBindingsInputSchema.validate({
         ...base,
         occurredAtMs: -1,
-      }).success,
+      }),
     ).toBe(false);
     expect(
-      authzDefineRoleInputSchema.safeParse({
+      authzDefineRoleInputSchema.validate({
         organizationId: "org_1",
         roleId: "role_1",
         name: "",
         permissions: [""],
         kind: "operator",
         actor,
-      }).success,
+      }),
     ).toBe(false);
     expect(
-      authzDeleteRoleInputSchema.safeParse({
+      authzDeleteRoleInputSchema.validate({
         organizationId: "org_1",
         roleId: "role_1",
         actor,
         awaitProjection: "later",
-      }).success,
+      }),
     ).toBe(false);
   });
 
