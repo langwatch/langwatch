@@ -14,6 +14,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryTraceTenantBroadcastChannel } from "../../channels/memory/memory.trace-tenant-broadcast.channel.ts";
 import {
   CLICKHOUSE_FACET_CATALOG,
   FACET_REGISTRY,
@@ -82,6 +83,7 @@ async function facetsFor({
 }) {
   const { repository, calls } = recordingRepository();
   const service = TraceListService.create({
+    discoverUpdates: MemoryTraceTenantBroadcastChannel.create(),
     facets: CLICKHOUSE_FACET_CATALOG,
     repository,
     evaluations: createApiFixture<EvaluationApi>({}),

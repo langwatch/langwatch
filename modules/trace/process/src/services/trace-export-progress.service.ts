@@ -1,9 +1,7 @@
-import { on } from "node:events";
-
 import { createLogger } from "@langwatch/observability";
 import { exportProgressEventSchema, type ExportProgressEvent } from "@langwatch/trace-contract";
 
-import type { TracesTrpcEmitters } from "#app/trace.app";
+import type { TraceTenantUpdateStreamService } from "./trace-tenant-update-stream.service.ts";
 
 const logger = createLogger("langwatch:api:export");
 
@@ -12,10 +10,14 @@ const logger = createLogger("langwatch:api:export");
  * main's `export` router). The channel is per tenant, so the exportId separates exports.
  */
 export class TraceExportProgressService {
-  private constructor(private readonly broadcast: TracesTrpcEmitters) {}
+  private constructor(private readonly updates: TraceTenantUpdateStreamService) {}
 
-  static create({ broadcast }: { broadcast: TracesTrpcEmitters }): TraceExportProgressService {
-    return new TraceExportProgressService(broadcast);
+  static create({
+    updates,
+  }: {
+    updates: TraceTenantUpdateStreamService;
+  }): TraceExportProgressService {
+    return new TraceExportProgressService(updates);
   }
 
   async *stream({
@@ -27,24 +29,23 @@ export class TraceExportProgressService {
     exportId: string;
     signal?: AbortSignal | undefined;
   }): AsyncGenerator<ExportProgressEvent> {
-    const emitter = this.broadcast.getTenantEmitter(projectId);
     logger.info({ projectId, exportId }, "Export progress subscription started");
 
-    try {
-      for await (const eventArgs of on(emitter, "export_progress", { signal })) {
-        const frame = exportProgressEventSchema.safeParse(parseEnvelope(eventArgs[0]));
-        if (!frame.success) {
-          logger.warn({ projectId, exportId }, "Ignoring invalid export progress event");
-          continue;
-        }
-        if (frame.data.exportId !== exportId) continue;
-
-        yield frame.data;
-
-        if (frame.data.type === "done" || frame.data.type === "error") break;
+    for await (const envelope of this.updates.watch({
+      projectId,
+      eventName: "export_progress",
+      signal,
+    })) {
+      const frame = exportProgressEventSchema.safeParse(parseEnvelope(envelope));
+      if (!frame.success) {
+        logger.warn({ projectId, exportId }, "Ignoring invalid export progress event");
+        continue;
       }
-    } finally {
-      this.broadcast.cleanupTenantEmitter(projectId);
+      if (frame.data.exportId !== exportId) continue;
+
+      yield frame.data;
+
+      if (frame.data.type === "done" || frame.data.type === "error") break;
     }
   }
 }

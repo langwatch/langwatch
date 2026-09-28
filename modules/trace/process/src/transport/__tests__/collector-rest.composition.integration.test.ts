@@ -28,6 +28,7 @@ import { describe, expect, it } from "vitest";
 import { composeTraceAppDependencies } from "../../app/trace-composition.build.ts";
 import { TraceApp } from "../../app/trace.app.ts";
 import type { TraceProcessingCommands } from "../../app/trace.members.ts";
+import { MemoryTraceTenantBroadcastChannel } from "../../channels/memory/memory.trace-tenant-broadcast.channel.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
@@ -180,6 +181,7 @@ function deployment(access: CollectorAccess = {}) {
         },
         cleanupTenantEmitter: () => undefined,
       },
+      tenantBroadcast: MemoryTraceTenantBroadcastChannel.create(),
       apiKeys: apiKeyDirectory(access, markedUsed),
       // The one question the ingest door asks, on its own narrow seam. The
       // viewer protections below stay unreachable: nothing on the ingest path

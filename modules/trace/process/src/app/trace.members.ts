@@ -413,21 +413,6 @@ export interface TraceTopicAssignmentCommand {
   sendAssignTopic(input: AssignTopicCommandData): Promise<void>;
 }
 
-/** The realtime fan-out the trace ingestion path tells a tenant's tabs through.
- * Wire format (Redis channel) is the contract; the channel is pinned by literal
- * in the composition test, not derived from a constant. */
-export interface TraceTenantBroadcast {
-  broadcastToTenant(
-    tenantId: string,
-    /** The already-serialised payload the browser receives verbatim. */
-    event: string,
-    eventType: "trace_updated",
-  ): Promise<void>;
-}
-
-/** The one channel the trace path publishes on, as the far side spells it. */
-export const TRACE_TENANT_BROADCAST_EVENT_TYPE = "trace_updated" as const;
-
 export const traceDependencies = {
   annotations: AnnotationApi,
   /**

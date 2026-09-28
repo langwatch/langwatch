@@ -7,6 +7,7 @@ import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceExportProgressService } from "../trace-export-progress.service.ts";
+import { TraceTenantUpdateStreamService } from "../trace-tenant-update-stream.service.ts";
 
 const PROJECT_ID = "project-1";
 
@@ -14,7 +15,9 @@ function relay() {
   const emitter = new EventEmitter();
   const cleanupTenantEmitter = vi.fn();
   const service = TraceExportProgressService.create({
-    broadcast: { getTenantEmitter: () => emitter, cleanupTenantEmitter },
+    updates: TraceTenantUpdateStreamService.create({
+      emitters: { getTenantEmitter: () => emitter, cleanupTenantEmitter },
+    }),
   });
   const emit = (event: unknown) =>
     emitter.emit("export_progress", { event: JSON.stringify(event), timestamp: 1 });

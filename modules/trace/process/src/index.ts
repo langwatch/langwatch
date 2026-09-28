@@ -8,7 +8,6 @@ export type {
   TraceSpanCostEnrichment,
   TraceSpanPiiRedaction,
   TraceSpanSpool,
-  TraceTenantBroadcast,
 } from "./app/trace.members.ts";
 export {
   passesTraceOriginGuards,

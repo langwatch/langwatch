@@ -1,5 +1,3 @@
-import { on } from "node:events";
-
 /**
  * Trace feature application: one typed contract replacing five previous bags.
  * Rules: attribution (caller stamped), full resolution on consuming reads,
@@ -290,6 +288,7 @@ import { TraceExportProgressService } from "../services/trace-export-progress.se
 import { TraceFacetValuesService } from "../services/trace-facet-values.service.ts";
 import { AmbiguousTraceIdPrefixError } from "../services/trace-legacy-read.service.ts";
 import { TraceSharedReadService } from "../services/trace-shared-read.service.ts";
+import { TraceTenantUpdateStreamService } from "../services/trace-tenant-update-stream.service.ts";
 import { TraceTranscriptReadService } from "../services/trace-transcript-read.service.ts";
 import type {
   TraceLegacyReads,
@@ -530,11 +529,8 @@ export type TracesTopicReader = Readonly<{
   ): Promise<readonly Readonly<{ id: string; name: string; parentId: string | null }>[]>;
 }>;
 
-/** The read side of the process's broadcast fabric. */
-export type TracesTrpcEmitters = Readonly<{
-  getTenantEmitter(tenantId: string): NodeJS.EventEmitter;
-  cleanupTenantEmitter(tenantId: string): void;
-}>;
+/** The read side of the process's broadcast fabric: presence's tenant fan-out, fed from Redis. */
+export type TracesTrpcEmitters = Pick<PresenceApi, "getTenantEmitter" | "cleanupTenantEmitter">;
 
 /** The resolved share, as far as the anonymous trace read needs to know it. */
 export type ResolvedShare = Readonly<{
@@ -736,6 +732,7 @@ export class TraceApp implements TraceApi, CollectorApp {
           slots: RedisTraceExportSlotRepository.create({ connection: input.members.redis }),
         }),
         presence: input.dependencies.presence,
+        broadcast: input.dependencies.presence,
         shareReadLimiter: input.members.rateLimiter,
         protections: {
           authz: input.dependencies.authz,
@@ -771,6 +768,7 @@ export class TraceApp implements TraceApi, CollectorApp {
       findSummary: (lookup) => app.findSummary(lookup),
       recordTrackedEvent: ({ tenantId, body, eventId }) =>
         app.recordTrackedEvent({ project: { id: tenantId }, body, eventId }),
+      broadcast: collaborators.tenantBroadcast,
     });
     return app;
   }
@@ -829,12 +827,14 @@ export class TraceApp implements TraceApi, CollectorApp {
   #sharedRead: TraceSharedReadService | null;
   #transcriptRead: TraceTranscriptReadService;
   #exportProgress: TraceExportProgressService;
+  #tenantUpdates: TraceTenantUpdateStreamService;
   private constructor(dependencies: TraceAppDependencies) {
     this.#dependencies = dependencies;
     this.#transcriptRead = TraceTranscriptReadService.create();
-    this.#exportProgress = TraceExportProgressService.create({
-      broadcast: dependencies.broadcast,
+    this.#tenantUpdates = TraceTenantUpdateStreamService.create({
+      emitters: dependencies.broadcast,
     });
+    this.#exportProgress = TraceExportProgressService.create({ updates: this.#tenantUpdates });
     this.#sharedRead =
       dependencies.protections && dependencies.shareReadLimiter
         ? TraceSharedReadService.create({
@@ -1086,19 +1086,12 @@ export class TraceApp implements TraceApi, CollectorApp {
     return trace;
   }
 
-  async *streamTenantUpdates(input: {
+  streamTenantUpdates(input: {
     projectId: string;
     eventName: "trace_updated" | "discover_updated";
     signal?: AbortSignal;
   }): AsyncGenerator<unknown> {
-    const emitter = this.getTenantEmitter(input.projectId);
-    try {
-      for await (const eventArgs of on(emitter, input.eventName, { signal: input.signal })) {
-        yield eventArgs[0];
-      }
-    } finally {
-      this.cleanupTenantEmitter(input.projectId);
-    }
+    return this.#tenantUpdates.watch(input);
   }
 
   async readConversationContextForViewer(input: {
@@ -1893,38 +1886,6 @@ export class TraceApp implements TraceApi, CollectorApp {
     input: Readonly<{ projectId: string }>,
   ): Promise<readonly Readonly<{ id: string; name: string; parentId: string | null }>[]> {
     return this.#dependencies.topics.getAll(input);
-  }
-
-  // -------------------------------------------------------------------------
-  // The process's broadcast fabric
-  // -------------------------------------------------------------------------
-
-  /** The tenant's broadcast emitter, for a caller that streams events itself. */
-  getTenantEmitter(tenantId: string): NodeJS.EventEmitter {
-    return this.#dependencies.broadcast.getTenantEmitter(tenantId);
-  }
-
-  /** Releases the tenant's broadcast emitter once a stream ends. */
-  cleanupTenantEmitter(tenantId: string): void {
-    this.#dependencies.broadcast.cleanupTenantEmitter(tenantId);
-  }
-
-  async *streamUpdates(input: {
-    projectId: string;
-    channel: "trace_updated" | "discover_updated";
-    signal?: unknown;
-  }): AsyncGenerator<unknown> {
-    const emitter = this.#dependencies.broadcast.getTenantEmitter(input.projectId);
-
-    try {
-      for await (const eventArgs of on(emitter, input.channel, {
-        signal: input.signal as AbortSignal | undefined,
-      })) {
-        yield eventArgs[0];
-      }
-    } finally {
-      this.#dependencies.broadcast.cleanupTenantEmitter(input.projectId);
-    }
   }
 
   // -------------------------------------------------------------------------

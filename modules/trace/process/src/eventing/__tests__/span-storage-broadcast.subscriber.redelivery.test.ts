@@ -22,7 +22,15 @@ function makeBroadcastSink(fail = false) {
     sent,
     deps: {
       broadcast: {
-        async broadcastToTenant(tenantId: string, event: string, eventType: "trace_updated") {
+        async broadcastToTenant({
+          tenantId,
+          event,
+          eventType,
+        }: {
+          tenantId: string;
+          event: string;
+          eventType: "trace_updated" | "discover_updated";
+        }) {
           if (fail) throw new Error("subscriber connection lost");
           sent.push(`${tenantId}|${eventType}|${event}`);
         },

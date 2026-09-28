@@ -597,8 +597,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
       parentId: string | null;
     }>[]
   >;
-  getTenantEmitter(tenantId: string): NodeJS.EventEmitter;
-  cleanupTenantEmitter(tenantId: string): void;
   readTraceList(params: {
     tenantId: string;
     timeRange: { from: number; to: number };

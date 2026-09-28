@@ -17,6 +17,7 @@ import { TopicApi } from "@langwatch/topic-contract";
 import { traceSummaryDataSchema, type TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryTraceTenantBroadcastChannel } from "../../channels/memory/memory.trace-tenant-broadcast.channel.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
@@ -137,6 +138,7 @@ function compose({ withClickHouse = true, summaryStore }: Composed) {
       },
       cleanupTenantEmitter: () => undefined,
     },
+    tenantBroadcast: MemoryTraceTenantBroadcastChannel.create(),
     protections: {
       authz: peers.authz,
       projects: peers.projects,

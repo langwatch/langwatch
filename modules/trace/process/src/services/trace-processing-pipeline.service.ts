@@ -23,6 +23,7 @@ import type {
   TraceSpanTokenEstimation,
 } from "../app/trace.members.ts";
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
+import type { TraceTenantBroadcast } from "../channels/trace-tenant-broadcast.channel.ts";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "../eventing/coding-agent-span-facts-dispatch.subscriber.ts";
 import { createCustomEvaluationSyncHandler } from "../eventing/custom-evaluation-sync.subscriber.ts";
 import { createDeferredOriginHandler } from "../eventing/deferred-origin.process.ts";
@@ -32,6 +33,7 @@ import { passesTraceOriginGuards } from "../eventing/origin-guarded.subscriber.t
 import { createProjectMetadataHandler } from "../eventing/project-metadata.subscriber.ts";
 import { EventingRecordSpanAdapter } from "../eventing/record-span.commands.ts";
 import { createSimulationMetricsSyncHandler } from "../eventing/simulation-metrics-sync.subscriber.ts";
+import { createSpanStorageBroadcastHandler } from "../eventing/span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "../eventing/span-storage.store.ts";
 import { TraceAnalyticsStore } from "../eventing/trace-derived.store.ts";
 import { createTraceProcessingProducerPipeline } from "../eventing/trace-processing-producer.pipeline.ts";
@@ -39,6 +41,7 @@ import { EventingTracePipelineAdapter } from "../eventing/trace-processing-proje
 import { buildTraceProcessingConsumer } from "../eventing/trace-processing.pipeline.ts";
 import { TraceAnalyticsRollupStore } from "../eventing/trace-rollup.store.ts";
 import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
+import { createTraceUpdateBroadcastHandler } from "../eventing/trace-update-broadcast.subscriber.ts";
 import {
   type TrackedEventSyncSubscriberDeps,
   createTrackedEventSyncHandler,
@@ -87,6 +90,8 @@ export interface TraceProcessingPipelineInput {
   commands: TraceProcessingCommandsService;
   findSummary: (input: { projectId: string; traceId: string }) => Promise<TraceSummaryData | null>;
   recordTrackedEvent: TrackedEventSyncSubscriberDeps["recordTrackedEvent"];
+  /** Tells a tenant's open tabs a trace moved; presence relays it in the serving process. */
+  broadcast: TraceTenantBroadcast;
 }
 
 /** trace_processing per role: producers send; consumers fold and react as main's worker did. */
@@ -170,7 +175,6 @@ export class TraceProcessingPipelineService {
   #reactions(): Parameters<typeof buildTraceProcessingConsumer>[1] {
     const { peers, commands } = this.input;
     const normalization = TraceSpanNormalizationAdapterService.create(this.input.canonicalisation);
-    const refusing = (capability: string) => () => Promise.reject(this.#refuse(capability));
     const resolveOrigin = createDeferredOriginHandler((data) => commands.resolveOrigin(data));
     return {
       resolveDeferredOrigin: async ({ tenantId, traceId }) => {
@@ -191,7 +195,7 @@ export class TraceProcessingPipelineService {
       trackedEventSync: createTrackedEventSyncHandler({
         recordTrackedEvent: this.input.recordTrackedEvent,
       }),
-      traceUpdateBroadcast: refusing("the trace live-update broadcast"),
+      traceUpdateBroadcast: createTraceUpdateBroadcastHandler({ broadcast: this.input.broadcast }),
       projectMetadata: createProjectMetadataHandler({
         projects: peers.projects,
         bootstrapTopicClustering: (projectId) => peers.topics.bootstrapClustering({ projectId }),
@@ -231,8 +235,8 @@ export class TraceProcessingPipelineService {
           }),
         contributeReceivedSpan: (input) => peers.codingAgents.contributeReceivedSpan(input),
       }),
-      spanStorageBroadcast: refusing("the span storage broadcast"),
-      broadcastDisabled: true,
+      spanStorageBroadcast: createSpanStorageBroadcastHandler({ broadcast: this.input.broadcast }),
+      broadcastDisabled: false,
     };
   }
 }

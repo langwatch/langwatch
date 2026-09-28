@@ -18,6 +18,7 @@ import type {
 
 import type { FacetCatalog } from "#rules/trace-facet-registry.rules";
 
+import type { TraceTenantBroadcast } from "../channels/trace-tenant-broadcast.channel.ts";
 import type { FacetFilterResolver } from "../rules/trace-facet-filter.rules.ts";
 import type { DiscoverParams, FacetValuesParams } from "../rules/trace-list-cache-key.rules.ts";
 import {
@@ -25,7 +26,7 @@ import {
   mapToTraceListItem,
   SORT_COLUMN_MAP,
 } from "../rules/trace-list-row.rules.ts";
-import { TraceDiscoverService, type DiscoverBroadcaster } from "./trace-discover.service.ts";
+import { TraceDiscoverService } from "./trace-discover.service.ts";
 import { TraceFacetValuesService } from "./trace-facet-values.service.ts";
 import { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
 import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
@@ -88,18 +89,26 @@ export class TraceListService {
     evaluations,
     topicService,
     facets,
+    discoverUpdates,
   }: {
     repository: TraceListRead;
     evaluations: EvaluationApi;
     topicService: TopicApi;
     facets: FacetCatalog;
+    /** Where a finished background discover refresh tells the tenant's tabs to refetch. */
+    discoverUpdates: TraceTenantBroadcast;
   }): TraceListService {
     const topicNaming = TraceTopicNamingService.create({ topicService });
 
     return new TraceListService({
       repository,
       evaluations,
-      discover: TraceDiscoverService.create({ repository, topicNaming, facets }),
+      discover: TraceDiscoverService.create({
+        repository,
+        topicNaming,
+        facets,
+        updates: discoverUpdates,
+      }),
       facetValues: TraceFacetValuesService.create({ repository, topicNaming, facets }),
     });
   }
@@ -143,11 +152,6 @@ export class TraceListService {
 
   getFacetValues(params: FacetValuesParams): Promise<FacetValuesResult> {
     return this.facetValues.getFacetValues(params);
-  }
-
-  /** Wires the SSE push a background discover refresh fires when it lands. */
-  static setDiscoverBroadcaster(fn: DiscoverBroadcaster | null): void {
-    TraceDiscoverService.setDiscoverBroadcaster(fn);
   }
 
   /**
