@@ -1,7 +1,7 @@
 /**
- * The "Add a block" picker. With Langy, a question closes it and asks Langy its prompt with the
- * board attached, writing nothing. "Blocks" adds a library block; from the Flight Deck it asks
- * which of the member's own boards (or a new one) gets it.
+ * The "Add a block" picker. With Langy, a question (or one the member types) closes it and asks
+ * Langy with the board attached, writing nothing. "Blocks" adds a library block; from the Flight
+ * Deck it asks which of the member's own boards (or a new one) gets it.
  */
 
 import { Box, Button, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
@@ -21,6 +21,7 @@ import {
   type LucideIcon,
   MessageSquare,
   Scale,
+  Sparkles,
   TrendingDown,
   XCircle,
 } from "lucide-react";
@@ -31,7 +32,11 @@ import { useBoardBlocks } from "../../behavior/use-board-blocks.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import type { BlockDefinition, BlockPeriod } from "../../blocks/index.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
-import { type BoardSubject, boardPromptQuestion } from "../../langy/model/board-langy.ts";
+import {
+  type BoardSubject,
+  boardPromptQuestion,
+  boardQuestion,
+} from "../../langy/model/board-langy.ts";
 import {
   BLOCK_QUESTION_SECTIONS,
   type BlockQuestion,
@@ -78,9 +83,16 @@ export function BlockPickerDialog({
     ? searchBlockQuestions({ sections: BLOCK_QUESTION_SECTIONS, search })
     : [];
   const blocks = searchLibraryBlocks(search);
+  const typed = search.trim();
+  const canAskTyped = langy.enabled && typed.length > 0;
 
   const ask = (question: BlockQuestion) => {
     langy.ask(boardPromptQuestion({ prompt: question.prompt, board, period }));
+    onClose();
+  };
+
+  const askTyped = () => {
+    langy.ask(boardQuestion({ question: typed, board, period }));
     onClose();
   };
 
@@ -103,10 +115,24 @@ export function BlockPickerDialog({
             boxShadow="0 1px 4px rgb(16 16 32 / 0.06)"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" || !canAskTyped) return;
+              event.preventDefault();
+              askTyped();
+            }}
           />
         </VStack>
         <Dialog.Body overflowY="auto" paddingY={5}>
           <VStack align="stretch" gap={6}>
+            {canAskTyped && (
+              <PickerRow
+                title={`Ask Langy: "${typed}"`}
+                detail="Langy answers with this dashboard attached."
+                icon={Sparkles}
+                palette="purple"
+                onClick={askTyped}
+              />
+            )}
             {sections.map((section) => (
               <QuestionSection key={section.id} section={section} onChoose={ask} />
             ))}
@@ -117,7 +143,7 @@ export function BlockPickerDialog({
                 onClose={onClose}
               />
             )}
-            {sections.length === 0 && blocks.length === 0 && (
+            {!canAskTyped && sections.length === 0 && blocks.length === 0 && (
               <Text fontSize="13px" color="fg.muted">
                 Nothing matches your search.
               </Text>

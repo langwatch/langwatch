@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  * Langy on a board, against an in-memory dashboards and widgets server: the
- * ask bar hands the question and the board to Langy, and a block just added
- * earns an insights offer that asks nothing until it is accepted.
+ * the bar opens the picker, a question typed there reaches Langy with the board,
+ * and a block just added earns an offer that asks nothing until accepted.
  * @see modules/dashboard/specs/dashboards-v1.feature
  */
 
@@ -115,6 +115,8 @@ function inMemoryServer({ widgets = [] }: { widgets?: Widget[] } = {}) {
 
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
 const MEMBER = ["analytics:view", "cost:view", "traces:view", "langy:create"];
+/** The bar's own words, which name the button. */
+const ASK_BAR = "What would you like to know?";
 const WRITES = /^dashboards\.(?!getAll|sourcePresence)|^dashboardWidgets\.(?!list)/;
 
 function openBoard({
@@ -146,19 +148,48 @@ afterEach(cleanup);
 
 describe("Langy on a board", () => {
   describe("given Langy is enabled for the project", () => {
-    describe("when the member types a question on their own board and presses Ask", () => {
+    describe("when the member looks at the bar on their own board", () => {
       /** @scenario "AC16 Ask Langy from the board" */
-      it("opens Langy with that question and the board attached", async () => {
+      it("shows a button that opens the picker, never a text field", async () => {
         const user = userEvent.setup();
         const host = openBoard({ server: inMemoryServer() });
 
-        const field = await screen.findByRole("textbox", {
-          name: "Ask Langy about this dashboard",
-        });
-        expect(field).toHaveAttribute("placeholder", "What would you like to know?");
-        await user.type(field, "Why did cost jump last week?");
-        await user.click(screen.getByRole("button", { name: "Ask" }));
+        const bar = await screen.findByRole("button", { name: ASK_BAR });
+        expect(screen.queryByRole("textbox", { name: /Ask Langy/ })).toBeNull();
+        expect(screen.queryByRole("textbox")).toBeNull();
+        await user.click(bar);
 
+        expect(host.lastQuery).toEqual({ addBlock: "open" });
+        expect(host.langyAsks).toEqual([]);
+      });
+    });
+
+    describe("when the member presses the bar on the Agent Flight Deck", () => {
+      /** @scenario "AC16 Ask Langy from the board" */
+      it("opens the picker from the keyboard too, and changes nothing on the deck", async () => {
+        const user = userEvent.setup();
+        const server = inMemoryServer();
+        const host = openBoard({ server, dashboardId: FLIGHT_DECK.id });
+
+        (await screen.findByRole("button", { name: ASK_BAR })).focus();
+        await user.keyboard("{Enter}");
+
+        expect(host.lastQuery).toEqual({ addBlock: "open" });
+        expect(host.langyAsks).toEqual([]);
+        expect(writesTo(server)).toEqual([]);
+      });
+    });
+
+    describe("when the member types their own question in the picker and asks it", () => {
+      /** @scenario "AC16 Ask Langy from the board" */
+      it("opens Langy with that question and the board attached", async () => {
+        const user = userEvent.setup();
+        const host = openBoard({ server: inMemoryServer(), query: { addBlock: "open" } });
+
+        await user.type(await screen.findByRole("searchbox"), "Why did cost jump last week?");
+        await user.click(screen.getByRole("button", { name: /^Ask Langy: "Why did cost jump/ }));
+
+        expect(host.lastQuery).toEqual({ addBlock: void 0 });
         expect(host.langyAsks).toHaveLength(1);
         const [ask] = host.langyAsks;
         expect(ask?.question).toBe("Why did cost jump last week?");
@@ -166,21 +197,22 @@ describe("Langy on a board", () => {
         expect(ask?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
         expect(ask?.context[0]?.ref).toContain('dashboard "Weekly review" (id board-1)');
         expect(ask?.context[0]?.ref).toContain("the member's own dashboard");
-        expect(field).toHaveValue("");
       });
     });
 
-    describe("when the member asks from the Agent Flight Deck", () => {
+    describe("when the member asks a typed question from the Agent Flight Deck's picker", () => {
       /** @scenario "AC16 Ask Langy from the board" */
       it("attaches the deck as read-only and changes nothing on it", async () => {
         const user = userEvent.setup();
         const server = inMemoryServer();
-        const host = openBoard({ server, dashboardId: FLIGHT_DECK.id });
-
-        const field = await screen.findByRole("textbox", {
-          name: "Ask Langy about this dashboard",
+        const host = openBoard({
+          server,
+          dashboardId: FLIGHT_DECK.id,
+          query: { addBlock: "open" },
         });
-        await user.type(field, "What should I add to track cost?{Enter}");
+
+        const search = await screen.findByRole("searchbox");
+        await user.type(search, "What should I add to track cost?{Enter}");
 
         expect(host.langyAsks).toHaveLength(1);
         const [ask] = host.langyAsks;
@@ -192,15 +224,15 @@ describe("Langy on a board", () => {
       });
     });
 
-    describe("when the member presses Ask with nothing typed", () => {
+    describe("when the picker's search is empty", () => {
       /** @scenario "AC16 Ask Langy from the board" */
-      it("asks nothing", async () => {
+      it("offers no typed question and asks nothing on Enter", async () => {
         const user = userEvent.setup();
-        const host = openBoard({ server: inMemoryServer() });
+        const host = openBoard({ server: inMemoryServer(), query: { addBlock: "open" } });
 
-        await screen.findByRole("textbox", { name: "Ask Langy about this dashboard" });
-        await user.click(screen.getByRole("button", { name: "Ask" }));
+        await user.type(await screen.findByRole("searchbox"), "{Enter}");
 
+        expect(screen.queryByRole("button", { name: /^Ask Langy:/ })).toBeNull();
         expect(host.langyAsks).toEqual([]);
       });
     });
@@ -219,7 +251,7 @@ describe("Langy on a board", () => {
       openBoard({ server: inMemoryServer(), flags, permissions });
 
       expect(await screen.findByRole("button", { name: /Add a block/ })).toBeInTheDocument();
-      expect(screen.queryByRole("textbox", { name: "Ask Langy about this dashboard" })).toBeNull();
+      expect(screen.queryByRole("button", { name: ASK_BAR })).toBeNull();
       expect(screen.queryByText("What would you like to know?")).toBeNull();
     });
   });
@@ -283,7 +315,7 @@ describe("Langy on a board", () => {
       openBoard({ server: inMemoryServer({ widgets: [storedTraceCount("w-1")] }) });
 
       await screen.findByTestId("dashboard-block-trace-count-over-time");
-      await screen.findByRole("textbox", { name: "Ask Langy about this dashboard" });
+      await screen.findByRole("button", { name: ASK_BAR });
       expect(screen.queryByRole("button", { name: "Generate insights", hidden: true })).toBeNull();
     });
   });

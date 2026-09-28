@@ -1,5 +1,5 @@
 /**
- * Langy on a board, only for a member who has it: the ask bar, and after a
+ * Langy on a board, only for a member who has it: the ask bar (it opens the picker), and after a
  * block is added, an offer to generate insights on it. The offer is a proposal:
  * nothing is asked until the member accepts, and neither ever writes the board.
  */
@@ -12,7 +12,7 @@ import { useBlockData, useSourceConnection } from "../../../blocks/behavior/use-
 import type { BlockPeriod } from "../../../blocks/index.ts";
 import type { BoardBlock } from "../../../model/board-blocks.ts";
 import { useJustAddedBlock, useLangyAsk } from "../../behavior/use-board-langy.ts";
-import { blockInsightsRequest, type BoardSubject, boardQuestion } from "../../model/board-langy.ts";
+import { blockInsightsRequest, type BoardSubject } from "../../model/board-langy.ts";
 import { BoardAskBar } from "../blocks/board-ask-bar.tsx";
 
 export function BoardLangy({
@@ -20,12 +20,15 @@ export function BoardLangy({
   period,
   projectId,
   watched,
+  onOpenPicker,
 }: {
   board: BoardSubject;
   period: BlockPeriod;
   projectId: string;
   /** The member's own board's blocks, watched for one just added; absent on the Flight Deck. */
   watched?: { blocks: readonly BoardBlock[]; settled: boolean };
+  /** Opens the question picker, where every ask starts. */
+  onOpenPicker: () => void;
 }) {
   const langy = useLangyAsk();
   const { justAdded, settle } = useJustAddedBlock({
@@ -36,7 +39,7 @@ export function BoardLangy({
 
   return (
     <VStack align="stretch" gap={0}>
-      <BoardAskBar onAsk={(question) => langy.ask(boardQuestion({ question, board, period }))} />
+      <BoardAskBar onOpen={onOpenPicker} />
       {justAdded && (
         <InsightsOffer
           key={justAdded.widgetId}

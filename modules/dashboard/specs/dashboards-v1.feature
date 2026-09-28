@@ -150,7 +150,9 @@ Feature: Dashboards v1
   @integration
   Scenario: AC16 Ask Langy from the board
     Given Langy is enabled for the project
-    When the member types in "What would you like to know?" and presses Ask
+    When the member presses "What would you like to know?" on any board, the Flight Deck included
+    Then the question picker opens, since the bar is a button and never a text field
+    When they type their own question in the picker and ask it
     Then Langy opens with that question
     And the current board is passed as context
 
