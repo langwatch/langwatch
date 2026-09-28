@@ -46,13 +46,14 @@ export interface DashboardRepository {
   findFirstDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined>;
   findLastDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined>;
   findDashboardIds(input: { projectId: string; dashboardIds: string[] }): Promise<string[]>;
-  /** Stored organisation-wide with no description; `createdById` null when absent. */
+  /** No description; `createdById` null and `visibility` organisation-wide when absent. */
   createDashboard(input: {
     id: string;
     projectId: string;
     name: string;
     order: number;
     createdById?: string | null;
+    visibility?: DashboardVisibility;
   }): Promise<DashboardRecord>;
   updateDashboard(input: {
     projectId: string;

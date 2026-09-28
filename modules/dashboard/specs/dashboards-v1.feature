@@ -96,6 +96,7 @@ Feature: Dashboards v1
   @e2e
   Scenario: AC10 Blank board matches the reference
     Given a member creates a new dashboard
+    Then it is visible only to them, under Mine in the sidebar
     When it opens
     Then they see "Add a description"
     And they see the "Add a block" area with "Start from the question you need answered."

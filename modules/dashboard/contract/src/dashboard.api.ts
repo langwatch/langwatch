@@ -55,8 +55,16 @@ export interface DashboardApi {
     dashboardId: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard & { graphs: Graph[] }>;
-  /** `createdById` is the member creating it; absent for a project credential. */
-  create(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard>;
+  /**
+   * `createdById` is the member creating it; absent for a project credential.
+   * `visibility` defaults to organisation; `only_me`/`team` need `createdById`.
+   */
+  create(input: {
+    projectId: string;
+    name: string;
+    createdById?: string;
+    visibility?: DashboardVisibility;
+  }): Promise<Dashboard>;
   rename(input: {
     projectId: string;
     dashboardId: string;

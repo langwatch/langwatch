@@ -293,8 +293,13 @@ export class DashboardApp implements DashboardApi {
     return this.#dashboards.getById(input);
   }
 
-  /** A new organisation-wide dashboard, appended after the current last. */
-  create(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard> {
+  /** A new dashboard, appended after the current last; organisation-wide by default. */
+  create(input: {
+    projectId: string;
+    name: string;
+    createdById?: string;
+    visibility?: DashboardVisibility;
+  }): Promise<Dashboard> {
     return this.#dashboards.create(input);
   }
 

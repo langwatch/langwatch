@@ -40,7 +40,13 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
   .withOutput(dashboardTrpcDetailSchema)
 
   .mutation("create")
-  .withInput(z.object({ ...projectScopeSchema.shape, name: z.string() }))
+  .withInput(
+    z.object({
+      ...projectScopeSchema.shape,
+      name: z.string(),
+      visibility: dashboardVisibilitySchema.optional(),
+    }),
+  )
   .withOutput(dashboardTrpcRowSchema)
 
   .mutation("rename")

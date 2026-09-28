@@ -42,7 +42,11 @@ export function useSavedDashboards() {
 
   const createBoard = () => {
     create.mutate(
-      { projectId, name: untitledBoardName({ existingCount: boards.length }) },
+      {
+        projectId,
+        name: untitledBoardName({ existingCount: boards.length }),
+        visibility: "only_me",
+      },
       {
         onSuccess: (created) => {
           void refresh();

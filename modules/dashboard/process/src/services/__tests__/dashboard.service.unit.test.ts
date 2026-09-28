@@ -4,6 +4,7 @@
  */
 import {
   DashboardNotFoundError,
+  DashboardOwnerOnlyError,
   DashboardReorderUnknownIdsError,
   GraphNotFoundError,
 } from "@langwatch/dashboard-contract";
@@ -126,6 +127,45 @@ describe("DashboardService", () => {
       const second = await service.create({ projectId: PROJECT, name: "Quality" });
 
       expect([first.order, second.order]).toEqual([0, 1]);
+    });
+  });
+
+  describe("given a member creates a new dashboard", () => {
+    /** @scenario "AC10 Blank board matches the reference" */
+    it("stays organisation-wide when visibility is not given", async () => {
+      const { service } = serviceWith();
+
+      const created = await service.create({
+        projectId: PROJECT,
+        name: "Reports",
+        createdById: "member-1",
+      });
+
+      expect(created.visibility).toBe("organisation");
+    });
+
+    /** @scenario "AC10 Blank board matches the reference" */
+    it("stores an only_me board under its creator", async () => {
+      const { service } = serviceWith();
+
+      const created = await service.create({
+        projectId: PROJECT,
+        name: "Reports",
+        createdById: "member-1",
+        visibility: "only_me",
+      });
+
+      expect(created.visibility).toBe("only_me");
+      expect(created.createdById).toBe("member-1");
+    });
+
+    /** @scenario "AC10 Blank board matches the reference" */
+    it("refuses only_me from a caller with no creator", async () => {
+      const { service } = serviceWith();
+
+      await expect(
+        service.create({ projectId: PROJECT, name: "Reports", visibility: "only_me" }),
+      ).rejects.toBeInstanceOf(DashboardOwnerOnlyError);
     });
   });
 
