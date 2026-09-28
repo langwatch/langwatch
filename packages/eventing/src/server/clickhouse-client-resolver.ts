@@ -24,28 +24,25 @@ export type EventingClickHouseClientResolver = (
   tenantId: string,
 ) => Promise<EventingClickHouseClient>;
 
-/** A `JSONEachRow` result consumed batch-by-batch rather than materialized. */
-export interface EventingClickHouseStreamingQueryResult extends EventingClickHouseQueryResult {
-  stream<Row>(): AsyncIterable<Row[]>;
+/**
+ * One statement replay runs, in the routed ClickHouse member's own vocabulary (ARCHITECTURE §7): it
+ * names its tenant, and a statement spanning every tenant names none (`""`) with a written reason.
+ */
+export interface EventingClickHouseReplayStatement {
+  tenantId: string;
+  sql: string;
+  params?: Record<string, unknown> | undefined;
+  /** Set when the statement genuinely spans tenants; see the member's tenant-scope guard. */
+  unscoped?: { reason: string } | undefined;
 }
 
 /**
- * The wider read surface replay needs on top of {@link EventingClickHouseClient}: streamed
- * rows, so a batch's memory stays bounded by the accumulators rather than its event count, and
- * `command` for the post-replay `OPTIMIZE TABLE`.
+ * The reads replay needs, which the routed member answers itself, so no adapter stands between
+ * them: whole results, streamed rows (a batch's memory stays bounded by the accumulators rather
+ * than its event count), and `command` for the post-replay `OPTIMIZE TABLE`.
  */
 export interface EventingClickHouseReplayClient {
-  query: (request: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
-    unscoped?: { reason: string };
-  }) => Promise<EventingClickHouseStreamingQueryResult>;
-  command(request: { query: string; query_params?: Record<string, unknown> }): Promise<unknown>;
+  query<Row>(request: EventingClickHouseReplayStatement): Promise<{ rows: Row[] }>;
+  stream<Row>(request: EventingClickHouseReplayStatement): AsyncIterable<Row[]>;
+  command(request: EventingClickHouseReplayStatement): Promise<void>;
 }
-
-/** Tenant-aware resolution of the replay read client, composed by the process root. */
-export type EventingClickHouseReplayClientResolver = (
-  tenantId: string,
-) => Promise<EventingClickHouseReplayClient>;

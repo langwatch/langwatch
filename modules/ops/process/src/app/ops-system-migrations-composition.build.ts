@@ -1,5 +1,4 @@
 import { createLogger } from "@langwatch/observability";
-import { OpsCapabilityUnavailableError } from "@langwatch/ops-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import {
   type MigrationCohort,
@@ -474,14 +473,21 @@ export function buildSystemMigrations({
   database,
   redis,
   isSaaS,
+  routes,
   dependencies,
   passRequests,
 }: Pick<OpsSystemMigrationsOptions, "database" | "redis" | "isSaaS"> & {
-  dependencies: Pick<OpsAppDependencies, "identity" | "auditLog">;
+  /** The clickhouse member's private routes (§7), read when a cohort or pass asks, not at boot. */
+  routes: () => ReadonlyMap<string, string>;
+  dependencies: Pick<OpsAppDependencies, "identity" | "authz" | "auditLog">;
   passRequests: Pick<SystemMigrationPassRequestsService, "request">;
 }): OpsSystemMigrationRunner {
-  const { identity, auditLog } = dependencies;
-  const organizationMigrations = () => identity.registeredMigrations();
+  const { identity, authz, auditLog } = dependencies;
+  // Main's registry order: the authorization engine's import, then identity's D04.
+  const organizationMigrations = () => [
+    ...authz.registeredMigrations(),
+    ...identity.registeredMigrations(),
+  ];
   const passes = OpsSystemMigrations.create({
     database,
     redis,
@@ -489,6 +495,12 @@ export function buildSystemMigrations({
     migrations: organizationMigrations,
     userMigrations: () => identity.userMigrations(),
     newbornSweep: () => identity.newbornSweep().runPass(),
+    dataplane: {
+      dataplaneFor: (organizationId) =>
+        RoutingTableOrganizationDataplaneService.create({ routes: routes() }).dataplaneFor(
+          organizationId,
+        ),
+    },
   });
   return SystemMigrationsService.create({
     state: PrismaSystemMigrationStateRepository.create({ prisma: database }),
@@ -500,11 +512,7 @@ export function buildSystemMigrations({
     ],
     isSaaS,
     enrollments: PrismaSystemMigrationEnrollmentRepository.create({ prisma: database }),
-    // Refused until the clickhouse member exposes its routing table: a cohort must never sweep
-    // up a private data plane, and an empty list here would say none exists.
-    privateDataplaneOrganizationIds: () => {
-      throw new OpsCapabilityUnavailableError("the private data-plane routing table");
-    },
+    privateDataplaneOrganizationIds: () => [...routes().keys()],
     audit: async ({ userId, organizationId, action, args }) => {
       await auditLog.record({
         userId,

@@ -7,6 +7,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
@@ -100,6 +101,7 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
       users: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),
       identity: createApiFixture<IdentityApi>(),
+      authz: createApiFixture<AuthzApi>(),
       projects: options.projects ?? createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
       auditLog:
         options.auditLog ??

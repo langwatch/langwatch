@@ -26,6 +26,7 @@ export class MetricTimeRollupMapProjection
   }
 
   readonly name = "metricTimeRollup";
+  readonly targetTable = "metric_time_rollups";
   readonly store: AppendStore<CanonicalMetricDataPoint>;
   protected readonly events = events;
 

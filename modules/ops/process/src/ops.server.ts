@@ -3,6 +3,7 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { OpsApp } from "#app/ops.app";
 import { anomalyDetectionEventing } from "#eventing/ops-anomaly-detection.pipeline";
+import { projectionReplayEventing } from "#eventing/ops-projection-replay.pipeline";
 import { storageStatsEventing } from "#eventing/ops-storage-stats.pipeline";
 import { systemMigrationsEventing } from "#eventing/ops-system-migrations.pipeline";
 import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
@@ -38,6 +39,7 @@ export const opsServer = defineServerModule("ops")
   .withEventing(usageReportEventing)
   .withEventing(anomalyDetectionEventing)
   .withEventing(storageStatsEventing)
+  .withEventing(projectionReplayEventing)
   .withEventing(systemMigrationsEventing)
   .withTasks(({ repositories }) => [
     ProcessManagerPurgeTask.create({ repository: () => repositories.processManagerPurge }),

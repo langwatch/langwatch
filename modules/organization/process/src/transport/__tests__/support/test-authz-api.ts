@@ -259,4 +259,5 @@ export class TestAuthzApi implements AuthzApi {
   clearPendingAdmission = unsupported<AuthzApi["clearPendingAdmission"]>("clearPendingAdmission");
   hasProjectPermission = unsupported<AuthzApi["hasProjectPermission"]>("hasProjectPermission");
   deriveGrantId = unsupported<AuthzApi["deriveGrantId"]>("deriveGrantId");
+  registeredMigrations = unsupported<AuthzApi["registeredMigrations"]>("registeredMigrations");
 }

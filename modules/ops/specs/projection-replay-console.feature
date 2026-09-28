@@ -25,6 +25,20 @@ Feature: Projection replay from the operator console
     And the worker executes it once and records it completed in history
 
   @unit @replay
+  Scenario: Starting a replay from the console files it under the operator who asked
+    Given an operator on the allow-list
+    When they start a replay from the console
+    Then the replay is started with their user id as the requesting operator
+    And the start is not refused as unavailable
+
+  @unit @replay
+  Scenario: A replay start that names no operator is refused as needing a session
+    Given an in-process caller that names no requesting operator
+    When it starts a replay
+    Then the start is refused as needing a signed-in session
+    And the replay is never asked to start
+
+  @unit @replay
   Scenario: A second start while one runs is refused as already running
     Given a replay is running
     When an operator starts another replay
@@ -77,3 +91,11 @@ Feature: Projection replay from the operator console
     When a replay rebuilds it
     Then the replay carries that table for its post-rebuild OPTIMIZE
     And a map declaring no table names none
+
+  # The event explorer reads through the routed ClickHouse member itself (ARCHITECTURE §7).
+  @unit @replay
+  Scenario: One aggregate's history reads its tenant's server, a cross-tenant search the shared one
+    Given an operator exploring the event log to find what to replay
+    When they open one aggregate's history
+    Then the read names that aggregate's tenant
+    And a search across tenants names none and states why, so it reads the shared server

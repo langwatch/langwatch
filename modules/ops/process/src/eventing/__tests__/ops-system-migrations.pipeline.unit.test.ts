@@ -243,4 +243,23 @@ describe("given ops's system-migrations declaration", () => {
       expect(runPass).toHaveBeenCalledOnce();
     });
   });
+
+  describe("when the kick cannot be sent", () => {
+    /** @scenario "A kick in a process that never connected the pass command still answers started" */
+    it("resolves without sending anything", async () => {
+      const requests = SystemMigrationPassRequestsService.create();
+
+      await expect(requests.request({ actorUserId: "user_operator" })).resolves.toBeUndefined();
+    });
+
+    /** @scenario "A kick whose send fails still answers started" */
+    it("resolves after the sender refused", async () => {
+      const requests = SystemMigrationPassRequestsService.create();
+      const send = vi.fn(() => Promise.reject(new Error("event store unavailable")));
+      requests.connect({ send });
+
+      await expect(requests.request({ actorUserId: "user_operator" })).resolves.toBeUndefined();
+      expect(send).toHaveBeenCalledOnce();
+    });
+  });
 });

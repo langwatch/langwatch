@@ -9,6 +9,7 @@ import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-k
  */
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
+import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DashboardApi } from "@langwatch/dashboard-contract";
@@ -456,6 +457,8 @@ export interface OpsAppDependencies {
    * answers, per organization.
    */
   identity: IdentityApiContract;
+  /** The authorization engine, answering the migrations it registers. */
+  authz: AuthzApiContract;
   projects: ProjectApiContract;
   auditLog: AuditLogApi;
   /** The report schedules the operator scheduler lists and controls. */
@@ -655,6 +658,7 @@ export class OpsApp implements OpsApi {
     users: UserApi,
     auth: AuthApi,
     identity: IdentityApi,
+    authz: AuthzApi,
     // The same identity app, asked through its lookup surface for proved domains (D12).
     projects: ProjectApi,
     auditLog: AuditLogApi,
@@ -1060,13 +1064,11 @@ export class OpsApp implements OpsApi {
   findHistoryEntry(input: FindHistoryEntryInput): Promise<ReplayHistoryEntry | null> {
     return this.#dependencies.ops.replay.findHistoryEntry(input);
   }
-  /** `requestedByUserId` files the request under the operator; absent, the start is refused. */
-  startReplay(
-    input: StartReplayInput & { requestedByUserId?: string },
-  ): Promise<StartReplayResult> {
+  /** `requestedByUserId` files the request under the operator; a start naming none is refused. */
+  startReplay(input: StartReplayInput): Promise<StartReplayResult> {
     const { requestedByUserId } = input;
     if (requestedByUserId === undefined) {
-      return Promise.reject(new OpsCapabilityUnavailableError("the replay's requesting operator"));
+      return Promise.reject(new OpsOperatorSessionRequiredError());
     }
     return this.#dependencies.ops.replay.startReplay({ ...input, requestedByUserId });
   }

@@ -1,14 +1,12 @@
-import type {
-  CutoffInfo,
-  DiscoveredAggregateWithEventTypes,
-  OccurredAtBounds,
-  ReplayEvent,
-  ReplayEventSource,
+import {
+  type CutoffInfo,
+  type DiscoveredAggregateWithEventTypes,
+  type OccurredAtBounds,
+  REPLAY_ALL_TENANTS,
+  type ReplayEvent,
+  type ReplayEventSource,
 } from "../../../replay/replayEventSource.ts";
-import type {
-  EventingClickHouseReplayClient,
-  EventingClickHouseReplayClientResolver,
-} from "../../clickhouse-client-resolver.ts";
+import type { EventingClickHouseReplayClient } from "../../clickhouse-client-resolver.ts";
 
 /** ClickHouse event_log row shape. */
 export interface ClickHouseEventRow {
@@ -89,8 +87,9 @@ export async function discoverAffectedAggregates({
   };
   if (tenantId) params.tenantId = tenantId;
 
-  const result = await client.query({
-    query: `
+  const { rows } = await client.query<DiscoveredAggregateWithEventTypes>({
+    tenantId: tenantId ?? REPLAY_ALL_TENANTS,
+    sql: `
       SELECT
         TenantId AS tenantId,
         AggregateType AS aggregateType,
@@ -103,15 +102,14 @@ export async function discoverAffectedAggregates({
       GROUP BY TenantId, AggregateType, AggregateId
       ORDER BY TenantId
     `,
-    query_params: params,
-    format: "JSONEachRow",
+    params,
     unscoped: {
       reason:
         "Replay discovery: a replay is asked for one tenant or for every tenant, and the tenant predicate is present only in the first case.",
     },
   });
 
-  return (await result.json()) as DiscoveredAggregateWithEventTypes[];
+  return rows;
 }
 
 /**
@@ -134,8 +132,9 @@ export async function countEventsForAggregates({
   };
   if (tenantId) params.tenantId = tenantId;
 
-  const result = await client.query({
-    query: `
+  const { rows } = await client.query<{ totalEvents: string }>({
+    tenantId: tenantId ?? REPLAY_ALL_TENANTS,
+    sql: `
       SELECT count() as totalEvents
       FROM event_log
       WHERE ${tenantId ? "TenantId = {tenantId:String} AND" : ""} EventType IN ({eventTypes:Array(String)})
@@ -146,15 +145,13 @@ export async function countEventsForAggregates({
             AND EventTimestamp >= {sinceMs:UInt64}
         )
     `,
-    query_params: params,
-    format: "JSONEachRow",
+    params,
     unscoped: {
       reason:
         "Replay discovery: a replay is asked for one tenant or for every tenant, and the tenant predicate is present only in the first case.",
     },
   });
 
-  const rows = (await result.json()) as { totalEvents: string }[];
   return parseInt(rows[0]?.totalEvents ?? "0", 10);
 }
 
@@ -189,8 +186,13 @@ export async function getAggregateOccurredAtBounds({
 }): Promise<OccurredAtBounds | undefined> {
   if (aggregateIds.length === 0) return undefined;
 
-  const result = await client.query({
-    query: `
+  const { rows } = await client.query<{
+    cnt: string;
+    minOccurredAt: string;
+    maxOccurredAt: string;
+  }>({
+    tenantId,
+    sql: `
       SELECT
         count() AS cnt,
         min(EventOccurredAt) AS minOccurredAt,
@@ -200,15 +202,9 @@ export async function getAggregateOccurredAtBounds({
         AND AggregateType IN ({aggregateTypes:Array(String)})
         AND AggregateId IN ({aggregateIds:Array(String)})
     `,
-    query_params: { tenantId, aggregateTypes, aggregateIds },
-    format: "JSONEachRow",
+    params: { tenantId, aggregateTypes, aggregateIds },
   });
 
-  const rows = (await result.json()) as {
-    cnt: string;
-    minOccurredAt: string;
-    maxOccurredAt: string;
-  }[];
   const row = rows[0];
   if (!row || parseInt(row.cnt, 10) === 0) return undefined;
 
@@ -237,8 +233,14 @@ export async function batchGetCutoffEventIds({
   occurredAtBounds?: OccurredAtBounds;
 }): Promise<Map<string, CutoffInfo>> {
   const pruning = occurredAtPredicate(occurredAtBounds);
-  const result = await client.query({
-    query: `
+  const { rows } = await client.query<{
+    aggregateType: string;
+    aggregateId: string;
+    cutoffEventId: string;
+    cutoffTimestamp: string;
+  }>({
+    tenantId,
+    sql: `
       SELECT
         AggregateType AS aggregateType,
         AggregateId AS aggregateId,
@@ -251,21 +253,13 @@ export async function batchGetCutoffEventIds({
         ${pruning.sql}
       GROUP BY AggregateType, AggregateId
     `,
-    query_params: {
+    params: {
       tenantId,
       eventTypes: [...eventTypes],
       aggregateIds,
       ...pruning.params,
     },
-    format: "JSONEachRow",
   });
-
-  const rows = (await result.json()) as {
-    aggregateType: string;
-    aggregateId: string;
-    cutoffEventId: string;
-    cutoffTimestamp: string;
-  }[];
 
   const map = new Map<string, CutoffInfo>();
   for (const row of rows) {
@@ -347,8 +341,9 @@ export async function streamEventsForAggregatesBulk({
   if (aggregateIds.length === 0) return { eventsApplied: 0 };
 
   const pruning = occurredAtPredicate(occurredAtBounds);
-  const result = await client.query({
-    query: `
+  const batches = client.stream<ClickHouseEventRow>({
+    tenantId,
+    sql: `
       SELECT EventId, EventTimestamp, EventOccurredAt, EventType, EventPayload,
              EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent,
              IdempotencyKey
@@ -359,17 +354,16 @@ export async function streamEventsForAggregatesBulk({
         ${pruning.sql}
       ORDER BY AggregateId, EventTimestamp ASC, EventId ASC
     `,
-    query_params: {
+    params: {
       tenantId,
       eventTypes: [...eventTypes],
       aggregateIds,
       ...pruning.params,
     },
-    format: "JSONEachRow",
   });
 
   let eventsApplied = 0;
-  for await (const rows of result.stream<ClickHouseEventRow>()) {
+  for await (const rows of batches) {
     for (const row of rows) {
       const key = `${tenantId}:${row.AggregateType}:${row.AggregateId}`;
       if (isRowBeyondCutoff(row, cutoffs.get(key))) continue;
@@ -449,9 +443,10 @@ export async function batchLoadAggregateEvents({
     LIMIT {batchSize:UInt32}
   `;
 
-  const result = await client.query({
-    query,
-    query_params: {
+  const { rows } = await client.query<ClickHouseEventRow>({
+    tenantId,
+    sql: query,
+    params: {
       tenantId,
       eventTypes: [...eventTypes],
       aggregateIds,
@@ -466,65 +461,51 @@ export async function batchLoadAggregateEvents({
       batchSize,
       ...pruning.params,
     },
-    format: "JSONEachRow",
   });
 
-  const rows = (await result.json()) as ClickHouseEventRow[];
   return rows.map((row) => rowToEvent(row, lean));
 }
 
 /**
- * The canonical `event_log` reader replay runs against. Reads only. It never dispatches to
- * subscribers or process managers, and offers no seam that could — replay rebuilds derived
- * state and must not re-fire the side effects the original events already caused.
+ * The canonical `event_log` reader replay runs against, over the routed ClickHouse member, which
+ * places each statement on its tenant's server. Reads only. It never dispatches to subscribers or
+ * process managers, and offers no seam that could — replay must not re-fire side effects.
  */
 export class EventingClickHouseReplayEventSource implements ReplayEventSource {
-  private readonly resolveClient: EventingClickHouseReplayClientResolver;
+  private readonly clickhouse: EventingClickHouseReplayClient;
   private readonly lean: ReplayEventLean;
 
-  constructor(deps: {
-    resolveClient: EventingClickHouseReplayClientResolver;
-    lean: ReplayEventLean;
-  }) {
-    this.resolveClient = deps.resolveClient;
+  constructor(deps: { clickhouse: EventingClickHouseReplayClient; lean: ReplayEventLean }) {
+    this.clickhouse = deps.clickhouse;
     this.lean = deps.lean;
   }
 
-  async discoverAffectedAggregates(input: {
+  discoverAffectedAggregates(input: {
     eventTypes: readonly string[];
     sinceMs: number;
     tenantId?: string;
   }): Promise<DiscoveredAggregateWithEventTypes[]> {
-    return discoverAffectedAggregates({
-      client: await this.resolveClient(input.tenantId ?? "default"),
-      ...input,
-    });
+    return discoverAffectedAggregates({ client: this.clickhouse, ...input });
   }
 
-  async countEventsForAggregates(input: {
+  countEventsForAggregates(input: {
     eventTypes: readonly string[];
     sinceMs: number;
     tenantId?: string;
   }): Promise<number> {
-    return countEventsForAggregates({
-      client: await this.resolveClient(input.tenantId ?? "default"),
-      ...input,
-    });
+    return countEventsForAggregates({ client: this.clickhouse, ...input });
   }
 
-  async getBoundedCutoffs(input: {
+  getBoundedCutoffs(input: {
     tenantId: string;
     aggregateTypes: string[];
     aggregateIds: string[];
     eventTypes: readonly string[];
   }) {
-    return getBoundedCutoffs({
-      client: await this.resolveClient(input.tenantId),
-      ...input,
-    });
+    return getBoundedCutoffs({ client: this.clickhouse, ...input });
   }
 
-  async streamEventsForAggregates(input: {
+  streamEventsForAggregates(input: {
     tenantId: string;
     aggregateIds: string[];
     eventTypes: readonly string[];
@@ -532,14 +513,10 @@ export class EventingClickHouseReplayEventSource implements ReplayEventSource {
     occurredAtBounds?: OccurredAtBounds;
     onEvent: (event: ReplayEvent) => void | Promise<void>;
   }): Promise<{ eventsApplied: number }> {
-    return streamEventsForAggregatesBulk({
-      client: await this.resolveClient(input.tenantId),
-      lean: this.lean,
-      ...input,
-    });
+    return streamEventsForAggregatesBulk({ client: this.clickhouse, lean: this.lean, ...input });
   }
 
-  async loadAggregateEvents(input: {
+  loadAggregateEvents(input: {
     tenantId: string;
     aggregateIds: string[];
     eventTypes: readonly string[];
@@ -548,19 +525,16 @@ export class EventingClickHouseReplayEventSource implements ReplayEventSource {
     batchSize: number;
     occurredAtBounds?: OccurredAtBounds;
   }): Promise<ReplayEvent[]> {
-    return batchLoadAggregateEvents({
-      client: await this.resolveClient(input.tenantId),
-      lean: this.lean,
-      ...input,
-    });
+    return batchLoadAggregateEvents({ client: this.clickhouse, lean: this.lean, ...input });
   }
 
   async optimizeTables(tenantId: string, tables: readonly string[]): Promise<void> {
-    const client = await this.resolveClient(tenantId);
     for (const table of tables) {
-      await client.command({
-        query: "OPTIMIZE TABLE {table:Identifier}",
-        query_params: { table },
+      await this.clickhouse.command({
+        tenantId,
+        sql: "OPTIMIZE TABLE {table:Identifier}",
+        params: { table },
+        unscoped: { reason: "Replay's post-rebuild OPTIMIZE TABLE names a table, not a tenant." },
       });
     }
   }

@@ -1094,6 +1094,14 @@ from the `CLICKHOUSE_URL__*` family. A module needing that deployment fact (ops'
 read through `RoutingTableOrganizationDataplaneService`) reads the member, never a second
 declaration of the env family in its own config.
 
+**Routing is folded into the `clickhouse` member** (Alex, 2026-09-28): the member routes every
+statement by its tenant's organization itself, so a module hands the member its statement and
+never writes a routed-client adapter (ops' replay and event-explorer adapters are deleted). A
+statement spanning every tenant names none (`tenantId: ""`) with a written `unscoped` reason, and
+the member reads it on the shared server, where main's `"default"` fallback read. Eventing's replay
+reads through the member's own surface (`query`, `stream`, `command`); `stream` yields a large read
+batch by batch under the tenant guard and the route, holding no slot and never retried.
+
 ---
 
 ## 8. Transports (REST + tRPC)
@@ -1230,6 +1238,8 @@ on ops' `ops_system_migrations` (Alex, 2026-09-28): the hourly wake asks for a p
 stored state holds a tenant a pass could still move, and the kick is a command whose event asks
 the same intent ungated. The kick's tenant is the operator's user, which the event store places on
 the shared cluster, and its aggregate is not the scheduled singleton, whose wake an event would clear.
+A kick that cannot be sent is logged, never refused: the page is told the pass started, as main's
+fire-and-forget kick was, and the hourly wake still re-drives any tenant that could move.
 An experiment run executes on its pipeline, never in a request: `StartRun` is a command, a process manager
 emits one cell intent per row and target, the worker runs each cell as a command appending its result
 events, and projections fold progress that SSE and polling read. Abort is a command the manager honours.

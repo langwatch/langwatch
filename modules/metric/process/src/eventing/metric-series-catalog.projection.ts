@@ -26,6 +26,7 @@ export class MetricSeriesCatalogMapProjection
   }
 
   readonly name = "metricSeriesCatalog";
+  readonly targetTable = "metric_series";
   readonly store: AppendStore<CanonicalMetricDataPoint>;
   protected readonly events = events;
 

@@ -1,4 +1,5 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { SystemMigration } from "@langwatch/system-migrations";
 import type { Instant } from "@langwatch/time";
 
 import type * as authzGrantEventsModule from "./authz-grant.events.ts";
@@ -214,6 +215,8 @@ export interface AuthzApi {
     resourceToken?: string;
     occurredAtMs: number;
   }): string;
+  /** The ORGANIZATION-rooted migrations authz registers (the grant import), as main named it. */
+  registeredMigrations(): readonly SystemMigration[];
 }
 
 export const AuthzApi = moduleApi<AuthzApi>()("authz");

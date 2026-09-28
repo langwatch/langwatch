@@ -2,11 +2,12 @@ import { nowInstant, toEpochMs } from "@langwatch/time";
 
 import { pMapLimited } from "./pMapLimited.ts";
 import { pauseProjection, unpauseProjection, waitForAllActiveJobs } from "./replayDrain.ts";
-import type {
-  CutoffInfo,
-  DiscoveredAggregate,
-  OccurredAtBounds,
-  ReplayEvent,
+import {
+  type CutoffInfo,
+  type DiscoveredAggregate,
+  type OccurredAtBounds,
+  REPLAY_ALL_TENANTS,
+  type ReplayEvent,
 } from "./replayEventSource.ts";
 import {
   FoldAccumulator,
@@ -513,7 +514,7 @@ export async function optimizeTouchedTables({
   const eventSource = ctx.eventSource;
   if (!eventSource.optimizeTables) return;
 
-  const tenantTargets = touchedTenants.size > 0 ? [...touchedTenants] : ["default"];
+  const tenantTargets = touchedTenants.size > 0 ? [...touchedTenants] : [REPLAY_ALL_TENANTS];
 
   await pMapLimited({
     items: tenantTargets,

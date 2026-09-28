@@ -103,4 +103,10 @@ export interface QueryDriver {
    * one is a syntax error, not an empty answer.
    */
   command(request: QueryRequest): Promise<void>;
+  /**
+   * Reads one statement's rows batch by batch as the server sends them, so a large read holds one
+   * batch in memory rather than the whole result. Optional: a driver without it answers the whole
+   * result as one batch through {@link execute}.
+   */
+  stream?<Row>(request: QueryRequest): AsyncIterable<Row[]>;
 }

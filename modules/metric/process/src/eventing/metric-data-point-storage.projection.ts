@@ -26,6 +26,7 @@ export class MetricDataPointStorageMapProjection
   }
 
   readonly name = "metricDataPointStorage";
+  readonly targetTable = "metric_data_points";
   readonly store: AppendStore<CanonicalMetricDataPoint>;
   protected readonly events = events;
 

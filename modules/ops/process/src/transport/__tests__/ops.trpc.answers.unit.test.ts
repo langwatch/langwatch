@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { TrpcContract } from "@langwatch/api/contract";
 /**
  * @vitest-environment node
@@ -9,9 +10,10 @@ import { bindTrpcFact, createTrpcRuntime, type TrpcRouterDeclaration } from "@la
 import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
 import type { OpsCapability } from "@langwatch/ops-process";
 import { initTRPC } from "@trpc/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createOpsTestApp, OPS_STAFF_ADDRESS } from "../../app/__tests__/ops.fixture.ts";
+import type { OpsReplayRunner } from "../../app/ops.app.ts";
 import { opsDashboardTrpcTransport } from "../ops-dashboard.trpc.ts";
 import { opsEventLogTrpcTransport } from "../ops-event-log.trpc.ts";
 import { opsOperatorFact } from "../ops-operator.trpc.ts";
@@ -168,6 +170,51 @@ describe("the ops surface's declared answers", () => {
       const { outsider } = mount(opsDashboardTrpcTransport);
 
       await expect(outsider.getScope()).resolves.toEqual({ scope: { kind: "none" } });
+    });
+  });
+
+  describe("when an operator starts a replay from the console", () => {
+    /** @scenario "Starting a replay from the console files it under the operator who asked" */
+    it("hands the replay the operator's user id, so the start is not refused", async () => {
+      const started: Parameters<OpsReplayRunner["startReplay"]>[0][] = [];
+      const { operator } = mount(opsEventLogTrpcTransport, {
+        replay: createApiFixture<OpsReplayRunner>({
+          startReplay: async (input) => {
+            started.push(input);
+            return { runId: "replay_1" };
+          },
+        }),
+      });
+
+      await expect(
+        operator.startReplay({
+          projectionNames: ["traceSummary"],
+          since: "2026-09-01T00:00:00.000Z",
+          description: "rebuild after the fold fix",
+        }),
+      ).resolves.toEqual({ runId: "replay_1" });
+      expect(started).toEqual([
+        expect.objectContaining({ requestedByUserId: OPERATOR.id, tenantIds: [] }),
+      ]);
+    });
+
+    /** @scenario "A replay start that names no operator is refused as needing a session" */
+    it("refuses an in-process start that names no operator, before the replay is asked", async () => {
+      const startReplay = vi.fn(async () => ({ runId: "never" }));
+      const { app } = createOpsTestApp({
+        capability: { replay: createApiFixture<OpsReplayRunner>({ startReplay }) },
+      });
+
+      await expect(
+        app.startReplay({
+          projectionNames: ["traceSummary"],
+          since: "2026-09-01T00:00:00.000Z",
+          tenantIds: [],
+          description: "rebuild",
+          userName: "unknown",
+        }),
+      ).rejects.toMatchObject({ code: "ops_operator_session_required" });
+      expect(startReplay).not.toHaveBeenCalled();
     });
   });
 

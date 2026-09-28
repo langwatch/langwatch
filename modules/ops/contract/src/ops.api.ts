@@ -229,6 +229,8 @@ export type StartReplayInput = {
   fullRebuild?: boolean;
   description: string;
   userName: string;
+  /** The operator's user id; the requested replay event is filed under it (§9). */
+  requestedByUserId?: string | undefined;
 };
 
 export type StartReplayResult = { runId: string };

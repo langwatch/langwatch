@@ -35,6 +35,12 @@ export interface OccurredAtBounds {
   maxMs: number;
 }
 
+/**
+ * The tenant a replay names when it spans every tenant: none. The routed ClickHouse member places
+ * a statement naming none on the shared server, where main's "default" fallback read (§7).
+ */
+export const REPLAY_ALL_TENANTS = "";
+
 export interface ReplayEventSource {
   discoverAffectedAggregates(input: {
     eventTypes: readonly string[];

@@ -97,6 +97,20 @@ export class ClickHouseQueryClient {
   }
 
   /**
+   * Streams one read batch by batch (replay's event reads). The tenant guard applies; the slot and
+   * retries do not, since the reader sets how long it runs and a retried stream would repeat rows.
+   * A driver that cannot stream answers the whole result, under every policy, as one batch.
+   */
+  async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
+    this.tenantGuard?.assert(request);
+    if (this.driver.stream === undefined) {
+      yield (await this.query<Row>(request)).rows;
+      return;
+    }
+    yield* this.driver.stream<Row>(request);
+  }
+
+  /**
    * Run a statement that answers no rows, under every policy this client was
    * given. Same order, same reasons as {@link query}.
    */

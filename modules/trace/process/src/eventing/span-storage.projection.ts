@@ -32,6 +32,7 @@ export class SpanStorageMapProjection
   implements MapEventHandlers<typeof spanEvents, NormalizedSpan>
 {
   readonly name = "spanStorage";
+  readonly targetTable = "stored_spans";
   readonly store: AppendStore<NormalizedSpan>;
   private readonly spanCostService: SpanCostService;
   private readonly spanNormalization: TraceSpanNormalization;

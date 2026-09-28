@@ -9,6 +9,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
@@ -64,6 +65,7 @@ function process(
   role: "api" | "worker",
   redisCommands: unknown[][] = [],
   identity: IdentityApi = createApiFixture<IdentityApi>(),
+  authz: AuthzApi = createApiFixture<AuthzApi>(),
 ) {
   const { logger } = createTestLogger();
 
@@ -100,6 +102,7 @@ function process(
       user: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),
       identity,
+      authz,
       project: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
       "audit-log": createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),
@@ -205,6 +208,9 @@ describe("ops app installation", () => {
       registeredMigrations: () => [migration("sso-domain-ownership", "Domain ownership")],
       userMigrations: () => [migration("identity-identifier-backfill", "Sign-in identifiers")],
     });
+    const authz = createApiFixture<AuthzApi>({
+      registeredMigrations: () => [migration("authz-grants-genesis-import", "Grant import")],
+    });
 
     /** @scenario "The migrations page lists every registered migration when served by the api role" */
     /** @scenario "A migration registered by a peer module appears on the page with its title and description" */
@@ -217,7 +223,7 @@ describe("ops app installation", () => {
         PrismaSystemMigrationStateRepository.prototype,
         "findRecordsByStatus",
       ).mockResolvedValue([]);
-      const runtime = await process("api", [], identity).boot();
+      const runtime = await process("api", [], identity, authz).boot();
 
       try {
         const listed = await runtime.service(OpsApi).listSystemMigrations();
@@ -225,6 +231,11 @@ describe("ops app installation", () => {
         expect(
           listed.map(({ name, title, description }) => ({ name, title, description })),
         ).toEqual([
+          {
+            name: "authz-grants-genesis-import",
+            title: "Grant import",
+            description: "Grant import, as its owner describes it.",
+          },
           {
             name: "sso-domain-ownership",
             title: "Domain ownership",
@@ -236,7 +247,7 @@ describe("ops app installation", () => {
             description: "Sign-in identifiers, as its owner describes it.",
           },
         ]);
-        expect(listed[0]?.counts.finalized).toBe(3);
+        expect(listed[1]?.counts.finalized).toBe(3);
       } finally {
         vi.restoreAllMocks();
         await runtime.stop();
