@@ -923,11 +923,11 @@ function ModelProviderFields({
           <NativeSelect.Indicator />
         </NativeSelect.Root>
         {selectedProvider && !selectedProvider.configured && (
-          <Alert.Root status="warning" variant="surface" marginTop={2}>
+          <Alert.Root status="warning" variant="surface" size="sm" marginTop={2}>
             <Alert.Indicator />
             <Alert.Content>
               <Alert.Title>Provider not configured</Alert.Title>
-              <Alert.Description fontSize="xs">
+              <Alert.Description>
                 This provider has no enabled credential yet. Tiles will publish but VK issuance will
                 502 until you{" "}
                 <Link href="/settings/model-providers" color="orange.600">
