@@ -7,15 +7,21 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
   EXPERIMENT_TYPES,
   type Experiment,
   type ExperimentApi,
 } from "@langwatch/experiment-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { UnavailableLangyWorkerChannel } from "../../channels/unavailable.langy-worker.channel.ts";
@@ -124,6 +130,12 @@ function composedRelay() {
           findById: async ({ id }) => (id === SUMMER_EVAL.id ? SUMMER_EVAL : null),
         }),
         agents: createApiFixture<AgentApi>(),
+        prompts: createApiFixture<PromptApi>(),
+        datasets: createApiFixture<DatasetApi>(),
+        workflows: createApiFixture<WorkflowApi>(),
+        monitors: createApiFixture<MonitorApi>(),
+        evaluators: createApiFixture<EvaluatorApi>(),
+        scenarios: createApiFixture<ScenarioApi>(),
         publicBaseUrl: ORIGIN,
       }),
       publicBaseUrl: ORIGIN,

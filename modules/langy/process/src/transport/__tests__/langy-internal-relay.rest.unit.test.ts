@@ -11,19 +11,25 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { OnboardingApi } from "@langwatch/onboarding-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type { UserApi } from "@langwatch/user-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { LangyApp } from "../../app/langy.app.ts";
@@ -61,6 +67,12 @@ async function relayRoute() {
       secrets: createApiFixture<SecretApi>(),
       experiments: createApiFixture<ExperimentApi>(),
       agents: createApiFixture<AgentApi>(),
+      prompts: createApiFixture<PromptApi>(),
+      datasets: createApiFixture<DatasetApi>(),
+      workflows: createApiFixture<WorkflowApi>(),
+      monitors: createApiFixture<MonitorApi>(),
+      evaluators: createApiFixture<EvaluatorApi>(),
+      scenarios: createApiFixture<ScenarioApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       authz: createApiFixture<AuthzApi>(),

@@ -4,8 +4,14 @@
  * authored ever becomes the address.
  */
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
+import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import {
   type LangyNavigateResourceKind,
@@ -22,27 +28,34 @@ const UNKNOWN: LangyNavigateResourceLocation = { outcome: "unknown" };
 
 type LocateInput = { projectId: string; resourceId: string };
 
+/** The one read each owning feature lends the locator, and nothing wider. */
+type LocatorPeers = {
+  experiments: Pick<ExperimentApi, "findById">;
+  agents: Pick<AgentApi, "getById" | "platformUrl">;
+  prompts: Pick<PromptApi, "findByIdOrHandle">;
+  datasets: Pick<DatasetApi, "findBySlugOrId">;
+  workflows: Pick<WorkflowApi, "getById">;
+  monitors: Pick<MonitorApi, "findById">;
+  evaluators: Pick<EvaluatorApi, "findById">;
+  scenarios: Pick<ScenarioApi, "getById" | "findScenarioRunData" | "platformUrl">;
+};
+
 export class LangyNavigateResourceLocatorService {
-  static create(input: {
-    experiments: Pick<ExperimentApi, "findById">;
-    agents: Pick<AgentApi, "getById" | "platformUrl">;
-    publicBaseUrl: string | undefined;
-  }): LangyNavigateResourceLocatorService {
+  static create(
+    input: LocatorPeers & { publicBaseUrl: string | undefined },
+  ): LangyNavigateResourceLocatorService {
     return new LangyNavigateResourceLocatorService(input);
   }
 
-  readonly #experiments: Pick<ExperimentApi, "findById">;
-  readonly #agents: Pick<AgentApi, "getById" | "platformUrl">;
+  readonly #peers: LocatorPeers;
   readonly #publicBaseUrl: string | undefined;
 
-  private constructor(input: {
-    experiments: Pick<ExperimentApi, "findById">;
-    agents: Pick<AgentApi, "getById" | "platformUrl">;
-    publicBaseUrl: string | undefined;
-  }) {
-    this.#experiments = input.experiments;
-    this.#agents = input.agents;
-    this.#publicBaseUrl = input.publicBaseUrl;
+  private constructor({
+    publicBaseUrl,
+    ...peers
+  }: LocatorPeers & { publicBaseUrl: string | undefined }) {
+    this.#peers = peers;
+    this.#publicBaseUrl = publicBaseUrl;
   }
 
   locate(
@@ -54,22 +67,102 @@ export class LangyNavigateResourceLocatorService {
       case "agent":
         return this.#agent(input);
       case "prompt":
+        return this.#prompt(input);
       case "dataset":
+        return this.#dataset(input);
       case "workflow":
+        return this.#workflow(input);
       case "monitor":
+        return this.#monitor(input);
       case "evaluator":
+        return this.#evaluator(input);
       case "scenario":
+        return this.#scenario(input);
       case "scenarioRun":
-        // Their owners' contracts are not dependencies of this package yet.
-        return Promise.resolve(UNKNOWN);
+        return this.#scenarioRun(input);
     }
+  }
+
+  async #prompt({ projectId, resourceId }: LocateInput): Promise<LangyNavigateResourceLocation> {
+    const prompt = await this.#peers.prompts.findByIdOrHandle({
+      idOrHandle: resourceId,
+      projectId,
+    });
+    if (!prompt) return UNKNOWN;
+    return this.#underProject(NAVIGATE_RESOURCE_PATHS.prompt(prompt.id));
+  }
+
+  async #dataset({ projectId, resourceId }: LocateInput): Promise<LangyNavigateResourceLocation> {
+    const dataset = await this.#peers.datasets.findBySlugOrId({ slugOrId: resourceId, projectId });
+    if (!dataset) return UNKNOWN;
+    return this.#underProject(NAVIGATE_RESOURCE_PATHS.dataset(dataset.id));
+  }
+
+  /** An archived workflow reads as missing, as it does in the studio's own list. */
+  async #workflow({ projectId, resourceId }: LocateInput): Promise<LangyNavigateResourceLocation> {
+    try {
+      const workflow = await this.#peers.workflows.getById({ id: resourceId, projectId });
+      return this.#underProject(NAVIGATE_RESOURCE_PATHS.workflow(workflow.id));
+    } catch (error) {
+      if (HandledError.isHandled(error) && error.code === "workflow_not_found") return UNKNOWN;
+      throw error;
+    }
+  }
+
+  async #monitor({ projectId, resourceId }: LocateInput): Promise<LangyNavigateResourceLocation> {
+    const monitor = await this.#peers.monitors.findById({ id: resourceId, projectId });
+    if (!monitor) return UNKNOWN;
+    return this.#underProject(NAVIGATE_RESOURCE_PATHS.monitor(monitor.id));
+  }
+
+  async #evaluator({ projectId, resourceId }: LocateInput): Promise<LangyNavigateResourceLocation> {
+    const evaluator = await this.#peers.evaluators.findById({ id: resourceId, projectId });
+    if (!evaluator) return UNKNOWN;
+    return this.#underProject(NAVIGATE_RESOURCE_PATHS.evaluator(evaluator.id));
+  }
+
+  async #scenario({ projectId, resourceId }: LocateInput): Promise<LangyNavigateResourceLocation> {
+    try {
+      const scenario = await this.#peers.scenarios.getById({ id: resourceId, projectId });
+      return this.#scenarioAddress({ projectId, resource: { scenarioId: scenario.id } });
+    } catch (error) {
+      if (HandledError.isHandled(error) && error.code === "scenario_not_found") return UNKNOWN;
+      throw error;
+    }
+  }
+
+  async #scenarioRun({
+    projectId,
+    resourceId,
+  }: LocateInput): Promise<LangyNavigateResourceLocation> {
+    const run = await this.#peers.scenarios.findScenarioRunData({
+      projectId,
+      scenarioRunId: resourceId,
+    });
+    if (!run) return UNKNOWN;
+    return this.#scenarioAddress({ projectId, resource: { scenarioRunId: resourceId } });
+  }
+
+  /** Scenarios and runs open where the scenario module says, in the interface the project reads. */
+  #scenarioAddress({
+    projectId,
+    resource,
+  }: Pick<
+    Parameters<ScenarioApi["platformUrl"]>[0],
+    "projectId" | "resource"
+  >): LangyNavigateResourceLocation {
+    return {
+      outcome: "located",
+      address: (projectSlug) =>
+        this.#peers.scenarios.platformUrl({ projectId, projectSlug, resource }),
+    };
   }
 
   async #experiment({
     projectId,
     resourceId,
   }: LocateInput): Promise<LangyNavigateResourceLocation> {
-    const experiment = await this.#experiments.findById({ projectId, id: resourceId });
+    const experiment = await this.#peers.experiments.findById({ projectId, id: resourceId });
     if (!experiment) return UNKNOWN;
     // The experiment page reads slug or id; the slug is what the app's own links use.
     return this.#underProject(NAVIGATE_RESOURCE_PATHS.experiment(experiment.slug || experiment.id));
@@ -77,12 +170,16 @@ export class LangyNavigateResourceLocatorService {
 
   async #agent({ projectId, resourceId }: LocateInput): Promise<LangyNavigateResourceLocation> {
     try {
-      const agent = await this.#agents.getById({ id: resourceId, projectId });
+      const agent = await this.#peers.agents.getById({ id: resourceId, projectId });
       return {
         outcome: "located",
         address: (projectSlug) =>
           Promise.resolve(
-            this.#agents.platformUrl({ projectSlug, agentId: agent.id, agentType: agent.type }),
+            this.#peers.agents.platformUrl({
+              projectSlug,
+              agentId: agent.id,
+              agentType: agent.type,
+            }),
           ),
       };
     } catch (error) {

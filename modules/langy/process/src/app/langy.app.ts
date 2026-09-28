@@ -10,7 +10,9 @@ import {
 } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 /**
@@ -96,12 +98,16 @@ import {
 } from "@langwatch/langy-contract";
 import type * as langyContractModule from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import { OnboardingApi } from "@langwatch/onboarding-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
+import { PromptApi } from "@langwatch/prompt-contract";
+import { ScenarioApi } from "@langwatch/scenario-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { UserApi } from "@langwatch/user-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 import type { Redis } from "ioredis";
 import type { z } from "zod";
 
@@ -254,6 +260,13 @@ export class LangyApp implements LangyApiContract {
     experiments: ExperimentApi,
     /** The agent a navigate with no remembered link opens, at the agent's own address. */
     agents: AgentApi,
+    /** The resources a navigate with no remembered link opens, each looked up in its owner. */
+    prompts: PromptApi,
+    datasets: DatasetApi,
+    workflows: WorkflowApi,
+    monitors: MonitorApi,
+    evaluators: EvaluatorApi,
+    scenarios: ScenarioApi,
     /** Whether a failed turn belonged to guided onboarding, and where that failure is tracked. */
     onboarding: OnboardingApi,
     /** The platform default retention the analytics grain is written on. */
@@ -305,6 +318,12 @@ export class LangyApp implements LangyApiContract {
         resources: LangyNavigateResourceLocatorService.create({
           experiments: setup.dependencies.experiments,
           agents: setup.dependencies.agents,
+          prompts: setup.dependencies.prompts,
+          datasets: setup.dependencies.datasets,
+          workflows: setup.dependencies.workflows,
+          monitors: setup.dependencies.monitors,
+          evaluators: setup.dependencies.evaluators,
+          scenarios: setup.dependencies.scenarios,
           publicBaseUrl: setup.members.publicBaseUrl,
         }),
         publicBaseUrl: setup.members.publicBaseUrl,
