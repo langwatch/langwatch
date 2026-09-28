@@ -54,6 +54,7 @@ import {
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, Temporal } from "@langwatch/time";
@@ -68,7 +69,15 @@ import {
   type InstanceIdentityDatabase,
   PrismaInstanceIdentityRepository,
 } from "../repositories/prisma/prisma.instance-identity.repository.ts";
+import {
+  type IssuedLicenseDatabase,
+  PrismaIssuedLicenseRepository,
+} from "../repositories/prisma/prisma.issued-license.repository.ts";
 import { PrismaOrganizationLicenseRepository } from "../repositories/prisma/prisma.organization-license.repository.ts";
+import {
+  PrismaSelfHostedInstanceRepository,
+  type SelfHostedInstanceDatabase,
+} from "../repositories/prisma/prisma.self-hosted-instance.repository.ts";
 import { ActivationCodeService } from "../services/activation-code.service.ts";
 import { ConnectCredentialService } from "../services/connect-credential.service.ts";
 import { ConnectInstallService } from "../services/connect-install.service.ts";
@@ -138,7 +147,7 @@ export type LicensingInfrastructure = Readonly<{
    * composes one; everywhere else the hosted operations refuse by name.
    */
   hosted?: HostedServicesInfrastructure;
-  /** The registry of self-hosted installs (ADR-156, section 10), on Cloud only. */
+  /** The registry of self-hosted installs (ADR-156, section 10); else derived from the stores. */
   instances?: SelfHostedInstancesInfrastructure;
   /**
    * The install end of Connect (ADR-156, section 9). Every deployment has one;
@@ -283,7 +292,14 @@ export class LicensingApp implements LicensingApiContract {
     const registryParts = licenseRegistryParts({
       infrastructure: registry ?? partial.unavailableRegistry(),
       hosted: hosted ?? partial.unavailableHostedServices(),
-      instances: instances ?? partial.unavailableSelfHostedInstances(),
+      instances:
+        instances ??
+        (members.prisma
+          ? selfHostedInstancesOverPrisma({
+              database: members.prisma,
+              organizations: dependencies.organizations,
+            })
+          : partial.unavailableSelfHostedInstances()),
       cryptography,
       logger: logger ?? members.logger,
     });
@@ -769,8 +785,8 @@ function licenseRegistryParts({
     door: hosted.door,
     instances: SelfHostedInstanceService.create({
       repository: instances.repository,
-      licenses: infrastructure.repository,
-      organizations: infrastructure.organizations,
+      licenses: instances.licenses,
+      organizations: instances.organizations,
       optionalReportKeys: instances.optionalReportKeys,
       ...(instances.leads
         ? {
@@ -807,6 +823,33 @@ function licenseRegistryParts({
       systemActorId: infrastructure.systemActorId,
       now,
     }),
+  };
+}
+
+/** The install rows and the licences bound to them, over one connection. */
+type SelfHostedInstancesDatabase = SelfHostedInstanceDatabase & IssuedLicenseDatabase;
+
+/**
+ * The instance registry derived from the process's own stores, as main built it on
+ * every deployment: the rows from Postgres, the customer's name from its owner.
+ */
+function selfHostedInstancesOverPrisma({
+  database,
+  organizations,
+}: {
+  database: SelfHostedInstancesDatabase;
+  organizations: Pick<OrganizationApi, "findProvisioningSummary">;
+}): SelfHostedInstancesInfrastructure {
+  return {
+    repository: PrismaSelfHostedInstanceRepository.create(database),
+    licenses: PrismaIssuedLicenseRepository.create(database),
+    organizations: {
+      findById: async (organizationId) => {
+        const summary = await organizations.findProvisioningSummary(organizationId);
+        return summary ? { id: summary.id, name: summary.name } : null;
+      },
+    },
+    optionalReportKeys: new Set(optionalUsageReportKeys()),
   };
 }
 

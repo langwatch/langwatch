@@ -78,6 +78,36 @@ Feature: Enterprise licensing lifecycle
       When that process inspects platform access
       Then the stored key is accepted and only the mutation ports refuse
 
+  Rule: Every deployment composes the self-hosted instance registry from its own stores
+
+    Main built the instance registry from Postgres on every deployment. The
+    operator's instance list names each install's customer through the
+    organization feature, whether or not this process composes the licence registry.
+
+    @integration
+    Scenario: A deployment composed from its stores lists installs with their customer's name
+      Given an install that reported, attributed to an organization
+      When an operator lists the self-hosted instances of a process composed from its stores
+      Then the install is listed with the name the organization feature answers
+
+    @unit
+    Scenario: The instance list names each install's customer without the licence registry
+      Given an install attributed to an organization, and no licence registry composed
+      When an operator lists the self-hosted instances
+      Then the install is listed with its organization's name
+
+    @unit
+    Scenario: An install whose customer the organization feature no longer knows lists without a name
+      Given an install attributed to an organization the organization feature does not know
+      When an operator lists the self-hosted instances
+      Then the install is listed with no organization name
+
+    @unit
+    Scenario: A process that composes no stores refuses the instance registry by name
+      Given a process composed without stores or an instance registry
+      When an operator lists the self-hosted instances
+      Then the read is refused naming the self-hosted instance registry
+
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber

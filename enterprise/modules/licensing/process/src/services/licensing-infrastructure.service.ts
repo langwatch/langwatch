@@ -149,7 +149,7 @@ export class LicensingInfrastructureService {
     };
   }
 
-  /** The instance registry the usage report receiver writes, on Cloud only. */
+  /** The instance registry the usage report receiver writes, for a process composing no stores. */
   unavailableSelfHostedInstances(): SelfHostedInstancesInfrastructure {
     const refuse = () =>
       Promise.reject(
@@ -164,6 +164,8 @@ export class LicensingInfrastructureService {
         findByInstanceId: refuse,
         findReports: refuse,
       },
+      licenses: { findAllBoundToInstance: refuse },
+      organizations: { findById: refuse },
       optionalReportKeys: new Set(),
     };
   }

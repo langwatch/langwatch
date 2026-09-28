@@ -311,10 +311,14 @@ export type SelfHostedLeadsInfrastructure = Readonly<{
 
 /**
  * The registry of self-hosted installs (ADR-156, section 10), which the usage
- * report receiver on LangWatch Cloud writes. Only Cloud composes one.
+ * report receiver writes. Every deployment composes it from its own stores.
  */
 export type SelfHostedInstancesInfrastructure = Readonly<{
   repository: SelfHostedInstanceRepository;
+  /** The licence bound to an install, which names its customer. */
+  licenses: Pick<IssuedLicenseRepository, "findAllBoundToInstance">;
+  /** The customer's name, as the organization feature answers it. */
+  organizations: Pick<LicenseCustomers, "findById">;
   /** The usage report's optional-category keys, from its field dictionary. */
   optionalReportKeys: ReadonlySet<string>;
   leads?: SelfHostedLeadsInfrastructure;
