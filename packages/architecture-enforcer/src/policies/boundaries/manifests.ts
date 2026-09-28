@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { ArchitectureViolation, ClassifiedPackage, PackageManifest } from "../../types.ts";
-import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+import { featurePackageName, type WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 function exportKeys(exportsValue: unknown): string[] {
   if (!exportsValue || typeof exportsValue !== "object" || Array.isArray(exportsValue)) {
@@ -352,15 +352,16 @@ const enterpriseDirectionCheck: DependencyCheck = (pkg, target, dependency) => {
 const crossFeatureCheck: DependencyCheck = (pkg, target, dependency) => {
   const isForeignFeature = pkg.feature !== target.feature;
   const isImplementationTarget = target.kind !== "contract" && target.kind !== "browser";
-  const hasFeaturePair = pkg.feature && target.feature;
-  if (!hasFeaturePair || !isForeignFeature || !isImplementationTarget) return undefined;
+  if (!pkg.feature || !target.feature || !isForeignFeature || !isImplementationTarget) {
+    return undefined;
+  }
 
   return {
     policy: "cross-feature",
     file: pkg.manifestPath,
     specifier: dependency,
     message: `Feature "${pkg.feature}" cannot depend on ${target.kind} package "${target.name}".`,
-    allowed: `Depend on ${target.enterprise ? `@langwatch/enterprise-${target.feature}-contract` : `@langwatch/${target.feature}-contract`}.`,
+    allowed: `Depend on ${featurePackageName({ feature: target.feature, role: "contract", enterprise: Boolean(target.enterprise) })}.`,
   };
 };
 

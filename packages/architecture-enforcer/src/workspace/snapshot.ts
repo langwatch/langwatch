@@ -171,9 +171,7 @@ function discoverFeatureRoles({
     const role = roleName as FeaturePackageRole;
     const manifest = readManifest(manifestPath);
 
-    const expectedName = enterprise
-      ? `@langwatch/enterprise-${feature}-${role}`
-      : `@langwatch/${feature}-${role}`;
+    const expectedName = featurePackageName({ feature, role, enterprise });
 
     if (manifest.name !== expectedName) {
       violations.push({
@@ -677,3 +675,17 @@ export function buildWorkspaceSnapshot({ root, changedFiles }: SnapshotOptions):
     files: listFiles,
   };
 }
+
+/** An enterprise feature id already saying "enterprise-" is not prefixed twice. */
+export const featurePackageName = ({
+  feature,
+  role,
+  enterprise,
+}: {
+  feature: string;
+  role: string;
+  enterprise: boolean;
+}): string =>
+  enterprise
+    ? `@langwatch/enterprise-${feature.replace(/^enterprise-/, "")}-${role}`
+    : `@langwatch/${feature}-${role}`;
