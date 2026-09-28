@@ -1414,8 +1414,10 @@ invented:
   The loader resolves a default-exported provider rendering
   `<SecretHostProvider value={host}>{children}</SecretHostProvider>`;
   `installedModuleHostMounts` collects every declared one in install order and
-  `createUiModuleHostStack` composes them into the root layout, below the
-  feature shell and below the router.
+  `createUiModuleHostStack` composes them inside the feature shell, below the
+  router, around both the page and the open drawer (`CurrentDrawer`): a drawer
+  reads the same hosts its screen does (moved out of the root layout in
+  cc00c8a30b, when drawers crashed without `ScenarioHostProvider`).
 
   Two constraints decided the position, and both rule out the alternative of
   wrapping the declaring module's own screen loaders:
