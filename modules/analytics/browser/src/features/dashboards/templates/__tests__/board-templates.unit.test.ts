@@ -27,7 +27,7 @@ function navigateTargets(code: string): string[] {
 }
 
 describe("BOARD_TEMPLATES", () => {
-  /** @scenario "AC27 Each question group of the picker is also a template" */
+  /** @scenario "AC28 Each question group of the picker is also a template" */
   it("lists the Flight Deck, then one template per picker section in picker order", () => {
     expect(BOARD_TEMPLATES.map(({ id }) => id)).toEqual([
       AGENT_FLIGHT_DECK_TEMPLATE.id,
@@ -38,7 +38,7 @@ describe("BOARD_TEMPLATES", () => {
     );
   });
 
-  /** @scenario "AC27 Each question group of the picker is also a template" */
+  /** @scenario "AC28 Each question group of the picker is also a template" */
   it("names each question group's template with the section's title and why-line", () => {
     for (const section of BLOCK_QUESTION_SECTIONS) {
       const template = BOARD_TEMPLATES.find(({ id }) => id === section.id);
@@ -47,7 +47,7 @@ describe("BOARD_TEMPLATES", () => {
     }
   });
 
-  /** @scenario "AC27 Each question group of the picker is also a template" */
+  /** @scenario "AC28 Each question group of the picker is also a template" */
   it("gives each question group's template at least one widget per question in the group", () => {
     for (const section of BLOCK_QUESTION_SECTIONS) {
       const template = BOARD_TEMPLATES.find(({ id }) => id === section.id);
@@ -95,7 +95,7 @@ describe("BOARD_TEMPLATES", () => {
         expect(new Set(cells).size).toBe(cells.length);
       });
 
-      /** @scenario "AC27 Each question group of the picker is also a template" */
+      /** @scenario "AC28 Each question group of the picker is also a template" */
       it("shows every widget's not-connected face with an allowlisted setup button", () => {
         for (const { name, definition } of widgets) {
           expect(definition.code, name).toContain("<CallToAction />");
@@ -105,7 +105,7 @@ describe("BOARD_TEMPLATES", () => {
         }
       });
 
-      /** @scenario "AC27 Each question group of the picker is also a template" */
+      /** @scenario "AC28 Each question group of the picker is also a template" */
       it("reads every query the widget's code asks for", () => {
         for (const { name, definition } of widgets) {
           const asked = [...definition.code.matchAll(/LW\.useChartQuery\("([^"]+)"/g)];
