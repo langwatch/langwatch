@@ -100,7 +100,7 @@ export class UsageReportWorld {
       automations: { countUsage: async () => ({ triggers: 0 }) },
       github: { countUsage: async () => ({ pullRequests: 0 }) },
       langy: { countUsage: async () => ({ turns: 0, activeUsers: 0 }) },
-      dashboards: { countUsage: async () => ({ builderCharts: 0 }) },
+      dashboards: { countUsage: async () => ({ builderCharts: 0, charts: 0 }) },
       modelProviders: { countUsage: async () => ({ providers: [] }) },
       traces: {
         countUsage: async (input) => ({

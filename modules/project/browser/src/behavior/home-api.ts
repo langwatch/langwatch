@@ -7,7 +7,8 @@
 import type { TimeseriesBucket } from "@langwatch/analytics-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { homeTrpc } from "@langwatch/audit-log-contract";
-import type { integrationsChecksTrpc, projectTrpc } from "@langwatch/project-contract";
+import type { integrationsChecksTrpc } from "@langwatch/onboarding-contract";
+import type { projectTrpc } from "@langwatch/project-contract";
 
 /**
  * What kind of thing the reader touched. Restated rather than imported: a web
