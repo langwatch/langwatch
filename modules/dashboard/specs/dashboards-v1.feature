@@ -271,6 +271,36 @@ Feature: Dashboards v1
     And it is not the empty state of AC9
     And once one row exists for Your coding agents the panel shows data
 
+  @integration
+  Scenario: AC26 A member inside the audience with the edit permission can edit
+    Given a board set to team or organisation
+    And a member inside that audience with analytics:update
+    When that member opens the board
+    Then they can edit it
+
+  @integration
+  Scenario: AC26 A member inside the audience without the edit permission sees no edit controls
+    Given a board set to team or organisation
+    And a member inside that audience without analytics:update
+    When that member opens the board
+    Then they see no edit controls
+    And the server refuses their write
+
+  @integration
+  Scenario: AC26 Only the creator or an admin can change visibility or delete the board
+    Given a board set to team or organisation
+    And a member inside that audience who is neither its creator nor an admin
+    When that member tries to change its visibility or delete it
+    Then the server refuses the write
+    And the creator or an admin can perform that same write
+
+  @integration
+  Scenario: AC26 The server refuses every write from a member outside the audience
+    Given a board set to team or organisation
+    And a member outside that audience
+    When that member sends any write for the board
+    Then the server refuses every one of those writes
+
   # --- AC Coverage Map ---
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
   # AC 2: "Landing on the Flight Deck" → Scenario: AC2 Landing on the Flight Deck
@@ -297,3 +327,4 @@ Feature: Dashboards v1
   # AC 23: "A failing query does not take the board down" → Scenario: AC23 A failing query does not take the board down
   # AC 24: "Boards created before this change keep working" (sharpened) → Scenario: AC24 Boards created before this change keep working
   # AC 25: "Every optional source has its own call to action" → Scenario: AC25 Scenario results shows its own call to action before any row exists; Scenario: AC25 Quality signal shows its own call to action before any row exists; Scenario: AC25 User feedback shows its own call to action before any row exists; Scenario: AC25 Gateway routing shows its own call to action before any row exists; Scenario: AC25 Your coding agents shows its own call to action before any row exists
+  # AC 26: "Visibility changes who can see a board, not who can edit it" → Scenario: AC26 A member inside the audience with the edit permission can edit; Scenario: AC26 A member inside the audience without the edit permission sees no edit controls; Scenario: AC26 Only the creator or an admin can change visibility or delete the board; Scenario: AC26 The server refuses every write from a member outside the audience
