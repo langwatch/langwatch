@@ -185,6 +185,11 @@ document, is the authority on filenames):
 - No `utils/`, `ports/`, `adapters/`, `composition/`, `lib/`, `helpers/`,
   `domain/`.
 
+**A value is parsed once, where it enters untyped** (a transport, a channel's inbound message, a
+fold's stored payload) and travels as its `z.infer` type after that: a service does not re-parse what
+its transport or a peer's typed call handed it, and a Prisma repository does not parse columns Prisma
+already types (Alex, 2026-09-28).
+
 **An implementation never sees a raw client.** No prisma, no redis, no
 clickhouse in any `*Module` class. Raw clients cross into a module in exactly
 one place — a registry or channel factory's `create(members)` — and arrive as
@@ -1190,6 +1195,10 @@ emits one cell intent per row and target, the worker runs each cell as a command
 events, and projections fold progress that SSE and polling read. Abort is a command the manager honours.
 The manager is the concurrency window: it sends N cell intents, then one per finished cell; phase 2 reads
 phase 1's outputs from the run's fold; a run without an experiment is keyed by runId (Alex, 2026-09-28).
+A cell intent carries only its ordinal and phase: `started` carries the scoped plan, the run's fold keeps
+it, and each cell reads its row, target and evaluators from the fold. The comparison set is planned from the
+run's configuration at start; each comparison cell decides from its own row's variant outputs whether it runs
+or finishes skipped, so the manager stays pure over counts (Alex, 2026-09-28).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and

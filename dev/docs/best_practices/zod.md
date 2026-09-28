@@ -1,8 +1,38 @@
 # Zod
 
-The repository is on zod 4. Two identity packages still resolve zod 3, so both
-majors are installed at once. Most of the difference is covered by the type
-checker. What follows is the part that is not.
+The repository is on zod 4.6. Zod 3 is still installed because third-party
+libraries depend on it (`@openai/agents`, the AI SDK, `@ag-ui/core`), so a
+schema or error from one of them can be zod 3. Most of the difference is
+covered by the type checker. What follows is the part that is not.
+
+## Checks read for their flag
+
+A check read only for its flag is `.validate(x)`, never
+`.safeParse(x).success`: it builds neither the output nor the error.
+`langwatch/zod-validate-for-boolean` enforces it.
+
+## Build a schema once
+
+A schema caches its parser on its own instance. A schema
+built inside a loop or a per-request method throws that parser away and
+rebuilds it every time (measured on zod 4.4):
+
+| 20,000 rows                  | Built once | Built per row |
+| ---------------------------- | ---------- | ------------- |
+| `z.object({ … }).parse(row)` | 0.6 ms     | 487 ms        |
+| `z.record(…).parse(row)`     | 6.7 ms     | 248 ms        |
+
+`z.array(item).parse(rows)` costs the same as parsing each row with a hoisted
+`item`: batching is not the win, hoisting is. `langwatch/zod-schema-per-call`
+reports the pattern, and `langwatch/zod-object-intersection` reports object
+intersections, which parse the input once per side.
+
+## Parse once
+
+A value is parsed where it enters untyped and travels as its `z.infer` type
+after that: a service does not re-parse what its transport parsed, and a
+Prisma repository does not parse columns Prisma already types
+(`dev/docs/ARCHITECTURE.md` §3.2).
 
 ## Never inspect a schema you did not build
 
@@ -50,11 +80,12 @@ structurally (an `issues` array and a `flatten` method) and converts with
 `ValidationError.fromZodError`. Both majors satisfy both.
 
 **That structural check is load-bearing.** Replacing it with
-`instanceof z.ZodError` turns every identity validation failure into an unknown 500. Use a structural check at any boundary that can receive a schema or an
+`instanceof z.ZodError` turns every validation failure from a zod 3 library into
+an unknown 500. Use a structural check at any boundary that can receive a schema or an
 error it did not itself create.
 
 Errors cross the boundary safely. Schemas do not, and nothing can make them:
 a schema is handed to a library that reads its internals. Zod 3's
-`ZodEffects<…>` is not assignable to zod 4's `ZodType<…>`, so a zod 4 package
-that imports a schema from a zod 3 package does not compile against it. Expect
+`ZodEffects<…>` is not assignable to zod 4's `ZodType<…>`, so a zod 4 schema
+handed to a library typed against zod 3 does not compile. Expect
 that wherever the boundary is crossed. The durable fix is one zod.
