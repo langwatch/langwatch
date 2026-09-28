@@ -11,7 +11,7 @@
  * identifiers back has to be one rule consulted twice, because a rule that only
  * one engine knows about is a rule the other engine will undo.
  *
- * Two questions are asked, in this order.
+ * Three questions are asked, in this order.
  *
  *   1. Does the attribute NAME reserve it, AND does the value look like the
  *      address that name promises? A short list of trace and span identifier
@@ -19,7 +19,12 @@
  *      are not a protected namespace — the OTLP endpoint takes attributes as the
  *      caller wrote them — so the value still has to be hex or decimal before
  *      the name is allowed to turn the personal-data pass off.
- *   2. Is the VALUE exclusively one opaque identifier token? A uuid, a hex
+ *   2. Does the attribute NAME mark a model, provider or tool name, AND is the
+ *      value one token shaped like one? Asked by the analysis path only, and
+ *      only after the native pass has run: it spares these values the name
+ *      detector, which reads `claude-sonnet-4-6` as a person, not the pattern
+ *      recognizers. See {@link reservesModelOrToolName}.
+ *   3. Is the VALUE exclusively one opaque identifier token? A uuid, a hex
  *      digest, a ULID, a `prefix_<random>` record id. Nothing in such a value
  *      is personal data, so there is nothing for either engine to find.
  *      Exclusively: a value that merely CONTAINS one is prose, and prose is
@@ -38,7 +43,7 @@
  * fills in themselves — user, customer, thread and conversation identifiers.
  * Customers routinely put an email address or a full name in them, and a name on
  * the reserved list would mean storing that in the clear. They are covered by
- * question 2 like every other attribute: an opaque value is held back, personal
+ * question 3 like every other attribute: an opaque value is held back, personal
  * data is still redacted.
  */
 
@@ -342,8 +347,11 @@ const RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set([
  * `anthropic/claude-sonnet-4`, `gpt-5:latest`, `lookup_profile`).
  *
  * No whitespace, so prose written under one of these names is still analysed;
- * no `@`, so an email address is still analysed; and a URL is sent on too (see
- * {@link reservesModelOrToolName}), since it can carry a person in its path.
+ * no `@`, so an email address is still analysed; and a URL with a scheme
+ * (`https://...`) is sent on too (see {@link reservesModelOrToolName}), since
+ * it can carry a person in its path. A scheme-less path is not: model ids use
+ * `/` themselves (`anthropic/claude-sonnet-4`), so it cannot be refused on
+ * shape.
  *
  * What this knowingly lets through is a lone single-token name written under a
  * model or tool attribute ("jane.doe", "jane_doe"). It cannot be told apart by
@@ -351,7 +359,8 @@ const RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set([
  * `openai.chat`), which is the exact value this rule exists for. The trace
  * rule can refuse "jane.doe" because an address is hex or decimal; a model name
  * is words. That is the residual, and it is accepted: those attributes are set
- * by code, and the native pass still runs on them, so card numbers, phone
+ * by code, and the rule is only consulted after the native pass has run on
+ * them (see {@link isHeldOutIdentifierAttribute}), so card numbers, phone
  * numbers and secrets in them are redacted either way.
  */
 const MODEL_OR_TOOL_NAME_VALUE = /^[A-Za-z0-9._:/+-]+$/;
@@ -391,19 +400,27 @@ export function reservesModelOrToolName({
  * name (a trace address, or a model or tool name), or a value that is
  * exclusively one opaque identifier token.
  *
+ * The model or tool name rule applies only when `afterNativePass` is set. Its
+ * residual is safe only because the native pass has already redacted cards,
+ * phones and secrets in those values; on the no-policy path (no tenant, the
+ * kill switch, a failed policy lookup) the analysis batch is the only pass, and
+ * holding a value back there would store whatever it holds in the clear.
+ *
  * Attribute values only. Free text — a log body, a status message, the chat
  * content itself — is content by definition and always analysed.
  */
 export function isHeldOutIdentifierAttribute({
   key,
   value,
+  afterNativePass,
 }: {
   key: string;
   value: string;
+  afterNativePass: boolean;
 }): boolean {
   return (
     reservesTraceAddress({ key, value }) ||
-    reservesModelOrToolName({ key, value }) ||
+    (afterNativePass && reservesModelOrToolName({ key, value })) ||
     isOpaqueIdentifierValue(value)
   );
 }

@@ -353,6 +353,15 @@ Feature: Redacting personal data from traces
     When a trace is ingested with a model name attribute whose value is a phone number
     Then the stored attribute has the phone number redacted
 
+  # The hold-out is safe only because the native pass has already redacted
+  # phones, cards and secrets in these values. Without a resolved policy the
+  # analysis service is the only redaction, so nothing is held back from it.
+  @unit
+  Scenario: Without a resolved policy a model name attribute is still sent for analysis
+    Given no PII policy can be resolved for the project
+    When a trace is ingested with a model name attribute whose value is a phone number
+    Then the analysis service received that value
+
   # The reserved names are not a namespace anyone owns. Attributes arrive on the
   # ingestion endpoint spelled exactly as the sender wrote them, so a sender can
   # put an email address under a trace identifier name - by mistake or on

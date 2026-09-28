@@ -295,6 +295,19 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
 
       expect(attr(span, "ai.model.id")).not.toContain("234-567-8901");
     });
+
+    // With no tenant (or the kill switch, or a failed policy lookup) the native
+    // pass never runs and the analysis batch is the only redaction. Holding a
+    // model name back there would store a phone number under it in the clear.
+    /** @scenario "Without a resolved policy a model name attribute is still sent for analysis" */
+    it("still submits a model name attribute when the native pass did not run", async () => {
+      const { service, submitted } = makeService();
+      const span = spanWith({ "ai.model.id": "+1-234-567-8901" });
+
+      await service.redactSpan(span, null, "STRICT");
+
+      expect(submitted()).toContain("+1-234-567-8901");
+    });
   });
 
   // Custom metadata does not reach redaction spelled the way the caller wrote

@@ -152,6 +152,7 @@ describe("given the identifier hold-out rules", () => {
         isHeldOutIdentifierAttribute({
           key: "metadata.trace_id",
           value: "17575001234540000091234567890123",
+          afterNativePass: false,
         }),
       ).toBe(true);
     });
@@ -168,7 +169,11 @@ describe("given the identifier hold-out rules", () => {
     ])("does not hold a reserved name back over %s", (_case, value) => {
       expect(isReservedIdentifierAttributeKey("metadata.trace_id")).toBe(true);
       expect(
-        isHeldOutIdentifierAttribute({ key: "metadata.trace_id", value }),
+        isHeldOutIdentifierAttribute({
+          key: "metadata.trace_id",
+          value,
+          afterNativePass: true,
+        }),
       ).toBe(false);
     });
 
@@ -194,9 +199,13 @@ describe("given the identifier hold-out rules", () => {
       "gen_ai.conversation.id",
     ])("does not reserve %s, which customers fill in themselves", (key) => {
       expect(isReservedIdentifierAttributeKey(key)).toBe(false);
-      expect(isHeldOutIdentifierAttribute({ key, value: "Jane Doe" })).toBe(
-        false,
-      );
+      expect(
+        isHeldOutIdentifierAttribute({
+          key,
+          value: "Jane Doe",
+          afterNativePass: true,
+        }),
+      ).toBe(false);
     });
 
     /**
@@ -218,6 +227,7 @@ describe("given the identifier hold-out rules", () => {
         isHeldOutIdentifierAttribute({
           key: `${prefix}trace_id`,
           value: DECIMAL_TRACE_ADDRESS,
+          afterNativePass: false,
         }),
       ).toBe(true);
     });
@@ -238,7 +248,31 @@ describe("given the identifier hold-out rules", () => {
       ["ai.toolCall.name", "search_documents"],
     ])("holds %s back over %s", (key, value) => {
       expect(reservesModelOrToolName({ key, value })).toBe(true);
-      expect(isHeldOutIdentifierAttribute({ key, value })).toBe(true);
+      expect(
+        isHeldOutIdentifierAttribute({ key, value, afterNativePass: true }),
+      ).toBe(true);
+    });
+
+    /**
+     * Without the native pass the analysis batch is the only redaction there
+     * is, so a phone or card number under a model name would be stored in the
+     * clear. The rule is not consulted on that path at all.
+     */
+    it("does not hold a model name back when the native pass did not run", () => {
+      expect(
+        isHeldOutIdentifierAttribute({
+          key: "ai.model.id",
+          value: "+1-234-567-8901",
+          afterNativePass: false,
+        }),
+      ).toBe(false);
+      expect(
+        isHeldOutIdentifierAttribute({
+          key: "gen_ai.request.model",
+          value: "claude-sonnet-4-6",
+          afterNativePass: false,
+        }),
+      ).toBe(false);
     });
 
     it("holds a name back at the length cap", () => {
@@ -283,6 +317,7 @@ describe("given the identifier hold-out rules", () => {
     it.each([
       "jane.doe",
       "jane_doe",
+      "acme.example.com/u/jane.doe",
     ])("knowingly holds back the single-token name %s", (value) => {
       expect(
         reservesModelOrToolName({ key: "gen_ai.request.model", value }),
