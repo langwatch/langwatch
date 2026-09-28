@@ -212,10 +212,15 @@ export interface DashboardApi {
 
   /** The experimental gate over the whole workbench surface, asked per request. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
-  listSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChart[]>;
+  /** Charts placed on a board outside the viewer's audience are left out or read as not found. */
+  listSavedWorkbenchCharts(input: {
+    projectId: string;
+    viewer?: DashboardViewer;
+  }): Promise<SavedWorkbenchChart[]>;
   getSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart>;
   /** For a credential that resolved its own protections, such as an API key. */
   createSavedWorkbenchChart(input: {
@@ -230,6 +235,7 @@ export interface DashboardApi {
     chartId: string;
     name?: string;
     definitionUpdate?: SavedWorkbenchChartDefinitionUpdate;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart>;
   /** For a signed-in member, whose own protections decide what the chart may name. */
   createMemberSavedWorkbenchChart(input: {
@@ -244,8 +250,13 @@ export interface DashboardApi {
     chartId: string;
     name?: string;
     definition?: unknown;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart>;
-  deleteSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<void>;
+  deleteSavedWorkbenchChart(input: {
+    projectId: string;
+    chartId: string;
+    viewer?: DashboardViewer;
+  }): Promise<void>;
   placeSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
@@ -268,6 +279,7 @@ export interface DashboardApi {
     timeWindow?: LangWatchQLTimeWindow;
     granularitySeconds?: number;
     onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+    viewer?: DashboardViewer;
   }): Promise<LangWatchQLQueryResult>;
 
   listSavedViews(input: {
