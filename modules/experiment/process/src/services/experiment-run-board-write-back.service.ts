@@ -14,12 +14,12 @@ import { createLogger } from "@langwatch/observability";
 import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
 import { hasExperiment, makeExperimentRunKey } from "../rules/experiment-run-key.rules.ts";
 import { ExperimentRunResultsWriterService } from "./experiment-run-results-writer.service.ts";
-import type { ExperimentService } from "./experiment.service.ts";
+import type { ExperimentWorkbenchService } from "./experiment-workbench.service.ts";
 
 const logger = createLogger("langwatch:experiment:run-board-write-back");
 
 type BoardWriteExperiments = Pick<
-  ExperimentService,
+  ExperimentWorkbenchService,
   "getWorkbenchState" | "recordWorkbenchRunResults" | "hasWorkbenchVersionOfRun"
 >;
 

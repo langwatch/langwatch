@@ -6,7 +6,7 @@ import {
   ExperimentEvaluationInputError,
   ExperimentRunLoopUnavailableError,
   extractPersistedState,
-  type FindOrCreateWorkflowExperimentInput,
+  findOrCreateWorkflowExperimentInputSchema,
   generateHumanReadableId,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
@@ -318,9 +318,10 @@ export class WorkflowEvaluationService {
       projectId,
       workflowId: workflow.id,
       name: workflow.name,
-      workbenchState: extractPersistedState(
-        state,
-      ) as FindOrCreateWorkflowExperimentInput["workbenchState"],
+      // Stored as JSON, so an absent field is dropped, as main's row write dropped it.
+      workbenchState: findOrCreateWorkflowExperimentInputSchema.shape.workbenchState.parse(
+        JSON.parse(JSON.stringify(extractPersistedState(state))),
+      ),
     });
   }
 

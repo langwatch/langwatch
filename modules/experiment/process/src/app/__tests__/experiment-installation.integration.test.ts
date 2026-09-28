@@ -125,6 +125,7 @@ async function bootWorker(workflow = createApiFixture<WorkflowApi>({})) {
 
 describe("experiment installed in the worker", () => {
   /** @scenario "The worker registers the run pipeline from experiment's own declaration" */
+  /** @scenario "The worker mounts the pipeline rather than being handed one" */
   it("registers experiment_run_processing from its own declaration", async () => {
     const { runtime, eventing } = await bootWorker();
 

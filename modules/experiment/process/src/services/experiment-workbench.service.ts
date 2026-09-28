@@ -229,6 +229,15 @@ export class ExperimentWorkbenchService {
     });
   }
 
+  /** Whether a run already wrote a version of the workbench, so its write lands once. */
+  hasWorkbenchVersionOfRun(input: {
+    projectId: string;
+    experimentId: string;
+    runId: string;
+  }): Promise<boolean> {
+    return this.repository.hasWorkbenchVersionOfRun(input);
+  }
+
   async recordWorkbenchRunResults(
     input: RecordWorkbenchRunResultsInput,
   ): Promise<WorkbenchSaveResult> {

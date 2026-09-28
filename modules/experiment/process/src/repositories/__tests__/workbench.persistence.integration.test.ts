@@ -398,7 +398,7 @@ describe.skipIf(!databaseUrl)("Experiment workbench persistence", () => {
       });
 
       const holds = (runId: string) =>
-        experiments.hasWorkbenchVersionOfRun({
+        experiments.workbench.hasWorkbenchVersionOfRun({
           projectId,
           experimentId: created.experimentId,
           runId,

@@ -414,7 +414,7 @@ export function buildExperimentRunCells(input: {
     refusals,
     boardWriteBack: ExperimentRunBoardWriteBackService.create({
       folds,
-      experiments: input.experiments,
+      experiments: input.experiments.workbench,
     }),
     cells: ExperimentRunCellService.create({
       folds,

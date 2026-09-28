@@ -140,7 +140,7 @@ export class ExperimentService {
   private readonly updates: ExperimentWorkbenchUpdates;
   private readonly slugs: ExperimentSlugService;
   private readonly workbenchReferences: ExperimentWorkbenchReferencesService;
-  private readonly workbench: ExperimentWorkbenchService;
+  readonly workbench: ExperimentWorkbenchService;
 
   private constructor(private readonly options: ExperimentServiceOptions) {
     this.execution = options.execution ?? UnavailableExperimentExecution.create();
@@ -287,7 +287,10 @@ export class ExperimentService {
     input: FindOrCreateWorkflowExperimentInput,
   ): Promise<{ id: string; slug: string }> {
     const command = findOrCreateWorkflowExperimentInputSchema.parse(input);
-    const existing = await this.options.repository.findForWorkflow(command);
+    const existing = await this.options.repository.findForWorkflow({
+      projectId: command.projectId,
+      workflowId: command.workflowId,
+    });
     if (existing) {
       await this.options.repository.updateWorkbenchState({
         projectId: command.projectId,
@@ -459,15 +462,6 @@ export class ExperimentService {
 
   recordWorkbenchRunResults(input: RecordWorkbenchRunResultsInput): Promise<WorkbenchSaveResult> {
     return this.workbench.recordWorkbenchRunResults(input);
-  }
-
-  /** Whether a run already wrote a version of the workbench, so its write lands once. */
-  hasWorkbenchVersionOfRun(input: {
-    projectId: string;
-    experimentId: string;
-    runId: string;
-  }): Promise<boolean> {
-    return this.options.repository.hasWorkbenchVersionOfRun(input);
   }
 
   listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {
