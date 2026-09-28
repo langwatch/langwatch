@@ -4,9 +4,9 @@
  */
 
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
-import type { Protections, SpanDetail, TraceLogRecordDto } from "@langwatch/trace-contract";
+import type { Protections, Span, SpanDetail, TraceLogRecordDto } from "@langwatch/trace-contract";
 
-import type { TraceApp } from "#app/trace.app";
+import type { TraceLogRecordReadRow } from "#app/trace.app";
 
 import {
   gateTraceLogVisibility,
@@ -29,27 +29,55 @@ export type TracesReadMembers = Readonly<{
   derivedAttrPrefixes: TraceDerivedAttrPrefixes;
 }>;
 
+/** The span, log and transcript reads this service stands on; the trace app answers them. */
+export type TraceTranscriptReads = Readonly<{
+  readSpans(input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    visibilityCutoffMs?: number | null;
+  }): Promise<Span[]>;
+  enrichSpansFromCodingAgentLogs(input: {
+    projectId: string;
+    traceId: string;
+    spans: Span[];
+    occurredAtMs?: number;
+  }): Promise<Span[]>;
+  readTraceLogRecords(input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number;
+  }): Promise<TraceLogRecordReadRow[]>;
+  codingAgentLogContentKeys(
+    eventName: string,
+  ): readonly { key: string; category: "input" | "output" | "both" }[];
+  buildCodingAgentTranscript(input: {
+    spans: SpanDetail[];
+    logs: TraceLogRecordReadRow[];
+  }): unknown;
+}>;
+
 /**
  * Load one trace's spans, enriched and REDACTED. Extracted so `spansFull`
  * and `codingAgentTranscript` cannot drift apart — content that skipped
  * this pass would bypass the data-privacy policy, so there's exactly one way in.
  */
 async function loadSpansFullWithProtections({
-  app,
+  reads,
   ports,
   projectId,
   traceId,
   occurredAtMs,
   protections,
 }: {
-  app: TraceApp;
+  reads: TraceTranscriptReads;
   ports: TracesReadMembers;
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
   protections: Protections;
 }): Promise<SpanDetail[]> {
-  const storedSpans = await app.readSpans({
+  const storedSpans = await reads.readSpans({
     projectId,
     traceId,
     occurredAtMs,
@@ -59,7 +87,7 @@ async function loadSpansFullWithProtections({
   // message content, which lives in the trace's OTLP log records. Join it on
   // BEFORE protections run, so the joined content goes through the same
   // redaction pass as any other span content rather than bypassing it.
-  const spans = await app.enrichSpansFromCodingAgentLogs({
+  const spans = await reads.enrichSpansFromCodingAgentLogs({
     projectId,
     traceId,
     spans: storedSpans,
@@ -71,14 +99,14 @@ async function loadSpansFullWithProtections({
 
 /** Load one trace's log records, gated by the viewer's visibility exactly as `traceLogs` does. */
 async function loadTraceLogsWithProtections({
-  app,
+  reads,
   ports,
   projectId,
   traceId,
   occurredAtMs,
   protections,
 }: {
-  app: TraceApp;
+  reads: TraceTranscriptReads;
   ports: TracesReadMembers;
   projectId: string;
   traceId: string;
@@ -86,7 +114,7 @@ async function loadTraceLogsWithProtections({
   protections: Protections;
 }): Promise<TraceLogRecordDto[]> {
   const { visibilityCutoffMs } = await ports.getVisibilityWindow(projectId);
-  const rows = await app.readTraceLogRecords({ projectId, traceId, occurredAtMs });
+  const rows = await reads.readTraceLogRecords({ projectId, traceId, occurredAtMs });
   return rows.map((row) =>
     gateTraceLogVisibility({
       row: {
@@ -102,7 +130,7 @@ async function loadTraceLogsWithProtections({
       visibilityCutoffMs,
       codingAgents: {
         logContentKeys: (eventName) =>
-          app.codingAgentLogContentKeys(eventName).map((entry) => ({
+          reads.codingAgentLogContentKeys(eventName).map((entry) => ({
             key: entry.key,
             category: entry.category,
           })),
@@ -126,27 +154,27 @@ export class TraceTranscriptReadService {
    * so both doors run identical span/log loads through the same redaction.
    */
   async readCodingAgentTranscript({
-    app,
+    reads,
     ports,
     projectId,
     traceId,
     occurredAtMs,
     protections,
   }: {
-    app: TraceApp;
+    reads: TraceTranscriptReads;
     ports: TracesReadMembers;
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
     protections: Protections;
   }): Promise<CodingAgentTranscript> {
-    const args = { app, ports, projectId, traceId, occurredAtMs, protections };
+    const args = { reads, ports, projectId, traceId, occurredAtMs, protections };
     const [spans, logs] = await Promise.all([
       loadSpansFullWithProtections(args),
       loadTraceLogsWithProtections(args),
     ]);
 
-    return app.buildCodingAgentTranscript({
+    return reads.buildCodingAgentTranscript({
       spans,
       logs,
     }) as CodingAgentTranscript;
