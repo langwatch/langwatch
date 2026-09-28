@@ -1,7 +1,5 @@
 import { PrismaRepository } from "@langwatch/prisma-client";
 import {
-  shareLinkSchema,
-  shareWithProjectSchema,
   type ShareLink,
   type ShareResourceType,
   type ShareWithProject,
@@ -45,23 +43,19 @@ export class PrismaShareRepository
   static readonly create = this.factory((prisma) => new PrismaShareRepository(prisma));
 
   async findByToken(token: string): Promise<ShareWithProject | null> {
-    const row = await this.prisma.shareLink.findUnique({
+    return this.prisma.shareLink.findUnique({
       where: { token },
       include: projectInclude,
     });
-
-    return row ? shareWithProjectSchema.parse(row) : null;
   }
 
   async findById({ id, projectId }: ShareLinkScope): Promise<ShareWithProject | null> {
     // findFirst (not findUnique): the where carries projectId so the lookup is
     // tenant-scoped in the query itself, not just checked after the fetch.
-    const row = await this.prisma.shareLink.findFirst({
+    return this.prisma.shareLink.findFirst({
       where: { id, projectId },
       include: projectInclude,
     });
-
-    return row ? shareWithProjectSchema.parse(row) : null;
   }
 
   async existsById({ id, projectId }: ShareLinkScope): Promise<boolean> {
@@ -78,12 +72,10 @@ export class PrismaShareRepository
     resourceType,
     resourceId,
   }: ShareResourceScope): Promise<ShareLink[]> {
-    const rows = await this.prisma.shareLink.findMany({
+    return this.prisma.shareLink.findMany({
       where: { projectId, resourceType, resourceId },
       orderBy: { createdAt: "desc" },
     });
-
-    return rows.map((row) => shareLinkSchema.parse(row));
   }
 
   async countActiveForResource({
@@ -111,7 +103,7 @@ export class PrismaShareRepository
     maxViews,
     userId,
   }: CreateShareLinkParams): Promise<ShareLink> {
-    const row = await this.prisma.shareLink.create({
+    return this.prisma.shareLink.create({
       data: {
         token,
         projectId,
@@ -123,8 +115,6 @@ export class PrismaShareRepository
         userId: userId ?? null,
       },
     });
-
-    return shareLinkSchema.parse(row);
   }
 
   async consumeView({ id, projectId, maxViews }: ConsumeShareViewParams): Promise<boolean> {

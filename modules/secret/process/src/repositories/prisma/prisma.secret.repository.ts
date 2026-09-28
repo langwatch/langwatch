@@ -1,11 +1,6 @@
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { isRecordNotFoundError, isUniqueConstraintError } from "@langwatch/prisma-client/errors";
-import {
-  SecretDuplicateError,
-  SecretNotFoundError,
-  secretSchema,
-  type Secret,
-} from "@langwatch/secret-contract";
+import { SecretDuplicateError, SecretNotFoundError, type Secret } from "@langwatch/secret-contract";
 
 import type {
   CreateStoredSecretInput,
@@ -40,7 +35,7 @@ export class PrismaSecretRepository
       orderBy: { name: "asc" },
     });
 
-    return rows.map((row) => secretSchema.parse(row));
+    return rows;
   }
 
   findAllValues(input: SecretProjectScope): Promise<StoredSecretValue[]> {
@@ -56,7 +51,7 @@ export class PrismaSecretRepository
       select: safeSecretSelect,
     });
 
-    return row ? secretSchema.parse(row) : undefined;
+    return row ?? undefined;
   }
 
   count(input: SecretProjectScope): Promise<number> {
@@ -76,7 +71,7 @@ export class PrismaSecretRepository
         select: safeSecretSelect,
       });
 
-      return secretSchema.parse(row);
+      return row;
     } catch (error) {
       if (isUniqueConstraintError(error)) throw new SecretDuplicateError(input.name);
 
@@ -92,7 +87,7 @@ export class PrismaSecretRepository
         select: safeSecretSelect,
       });
 
-      return secretSchema.parse(row);
+      return row;
     } catch (error) {
       if (isRecordNotFoundError(error)) throw new SecretNotFoundError();
 

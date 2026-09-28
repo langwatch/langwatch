@@ -1,5 +1,4 @@
 import {
-  pinnedTraceSchema,
   type PinSource,
   type PinTraceInput,
   type PinnedTrace,
@@ -20,17 +19,13 @@ export class PrismaPinnedTraceRepository
     projectId,
     traceId,
   }: UnpinTraceInput): Promise<PinnedTrace | null> {
-    const row = await this.prisma.pinnedTrace.findUnique({
+    return this.prisma.pinnedTrace.findUnique({
       where: { projectId_traceId: { projectId, traceId } },
     });
-
-    return row ? pinnedTraceSchema.parse(row) : null;
   }
 
   async findAllByProject({ projectId }: { projectId: string }): Promise<PinnedTrace[]> {
-    const rows = await this.prisma.pinnedTrace.findMany({ where: { projectId } });
-
-    return rows.map((row) => pinnedTraceSchema.parse(row));
+    return this.prisma.pinnedTrace.findMany({ where: { projectId } });
   }
 
   async findAllTraceIds({ projectId }: { projectId: string }): Promise<string[]> {
@@ -39,11 +34,11 @@ export class PrismaPinnedTraceRepository
       select: { traceId: true },
     });
 
-    return pins.map((pin) => pinnedTraceSchema.pick({ traceId: true }).parse(pin).traceId);
+    return pins.map((pin) => pin.traceId);
   }
 
   async create(params: PinTraceInput & { source: PinSource }): Promise<PinnedTrace> {
-    const row = await this.prisma.pinnedTrace.upsert({
+    return this.prisma.pinnedTrace.upsert({
       where: {
         projectId_traceId: {
           projectId: params.projectId,
@@ -66,8 +61,6 @@ export class PrismaPinnedTraceRepository
         reason: params.reason ?? null,
       },
     });
-
-    return pinnedTraceSchema.parse(row);
   }
 
   async delete({ projectId, traceId }: UnpinTraceInput): Promise<void> {
