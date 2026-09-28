@@ -4,7 +4,7 @@
  * @see dev/docs/best_practices/drawers.md
  */
 
-import { setFlowCallbacks } from "@langwatch/browser-host/drawer";
+import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { useCallback, useState, useEffect } from "react";
 
 import type { Scenario } from "../../../../behavior/scenario-api.ts";
@@ -20,11 +20,22 @@ export function AgentTestingCaseEditor() {
   const projectId = project?.id ?? "";
   const onRunStarted = useRunStartedHandler();
   const [runSubject, setRunSubject] = useState<RunDialogSubject | null>(null);
+  const [pendingSubject, setPendingSubject] = useState<RunDialogSubject | null>(null);
+  const { drawerOpen } = useDrawer();
+  const editorIsOpen = drawerOpen(CASE_EDITOR_DRAWER);
+
+  // Opened only once the editor drawer has closed: a dialog opened over it is its nested
+  // layer, and closing the drawer dismisses it with it.
+  useEffect(() => {
+    if (!pendingSubject || editorIsOpen) return;
+    setRunSubject(pendingSubject);
+    setPendingSubject(null);
+  }, [pendingSubject, editorIsOpen]);
 
   const handleSaved = useCallback(
     (saved: Scenario, { shouldRunAfterSave }: { shouldRunAfterSave: boolean }) => {
       if (!shouldRunAfterSave) return;
-      setRunSubject({
+      setPendingSubject({
         kind: "case",
         scenarioId: saved.id,
         name: saved.name,
