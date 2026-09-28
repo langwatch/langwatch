@@ -61760,7 +61760,8 @@ The `smtp` gateway ignores these variables on purpose, because an SMTP relay is 
 | Variable              | Description                       | Default |
 | --------------------- | --------------------------------- | ------- |
 | `DISABLE_USAGE_STATS` | Stop the daily usage report. See [Data and telemetry](/self-hosting/data-and-telemetry) for what it carries and the two smaller switches | `false` |
-| `METRICS_API_KEY`     | API key for metrics collection    | -       |
+| `LANGWATCH_METRICS_MODE` | `otlp` pushes metrics to `OTEL_EXPORTER_OTLP_ENDPOINT`; `prometheus` serves a `/metrics` scrape endpoint instead. The Helm chart sets `prometheus` when `app.telemetry.metrics.enabled` is true | `otlp` |
+| `LANGWATCH_METRICS_TOKEN` | Bearer token a Prometheus scrape must send. In production, `/metrics` is not served without it | -       |
 
 ## Langy (optional)
 

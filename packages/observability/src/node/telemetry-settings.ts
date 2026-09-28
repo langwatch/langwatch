@@ -66,7 +66,11 @@ export type TelemetrySecrets = Readonly<{
 
 /** What the preamble hands a telemetry or metrics factory (§4). */
 export type TelemetryContext = Readonly<{
-  config: Readonly<{ observability: TelemetrySettings }>;
+  config: Readonly<{
+    observability: TelemetrySettings;
+    /** The process slice's `NODE_ENV`; production closes an ungated scrape door. */
+    process?: Readonly<{ nodeEnvironment?: string | undefined }>;
+  }>;
   secrets: TelemetrySecrets;
   /** Field paths every log record masks; the boot seam names them, this package holds none. */
   redactPaths?: readonly string[];
