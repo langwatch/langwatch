@@ -345,6 +345,73 @@ describe("Dashboards v1 on the server", () => {
         app.deleteDashboardWidget({ projectId: PROJECT, id: placed.id, viewer: CREATOR }),
       ).resolves.toBeUndefined();
     });
+
+    /** @scenario "AC18 Saved charts on a board follow the board's visibility" */
+    it("leaves its saved charts out of another member's list and refuses them as not found", async () => {
+      const { app, repositories } = await privateBoardWithBlocks();
+      await repositories.dashboards.createSavedWorkbenchChart({
+        id: "chart-loose",
+        projectId: PROJECT,
+        name: "Loose",
+        definition: { version: 1, sql: "SELECT 1", parameters: {} },
+      });
+      const onBoard = { projectId: PROJECT, chartId: "chart-placed", viewer: TEAMMATE };
+      const listedFor = async (viewer?: { userId: string }) =>
+        (await app.listSavedWorkbenchCharts({ projectId: PROJECT, viewer })).map(({ id }) => id);
+
+      expect(await listedFor(TEAMMATE)).toEqual(["chart-loose"]);
+      expect(await listedFor(undefined)).toEqual(["chart-loose"]);
+      expect(await listedFor(CREATOR)).toEqual(
+        expect.arrayContaining(["chart-placed", "chart-loose"]),
+      );
+
+      const codes = await Promise.all([
+        codeOf(app.getSavedWorkbenchChart(onBoard)),
+        codeOf(app.getSavedWorkbenchChart({ projectId: PROJECT, chartId: "chart-placed" })),
+        codeOf(app.updateSavedWorkbenchChart({ ...onBoard, name: "Taken" })),
+        codeOf(
+          app.updateMemberSavedWorkbenchChart({
+            ...onBoard,
+            actorId: TEAMMATE.userId,
+            name: "Taken",
+          }),
+        ),
+        codeOf(app.runSavedWorkbenchChart({ ...onBoard, actorId: TEAMMATE.userId })),
+        codeOf(app.deleteSavedWorkbenchChart(onBoard)),
+      ]);
+      expect(codes).toEqual(Array(codes.length).fill("saved_workbench_chart_not_found"));
+
+      await expect(
+        app.getSavedWorkbenchChart({ ...onBoard, viewer: CREATOR }),
+      ).resolves.toMatchObject({ name: "Spend" });
+    });
+
+    /** @scenario "AC18 Saved charts on a board follow the board's visibility" */
+    it("lets the creator run, rename and delete a chart on it, and anyone use an unplaced one", async () => {
+      const { app, repositories } = await privateBoardWithBlocks();
+      await repositories.dashboards.createSavedWorkbenchChart({
+        id: "chart-loose",
+        projectId: PROJECT,
+        name: "Loose",
+        definition: { version: 1, sql: "SELECT 1", parameters: {} },
+      });
+      const mine = { projectId: PROJECT, chartId: "chart-placed", viewer: CREATOR };
+      const loose = { projectId: PROJECT, chartId: "chart-loose", viewer: TEAMMATE };
+
+      await expect(
+        app.runSavedWorkbenchChart({ ...mine, actorId: CREATOR.userId }),
+      ).resolves.toMatchObject({ rows: [] });
+      await expect(
+        app.updateMemberSavedWorkbenchChart({ ...mine, actorId: CREATOR.userId, name: "Mine" }),
+      ).resolves.toMatchObject({ name: "Mine" });
+      await expect(app.deleteSavedWorkbenchChart(mine)).resolves.toBeUndefined();
+
+      await expect(app.getSavedWorkbenchChart(loose)).resolves.toMatchObject({ name: "Loose" });
+      await expect(
+        app.updateSavedWorkbenchChart({ projectId: PROJECT, chartId: "chart-loose", name: "Ours" }),
+      ).resolves.toMatchObject({ name: "Ours" });
+      await expect(app.deleteSavedWorkbenchChart(loose)).resolves.toBeUndefined();
+    });
   });
 
   describe("given blocks on a board set to team", () => {
