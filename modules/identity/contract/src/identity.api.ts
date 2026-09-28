@@ -769,6 +769,8 @@ export interface IdentityApi {
   newbornSweep(): IdentityNewbornSweepApi;
   /** The USER-rooted migration registry (ADR-101 §6), in main's order. */
   userMigrations(): readonly SystemMigration[];
+  /** The ORGANIZATION-rooted migrations identity registers (D04), main's `registeredMigrations`. */
+  registeredMigrations(): readonly SystemMigration[];
   joinRequestGuards(): JoinRequestGuardsApi;
   ssoConnections(): SsoConnectionApi;
   ssoConnectionGuards(): SsoConnectionGuardsApi;

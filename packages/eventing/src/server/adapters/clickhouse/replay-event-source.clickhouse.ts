@@ -8,7 +8,6 @@ import type {
 import type {
   EventingClickHouseReplayClient,
   EventingClickHouseReplayClientResolver,
-  EventingClickHouseRow,
 } from "../../clickhouse-client-resolver.ts";
 
 /** ClickHouse event_log row shape. */
@@ -370,10 +369,8 @@ export async function streamEventsForAggregatesBulk({
   });
 
   let eventsApplied = 0;
-  const stream = result.stream();
-  for await (const rows of stream) {
-    for (const streamedRow of rows as EventingClickHouseRow[]) {
-      const row = streamedRow.json<ClickHouseEventRow>();
+  for await (const rows of result.stream<ClickHouseEventRow>()) {
+    for (const row of rows) {
       const key = `${tenantId}:${row.AggregateType}:${row.AggregateId}`;
       if (isRowBeyondCutoff(row, cutoffs.get(key))) continue;
 

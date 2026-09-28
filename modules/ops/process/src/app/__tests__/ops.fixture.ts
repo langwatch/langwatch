@@ -21,6 +21,7 @@ import {
   type OpsAppInfrastructure,
   type OpsCapability,
   type OpsEventingIntrospection,
+  type OpsSystemMigrationRunner,
 } from "../ops.app.ts";
 
 /** The staff address every fixture operator is measured against. */
@@ -73,12 +74,13 @@ export function createOpsTestInfrastructure(
       read: () => ({ searchLookbackDays: 365, hotTierDays: null, hotTierEnvVar: null }),
     },
     grafana: { findLinkConfig: () => null },
-    systemMigrations: createApiFixture<OpsAppInfrastructure["systemMigrations"]>({
-      requiresOperatorConfirmation: () => false,
-      enroll: async () => {},
-      withdraw: async () => {},
-      startPass: () => {},
-    }),
+    createSystemMigrations: () =>
+      createApiFixture<OpsSystemMigrationRunner>({
+        requiresOperatorConfirmation: () => false,
+        enroll: async () => {},
+        withdraw: async () => {},
+        startPass: async () => {},
+      }),
     bugReportRateLimiter: { consume: async () => ({ allowed: true }) },
     bugReportNotifier: { notify: async () => {} },
     explainClients: { findClient: () => null },

@@ -1583,6 +1583,7 @@ const TRPC_CODE_BY_STATUS: Partial<Record<number, TRPCError["code"]>> = {
   // already used for a still-preparing dataset.
   425: "PRECONDITION_FAILED",
   429: "TOO_MANY_REQUESTS",
+  503: "SERVICE_UNAVAILABLE",
 };
 
 function trpcCodeOf(error: HandledError): TRPCError["code"] {

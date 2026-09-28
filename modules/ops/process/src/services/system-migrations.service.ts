@@ -156,17 +156,25 @@ export class SystemMigrationsService {
   }
 
   /**
-   * Kick a pass now instead of waiting for the next worker boot. Lever for
-   * processing fresh enrollment or re-verifying held tenants. Fire-and-forget:
-   * worst case for double click is a pass that finds everything claimed.
+   * Kick a pass now instead of waiting for the next re-drive. Sent to a worker as a command and
+   * awaited until recorded; a double click is harmless, since each organization's claim keeps two
+   * passes off it.
    */
-  startPass(): void {
-    void this.deps.runPass().catch((error) => {
-      // Per-tenant failures park-and-log inside the pass; this catches the
-      // pass itself dying (state table or tenant source down). The next boot
-      // retries either way.
-      logger.error({ error }, "operator-kicked migration pass failed");
-    });
+  async startPass({ actorUserId }: { actorUserId: string }): Promise<void> {
+    await this.deps.requestPass({ actorUserId });
+  }
+
+  /**
+   * One pass on the worker. An operator's kick always runs; the hourly re-drive first asks the
+   * stored state whether any tenant could still move, so a latched fleet is not swept.
+   */
+  async executePass({ redrive }: { redrive: boolean }): Promise<void> {
+    if (redrive && !(await this.deps.hasTenantAwaitingRedrive())) {
+      logger.debug("no parked or held tenant; skipping the system migration re-drive");
+      return;
+    }
+    const summary = await this.deps.runPass();
+    logger.info({ summary, redrive }, "system migration pass complete");
   }
 
   /**

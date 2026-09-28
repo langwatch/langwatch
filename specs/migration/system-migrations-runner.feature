@@ -370,6 +370,13 @@ Feature: Running system migrations across organizations
     When the cadence comes round again
     Then another pass is attempted
 
+  @unit
+  Scenario: The hourly re-drive runs as a scheduled process once across the fleet
+    Given several workers are running
+    When an hour passes
+    Then one scheduled process wakes on one of them
+    And it asks for exactly one re-drive pass for that wake
+
   # D04 records the configured legacy route WITHOUT treating the old domain
   # string as ownership evidence, which is what let it join the shared
   # registry: existing sign-in stays compatible, while activation, linking and
@@ -731,3 +738,22 @@ Feature: Running system migrations across organizations
     When the run reports
     Then it says it waited
     And it does not report "org_acme" as held
+
+  @unit
+  Scenario: The migrations page lists every registered migration when served by the api role
+    Given the api role serves the migrations page
+    And identity registers an organization-rooted and a user-rooted migration
+    When an operator opens the migrations page
+    Then both migrations are listed, organization-rooted first, with their rollups
+
+  @unit
+  Scenario: A migration registered by a peer module appears on the page with its title and description
+    Given a peer module registers a migration with its own title and description
+    When an operator opens the migrations page
+    Then the migration is listed with that title and description
+
+  @unit
+  Scenario: Kicking a pass from the page runs one pass on a worker
+    When an operator asks for a pass now
+    Then the request is recorded under the operator
+    And a worker runs one pass for it without first asking whether anything could move

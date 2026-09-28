@@ -23,7 +23,6 @@ export type {
   EventingClickHouseQueryResult,
   EventingClickHouseReplayClient,
   EventingClickHouseReplayClientResolver,
-  EventingClickHouseRow,
   EventingClickHouseStreamingQueryResult,
 } from "./clickhouse-client-resolver.ts";
 export type { EventingProcessPersistenceDatabase } from "./process-persistence.database.ts";

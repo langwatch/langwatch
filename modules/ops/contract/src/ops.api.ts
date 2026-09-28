@@ -526,7 +526,8 @@ export interface OpsApi {
     operator: OpsOperator | null;
     confirm?: string | undefined;
   }): Promise<OpsMigrationTargetedRunResult>;
-  runSystemMigrationPass(): void;
+  /** Asks a worker for one pass now; resolves once the request is recorded, not the pass. */
+  runSystemMigrationPass(input: { operator: OpsOperator | null }): Promise<void>;
   assertSystemMigrationLegacyWritersDrained(input: {
     migrationName: string;
     tenantId: string;

@@ -5,6 +5,7 @@ import type { ReplayProgress } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
+  OpsCapabilityUnavailableError,
   ReplayAlreadyRunningError,
   ReplayStartFailedError,
   type ReplayHistoryEntry,
@@ -13,6 +14,7 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import type { OpsReplayRuntime, OpsReplayRuntimeFactory } from "../app/ops.app.ts";
+import type { ProjectionReplayRun } from "../eventing/ops-projection-replay.events.ts";
 import type { ReplayRepository } from "../repositories/replay.repository.ts";
 import { ReplayLockHeartbeatService } from "./replay-lock-heartbeat.service.ts";
 
@@ -27,6 +29,11 @@ interface ReplaySelection {
   stateProjections: OpsReplayRuntime["stateProjections"];
   length: number;
 }
+
+/** The `requestProjectionReplay` sender, as ops' own pipeline answers with it once registered. */
+export type ProjectionReplayRequestSender = {
+  send(input: ProjectionReplayRun & { tenantId: string; occurredAt: number }): Promise<unknown>;
+};
 
 class ReplayCancelledError extends Error {
   constructor() {
@@ -49,6 +56,13 @@ export class ReplayService {
     readonly repo: ReplayRepository,
     private readonly runtimeFactory: OpsReplayRuntimeFactory,
   ) {}
+
+  #requests: ProjectionReplayRequestSender | null = null;
+
+  /** Binds the pipeline's sender once it registers; a process that never does refuses a start. */
+  connect(sender: ProjectionReplayRequestSender): void {
+    this.#requests = sender;
+  }
 
   async getStatus(): Promise<ReplayStatus> {
     return this.repo.getStatus();
@@ -77,7 +91,12 @@ export class ReplayService {
     fullRebuild?: boolean;
     description: string;
     userName: string;
+    /** The operator's user id: the requested event's tenant. */
+    requestedByUserId: string;
   }): Promise<{ runId: string }> {
+    const requests = this.#requests;
+    if (!requests) throw new OpsCapabilityUnavailableError("the projection replay pipeline");
+    const { requestedByUserId, ...run } = params;
     const runId = generate("replayrun").toString();
 
     let acquired: boolean;
@@ -118,11 +137,46 @@ export class ReplayService {
       throw new ReplayStartFailedError(error);
     }
 
-    this.executeReplay({ runId, ...params }).catch((err) => {
-      logger.error({ error: err, runId }, "Unexpected replay orchestration error");
-    });
+    try {
+      await requests.send({
+        ...run,
+        runId,
+        tenantId: requestedByUserId,
+        occurredAt: nowInstant().epochMilliseconds,
+      });
+    } catch (error) {
+      await this.finalizeWithError({
+        runId,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        historyCtx: run,
+      });
+      throw new ReplayStartFailedError(error);
+    }
 
     return { runId };
+  }
+
+  /**
+   * The worker's half: runs a requested replay to its end. Fenced by the lock holder, so a
+   * redelivered or duplicate request for a run that no longer holds the lock does nothing.
+   */
+  async executeReplay(run: ProjectionReplayRun): Promise<void> {
+    const lockHolder = await this.repo.getLockHolder();
+    const status = await this.repo.getStatus();
+    const holdsRun = lockHolder.kind === "held" && lockHolder.runId === run.runId;
+    if (!holdsRun || status.state !== "running" || status.runId !== run.runId) {
+      logger.warn(
+        { runId: run.runId },
+        "Skipping replay execution: the run no longer holds the lock",
+      );
+      return;
+    }
+
+    try {
+      await this.runReplay(run);
+    } catch (err) {
+      logger.error({ error: err, runId: run.runId }, "Unexpected replay orchestration error");
+    }
   }
 
   async cancelReplay(): Promise<{ cancelled: boolean }> {
@@ -139,16 +193,7 @@ export class ReplayService {
     return { cancelled: true };
   }
 
-  private async executeReplay(params: {
-    runId: string;
-    projectionNames: string[];
-    since: string;
-    tenantIds: string[];
-    aggregateIds?: string[];
-    fullRebuild?: boolean;
-    description: string;
-    userName: string;
-  }): Promise<void> {
+  private async runReplay(params: ProjectionReplayRun): Promise<void> {
     let runtime;
     try {
       runtime = this.runtimeFactory.create();
@@ -216,7 +261,7 @@ export class ReplayService {
     params,
     err,
   }: {
-    params: Parameters<ReplayService["executeReplay"]>[0];
+    params: ProjectionReplayRun;
     err: unknown;
   }): Promise<void> {
     // A run that has lost the lock owns nothing: finalizing would overwrite the successor's

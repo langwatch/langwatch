@@ -137,6 +137,7 @@ import { SsoConnectionHistoryService } from "../services/sso-connection-history.
 import { SsoConnectionRoutingService } from "../services/sso-connection-routing.service.ts";
 import type { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
+import { SsoDomainOwnershipBackfillService } from "../services/sso-domain-ownership-backfill.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
 import { SsoEngineProviderService } from "../services/sso-engine-provider.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
@@ -159,6 +160,7 @@ import {
 } from "../services/sso-test-arrival.service.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationService } from "../services/system-migration-identity-secret-heal.service.ts";
+import { SsoDomainOwnershipMigrationService } from "../services/system-migration-sso-domain-ownership.service.ts";
 import { TwoStepAccountService } from "../services/two-step-account.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
 import {
@@ -202,6 +204,7 @@ type IdentityAppParts = {
   newbornSweep: IdentityNewbornReconciliationService;
   backfill: IdentityBackfillService;
   secrets: IdentitySecretCarryService;
+  ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService;
   joinRequestGuards: JoinRequestGuardsService;
   ssoConnections: SsoConnectionService | null;
   ssoConnectionGuards: SsoConnectionGuardsService;
@@ -719,6 +722,9 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       newbornSweep,
       backfill,
       secrets,
+      ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService.create(
+        setup.repositories.ssoDomainOwnership,
+      ),
       joinRequestGuards,
       ssoConnections,
       ssoConnectionGuards,
@@ -981,6 +987,10 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       IdentityIdentifierBackfillMigrationService.create(this.#parts.backfill),
       IdentitySecretHealMigrationService.create(this.#parts.secrets),
     ] as const;
+  }
+
+  registeredMigrations(): readonly SystemMigration[] {
+    return [SsoDomainOwnershipMigrationService.create(this.#parts.ssoDomainOwnershipBackfill)];
   }
 
   joinRequestGuards(): JoinRequestGuardsService {

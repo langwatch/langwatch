@@ -67,6 +67,8 @@ function serviceWith({
     privateDataplaneOrganizationIds: () => privateDataplaneOrganizationIds,
     audit,
     runPass: vi.fn(),
+    requestPass: vi.fn(),
+    hasTenantAwaitingRedrive: vi.fn(),
     runTargetedPass: vi.fn(),
   });
   return { service, findCohortEligibleOrganizations, createMany, audit };

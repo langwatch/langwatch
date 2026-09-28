@@ -24,14 +24,9 @@ export type EventingClickHouseClientResolver = (
   tenantId: string,
 ) => Promise<EventingClickHouseClient>;
 
-/** One row of a streamed `JSONEachRow` result set. */
-export interface EventingClickHouseRow {
-  json<Row>(): Row;
-}
-
 /** A `JSONEachRow` result consumed batch-by-batch rather than materialized. */
 export interface EventingClickHouseStreamingQueryResult extends EventingClickHouseQueryResult {
-  stream(): AsyncIterable<EventingClickHouseRow[]>;
+  stream<Row>(): AsyncIterable<Row[]>;
 }
 
 /**

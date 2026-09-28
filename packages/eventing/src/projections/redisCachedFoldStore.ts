@@ -96,6 +96,11 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     this.updatedAtOf = options.updatedAtOf ?? readUpdatedAt;
   }
 
+  /** The durable store behind the cache, which a replay writes directly (ARCHITECTURE §9). */
+  durableTier(): FoldProjectionStore<State> {
+    return this.inner;
+  }
+
   async get(aggregateId: string, context: ProjectionStoreContext): Promise<FoldStateRead<State>> {
     const { state } = await this.getWithApplied(aggregateId, context);
     return state === null ? { kind: "empty" } : { kind: "folded", state };

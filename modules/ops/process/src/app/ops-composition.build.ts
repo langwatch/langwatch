@@ -1,7 +1,18 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { EventSourcing, ProcessStore } from "@langwatch/eventing";
+import {
+  type EventSourcing,
+  type ProcessStore,
+  ReplayService as EventingReplayService,
+  replayLeanOf,
+  replayProjectionsOf,
+} from "@langwatch/eventing";
+import {
+  EventingClickHouseReplayEventSource,
+  type EventingClickHouseReplayClient,
+  type EventingClickHouseStreamingQueryResult,
+} from "@langwatch/eventing/server";
 /**
  * Builds the {@link OpsAppInfrastructure} `apps/api/src/features/ops/ops.composition.ts`
  * (deleted by b383462d96) used to hand-compose. Answers each api-unavailable
@@ -10,7 +21,6 @@ import type { EventSourcing, ProcessStore } from "@langwatch/eventing";
 import type { ResourceOwnership } from "@langwatch/kernel";
 import type { Logger } from "@langwatch/observability";
 import {
-  OpsCapabilityUnavailableError,
   type OpsServerConfig,
   type OpsBlockedSummary,
   type OpsParkedTenantsPage,
@@ -47,6 +57,7 @@ import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly
 import { BlobStoreRedisRepository } from "../repositories/redis/redis.blob-store.repository.ts";
 import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metrics.repository.ts";
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
+import { ReplayRedisRepository } from "../repositories/redis/redis.replay.repository.ts";
 import {
   type AdminAccess,
   AdminAccessService,
@@ -66,11 +77,13 @@ import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.servi
 import { OpsService } from "../services/ops.service.ts";
 import { QueueAuditService } from "../services/queue-audit.service.ts";
 import { QueueService } from "../services/queue.service.ts";
+import { ReplayService } from "../services/replay.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import type {
   StorageStatsClickHouseClient,
   StorageStatsInstance,
 } from "../services/storage-stats-collection.service.ts";
+import { buildSystemMigrations } from "./ops-system-migrations-composition.build.ts";
 import type {
   OpsExplorers,
   QueuePayloadDecoder,
@@ -79,8 +92,8 @@ import type {
   OpsCapability,
   OpsEventExplorer,
   OpsProcessExplorer,
-  OpsReplayRunner,
-  OpsSystemMigrationRunner,
+  OpsReplayRuntime,
+  OpsReplayRuntimeFactory,
 } from "./ops.app.ts";
 
 /** What `buildOpsInfrastructure` reads off the process's own members. */
@@ -102,36 +115,87 @@ export type OpsProcessMembers = Readonly<{
   processName: string;
 }>;
 
-/** The replay runner this process has none of, refused by name on every method. */
-class UnavailableReplayRunner implements OpsReplayRunner {
-  readonly #refusal = () => new OpsCapabilityUnavailableError("the projection replay runner");
+/**
+ * One replay run's engine over the pipelines this process registered: the event log through the
+ * routed member, markers on its own standalone Redis connection, so a rebuild shares no socket
+ * with live traffic. A Cluster refuses replay's multi-key operations (CROSSSLOT), as on main.
+ */
+class OpsReplayRuntimes implements OpsReplayRuntimeFactory {
+  constructor(
+    private readonly members: Pick<OpsProcessMembers, "redis" | "clickhouse" | "eventing">,
+  ) {}
 
-  getHistory = () => Promise.reject(this.#refusal());
-  findHistoryEntry = () => Promise.reject(this.#refusal());
-  startReplay = () => Promise.reject(this.#refusal());
-  getStatus = () => Promise.reject(this.#refusal());
-  cancelReplay = () => Promise.reject(this.#refusal());
+  create(): OpsReplayRuntime {
+    const { redis, clickhouse, eventing } = this.members;
+    if (redis.isCluster) {
+      throw new Error(
+        "Replay requires a standalone Redis: a Cluster refuses its multi-key operations.",
+      );
+    }
+    const connection = redis.duplicate();
+    const definitions = eventing.definitions;
+    const service = new EventingReplayService({
+      eventSource: new EventingClickHouseReplayEventSource({
+        resolveClient: (tenantId) =>
+          Promise.resolve(new RoutedReplayClickHouseClient({ clickhouse, tenantId })),
+        lean: replayLeanOf(definitions),
+      }),
+      redis: connection,
+    });
+    return {
+      service,
+      ...replayProjectionsOf(definitions),
+      close: async () => {
+        connection.disconnect();
+      },
+    };
+  }
 }
 
-/** The system migration runner this process has none of, refused by name on every method. */
-class UnavailableSystemMigrationRunner implements OpsSystemMigrationRunner {
-  readonly #refusal = () => new OpsCapabilityUnavailableError("the system migration runner");
+/** What replay's discovery across all tenants names in place of one; it reads the shared server. */
+const REPLAY_ALL_TENANTS = "default";
 
-  getOverview = () => Promise.reject(this.#refusal());
-  getEnrollments = () => Promise.reject(this.#refusal());
-  searchOrganizations = () => Promise.reject(this.#refusal());
-  requiresOperatorConfirmation = (): boolean => {
-    throw this.#refusal();
+/**
+ * Replay's reads over the routed member. The member answers whole result sets, so a batch's
+ * "stream" is its one materialized page; statements naming no tenant read the shared server.
+ */
+class RoutedReplayClickHouseClient implements EventingClickHouseReplayClient {
+  private readonly clickhouse: ClickHouseQueryClient;
+  private readonly tenantId: string;
+
+  constructor(input: { clickhouse: ClickHouseQueryClient; tenantId: string }) {
+    this.clickhouse = input.clickhouse;
+    this.tenantId = input.tenantId === REPLAY_ALL_TENANTS ? "" : input.tenantId;
+  }
+
+  query = (request: {
+    query: string;
+    query_params?: Record<string, unknown>;
+    format: "JSONEachRow";
+    unscoped?: { reason: string };
+  }): Promise<EventingClickHouseStreamingQueryResult> => {
+    const statement = {
+      tenantId: this.tenantId,
+      sql: request.query,
+      ...(request.query_params ? { params: request.query_params } : {}),
+      ...(request.unscoped ? { unscoped: request.unscoped } : {}),
+    };
+    const rowsOf = <Row>() => this.clickhouse.query<Row>(statement).then((result) => result.rows);
+    return Promise.resolve({ json: rowsOf, stream: <Row>() => oneBatch(rowsOf<Row>()) });
   };
-  enroll = () => Promise.reject(this.#refusal());
-  enrollCohort = () => Promise.reject(this.#refusal());
-  withdraw = () => Promise.reject(this.#refusal());
-  runForOrganization = () => Promise.reject(this.#refusal());
-  startPass = (): void => {
-    throw this.#refusal();
-  };
-  assertLegacyWritersDrained = () => Promise.reject(this.#refusal());
-  rollBack = () => Promise.reject(this.#refusal());
+
+  async command(request: { query: string; query_params?: Record<string, unknown> }): Promise<void> {
+    await this.clickhouse.command({
+      tenantId: this.tenantId,
+      sql: request.query,
+      ...(request.query_params ? { params: request.query_params } : {}),
+      unscoped: { reason: "Replay's post-rebuild OPTIMIZE TABLE names a table, not a tenant." },
+    });
+  }
+}
+
+async function* oneBatch<Row>(rows: Promise<Row[]>): AsyncIterable<Row[]> {
+  yield await rows;
 }
 
 /** The writer's queue reads over the queue service alone, for a process with no Postgres. */
@@ -315,9 +379,12 @@ export function buildOpsInfrastructure(input: {
             }),
             introspection,
           }) satisfies OpsProcessExplorer,
-          // Unconditional: no replay runtime exists in the tree for the api
-          // role to compose, whatever this deployment is configured with.
-          replay: new UnavailableReplayRunner(),
+          // Every role reads, cancels and starts; only the worker hosting
+          // `ops_projection_replay` builds a runtime and executes.
+          replay: ReplayService.create({
+            repo: ReplayRedisRepository.create({ redis: members.redis }),
+            runtimeFactory: new OpsReplayRuntimes(members),
+          }),
           // Read-only here: the worker holds the lease and writes the
           // artifact; a second writer would publish a second answer.
           snapshots,
@@ -333,7 +400,14 @@ export function buildOpsInfrastructure(input: {
       read: () => ({ searchLookbackDays: 7, hotTierDays: null, hotTierEnvVar: null }),
     },
     grafana: { findLinkConfig: () => null },
-    systemMigrations: new UnavailableSystemMigrationRunner(),
+    createSystemMigrations: ({ dependencies, passRequests }) =>
+      buildSystemMigrations({
+        database: members.prisma,
+        redis: members.redis,
+        isSaaS: () => members.isSaas,
+        dependencies,
+        passRequests,
+      }),
     // The bug-report intake's own flood bound and best-effort alert. This
     // process has neither a dedicated limiter nor a notifier of its own for
     // this endpoint yet, so it allows and answers silently rather than
