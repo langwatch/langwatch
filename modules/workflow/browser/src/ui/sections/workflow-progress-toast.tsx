@@ -69,13 +69,8 @@ export function BaseProgressToast({
       right="3"
       zIndex={100}
       width="fit-content"
-      background="bg"
       padding={1}
-      borderRadius="md"
-      border="1px solid"
-      borderColor="border"
       onClick={onClick}
-      color="fg"
     >
       <VStack align="start" gap={1}>
         <VStack align="start" gap={1} paddingY={2} paddingX={3}>
@@ -84,7 +79,7 @@ export function BaseProgressToast({
             <Alert.Title>Please wait...</Alert.Title>
           </HStack>
           <HStack minWidth="300px">
-            <Alert.Description fontSize="14px">{description}</Alert.Description>
+            <Alert.Description>{description}</Alert.Description>
             <Spacer />
             <Button
               size="sm"

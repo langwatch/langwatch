@@ -415,12 +415,7 @@ function EvaluationsContent() {
   return (
     <AnalyticsLayout title="Online Evaluations" railEntry="evaluations">
       {checks.data && checks.data?.length === 0 && (
-        <Alert.Root
-          colorPalette="warning"
-          borderStartWidth="4px"
-          borderStartColor="colorPalette.solid"
-          marginBottom={6}
-        >
+        <Alert.Root status="warning" variant="surface" marginBottom={6}>
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Title>No online evaluations yet</Alert.Title>
@@ -433,7 +428,7 @@ function EvaluationsContent() {
         </Alert.Root>
       )}
       {selectedEvaluation && (
-        <Alert.Root colorPalette="blue" marginBottom={6}>
+        <Alert.Root status="info" marginBottom={6}>
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Title>{selectedEvaluation.name}</Alert.Title>

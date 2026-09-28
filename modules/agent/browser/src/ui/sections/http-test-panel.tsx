@@ -108,7 +108,7 @@ export function HttpTestPanel({
           </Alert.Indicator>
           <Alert.Content>
             <Alert.Title>Invalid JSON in body template</Alert.Title>
-            <Alert.Description fontFamily="mono" fontSize="sm">
+            <Alert.Description fontFamily="mono">
               {bodyValidation.error /* no-raw-error-toast-ok */}
             </Alert.Description>
           </Alert.Content>

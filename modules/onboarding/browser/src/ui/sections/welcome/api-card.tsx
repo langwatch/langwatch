@@ -83,13 +83,7 @@ const APICard: React.FC = () => {
       )}
       <Box mt={1}>
         {hasFirstMessage ? (
-          <Alert.Root
-            size="sm"
-            borderStartWidth="3px"
-            borderStartColor="green.500"
-            colorPalette="green"
-            title="Integration configured"
-          >
+          <Alert.Root status="success" variant="surface" size="sm" title="Integration configured">
             <Alert.Indicator>
               <LuCheckCheck size={16} />
             </Alert.Indicator>
@@ -97,9 +91,8 @@ const APICard: React.FC = () => {
           </Alert.Root>
         ) : (
           <Alert.Root
+            variant="surface"
             size="sm"
-            borderStartWidth="3px"
-            borderStartColor="orange.400"
             colorPalette="orange"
             title="Waiting for first trace..."
           >
@@ -113,7 +106,7 @@ const APICard: React.FC = () => {
       <Separator marginY={4} />
       <ObservabilityCard />
       {hasFirstMessage ? (
-        <Alert.Root colorPalette="orange" borderRadius="md">
+        <Alert.Root colorPalette="orange">
           <Alert.Indicator />
           <Alert.Title>
             Ready to go deeper? Set up
@@ -131,7 +124,7 @@ const APICard: React.FC = () => {
           </Alert.Title>
         </Alert.Root>
       ) : (
-        <Alert.Root colorPalette="orange" borderRadius="md">
+        <Alert.Root colorPalette="orange">
           <Alert.Indicator />
           <Alert.Title>
             Pick a guide above, or check our

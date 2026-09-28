@@ -11,7 +11,7 @@ export function ErrorMessage({ error }: ErrorMessageProps) {
   const description = error.type === "unknown" ? UNKNOWN_FAILURE : describeLLMError(error.type);
 
   return (
-    <Alert.Root status="error" borderRadius="md">
+    <Alert.Root status="error">
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description>

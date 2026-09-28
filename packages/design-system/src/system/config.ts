@@ -6,7 +6,9 @@
 import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
 
 import { colorSystem } from "../color-mode/index.tsx";
+import { alertSlotRecipe } from "./alert.recipe.ts";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
+import { statusHairline } from "./status-hairline.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
 // globals.scss. This file names the families, it does not fetch them.
@@ -15,14 +17,6 @@ const interFontFamily = "'Inter', sans-serif";
 /** The face the product's small technical lines are set in. */
 const monoFontFamily =
   '"JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace';
-
-/**
- * A restrained hairline in the status colour, mixed into the neutral border
- * rather than drawn on top — same formula as the Langy card's `accentBorder`
- * (`features/asaplangy/tokens.ts`), for a tone without a coloured ring.
- */
-const statusHairline = (color: string) =>
-  `color-mix(in srgb, var(--chakra-colors-${color}) 26%, var(--chakra-colors-border-muted))`;
 
 /**
  * The card material a toast wears in dark mode — same panel + hairline pair
@@ -1232,14 +1226,7 @@ export const designSystemConfig = defineConfig({
           },
         },
       }),
-      alert: defineSlotRecipe({
-        slots: ["root"],
-        base: {
-          root: {
-            borderRadius: "lg",
-          },
-        },
-      }),
+      alert: alertSlotRecipe,
       radioGroup: defineSlotRecipe({
         slots: ["itemControl"],
         base: {

@@ -126,7 +126,7 @@ export function SecretsIndicator({ projectId, onInsertSecret }: SecretsIndicator
 
             {/* Usage hint */}
             <Box padding={2} borderTopWidth="1px">
-              <Alert.Root status="info" size="sm" borderRadius="md">
+              <Alert.Root status="info" size="sm">
                 <Alert.Indicator />
                 <Alert.Content>
                   <Text fontSize="xs">

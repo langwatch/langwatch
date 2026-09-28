@@ -200,12 +200,12 @@ export function CredentialSignInForm({
         {submitError ? (
           <Alert.Root
             status="error"
+            variant="outline"
             borderStartWidth="4px"
             borderStartColor={"frontDoor.danger"}
-            color={"frontDoor.danger"}
           >
             <Alert.Content>
-              <Alert.Description data-testid="signin-failure">
+              <Alert.Description data-testid="signin-failure" color={"frontDoor.danger"}>
                 {submitError}
                 {secondsToWait !== null ? (
                   <>

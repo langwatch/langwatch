@@ -1,6 +1,6 @@
 /** Inline error alert; says failure using host's explanation or generic fallback. */
 
-import { Box, HStack, List, Stack, Text } from "@chakra-ui/react";
+import { Alert, List, Text } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";
 
 import { explainErrorCode } from "../../model/error-presentation.ts";
@@ -9,13 +9,6 @@ import {
   readErrorTraceId,
   readHandledError,
 } from "../../model/read-handled-error.ts";
-
-/**
- * The same restrained hairline the toast wears — the tone lives in the border
- * and the icon, never in a filled wash.
- */
-const HAIRLINE =
-  "color-mix(in srgb, var(--chakra-colors-red-solid) 26%, var(--chakra-colors-border-muted))";
 
 /** Copy for a failure with no handled payload at all. See ADR-045. */
 const UNKNOWN_TITLE = "Something went wrong";
@@ -61,52 +54,35 @@ export function HandledErrorAlert({
   const traceId = readErrorTraceId(error);
 
   return (
-    <Box
-      role="alert"
-      className={className}
-      borderWidth="1px"
-      borderColor={HAIRLINE}
-      borderRadius="12px"
-      bg="bg.surface"
-      _dark={{ bg: "bg.panel" }}
-      paddingX="14px"
-      paddingY="12px"
-    >
-      <HStack gap="2.5" alignItems="flex-start">
-        <Box color="red.fg" display="flex" flexShrink={0} marginTop="1px">
-          <AlertCircle size={15} aria-hidden="true" />
-        </Box>
+    <Alert.Root status="error" role="alert" className={className}>
+      <Alert.Indicator>
+        <AlertCircle aria-hidden="true" />
+      </Alert.Indicator>
+      <Alert.Content>
+        <Alert.Title>{headline}</Alert.Title>
+        <Alert.Description>{description}</Alert.Description>
 
-        <Stack gap="0.5" flex="1" minWidth={0}>
-          <Text fontSize="13.5px" fontWeight="640" lineHeight="1.35" letterSpacing="-0.005em">
-            {headline}
-          </Text>
-          <Text fontSize="13px" lineHeight="1.5" color="fg.muted">
-            {description}
-          </Text>
-
-          {showAllTips && tips.length > 0 && (
-            <List.Root gap={0.5} marginTop={1.5} fontSize="12.5px" color="fg.muted" paddingLeft={4}>
-              {/* Index key: tips are server-supplied prose, so two can be
+        {showAllTips && tips.length > 0 && (
+          <List.Root gap={0.5} marginTop={1} textStyle="xs" color="fg.muted" paddingLeft={4}>
+            {/* Index key: tips are server-supplied prose, so two can be
                   identical and collide as keys. Their order is fixed. */}
-              {tips.map((tip, index) => (
-                <List.Item key={index}>{tip}</List.Item>
-              ))}
-            </List.Root>
-          )}
-          {!showAllTips && tips[0] && (
-            <Text fontSize="12.5px" marginTop={1} color="fg.muted">
-              {tips[0]}
-            </Text>
-          )}
+            {tips.map((tip, index) => (
+              <List.Item key={index}>{tip}</List.Item>
+            ))}
+          </List.Root>
+        )}
+        {!showAllTips && tips[0] && (
+          <Text textStyle="xs" color="fg.muted">
+            {tips[0]}
+          </Text>
+        )}
 
-          {traceId ? (
-            <Text fontSize="11.5px" marginTop={1} color="fg.subtle">
-              Error id {traceId}
-            </Text>
-          ) : null}
-        </Stack>
-      </HStack>
-    </Box>
+        {traceId ? (
+          <Text textStyle="xs" color="fg.subtle">
+            Error id {traceId}
+          </Text>
+        ) : null}
+      </Alert.Content>
+    </Alert.Root>
   );
 }

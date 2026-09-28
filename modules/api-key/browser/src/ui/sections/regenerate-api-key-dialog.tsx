@@ -37,7 +37,7 @@ export function RegenerateApiKeyDialog({
                 This will invalidate your current API key immediately. Any applications or services
                 using the old key will stop working.
               </Text>
-              <Alert.Root status="error" borderRadius="md">
+              <Alert.Root status="error">
                 <Alert.Indicator />
                 <Alert.Content>
                   <Alert.Title>This action cannot be undone</Alert.Title>

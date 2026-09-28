@@ -326,9 +326,9 @@ export function TokenCreatedDialog({
             </VStack>
 
             {/* ── Amber warning ── */}
-            <Alert.Root status="warning" variant="subtle" opacity={0.8}>
+            <Alert.Root status="warning" size="sm">
               <Alert.Indicator />
-              <Alert.Title fontSize="xs">
+              <Alert.Title>
                 Copy this token now. You won&apos;t be able to see it again.
               </Alert.Title>
             </Alert.Root>

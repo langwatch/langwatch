@@ -55,10 +55,10 @@ function SharedTraceView() {
     >
       {shared?.isSpanDetailTruncated && (
         <Box paddingX={4} paddingTop={3}>
-          <Alert.Root status="info" size="sm" variant="subtle" width="full">
+          <Alert.Root status="info" width="full">
             <Alert.Indicator />
             <Alert.Content>
-              <Alert.Description fontSize="sm">
+              <Alert.Description>
                 This is a large trace. The timeline below is complete, but step-by-step detail is
                 only shown for the first {shared.spansFull.length.toLocaleString()} steps.
               </Alert.Description>

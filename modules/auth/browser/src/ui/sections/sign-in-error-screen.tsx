@@ -241,7 +241,7 @@ export function SignInError({ error: rawError }: { error: string }) {
           <Alert.Root status={error === "OAuthAccountNotLinked" ? "warning" : "error"}>
             <Alert.Indicator />
             <Alert.Content gap={4}>
-              <Alert.Title fontWeight="bold">{errorTitle(error)}</Alert.Title>
+              <Alert.Title>{errorTitle(error)}</Alert.Title>
               <SignInErrorDescription error={error} callbackUrl={callbackUrl} />
             </Alert.Content>
           </Alert.Root>
