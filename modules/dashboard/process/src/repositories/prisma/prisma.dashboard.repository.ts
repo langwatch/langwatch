@@ -1,6 +1,7 @@
 import { chartGridBottomRow } from "@langwatch/analytics-contract/chart-grid";
 import {
   dashboardSchema,
+  DEFAULT_DASHBOARD_VISIBILITY,
   graphFiltersSchema,
   graphPayloadSchema,
   graphSchema,
@@ -8,6 +9,7 @@ import {
   savedWorkbenchChartSchema,
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartNotFoundError,
+  type DashboardVisibility,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
   type DashboardUsageCount,
@@ -189,10 +191,15 @@ export class PrismaDashboardRepository
     name: string;
     order: number;
     createdById?: string | null;
+    visibility?: DashboardVisibility;
   }): Promise<DashboardRecord> {
     return dashboardRow(
       await this.prisma.dashboard.create({
-        data: { ...input, createdById: input.createdById ?? null },
+        data: {
+          ...input,
+          createdById: input.createdById ?? null,
+          visibility: input.visibility ?? DEFAULT_DASHBOARD_VISIBILITY,
+        },
       }),
     );
   }

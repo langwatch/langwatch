@@ -13,6 +13,7 @@ import {
   DashboardReorderUnknownIdsError,
   dashboardDetailsUpdateSchema,
   dashboardVisibilitySchema,
+  DEFAULT_DASHBOARD_VISIBILITY,
   GRAPH_KSUID_RESOURCE,
   graphCreateInputSchema,
   graphIdSchema,
@@ -115,18 +116,28 @@ export class DashboardService {
     projectId: string;
     name: string;
     createdById?: string;
+    visibility?: DashboardVisibility;
   }): Promise<Dashboard> {
     const { createdById, ...fields } = input;
     const parsed = dashboardCreateInputSchema.parse(fields);
+    const visibility = parsed.visibility ?? DEFAULT_DASHBOARD_VISIBILITY;
+    const id = generate(DASHBOARD_KSUID_RESOURCE).toString();
+
+    // A private or team board needs someone to belong to; a project
+    // credential (API key, REST) has no member to claim it for.
+    if (visibility !== "organisation" && createdById === undefined) {
+      throw new DashboardOwnerOnlyError(id);
+    }
 
     const last = await this.#repository.findLastDashboard({ projectId: parsed.projectId });
 
     return this.#repository.createDashboard({
-      id: generate(DASHBOARD_KSUID_RESOURCE).toString(),
+      id,
       projectId: parsed.projectId,
       name: parsed.name,
       order: (last?.order ?? -1) + 1,
       createdById: createdById ?? null,
+      visibility,
     });
   }
 

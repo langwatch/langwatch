@@ -35,7 +35,12 @@ export const dashboardTrpcTransport = defineTrpcRouter(DashboardApi, dashboardTr
   .procedure("create")
   .withPermission("analytics:create")
   .handle(async ({ app, input, actor }) =>
-    app.create({ projectId: input.projectId, name: input.name, createdById: actor.id }),
+    app.create({
+      projectId: input.projectId,
+      name: input.name,
+      createdById: actor.id,
+      ...(input.visibility === undefined ? {} : { visibility: input.visibility }),
+    }),
   )
 
   .procedure("rename")

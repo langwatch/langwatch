@@ -6,6 +6,7 @@ import {
   savedWorkbenchChartSchema,
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartNotFoundError,
+  type DashboardVisibility,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
   type DashboardUsageCount,
@@ -124,11 +125,12 @@ export class MemoryDashboardRepository implements DashboardRepository {
     name: string;
     order: number;
     createdById?: string | null;
+    visibility?: DashboardVisibility;
   }): Promise<DashboardRecord> {
     const dashboard = dashboardSchema.parse({
       ...input,
       description: null,
-      visibility: DEFAULT_DASHBOARD_VISIBILITY,
+      visibility: input.visibility ?? DEFAULT_DASHBOARD_VISIBILITY,
       createdById: input.createdById ?? null,
       createdAt: this.#now(),
       updatedAt: this.#now(),

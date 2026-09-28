@@ -36,6 +36,8 @@ export const dashboardCreateInputSchema = z
   .object({
     projectId: projectIdSchema,
     name: dashboardNameSchema,
+    /** Absent keeps today's behaviour: organisation-wide. */
+    visibility: dashboardVisibilitySchema.optional(),
   })
   .strict();
 
