@@ -1,0 +1,59 @@
+---
+title: Dashboards
+description: Build custom boards of charts over your LangWatch data, or use the built-in Agent Flight Deck for an at-a-glance view of your project.
+---
+
+## Turn on Dashboards
+
+Dashboards is a product in the product switcher at the top left of LangWatch.
+It sits behind the `release_dashboards` feature flag, which is off by default.
+
+## The sidebar
+
+The sidebar has a quick search box and the list of saved boards, grouped into
+Mine, Team and Organisation. The **+** button creates a new board.
+
+## Agent Flight Deck
+
+Agent Flight Deck is the built-in default board. It is read-only, and gives a
+project-wide view across ten panels:
+
+- Status
+- Throughput, latency and errors
+- Cost efficiency
+- Failure intelligence
+- Scenario results
+- Quality signal
+- User feedback
+- Gateway routing
+- Your coding agents
+- Most impactful traces
+
+If a panel's data source is not connected yet, it shows a call to action that
+links to where you set it up.
+
+## Period and grain
+
+Every board has a period, from one hour to one year, defaulting to 30 days,
+and a grain: auto, hour, day or week.
+
+## Building your own board
+
+On a board you own, you can rename it, add a description, and add blocks from
+the Blocks list. Move and resize blocks on the grid, and use each block's menu
+for further options.
+
+A board's visibility is Only me, Team or Organisation. Only the board's
+creator or a project admin can change its visibility or delete it.
+
+## Asking questions
+
+The question picker lists suggested questions. Picking one sends a detailed
+prompt to Langy, with the board as context. Langy answers in its own panel. No
+block is added to the board. There is also an ask bar at the top of every board for asking Langy
+about that board directly. Both need Langy to be enabled for your project.
+
+## How the data is read
+
+All board data is read with LangWatchQL, LangWatch's query layer over your
+traces, evaluations and cost data.
