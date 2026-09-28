@@ -25,10 +25,10 @@ import type { ExperimentRunStreamMessage } from "../../channels/experiment-run-e
 import type { ExperimentRunProcessingPipeline } from "../../eventing/experiment-run-processing.pipeline.ts";
 import { experimentServer } from "../../experiment.server.ts";
 import type { ExperimentIdLookupRepository } from "../../repositories/experiment-id-lookup.repository.ts";
-import type {
-  ExperimentRunProgressRepository,
-  ExperimentRunProgressState,
-} from "../../repositories/experiment-run-progress.repository.ts";
+import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
+import type { ExperimentRunProgressRepository } from "../../repositories/experiment-run-progress.repository.ts";
+import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment-run-abort.repository.ts";
+import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
 import type { ExperimentWorkflowDsl } from "../../services/experiment-execution-data.service.ts";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
@@ -97,45 +97,68 @@ const storedRun: ExperimentRun = {
 
 type Harness = {
   experiments?: Partial<ExperimentService>;
+  /** The old loop's progress store; only its presence opens the gate, and it is never read. */
   progress?: Partial<ExperimentRunProgressRepository> | null;
   ports?: ExperimentRunCollaborators | null;
   /** What the run pipeline's worker publishes on the run's channel once a start is sent. */
   worker?: (start: { runId: string }) => ExperimentRunStreamMessage[];
+  /** Runs the progress fold already holds. */
+  folded?: ExperimentRunProgressState[];
 };
 
-/** The run pipeline as the api process holds it: its senders, and the channel of its frames. */
+/** The run pipeline as the api process holds it: its senders, folds, stop signal and channel. */
 function runPipeline(worker: NonNullable<Harness["worker"]>) {
   const stream = experimentRunEventStreamChannels.memory.create();
   const commands = ExperimentRunCommandDispatcherService.create();
-  const starts: unknown[] = [];
+  const sent: { starts: unknown[]; completions: unknown[]; aborts: unknown[] } = {
+    starts: [],
+    completions: [],
+    aborts: [],
+  };
   commands.connect({
     startExperimentRun: {
       send: async (start: { runId: string }) => {
-        starts.push(start);
+        sent.starts.push(start);
         for (const message of worker(start))
           await stream.publish({ runId: start.runId, ...message });
       },
     },
+    completeExperimentRun: {
+      send: async (completion: unknown) => sent.completions.push(completion),
+    },
+    abortExperimentRun: { send: async (abort: unknown) => sent.aborts.push(abort) },
   });
+  const folds = MemoryExperimentRunFoldRepository.create();
+  const abort = MemoryExperimentRunAbortRepository.create();
   return {
-    starts,
+    sent,
+    folds,
+    abort,
     runProcessing: {
       pipeline: createApiFixture<ExperimentRunProcessingPipeline>({}, "pipeline"),
       commands,
       idLookup: createApiFixture<ExperimentIdLookupRepository>({}, "idLookup"),
       stream,
+      folds,
+      abort,
+      publicBaseUrl: "https://app.test",
     },
   };
 }
 
-function harness({ experiments = {}, progress = null, ports = null, worker }: Harness = {}) {
-  const pipeline = worker ? runPipeline(worker) : undefined;
+async function harness({
+  experiments = {},
+  progress = null,
+  ports = null,
+  worker = () => [],
+  folded = [],
+}: Harness = {}) {
+  const pipeline = runPipeline(worker);
+  for (const state of folded) await pipeline.folds.writeProgress({ state });
   const experimentService = createApiFixture<ExperimentService>(experiments, "ExperimentService");
-  const startRun = vi.fn(async () => ({
-    runId: "run-9",
-    runUrl: "https://app.test/run-9",
-    total: 1,
-  }));
+  const startRun = vi.fn(async () => {
+    throw new Error("the old run loop is unwired");
+  });
   const runLoop: ExperimentV3RunLoop = {
     ports,
     progress:
@@ -170,7 +193,7 @@ function harness({ experiments = {}, progress = null, ports = null, worker }: Ha
     runLoop,
     workbenchObserver: { recordExperimentRan: vi.fn(), reportError: vi.fn() },
     workflowEvaluations: createApiFixture<WorkflowEvaluationService>({}, "workflowEvaluations"),
-    ...(pipeline ? { runProcessing: pipeline.runProcessing } : {}),
+    runProcessing: pipeline.runProcessing,
   };
   const app = ExperimentApp.createForTesting(dependencies);
 
@@ -235,7 +258,8 @@ function harness({ experiments = {}, progress = null, ports = null, worker }: Ha
 
   return {
     startRun,
-    starts: pipeline?.starts ?? [],
+    ...pipeline.sent,
+    abort: pipeline.abort,
     request: (path: string, init?: RequestInit) =>
       keyed.fetch(new Request(`http://api.test/api/experiments${path}`, init)),
     mounted: (path: string) =>
@@ -245,6 +269,14 @@ function harness({ experiments = {}, progress = null, ports = null, worker }: Ha
     execute: (body: unknown) => browser.fetch(executeRequest("/api/experiments", body)),
     legacyExecute: (body: unknown) =>
       legacyBrowser.fetch(executeRequest("/api/evaluations/v3", body)),
+    abortRun: (body: unknown) =>
+      browser.fetch(
+        new Request("http://api.test/api/experiments/abort", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+      ),
   };
 }
 
@@ -277,6 +309,50 @@ const eventStreamHeaders = (response: Response) => ({
   connection: response.headers.get("connection"),
 });
 
+/** A run as the progress fold holds it, main's poller JSON first. */
+const folded = (
+  overrides: Partial<ExperimentRunProgressState> & Pick<ExperimentRunProgressState, "status">,
+): ExperimentRunProgressState => ({
+  runId: "run-1",
+  projectId: PROJECT,
+  experimentId: "experiment-1",
+  experimentSlug: "checkout-eval",
+  progress: 1,
+  total: 2,
+  startedAt: 10,
+  recentEvents: [],
+  seq: 0,
+  failed: 0,
+  persistResults: false,
+  resultFrames: {},
+  planned: true,
+  phaseOneCells: 2,
+  evaluators: {},
+  finishedCells: "",
+  targetOutputs: {},
+  traceIds: {},
+  evaluatorScores: {},
+  CreatedAt: 0,
+  UpdatedAt: 0,
+  LastEventOccurredAt: 0,
+  ...overrides,
+});
+
+/** A run loop whose ownership rule refuses someone else's personal development agent. */
+const refusedOwnership = () =>
+  createApiFixture<ExperimentRunCollaborators>({
+    connectedAgentOwnership: {
+      assertConnectedAgentsRunnable: async () => {
+        throw new AgentOwnerOnlyError({
+          agentId: "agent-1",
+          agentName: "Laptop agent",
+          ownerUserId: "user-2",
+          ownerName: "Someone else",
+        });
+      },
+    },
+  });
+
 describe("POST /api/experiments/:slug/run", () => {
   const found = (state: Experiment["workbenchState"]) => ({
     findBySlugAndType: vi.fn(async () => savedExperiment(state)),
@@ -284,7 +360,7 @@ describe("POST /api/experiments/:slug/run", () => {
 
   describe("when no experiment answers to the slug", () => {
     it("answers 404 with the handled refusal", async () => {
-      const { request } = harness({ experiments: { findBySlugAndType: async () => null } });
+      const { request } = await harness({ experiments: { findBySlugAndType: async () => null } });
 
       const response = await request("/checkout-eval/run", runOf(""));
 
@@ -295,7 +371,7 @@ describe("POST /api/experiments/:slug/run", () => {
 
   describe("when the saved setup has no dataset", () => {
     it("refuses 400 as an invalid evaluation input", async () => {
-      const { request } = harness({ experiments: found(savedState([])) });
+      const { request } = await harness({ experiments: found(savedState([])) });
 
       const response = await request("/checkout-eval/run", runOf(""));
 
@@ -306,7 +382,7 @@ describe("POST /api/experiments/:slug/run", () => {
 
   describe("when the body is not JSON", () => {
     it("refuses 400 as an invalid evaluation input", async () => {
-      const { request } = harness({ experiments: found(savedState()) });
+      const { request } = await harness({ experiments: found(savedState()) });
 
       const response = await request("/checkout-eval/run", runOf("{not json"));
 
@@ -317,7 +393,7 @@ describe("POST /api/experiments/:slug/run", () => {
 
   describe("when the body fails the run inputs", () => {
     it("refuses 400 as an invalid evaluation input", async () => {
-      const { request } = harness({ experiments: found(savedState()) });
+      const { request } = await harness({ experiments: found(savedState()) });
 
       const response = await request("/checkout-eval/run", runOf('{"row_indices":"all"}'));
 
@@ -326,27 +402,76 @@ describe("POST /api/experiments/:slug/run", () => {
     });
   });
 
+  const runnable = createApiFixture<ExperimentRunCollaborators>({
+    connectedAgentOwnership: { assertConnectedAgentsRunnable: async () => {} },
+  });
+
   describe("when the caller asks for JSON", () => {
-    it("starts a polled run and answers its id", async () => {
-      const { request, startRun } = harness({ experiments: found(savedState()) });
+    /** @scenario "A polled saved run starts on the run's pipeline and answers at once" */
+    it("starts the run on its pipeline and answers main's body with its id, total and link", async () => {
+      const { request, starts, startRun } = await harness({
+        experiments: found(savedState()),
+        ports: runnable,
+        progress: {},
+      });
 
       const response = await request("/checkout-eval/run", runOf(""));
 
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toBe("application/json");
-      expect(await response.json()).toEqual({
-        runId: "run-9",
+      const body = await response.json();
+      expect(body).toEqual({
+        runId: expect.any(String),
         status: "running",
-        total: 1,
-        runUrl: "https://app.test/run-9",
+        total: 0,
+        runUrl: `https://app.test/acme/experiments/checkout-eval?runId=${body.runId}`,
       });
-      expect(startRun).toHaveBeenCalledTimes(1);
+      expect(starts).toMatchObject([
+        {
+          tenantId: PROJECT,
+          runId: body.runId,
+          experimentId: "experiment-1",
+          plan: {
+            origin: "saved",
+            persistResults: true,
+            actor: { userId: "user-1", label: "api" },
+            experimentSlug: "checkout-eval",
+            runUrl: body.runUrl,
+          },
+        },
+      ]);
+      expect(startRun).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A polled saved run against someone else's personal agent is stored failed" */
+    it("answers started, sends no start, and completes the run failed with the refusal", async () => {
+      const { request, starts, completions } = await harness({
+        experiments: found(savedState()),
+        ports: refusedOwnership(),
+        progress: {},
+      });
+
+      const response = await request("/checkout-eval/run", runOf(""));
+
+      expect(response.status).toBe(200);
+      const { runId } = await response.json();
+      expect(starts).toEqual([]);
+      expect(completions).toMatchObject([
+        { tenantId: PROJECT, runId, outcome: "failed", error: { code: "agent_owner_only" } },
+      ]);
+    });
+
+    it("refuses with the run-loop refusal where no run loop was composed", async () => {
+      const { request, starts } = await harness({ experiments: found(savedState()) });
+
+      expect((await request("/checkout-eval/run", runOf(""))).status).toBe(503);
+      expect(starts).toEqual([]);
     });
   });
 
   describe("when the caller asks for an event stream on a process with no run loop", () => {
     it("refuses with the run-loop refusal", async () => {
-      const { request } = harness({ experiments: found(savedState()) });
+      const { request } = await harness({ experiments: found(savedState()) });
 
       const response = await request("/checkout-eval/run", runOf("", "text/event-stream"));
 
@@ -355,11 +480,16 @@ describe("POST /api/experiments/:slug/run", () => {
   });
 
   describe("when the caller asks for an event stream", () => {
-    it("streams data frames under the framework's event-stream headers", async () => {
-      const { request, startRun } = harness({
+    /** @scenario "A streamed saved run starts on the run's pipeline and streams its frames" */
+    it("streams the run's frames under the framework's event-stream headers until done", async () => {
+      const { request, starts } = await harness({
         experiments: found(savedState()),
-        ports: createApiFixture<ExperimentRunCollaborators>(),
+        ports: runnable,
         progress: {},
+        worker: ({ runId }) => [
+          { seq: 1, frame: { type: "execution_started", runId, total: 0 } },
+          { seq: 2, frame: { type: "done", summary: doneSummary(runId) } },
+        ],
       });
 
       const response = await request("/checkout-eval/run", runOf("", "text/event-stream"));
@@ -370,15 +500,14 @@ describe("POST /api/experiments/:slug/run", () => {
         cacheControl: "no-cache, no-transform",
         connection: "keep-alive",
       });
-      expect(await framesOf(response)).toMatchInlineSnapshot(`
-        [
-          {
-            "message": "lw.unnamed_failure",
-            "type": "error",
-          },
-        ]
-      `);
-      expect(startRun).not.toHaveBeenCalled();
+      expect((await framesOf(response)).map((frame) => frame.type)).toEqual([
+        "execution_started",
+        "done",
+      ]);
+      expect(starts).toMatchObject([
+        { plan: { origin: "saved", persistResults: false, experimentSlug: "checkout-eval" } },
+      ]);
+      expect(starts).not.toMatchObject([{ plan: { runUrl: expect.any(String) } }]);
     });
   });
 });
@@ -387,7 +516,7 @@ describe("GET /api/experiments/runs", () => {
   describe("when the module mounts every experiments family", () => {
     /** @scenario "The run list is not answered as an experiment named runs" */
     it("answers the run list's own 400 rather than an experiment lookup", async () => {
-      const { mounted } = harness();
+      const { mounted } = await harness();
 
       const response = await mounted("/runs");
 
@@ -400,7 +529,7 @@ describe("GET /api/experiments/runs", () => {
 
   describe("when no experimentSlug is given", () => {
     it("answers 400 with main's flat body", async () => {
-      const { request } = harness();
+      const { request } = await harness();
 
       const response = await request("/runs");
 
@@ -418,7 +547,7 @@ describe("GET /api/experiments/runs", () => {
         runs: [storedRun],
         totalHits: 450,
       }));
-      const { request } = harness({ experiments: { getRunsPageBySlug } });
+      const { request } = await harness({ experiments: { getRunsPageBySlug } });
 
       const response = await request("/runs?experimentSlug=checkout-eval&pageSize=999&page=x");
 
@@ -440,7 +569,7 @@ describe("GET /api/experiments/runs", () => {
 
   describe("when the experiment does not exist", () => {
     it("answers 404 experiment_not_found", async () => {
-      const { request } = harness({
+      const { request } = await harness({
         experiments: {
           getRunsPageBySlug: async () => {
             throw new NotFoundError("experiment_not_found", "Experiment", "checkout-eval");
@@ -457,28 +586,27 @@ describe("GET /api/experiments/runs", () => {
 });
 
 describe("GET /api/experiments/runs/:runId", () => {
-  const state = (
-    overrides: Partial<ExperimentRunProgressState> & Pick<ExperimentRunProgressState, "status">,
-  ): ExperimentRunProgressState => ({
-    runId: "run-1",
-    projectId: PROJECT,
-    experimentId: "experiment-1",
-    experimentSlug: "checkout-eval",
-    progress: 1,
-    total: 2,
-    startedAt: 10,
-    ...overrides,
-  });
-
   it("refuses by name where no progress store was composed", async () => {
-    const { request } = harness();
+    const { request } = await harness();
 
     expect((await request("/runs/run-1")).status).toBe(503);
   });
 
+  /** @scenario "A poll answers main's poller body from the run's progress fold" */
+  it("answers 404 for a run the progress fold does not hold", async () => {
+    const { request } = await harness({ progress: {} });
+
+    const response = await request("/runs/run-1");
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ code: "run_not_found" });
+  });
+
+  /** @scenario "A poll answers main's poller body from the run's progress fold" */
   it("answers 404 for a run another project owns", async () => {
-    const { request } = harness({
-      progress: { findRunState: async () => state({ projectId: "other", status: "running" }) },
+    const { request } = await harness({
+      progress: {},
+      folded: [folded({ projectId: "other", status: "running" })],
     });
 
     const response = await request("/runs/run-1");
@@ -488,18 +616,21 @@ describe("GET /api/experiments/runs/:runId", () => {
   });
 
   it("answers 404 for a run whose experiment was archived", async () => {
-    const { request } = harness({
+    const { request } = await harness({
       experiments: { isActive: async () => false },
-      progress: { findRunState: async () => state({ status: "running" }) },
+      progress: {},
+      folded: [folded({ status: "running" })],
     });
 
     expect((await request("/runs/run-1")).status).toBe(404);
   });
 
+  /** @scenario "A poll answers main's poller body from the run's progress fold" */
   it("answers progress only while the run is going", async () => {
-    const { request } = harness({
+    const { request } = await harness({
       experiments: { isActive: async () => true },
-      progress: { findRunState: async () => state({ status: "running", finishedAt: 99 }) },
+      progress: {},
+      folded: [folded({ status: "running", finishedAt: 99 })],
     });
 
     expect(await (await request("/runs/run-1")).json()).toEqual({
@@ -511,13 +642,33 @@ describe("GET /api/experiments/runs/:runId", () => {
     });
   });
 
-  it("answers the failure's code and trace for a failed run", async () => {
-    const { request } = harness({
+  /** @scenario "A poll answers main's poller body from the run's progress fold" */
+  it("answers main's summary and the run's link once the run completed", async () => {
+    const summary = { ...doneSummary("run-1"), runUrl: "https://app.test/acme/run-1" };
+    const { request } = await harness({
       experiments: { isActive: async () => true },
-      progress: {
-        findRunState: async () =>
-          state({ status: "failed", finishedAt: 20, error: "boom_code", traceId: "trace-1" }),
-      },
+      progress: {},
+      folded: [folded({ status: "completed", finishedAt: 20, summary })],
+    });
+
+    expect(await (await request("/runs/run-1")).json()).toEqual({
+      runId: "run-1",
+      status: "completed",
+      progress: 1,
+      total: 2,
+      startedAt: 10,
+      finishedAt: 20,
+      summary,
+    });
+  });
+
+  it("answers the failure's code and trace for a failed run", async () => {
+    const { request } = await harness({
+      experiments: { isActive: async () => true },
+      progress: {},
+      folded: [
+        folded({ status: "failed", finishedAt: 20, error: "boom_code", traceId: "trace-1" }),
+      ],
     });
 
     expect(await (await request("/runs/run-1")).json()).toEqual({
@@ -533,11 +684,10 @@ describe("GET /api/experiments/runs/:runId", () => {
   });
 
   it("answers finishedAt without a summary for a stopped run", async () => {
-    const { request } = harness({
+    const { request } = await harness({
       experiments: { isActive: async () => true },
-      progress: {
-        findRunState: async () => state({ status: "stopped", finishedAt: 20 }),
-      },
+      progress: {},
+      folded: [folded({ status: "stopped", finishedAt: 20 })],
     });
 
     expect(await (await request("/runs/run-1")).json()).toEqual({
@@ -552,8 +702,8 @@ describe("GET /api/experiments/runs/:runId", () => {
 });
 
 describe("GET /api/experiments/runs/:runId/results", () => {
-  it("answers 404 when neither the cache nor the slug names an experiment", async () => {
-    const { request } = harness({ progress: { findRunState: async () => null } });
+  it("answers 404 when neither the fold nor the slug names an experiment", async () => {
+    const { request } = await harness({ progress: {} });
 
     const response = await request("/runs/run-1/results");
 
@@ -561,11 +711,11 @@ describe("GET /api/experiments/runs/:runId/results", () => {
     expect(await response.json()).toMatchObject({ code: "run_not_found" });
   });
 
-  it("resolves the experiment by slug for a run past the cache", async () => {
+  it("resolves the experiment by slug for a run past the fold", async () => {
     const findRun = vi.fn(async () => null);
-    const { request } = harness({
+    const { request } = await harness({
       experiments: { findIdBySlug: async () => ({ id: "experiment-1", slug: "s" }), findRun },
-      progress: { findRunState: async () => null },
+      progress: {},
     });
 
     const response = await request("/runs/run-1/results?experimentSlug=s");
@@ -576,6 +726,67 @@ describe("GET /api/experiments/runs/:runId/results", () => {
       experimentId: "experiment-1",
       runId: "run-1",
     });
+  });
+
+  it("reads the run's experiment from its progress fold", async () => {
+    const findRun = vi.fn(async () => ({
+      experimentId: "experiment-1",
+      runId: "run-1",
+      projectId: PROJECT,
+      dataset: [],
+      evaluations: [],
+      timestamps: { createdAt: 1, updatedAt: 2 },
+    }));
+    const { request } = await harness({
+      experiments: { isActive: async () => true, findRun },
+      progress: {},
+      folded: [folded({ status: "completed", finishedAt: 20 })],
+    });
+
+    expect((await request("/runs/run-1/results")).status).toBe(200);
+    expect(findRun).toHaveBeenCalledWith({
+      projectId: PROJECT,
+      experimentId: "experiment-1",
+      runId: "run-1",
+    });
+  });
+});
+
+describe("POST /api/experiments/abort", () => {
+  /** @scenario "Aborting a run reads its progress fold and refuses another project's run" */
+  it("answers 404 for a run another project owns, and stops nothing", async () => {
+    const { abortRun, abort, aborts } = await harness({
+      progress: {},
+      folded: [folded({ projectId: "other", status: "running" })],
+    });
+
+    const response = await abortRun({ projectId: PROJECT, runId: "run-1" });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ code: "run_not_found" });
+    expect(await abort.isAborted("run-1")).toBe(false);
+    expect(aborts).toEqual([]);
+  });
+
+  /** @scenario "Aborting a run reads its progress fold and refuses another project's run" */
+  it("sets the run's stop flag and sends the abort under the fold's experiment", async () => {
+    const { abortRun, abort, aborts } = await harness({
+      progress: {},
+      folded: [folded({ status: "running" })],
+    });
+
+    const response = await abortRun({ projectId: PROJECT, runId: "run-1" });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      success: true,
+      runId: "run-1",
+      message: "Abort requested",
+    });
+    expect(await abort.isAborted("run-1")).toBe(true);
+    expect(aborts).toMatchObject([
+      { tenantId: PROJECT, runId: "run-1", experimentId: "experiment-1", requestedBy: "user-1" },
+    ]);
   });
 });
 
@@ -602,7 +813,7 @@ describe("POST /api/experiments/execute", () => {
 
   /** @scenario "A streamed workbench run subscribes to its frames, then starts on the run's pipeline" */
   it("streams the run's frames under the framework's event-stream headers until done", async () => {
-    const { execute } = harness({ ports: runnable, progress: {}, worker });
+    const { execute } = await harness({ ports: runnable, progress: {}, worker });
 
     const response = await execute(request);
 
@@ -620,7 +831,7 @@ describe("POST /api/experiments/execute", () => {
 
   /** @scenario "A streamed workbench run subscribes to its frames, then starts on the run's pipeline" */
   it("starts the run with its plan, credited to the person who started it", async () => {
-    const { execute, starts } = harness({ ports: runnable, progress: {}, worker });
+    const { execute, starts } = await harness({ ports: runnable, progress: {}, worker });
 
     await (await execute(request)).text();
 
@@ -636,19 +847,8 @@ describe("POST /api/experiments/execute", () => {
 
   /** @scenario "A workbench run against someone else's personal agent streams its refusal and starts nothing" */
   it("streams the ownership refusal as main's error frame and sends no start", async () => {
-    const refused = createApiFixture<ExperimentRunCollaborators>({
-      connectedAgentOwnership: {
-        assertConnectedAgentsRunnable: async () => {
-          throw new AgentOwnerOnlyError({
-            agentId: "agent-1",
-            agentName: "Laptop agent",
-            ownerUserId: "user-2",
-            ownerName: "Someone else",
-          });
-        },
-      },
-    });
-    const { execute, starts } = harness({ ports: refused, progress: {}, worker });
+    const refused = refusedOwnership();
+    const { execute, starts } = await harness({ ports: refused, progress: {}, worker });
 
     const frames = await framesOf(await execute(request));
 
@@ -656,8 +856,28 @@ describe("POST /api/experiments/execute", () => {
     expect(starts).toEqual([]);
   });
 
+  /** @scenario "A streamed run passes a cell's start through without deduplicating it" */
+  it("passes a cell's start through, though it repeats the last folded seq", async () => {
+    const { execute } = await harness({
+      ports: runnable,
+      progress: {},
+      worker: ({ runId }) => [
+        { seq: 1, frame: { type: "execution_started", runId, total: 1 } },
+        { seq: 1, frame: { type: "cell_started", rowIndex: 0, targetId: "target-1" } },
+        { seq: 1, frame: { type: "execution_started", runId, total: 1 } },
+        { seq: 2, frame: { type: "done", summary: doneSummary(runId) } },
+      ],
+    });
+
+    expect((await framesOf(await execute(request))).map((frame) => frame.type)).toEqual([
+      "execution_started",
+      "cell_started",
+      "done",
+    ]);
+  });
+
   it("refuses with the run-loop refusal where no run loop was composed", async () => {
-    const { execute } = harness();
+    const { execute } = await harness();
 
     expect((await execute(request)).status).toBe(503);
   });
@@ -665,11 +885,16 @@ describe("POST /api/experiments/execute", () => {
 
 describe("/api/evaluations/v3/*, the SDKs' older name for the workbench doors", () => {
   type Answer = { status: number; contentType: string | null; body: string };
-  const answerOf = async (response: Response): Promise<Answer> => ({
-    status: response.status,
-    contentType: response.headers.get("content-type"),
-    body: await response.text(),
-  });
+  /** The answer with its generated run id masked, so two starts compare alike. */
+  const answerOf = async (response: Response): Promise<Answer> => {
+    const body = await response.text();
+    const runId = /"runId":"([^"]+)"/.exec(body)?.[1];
+    return {
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+      body: runId ? body.replaceAll(runId, "<run>") : body,
+    };
+  };
   const workbench = {
     experimentId: "experiment-1",
     slug: "checkout-eval",
@@ -689,6 +914,10 @@ describe("/api/evaluations/v3/*, the SDKs' older name for the workbench doors", 
     updatedAt: new Date("2026-09-02T00:00:00.000Z"),
   };
   const setup: Harness = {
+    ports: createApiFixture<ExperimentRunCollaborators>({
+      connectedAgentOwnership: { assertConnectedAgentsRunnable: async () => {} },
+    }),
+    progress: {},
     experiments: {
       findBySlugAndType: async () => savedExperiment(savedState()),
       getWorkbenchState: async () => workbench,
@@ -714,21 +943,15 @@ describe("/api/evaluations/v3/*, the SDKs' older name for the workbench doors", 
     ],
     ["a run list without its slug", {}, "/runs", undefined, 400],
     ["a run with no progress store", {}, "/runs/run-1", undefined, 503],
-    [
-      "results nothing names",
-      { progress: { findRunState: async () => null } },
-      "/runs/r/results",
-      undefined,
-      404,
-    ],
+    ["results nothing names", { progress: {} }, "/runs/r/results", undefined, 404],
     ["a setup read", setup, "/checkout-eval/workbench-state?fields=version", undefined, 200],
     ["a setup save", setup, "/checkout-eval/workbench-state", save, 200],
     ["a version page", setup, "/checkout-eval/versions?limit=5", undefined, 200],
   ] as const)(
     "answers %s with the canonical status and body",
     async (_case, options, path, init, status) => {
-      const canonical = await answerOf(await harness(options).request(path, init?.()));
-      const alias = await answerOf(await harness(options).legacy(path, init?.()));
+      const canonical = await answerOf(await (await harness(options)).request(path, init?.()));
+      const alias = await answerOf(await (await harness(options)).legacy(path, init?.()));
 
       expect(alias.status).toBe(status);
       expect(alias).toEqual(canonical);
@@ -737,25 +960,26 @@ describe("/api/evaluations/v3/*, the SDKs' older name for the workbench doors", 
 
   /** @scenario "The evaluations v3 alias answers what the experiments run doors answer" */
   it("answers a started run with main's body at the alias path", async () => {
-    const { legacy, startRun } = harness(setup);
+    const { legacy, starts } = await harness(setup);
 
     const response = await legacy("/checkout-eval/run", runOf(""));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      runId: "run-9",
+    const body = await response.json();
+    expect(body).toEqual({
+      runId: expect.any(String),
       status: "running",
-      total: 1,
-      runUrl: "https://app.test/run-9",
+      total: 0,
+      runUrl: `https://app.test/acme/experiments/checkout-eval?runId=${body.runId}`,
     });
-    expect(startRun).toHaveBeenCalledTimes(1);
+    expect(starts).toHaveLength(1);
   });
 
   /** @scenario "The evaluations v3 alias answers what the experiments run doors answer" */
   it("refuses a browser execute at the alias as the canonical door does", async () => {
     const body = { projectId: PROJECT, experimentId: "experiment-1", name: "Checkout eval" };
-    const canonical = await answerOf(await harness().execute(body));
-    const alias = await answerOf(await harness().legacyExecute(body));
+    const canonical = await answerOf(await (await harness()).execute(body));
+    const alias = await answerOf(await (await harness()).legacyExecute(body));
 
     expect(alias).toEqual(canonical);
   });

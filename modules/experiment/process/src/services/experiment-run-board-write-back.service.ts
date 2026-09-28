@@ -1,7 +1,7 @@
 /**
  * Writes a pipeline run's cells back to the workbench board before the run is completed, as main's
- * run did before reporting it ended; the manager completes only a finished or stopped run. Design:
- * specs/experiment-run-execution.md section 7.
+ * run did before reporting it ended, once per run; the manager completes only a finished or stopped
+ * run. Design: specs/experiment-run-execution.md section 7.
  */
 import {
   applyRunEvent,
@@ -78,8 +78,13 @@ export class ExperimentRunBoardWriteBackService {
       );
     }
     if (!progress) return;
+    if (await this.#holdsRun({ projectId: progress.projectId, experimentId, runId })) {
+      logger.info({ runId, experimentId }, "The board already holds this run's cells");
+      return;
+    }
 
-    const draft = emptyRunResultsDraft();
+    // Named for the run, as main's draft was, so a redelivered completion finds it written.
+    const draft = { ...emptyRunResultsDraft(), runId };
     for (const frame of Object.values(progress.resultFrames))
       applyRunEvent({ draft, event: frame });
 
@@ -91,6 +96,21 @@ export class ExperimentRunBoardWriteBackService {
       scope: plan.scope,
       draft,
     });
+  }
+
+  /** Whether the saved board's cells are already this run's, so a redelivery writes nothing. */
+  async #holdsRun({
+    projectId,
+    experimentId,
+    runId,
+  }: {
+    projectId: string;
+    experimentId: string;
+    runId: string;
+  }): Promise<boolean> {
+    const current = await this.experiments.getWorkbenchState({ projectId, id: experimentId });
+
+    return current.state?.results?.runId === runId;
   }
 }
 

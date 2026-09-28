@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
 import type { WorkflowEvaluationRunner } from "../../eventing/experiment-workflow-evaluation.subscriber.ts";
+import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment-run-abort.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
 import type { ExperimentRunBoardWriteBackService } from "../../services/experiment-run-board-write-back.service.ts";
 import type { ExperimentRunCellService } from "../../services/experiment-run-cell.service.ts";
@@ -44,6 +45,7 @@ function build() {
     workflowEvaluations: createApiFixture<WorkflowEvaluationRunner>({}, "workflowEvaluations"),
     runCells: {
       folds: MemoryExperimentRunFoldRepository.create(),
+      abort: MemoryExperimentRunAbortRepository.create(),
       cells: createApiFixture<ExperimentRunCellService>({}, "cells"),
       stream: experimentRunEventStreamChannels.memory.create(),
       boardWriteBack: createApiFixture<ExperimentRunBoardWriteBackService>({}, "boardWriteBack"),

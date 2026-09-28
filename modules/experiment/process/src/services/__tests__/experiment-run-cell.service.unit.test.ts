@@ -12,6 +12,8 @@ import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contrac
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
+import type { ExperimentRunStreamMessage } from "../../channels/experiment-run-event-stream.channel.ts";
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
 import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment-run-abort.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
@@ -163,8 +165,10 @@ function compose() {
     },
     "collaborators",
   );
+  const stream = experimentRunEventStreamChannels.memory.create();
   const cells = ExperimentRunCellService.create({
     folds,
+    stream,
     collaborators,
     services: createApiFixture<ExecutionDataServices>(
       {
@@ -180,7 +184,7 @@ function compose() {
     }),
   });
 
-  return { folds, abort, cells };
+  return { folds, abort, cells, stream };
 }
 
 async function planned(folds: MemoryExperimentRunFoldRepository, plan = planWith()) {
@@ -276,6 +280,26 @@ describe("ExperimentRunCellService", () => {
           passed: true,
         });
         expect(reported).toEqual(["exact"]);
+      });
+    });
+
+    describe("when it starts after the run's fold has numbered its frames", () => {
+      /** @scenario "A cell's start is published on the run's channel with the last folded seq" */
+      it("publishes cell_started on the run's channel with the last folded seq, appending nothing for it", async () => {
+        const { folds, cells, stream } = compose();
+        await planned(folds);
+        await folds.writeProgress({ state: progress({ seq: 7 }) });
+        succeeds("target_a", { output: "4" });
+        succeeds("target_a.exact", { passed: true, score: 1 });
+        const heard: ExperimentRunStreamMessage[] = [];
+        await stream.subscribe({ runId: "run_1", onMessage: (message) => heard.push(message) });
+
+        const executed = await cells.execute(request(0, 1));
+
+        expect(heard).toEqual([
+          { seq: 7, frame: { type: "cell_started", rowIndex: 0, targetId: "target_a" } },
+        ]);
+        expect(executed.results.map((result) => result.kind)).toEqual(["target", "evaluator"]);
       });
     });
 

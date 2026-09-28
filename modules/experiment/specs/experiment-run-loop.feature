@@ -388,6 +388,63 @@ Feature: An experiment run executes on its pipeline
     Then it throws and is retried, writing and completing nothing
     And its last attempt writes what is folded and completes the run
 
+  # Polls, abort and saved runs over the pipeline (switchover step 5b, spec sections 6, 7 and 9).
+  @integration
+  Scenario: A poll answers main's poller body from the run's progress fold
+    Given a run whose progress fold reads it running, and another whose fold reads it completed
+    When each is polled by its runId
+    Then the running run answers its progress only
+    And the completed run answers its finish and main's summary with the run's link
+    And a run the fold does not hold, or holds for another project, answers run_not_found
+
+  @integration
+  Scenario: Aborting a run reads its progress fold and refuses another project's run
+    Given a run in flight whose progress fold names its project and experiment
+    When another project asks to abort it
+    Then it is refused as run_not_found and nothing is stopped
+    When its own project asks to abort it
+    Then the run's stop flag is set and the abort is sent under the fold's experiment
+
+  @integration
+  Scenario: A polled saved run starts on the run's pipeline and answers at once
+    Given a saved workbench and a caller that does not accept events
+    When the run is started by slug
+    Then the start carries a saved-origin plan that writes the board, credited to the key's person
+    And it answers main's body with the run id, the total and the link to its results
+
+  @integration
+  Scenario: A polled saved run against someone else's personal agent is stored failed
+    Given a saved workbench whose target is another person's personal development agent
+    When the run is started by slug without accepting events
+    Then it answers started as main did, sends no start
+    And the run is completed failed carrying the refusal's code for the poller
+
+  @integration
+  Scenario: A streamed saved run starts on the run's pipeline and streams its frames
+    Given a saved workbench and a caller that accepts events
+    When the run is started by slug
+    Then the start carries a saved-origin plan that leaves the board alone and names no link
+    And the stream carries the run's frames until done
+
+  @unit
+  Scenario: A cell's start is published on the run's channel with the last folded seq
+    Given a cell whose run's progress fold has numbered its frames up to a seq
+    When the cell starts
+    Then main's cell_started frame is published on the run's channel carrying that seq
+    And nothing is appended or folded for it
+
+  @integration
+  Scenario: A streamed run passes a cell's start through without deduplicating it
+    Given a run whose channel carries a cell_started frame repeating the last folded seq
+    When the run streams
+    Then the cell_started frame reaches the client, and a repeated folded frame does not
+
+  @unit
+  Scenario: A redelivered completion writes the run's cells to the board once
+    Given a run whose board write already landed
+    When its completion is delivered again
+    Then the board is not written again and its version is bumped once, naming the run
+
   # The run's plan, built in the request before StartExperimentRun (spec sections 2, 4 and 8, D4, D5).
   @unit
   Scenario: A run's plan lists its target cells, then its comparison cells, in one ordinal order

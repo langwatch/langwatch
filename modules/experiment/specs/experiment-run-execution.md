@@ -129,14 +129,21 @@ the durable record the manager honours, and the flag is the fast signal. The fla
     exactly its event's `{seq, frame}` on `experiment_run:<runId>` through `ExperimentRunEventStream`.
     A redelivery republishes the same `seq`; a listener drops a `seq` it has seen.
   - `cell_started` is published by the cell command straight onto the channel, not appended. It is
-    ephemeral, as main's was (round 5).
+    ephemeral, as main's was. It carries the last folded `seq` without advancing it, and the api
+    stream passes it through undeduplicated, since only folded frames are deduplicated.
   - The api handler **subscribes first, then sends StartExperimentRun, then streams**, so it misses no
     frame. It ends on `done`, `stopped` or a run-level `error`.
   - **No resume, as main had none:** a client that drops the stream polls `GET /runs/:runId` over the
     fold. `seq` and `recentEvents` stay in the fold for the poller; nothing reads a `Last-Event-ID`.
   - Latency: one queue hop and one publish, roughly 50 to 300 ms per frame against main's
     in-process zero.
-- **Polled `GET /runs/:runId`** and `/results` read the fold. Wire unchanged.
+- **Polled `GET /runs/:runId`** and `/results` read the fold. Wire unchanged. Abort reads it too,
+  refusing another project's run as `run_not_found`, then sets the flag and sends
+  AbortExperimentRun under the fold's experimentId.
+- **Saved runs (`POST /:slug/run`)** plan an `origin: saved` run credited to the key's person and send
+  StartExperimentRun. Polled, the run answers at once with its link and writes the board for the
+  saved dataset; streamed, it streams like `execute` and writes nothing, as main's stream did. A
+  polled run refused before its start (ownership) is completed `failed` with the refusal.
 - **Board write-back, before `completed` (main's order):** the manager's `complete` intent carries
   the cells it counted finished. Its executor, for a run whose plan persists results, first folds the
   progress fold's kept result frames into main's draft and writes it through
@@ -145,6 +152,8 @@ the durable record the manager honours, and the flag is the fast signal. The fla
   it; the intent's last attempt writes what is folded, so the run always completes. The manager
   completes only finished or stopped runs, so a failed run writes nothing, as main's did. The write
   is credited to the plan's actor (a person, a Langy session or a key with no person), else the API.
+  It lands once per run: the draft is named for the run, and a redelivered intent that finds the
+  saved board's results already named for it writes nothing and bumps no version.
 - **Workflow evaluations:** the api still registers the run and sends RequestWorkflowEvaluation. The
   worker's subscriber now prepares the run (workflow, version, dataset), plans it with its slug and
   link, and sends StartExperimentRun; a refusal appends `completed{failed}` with the serialised
@@ -198,6 +207,11 @@ foreign run, and GET runs' bodies. Differences:
 12. A redelivered result event streams its frame again under a new `seq` (the fold keeps no applied
     event ids); the board shows the same cell. A redelivered finish, start or completion streams
     nothing.
+13. A poll or abort between a run's start and the worker folding it answers `run_not_found`; main
+    registered the run before answering. The SDKs wait one poll interval (2 s) before polling.
+14. A streamed saved run can be polled by its runId; main's stream kept no poller state.
+15. A polled saved run refused before its start polls `failed` with a total of 0, where main kept the
+    planned total: the refusal's `completed` carries no total.
 
 ## 10. Decisions
 

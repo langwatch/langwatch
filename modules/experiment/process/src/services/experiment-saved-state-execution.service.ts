@@ -6,11 +6,13 @@ import {
   createInitialUIState,
   type EvaluationsV3State,
   type ExecutionScope,
+  ExperimentEvaluationInputError,
   ExperimentNotFoundError,
   InvalidExperimentConfigurationError,
   persistedEvaluationsV3StateSchema,
   planBoardCarryOver,
   planComparisonSeeding,
+  runInputsBodySchema,
   type SeedableResults,
   type SeedTargetOutputs,
 } from "@langwatch/experiment-contract";
@@ -86,6 +88,25 @@ export class ExperimentSavedStateExecutionService {
   /**
    * The board cells a run with no page attached carries rather than produces.
    */
+  /** A saved run's body: empty is no inputs; anything else must be JSON main's inputs accept. */
+  parseRunInputs({ body }: { body: string }): z.infer<typeof runInputsBodySchema> {
+    let rawBody: unknown = {};
+    if (body.trim()) {
+      try {
+        rawBody = JSON.parse(body);
+      } catch {
+        throw new ExperimentEvaluationInputError({ status: 400, reason: "Invalid JSON body" });
+      }
+    }
+    const inputsParse = runInputsBodySchema.safeParse(rawBody);
+    if (!inputsParse.success) {
+      const reason = inputsParse.error.issues[0]?.message ?? "Invalid request body";
+      throw new ExperimentEvaluationInputError({ status: 400, reason });
+    }
+
+    return inputsParse.data;
+  }
+
   planSavedRunCarryOver({
     prepared,
     scope,

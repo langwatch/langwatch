@@ -107,13 +107,14 @@ import type {
 import type { ExperimentRunEventStream } from "../channels/experiment-run-event-stream.channel.ts";
 import type { ExperimentRunProcessingPipeline } from "../eventing/experiment-run-processing.pipeline.ts";
 import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
+import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
+import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 import { ExperimentCopyService } from "../services/experiment-copy.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
 import { ExperimentListingService } from "../services/experiment-listing.service.ts";
 import { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
-import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
 import {
   ExperimentWorkbenchRunService,
   type WorkbenchExecutionRequest,
@@ -240,6 +241,12 @@ export interface ExperimentAppDependencies {
     idLookup: ExperimentIdLookupRepository;
     /** The channel a run's frames reach the process streaming it on. */
     stream: ExperimentRunEventStream;
+    /** The run's progress fold, which a poll and an abort read by runId. */
+    folds: ExperimentRunFoldRepository;
+    /** The run's stop signal, set on abort. */
+    abort: ExperimentRunAbortRepository;
+    /** This deployment's public origin, for the link a polled run answers with. */
+    publicBaseUrl: string | undefined;
   }>;
 }
 
@@ -329,6 +336,9 @@ export class ExperimentApp implements ExperimentApi {
         commands,
         idLookup: buildExperimentIdLookup(members.clickhouse),
         stream: runCells.stream,
+        folds: runCells.folds,
+        abort: runCells.abort,
+        publicBaseUrl: members.publicBaseUrl,
       },
     });
   }
@@ -929,18 +939,14 @@ export class ExperimentApp implements ExperimentApi {
 
   // ── The workbench's own doors ────────────────────────
 
-  async abortWorkbenchRun(
+  abortWorkbenchRun(
     input: Readonly<{
       projectId: string;
       runId: string;
     }>,
+    by: Readonly<{ id: string }>,
   ): Promise<{ success: true; runId: string; message: "Abort requested" }> {
-    return ExperimentRunOrchestratorService.create().requestOwnedAbort({
-      ports: this.#dependencies.runLoop.ports,
-      progress: this.#dependencies.runLoop.progress,
-      projectId: input.projectId,
-      runId: input.runId,
-    });
+    return this.#workbenchRuns.abortRun(input, by);
   }
 
   resolveWorkbenchTargetNames(input: {

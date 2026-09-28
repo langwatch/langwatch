@@ -3,12 +3,15 @@
  * until it ends. Design: specs/experiment-run-execution.md section 7.
  */
 import type {
+  CarriedOverCell,
   EvaluationV3Event,
   EvaluationsV3State,
-  executionRequestSchema,
+  ExperimentRunPlan,
 } from "@langwatch/experiment-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { z } from "zod";
+import type { RunActor } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 
 import type { ExperimentWorkbenchObserver } from "../app/experiment-workbench.members.ts";
 import type {
@@ -17,6 +20,8 @@ import type {
 } from "../channels/experiment-run-event-stream.channel.ts";
 import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
 import type { ExperimentRunStartedEventData } from "../eventing/experiment-run-events.process.ts";
+import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
+import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentCarriedBoardService } from "./experiment-carried-board.service.ts";
 import type { LoadedExecutionData } from "./experiment-execution-data.service.ts";
@@ -26,20 +31,32 @@ import type { ExperimentService } from "./experiment.service.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
 
-/** The run pipeline's senders, and the channel a run's frames come back on. */
+/** The run pipeline's senders, its progress fold and stop signal, and its frames' channel. */
 export type WorkbenchRunPipeline = Readonly<{
-  commands: Pick<ExperimentRunCommandDispatcherService, "startExperimentRun">;
+  commands: Pick<
+    ExperimentRunCommandDispatcherService,
+    "startExperimentRun" | "completeExperimentRun" | "abortExperimentRun"
+  >;
   stream: ExperimentRunEventStream;
+  folds: ExperimentRunFoldRepository;
+  abort: ExperimentRunAbortRepository;
+  /** This deployment's public origin, for the link a polled run answers with. */
+  publicBaseUrl: string | undefined;
 }>;
 
-/** What one pipeline run streams from: its start, and what is checked and carried beside it. */
+/** What one pipeline run starts from: its start, and what is checked and carried beside it. */
 export type PipelineRunStart = {
   start: ExperimentRunStartedEventData & { tenantId: string; occurredAt: number };
   ownership: ExperimentRunCollaborators["connectedAgentOwnership"];
+  /** Whom a personal development agent is checked against; nobody is refused by its rule. */
+  actor: RunActor | undefined;
   data: LoadedExecutionData;
   state: EvaluationsV3State;
-  input: z.infer<typeof executionRequestSchema>;
-  userId: string;
+  carriedOverCells: CarriedOverCell[];
+  /** What an unnamed failure is reported with. */
+  reportContext: Readonly<Record<string, unknown>>;
+  /** Recorded once a streamed run ends done or stopped; only a person's run records one. */
+  ran?: Parameters<ExperimentWorkbenchObserver["recordExperimentRan"]>[0];
 };
 
 type WorkbenchPipelineRunDeps = {
@@ -63,40 +80,87 @@ export class ExperimentWorkbenchPipelineRunService {
     return new ExperimentWorkbenchPipelineRunService(deps);
   }
 
+  /** The start a pipeline run sends: its plan, its cell count and its targets' metadata. */
+  startOf({
+    projectId,
+    runId,
+    experimentId,
+    plan,
+    state,
+    data,
+  }: {
+    projectId: string;
+    runId: string;
+    experimentId: string;
+    plan: ExperimentRunPlan;
+    state: EvaluationsV3State;
+    data: LoadedExecutionData;
+  }): PipelineRunStart["start"] {
+    return {
+      tenantId: projectId,
+      occurredAt: nowInstant().epochMilliseconds,
+      runId,
+      experimentId,
+      workflowVersionId: null,
+      total: plan.cells.length,
+      targets: ExperimentResultDispatchService.create().buildTargetMetadata({
+        targets: state.targets,
+        loadedPrompts: data.loadedPrompts,
+        loadedAgents: data.loadedAgents,
+        loadedEvaluators: data.loadedEvaluators,
+        loadedWorkflows: data.loadedWorkflows,
+      }),
+      plan,
+    };
+  }
+
   /**
-   * The `execute` stream: subscribed before the start is sent, so no frame is missed, and ended on
-   * done, stopped or the run's own error. A dropped stream is not resumed; the client polls
+   * A streamed run: subscribed before the start is sent, so no frame is missed, and ended on done,
+   * stopped or the run's own error. A dropped stream is not resumed; the client polls
    * `GET /runs/:runId` (spec section 7).
    */
   async *streamRun(run: PipelineRunStart): AsyncGenerator<EvaluationV3Event> {
-    const { projectId } = run.input;
     try {
       // A personal development agent runs on one person's machine; only they may send it a turn.
       await run.ownership.assertConnectedAgentsRunnable({
         agents: [...run.data.loadedAgents.values()],
-        actor: { id: run.userId, label: "user" },
+        actor: run.actor,
       });
       for await (const frame of this.#frames(run)) {
         yield frame;
-        if (frame.type === "done" || frame.type === "stopped") {
-          this.observer.recordExperimentRan({
-            userId: run.userId,
-            projectId,
-            experimentId: run.input.experimentId,
-            isFullRun: run.input.scope.type === "full",
-          });
+        if (run.ran && (frame.type === "done" || frame.type === "stopped")) {
+          this.observer.recordExperimentRan(run.ran);
         }
       }
     } catch (error) {
-      logger.error({ error, projectId }, "Pipeline run error");
-      this.observer.reportError(error, { projectId });
+      logger.error({ error, ...run.reportContext }, "Pipeline run error");
+      this.observer.reportError(error, run.reportContext);
       yield mapThrownErrorEvent({ error });
     }
   }
 
+  /**
+   * A polled run: started and left to the worker. A refusal is recorded as the run's failure, so
+   * the poller reads its code, as main's background run did (spec section 9, wire note 6).
+   */
+  async startRun(run: PipelineRunStart): Promise<void> {
+    try {
+      await run.ownership.assertConnectedAgentsRunnable({
+        agents: [...run.data.loadedAgents.values()],
+        actor: run.actor,
+      });
+    } catch (error) {
+      await this.#failBeforeStart({ run, error });
+      return;
+    }
+
+    await this.runs.commands.startExperimentRun(run.start);
+    await this.#carryBoard({ run });
+  }
+
   /** The run's frames in `seq` order, a redelivered one dropped, until the run ends. */
   async *#frames(run: PipelineRunStart): AsyncGenerator<EvaluationV3Event> {
-    const { runId, experimentId } = run.start;
+    const { runId } = run.start;
     const queued: ExperimentRunStreamMessage[] = [];
     let wake: (() => void) | null = null;
     const unsubscribe = await this.runs.stream.subscribe({
@@ -108,7 +172,7 @@ export class ExperimentWorkbenchPipelineRunService {
     });
     try {
       await this.runs.commands.startExperimentRun(run.start);
-      if (experimentId !== "") await this.#carryBoard({ run });
+      await this.#carryBoard({ run });
 
       let seen = 0;
       let ended = false;
@@ -119,6 +183,11 @@ export class ExperimentWorkbenchPipelineRunService {
             wake = resolve;
           });
           wake = null;
+          continue;
+        }
+        // Never folded, so it repeats the last seq; only folded frames are deduplicated.
+        if (next.frame.type === "cell_started") {
+          yield next.frame;
           continue;
         }
         if (next.seq <= seen) continue;
@@ -132,16 +201,34 @@ export class ExperimentWorkbenchPipelineRunService {
     }
   }
 
+  /** The run completed failed before it started, with the refusal when it is handled. */
+  async #failBeforeStart({ run, error }: { run: PipelineRunStart; error: unknown }): Promise<void> {
+    const { runId, experimentId, tenantId } = run.start;
+    logger.error({ error, runId, ...run.reportContext }, "Execution error");
+    if (!HandledError.isHandled(error)) this.observer.reportError(error, run.reportContext);
+
+    await this.runs.commands.completeExperimentRun({
+      tenantId,
+      occurredAt: nowInstant().epochMilliseconds,
+      runId,
+      experimentId,
+      outcome: "failed",
+      ...(HandledError.isHandled(error) ? { error: error.serialize() } : {}),
+    });
+  }
+
   /** The board cells the page carried into the run, recorded as the run's and never streamed. */
   async #carryBoard({ run }: { run: PipelineRunStart }): Promise<void> {
+    if (run.start.experimentId === "") return;
+
     await ExperimentCarriedBoardService.create({
       commands: this.experiments,
       dispatches: ExperimentResultDispatchService.create(),
     }).recordCarriedOverBoard({
-      projectId: run.input.projectId,
+      projectId: run.start.tenantId,
       runId: run.start.runId,
       experimentId: run.start.experimentId,
-      cells: run.input.carriedOverCells ?? [],
+      cells: run.carriedOverCells,
       datasetRows: run.data.datasetRows,
       state: run.state,
       loadedEvaluators: run.data.loadedEvaluators,

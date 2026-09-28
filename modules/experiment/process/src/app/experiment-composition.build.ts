@@ -52,6 +52,7 @@ import { ClickHouseExperimentRunProcessingRepository } from "../repositories/cli
 import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
 import { ExperimentDspyRetentionRepository } from "../repositories/experiment-dspy-retention.repository.ts";
 import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
+import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
 import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
 import { MemoryExperimentRunAbortRepository } from "../repositories/memory/memory.experiment-run-abort.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../repositories/memory/memory.experiment-run-fold.repository.ts";
@@ -322,6 +323,8 @@ function attachmentInputs(input: {
 /** A run's folds, cells and board write-back, and the channel its frames travel on. */
 export type ExperimentRunCells = Readonly<{
   folds: ExperimentRunFoldRepository;
+  /** The run's stop signal: the api sets it on abort, a cell reads it. */
+  abort: ExperimentRunAbortRepository;
   cells: ExperimentRunCellService;
   stream: ExperimentRunEventStream;
   boardWriteBack: ExperimentRunBoardWriteBackService;
@@ -354,12 +357,16 @@ export function buildExperimentRunCells(input: {
   const folds = redis
     ? RedisExperimentRunFoldRepository.create({ redis })
     : MemoryExperimentRunFoldRepository.create();
+  const abort = redis
+    ? RedisExperimentRunAbortRepository.create({ redis })
+    : MemoryExperimentRunAbortRepository.create();
+  const stream = redis
+    ? experimentRunEventStreamChannels.live.create({ redis })
+    : experimentRunEventStreamChannels.memory.create();
   const collaborators: ExperimentRunCollaborators = {
     studio: dependencies.workflows,
     cost: ExperimentRunModelCostService.create({ modelProviders: dependencies.modelProviders }),
-    abort: redis
-      ? RedisExperimentRunAbortRepository.create({ redis })
-      : MemoryExperimentRunAbortRepository.create(),
+    abort,
     experiments: input.experiments,
     evaluationReporting: dependencies.evaluation,
     sandboxCredentials: ExperimentRunSandboxCredentialService.create({
@@ -376,15 +383,15 @@ export function buildExperimentRunCells(input: {
 
   return {
     folds,
-    stream: redis
-      ? experimentRunEventStreamChannels.live.create({ redis })
-      : experimentRunEventStreamChannels.memory.create(),
+    abort,
+    stream,
     boardWriteBack: ExperimentRunBoardWriteBackService.create({
       folds,
       experiments: input.experiments,
     }),
     cells: ExperimentRunCellService.create({
       folds,
+      stream,
       collaborators,
       services: executionDataServices(dependencies),
       workflows: dependencies.workflows,

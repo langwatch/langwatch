@@ -83,7 +83,7 @@ function board() {
     },
     "experiments",
   );
-  return { experiments, writers, results: () => view.state?.results };
+  return { experiments, writers, results: () => view.state?.results, version: () => view.version };
 }
 
 async function foldsWith({
@@ -123,6 +123,24 @@ describe("ExperimentRunBoardWriteBackService.writeBack", () => {
 
       expect(results()?.targetOutputs).toEqual({ target_a: ["4"] });
       expect(writers).toEqual([{ userId: "user_1", label: "langy", runId: "run_1" }]);
+    });
+  });
+
+  describe("given a completion delivered again after its board write landed", () => {
+    /** @scenario "A redelivered completion writes the run's cells to the board once" */
+    it("writes the board once, naming the run, and bumps the version once", async () => {
+      const { experiments, writers, results, version } = board();
+      const service = ExperimentRunBoardWriteBackService.create({
+        folds: await foldsWith(),
+        experiments,
+      });
+
+      await service.writeBack({ ...run, finishedCells: 1, lastAttempt: false });
+      await service.writeBack({ ...run, finishedCells: 1, lastAttempt: false });
+
+      expect(writers).toHaveLength(1);
+      expect(results()?.runId).toBe("run_1");
+      expect(version()).toBe(2);
     });
   });
 
