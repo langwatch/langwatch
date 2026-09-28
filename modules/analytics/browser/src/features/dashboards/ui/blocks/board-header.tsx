@@ -29,6 +29,7 @@ export function BoardHeader({
   onAddChart,
   periodControl,
   shareControl,
+  refreshControl,
 }: {
   name: string;
   description: string;
@@ -39,6 +40,8 @@ export function BoardHeader({
   periodControl: ReactNode;
   /** The share icon: the board's visibility menu. */
   shareControl: ReactNode;
+  /** Data age and the auto-refresh menu. */
+  refreshControl?: ReactNode;
 }) {
   return (
     <VStack align="stretch" gap={2} marginBottom={5}>
@@ -51,6 +54,7 @@ export function BoardHeader({
           <SharedChip visibility={visibility} />
         </HStack>
         <HStack gap={3} flexShrink={0}>
+          {refreshControl}
           {shareControl}
           <Button
             variant="outline"

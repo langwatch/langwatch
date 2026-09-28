@@ -247,27 +247,19 @@ afterEach(cleanup);
 
 describe("a member's board", () => {
   describe("given a member opens a board with nothing on it", () => {
+    /** @scenario 'AC1 The empty board has no "Add a block" box' */
     /** @scenario "AC10 Blank board matches the reference" */
-    it("shows the blank-board state with the Agent Flight Deck template", async () => {
+    it("shows the template strip and no Add a block box", async () => {
       openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
-      expect(await screen.findByRole("button", { name: /Add a block/ })).toBeInTheDocument();
-      expect(screen.getByText("Add a description")).toBeInTheDocument();
-      expect(screen.getByText("Start from the question you need answered.")).toBeInTheDocument();
-      expect(screen.getByText("Start from a template")).toBeInTheDocument();
+      expect(await screen.findByText("Add a description")).toBeInTheDocument();
+      expect(await screen.findByText("Start from a template")).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: new RegExp(escape(AGENT_FLIGHT_DECK_TEMPLATE.name)) }),
+        await screen.findByRole("button", {
+          name: new RegExp(escape(AGENT_FLIGHT_DECK_TEMPLATE.name)),
+        }),
       ).toBeInTheDocument();
-    });
-
-    /** @scenario "AC10 Blank board matches the reference" */
-    it("opens the picker from the Add a block area", async () => {
-      const user = userEvent.setup();
-      const { host } = openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
-
-      await user.click(await screen.findByRole("button", { name: /Add a block/ }));
-
-      expect(host.lastQuery).toEqual({ addBlock: "open" });
+      expect(screen.queryByRole("button", { name: /Add a block/ })).toBeNull();
     });
   });
 
@@ -618,6 +610,18 @@ describe("a member's board", () => {
       openBoard({ server });
     };
 
+    describe("when the member clicks the footer's Add a block box", () => {
+      /** @scenario "AC10 A non-empty board still offers a way to add a widget" */
+      it("opens the picker", async () => {
+        const user = userEvent.setup();
+        const { host } = openBoard({ server: boardWithOneWidget() });
+
+        await user.click(await screen.findByRole("button", { name: /Add a block/ }));
+
+        expect(host.lastQuery).toEqual({ addBlock: "open" });
+      });
+    });
+
     describe("when the member opens its menu", () => {
       /** @scenario "AC15 Widget menu actions persist after reload" */
       it("offers Edit, Duplicate and Delete, and nothing else", async () => {
@@ -680,7 +684,7 @@ describe("a member's board", () => {
         await waitFor(() => expect(callsTo(server, "dashboardWidgets.delete")).toHaveLength(1));
         reload(server);
 
-        expect(await screen.findByRole("button", { name: /Add a block/ })).toBeInTheDocument();
+        expect(await screen.findByText("Start from a template")).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "Actions for Traces" })).toBeNull();
       });
     });

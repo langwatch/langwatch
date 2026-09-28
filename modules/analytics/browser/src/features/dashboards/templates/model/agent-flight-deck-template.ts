@@ -20,7 +20,7 @@ import {
   IMPACTFUL_TRACES_CODE,
   SCENARIOS_CODE,
 } from "./flight-deck-table-widgets.ts";
-import { definition, full, half } from "./template-widget.ts";
+import { definition, full, half, TABLE_ROWS } from "./template-widget.ts";
 
 const WIDGETS: readonly BoardTemplateWidget[] = [
   {
@@ -42,13 +42,13 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: COST_EFFICIENCY_CODE,
       queries: { summary: sql.COST_SUMMARY_SQL, models: sql.COST_BY_MODEL_SQL },
     }),
-    layout: half({ side: "left", gridRow: 9 }),
+    layout: half({ side: "left", gridRow: 9, rowSpan: TABLE_ROWS }),
   },
   {
     key: "failures",
     name: "Failure intelligence",
     definition: definition({ code: FAILURES_CODE, queries: { main: sql.FAILURES_SQL } }),
-    layout: half({ side: "right", gridRow: 9 }),
+    layout: half({ side: "right", gridRow: 9, rowSpan: TABLE_ROWS }),
   },
   {
     key: "scenarios",
@@ -57,7 +57,7 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: SCENARIOS_CODE,
       queries: { summary: sql.SCENARIO_SUMMARY_SQL, suites: sql.SCENARIO_SUITES_SQL },
     }),
-    layout: half({ side: "left", gridRow: 14 }),
+    layout: half({ side: "left", gridRow: 13, rowSpan: TABLE_ROWS }),
   },
   {
     key: "quality",
@@ -66,7 +66,7 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: QUALITY_CODE,
       queries: { passRate: sql.EVALUATION_PASS_RATE_SQL, errorRate: sql.ERROR_RATE_SQL },
     }),
-    layout: half({ side: "right", gridRow: 14 }),
+    layout: half({ side: "right", gridRow: 13 }),
   },
   {
     key: "feedback",
@@ -75,13 +75,13 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: FEEDBACK_CODE,
       queries: { summary: sql.FEEDBACK_SUMMARY_SQL, rate: sql.FEEDBACK_RATE_SQL },
     }),
-    layout: half({ side: "left", gridRow: 19 }),
+    layout: half({ side: "left", gridRow: 18 }),
   },
   {
     key: "gateway",
     name: "Gateway routing",
     definition: definition({ code: GATEWAY_CODE, queries: { main: sql.GATEWAY_ROUTES_SQL } }),
-    layout: half({ side: "right", gridRow: 19 }),
+    layout: half({ side: "right", gridRow: 18, rowSpan: TABLE_ROWS }),
   },
   {
     key: "coding-agents",
@@ -90,7 +90,7 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: CODING_AGENTS_CODE,
       queries: { agents: sql.CODING_AGENTS_SQL, trend: sql.CODING_AGENT_TREND_SQL },
     }),
-    layout: full({ gridRow: 24, rowSpan: 5 }),
+    layout: full({ gridRow: 23, rowSpan: TABLE_ROWS }),
   },
   {
     key: "impactful-traces",
@@ -99,7 +99,7 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: IMPACTFUL_TRACES_CODE,
       queries: { main: sql.IMPACTFUL_TRACES_SQL },
     }),
-    layout: full({ gridRow: 29, rowSpan: 6 }),
+    layout: full({ gridRow: 27, rowSpan: TABLE_ROWS }),
   },
 ];
 
@@ -107,5 +107,6 @@ export const AGENT_FLIGHT_DECK_TEMPLATE: BoardTemplate = {
   id: "agent-flight-deck",
   name: "Agent Flight Deck",
   description: "Traffic, quality, latency and cost on one timeline.",
+  summary: "Traffic, quality, latency and cost on one timeline.",
   widgets: WIDGETS,
 };

@@ -76,6 +76,7 @@ beforeEach(() => {
 
 describe("handleAddDashboardWidget()", () => {
   describe("when the dashboard exists and creation succeeds", () => {
+    /** @scenario "AC8 An MCP agent adds a widget to a board" */
     it("creates the widget scoped to the current project, then places it", async () => {
       const result = await handleAddDashboardWidget({
         dashboardId: "dash_1",
@@ -126,6 +127,7 @@ describe("handleAddDashboardWidget()", () => {
       );
     });
 
+    /** @scenario "AC8b add_dashboard_widget rejects an unknown dashboard" */
     it("names the dashboard id in the error and creates no widget", async () => {
       await expect(
         handleAddDashboardWidget({
