@@ -1,6 +1,7 @@
 /**
- * The Agent Flight Deck as a board template: ten stored widgets in the
- * prototype's order. Status and Throughput span the grid; the rest sit in pairs.
+ * The Agent Flight Deck as a board template: ten stored widgets in the prototype's
+ * order. Status, Throughput, coding agents and the traces span the grid; the rest sit
+ * in pairs. Row spans are 44px board rows, sized to each panel's content.
  */
 
 import {
@@ -45,7 +46,7 @@ const HALF = 4;
 function half({
   side,
   gridRow,
-  rowSpan = 4,
+  rowSpan = 5,
 }: {
   side: "left" | "right";
   gridRow: number;
@@ -65,7 +66,7 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
     key: "throughput",
     name: "Throughput, latency & errors",
     definition: definition({ code: THROUGHPUT_CODE, queries: { main: sql.THROUGHPUT_SQL } }),
-    layout: { gridColumn: 0, gridRow: 3, colSpan: FULL, rowSpan: 4 },
+    layout: { gridColumn: 0, gridRow: 3, colSpan: FULL, rowSpan: 6 },
   },
   {
     key: "cost-efficiency",
@@ -74,13 +75,13 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: COST_EFFICIENCY_CODE,
       queries: { summary: sql.COST_SUMMARY_SQL, models: sql.COST_BY_MODEL_SQL },
     }),
-    layout: half({ side: "left", gridRow: 7, rowSpan: 3 }),
+    layout: half({ side: "left", gridRow: 9 }),
   },
   {
     key: "failures",
     name: "Failure intelligence",
     definition: definition({ code: FAILURES_CODE, queries: { main: sql.FAILURES_SQL } }),
-    layout: half({ side: "right", gridRow: 7, rowSpan: 3 }),
+    layout: half({ side: "right", gridRow: 9 }),
   },
   {
     key: "scenarios",
@@ -89,7 +90,7 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: SCENARIOS_CODE,
       queries: { summary: sql.SCENARIO_SUMMARY_SQL, suites: sql.SCENARIO_SUITES_SQL },
     }),
-    layout: half({ side: "left", gridRow: 10 }),
+    layout: half({ side: "left", gridRow: 14 }),
   },
   {
     key: "quality",
@@ -98,7 +99,7 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: QUALITY_CODE,
       queries: { passRate: sql.EVALUATION_PASS_RATE_SQL, errorRate: sql.ERROR_RATE_SQL },
     }),
-    layout: half({ side: "right", gridRow: 10 }),
+    layout: half({ side: "right", gridRow: 14 }),
   },
   {
     key: "feedback",
@@ -107,13 +108,13 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: FEEDBACK_CODE,
       queries: { summary: sql.FEEDBACK_SUMMARY_SQL, rate: sql.FEEDBACK_RATE_SQL },
     }),
-    layout: half({ side: "left", gridRow: 14 }),
+    layout: half({ side: "left", gridRow: 19 }),
   },
   {
     key: "gateway",
     name: "Gateway routing",
     definition: definition({ code: GATEWAY_CODE, queries: { main: sql.GATEWAY_ROUTES_SQL } }),
-    layout: half({ side: "right", gridRow: 14 }),
+    layout: half({ side: "right", gridRow: 19 }),
   },
   {
     key: "coding-agents",
@@ -122,7 +123,7 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: CODING_AGENTS_CODE,
       queries: { agents: sql.CODING_AGENTS_SQL, trend: sql.CODING_AGENT_TREND_SQL },
     }),
-    layout: half({ side: "left", gridRow: 18 }),
+    layout: { gridColumn: 0, gridRow: 24, colSpan: FULL, rowSpan: 5 },
   },
   {
     key: "impactful-traces",
@@ -131,7 +132,7 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: IMPACTFUL_TRACES_CODE,
       queries: { main: sql.IMPACTFUL_TRACES_SQL },
     }),
-    layout: half({ side: "right", gridRow: 18 }),
+    layout: { gridColumn: 0, gridRow: 29, colSpan: FULL, rowSpan: 6 },
   },
 ];
 

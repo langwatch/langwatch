@@ -140,7 +140,15 @@ export interface LwSetHeightMessage {
  * semi-trusted and a raw destination would be an open redirect.
  * @see useDashboardWidgetChartNavigate
  */
-export const NAVIGABLE_TARGETS = ["traces", "trace"] as const;
+export const NAVIGABLE_TARGETS = [
+  "traces",
+  "trace",
+  "scenarios",
+  "onlineEvaluations",
+  "annotations",
+  "gatewayVirtualKeys",
+  "codingSessions",
+] as const;
 export type NavigableTarget = (typeof NAVIGABLE_TARGETS)[number];
 
 export interface LwNavigateMessage {

@@ -88,6 +88,8 @@ export interface ChartGridProps {
    * container otherwise — tests render without layout and pass it.
    */
   width?: number;
+  /** The height of one grid row, where a surface uses a finer grid than the default. */
+  rowHeightPx?: number;
 }
 
 export function ChartGrid({
@@ -95,6 +97,7 @@ export function ChartGrid({
   onPlacementsCommit,
   renderCard,
   width: fixedWidth,
+  rowHeightPx = CHART_GRID_ROW_HEIGHT_PX,
 }: ChartGridProps) {
   const { width: measuredWidth, containerRef, mounted } = useContainerWidth();
   const width = fixedWidth ?? measuredWidth;
@@ -118,7 +121,7 @@ export function ChartGrid({
           layout={layout}
           gridConfig={{
             cols: CHART_GRID_COLUMNS,
-            rowHeight: CHART_GRID_ROW_HEIGHT_PX,
+            rowHeight: rowHeightPx,
             margin: [CHART_GRID_MARGIN_PX, CHART_GRID_MARGIN_PX],
             containerPadding: [0, 0],
           }}
