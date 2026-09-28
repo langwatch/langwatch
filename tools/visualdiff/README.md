@@ -193,27 +193,27 @@ One classifier (`classify.go`) decides every screen, for the report,
 that applies wins, and every row keeps both screenshots so a person can
 overrule it. The finding classes fail the run (exit 1):
 
-| Class               | Rule                                                                        |
-| ------------------- | --------------------------------------------------------------------------- |
-| `missing-candidate` | the base captured the screen and the candidate never did                    |
-| `missing-base`      | the candidate captured the screen and the base never did - nothing compared |
-| `broken-both`       | the route or flow step fails on both refs                                   |
-| `regression`        | the candidate fails, or logs a console error, where the base does not      |
-| `not-found`         | the candidate shows its not-found page where the base renders the screen   |
-| `blank`             | the candidate page has no text at all, on any route or step                 |
-| `redirect`          | the candidate ends on a different path (ids masked) than the base           |
-| `api-error`         | a 4xx, 5xx or failed `/api/` or tRPC request the base does not make         |
-| `controls`          | a button, link, heading, tab or form field one side has and the other lacks |
+| Class               | Rule                                                                            |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `missing-candidate` | the base captured the screen and the candidate never did                        |
+| `missing-base`      | the candidate captured the screen and the base never did - nothing compared     |
+| `broken-both`       | the route or flow step fails on both refs                                       |
+| `regression`        | the candidate fails, or logs a console error, where the base does not           |
+| `not-found`         | the candidate shows its not-found page where the base renders the screen        |
+| `blank`             | the candidate page has no text at all, on any route or step                     |
+| `redirect`          | the candidate ends on a different path (ids masked) than the base               |
+| `api-error`         | a 4xx, 5xx or failed `/api/` or tRPC request the base does not make             |
+| `controls`          | a button, link, heading, tab or form field one side has and the other lacks     |
 | `uncovered`         | a route either ref declares that `visualdiff.yaml` neither renders nor excludes |
 
 The informational classes are reported and never fail it:
 
-| Class              | Rule                                                        |
-| ------------------ | ----------------------------------------------------------- |
+| Class              | Rule                                                                 |
+| ------------------ | -------------------------------------------------------------------- |
 | `intended-restore` | the base has no such screen, or fails, and the candidate renders one |
-| `copy`             | the same controls with different words                     |
-| `changed`          | a pixel difference over 2% none of the rules explains      |
-| `noise`            | under 2% different with nothing else wrong                 |
+| `copy`             | the same controls with different words                               |
+| `changed`          | a pixel difference over 2% none of the rules explains                |
+| `noise`            | under 2% different with nothing else wrong                           |
 
 Text evidence comes from each screen's accessibility tree
 (`page.locator("body").ariaSnapshot()`), compared with dates, times,
