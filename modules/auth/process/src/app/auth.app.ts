@@ -548,6 +548,7 @@ export class AuthApp implements AuthApiContract {
             encryption: members.encryption,
             redis: members.redis,
             auth: app,
+            grants: dependencies.authz,
             users: dependencies.users,
             identityApi: dependencies.identity,
             signInRouting: (input) => dependencies.identity.routeSignIn(input),

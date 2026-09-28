@@ -3,7 +3,7 @@
  * absences are deliberate—each collaborator refuses by name if absent.
  */
 import type { AuthApi } from "@langwatch/auth-contract";
-import { AuthzGrantsService } from "@langwatch/authz-contract";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
@@ -284,87 +284,6 @@ export class AbsentSignUpVerification implements SignUpVerification {
 }
 
 /**
- * Nothing to write a grant with. Reached only from the SSO domain auto-join,
- * which runs only when {@link ModuleBetterAuthFederation} allows platform SSO —
- * and it answers that it does not.
- */
-export class UnavailableBetterAuthGrants extends AuthzGrantsService {
-  static create(): UnavailableBetterAuthGrants {
-    return new UnavailableBetterAuthGrants();
-  }
-
-  private unavailable(): Promise<never> {
-    return Promise.reject(
-      new Error("This process composes no grant writer for the Better Auth transport"),
-    );
-  }
-
-  attach(): Promise<never> {
-    return this.unavailable();
-  }
-  update(): Promise<never> {
-    return this.unavailable();
-  }
-  revoke(): Promise<never> {
-    return this.unavailable();
-  }
-  replace(): Promise<never> {
-    return this.unavailable();
-  }
-  offboard(): Promise<never> {
-    return this.unavailable();
-  }
-  invalidateOrganization(): Promise<never> {
-    return this.unavailable();
-  }
-  attachBindings(): Promise<never> {
-    return this.unavailable();
-  }
-  attachResourceGrant(): Promise<never> {
-    return this.unavailable();
-  }
-  revokeResourceGrants(): Promise<never> {
-    return this.unavailable();
-  }
-  changeBindingRole(): Promise<never> {
-    return this.unavailable();
-  }
-  revokeBindings(): Promise<never> {
-    return this.unavailable();
-  }
-  revokeBindingsWhere(): Promise<never> {
-    return this.unavailable();
-  }
-  retireDirectoryGrants(): Promise<never> {
-    return this.unavailable();
-  }
-  findDirectoryCausedChanges(): Promise<never> {
-    return this.unavailable();
-  }
-  offboardMember(): Promise<never> {
-    return this.unavailable();
-  }
-  defineRole(): Promise<never> {
-    return this.unavailable();
-  }
-  deleteRole(): Promise<never> {
-    return this.unavailable();
-  }
-  createBinding(): Promise<never> {
-    return this.unavailable();
-  }
-  updateBinding(): Promise<never> {
-    return this.unavailable();
-  }
-  deleteBinding(): Promise<never> {
-    return this.unavailable();
-  }
-  applyMemberBindings(): Promise<never> {
-    return this.unavailable();
-  }
-}
-
-/**
  * Password-reset mail, on a module that composes no gateway. Refuses by name
  * rather than resolving: a reset link nobody sends is worse than a refusal an
  * operator can read.
@@ -405,6 +324,8 @@ export type BuildBetterAuthOptions = Readonly<{
   redis: RedisConnection | null;
   /** The Auth application whose sessions this instance mints and revokes. */
   auth: AuthApi;
+  /** The grants ledger an SSO domain auto-join writes its organization binding to. */
+  grants: AuthzGrantsService;
   /** The same user directory the rest of this process serves from. */
   users: UserApi;
   /** Whose connections decide what a federated sign-in arrives into. */
@@ -524,7 +445,7 @@ export async function buildBetterAuth(
     invites: AbsentBetterAuthPendingInvites.create(logger),
     announcements: LoggedBetterAuthAnnouncements.create(logger),
     shadow: OffSignInRouterShadow.create(),
-    authzGrants: UnavailableBetterAuthGrants.create(),
+    authzGrants: options.grants,
     arrivals: IdentitySsoArrivals.create(options.identityApi),
     ssoActivity: {
       record: (args) => options.identityApi.ssoActivity().record(args),
