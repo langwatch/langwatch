@@ -1,4 +1,4 @@
-import type { ConsoleLink } from "./components/top-bar.tsx";
+import type { ConsoleLink } from "./layout/top-bar.tsx";
 
 /** The haven naming scheme (tools/thuishaven/domain/naming.go). */
 const DOMAIN = "langwatch.localhost";
