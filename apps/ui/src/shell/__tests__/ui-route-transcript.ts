@@ -175,6 +175,6 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "  route /ops/backoffice/subscriptions -> pages/ops/backoffice/subscriptions",
   "  route /ops/backoffice/sso-connections -> pages/ops/backoffice/sso-connections",
   "  route /ops/backoffice/directory-sync -> pages/ops/backoffice/directory-sync",
-  "route /@project/* -> pages/@project/[...path]/index",
-  "route * -> pages/not-found",
+  "  route /@project/* -> pages/@project/[...path]/index",
+  "  route * -> pages/not-found",
 ];
