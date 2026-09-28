@@ -15,6 +15,8 @@ import {
 
 import type { ExperimentApp } from "../app/experiment.app.ts";
 import {
+  type AbortRequestedEventData,
+  type CellFinishedEventData,
   type EvaluatorResultEventData,
   type ExperimentRunCompletedEventData,
   type ExperimentRunProcessingEvent,
@@ -22,6 +24,8 @@ import {
   type TargetResultEventData,
   type TraceMetricsComputedEventData,
   type WorkflowEvaluationRequestedEventData,
+  abortRequestedEventSchema,
+  cellFinishedEventSchema,
   evaluatorResultEventSchema,
   experimentRunCompletedEventSchema,
   experimentRunStartedEventSchema,
@@ -30,8 +34,10 @@ import {
   workflowEvaluationRequestedEventSchema,
 } from "./experiment-run-events.process.ts";
 import {
+  AbortExperimentRunCommand,
   CompleteExperimentRunCommand,
   ComputeExperimentRunMetricsCommand,
+  FailExperimentCellCommand,
   RecordEvaluatorResultCommand,
   RecordTargetResultCommand,
   RequestWorkflowEvaluationCommand,
@@ -72,6 +78,8 @@ export type ExperimentRunProcessingPipeline = StaticPipelineDefinition<
   | { name: "computeExperimentRunMetrics"; payload: TraceMetricsComputedEventData }
   | { name: "completeExperimentRun"; payload: ExperimentRunCompletedEventData }
   | { name: "requestWorkflowEvaluation"; payload: WorkflowEvaluationRequestedEventData }
+  | { name: "failExperimentCell"; payload: CellFinishedEventData }
+  | { name: "abortExperimentRun"; payload: AbortRequestedEventData }
 >;
 
 /** The run pipeline over the stores a deployment composed for it. */
@@ -91,6 +99,8 @@ export function buildExperimentRunProcessingPipeline(
       traceMetricsComputedEventSchema,
       experimentRunCompletedEventSchema,
       workflowEvaluationRequestedEventSchema,
+      cellFinishedEventSchema,
+      abortRequestedEventSchema,
     ])
     .withClickHouseFoldProjection(
       ExperimentRunStateFoldProjection.create({
@@ -114,5 +124,7 @@ export function buildExperimentRunProcessingPipeline(
     .withCommand("computeExperimentRunMetrics", ComputeExperimentRunMetricsCommand)
     .withCommand("completeExperimentRun", CompleteExperimentRunCommand)
     .withCommand("requestWorkflowEvaluation", RequestWorkflowEvaluationCommand)
+    .withCommand("failExperimentCell", FailExperimentCellCommand)
+    .withCommand("abortExperimentRun", AbortExperimentRunCommand)
     .build();
 }

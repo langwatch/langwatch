@@ -5,7 +5,12 @@
  */
 
 export function makeExperimentRunKey(experimentId: string, runId: string): string {
-  return `${experimentId}:${runId}`;
+  return hasExperiment(experimentId) ? `${experimentId}:${runId}` : runId;
+}
+
+/** A run without an experiment (execute's is optional) is keyed by runId alone, ARCHITECTURE §9. */
+export function hasExperiment(experimentId: string): boolean {
+  return experimentId !== "";
 }
 
 export function parseExperimentRunKey(compositeKey: string): {

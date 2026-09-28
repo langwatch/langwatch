@@ -68,6 +68,7 @@ function build({
     redis,
     publicBaseUrl,
     processName: "langwatch-test",
+    runConcurrency: 10,
     logger: { warn: () => undefined },
     experiments: createApiFixture<ExperimentService>({}, "experiments"),
     services: createApiFixture<ExecutionDataServices>({}, "services"),

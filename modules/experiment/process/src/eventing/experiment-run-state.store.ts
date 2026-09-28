@@ -6,7 +6,7 @@ import type {
 
 import type { ExperimentRunStateRepository } from "../repositories/experiment-run-state.repository.ts";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules.ts";
-import { parseExperimentRunKey } from "../rules/experiment-run-key.rules.ts";
+import { hasExperiment, parseExperimentRunKey } from "../rules/experiment-run-key.rules.ts";
 import type {
   ExperimentRunState,
   ExperimentRunStateData,
@@ -30,6 +30,9 @@ export class ExperimentRunStateStore implements FoldProjectionStore<ExperimentRu
     // This prevents the split-row bug where ExperimentId mutates from ""
     // to the real value between writes.
     const { experimentId, runId } = parseExperimentRunKey(context.aggregateId);
+    // A run without an experiment stores no row, as main skipped its ClickHouse writes (§9).
+    if (!hasExperiment(experimentId)) return;
+
     const stateWithKeys: ExperimentRunStateData = {
       ...state,
       RunId: runId,

@@ -122,6 +122,8 @@ describe("ClickHouseExperimentRunProcessingAdapter", () => {
         "computeExperimentRunMetrics",
         "completeExperimentRun",
         "requestWorkflowEvaluation",
+        "failExperimentCell",
+        "abortExperimentRun",
       ]);
     });
 

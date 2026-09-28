@@ -295,6 +295,7 @@ export class ExperimentApp implements ExperimentApi {
       execution: commands,
       publicBaseUrl: members.publicBaseUrl,
       processName: members.processName,
+      runConcurrency: config.runConcurrency,
       attachmentEgress: {
         blockLocal: config.blockLocalHttpCalls,
         allowedHosts: config.allowedProxyHosts,

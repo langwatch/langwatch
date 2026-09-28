@@ -1,7 +1,8 @@
 # Experiment run execution on the pipeline
 
-Status: design, for review. Ruling: ARCHITECTURE.md §9 (Alex, 2026-09-28): "An experiment run executes
-on its pipeline, never in a request". Scenarios: `experiment-run-execution.feature`.
+Status: design, every decision ruled (section 10). Ruling: ARCHITECTURE.md §9 (Alex, 2026-09-28):
+"An experiment run executes on its pipeline, never in a request". Scenarios:
+`experiment-run-loop.feature`.
 
 ## 1. Pipeline: extend `experiment_run_processing`
 
@@ -17,11 +18,11 @@ cell's results and the run's start and completion. So: extend it. No new aggrega
 
 | Event | Status | Carries |
 | --- | --- | --- |
-| `started` | new version | today's fields plus the **plan**: `concurrency`, the ordered cell list (`ordinal, rowIndex, targetId, phase: 1`), the run snapshot (targets, evaluators, dataset columns, pinned prompt versions, agent and workflow version ids), `scope`, `actor`, `persistResults`, `origin: workbench \| saved \| workflow` |
+| `started` | new version | today's fields plus the **plan** (D4): `concurrency`, `origin: workbench \| saved \| workflow`, `persistResults`, `actor`, `scope`, the snapshot (targets, evaluators, dataset columns, the mapping dataset id, pinned prompt and workflow versions), the scoped rows once each, and the ordered cells: phase 1 (`ordinal, rowIndex, targetId, evaluatorIds`, plus an evaluator re-run's precomputed output and trace), then phase 2 (`ordinal, rowIndex, targetId, evaluatorId`, and a setup skip when the comparison cannot be built for any row) |
 | `target_result`, `evaluator_result` | reused unchanged | appended by the cell command instead of the api's loop |
-| `cell_finished` | **new** | `ordinal, phase, outcome: succeeded \| failed \| stopped`, `error` (serialised HandledError) when failed. The cell failure event: one terminal per cell, whatever happened |
+| `cell_finished` | **new** | `ordinal, phase, outcome: succeeded \| failed \| stopped \| skipped`, `error` (serialised HandledError) when failed. The cell failure event: one terminal per cell, whatever happened |
 | `abort_requested` | **new** (RunAborted) | `requestedBy`, `occurredAt` |
-| `completed` | reused, one new field | `outcome: finished \| stopped \| failed` |
+| `completed` | reused, two new fields | `outcome: finished \| stopped \| failed`, and `error` (serialised HandledError) when failed |
 | `trace_metrics_computed`, `workflow_evaluation_requested` | unchanged | |
 
 The old `started` version still parses (no plan: a run started before the cut-over is folded, never
@@ -40,22 +41,26 @@ a re-executed cell appends duplicates the store and the fold's applied-id set dr
   owner record goes), sets the Redis abort flag (section 6) and appends `abort_requested`.
 - **CompleteExperimentRun** (existing, sent by the manager's `complete` intent). Appends `completed`
   with the summary the manager hands it.
-- **FailExperimentCells** (manager's stall intent, section 4). Appends `cell_finished{failed,
-  experiment_cell_lost}` for the ordinals it names.
+- **FailExperimentCell** (manager's stall intent, section 4, sent once per unfinished ordinal).
+  Appends `cell_finished{failed, experiment_cell_lost}` under the same idempotency key a finishing cell
+  uses, so a cell that finishes after all is dropped as a duplicate.
 
 ## 4. Process manager `experimentRunExecution`, keyed by runId
 
-- **State:** `phase`, `concurrency`, `planned` count, a bitmap of finished ordinals (base64, n/8 bytes
-  so a 5,000-cell run holds about 1 KB), `aborting`, the phase-2 descriptor, and `lastActivityAt`.
-- **`started`:** emits one `executeCell` intent per phase-1 cell (`messageKey cell:<ordinal>:1`), each
-  carrying its row, target config, evaluators and pinned entities (never the sandbox key), and arms a stall wake.
+- **State:** `concurrency`, the phase-1 and phase-2 cell counts, the next unsent ordinal, a bitmap of
+  finished ordinals (base64, n/8 bytes so a 5,000-cell run holds about 1 KB), `aborting`, and
+  `lastActivityAt`. Counts only: the plan stays in `started` and the fold (D4).
+- **`started`:** emits the first `concurrency` `executeCell` intents (`messageKey cell:<ordinal>:<phase>`),
+  each carrying only `ordinal` and `phase` (D4), and arms a stall wake. The cell reads its row, target
+  and evaluators from the run's fold, retrying while `started` is not folded yet.
 - **`cell_finished`:** sets the ordinal's bit. Setting a set bit is a no-op, so a redelivered event,
   or a duplicate from a re-executed cell, counts once (the process inbox also dedups by event id).
   Re-arms the stall wake.
-- **Phase 2:** when every phase-1 bit is set and the run has a pairwise comparison, the manager plans
-  the comparison cells (ordinals after phase 1) with `ExperimentComparisonPlanService`'s pure rules and
-  emits their intents. Its inputs are which variants succeeded per row, which the manager holds as bits.
-  The outputs themselves come from the fold (decision D2).
+- **Phase 2 (D5):** the comparison cells are planned at start from the run's configuration and sit in
+  the plan after phase 1, with any setup skip (too few variants, golden not set, variant not found)
+  already on them. The manager sends none until every phase-1 bit is set, then windows them like phase
+  1. Each comparison cell reads its row's variant outputs from the fold (D2) and either runs or finishes
+  `skipped`, appending the skip's `evaluator_result` error first. The manager stays pure over counts.
 - **Completion:** all bits of the last phase set, so emit `complete{finished}`. When aborting, complete
   once every *started* cell has finished (section 6), with `complete{stopped}`.
 - **A worker dying mid-cell:** the group queue stops seeing its heartbeat. After `activeTtlSec` (300 s)
@@ -65,16 +70,16 @@ a re-executed cell appends duplicates the store and the fold's applied-id set dr
   `simulationRunExecutionWake`) then emits FailExperimentCells for every unfinished ordinal, so the run
   completes with errors instead of hanging.
 
-## 5. Concurrency: the group queue's, per run
+## 5. Concurrency: the manager is the window (D1, ruled (b))
 
 `concurrency = request.concurrency ?? config.runConcurrency ?? 10`. `runConcurrency` is a new leaf on
 `experimentConfig` reading `EVAL_V3_CONCURRENCY`, restoring main's knob (the branch hard-codes 10). It
-is fixed at start and recorded in `started`. The queue runs one job per group at a time, so
-ExecuteExperimentCell routes through `__routing.groupKey = <experimentId>:<runId>:lane:<ordinal mod
-concurrency>`, with `score` = ordinal (FIFO within a lane) and `dedupId = <runId>:<ordinal>:<phase>`.
-That gives at most `concurrency` cells of one run in flight, and runs don't contend beyond the global
-worker concurrency. The difference from main's semaphore: lanes are static, so one slow cell delays
-the rest of its lane while other lanes may already be idle (decision D1).
+is fixed at start and recorded in `started`. The manager sends the first `concurrency` cell intents on
+`started`, then the next unsent ordinal on each `cell_finished`, so at most `concurrency` cells of one
+run are in flight; phase 2 opens only once phase 1 has drained. Each cell is its own
+queue group (`__routing.groupKey = <run key>:cell:<ordinal>:<phase>`, `dedupId =
+<runId>:<ordinal>:<phase>`), which is work-conserving like main's semaphore, and an abort leaves
+nothing queued beyond the cells already sent. Emission is serial through the manager.
 
 ## 6. Abort
 
@@ -98,8 +103,9 @@ the durable record the manager honours, and the flag is the fast signal. The fla
 - **Projection `experimentRunProgress`** (new fold, Redis store under main's key `eval_v3_run:<runId>`,
   24 h TTL). It has the same JSON the pollers read today: `runId, projectId, experimentId,
   experimentSlug, status, progress, total, startedAt, finishedAt, summary, runUrl, error, recentEvents`
-  (last 50). It adds `seq` (per-run frame counter) and the `results` draft (`applyRunEvent` over
-  targetOutputs and evaluatorResults), which feeds write-back and phase 2. **The imperative Redis
+  (last 50). It adds `seq` (per-run frame counter), the run's plan from `started` (D4), which every
+  cell reads its inputs from, and the `results` draft (`applyRunEvent` over targetOutputs and
+  evaluatorResults), which feeds write-back and the comparison cells (D2, D5). **The imperative Redis
   progress store goes.** Its read (`findRunState`) stays over the fold store, and its writers
   (createRun, addEvent, completeRun, failRun, stopRun) are deleted.
 - **SSE push path**, precedent: `RedisScenarioEventBroadcastChannel` and notification's
@@ -126,11 +132,14 @@ the durable record the manager honours, and the flag is the fast signal. The fla
 
 ## 8. Collaborators per handler, and what is deleted
 
-- **ExecuteExperimentCell:** studio (`WorkflowApi.postStudioEvent`), cost (`ExperimentRunModelCostService`),
+- **ExecuteExperimentCell:** its cell from the progress fold's plan, and for a comparison its row's
+  variant outputs from the fold's results; studio (`WorkflowApi.postStudioEvent`), cost (`ExperimentRunModelCostService`),
   evaluator reporting (`EvaluationApi.reportEvaluation`), sandbox key (`ExperimentRunSandboxCredentialService`,
   minted per cell and shared through ApiKey's Redis), connected dispatch (`AgentApi.callConnected`),
   attachments (`ExperimentAttachmentInputService`), and the abort flag.
-- **The api's start:** `SuiteApi.assertConnectedAgentsRunnable` plus execution-data loading.
+- **The api's start:** `SuiteApi.assertConnectedAgentsRunnable`, execution-data loading, and the plan:
+  phase-1 cells from `ExperimentCellPlanService`, phase-2 cells and setup skips from the comparison
+  planner's configuration half.
 - **Deleted:**
   - the orchestrator/driver async generator, `createEventStream`'s in-memory queue, `createSemaphore`
     and `ExperimentRunLoopService`;
@@ -153,24 +162,28 @@ foreign run, and GET runs' bodies. Differences:
 5. A dead worker's cell is retried after 300 s instead of failing the request.
 6. Ownership refusal: unchanged observably. SSE emits the same `error` frame; a polled run answers
    started, then polls `failed` with `agent_owner_only`, as main's background run did.
+7. The progress total counts the comparison cells from the start; main's total grew by them after
+   phase 1. A skipped comparison row is a cell that finishes `skipped`, still with its
+   `evaluator_result` error frame, where main emitted the frame outside the cell count.
 
-## 10. Decisions for Alex
+## 10. Decisions
 
-- **D1 Concurrency shape.**
-  - (a) Static lanes per the ruling: simple, but head-of-line blocking within a lane.
-  - (b) The manager is the window: it emits `concurrency` intents, then one per `cell_finished`, each
-    cell its own group. Work-conserving like main, and abort leaves nothing queued, but emission is
-    serial through the manager.
-  - I'd pick (b) if main's throughput on uneven cells matters. It reads "the queue's" as the queue
-    enforcing one-per-group.
-- **D2 Where phase 2 reads phase-1 outputs.**
-  - (a) The fold's `results` draft, retrying while an output is not folded yet. Recommended: no new state.
-  - (b) A Redis run-output hash the cell command writes.
-  - (c) The manager's state: pure, but its size grows with outputs.
-- **D3 Runs without an experiment** (execute's `experimentId` is optional).
-  - (a) Key the aggregate by runId alone and have the ClickHouse projections skip rows without an
-    experiment, as main skipped its ClickHouse writes.
-  - (b) Require an experiment, creating one on first run.
+Ruled (Alex, 2026-09-28, recorded in ARCHITECTURE.md §9):
+
+- **D1 (b):** the manager is the concurrency window. It sends `concurrency` cell intents, then one per
+  `cell_finished`, each cell its own queue group (section 5).
+- **D2 (a):** phase 2 reads phase-1 outputs from the run's fold (the `results` draft of section 7),
+  retrying while an output is not folded yet. No new state.
+- **D3 (a):** a run without an experiment is keyed by runId alone; the ClickHouse projections skip
+  it, as main skipped its ClickHouse writes.
+
+Ruled after building began (Alex, 2026-09-28, ARCHITECTURE.md §9):
+
+- **D4 (a):** a cell intent carries only its ordinal and phase. `started` carries the scoped plan, the
+  run's fold keeps it, and each cell reads its row, target and evaluators from the fold.
+- **D5 (b):** the comparison set is planned from the run's configuration at start, so per-comparison
+  setup skips land in the plan. Each comparison cell reads its own row's variant outputs from the
+  fold and either runs or finishes skipped. No `comparisons_planned` event, no planning command.
 
 ## 11. Tests (installation, through `createApp`: in-memory event and process store, `memoryRedisDouble()`, peer fixtures)
 

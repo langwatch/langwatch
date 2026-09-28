@@ -7,8 +7,17 @@ describe("makeExperimentRunKey", () => {
     expect(makeExperimentRunKey("exp-1", "run-abc")).toBe("exp-1:run-abc");
   });
 
-  it("handles empty experimentId", () => {
-    expect(makeExperimentRunKey("", "run-abc")).toBe(":run-abc");
+  describe("when the run has no experiment", () => {
+    it("keys the run by its runId alone", () => {
+      expect(makeExperimentRunKey("", "run-abc")).toBe("run-abc");
+    });
+
+    it("round-trips to an empty experimentId", () => {
+      expect(parseExperimentRunKey(makeExperimentRunKey("", "run-abc"))).toEqual({
+        experimentId: "",
+        runId: "run-abc",
+      });
+    });
   });
 });
 

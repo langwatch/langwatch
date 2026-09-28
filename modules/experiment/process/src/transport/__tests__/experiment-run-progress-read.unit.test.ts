@@ -22,6 +22,7 @@ function infrastructure(redis: unknown) {
     execution: ExperimentRunCommandDispatcherService.create(),
     publicBaseUrl: undefined,
     processName: "langwatch-test",
+    runConcurrency: 10,
     attachmentEgress: { blockLocal: true, allowedHosts: [], verifyTls: true },
     dependencies: {} as never,
   });

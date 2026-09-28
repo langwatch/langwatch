@@ -88,7 +88,9 @@ async function bootWorker(workflow = createApiFixture<WorkflowApi>({})) {
     .withKeyvalue(
       createApiFixture<NonNullable<ProcessMembers["redis"]>>({}, "redis (unused at boot)"),
     )
-    .withConfig({ experiment: { blockLocalHttpCalls: false, allowedProxyHosts: [] } })
+    .withConfig({
+      experiment: { blockLocalHttpCalls: false, allowedProxyHosts: [], runConcurrency: 10 },
+    })
     .withMember("publicBaseUrl", undefined)
     .withMember("processName", "langwatch-test")
     .withMember("isSaas", false)

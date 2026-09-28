@@ -80,9 +80,6 @@ import type {
  */
 const DSPY_DEFAULT_RETENTION_DAYS = 49;
 
-/** Cells in flight at once when a run names no limit of its own. */
-const RUN_DEFAULT_CONCURRENCY = 10;
-
 /** A draft name and an archived-slug disambiguator; never a row's own id. */
 const EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE = "expdisambig";
 
@@ -332,6 +329,8 @@ export function buildExperimentRunLoop(input: {
   publicBaseUrl: string | undefined;
   /** Names this process in a refusal. */
   processName: string;
+  /** Cells in flight at once when a run names no limit of its own (`EVAL_V3_CONCURRENCY`). */
+  runConcurrency: number;
   logger: Pick<Logger, "warn">;
   experiments: ExperimentService;
   services: ExecutionDataServices;
@@ -350,7 +349,7 @@ export function buildExperimentRunLoop(input: {
   const shared = {
     services: input.services,
     workflows: dependencies.workflows,
-    defaultConcurrency: RUN_DEFAULT_CONCURRENCY,
+    defaultConcurrency: input.runConcurrency,
   };
   if (!redis || !publicBaseUrl) {
     const capability = redis
@@ -395,7 +394,7 @@ export function buildExperimentRunLoop(input: {
         workflows: dependencies.workflows,
         progress,
         baseUrl: publicBaseUrl,
-        defaultConcurrency: run.defaultConcurrency ?? RUN_DEFAULT_CONCURRENCY,
+        defaultConcurrency: run.defaultConcurrency ?? input.runConcurrency,
       }),
   };
 }
@@ -411,6 +410,8 @@ export function buildExperimentInfrastructure(input: {
   /** This deployment's public origin, for the link a run answers with. */
   publicBaseUrl: string | undefined;
   processName: string;
+  /** Cells in flight at once when a run names no limit of its own (`EVAL_V3_CONCURRENCY`). */
+  runConcurrency: number;
   /** The fence a run reads a row's attachment link behind. */
   attachmentEgress: ExperimentAttachmentEgressPolicy;
   dependencies: {
@@ -476,6 +477,7 @@ export function buildExperimentInfrastructure(input: {
     redis,
     publicBaseUrl,
     processName: input.processName,
+    runConcurrency: input.runConcurrency,
     logger,
     experiments,
     services,
