@@ -132,7 +132,7 @@ Feature: The package-boundaries lint rule
 
   @unit
   Scenario: apps/tasks' migration runner may name a process package, nothing else in an app may
-    Given apps/tasks' migration-runner files import a module's process package for their hand-run migrations
+    Given apps/tasks' migration-runner files, lwql-provision and lwql-render-access-config among them, import a module's process package for their hand-run steps
     When the package-boundaries rule runs over them
     Then it reports nothing, because migrations run before any module boots
     And apps/tasks' main.ts, its other tasks, another app's migrate file and a nested file still report compositionRoot

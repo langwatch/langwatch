@@ -188,7 +188,7 @@ import { SimulationRunViewService } from "../services/simulation-run-view.servic
 import { SimulationUpdateStreamService } from "../services/simulation-update-stream.service.ts";
 import { VoiceMediaDoorService } from "../services/voice-media-door.service.ts";
 import { VoiceNonceRegistryService } from "../services/voice-nonce-registry.service.ts";
-import type { VoicePublicUrl } from "../services/voice-public-url.service.ts";
+import { VoicePublicUrlService } from "../services/voice-public-url.service.ts";
 import { VoiceSessionService } from "../services/voice-session.service.ts";
 import { buildScenarioComposition } from "./scenario-composition.build.ts";
 
@@ -304,8 +304,8 @@ type ScenarioProcessMembers = Readonly<{
   publicBaseUrl: string | undefined;
   /** The compiled scenario child, as the app that ships it answers (a deployment fact). */
   scenarioChildBundle: ScenarioChildBundle;
-  /** The worker's public media origin, or why it has none (resolved by the process at boot). */
-  voicePublicUrl: VoicePublicUrl;
+  /** The raw-socket door's port, which the worker's quick tunnel points at. */
+  rawSocketPort: number;
   nlpServiceUrl: string | undefined;
   nlpCodeBlockTimeoutSeconds: string | undefined;
   isSaas: boolean;
@@ -335,7 +335,7 @@ export class ScenarioApp implements ScenarioApi {
     "redis",
     "publicBaseUrl",
     "scenarioChildBundle",
-    "voicePublicUrl",
+    "rawSocketPort",
     "nlpServiceUrl",
     "nlpCodeBlockTimeoutSeconds",
     "isSaas",
@@ -365,6 +365,17 @@ export class ScenarioApp implements ScenarioApi {
           (session) => credentials ?? session,
         ),
     );
+    // Resolved here, in the worker only, before any child spawns (Alex, 2026-09-28).
+    const voice = await VoicePublicUrlService.create().resolveForRole({
+      role: setup.role,
+      configuredUrl: setup.config.voicePublicBaseUrl,
+      tunnelEnabled: setup.config.voiceTunnel,
+      workerOnly: setup.config.voiceWorkerOnly,
+      port: setup.members.rawSocketPort,
+    });
+    if (setup.role === "worker") {
+      setup.resources.own("scenario voice public URL", () => voice.close());
+    }
     const simulationCommands = SimulationCommandDispatcherService.create();
     const composed = buildScenarioComposition({
       encryption: setup.members.encryption,
@@ -545,7 +556,7 @@ export class ScenarioApp implements ScenarioApi {
           config: setup.config,
           host: {
             scenarioChildBundle: setup.members.scenarioChildBundle,
-            voicePublicUrl: setup.members.voicePublicUrl,
+            voicePublicUrl: voice.publicUrl,
             nlpServiceUrl: setup.members.nlpServiceUrl,
             isSaas: setup.members.isSaas,
             nodeEnvironment: setup.members.nodeEnvironment,

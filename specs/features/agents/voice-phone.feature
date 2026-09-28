@@ -241,7 +241,7 @@ Feature: Voice agents: reach an agent by phone
   Scenario: The voice worker reads its infrastructure environment variables
     Given the voice worker environment with no variables set
     When the worker environment is read
-    Then the websocket port defaults to 3300 and no public base URL is set
+    Then voice worker only is off, the tunnel fallback is on and no public base URL is set
 
   @unit
   Scenario: A public base URL must be an https origin
@@ -337,78 +337,17 @@ Feature: Voice agents: reach an agent by phone
     Then the child receives the socket handle and the bytes read during the upgrade
 
   # ---------------------------------------------------------------------------
-  # Cloudflared binary on PATH (the SDK spawns a bare `cloudflared`)
+  # cloudflared comes from the image's PATH (Alex, 2026-09-28)
   # ---------------------------------------------------------------------------
   # The scenario SDK opens its quick tunnel with a bare-command spawn, a PATH
-  # lookup. Before the worker opens a tunnel it makes the cloudflared binary
-  # reachable on PATH, downloading it only as a fallback, and surfaces any
-  # failure so the run error names the real cause.
+  # lookup. The image puts cloudflared on PATH (infra/docker/Dockerfile); the
+  # worker never writes its own environment to find it.
 
   @unit
-  Scenario: cloudflared already on PATH is used as-is
-    Given a cloudflared binary is already reachable on PATH
-    When the worker ensures cloudflared is available
-    Then it uses the one on PATH and downloads nothing
-
-  @unit
-  Scenario: A present cloudflared binary is put on PATH without downloading
-    Given no cloudflared is on PATH but its binary is already present on disk
-    When the worker ensures cloudflared is available
-    Then it makes that binary reachable on PATH without downloading
-
-  @unit
-  Scenario: A missing cloudflared binary is downloaded then put on PATH
-    Given no cloudflared is on PATH and its binary is missing from disk
-    When the worker ensures cloudflared is available
-    Then it downloads the binary and makes it reachable on PATH
-
-  @unit
-  Scenario: A cloudflared download failure surfaces as a tunnel binary error
-    Given no cloudflared is on PATH and the fallback download fails
-    When the worker ensures cloudflared is available
-    Then it fails with a tunnel binary error naming the underlying cause
-
-  @unit
-  Scenario: A cloudflared download that hangs is abandoned
-    Given no cloudflared is on PATH and the fallback download never completes
-    When the worker ensures cloudflared is available
-    Then it abandons the download after the timeout and fails with a tunnel binary error
-
-  @unit
-  Scenario: An unresolvable cloudflared package surfaces as a tunnel binary error
-    Given the cloudflared package cannot be resolved
-    When the worker ensures cloudflared is available
-    Then it fails with a tunnel binary error naming the resolution failure
-
-  @unit
-  Scenario: cloudflared resolves through the langwatch SDK scope first
-    Given the langwatch SDK scope can resolve the cloudflared package
-    When the worker resolves cloudflared across its scopes
-    Then it uses the langwatch scope's package and tries no later scope
-
-  @unit
-  Scenario: cloudflared falls back to the scenario scope when the langwatch scope fails
-    Given the langwatch scope cannot resolve cloudflared but the scenario scope can
-    When the worker resolves cloudflared across its scopes
-    Then it uses the scenario scope's package
-
-  @unit
-  Scenario: cloudflared unresolvable from every scope names all tried scopes
-    Given no scope can resolve the cloudflared package
-    When the worker resolves cloudflared across its scopes
-    Then it fails with an error naming every scope it tried
-
-  @unit
-  Scenario: A voice worker puts cloudflared on PATH before opening its quick tunnel
-    Given a voice worker about to open its quick tunnel
-    When it opens the tunnel
-    Then it makes cloudflared reachable on PATH before spawning the tunnel
-
-  @unit
-  Scenario: A voice worker's tunnel fails to open when the cloudflared binary is unavailable
-    Given cloudflared cannot be made reachable on PATH
+  Scenario: A voice worker's tunnel fails to open when cloudflared is not on PATH
+    Given the SDK cannot spawn cloudflared
     When a voice worker tries to open its quick tunnel
-    Then it never spawns the tunnel and the open fails
+    Then the open fails with the spawn's own error
 
   @unit
   Scenario: A failed voice tunnel boot records its reason for the phone run error

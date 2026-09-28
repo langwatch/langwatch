@@ -13,8 +13,9 @@ const BROWSER_RUNTIME =
   /^(?:react|react-dom|@chakra-ui\/|@langwatch\/(?:browser-host|browser-trpc|design-system|ui-kernel)(?:\/|$))/;
 const SERVER_RUNTIME =
   /^(?:hono|@trpc\/server|@langwatch\/(?:eventing|group-queue|process-server|process-stores)(?:\/|$))/;
-/** apps/tasks' migration-runner sources: its top-level `*migrat*` files. */
-const MIGRATION_RUNNER = /^apps\/tasks\/src\/[^/]*migrat[^/]*\.[cm]?tsx?$/;
+/** apps/tasks' pre-serve migration steps: its `*migrat*` files and the two LangWatchQL steps. */
+const MIGRATION_RUNNER =
+  /^apps\/tasks\/src\/(?:[^/]*migrat[^/]*|lwql-provision|lwql-render-access-config)\.[cm]?tsx?$/;
 const KIT_FETCH = /^@langwatch\/browser-trpc(?:\/|$)/;
 const SCHEMA_BINDING = new Set(["@hono/zod-validator", "hono-openapi/zod"]);
 const BROWSER_ROLES = new Set(["browser", "browser-kit"]);

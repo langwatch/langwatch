@@ -194,6 +194,8 @@ export class ProcessServer implements ProcessBoot {
               nlpServiceUrl: this.settings.nlpServiceUrl,
               nlpCodeBlockTimeoutSeconds: this.settings.nlpCodeBlockTimeoutSeconds,
               adminEmails: this.settings.adminEmails ?? [],
+              // The raw-socket door's port, which a module tunnelling to that door reads.
+              rawSocketPort: this.settings.rawSocketPort,
               // Role facts: the composition's word, never a deployment's.
               processName: this.server.name,
               ...Object.fromEntries(

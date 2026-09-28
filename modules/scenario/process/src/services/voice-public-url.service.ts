@@ -1,3 +1,4 @@
+import type { ServerRole } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 
 import {
@@ -36,11 +37,38 @@ export class VoicePublicUrlService {
       | undefined,
   ) {}
 
+  /**
+   * Only the worker, which spawns the children, resolves an address; a voice-only worker
+   * refuses to boot without a public https origin, as main's did.
+   */
+  async resolveForRole(input: {
+    role: ServerRole | undefined;
+    configuredUrl: string | undefined;
+    tunnelEnabled: boolean;
+    workerOnly: boolean;
+    port: number;
+  }): Promise<ResolvedVoicePublicUrl> {
+    if (input.role !== "worker") {
+      return {
+        publicUrl: { unavailable: "this role runs no scenario children" },
+        close: async () => {},
+      };
+    }
+    if (input.configuredUrl !== undefined && !input.configuredUrl.startsWith("https://")) {
+      throw new Error("VOICE_PUBLIC_BASE_URL must be an https origin");
+    }
+    if (input.workerOnly && input.configuredUrl === undefined) {
+      throw new Error(
+        "VOICE_WORKER_ONLY is set but VOICE_PUBLIC_BASE_URL is missing; the voice worker refuses to start without a public https origin Twilio can dial back.",
+      );
+    }
+    return this.resolve(input);
+  }
+
   async resolve(input: {
     configuredUrl: string | undefined;
     tunnelEnabled: boolean;
     port: number;
-    environment: NodeJS.ProcessEnv;
   }): Promise<ResolvedVoicePublicUrl> {
     const released = async (): Promise<void> => {};
     if (input.configuredUrl !== undefined) {
@@ -55,7 +83,7 @@ export class VoicePublicUrlService {
     try {
       const tunnel = await (this.openTunnel
         ? this.openTunnel({ port: input.port })
-        : openVoicePublicUrlTunnel({ port: input.port, env: input.environment }));
+        : openVoicePublicUrlTunnel({ port: input.port }));
       logger.info({ url: tunnel.url }, "voice public URL tunnel ready");
       return { publicUrl: { url: tunnel.url }, close: () => tunnel.close() };
     } catch (error) {

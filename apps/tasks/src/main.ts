@@ -93,7 +93,6 @@ export async function runModuleTask({
       .withMember("gatewayInternalProtocol", () => ({}))
       .withMember("connectJudge", () => null)
       .withMember("scenarioChildBundle", () => scenarioChildBundle)
-      .withMember("voicePublicUrl", () => ({ unavailable: "this role runs no scenario children" }))
       .withMember("monitor", () => void 0)
       .withPipelines((pipelines) => pipelines.produce())
       .boot();

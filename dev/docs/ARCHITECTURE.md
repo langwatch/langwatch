@@ -565,6 +565,9 @@ instead of `serve()`. The role decides what `boot()` hosts: jobs and
 subscriptions instead of HTTP doors. Liveness/metrics is a built-in Server
 component. Its pipeline declaration selects consumption, and shutdown drains that work
 before closing the services and stores it uses.
+A module's `static create(setup)` is told the role it boots in as `setup.role`, so work only
+one role owns (the worker's voice tunnel) is built there and released through
+`setup.resources` (Alex, 2026-09-28).
 
 **Tasks** takes the Server for telemetry and config, skips the listener;
 graceful degenerates to run-to-completion. Migrations are tasks (§7), run before any module boots,
@@ -1005,7 +1008,10 @@ the chain call is plumbing that carries config's answer, and the test seam
 before serve by the start script and the deploy pipeline. Prisma migrations
 live with the schema; ClickHouse migrations are goose SQL files. A serving
 process holding DDL locks is how deploys die. Because they run before any module boots, apps/tasks'
-migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27).
+migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27), and
+so may `lwql-provision.ts` and `lwql-render-access-config.ts`: LangWatchQL provisioning reads
+both schemas under the same migration lock, before serve, and the access-config render runs from
+env alone in its Helm job (Alex, 2026-09-28).
 
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path.

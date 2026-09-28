@@ -104,10 +104,8 @@ describe("openVoicePublicUrlTunnel", () => {
 
     const tunnel = await openVoicePublicUrlTunnel({
       port: 3300,
-      env: {},
       openTunnel,
       resolveHost,
-      ensureBinaryOnPath: async () => {},
       ...FAST,
     });
 
@@ -119,53 +117,71 @@ describe("openVoicePublicUrlTunnel", () => {
     expect(close).not.toHaveBeenCalled();
   });
 
-  /** @scenario "A voice worker puts cloudflared on PATH before opening its quick tunnel" */
-  it("puts the cloudflared binary on PATH before opening the tunnel", async () => {
-    const events: string[] = [];
-    const ensureBinaryOnPath = vi.fn(async () => {
-      events.push("ensure");
-    });
-    const openTunnel = vi.fn(async () => {
-      events.push("open");
-      return {
-        url: "https://ready.trycloudflare.com",
-        provider: "cloudflared" as const,
-        close: vi.fn().mockResolvedValue(undefined),
-      };
-    });
-    const resolveHost = vi.fn().mockResolvedValue(true);
-
-    await openVoicePublicUrlTunnel({
-      port: 3300,
-      env: {},
-      openTunnel,
-      resolveHost,
-      ensureBinaryOnPath,
-      ...FAST,
-    });
-
-    // The binary must be on PATH before the SDK's bare `spawn("cloudflared")`.
-    expect(events).toEqual(["ensure", "open"]);
-  });
-
-  /** @scenario "A voice worker's tunnel fails to open when the cloudflared binary is unavailable" */
-  it("never opens the tunnel when putting the binary on PATH fails", async () => {
-    const openTunnel = vi.fn();
-    const ensureBinaryOnPath = vi.fn(async () => {
-      throw new Error("cloudflared tunnel binary unavailable: spawn ENOENT");
-    });
+  /** @scenario "A voice worker's tunnel fails to open when cloudflared is not on PATH" */
+  it("fails with the spawn's own error when cloudflared cannot be spawned", async () => {
+    const openTunnel = vi.fn().mockRejectedValue(new Error("spawn cloudflared ENOENT"));
 
     await expect(
       openVoicePublicUrlTunnel({
         port: 3300,
-        env: {},
         openTunnel,
         resolveHost: vi.fn().mockResolvedValue(true),
-        ensureBinaryOnPath,
         ...FAST,
       }),
-    ).rejects.toThrow(/cloudflared tunnel binary unavailable/);
-    expect(openTunnel).not.toHaveBeenCalled();
+    ).rejects.toThrow(/spawn cloudflared ENOENT/);
+  });
+
+  /** @scenario "A voice worker's public URL tunnel fails fast when it never becomes reachable" */
+  it("throws VoiceTunnelNotReadyError once the timeout elapses without a resolution", async () => {
+    const resolveHost = vi.fn<(host: string) => Promise<boolean>>().mockResolvedValue(false);
+
+    await expect(
+      waitUntilTunnelResolvable({
+        url: "https://never-resolves.trycloudflare.com",
+        resolveHost,
+        ...FAST,
+      }),
+    ).rejects.toThrow(VoiceTunnelNotReadyError);
+  });
+
+  /** @scenario "A voice worker's public URL tunnel fails fast when it never becomes reachable" */
+  it("names the tunnel URL and timeout in the failure message", async () => {
+    const resolveHost = vi.fn<(host: string) => Promise<boolean>>().mockResolvedValue(false);
+
+    await expect(
+      waitUntilTunnelResolvable({
+        url: "https://never-resolves.trycloudflare.com",
+        resolveHost,
+        ...FAST,
+      }),
+    ).rejects.toThrow(/never-resolves\.trycloudflare\.com.*30ms/s);
+  });
+});
+
+describe("openVoicePublicUrlTunnel", () => {
+  /** @scenario "A voice worker opens a quick tunnel when no public base URL is configured" */
+  it("returns the opened tunnel's URL once it becomes resolvable", async () => {
+    const close = vi.fn().mockResolvedValue(undefined);
+    const openTunnel = vi.fn().mockResolvedValue({
+      url: "https://ready.trycloudflare.com",
+      provider: "cloudflared" as const,
+      close,
+    });
+    const resolveHost = vi.fn().mockResolvedValue(true);
+
+    const tunnel = await openVoicePublicUrlTunnel({
+      port: 3300,
+      openTunnel,
+      resolveHost,
+      ...FAST,
+    });
+
+    expect(tunnel.url).toBe("https://ready.trycloudflare.com");
+    expect(openTunnel).toHaveBeenCalledWith({
+      port: 3300,
+      provider: "cloudflared",
+    });
+    expect(close).not.toHaveBeenCalled();
   });
 
   /** @scenario "A voice worker's public URL tunnel fails fast when it never becomes reachable" */
@@ -181,10 +197,8 @@ describe("openVoicePublicUrlTunnel", () => {
     await expect(
       openVoicePublicUrlTunnel({
         port: 3300,
-        env: {},
         openTunnel,
         resolveHost,
-        ensureBinaryOnPath: async () => {},
         ...FAST,
       }),
     ).rejects.toThrow(VoiceTunnelNotReadyError);
@@ -203,10 +217,8 @@ describe("openVoicePublicUrlTunnel", () => {
 
     const tunnel = await openVoicePublicUrlTunnel({
       port: 3300,
-      env: {},
       openTunnel,
       resolveHost,
-      ensureBinaryOnPath: async () => {},
       ...FAST,
     });
     await tunnel.close();

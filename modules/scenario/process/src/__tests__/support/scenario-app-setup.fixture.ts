@@ -11,6 +11,8 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 export const scenarioTestConfig: ScenarioServerConfig = {
   langwatchEndpoint: void 0,
   voicePublicBaseUrl: void 0,
+  voiceTunnel: false,
+  voiceWorkerOnly: false,
   voiceCallMaxSeconds: void 0,
   blockLocalHttpCalls: true,
   allowedProxyHosts: [],
@@ -46,6 +48,7 @@ export const scenarioHostMembers = {
     sourcePath: "/app/apps/scenario-child/src/main.ts",
     sourceRoots: ["/app/apps/scenario-child/src"],
   },
+  rawSocketPort: 0,
   voicePublicUrl: { unavailable: "no media door in a test process" },
   nlpServiceUrl: void 0,
   nlpCodeBlockTimeoutSeconds: void 0,

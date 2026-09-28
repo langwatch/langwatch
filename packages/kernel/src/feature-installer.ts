@@ -50,6 +50,8 @@ export type FeatureSetup<
   readonly resources: ResourceOwnership;
   /** This module's declared handles, resolved only through `into` (§6). */
   readonly secrets: ScopedSecrets;
+  /** Which process this install is in; absent only where a test builds the App by hand. */
+  readonly role?: ServerRole;
 }> &
   ([Members] extends [never] ? object : Readonly<{ readonly members: Members }>) &
   ([Repositories] extends [never] ? object : Readonly<{ readonly repositories: Repositories }>);
@@ -154,6 +156,8 @@ export type FeatureTransportDescriptor = Readonly<{
 /** What a setup is handed, once per process. */
 export interface FeatureSetupArguments<Config, Members, Dependencies> {
   readonly resources: ResourceOwnership;
+  /** Which process this install is in. */
+  readonly role: ServerRole;
   readonly config: Config;
   readonly members: Members;
   readonly dependencies: Dependencies;
@@ -837,6 +841,7 @@ export class ServerFeatureAssembly<
           members: args.members,
           dependencies,
           resources: args.resources,
+          role: args.role,
           repositorySelection: args.repositorySelection,
           repositories: args.repositories,
         };
@@ -1335,6 +1340,7 @@ class RepositoryAppBuilder<
           config,
           secrets,
           resources,
+          role,
           repositories,
         }): App | Promise<App> => {
           return app.create({
@@ -1343,6 +1349,7 @@ class RepositoryAppBuilder<
             config,
             secrets,
             resources,
+            role,
             repositories: repositories as ModuleRepositories<Live, Memory>,
           });
         },
@@ -1536,13 +1543,14 @@ class ConfiguredAppBuilder<
     const declaration = serverFeature<Members>(this.name)
       .withConfigType<Config>()
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, members, config, secrets, resources }) =>
+      .withSetup(({ dependencies, members, config, secrets, resources, role }) =>
         app.create({
           dependencies,
           members,
           config,
           secrets,
           resources,
+          role,
         }),
       )
       .provides(app.contract)
@@ -1641,13 +1649,14 @@ class UnconfiguredAppBuilder<
     const declaration = serverFeature<Members>(this.name)
       .withConfigType<undefined>()
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, members, config, secrets, resources }) =>
+      .withSetup(({ dependencies, members, config, secrets, resources, role }) =>
         app.create({
           dependencies,
           members,
           config,
           secrets,
           resources,
+          role,
         }),
       )
       .provides(app.contract)

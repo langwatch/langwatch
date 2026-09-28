@@ -4,8 +4,6 @@
 import { voice as scenarioVoice } from "@langwatch/scenario";
 import { nowInstant } from "@langwatch/time";
 
-import { ensureCloudflaredOnPath } from "./voice-cloudflared-binary.channels.ts";
-
 /** The tunnel the SDK opens, as far as this module reads it. */
 type OpenedTunnel = { url: string; close(): Promise<void> };
 
@@ -122,23 +120,14 @@ export async function waitUntilTunnelResolvable(params: {
  */
 export async function openVoicePublicUrlTunnel(params: {
   port: number;
-  env: NodeJS.ProcessEnv;
   timeoutMs?: number;
   pollIntervalMs?: number;
   openTunnel?: TunnelOpener;
   resolveHost?: (host: string) => Promise<boolean>;
-  /** Puts the cloudflared binary on PATH before `openTunnel` spawns it.
-   *  Injectable so a test with a fake opener stays hermetic; defaults to the
-   *  real {@link ensureCloudflaredOnPath}. */
-  ensureBinaryOnPath?: () => Promise<void>;
 }): Promise<VoicePublicUrlTunnel> {
+  // The SDK's cloudflared provider spawns a bare `cloudflared`: the image puts it on PATH
+  // (infra/docker/Dockerfile), and nothing here writes the process environment.
   const openTunnel = params.openTunnel ?? defaultOpenTunnel;
-  // The SDK's cloudflared provider opens the tunnel with a bare
-  // `spawn("cloudflared", ...)`, a PATH lookup, so the binary's directory
-  // must be on PATH before openTunnel runs (see voice-cloudflared-binary.ts).
-  const ensureBinaryOnPath =
-    params.ensureBinaryOnPath ?? (() => ensureCloudflaredOnPath({ env: params.env }));
-  await ensureBinaryOnPath();
   const tunnel = await openTunnel({
     port: params.port,
     provider: "cloudflared",

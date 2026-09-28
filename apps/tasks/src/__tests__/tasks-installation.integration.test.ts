@@ -123,7 +123,7 @@ async function bootTasks() {
         gatewayInternalProtocol: {},
         connectJudge: null,
         scenarioChildBundle,
-        voicePublicUrl: { unavailable: "no media door in a test process" },
+        rawSocketPort: 0,
         monitor: void 0,
         langwatchQl: {
           admin: { configured: false },

@@ -14,7 +14,6 @@ describe("VoicePublicUrlService", () => {
         configuredUrl: "https://voice.example.com",
         tunnelEnabled: true,
         port: PORT,
-        environment: {},
       });
 
       expect(resolved.publicUrl).toEqual({ url: "https://voice.example.com" });
@@ -28,7 +27,6 @@ describe("VoicePublicUrlService", () => {
         configuredUrl: undefined,
         tunnelEnabled: false,
         port: PORT,
-        environment: {},
       });
 
       expect(resolved.publicUrl).toEqual({
@@ -45,7 +43,6 @@ describe("VoicePublicUrlService", () => {
         configuredUrl: undefined,
         tunnelEnabled: true,
         port: PORT,
-        environment: {},
       });
       await resolved.close();
 
@@ -63,10 +60,57 @@ describe("VoicePublicUrlService", () => {
         configuredUrl: undefined,
         tunnelEnabled: true,
         port: PORT,
-        environment: {},
       });
 
       expect(resolved.publicUrl).toEqual({ unavailable: "spawn cloudflared ENOENT" });
+    });
+  });
+
+  describe("given the role a process boots in", () => {
+    const base = { configuredUrl: undefined, tunnelEnabled: false, workerOnly: false, port: PORT };
+
+    it("answers unavailable outside the worker and opens no tunnel", async () => {
+      const tunnel = MemoryVoicePublicUrlTunnelChannel.create({ url: "https://tunnel.test" });
+
+      const resolved = await VoicePublicUrlService.create({
+        openTunnel: tunnel.open,
+      }).resolveForRole({ ...base, role: "api", tunnelEnabled: true });
+
+      expect(resolved.publicUrl).toEqual({ unavailable: "this role runs no scenario children" });
+      expect(tunnel.openedPorts).toEqual([]);
+    });
+
+    it("refuses a voice-only worker without a public base URL", async () => {
+      await expect(
+        VoicePublicUrlService.create().resolveForRole({
+          ...base,
+          role: "worker",
+          workerOnly: true,
+        }),
+      ).rejects.toThrow(/VOICE_PUBLIC_BASE_URL is missing/);
+    });
+
+    /** @scenario "A public base URL must be an https origin" */
+    it("starts a voice-only worker with a public https base URL and reports it", async () => {
+      const resolved = await VoicePublicUrlService.create().resolveForRole({
+        ...base,
+        role: "worker",
+        workerOnly: true,
+        configuredUrl: "https://voice.example.com",
+      });
+
+      expect(resolved.publicUrl).toEqual({ url: "https://voice.example.com" });
+    });
+
+    /** @scenario "A public base URL must be an https origin" */
+    it("rejects a non-https public base URL", async () => {
+      await expect(
+        VoicePublicUrlService.create().resolveForRole({
+          ...base,
+          role: "worker",
+          configuredUrl: "http://voice.example.com",
+        }),
+      ).rejects.toThrow(/https origin/);
     });
   });
 });

@@ -3,9 +3,8 @@ import { serverModules as processModules } from "@langwatch/installed-server-mod
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process-server";
 import { scenarioChildBundle } from "@langwatch/scenario-child";
-import { VoicePublicUrlService } from "@langwatch/scenario-process";
 
-import { processEnvironment, readWorkerVoiceEnvironment } from "./config.ts";
+import { processEnvironment } from "./config.ts";
 
 /**
  * The local launcher hosts both halves in one Node process: only the owner may
@@ -33,16 +32,6 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
       : preamble
   ).start();
 
-  // Resolved before any scenario child spawns: a configured origin, else a quick tunnel.
-  const { voice, environment } = readWorkerVoiceEnvironment();
-  const voicePublicUrl = await VoicePublicUrlService.create().resolve({
-    configuredUrl: voice.voicePublicBaseUrl,
-    tunnelEnabled: voice.voiceTunnelEnabled,
-    port: voice.voiceWsPort,
-    environment,
-  });
-  server.with({ name: "voice public URL tunnel", stop: () => voicePublicUrl.close() });
-
   const app = await server
     .composeProcess("worker")
     .withModules(processModules)
@@ -53,7 +42,6 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
     .withMember("gatewayInternalProtocol", () => ({}))
     .withMember("connectJudge", () => null)
     .withMember("scenarioChildBundle", () => scenarioChildBundle)
-    .withMember("voicePublicUrl", () => voicePublicUrl.publicUrl)
     .withMember("monitor", () => void 0)
     .withPipelines((pipelines) => pipelines.consume())
     .boot();
