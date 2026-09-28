@@ -482,10 +482,12 @@ jobs:
       - name: Cache TypeScript incremental build info
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
+          # One level per package: a `**` walks every node_modules symlink below
+          # it, and the save then outlives the job's timeout.
           path: |
-            packages/**/dist
-            modules/**/dist
-            enterprise/**/dist
+            packages/*/dist
+            modules/*/*/dist
+            enterprise/modules/*/*/dist
             apps/*/dist
           key: ${{ runner.os }}-pkg-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
