@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 
+import { deviceLabelForSession } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   type EnterpriseGatewayApi,
@@ -486,10 +487,9 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
         sourceType: input.sourceType,
         fromCliSession: true,
         parentApiKeyId: input.caller.cli_api_key_id ?? null,
-        // Snapshot which device minted the key so the API-keys settings page
-        // can attribute it; null for CLIs that predate device metadata.
-        createdByDeviceLabel:
-          input.caller.client_info?.device_label ?? input.caller.client_info?.hostname ?? null,
+        // The same label the session's login key carries, so the devices tab
+        // can put the key beside its session.
+        createdByDeviceLabel: deviceLabelForSession(input.caller.client_info),
       });
 
       return {

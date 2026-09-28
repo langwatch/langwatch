@@ -421,6 +421,34 @@ describe("the CLI governance plane", () => {
     });
   });
 
+  describe("when a CLI that sent no device metadata mints a personal ingestion key", () => {
+    /** @scenario "A personal ingestion key minted by a CLI without device metadata is named for an unknown device" */
+    it("labels the key unknown-device, as its login key is labelled", async () => {
+      const mint = vi.fn().mockResolvedValue({ token: "ik-lw-abc_secret", prefix: "ik-lw-abc" });
+      const api = mountCli({
+        ingestionKeys: { mint },
+        verify: () =>
+          Promise.resolve({
+            userId: USER_ID,
+            organizationId: ORGANIZATION_ID,
+            tokenKey: TOKEN_KEY,
+          }),
+      });
+
+      const response = await api.post("/api/auth/cli/governance/ingestion-key", {
+        source_type: "copilot_app",
+      });
+
+      expect(response.status).toBe(201);
+      expect(mint).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceType: "copilot_app",
+          createdByDeviceLabel: "unknown-device",
+        }),
+      );
+    });
+  });
+
   describe("when the CLI asks what became of one of its own keys", () => {
     /** @scenario The CLI can ask what became of its own key */
     it("answers with the cause for a revoked key and unknown for one it does not hold", async () => {
