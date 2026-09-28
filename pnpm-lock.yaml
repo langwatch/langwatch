@@ -11031,6 +11031,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/contract
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract

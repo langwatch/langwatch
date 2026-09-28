@@ -39,6 +39,9 @@
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
     },
     {
