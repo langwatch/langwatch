@@ -1,9 +1,9 @@
 /**
  * @vitest-environment node
  * @see dev/docs/adr/130-the-api-router-type-is-declared.md
- * A ratchet on how many workspace files the compiler loads to resolve `AppRouter`.
+ * A ratchet on how many workspace files the compiler loads to type every module's procedures.
  */
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,15 +14,24 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
-/** The module a browser package names to get typed procedures. */
-const APP_ROUTER_TYPES = join(REPO_ROOT, "apps", "api", "src", "app-trpc", "app-trpc.types.ts");
-
 /**
- * Measured at 3,746 the day ADR-130 was written, after composed-feature
- * records moved out of their compositions. A ceiling, not a target — the
- * target is under 500. Lower it when earned; never raise it without saying why.
+ * Measured at 1,595 when the aggregated `AppRouter` gave way to per-module maps
+ * derived from each contract. A ceiling, not a target. Lower it when earned;
+ * never raise it without saying why.
  */
-const CEILING = 3_850;
+const CEILING = 1_700;
+
+/** Every browser file that declares a module's typed procedures through `createModuleApi`. */
+function moduleApiDeclarations(): string[] {
+  const moduleDirs = ["modules", join("enterprise", "modules")].flatMap((parent) =>
+    readdirSync(join(REPO_ROOT, parent), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => join(REPO_ROOT, parent, entry.name, "browser", "src")),
+  );
+  return moduleDirs
+    .flatMap((dir) => walkFiles(dir, (path) => /\.tsx?$/.test(path) && !path.includes("__tests__")))
+    .filter((file) => readFileSync(file, "utf8").includes("createModuleApi<"));
+}
 
 /**
  * The walk scans every workspace manifest and then thousands of files, so both
@@ -30,8 +39,8 @@ const CEILING = 3_850;
  */
 let walked: ReadonlySet<string> | undefined;
 
-function appRouterModules(): ReadonlySet<string> {
-  walked ??= reachableWorkspaceModules({ roots: [APP_ROUTER_TYPES] });
+function moduleApiGraph(): ReadonlySet<string> {
+  walked ??= reachableWorkspaceModules({ roots: moduleApiDeclarations() });
   return walked;
 }
 
@@ -53,35 +62,37 @@ function reachableWorkspaceModules({ roots }: { roots: readonly string[] }): Rea
   return seen;
 }
 
-describe("given a program names the API router type", () => {
+describe("given a program names every module's typed procedures", () => {
   describe("when the modules it loads are counted", () => {
-    /** @scenario "The router type's module graph stays under its ceiling" */
+    /** @scenario "The module procedure maps' graph stays under its ceiling" */
     it("stays under the recorded ceiling", { timeout: 120_000 }, () => {
-      const reached = appRouterModules();
+      const roots = moduleApiDeclarations();
+      expect(roots.length).toBeGreaterThan(30);
+      const reached = moduleApiGraph();
 
       expect(
         reached.size,
-        `Naming AppRouter now loads ${reached.size} workspace source files (ceiling ${CEILING}). ` +
-          "Something added a module to the router type's graph. See ADR-130.",
+        `Typing every module's procedures now loads ${reached.size} workspace source files ` +
+          `(ceiling ${CEILING}). Something added a module to a procedure map's graph. See ADR-130.`,
       ).toBeLessThan(CEILING);
     });
   });
 
-  describe("when a feature's composed record is reached", () => {
-    /** @scenario "A feature's composed record is reached without its composition" */
-    it("does not reach the composition that builds it", { timeout: 120_000 }, () => {
-      const reached = appRouterModules();
-      // A feature whose record moved out of its composition has a
-      // `.composition.types.ts` sibling. Reaching the composition again means
-      // the record, or something the record names, was put back into it.
-      const rejoined = [...reached].filter(
-        (file) =>
-          file.startsWith(join(REPO_ROOT, "apps", "api", "src", "features") + sep) &&
-          file.endsWith(".composition.ts") &&
-          existsSync(file.replace(/\.composition\.ts$/, ".composition.types.ts")),
-      );
+  describe("when a module's procedure map is reached", () => {
+    /** @scenario "A module's procedure map is reached without its process half" */
+    it("does not reach a process package or an application", { timeout: 120_000 }, () => {
+      const processHalf = /^(enterprise\/)?modules\/[^/]+\/process\//;
+      const leaked = [...moduleApiGraph()]
+        .map((file) =>
+          file
+            .slice(REPO_ROOT.length + 1)
+            .split(sep)
+            .join("/"),
+        )
+        .filter((file) => processHalf.test(file) || file.startsWith("apps/"));
 
-      expect(rejoined.map((file) => file.slice(REPO_ROOT.length + 1))).toEqual([]);
+      expect(existsSync(join(REPO_ROOT, "modules", "trace", "process", "src"))).toBe(true);
+      expect(leaked.toSorted()).toEqual([]);
     });
   });
 });

@@ -18,17 +18,21 @@ Feature: Naming the API router type does not compile the API application
 
   ADR: dev/docs/adr/130-the-api-router-type-is-declared.md
 
-  @unit
-  Scenario: A feature's composed record is reached without its composition
-    Given a feature composes an application, a router and its adapters
-    When a program names only the record that feature contributes to the router
-    Then it reaches the record and the router the record names
-    But it does not reach the repositories, adapters or byte stores the
-      composition opens
+  Each module's browser package now derives its typed procedures from its own
+  contract (`ContractApiMap<typeof fooTrpc>` passed to `createModuleApi`); no
+  aggregated router type remains. The ratchet moved with it: the graph behind
+  those per-module maps is what stays small.
 
   @unit
-  Scenario: The router type's module graph stays under its ceiling
-    Given a program whose whole content is a type-only import of `AppRouter`
+  Scenario: A module's procedure map is reached without its process half
+    Given every module declares its typed procedures from its contract
+    When a program names those procedure maps
+    Then it reaches the contracts and the schemas they name
+    But it does not reach any module's process package or any application
+
+  @unit
+  Scenario: The module procedure maps' graph stays under its ceiling
+    Given a program that names every module's procedure map
     When the modules that program loads are counted
     Then the count stays under the recorded ceiling
     And a change that widens the graph fails with the new count, not silently
