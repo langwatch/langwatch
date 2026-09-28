@@ -12,6 +12,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { EmailDelivery } from "@langwatch/mail";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   type InternalProject,
@@ -73,7 +74,11 @@ function process(
 ) {
   return createApp({ role })
     .withModules([withMemoryRepositories(userServer)])
-    .withMembers({ passkeysEnabled: false, publicBaseUrl: undefined })
+    .withMembers({
+      passkeysEnabled: false,
+      publicBaseUrl: undefined,
+      mail: createApiFixture<EmailDelivery>(),
+    })
     .withRelational(
       prismaDouble({
         organizationUser: { findFirst: async () => null },

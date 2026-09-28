@@ -16,6 +16,7 @@ import {
   routesToOrganizationConnection,
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import type { EmailDelivery } from "@langwatch/mail";
 import { createLogger } from "@langwatch/observability";
 import { OpsApi, type AdminIdentity } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -148,9 +149,9 @@ interface UserAppDependencies {
 }
 
 /** `PASSKEYS_ENABLED` has one owner, `auth`, so this module asks that peer
- * rather than redeclaring it; `publicBaseUrl` is the process's own fact. */
+ * rather than redeclaring it; `publicBaseUrl` and `mail` are the process's own. */
 type UserMembers = MembersRead<readonly ["prisma", "redis"]> &
-  Readonly<{ publicBaseUrl: string | undefined }>;
+  Readonly<{ publicBaseUrl: string | undefined; mail: EmailDelivery }>;
 
 /** The two flagged facts above, resolved once and threaded where `config` used to travel. */
 export type UserFacts = Readonly<{ passkeysEnabled: boolean; baseUrl: string | null }>;
@@ -164,8 +165,8 @@ type UserSetup = FeatureSetup<
 
 export class UserApp implements UserApi {
   static readonly contract = UserApi;
-  /** `publicBaseUrl` is named raw: the process answers it, no store does. */
-  static readonly reads = [...reads("prisma", "redis"), "publicBaseUrl"] as const;
+  /** `publicBaseUrl` and `mail` are named raw: the process answers them, no store does. */
+  static readonly reads = [...reads("prisma", "redis"), "publicBaseUrl", "mail"] as const;
   static readonly dependencies: {
     auth: typeof AuthApi;
     authz: typeof AuthzApi;
@@ -196,6 +197,8 @@ export class UserApp implements UserApi {
       auth: setup.dependencies.auth,
       projects: setup.dependencies.projects,
       governance: setup.dependencies.governance,
+      mail: setup.members.mail,
+      publicBaseUrl: setup.members.publicBaseUrl,
     });
 
     return UserApp.#build({

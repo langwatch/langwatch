@@ -17,7 +17,8 @@ import { defineTemplate, renderMailTemplate } from "./registry.ts";
 export const budgetIncreaseRequestEmailProps = z.object({
   requesterEmail: z.email(),
   requesterName: z.string().min(1).optional(),
-  organizationName: z.string().min(1),
+  /** Blank where the organization carries no name; main rendered it blank rather than refusing. */
+  organizationName: z.string(),
   /**
    * Where the recipient goes to act on it. The deployment's public base URL
    * is the deployment's, so it arrives with the message rather than being

@@ -8,6 +8,7 @@ import type {
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { EmailDelivery } from "@langwatch/mail";
 import type {
   OrganizationApi,
   OrganizationSettings,
@@ -58,7 +59,11 @@ function process(
 ) {
   return createApp({ role })
     .withModules([withMemoryRepositories(userServer)])
-    .withMembers({ passkeysEnabled: false, publicBaseUrl: undefined })
+    .withMembers({
+      passkeysEnabled: false,
+      publicBaseUrl: undefined,
+      mail: createApiFixture<EmailDelivery>(),
+    })
     .withRelational(fakeUserPrisma())
     .withKeyvalue(fakeUserRedis())
     .provide({

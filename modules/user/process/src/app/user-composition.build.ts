@@ -8,6 +8,7 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import { sendBudgetIncreaseRequestEmail, type EmailDelivery } from "@langwatch/mail";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
@@ -17,7 +18,7 @@ import { UserCapabilityUnavailableError } from "@langwatch/user-contract";
 import { hash, compare } from "bcrypt";
 
 import { PrismaUserOrganizationDirectoryRepository } from "../repositories/prisma/prisma.user-organization-directory.repository.ts";
-import type { UserInfrastructure } from "./user.members.ts";
+import type { UserBudgetRequestMailer, UserInfrastructure } from "./user.members.ts";
 
 /** What this process hands `UserApp` at boot. */
 export function buildUserInfrastructure(input: {
@@ -32,9 +33,11 @@ export function buildUserInfrastructure(input: {
   auth: Pick<AuthApi, "revokeCliTokens">;
   projects: Pick<ProjectApi, "findInternal">;
   governance: Pick<GovernanceRestApi, "personalUsage">;
+  mail: EmailDelivery;
+  publicBaseUrl: string | undefined;
 }): UserInfrastructure {
   const { prisma, redis, organizations, enterpriseGateway, gateway } = input;
-  const { auth, projects, governance } = input;
+  const { auth, projects, governance, mail, publicBaseUrl } = input;
 
   return {
     avatarStorage: {
@@ -93,18 +96,37 @@ export function buildUserInfrastructure(input: {
       listPersonalVirtualKeys: (keysInput) => enterpriseGateway.personalVirtualKeyList(keysInput),
       checkBudget: (budgetInput) => gateway.checkBudget(budgetInput),
     },
-    budgetRequests: {
-      sendBudgetIncreaseRequest: () =>
-        Promise.reject(
-          unavailable(
-            "mail gateway with a public base URL, so it cannot send the budget increase request",
-          ),
-        ),
-    },
+    budgetRequests: budgetRequestMailer({ mail, publicBaseUrl }),
     // The spend rollup behind `/api/me/usage`, main's PersonalUsageService.
     personalUsage: {
       personalUsage: (usageInput) => governance.personalUsage(usageInput),
     },
+  };
+}
+
+/**
+ * Main's budget-increase mail, linking the administrator to the gateway's
+ * budgets page on this deployment. With no public base URL there is no page
+ * to link, so it refuses by name.
+ */
+export function budgetRequestMailer(input: {
+  mail: EmailDelivery;
+  publicBaseUrl: string | undefined;
+}): UserBudgetRequestMailer {
+  const { mail, publicBaseUrl } = input;
+  if (!publicBaseUrl) {
+    const refusal = "public base URL, so it cannot link the budget increase request";
+
+    return { sendBudgetIncreaseRequest: () => Promise.reject(unavailable(refusal)) };
+  }
+
+  return {
+    sendBudgetIncreaseRequest: (request) =>
+      sendBudgetIncreaseRequestEmail({
+        mailer: mail,
+        ...request,
+        budgetsUrl: `${publicBaseUrl}/gateway/budgets`,
+      }),
   };
 }
 

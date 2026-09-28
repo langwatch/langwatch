@@ -56,6 +56,12 @@ describe("sendBudgetIncreaseRequestEmail", () => {
       expect(call[0].content.html).toContain("ACME Corp");
     });
 
+    it("renders an organization that carries no name blank rather than refusing", async () => {
+      await sendBudgetIncreaseRequestEmail({ ...baseParams, organizationName: "" });
+
+      expect(sendEmail).toHaveBeenCalledTimes(1);
+    });
+
     it("includes the spend / limit / period context", async () => {
       await sendBudgetIncreaseRequestEmail(baseParams);
 
