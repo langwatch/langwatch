@@ -515,6 +515,16 @@ export const modelCostRateSchema = z
   .strict();
 export type ModelCostRate = z.infer<typeof modelCostRateSchema>;
 
+/** A catalogue rate listed beside the stored rules; `projectId: ""` is main's wire for it. */
+export const modelCostCatalogueRowSchema = modelCostRateSchema.safeExtend({
+  projectId: z.literal(""),
+});
+export type ModelCostCatalogueRow = z.infer<typeof modelCostCatalogueRowSchema>;
+
+/** One row of the model-costs listing: a stored rule (with an id) or a catalogue rate (without). */
+export const modelCostListRowSchema = z.union([modelCostSchema, modelCostCatalogueRowSchema]);
+export type ModelCostListRow = z.infer<typeof modelCostListRowSchema>;
+
 /** Canonical inputs for the shared trace/gateway model-pricing cascade. */
 export const modelCostEstimateInputSchema = z
   .object({

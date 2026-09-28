@@ -156,6 +156,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve([]);
   }
 
+  listCostsWithCatalogue(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
   upsertCost(): Promise<never> {
     throw new Error("Not used by Trace tests.");
   }

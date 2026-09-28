@@ -67,26 +67,30 @@ vi.mock("@langwatch/design-system/menu", () => ({
 
 const { default: ModelCostsScreen } = await import("../model-costs-screen.tsx");
 
+/** Main's wire for a catalogue rate: no id, no scope, `projectId: ""`. */
 const CATALOGUE_ROW = {
-  id: null,
-  projectId: null,
+  projectId: "",
   model: "openai/gpt-5.5",
   regex: "^openai/gpt-5\\.5$",
   inputCostPerToken: 0.000001,
   outputCostPerToken: 0.000002,
-  cacheReadCostPerToken: null,
-  cacheCreationCostPerToken: null,
-  cacheCreation1hCostPerToken: null,
-  updatedAt: null,
 };
 
 const STORED_ROW = {
-  ...CATALOGUE_ROW,
   id: "cost_1",
+  organizationId: "organization-1",
   projectId: "proj-1",
+  scopeType: "PROJECT",
+  scopeId: "proj-1",
   model: "anthropic/claude-sonnet-4-6",
   regex: "^anthropic/claude",
-  updatedAt: new Date("2026-05-15T12:00:00Z"),
+  inputCostPerToken: 0.000003,
+  outputCostPerToken: null,
+  cacheReadCostPerToken: null,
+  cacheCreationCostPerToken: null,
+  cacheCreation1hCostPerToken: null,
+  createdAt: "2026-05-15T12:00:00.000Z",
+  updatedAt: "2026-05-15T12:00:00.000Z",
 };
 
 function renderScreen(host = new FakeModelProviderHost()) {
@@ -96,7 +100,7 @@ function renderScreen(host = new FakeModelProviderHost()) {
 describe("given the LLM Model Costs screen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockState.costs = [CATALOGUE_ROW, STORED_ROW];
+    mockState.costs = [STORED_ROW, CATALOGUE_ROW];
   });
 
   afterEach(() => cleanup());
@@ -114,6 +118,17 @@ describe("given the LLM Model Costs screen", () => {
       fireEvent.click(screen.getByTestId("add-model-cost"));
 
       expect(host.drawerOpens).toEqual([{ drawer: "llmModelCost", params: {} }]);
+    });
+  });
+
+  describe("when the listing holds stored rules and catalogue rates", () => {
+    it("renders every row and counts them all, as main did", () => {
+      renderScreen();
+
+      expect(screen.getByText("2 models")).toBeTruthy();
+      expect(screen.getByText("anthropic/claude-sonnet-4-6")).toBeTruthy();
+      expect(screen.getByText("openai/gpt-5.5")).toBeTruthy();
+      expect(screen.getByText("^openai/gpt-5\\.5$")).toBeTruthy();
     });
   });
 

@@ -14,12 +14,12 @@ import {
   modelCostProjectTrpcInputSchema,
   modelCostWriteTrpcInputSchema,
 } from "./model-cost.trpc-schemas.ts";
-import { modelCostSchema } from "./model-provider.ts";
+import { modelCostListRowSchema, modelCostSchema } from "./model-provider.ts";
 
 export const llmModelCostTrpc = defineTrpcContract("llmModelCost")
   .query("getAllForProject")
   .withInput(modelCostProjectTrpcInputSchema)
-  .withOutput(z.array(modelCostSchema))
+  .withOutput(z.array(modelCostListRowSchema))
 
   .mutation("createOrUpdate")
   .withInput(modelCostWriteTrpcInputSchema)

@@ -7,6 +7,7 @@ import {
   type ModelCost,
   type ModelCostDeleteInput,
   type ModelCostEstimateInput,
+  type ModelCostListRow,
   type ModelCostWriteInput,
   type ModelDefaultApiKeyScopeCheck,
   type ModelDefaultAssignmentInput,
@@ -352,6 +353,10 @@ export class ModelProviderService {
 
   listCosts(input: { projectId: string }): Promise<ModelCost[]> {
     return this.costs.list(input);
+  }
+
+  listCostsWithCatalogue(input: { projectId: string }): Promise<ModelCostListRow[]> {
+    return this.costs.listWithCatalogue(input);
   }
 
   upsertCost(input: ModelCostWriteInput): Promise<ModelCost> {

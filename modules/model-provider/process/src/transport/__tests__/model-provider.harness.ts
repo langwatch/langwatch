@@ -200,6 +200,7 @@ function forwarded(app: ModelProviderApp): ModelProviderApi {
     findDefaultConfig: (...args) => app.findDefaultConfig(...args),
     deleteDefaultConfig: (...args) => app.deleteDefaultConfig(...args),
     listCosts: (...args) => app.listCosts(...args),
+    listCostsWithCatalogue: (...args) => app.listCostsWithCatalogue(...args),
     findModelLimits: (...args) => app.findModelLimits(...args),
     previewCostRuleMatchingSpans: (...args) => app.previewCostRuleMatchingSpans(...args),
     upsertCost: (...args) => app.upsertCost(...args),

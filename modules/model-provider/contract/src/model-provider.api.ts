@@ -12,6 +12,7 @@ import type {
   ModelCost,
   ModelCostEstimateInput,
   ModelCostListInput,
+  ModelCostListRow,
   ModelDefaultApiKeyScopeCheck,
   ModelDefaultConfig,
   ModelDefaultEffective,
@@ -309,6 +310,8 @@ export interface ModelProviderApi {
   findDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null>;
   deleteDefaultConfig(input: ModelDefaultDeleteRequest, by: ModelProviderCaller): Promise<void>;
   listCosts(input: ModelCostListInput): Promise<ModelCost[]>;
+  /** Stored rules, most specific first, then every static catalogue rate: main's listing. */
+  listCostsWithCatalogue(input: ModelCostListInput): Promise<ModelCostListRow[]>;
   /** The registry's context-window and output ceilings, or null when it names no such model. */
   findModelLimits(input: { model: string }): ModelLimits | null;
   /** What a cost rule the caller is still typing would match, over the recent window. */

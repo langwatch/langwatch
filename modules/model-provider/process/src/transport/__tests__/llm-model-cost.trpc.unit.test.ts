@@ -4,7 +4,11 @@
  * rename here is a cache-key change in every browser that calls it.
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import {
+  getStaticModelCostRates,
+  modelCostListRowSchema,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -18,6 +22,23 @@ import {
 
 const PROJECT_ID = "project-1";
 
+function stored(input: { id: string; scopeType: "PROJECT" | "ORGANIZATION"; scopeId: string }) {
+  const at = new Date("2026-05-15T12:00:00Z");
+  return {
+    ...input,
+    organizationId: "organization-1",
+    model: `custom/${input.id}`,
+    regex: `^custom/${input.id}$`,
+    inputCostPerToken: 0.000001,
+    outputCostPerToken: null,
+    cacheReadCostPerToken: null,
+    cacheCreationCostPerToken: null,
+    cacheCreation1hCostPerToken: null,
+    createdAt: at,
+    updatedAt: at,
+  };
+}
+
 function mount(
   options: {
     modelProviders?: Partial<ModelProviderApi>;
@@ -25,7 +46,7 @@ function mount(
     spans?: unknown;
   } = {},
 ) {
-  const { app } = mountableModelProviderApp({
+  const { app, repositories } = mountableModelProviderApp({
     modelProviders: options.modelProviders ?? {},
     spans: options.spans,
   });
@@ -37,7 +58,11 @@ function mount(
     members: modelProviderTrpcTestMembers(options.permits ?? (() => true)),
   }).mount(llmModelCostTrpcTransport, () => app);
 
-  return { router, caller: router.createCaller({ actor: { id: "user-1" } }) };
+  return {
+    router,
+    repositories,
+    caller: router.createCaller({ actor: { id: "user-1" } }),
+  };
 }
 
 describe("the llmModelCost tRPC namespace", () => {
@@ -52,6 +77,31 @@ describe("the llmModelCost tRPC namespace", () => {
         "getModelLimits",
         "previewMatchingSpans",
       ]);
+    });
+  });
+
+  describe("when the model-costs page lists a project's costs", () => {
+    it("answers main's body: the stored rules, most specific first, then every catalogue rate", async () => {
+      const { caller, repositories } = mount();
+      await repositories.costs.save(
+        stored({ id: "cost-org", scopeType: "ORGANIZATION", scopeId: "organization-1" }),
+      );
+      await repositories.costs.save(
+        stored({ id: "cost-project", scopeType: "PROJECT", scopeId: PROJECT_ID }),
+      );
+
+      const listed = await caller.getAllForProject({ projectId: PROJECT_ID });
+
+      const catalogue = getStaticModelCostRates();
+      expect(catalogue).toHaveLength(434);
+      expect(listed).toHaveLength(2 + catalogue.length);
+      expect(listed.slice(0, 2).map((row) => ("id" in row ? row.id : null))).toEqual([
+        "cost-project",
+        "cost-org",
+      ]);
+      expect(listed.slice(2)).toEqual(catalogue.map((rate) => ({ ...rate, projectId: "" })));
+      // The runtime only logs a body its declared output refuses, so the schema is asked directly.
+      expect(listed.every((row) => modelCostListRowSchema.validate(row))).toBe(true);
     });
   });
 

@@ -34,6 +34,7 @@ import {
   type ModelCost,
   type ModelCostEstimateInput,
   type ModelCostListInput,
+  type ModelCostListRow,
   type ModelDefaultApiKeyScopeCheck,
   type ModelDefaultConfig,
   type ModelDefaultEffective,
@@ -745,6 +746,11 @@ export class ModelProviderApp implements ModelProviderApi {
   /** The project's custom cost rules. */
   listCosts(input: ModelCostListInput): Promise<ModelCost[]> {
     return this.#modelProviders.listCosts(input);
+  }
+
+  /** What the model-costs page lists: the stored rules, then the static catalogue. */
+  listCostsWithCatalogue(input: ModelCostListInput): Promise<ModelCostListRow[]> {
+    return this.#modelProviders.listCostsWithCatalogue(input);
   }
 
   estimateCost(input: ModelCostEstimateInput): number {
