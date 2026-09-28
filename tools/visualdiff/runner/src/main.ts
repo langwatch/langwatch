@@ -171,7 +171,10 @@ const signInSide = async ({ plan, side }: { plan: Plan; side: Side }): Promise<v
     }
     failures.push(`${email}: ${failure === "" ? "still on an /auth/ page" : failure}`);
   }
-  const page = (await side.ariaSnapshot()).replaceAll("\n", " | ").slice(0, 1500);
+  const page = (await side.ariaSnapshot())
+    .replaceAll(/(textbox "[^"]*"): .*/g, "$1: <typed>")
+    .replaceAll("\n", " | ")
+    .slice(0, 1500);
   throw new Error(
     `${side.name} could not sign in (${failures.join("; ")}) at ${side.page.url()}; page: ${page}`,
   );
