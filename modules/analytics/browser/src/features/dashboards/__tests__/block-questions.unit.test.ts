@@ -6,19 +6,12 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import * as blockQueries from "../blocks/model/block-queries.ts";
 import { boardPromptQuestion, boardSubject } from "../langy/model/board-langy.ts";
 import { BLOCK_QUESTION_SECTIONS, searchBlockQuestions } from "../model/block-questions.ts";
+import { BOARD_LWQL_VIEWS } from "../model/board-lwql-views.ts";
 import { boardWidgetsOf, duplicateSlot } from "../model/board-widgets.ts";
 
 const every = BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions);
-
-/** Every LangWatchQL view the shipped block queries read, so a prompt names only real views. */
-const QUERIED_VIEWS = new Set(
-  Object.values(blockQueries)
-    .filter((value): value is string => typeof value === "string")
-    .flatMap((sql) => [...sql.matchAll(/\b(?:FROM|JOIN)\s+([a-z_]+)/g)].map((match) => match[1])),
-);
 
 const PERIOD = {
   periodStart: Temporal.Instant.from("2026-09-01T00:00:00Z").epochMilliseconds,
@@ -40,10 +33,10 @@ describe("the picker's questions", () => {
     });
 
     /** @scenario "AC12 Only working questions are offered" */
-    it("keeps every prompt tight and points it at a view the block queries read", () => {
+    it("keeps every prompt tight and points it at a real LangWatchQL view", () => {
       for (const { prompt } of every) {
         expect(prompt.split(/\s+/).length).toBeLessThanOrEqual(120);
-        expect([...QUERIED_VIEWS].some((view) => prompt.includes(view))).toBe(true);
+        expect(BOARD_LWQL_VIEWS.some((view) => prompt.includes(view))).toBe(true);
       }
     });
 

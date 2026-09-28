@@ -49,32 +49,34 @@ Feature: Dashboards v1
   # ---------------------------------------------------------------------------
 
   @e2e
-  Scenario: AC4 The ten panels in prototype order
+  Scenario: AC4 The ten widgets in prototype order
     Given a project with every source connected
-    When the member opens the Flight Deck
-    Then the panels appear in this order with their reference titles and subtitles: Status, Throughput latency and errors, Cost efficiency, Failure intelligence, Scenario results, Quality signal, User feedback, Gateway routing, Your coding agents, Most impactful traces
+    When the member starts a board from the Agent Flight Deck template
+    Then its widgets appear in this order with their reference titles and subtitles: Status, Throughput latency and errors, Cost efficiency, Failure intelligence, Scenario results, Quality signal, User feedback, Gateway routing, Your coding agents, Most impactful traces
     And Status, Throughput latency and errors, Your coding agents and Most impactful traces span the full width
-    And the other six panels sit two per row
+    And the other six widgets sit two per row
 
   @unit
   Scenario: AC5 Status tiles compare with the previous period
     Given a request volume, success rate, p95 latency and total cost value for the selected period
     And a request volume, success rate, p95 latency and total cost value for the period immediately before it
-    When the Status tile values are computed
+    When the Status widget's tile values are computed
     Then each tile carries its current value and its change versus the previous period
 
   @integration
   Scenario: AC6 Unconnected source shows a call to action
     Given a project that has never run a scenario
-    When the member views Scenario results
-    Then the panel shows the "Run a scenario" call to action from the reference
+    And a board made from the Agent Flight Deck template
+    When the member views its Scenario results widget
+    Then the widget shows the "Run a scenario" call to action from the reference
     And its button opens the scenarios page
 
   @integration
   Scenario: AC7 Connected state comes from real data
     Given a project that has ingested at least one row for a source
-    When the member opens the Flight Deck
-    Then that source's panel shows data queried from that ingested row
+    And a board made from the Agent Flight Deck template
+    When the member views that source's widget
+    Then it shows data queried from that ingested row
     And no URL flag or setting decided that the source is connected
 
   @integration
@@ -91,8 +93,9 @@ Feature: Dashboards v1
   @integration
   Scenario: AC9 Empty period shows an empty state
     Given a connected source with no rows in the selected period
-    When the member views its panel
-    Then the panel shows an empty state
+    And a board made from the Agent Flight Deck template
+    When the member views its widget for that source
+    Then the widget shows an empty state
     And it is not an error state
     And it is not the call-to-action state
 
@@ -225,26 +228,26 @@ Feature: Dashboards v1
 
   @integration
   Scenario: AC22 An unqueryable source ships as a call to action
-    Given the LWQL catalog check for a panel's source was run at build time
+    Given the LWQL catalog check for a widget's source was run at build time
     And that source is not queryable
-    When the member views the panel
+    When the member views the widget
     Then it shows its call-to-action state for every project
     And it sends no query
 
   @integration
-  Scenario: AC22 A queryable source follows the normal panel rules
-    Given the LWQL catalog check for a panel's source was run at build time
+  Scenario: AC22 A queryable source follows the normal widget rules
+    Given the LWQL catalog check for a widget's source was run at build time
     And that source is queryable
-    When the member views the panel
-    Then it follows the connected, unconnected and empty-period rules like any other panel
+    When the member views the widget
+    Then it follows the connected, unconnected and empty-period rules like any other widget
 
   @integration
   Scenario: AC23 A failing query does not take the board down
-    Given one panel or block whose LWQL query fails
+    Given one widget on a board whose LWQL query fails
     When the member views the board
-    Then that panel shows an error state with a retry
+    Then that widget shows an error state with a retry
     And it is not the empty state and not the call-to-action state
-    And every other panel on the board still renders its own data
+    And every other widget on the board still renders its own data
 
   @integration
   Scenario: AC24 Boards created before this change keep working
@@ -260,42 +263,47 @@ Feature: Dashboards v1
   @integration
   Scenario: AC25 Scenario results shows its own call to action before any row exists
     Given a project that has never recorded a row for Scenario results
-    When the member views the Scenario results panel
-    Then the panel shows Scenario results' own call to action from the prototype
+    And a board made from the Agent Flight Deck template
+    When the member views its Scenario results widget
+    Then the widget shows Scenario results' own call to action from the prototype
     And it is not the empty state of AC9
-    And once one row exists for Scenario results the panel shows data
+    And once one row exists for Scenario results the widget shows data
 
   @integration
   Scenario: AC25 Quality signal shows its own call to action before any row exists
     Given a project that has never recorded a row for Quality signal
-    When the member views the Quality signal panel
-    Then the panel shows Quality signal's own call to action from the prototype
+    And a board made from the Agent Flight Deck template
+    When the member views its Quality signal widget
+    Then the widget shows Quality signal's own call to action from the prototype
     And it is not the empty state of AC9
-    And once one row exists for Quality signal the panel shows data
+    And once one row exists for Quality signal the widget shows data
 
   @integration
   Scenario: AC25 User feedback shows its own call to action before any row exists
     Given a project that has never recorded a row for User feedback
-    When the member views the User feedback panel
-    Then the panel shows User feedback's own call to action from the prototype
+    And a board made from the Agent Flight Deck template
+    When the member views its User feedback widget
+    Then the widget shows User feedback's own call to action from the prototype
     And it is not the empty state of AC9
-    And once one row exists for User feedback the panel shows data
+    And once one row exists for User feedback the widget shows data
 
   @integration
   Scenario: AC25 Gateway routing shows its own call to action before any row exists
     Given a project that has never recorded a row for Gateway routing
-    When the member views the Gateway routing panel
-    Then the panel shows Gateway routing's own call to action from the prototype
+    And a board made from the Agent Flight Deck template
+    When the member views its Gateway routing widget
+    Then the widget shows Gateway routing's own call to action from the prototype
     And it is not the empty state of AC9
-    And once one row exists for Gateway routing the panel shows data
+    And once one row exists for Gateway routing the widget shows data
 
   @integration
   Scenario: AC25 Your coding agents shows its own call to action before any row exists
     Given a project that has never recorded a row for Your coding agents
-    When the member views the Your coding agents panel
-    Then the panel shows Your coding agents' own call to action from the prototype
+    And a board made from the Agent Flight Deck template
+    When the member views its Your coding agents widget
+    Then the widget shows Your coding agents' own call to action from the prototype
     And it is not the empty state of AC9
-    And once one row exists for Your coding agents the panel shows data
+    And once one row exists for Your coding agents the widget shows data
 
   @integration
   Scenario: AC26 A member inside the audience with the edit permission can edit
@@ -346,7 +354,7 @@ Feature: Dashboards v1
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
   # AC 2: "Landing" (changed: the member's own board, or a new "My dashboard"; no built-in board) → Scenario: AC2 Landing on the member's first own board; Scenario: AC2 A member with no board gets My dashboard
   # AC 3: "Sidebar matches the reference" (changed: stored boards only, no "Default" row) → Scenario: AC3 Sidebar matches the reference
-  # AC 4: "The ten panels in prototype order" → Scenario: AC4 The ten panels in prototype order
+  # AC 4: "The ten widgets in prototype order" → Scenario: AC4 The ten widgets in prototype order
   # AC 5: "Status tiles compare with the previous period" → Scenario: AC5 Status tiles compare with the previous period
   # AC 6: "Unconnected source shows a call to action" → Scenario: AC6 Unconnected source shows a call to action
   # AC 7: "Connected state comes from real data" → Scenario: AC7 Connected state comes from real data
@@ -364,7 +372,7 @@ Feature: Dashboards v1
   # AC 19: "LWQL only" → Scenario: AC19 Every dashboard data request goes to LWQL and none to legacy analytics
   # AC 20: "Legacy analytics untouched" → Scenario: AC20 Legacy analytics files are untouched; Scenario: AC20 Legacy analytics pages behave exactly as before
   # AC 21: "Permissions" (sharpened) → Scenario: AC21 A member without analytics:view is refused; Scenario: AC21 A refused member sees the same not-found page
-  # AC 22: "Gateway routing and coding agents ship in the state their data supports" → Scenario: AC22 An unqueryable source ships as a call to action; Scenario: AC22 A queryable source follows the normal panel rules
+  # AC 22: "Gateway routing and coding agents ship in the state their data supports" → Scenario: AC22 An unqueryable source ships as a call to action; Scenario: AC22 A queryable source follows the normal widget rules
   # AC 23: "A failing query does not take the board down" → Scenario: AC23 A failing query does not take the board down
   # AC 24: "Boards created before this change keep working" (sharpened) → Scenario: AC24 Boards created before this change keep working
   # AC 25: "Every optional source has its own call to action" → Scenario: AC25 Scenario results shows its own call to action before any row exists; Scenario: AC25 Quality signal shows its own call to action before any row exists; Scenario: AC25 User feedback shows its own call to action before any row exists; Scenario: AC25 Gateway routing shows its own call to action before any row exists; Scenario: AC25 Your coding agents shows its own call to action before any row exists
