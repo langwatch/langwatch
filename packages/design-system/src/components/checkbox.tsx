@@ -17,10 +17,17 @@ export const Checkbox = React.forwardRef<
     onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   }
 >(function Checkbox(props, ref) {
-  const { icon, children, inputProps, rootRef, ...rest } = props;
+  const { icon, children, inputProps, rootRef, onChange, ...rest } = props;
   return (
-    <ChakraCheckbox.Root ref={rootRef} {...(rest as any as CheckboxProps)}>
-      <ChakraCheckbox.HiddenInput ref={ref} {...inputProps} />
+    <ChakraCheckbox.Root ref={rootRef} {...rest}>
+      <ChakraCheckbox.HiddenInput
+        ref={ref}
+        {...inputProps}
+        onChange={(event) => {
+          inputProps?.onChange?.(event);
+          onChange?.(event);
+        }}
+      />
       <ChakraCheckbox.Control borderColor={!rest.checked ? rest.borderColor : undefined}>
         {icon ?? <ChakraCheckbox.Indicator />}
       </ChakraCheckbox.Control>
@@ -29,16 +36,13 @@ export const Checkbox = React.forwardRef<
   );
 });
 
-export const CheckboxGroup = React.forwardRef<
-  HTMLDivElement,
-  Omit<CheckboxGroupProps, "onChange"> & {
-    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  }
->(function CheckboxGroup(props, ref) {
-  const { children, ...rest } = props;
-  return (
-    <ChakraCheckboxGroup ref={ref} {...(rest as any)}>
-      {children}
-    </ChakraCheckboxGroup>
-  );
-});
+export const CheckboxGroup = React.forwardRef<HTMLDivElement, CheckboxGroupProps>(
+  function CheckboxGroup(props, ref) {
+    const { children, ...rest } = props;
+    return (
+      <ChakraCheckboxGroup ref={ref} {...rest}>
+        {children}
+      </ChakraCheckboxGroup>
+    );
+  },
+);

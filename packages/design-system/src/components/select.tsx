@@ -114,29 +114,26 @@ export const SelectValueText = React.forwardRef<HTMLSpanElement, SelectValueText
   },
 );
 
-export const SelectRoot = React.forwardRef<
-  HTMLDivElement,
-  Omit<ChakraSelect.RootProps, "onChange"> & {
-    onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  }
->(function SelectRoot(props, ref) {
-  return (
-    <ChakraSelect.Root
-      {...(props as any)}
-      ref={ref}
-      positioning={{ sameWidth: true, ...props.positioning }}
-    >
-      {props.asChild ? (
-        props.children
-      ) : (
-        <>
-          <ChakraSelect.HiddenSelect />
-          {props.children}
-        </>
-      )}
-    </ChakraSelect.Root>
-  );
-});
+export const SelectRoot = React.forwardRef<HTMLDivElement, ChakraSelect.RootProps>(
+  function SelectRoot(props, ref) {
+    return (
+      <ChakraSelect.Root
+        {...props}
+        ref={ref}
+        positioning={{ sameWidth: true, ...props.positioning }}
+      >
+        {props.asChild ? (
+          props.children
+        ) : (
+          <>
+            <ChakraSelect.HiddenSelect />
+            {props.children}
+          </>
+        )}
+      </ChakraSelect.Root>
+    );
+  },
+);
 
 interface SelectItemGroupProps extends ChakraSelect.ItemGroupProps {
   label: React.ReactNode;

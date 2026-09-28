@@ -1,4 +1,4 @@
-import { Box, Image, Portal, Text } from "@chakra-ui/react";
+import { Box, Image, type JsxStyleProps, Portal, Text } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useEscapeKey } from "../use-escape-key.ts";
@@ -137,8 +137,7 @@ export const ExternalImage = ({
   dontLinkify?: boolean;
   /** When true, clicking expands the image in place instead of opening new tab */
   expandable?: boolean;
-  [key: string]: any;
-}) => {
+} & JsxStyleProps) => {
   const [error, setError] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   // Store center point of original image

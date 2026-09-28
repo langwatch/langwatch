@@ -1,5 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const PRESS_FLASH_MS = 140;
 const DEMO_FIRST_DELAY_MS = 1500;
@@ -61,21 +61,32 @@ interface KbdProps {
   demoFirstDelayMs?: number;
 }
 
-export function Kbd({
-  children,
-  demo = false,
-  demoEveryMs = DEMO_INTERVAL_MS,
-  demoFirstDelayMs = DEMO_FIRST_DELAY_MS,
-}: KbdProps) {
-  const [pressed, setPressed] = useState(false);
-  const [userPressed, setUserPressed] = useState(false);
-  const flashTimeoutRef = useRef<number | null>(null);
-  const targetKey = useMemo(() => {
-    const label = flattenChildrenToString(children);
-    return deriveKey(label);
-  }, [children]);
+const PRESSED_STYLE = {
+  borderColor: "blue.solid",
+  bg: "blue.subtle",
+  color: "blue.fg",
+  transform: "translateY(1px) scale(0.94)",
+  boxShadow: "none",
+} as const;
 
-  const flash = () => {
+const RESTING_STYLE = {
+  borderColor: "border",
+  bg: "bg.surface",
+  color: "fg.muted",
+  transform: "translateY(0) scale(1)",
+  boxShadow: "0 1px 0 var(--chakra-colors-border-muted)",
+} as const;
+
+function normaliseKey(key: string): string {
+  return key.length === 1 ? key.toLowerCase() : key;
+}
+
+/** A short "pressed" pulse, cleared on its own and on unmount. */
+function useKeyFlash(): { pressed: boolean; flash: () => void } {
+  const [pressed, setPressed] = useState(false);
+  const flashTimeoutRef = useRef<number | null>(null);
+
+  const flash = useCallback(() => {
     setPressed(true);
     if (flashTimeoutRef.current != null) {
       window.clearTimeout(flashTimeoutRef.current);
@@ -84,37 +95,7 @@ export function Kbd({
       setPressed(false);
       flashTimeoutRef.current = null;
     }, PRESS_FLASH_MS);
-  };
-
-  useEffect(() => {
-    if (!targetKey) return;
-    const expected = targetKey.length === 1 ? targetKey.toLowerCase() : targetKey;
-    const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const got = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-      if (got !== expected) return;
-      setUserPressed(true);
-      flash();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [targetKey]);
-
-  // Self-demo loop: runs only when `demo` is on and the user hasn't pressed
-  // the real key yet. First press happens after a short pause so the screen
-  // can settle, then it repeats on `demoEveryMs`.
-  useEffect(() => {
-    if (!demo || userPressed) return;
-    let intervalId: number | null = null;
-    const firstId = window.setTimeout(() => {
-      flash();
-      intervalId = window.setInterval(flash, demoEveryMs);
-    }, demoFirstDelayMs);
-    return () => {
-      window.clearTimeout(firstId);
-      if (intervalId != null) window.clearInterval(intervalId);
-    };
-  }, [demo, userPressed, demoEveryMs, demoFirstDelayMs]);
+  }, []);
 
   useEffect(
     () => () => {
@@ -124,6 +105,81 @@ export function Kbd({
     },
     [],
   );
+
+  return { pressed, flash };
+}
+
+function useRealKeyPress({
+  targetKey,
+  onPress,
+}: {
+  targetKey: string | null;
+  onPress: () => void;
+}): void {
+  useEffect(() => {
+    if (!targetKey) return;
+    const expected = normaliseKey(targetKey);
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (normaliseKey(e.key) !== expected) return;
+      onPress();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [targetKey, onPress]);
+}
+
+/**
+ * Self-demo loop: runs only while `active`. First press happens after a short
+ * pause so the screen can settle, then it repeats every `everyMs`.
+ */
+function useDemoPresses({
+  active,
+  everyMs,
+  firstDelayMs,
+  flash,
+}: {
+  active: boolean;
+  everyMs: number;
+  firstDelayMs: number;
+  flash: () => void;
+}): void {
+  useEffect(() => {
+    if (!active) return;
+    let intervalId: number | null = null;
+    const firstId = window.setTimeout(() => {
+      flash();
+      intervalId = window.setInterval(flash, everyMs);
+    }, firstDelayMs);
+    return () => {
+      window.clearTimeout(firstId);
+      if (intervalId != null) window.clearInterval(intervalId);
+    };
+  }, [active, everyMs, firstDelayMs, flash]);
+}
+
+export function Kbd({
+  children,
+  demo = false,
+  demoEveryMs = DEMO_INTERVAL_MS,
+  demoFirstDelayMs = DEMO_FIRST_DELAY_MS,
+}: KbdProps) {
+  const [userPressed, setUserPressed] = useState(false);
+  const { pressed, flash } = useKeyFlash();
+  const targetKey = useMemo(() => deriveKey(flattenChildrenToString(children)), [children]);
+
+  const onRealPress = useCallback(() => {
+    setUserPressed(true);
+    flash();
+  }, [flash]);
+
+  useRealKeyPress({ targetKey, onPress: onRealPress });
+  useDemoPresses({
+    active: demo && !userPressed,
+    everyMs: demoEveryMs,
+    firstDelayMs: demoFirstDelayMs,
+    flash,
+  });
 
   return (
     <Box
@@ -136,13 +192,9 @@ export function Kbd({
       minWidth="15px"
       borderRadius="sm"
       border="1px solid"
-      borderColor={pressed ? "blue.solid" : "border"}
-      bg={pressed ? "blue.subtle" : "bg.surface"}
       fontSize="2xs"
       fontFamily="mono"
-      color={pressed ? "blue.fg" : "fg.muted"}
-      transform={pressed ? "translateY(1px) scale(0.94)" : "translateY(0) scale(1)"}
-      boxShadow={pressed ? "none" : "0 1px 0 var(--chakra-colors-border-muted)"}
+      {...(pressed ? PRESSED_STYLE : RESTING_STYLE)}
       transition="transform 0.08s ease, background 0.12s ease, border-color 0.12s ease, color 0.12s ease, box-shadow 0.08s ease"
     >
       {children}
