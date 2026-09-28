@@ -958,10 +958,11 @@ jobs:
         # Node @clickhouse/client still sees ECONNREFUSED on its first
         # connect (IPv6/IPv4 dual-stack bind race under --network host).
         # Retry the whole migrate step a couple of times to absorb the
-        # cold-start window.
+        # cold-start window. BUILD_TIME is unset for this one command: the
+        # task reads it as "no datastore here" and returns without migrating.
         run: |
           for i in 1 2 3; do
-            if pnpm task clickhouse-migrate; then
+            if env -u BUILD_TIME pnpm task clickhouse-migrate; then
               exit 0
             fi
             if [ "$i" -lt 3 ]; then
