@@ -19,6 +19,9 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../../agent/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../annotation/contract/tsconfig.build.json"
     },
     {
@@ -50,9 +53,6 @@
     },
     {
       "path": "../../prompt/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/system-migrations/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"

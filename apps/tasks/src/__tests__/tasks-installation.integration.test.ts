@@ -148,6 +148,7 @@ describe("the tasks process installation", () => {
       const names = runtime.tasks(isTask).map((task) => task.name);
       expect(names).toEqual([
         "backfill-annotations-to-clickhouse",
+        "agent-audit-log-ids-backfill",
         "clear-stale-pending-sso-setup",
         "slack-alert",
         "report-schedule-backfill",

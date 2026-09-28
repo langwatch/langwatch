@@ -20,6 +20,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
@@ -31,7 +32,6 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
-    "@langwatch/system-migrations": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",

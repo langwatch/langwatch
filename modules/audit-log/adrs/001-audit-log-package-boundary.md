@@ -46,17 +46,17 @@ The generated module list installs `auditLogServer` in every process; no app
 names it. Package imports never create database clients or read runtime
 configuration.
 
-The explicit `agent-audit-log-ids-backfill` task previews historical repairs by
-default. With `--execute`, it registers the project-rooted
-`AgentAuditLogIdsMigration` with the system migration runner. Redis leases and
-durable tenant checkpoints govern execution; no API or worker boot registers
-this repair automatically. Ambiguous matches hold the project for inspection.
+The one-shot `agent-audit-log-ids-backfill` task (`tasks/agent-audit-log-ids.task.ts`)
+carries main's `scripts/backfill-agent-audit-log-ids.ts`. It writes by default, as the
+script did, and `--dry-run` reports without writing. It runs only when an operator
+launches it through the tasks process; no API or worker boot runs it. An entry with no
+project, or whose window matches more than one agent, is skipped and counted.
 
-Its private migration repository receives a runtime capability for `AuditLog`
-and `Agent` only: it reads timestamp/source-copy candidates from Agent and
-patches AuditLog arguments. This historical exception grants no Agent table
-ownership to AuditLog and adds no repair method to either feature's public API.
-Once pre-fix history is repaired, the explicit task and migration can be removed.
+Its repository is claimed on `AuditLog` alone: it reads the pre-fix entries and
+patches their arguments. The candidate agents come through
+`AgentApi.findIdsCreatedInWindow`, main's query carried across the boundary, so the
+backfill never reads the Agent table and adds no repair method to AuditLog's API.
+Once pre-fix history is repaired, the task and its repository can be removed.
 
 ## Environment and configuration
 

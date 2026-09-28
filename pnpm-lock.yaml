@@ -4886,6 +4886,9 @@ importers:
 
   modules/audit-log/process:
     dependencies:
+      '@langwatch/agent-contract':
+        specifier: workspace:*
+        version: link:../../agent/contract
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../../annotation/contract
@@ -4919,9 +4922,6 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
-      '@langwatch/system-migrations':
-        specifier: workspace:*
-        version: link:../../../packages/system-migrations
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../packages/task
