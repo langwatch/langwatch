@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The installer, the transport declarations a process mounts, and the two
- * adapters that build what the installer's members asks for.
+ * The installer and the transport declarations a process mounts.
  */
-export { scimServer, type ScimBespokeMembers } from "./scim.server.ts";
+export { scimServer } from "./scim.server.ts";
 
 // The four declared doors: three REST families and one tRPC namespace, each
 // inert until a process mounts it on its own runtime.
@@ -18,10 +17,3 @@ export type {
   ScimUserPushOperation,
 } from "./app/scim.members.ts";
 export type { ScimUserProvisioning } from "./services/scim-provisioning.service.ts";
-
-/**
- * The one input `ScimApp` cannot build itself: the durable directory-sync
- * history that states what happened as facts on the connection's identity
- * aggregate (see `ScimBespokeMembers`, above).
- */
-export { createScimSyncLifecycle, type ScimSyncLifecycleAdapterDeps } from "./scim.server.ts";

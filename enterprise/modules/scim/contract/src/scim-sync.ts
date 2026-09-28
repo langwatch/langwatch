@@ -1,9 +1,9 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Directory sync aggregate: one per SSO connection, recording pushes and lifecycle. Audit history
  * only; membership consequences dispatch to the grants ledger. See D08.
  */
+import { identityActorSchema } from "@langwatch/identity-contract";
 import { z } from "zod";
-
-import { identityActorSchema } from "./vocabulary.ts";
 
 export const SCIM_SYNC_EVENT_VERSION_LATEST = "2026-08-24" as const;
 

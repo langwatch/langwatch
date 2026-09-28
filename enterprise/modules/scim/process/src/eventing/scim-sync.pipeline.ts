@@ -1,20 +1,20 @@
 import {
+  SCIM_SYNC_AGGREGATE_TYPE,
+  SCIM_SYNC_PIPELINE_NAME,
+} from "@langwatch/enterprise-scim-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import {
   defineAggregate,
   definePipeline,
-  type Projection,
-  type RegisteredCommand,
   type StateProjectionStore,
-  type StaticPipelineDefinition,
   defineEventingModule,
   type EventingSetup,
 } from "@langwatch/eventing";
-import { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
 
-import type { IdentityApp } from "../app/identity.app.ts";
-import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
+import type { ScimApp } from "../app/scim.app.ts";
+import type { ScimRepositories } from "../repositories/scim.repositories.ts";
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import {
-  type ScimSyncEvent,
   type ScimSyncFoldState,
   ScimSyncStateFoldProjection,
   scimTokenIssuedEventSchema,
@@ -35,11 +35,9 @@ import {
   RevokeScimSyncCommand,
 } from "./scim-sync.intent.ts";
 
-export interface ScimSyncPipelineDeps {
+interface ScimSyncPipelineDeps {
   scimSyncProjectionStore: StateProjectionStore<ScimSyncFoldState>;
-  /** The guards every command handler runs — `@langwatch/identity-process`'s
-   *  ScimSyncGuardsService over the app's projection reads, the same instance shape
-   *  the calling path uses. */
+  /** The guards every command handler runs, over the same head the calling path reads. */
   scimSyncGuards: ScimSyncGuardsService;
 }
 
@@ -47,15 +45,9 @@ export interface ScimSyncPipelineDeps {
  * The directory-sync pipeline (D08). One aggregate per connection's sync; the organization is the
  * tenant. Commands append (waited) and the operational projection folds into the Postgres
  * `ScimSyncState` head in per-sync FIFO. NO PROCESS MANAGER, deliberately.
-/** The directory-sync pipeline as a TYPE, derived from the builder below. */
-export type ScimSyncPipeline = StaticPipelineDefinition<
-  ScimSyncEvent,
-  Record<string, Projection>,
-  RegisteredCommand
->;
-
-export function defineScimSyncPipeline(deps: ScimSyncPipelineDeps): ScimSyncPipeline {
-  const builder = definePipeline({
+ */
+function scimSyncCommands(deps: ScimSyncPipelineDeps) {
+  return definePipeline({
     name: SCIM_SYNC_PIPELINE_NAME,
     aggregate: defineAggregate({
       type: SCIM_SYNC_AGGREGATE_TYPE,
@@ -106,13 +98,18 @@ export function defineScimSyncPipeline(deps: ScimSyncPipelineDeps): ScimSyncPipe
       handlerClass: RevokeScimSyncCommand,
       instance: new RevokeScimSyncCommand(deps.scimSyncGuards),
     });
+}
 
-  return builder.build();
+/** The directory-sync pipeline as a TYPE, derived from the builder above. */
+export type ScimSyncPipeline = ReturnType<ReturnType<typeof scimSyncCommands>["build"]>;
+
+export function defineScimSyncPipeline(deps: ScimSyncPipelineDeps): ScimSyncPipeline {
+  return scimSyncCommands(deps).build();
 }
 
 /** The directory-sync pipeline over its ONE row, in both roles. */
 export function composeScimSyncPipeline(
-  repositories: Pick<IdentityRepositories, "scimSyncs">,
+  repositories: Pick<ScimRepositories, "scimSyncs">,
 ): ScimSyncPipeline {
   return defineScimSyncPipeline({
     scimSyncProjectionStore: repositories.scimSyncs,
@@ -122,7 +119,7 @@ export function composeScimSyncPipeline(
 
 export const scimSyncEventing = defineEventingModule({
   pipeline: SCIM_SYNC_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<IdentityRepositories, IdentityApp>) => app.scimSyncPipeline(),
-  connect: ({ app, commands }) =>
-    app.connectPipeline({ pipeline: SCIM_SYNC_PIPELINE_NAME, commands }),
+  build: ({ repositories }: EventingSetup<ScimRepositories, ScimApp>) =>
+    composeScimSyncPipeline(repositories),
+  connect: ({ app, commands }) => app.connectScimSync(commands),
 });

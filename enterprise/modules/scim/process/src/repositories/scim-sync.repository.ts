@@ -1,4 +1,5 @@
-import type { ScimSyncState } from "@langwatch/identity-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { ScimSyncState } from "@langwatch/enterprise-scim-contract";
 
 /**
  * What the directory-sync guards read (D08): the folded state of one

@@ -67,7 +67,7 @@ import {
   EntitlementApi,
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender } from "@langwatch/eventing";
+import type { EventingCommandSender, EventSourcing } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
@@ -82,7 +82,18 @@ import {
   buildScimDirectoryPipeline,
   type ScimDirectoryDefinition,
 } from "../eventing/scim-directory.pipeline.ts";
+import type { ScimSyncEvent } from "../eventing/scim-sync-state.projection.ts";
+import {
+  EventingScimSyncActivityRepository,
+  type ScimSyncEventReads,
+} from "../repositories/eventing/eventing.scim-sync-activity.repository.ts";
+import { scimOperatorReads } from "../repositories/prisma/prisma.scim-sync-projection.repository.ts";
 import type { ScimRepositories } from "../repositories/scim.repositories.ts";
+import { newScimSyncCommandId } from "../rules/scim-sync-id.rules.ts";
+import {
+  ScimSyncLedgerWriterService,
+  type ScimSyncSenders,
+} from "../services/eventing-scim-sync-ledger.service.ts";
 import { PostgresScimService } from "../services/postgres-scim.service.ts";
 import { ScimConnectionRetirementService } from "../services/scim-connection-retirement.service.ts";
 import { ScimConnectionsService } from "../services/scim-connections.service.ts";
@@ -92,23 +103,13 @@ import { ScimDirectoryMoveService } from "../services/scim-directory-move.servic
 import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
 import { ScimOversightService } from "../services/scim-oversight.service.ts";
 import { ScimReconciliationService } from "../services/scim-reconciliation.service.ts";
-import type { ScimSyncLifecycle } from "./scim.members.ts";
-
-/**
- * The durable directory-sync history (D08): not drawn from `reads()`, because
- * it states facts on Identity's own `ScimSync` aggregate through guard and
- * ledger primitives Identity's public API does not expose to a peer module
- * today. A process composes one with `createScimSyncLifecycle`
- * (`scim.server.ts`) and supplies it beside `reads()`: it is neither a
- * process read nor a peer capability.
- */
-export type ScimBespokeMembers = Readonly<{
-  lifecycle: ScimSyncLifecycle;
-}>;
+import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
+import { ScimSyncLifecycleService } from "../services/scim-sync-lifecycle.service.ts";
+import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 
 type ScimSetup = FeatureSetup<
   typeof ScimApp.dependencies,
-  ScimBespokeMembers & MembersRead<typeof ScimApp.reads>,
+  MembersRead<typeof ScimApp.reads>,
   ScimServerConfig,
   ScimRepositories
 >;
@@ -213,6 +214,17 @@ function findBearer(authorization: string | null): string | null {
   return token.length > 0 ? token : null;
 }
 
+/** The directory-sync log's store, resolved per read so a stack not yet up at compose still answers. */
+function scimSyncEventStore(eventing: EventSourcing): () => Promise<ScimSyncEventReads> {
+  return async () => {
+    const store = eventing.getEventStore<ScimSyncEvent>();
+    if (!store) {
+      throw new Error("scim sync activity cannot read: the event-sourcing stack is unavailable");
+    }
+    return store;
+  };
+}
+
 /** Whether this user is on the staff list that may read across every customer. */
 type ScimOperatorGate = (userId: string) => Promise<boolean>;
 
@@ -245,7 +257,8 @@ export class ScimApp implements ScimApiContract {
   };
   static readonly config = scimConfig;
   static readonly secrets = { ...scimSecrets, ...scimTokenPepperSecrets } as const;
-  static readonly reads = reads();
+  static readonly reads = reads("eventing");
+  static readonly operatorReads = scimOperatorReads;
 
   readonly #scim: ScimService;
   readonly #connections: ScimConnectionsService;
@@ -259,6 +272,7 @@ export class ScimApp implements ScimApiContract {
   readonly #operators: ScimOperatorGate | undefined;
   #directoryMove: ScimDirectoryMoveService | undefined;
   #requestDirectoryMove: ScimDirectoryMoveSender | undefined;
+  #scimSyncLedger: ScimSyncLedgerWriterService | undefined;
 
   private constructor(options: ScimAppOptions) {
     this.#scim = options.scim;
@@ -286,6 +300,21 @@ export class ScimApp implements ScimApiContract {
     const tokenPepper = await secrets.into(ScimApp.secrets.tokenPepper, (credentials) =>
       secrets.into(ScimApp.secrets.tokenPepperFallback, (session) => credentials ?? session),
     );
+    const scimSyncLedger = ScimSyncLedgerWriterService.create();
+    const lifecycle = ScimSyncLifecycleService.create({
+      guards: ScimSyncGuardsService.create({ syncs: repositories.scimSyncs }),
+      ledger: scimSyncLedger,
+      newCommandId: newScimSyncCommandId,
+    });
+    const syncs = ScimSyncReadsService.create({
+      syncs: repositories.scimSyncs,
+      // Absent where no event stack was composed: an empty log would read as a quiet directory.
+      activity: members.eventing.isEnabled
+        ? EventingScimSyncActivityRepository.create({
+            eventStore: scimSyncEventStore(members.eventing),
+          })
+        : null,
+    });
     const scim = PostgresScimService.create({
       repository: repositories.scim,
       writer: dependencies.authorization,
@@ -293,7 +322,7 @@ export class ScimApp implements ScimApiContract {
       governance: dependencies.governance,
       organization: dependencies.organization,
       entitlements: dependencies.entitlements,
-      lifecycle: members.lifecycle,
+      lifecycle,
       provenOffboarding: config.provenOffboarding,
       tokenPepper,
     });
@@ -309,6 +338,7 @@ export class ScimApp implements ScimApiContract {
       }),
       reconciliation: ScimReconciliationService.create({
         identity: dependencies.identity,
+        syncs,
         grants: dependencies.authorization,
         people: dependencies.users,
         directory: scim,
@@ -317,13 +347,13 @@ export class ScimApp implements ScimApiContract {
       auditLog: dependencies.auditLog,
       webhookSecret: () => auth0WebhookSecret,
       oversight: ScimOversightService.create({
-        syncs: () => dependencies.identity.scimSyncReads(),
+        syncs,
         organizations: dependencies.organization,
         identities: repositories.scim,
-        lifecycle: members.lifecycle,
+        lifecycle,
         deprovision: ScimDeprovisionService.create({
           grants: dependencies.authorization,
-          lifecycle: members.lifecycle,
+          lifecycle,
           organization: dependencies.organization,
         }),
       }),
@@ -334,8 +364,9 @@ export class ScimApp implements ScimApiContract {
     });
     app.#directoryMove = ScimDirectoryMoveService.create({
       directory: repositories.scim,
-      lifecycle: members.lifecycle,
+      lifecycle,
     });
+    app.#scimSyncLedger = scimSyncLedger;
     return app;
   }
 
@@ -351,6 +382,11 @@ export class ScimApp implements ScimApiContract {
 
   connectDirectory(commands: Readonly<{ requestDirectoryMove: ScimDirectoryMoveSender }>): void {
     this.#requestDirectoryMove = commands.requestDirectoryMove;
+  }
+
+  /** scim-sync's senders: the directory-sync history stages each fact through them. */
+  connectScimSync(commands: ScimSyncSenders): void {
+    this.#scimSyncLedger?.connect(commands);
   }
 
   moveToConnection: ScimApiContract["moveToConnection"] = async (input) => {

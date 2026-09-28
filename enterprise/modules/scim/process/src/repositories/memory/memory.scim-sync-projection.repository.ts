@@ -1,10 +1,11 @@
+import { ScimSyncNotFoundError, type ScimSyncState } from "@langwatch/enterprise-scim-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
   StoredProjectionRead,
 } from "@langwatch/eventing";
-import { ScimSyncNotFoundError, type ScimSyncState } from "@langwatch/identity-contract";
 
 import type { ScimSyncFoldState } from "../../eventing/scim-sync-state.projection.ts";
 import { ScimSyncReadRepository } from "../scim-sync.repository.ts";
@@ -64,7 +65,7 @@ export class MemoryScimSyncProjectionRepository
           value.toLowerCase().includes(term),
         ),
     );
-    const start = (args.page - 1) * args.pageSize;
+    const start = args.page * args.pageSize;
     return { syncs: matching.slice(start, start + args.pageSize), total: matching.length };
   }
 

@@ -1,15 +1,21 @@
 import type {
+  ScimRevokeCause,
+  ScimSyncLifecycleState,
+  ScimSyncState,
+} from "@langwatch/enterprise-scim-contract";
+import { ScimSyncNotFoundError, scimSyncFailureSchema } from "@langwatch/enterprise-scim-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
   StoredProjectionRead,
 } from "@langwatch/eventing";
-import type {
-  ScimRevokeCause,
-  ScimSyncLifecycleState,
-  ScimSyncState,
-} from "@langwatch/identity-contract";
-import { ScimSyncNotFoundError, scimSyncFailureSchema } from "@langwatch/identity-contract";
+import {
+  OperatorRead,
+  type PrismaModelClient,
+  type ScopedOperatorReads,
+} from "@langwatch/prisma-client";
 import type {
   Prisma,
   PrismaClient,
@@ -21,6 +27,15 @@ import type { ScimSyncFoldState } from "../../eventing/scim-sync-state.projectio
 import type { ScimSyncReadRepository } from "../scim-sync.repository.ts";
 
 const storedFailuresSchema = z.array(scimSyncFailureSchema);
+
+/** Scim's declared read across organizations, named on `ScimApp` (ARCHITECTURE §7). */
+export const scimOperatorReads = {
+  syncs: OperatorRead.of("ScimSyncState", { actions: ["findMany", "count"] }),
+};
+
+/** The member the root hands scim's live registry, scoped to the handle above. */
+export type ScimOperatorReadsMember = Readonly<{ operatorReads: ScopedOperatorReads }>;
+
 /**
  * The directory-sync pipeline's projection store (D08): the Postgres `ScimSyncState` head and its
  * cursor, written under the queue's per-sync lock, plus the read the guards run against.
@@ -28,11 +43,21 @@ const storedFailuresSchema = z.array(scimSyncFailureSchema);
 export class PrismaScimSyncProjectionRepository
   implements StateProjectionStore<ScimSyncFoldState>, ScimSyncReadRepository
 {
-  static create(prisma: PrismaClient): PrismaScimSyncProjectionRepository {
-    return new PrismaScimSyncProjectionRepository(prisma);
+  /** The fold and the tenant reads run on the guarded client; the operator page on the declared read. */
+  static create({
+    prisma,
+    operatorReads,
+  }: { prisma: PrismaClient } & ScimOperatorReadsMember): PrismaScimSyncProjectionRepository {
+    return operatorReads.into(
+      scimOperatorReads.syncs,
+      (operator) => new PrismaScimSyncProjectionRepository(prisma, operator),
+    );
   }
 
-  constructor(private readonly prisma: PrismaClient) {}
+  private constructor(
+    private readonly prisma: PrismaClient,
+    private readonly operator: PrismaModelClient<"ScimSyncState">,
+  ) {}
 
   async get(
     key: string,
@@ -149,13 +174,13 @@ export class PrismaScimSyncProjectionRepository
         }
       : {};
     const [rows, total] = await Promise.all([
-      this.prisma.scimSyncState.findMany({
+      this.operator.scimSyncState.findMany({
         where,
         orderBy: { updatedAt: "desc" },
         skip: page * pageSize,
         take: pageSize,
       }),
-      this.prisma.scimSyncState.count({ where }),
+      this.operator.scimSyncState.count({ where }),
     ]);
     return {
       syncs: rows.map((row) => PrismaScimSyncProjectionRepository.rowToScimSync(row)),
@@ -168,8 +193,8 @@ export class PrismaScimSyncProjectionRepository
   }: {
     connectionId: string;
   }): Promise<ScimSyncState[]> {
-    const row = await this.prisma.scimSyncState.findUnique({ where: { id: connectionId } });
-    return row ? [PrismaScimSyncProjectionRepository.rowToScimSync(row)] : [];
+    const rows = await this.operator.scimSyncState.findMany({ where: { id: connectionId } });
+    return rows.map((row) => PrismaScimSyncProjectionRepository.rowToScimSync(row));
   }
 
   /**

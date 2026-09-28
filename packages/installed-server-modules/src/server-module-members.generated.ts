@@ -66,6 +66,6 @@ export const serverModuleMembers = {
   licensing: ["logger", "prisma"],
   "managed-provider": [],
   saas: ["isSaas"],
-  scim: [],
+  scim: ["eventing"],
   sso: ["isSaas", "logger", "publicBaseUrl"],
 } as const;

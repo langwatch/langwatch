@@ -1,4 +1,3 @@
-import { HandledError } from "@langwatch/handled-error";
 import {
   type IssueScimTokenCommandData,
   type RecordScimApplyFailureCommandData,
@@ -17,7 +16,9 @@ import {
   SCIM_USER_PUSHED_EVENT_TYPE,
   type ScimSyncFactInput,
   type ScimSyncState,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { HandledError } from "@langwatch/handled-error";
 
 import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
 

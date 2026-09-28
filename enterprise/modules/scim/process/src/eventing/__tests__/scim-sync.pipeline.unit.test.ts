@@ -1,10 +1,11 @@
-import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import {
   emptyScimSync,
   ScimSyncNotFoundError,
   type ScimSyncState,
   scimSyncIdFor,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { ScimSyncGuardsService } from "../../services/scim-sync-guards.service.ts";

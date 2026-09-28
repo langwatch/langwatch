@@ -1,4 +1,5 @@
-import type { ScimSyncActivityEntry } from "@langwatch/identity-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { ScimSyncActivityEntry } from "@langwatch/enterprise-scim-contract";
 
 /**
  * A connection's directory-sync log, read as a sequence (ADR-126). The

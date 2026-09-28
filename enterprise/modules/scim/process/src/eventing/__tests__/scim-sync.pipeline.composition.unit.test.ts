@@ -1,14 +1,16 @@
+import { SCIM_TOKEN_REVOKED_EVENT_TYPE } from "@langwatch/enterprise-scim-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
-import { SCIM_TOKEN_REVOKED_EVENT_TYPE } from "@langwatch/identity-contract";
+import { OperatorReadsResolver } from "@langwatch/prisma-client";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { liveRepositories } from "../../__tests__/support/live-repositories.ts";
-import type { ScimSyncFoldState } from "../../eventing/scim-sync-state.projection.ts";
 import {
-  composeScimSyncPipeline,
-  type ScimSyncPipeline,
-} from "../../eventing/scim-sync.pipeline.ts";
+  PrismaScimSyncProjectionRepository,
+  scimOperatorReads,
+} from "../../repositories/prisma/prisma.scim-sync-projection.repository.ts";
+import type { ScimSyncFoldState } from "../scim-sync-state.projection.ts";
+import { composeScimSyncPipeline, type ScimSyncPipeline } from "../scim-sync.pipeline.ts";
 
 const ORGANIZATION = "organization_acme";
 const SYNC = "scimsync_1";
@@ -26,7 +28,15 @@ function recordingDatabase() {
 
 function compose() {
   const recording = recordingDatabase();
-  const pipeline: ScimSyncPipeline = composeScimSyncPipeline(liveRepositories(recording.database));
+  const operatorReads = OperatorReadsResolver.over({ mint: () => recording.database }).scopeTo({
+    owner: "scim",
+    declared: Object.values(scimOperatorReads),
+  });
+  const scimSyncs = PrismaScimSyncProjectionRepository.create({
+    prisma: recording.database,
+    operatorReads,
+  });
+  const pipeline: ScimSyncPipeline = composeScimSyncPipeline({ scimSyncs });
   return { ...recording, pipeline };
 }
 

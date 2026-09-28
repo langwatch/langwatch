@@ -1,9 +1,10 @@
-import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
-import type { ScimSyncCommand, ScimSyncFactInput } from "@langwatch/identity-contract";
+import type { ScimSyncCommand, ScimSyncFactInput } from "@langwatch/enterprise-scim-contract";
 import {
   SCIM_SYNC_AGGREGATE_TYPE,
   SCIM_SYNC_EVENT_VERSION_LATEST,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 
 import type { ScimSyncEvent } from "./scim-sync-state.projection.ts";
 

@@ -10,7 +10,7 @@ import {
   SCIM_USER_PUSHED_EVENT_TYPE,
   ScimSyncNotFoundError,
   type ScimSyncState,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
 import { describe, expect, it } from "vitest";
 
 import {

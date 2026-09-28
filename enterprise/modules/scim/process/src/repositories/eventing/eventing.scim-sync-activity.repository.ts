@@ -1,9 +1,10 @@
-import { type EventStore, createTenantId } from "@langwatch/eventing";
 import {
   SCIM_SYNC_AGGREGATE_TYPE,
   type ScimSyncActivityEntry,
   scimSyncIdFor,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { type EventStore, createTenantId } from "@langwatch/eventing";
 
 import type { ScimSyncEvent } from "../../eventing/scim-sync-state.projection.ts";
 import { scimSyncActivityOutcome } from "../../rules/scim-sync-activity.rules.ts";

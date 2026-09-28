@@ -44,3 +44,34 @@ Feature: Declared operator reads across organizations
     Given the operator reads resolver has sealed
     When a module resolves its declared handle
     Then the resolve is refused
+
+  # Governance declares the suppression snapshot's two reads (ErasedIdentifierSuppression,
+  # GovernanceTenantHistory, findMany only); the guard exempts neither model any more.
+
+  @unit
+  Scenario: Governance reads the erasure snapshot across organizations through its declared handles
+    Given governance declared operator reads of the suppression and tenant-history tables
+    When the erasure suppression snapshot loads
+    Then every organization's digests and tenants are read through those two handles
+
+  @unit
+  Scenario: Governance's erasure snapshot is refused where its operator reads were not declared
+    Given governance's operator reads scoped to no handles
+    When its live repositories build the suppression snapshot
+    Then the build is refused and no client is minted
+
+  # Enterprise scim owns ScimSyncState and declares its operator read (findMany, count), so
+  # /ops/backoffice/directory-sync pages every organization's syncs without a guard exemption.
+
+  @unit
+  Scenario: Scim lists every organization's directory syncs through its declared handle
+    Given scim declared an operator read of ScimSyncState with findMany and count
+    When the platform operator lists directory syncs
+    Then every organization's syncs are paged and counted through that handle
+    And the guarded client is not asked
+
+  @unit
+  Scenario: Scim's directory-sync list is refused where its operator read was not declared
+    Given scim's operator reads scoped to no handles
+    When its live repositories build the directory-sync store
+    Then the build is refused and no client is minted

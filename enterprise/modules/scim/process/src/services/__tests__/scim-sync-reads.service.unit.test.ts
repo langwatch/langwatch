@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * Identity says where each connection's sync stands, scoped to the asking
@@ -7,7 +8,7 @@ import {
   emptyScimSync,
   ScimSyncNotFoundError,
   type ScimSyncState,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
 import { describe, expect, it } from "vitest";
 
 import { ScimSyncReadRepository } from "../../repositories/scim-sync.repository.ts";

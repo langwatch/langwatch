@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Directory-sync pipeline identity: one aggregate per sync keyed by scimSyncId, tenanted by
  * organizationId. Separate pipeline because sync and connection lifecycles differ. See D08.
  */

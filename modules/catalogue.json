@@ -391,7 +391,7 @@
       "id": "scim",
       "root": "enterprise/modules/scim",
       "classification": "enterprise",
-      "subjects": ["scim"]
+      "subjects": ["scim", "scim-sync"]
     },
     {
       "id": "sso",

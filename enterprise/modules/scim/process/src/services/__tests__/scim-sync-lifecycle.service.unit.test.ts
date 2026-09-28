@@ -12,7 +12,7 @@ import {
   SCIM_USER_PUSHED_EVENT_TYPE,
   type ScimSyncCommand,
   type ScimSyncFactInput,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {

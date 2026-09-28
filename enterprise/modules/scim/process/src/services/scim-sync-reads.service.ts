@@ -1,19 +1,18 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
-  IdentityCapabilityUnavailableError,
+  ScimCapabilityUnavailableError,
   type ScimSyncActivityEntry,
-  type ScimSyncReadsApi,
   type ScimSyncState,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
 
 import type { ScimSyncActivityRepository } from "../repositories/scim-sync-activity.repository.ts";
 import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
 
 /**
- * Where an organization's directory syncs stand, as a peer is answered.
- * Identity owns the folded state; the directory module composes its
- * reconciliation view from this beside the people it pushed itself.
+ * Where directory syncs stand: an organization's own, for its reconciliation
+ * view, and every organization's, for the platform operator (ADR-122).
  */
-export class ScimSyncReadsService implements ScimSyncReadsApi {
+export class ScimSyncReadsService {
   static create(deps: {
     syncs: ScimSyncReadRepository;
     activity: ScimSyncActivityRepository | null;
@@ -70,7 +69,7 @@ export class ScimSyncReadsService implements ScimSyncReadsApi {
     connectionId: string;
     limit: number;
   }): Promise<ScimSyncActivityEntry[]> {
-    if (!this.activity) throw new IdentityCapabilityUnavailableError("SCIM directory activity");
+    if (!this.activity) throw new ScimCapabilityUnavailableError("SCIM directory activity");
     return [...(await this.activity.findActivity(input))];
   }
 }

@@ -1,10 +1,4 @@
 import {
-  type Command,
-  type CommandHandler,
-  type CommandSchema,
-  defineCommandSchema,
-} from "@langwatch/eventing";
-import {
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,
   issueScimTokenCommandDataSchema,
   RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
@@ -18,7 +12,14 @@ import {
   recordScimUserPushCommandDataSchema,
   revokeScimSyncCommandDataSchema,
   type ScimSyncCommand,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import {
+  type Command,
+  type CommandHandler,
+  type CommandSchema,
+  defineCommandSchema,
+} from "@langwatch/eventing";
 import type { ZodTypeAny, z } from "zod";
 
 import type { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";

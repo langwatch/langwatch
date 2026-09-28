@@ -1,16 +1,17 @@
-/**
- * @vitest-environment node
- * A connection's directory-sync log, read: newest first, tenant-scoped, ids only.
- * Corresponds to enterprise/modules/scim/specs/scim.feature.
- */
-import { type EventStore, createTenantId } from "@langwatch/eventing";
 import {
   SCIM_APPLY_FAILED_EVENT_TYPE,
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
   SCIM_SYNC_AGGREGATE_TYPE,
   SCIM_SYNC_EVENT_VERSION_LATEST,
   SCIM_USER_PUSHED_EVENT_TYPE,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * @vitest-environment node
+ * A connection's directory-sync log, read: newest first, tenant-scoped, ids only.
+ * Corresponds to enterprise/modules/scim/specs/scim.feature.
+ */
+import { type EventStore, createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import type { ScimSyncEvent } from "../../../eventing/scim-sync-state.projection.ts";

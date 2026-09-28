@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * D08's remainder, over the real guards: a token belongs to one connection,
  * its pushes are attributed to it, and every membership a push causes is
@@ -10,7 +11,7 @@ import {
   type ScimSyncFactInput,
   ScimSyncNotFoundError,
   type ScimSyncState,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ScimSyncReadRepository } from "../../repositories/scim-sync.repository.ts";

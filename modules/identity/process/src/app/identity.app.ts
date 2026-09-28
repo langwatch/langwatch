@@ -66,7 +66,6 @@ import {
   composeJoinRequestPipeline,
   type JoinRequestPipeline,
 } from "../eventing/join-request.pipeline.ts";
-import { composeScimSyncPipeline, type ScimSyncPipeline } from "../eventing/scim-sync.pipeline.ts";
 import {
   composeSsoConnectionGraph,
   type SsoConnectionPipeline,
@@ -115,8 +114,6 @@ import { OrganizationMfaNotifierService } from "../services/organization-mfa-not
 import { OrganizationMfaService } from "../services/organization-mfa.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
 import { CachedIdentityLatchService } from "../services/per-subject-cached-latch.service.ts";
-import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
-import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { SignInAccountLookupService } from "../services/signin-account-lookup.service.ts";
 import { SignInRouterService } from "../services/signin-router.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
@@ -224,8 +221,6 @@ type IdentityAppParts = {
   ssoBreakGlass: SsoBreakGlassService;
   ssoSetup: SsoSetupService;
   ssoSetupCommands: SsoSetupCommandsService | null;
-  scimSyncGuards: ScimSyncGuardsService;
-  scimSyncReads: ScimSyncReadsService;
   lookup: IdentityLookupService;
   twoStepAccounts: TwoStepAccountService;
   organizationMfa: OrganizationMfaService;
@@ -233,12 +228,11 @@ type IdentityAppParts = {
   pipelines: IdentityPipelineBuilders;
 };
 
-/** The four pipelines' definitions over the module's own rows, in every role (Alex, 2026-09-27). */
+/** The three pipelines' definitions over the module's own rows, in every role (2026-09-27). */
 type IdentityPipelineBuilders = {
   eventing: ConnectedIdentityEventing;
   identity: () => IdentityPipeline;
   joinRequests: () => JoinRequestPipeline;
-  scimSync: () => ScimSyncPipeline;
   ssoConnections: () => SsoConnectionPipeline;
 };
 
@@ -662,11 +656,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       activity: setup.repositories.ssoMigrationEvidence,
       migrations: ssoMigrationProgress,
     });
-    const scimSyncGuards = ScimSyncGuardsService.create({ syncs: infrastructure.scimSyncs });
-    const scimSyncReads = ScimSyncReadsService.create({
-      syncs: infrastructure.scimSyncs,
-      activity: infrastructure.scimSyncActivity,
-    });
     const auth = setup.dependencies.auth;
     const resolveAuthProvider = () => auth.resolveAuthProvider();
     // Main's router (identity/runtime.ts): projected connections, the method policy, one
@@ -744,8 +733,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       ssoBreakGlass: ssoBreakGlassGrants,
       ssoSetup,
       ssoSetupCommands,
-      scimSyncGuards,
-      scimSyncReads,
       lookup: IdentityLookupService.create({
         reads: setup.repositories.identityLookup,
         history: setup.repositories.identityHistory,
@@ -802,7 +789,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
               plans: setup.dependencies.entitlements,
             }),
           }),
-        scimSync: () => composeScimSyncPipeline(setup.repositories),
         ssoConnections: ssoConnectionGraph.pipeline,
       },
     });
@@ -814,10 +800,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
 
   joinRequestPipeline(): JoinRequestPipeline {
     return this.#parts.pipelines.joinRequests();
-  }
-
-  scimSyncPipeline(): ScimSyncPipeline {
-    return this.#parts.pipelines.scimSync();
   }
 
   ssoConnectionPipeline(): SsoConnectionPipeline {
@@ -1088,14 +1070,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     }
 
     return this.#parts.ssoSetupCommands;
-  }
-
-  scimSyncGuards(): ScimSyncGuardsService {
-    return this.#parts.scimSyncGuards;
-  }
-
-  scimSyncReads(): ScimSyncReadsService {
-    return this.#parts.scimSyncReads;
   }
 
   lookupAddress(input: {
