@@ -20,6 +20,17 @@ describe("assertLegacyFiltersKeyed()", () => {
     });
   });
 
+  describe("when a keyed filter is empty", () => {
+    it("accepts it, since an empty filter applies no condition", () => {
+      expect(() =>
+        assertLegacyFiltersKeyed({
+          filters: { "evaluations.passed": [], "metadata.value": {} },
+          offersFilterString: true,
+        }),
+      ).not.toThrow();
+    });
+  });
+
   describe("when a keyed filter is a flat list", () => {
     it("refuses it with 422, naming the field and the filter-string form", () => {
       let thrown: unknown;
@@ -36,9 +47,7 @@ describe("assertLegacyFiltersKeyed()", () => {
       expect(error.httpStatus).toBe(422);
       expect(error.meta?.fields).toEqual(["filters.evaluations.passed"]);
       const reason = error.reasons[0] as SchemaFailure | undefined;
-      expect(String(reason?.meta?.message)).toContain(
-        "evaluatorVerdict:fail",
-      );
+      expect(String(reason?.meta?.message)).toContain("evaluatorVerdict:fail");
     });
   });
 

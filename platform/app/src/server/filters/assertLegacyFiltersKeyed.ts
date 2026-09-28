@@ -30,6 +30,9 @@ const FILTER_STRING_HINTS: Partial<Record<FilterField, string>> = {
 };
 
 /**
+ * Refuses a trace search whose keyed filter fields arrive shallower than their
+ * key requires, instead of letting them match nothing.
+ *
  * @param offersFilterString - whether the route also takes a `filter` string,
  *   so the refusal can point at the simpler form.
  * @throws RequestValidationError 422, one violation per keyed field sent
@@ -74,25 +77,51 @@ function unkeyedFilterViolations({
 
   return Object.entries(filters).flatMap(([name, value]) => {
     const field = name as FilterField;
-    const definition = availableFilters[field];
-    if (!definition?.requiresKey) return [];
-
-    const requiredDepth = definition.requiresSubkey ? 2 : 1;
-    if (depthOf(value) >= requiredDepth) return [];
-
-    const shape = definition.requiresSubkey
-      ? `{"${field}": {"<${definition.requiresKey.filter}>": {"<${definition.requiresSubkey.filter}>": [...]}}}`
-      : `{"${field}": {"<${definition.requiresKey.filter}>": [...]}}`;
-    const hint = offersFilterString ? FILTER_STRING_HINTS[field] : undefined;
-    return [
-      {
-        field: `filters.${field}`,
-        type: "filter_key_required",
-        message: `"${field}" is keyed by ${definition.requiresKey.filter}, so it takes ${shape}. Without the key it matches no trace.${hint ? ` The filter string is simpler: ${hint}.` : ""}`,
-        received: value,
-      },
-    ];
+    return isUnkeyed(field, value)
+      ? [unkeyedViolation({ field, value, offersFilterString })]
+      : [];
   });
+}
+
+/** Whether a keyed field arrived shallower than its key (and subkey) require. */
+function isUnkeyed(field: FilterField, value: unknown): boolean {
+  const definition = availableFilters[field];
+  if (!definition?.requiresKey) return false;
+  // An empty list or map applies no condition at all, so nothing is lost.
+  if (isEmpty(value)) return false;
+  const requiredDepth = definition.requiresSubkey ? 2 : 1;
+  return depthOf(value) < requiredDepth;
+}
+
+function unkeyedViolation({
+  field,
+  value,
+  offersFilterString,
+}: {
+  field: FilterField;
+  value: unknown;
+  offersFilterString: boolean;
+}): FieldViolation {
+  const { requiresKey, requiresSubkey } = availableFilters[field];
+  const key = requiresKey?.filter;
+  const shape = requiresSubkey
+    ? `{"${field}": {"<${key}>": {"<${requiresSubkey.filter}>": [...]}}}`
+    : `{"${field}": {"<${key}>": [...]}}`;
+  const hint = offersFilterString ? FILTER_STRING_HINTS[field] : undefined;
+  return {
+    field: `filters.${field}`,
+    type: "filter_key_required",
+    message: `"${field}" is keyed by ${key}, so it takes ${shape}. Without the key it matches no trace.${hint ? ` The filter string is simpler: ${hint}.` : ""}`,
+    received: value,
+  };
+}
+
+function isEmpty(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === "object" && value !== null) {
+    return Object.keys(value).length === 0;
+  }
+  return value === undefined || value === null;
 }
 
 /** How many object levels sit above the value list: 0 for a flat list. */
