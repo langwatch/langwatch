@@ -69,13 +69,20 @@ function sourceRelation({
  * The predicate a PostgreSQL-resident view carries so the read that reaches the primary is the
  * caller's tenant and not the whole table.
  */
-function postgresTenantPredicate({ names }: { names: LangWatchQLNames }): string {
+function postgresTenantPredicate({
+  names,
+  sourceDatabase,
+}: {
+  names: LangWatchQLNames;
+  /** Where the key map lives: the app's own ClickHouse database in a real deploy (migration 00084). */
+  sourceDatabase: string;
+}): string {
   // The key map is aliased and the inner reference qualified because the two relations name
   // their tenant column the same way: written bare, the identifier could bind to the outer
   // scope and turn this into a correlated subquery, which ClickHouse does not support and would
   // fail rather than silently widen — but failing at provisioning time is not a risk worth
   // taking for two characters.
-  const keyMap = `${sqlText.assertIdentifier(names.database, "database")}.${sqlText.assertIdentifier(names.keyMapTable, "keyMapTable")}`;
+  const keyMap = `${sqlText.assertIdentifier(sourceDatabase, "sourceDatabase")}.${sqlText.assertIdentifier(names.keyMapTable, "keyMapTable")}`;
 
   // The self-policy narrows the subquery to one *hash*, not to one *row*. The key map is
   // `ENGINE = MergeTree ORDER BY KeyHash`, which enforces no uniqueness, so a retried
@@ -355,7 +362,9 @@ export class LangWatchQLViewStatementsService {
     const from = strategy === "final" && !postgres && !grouped ? `${aliased} FINAL` : aliased;
     const joinClause = joinRelationClause(view, sourceDatabase);
     const enginePredicate = strategy === "in-tuple" ? `\n${dedupPredicate(view, relation)}` : "";
-    const where = postgres ? `\n${postgresTenantPredicate({ names })}` : enginePredicate;
+    const where = postgres
+      ? `\n${postgresTenantPredicate({ names, sourceDatabase })}`
+      : enginePredicate;
     const preFilter = preFilterClause(view, where);
     const groupBy = grouped
       ? `\nGROUP BY ${grain.map((column) => sourceColumn(catalogShapes.physicalColumn(view, column))).join(", ")}`
