@@ -23,6 +23,7 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import type { RecordSeatLimitReachedCommandData } from "../../eventing/seat-limit.events.ts";
 import type { InviteAssignableRoles } from "../../rules/invite-contracts.rules.ts";
 import { LicenseLimitService } from "../../services/license-limit.service.ts";
 import { buildOrganizationInfrastructure } from "../organization-composition.build.ts";
@@ -37,7 +38,7 @@ describe.skipIf(!DB_URL)("given an organization with two full members and one li
     PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }),
   ).client;
 
-  function limitsOnPlan(plan: Partial<Plan>): LicenseLimitService {
+  function infrastructureOnPlan(plan: Partial<Plan>) {
     const entitlement = createApiFixture<Pick<EntitlementApi, "getActivePlan" | "requestBound">>({
       getActivePlan: async () =>
         createApiFixture<Plan>({ overrideAddingLimitations: false, ...plan }),
@@ -59,10 +60,20 @@ describe.skipIf(!DB_URL)("given an organization with two full members and one li
         governance: createApiFixture<Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">>(),
       },
     });
+    const recorded: RecordSeatLimitReachedCommandData[] = [];
+    infrastructure.seatLimits.connect({
+      send: async (data: RecordSeatLimitReachedCommandData) => {
+        recorded.push(data);
+      },
+    });
+    return { infrastructure, recorded };
+  }
+
+  function limitsOnPlan(plan: Partial<Plan>): LicenseLimitService {
+    const { infrastructure } = infrastructureOnPlan(plan);
     return LicenseLimitService.create({
       seats: infrastructure.seats,
-      notices: null,
-      signals: infrastructure.signals,
+      notices: infrastructure.seatLimits,
     });
   }
 
@@ -116,5 +127,23 @@ describe.skipIf(!DB_URL)("given an organization with two full members and one li
       members: { allowed: false, current: 2, max: 2, limitType: "members" },
       membersLite: { allowed: false, current: 1, max: 1, limitType: "membersLite" },
     });
+  });
+
+  /** @scenario "Role change refused at a seat limit triggers notification" */
+  it("refuses promoting the lite member past the plan and records the seat-limit event", async () => {
+    const { infrastructure, recorded } = infrastructureOnPlan({ maxMembers: 2, maxMembersLite: 1 });
+
+    await expect(
+      infrastructure.seats.assertRoleChangeAllowed({
+        organizationId,
+        currentRole: OrganizationUserRole.EXTERNAL,
+        userPermissions: undefined,
+        role: OrganizationUserRole.MEMBER,
+      }),
+    ).rejects.toMatchObject({ code: "resource_limit_exceeded" });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(recorded).toEqual([
+      expect.objectContaining({ organizationId, limitType: "members", current: 2, max: 2 }),
+    ]);
   });
 });

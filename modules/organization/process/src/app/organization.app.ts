@@ -6,10 +6,12 @@ import {
   type AuthzAccessBreakdownOutput,
   type GrantsLedgerActor,
 } from "@langwatch/authz-contract";
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EventingCommandSender } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import type {
   GuidedOnboardingRecord,
   OnboardingInitializeOrganizationInput,
@@ -121,6 +123,11 @@ import { ShareApi } from "@langwatch/share-contract";
 import type { Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
+import type { RecordSeatLimitReachedCommandData } from "../eventing/seat-limit.events.ts";
+import {
+  buildSeatLimitPipeline,
+  type SeatLimitDefinition,
+} from "../eventing/seat-limit.pipeline.ts";
 import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
@@ -139,6 +146,7 @@ import {
   PersonalTeamScopeService,
   type PersonalTeamScopeReader,
 } from "../services/personal-team-scope.service.ts";
+import type { SeatLimitNoticeService } from "../services/seat-limit-notice.service.ts";
 import type { TeamManagementApi } from "../transport/team.rest.ts";
 import { buildOrganizationInfrastructure } from "./organization-composition.build.ts";
 import type {
@@ -255,6 +263,8 @@ export type OrganizationInfrastructure = Readonly<{
   joinRequests: OrganizationJoinRequests | null;
   plans: OrganizationPlanGate;
   signals: OrganizationSignals;
+  /** Where a reached seat limit is recorded as this module's event (§9). */
+  seatLimits: SeatLimitNoticeService;
   ceremony: OrganizationCeremony;
   directory: OrganizationDirectory;
   /** The demo organization's person and project, or empty strings when unset. */
@@ -292,6 +302,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     roles: RoleApi,
     /** Seeds the standard AI-tool catalogue during the sign-up ceremony. */
     governance: GovernanceRestApi,
+    /** Told of a reached seat limit by this module's own subscriber, as §9 rules. */
+    billing: BillingApi,
   };
   /** Named raw: the process answers these two, no store carries them. */
   static readonly reads = [
@@ -368,10 +380,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     });
 
     application.#members = members;
+    application.#billing = setup.dependencies.billing;
     application.#licenseLimits = LicenseLimitService.create({
       seats: members.seats,
-      notices: members.invitations,
-      signals: members.signals,
+      notices: members.seatLimits,
     });
     application.#memberProvenance = MemberProvenanceService.create({
       members: membershipRepository,
@@ -447,8 +459,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     application.#members = members;
     application.#licenseLimits = LicenseLimitService.create({
       seats: members.seats,
-      notices: members.invitations,
-      signals: members.signals,
+      notices: members.seatLimits,
     });
     application.#memberProvenance = setup.memberProvenance;
     application.#visibility = OrganizationVisibilityService.create({
@@ -504,6 +515,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   #members!: OrganizationInfrastructure;
   #memberProvenance!: MemberProvenanceService;
   #licenseLimits!: LicenseLimitService;
+  /** The peer the worker's seat-limit subscriber tells; absent only in a test's app. */
+  #billing: Pick<BillingApi, "notifyResourceLimitReached"> | undefined;
   #visibility!: OrganizationVisibilityService;
   #personalTeamScope!: PersonalTeamScopeService;
   #invitationDoor!: OrganizationInvitationDoorService | null;
@@ -1439,6 +1452,24 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       this.#members.seatCounts.getMembersLiteCount(input.organizationId),
     ]);
     return { fullMembers, liteMembers };
+  }
+
+  /** organization_seat_limit for this role: the worker also tells billing (§9). */
+  seatLimitPipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): SeatLimitDefinition {
+    if (participation === "produce") return buildSeatLimitPipeline({});
+    return buildSeatLimitPipeline({ billing: this.#billing });
+  }
+
+  connectSeatLimit(
+    commands: Readonly<{
+      recordSeatLimitReached: EventingCommandSender<RecordSeatLimitReachedCommandData>;
+    }>,
+  ): void {
+    this.#members.seatLimits.connect(commands.recordSeatLimitReached);
   }
 
   async checkLimit(

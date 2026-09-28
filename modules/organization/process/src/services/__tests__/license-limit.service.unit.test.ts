@@ -10,23 +10,27 @@ import type { LimitCheckResult } from "@langwatch/organization-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
-  OrganizationInvitations,
   OrganizationSeatLicense,
   OrganizationSignals,
 } from "../../app/organization.members.ts";
+import type { RecordSeatLimitReachedCommandData } from "../../eventing/seat-limit.events.ts";
 import { LicenseLimitService } from "../license-limit.service.ts";
+import { SeatLimitNoticeService } from "../seat-limit-notice.service.ts";
 
 const ORGANIZATION = "org_acme";
 const ANA = { id: "user_ana", name: "Ana", email: "ana@acme.com" };
 
 const checkLimit = vi.fn<OrganizationSeatLicense["checkLimit"]>();
-const notifySeatLimitReached = vi.fn<OrganizationInvitations["notifySeatLimitReached"]>();
+const send = vi.fn<(data: RecordSeatLimitReachedCommandData) => Promise<void>>();
 const reportError = vi.fn<OrganizationSignals["reportError"]>();
 
+const notices = SeatLimitNoticeService.create({
+  signals: createApiFixture<OrganizationSignals>({ reportError }),
+});
+notices.connect({ send });
 const limits = LicenseLimitService.create({
   seats: createApiFixture<OrganizationSeatLicense>({ checkLimit }),
-  notices: createApiFixture<OrganizationInvitations>({ notifySeatLimitReached }),
-  signals: createApiFixture<OrganizationSignals>({ reportError }),
+  notices,
 });
 
 function answer(result: Partial<LimitCheckResult> = {}): LimitCheckResult {
@@ -36,7 +40,7 @@ function answer(result: Partial<LimitCheckResult> = {}): LimitCheckResult {
 describe("the licence limit answers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    notifySeatLimitReached.mockResolvedValue(undefined);
+    send.mockResolvedValue(undefined);
   });
 
   describe("when a limit is read", () => {
@@ -69,17 +73,21 @@ describe("the licence limit answers", () => {
 
   describe("when a client reports that its pre-check blocked somebody", () => {
     /** @scenario "A blocked pre-check raises a limit notice once the server agrees" */
-    it("raises a limit notice once the server agrees the ceiling was reached", async () => {
+    /** @scenario "A confirmed blocked report records organization's seat-limit event" */
+    it("records organization's seat-limit event once the server agrees", async () => {
       checkLimit.mockResolvedValue(answer({ allowed: false, current: 5 }));
 
       await limits.reportBlocked({ organizationId: ORGANIZATION, limitType: "members" }, ANA);
 
-      expect(notifySeatLimitReached).toHaveBeenCalledWith({
-        organizationId: ORGANIZATION,
-        limitType: "members",
-        current: 5,
-        max: 5,
-      });
+      expect(send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: ORGANIZATION,
+          organizationId: ORGANIZATION,
+          limitType: "members",
+          current: 5,
+          max: 5,
+        }),
+      );
     });
 
     /** @scenario "A fabricated blocked report raises nothing" */
@@ -88,14 +96,14 @@ describe("the licence limit answers", () => {
 
       await limits.reportBlocked({ organizationId: ORGANIZATION, limitType: "members" }, ANA);
 
-      expect(notifySeatLimitReached).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
     });
 
     /** @scenario "A limit notice that fails is reported, never thrown" */
     it("reports a failed notice instead of failing the report", async () => {
       checkLimit.mockResolvedValue(answer({ allowed: false, current: 5 }));
       const failure = new Error("notice transport unavailable");
-      notifySeatLimitReached.mockRejectedValue(failure);
+      send.mockRejectedValue(failure);
 
       await expect(
         limits.reportBlocked({ organizationId: ORGANIZATION, limitType: "members" }, ANA),

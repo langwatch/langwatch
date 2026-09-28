@@ -41,6 +41,10 @@ import { InviteSendThrottleService } from "../services/invite-send-throttle.serv
 import { InviteService } from "../services/invite.service.ts";
 import { PersonalWorkspaceDiagnosticsService } from "../services/personal-workspace-diagnostics.service.ts";
 import { PersonalWorkspaceIdentityService } from "../services/personal-workspace-identity.service.ts";
+import {
+  type SeatLimitReached,
+  SeatLimitNoticeService,
+} from "../services/seat-limit-notice.service.ts";
 import { TeamIdentityService } from "../services/team-identity.service.ts";
 import type { OrganizationInfrastructure } from "./organization.app.ts";
 import type {
@@ -67,6 +71,7 @@ class EntitlementOrganizationSeatLicense {
   static create(options: {
     plans: Pick<EntitlementApi, "getActivePlan">;
     memberships: OrganizationSeatRepository;
+    notices: Pick<SeatLimitNoticeService, "reached">;
   }): EntitlementOrganizationSeatLicense {
     return new EntitlementOrganizationSeatLicense(options);
   }
@@ -75,6 +80,8 @@ class EntitlementOrganizationSeatLicense {
     private readonly options: {
       plans: Pick<EntitlementApi, "getActivePlan">;
       memberships: OrganizationSeatRepository;
+      /** A refused role change is recorded before it is thrown, as main's guard did. */
+      notices: Pick<SeatLimitNoticeService, "reached">;
     },
   ) {}
 
@@ -135,6 +142,12 @@ class EntitlementOrganizationSeatLicense {
     const max = this.allowance(input.plan, resource);
     const current = await this.seatsTaken(input.organizationId, resource);
     if (current >= max) {
+      this.options.notices.reached({
+        organizationId: input.organizationId,
+        limitType: resource,
+        current,
+        max,
+      });
       throw new LimitExceededError(resource, current, max);
     }
   }
@@ -225,7 +238,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     baseHost: string;
     identity: Pick<IdentityApi, "verifiedEmailsOf">;
     userDirectory: PrismaOrganizationUserDirectoryRepository;
-    logger: Pick<Logger, "warn">;
+    notices: Pick<SeatLimitNoticeService, "record">;
   }): InviteServiceOrganizationInvitations {
     return new InviteServiceOrganizationInvitations(options);
   }
@@ -238,7 +251,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
       baseHost: string;
       identity: Pick<IdentityApi, "verifiedEmailsOf">;
       userDirectory: PrismaOrganizationUserDirectoryRepository;
-      logger: Pick<Logger, "warn">;
+      notices: Pick<SeatLimitNoticeService, "record">;
     },
   ) {}
 
@@ -366,15 +379,9 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     return resolveInviteDisplayStatus(invite);
   }
 
-  /** No mail gateway is composed on this process (D11's "absent is supported" state), so the
-   * seat-limit notice has nowhere to send: logged rather than silently dropped. */
-  async notifySeatLimitReached(
-    input: Readonly<{ organizationId: string; limitType: string; current: number; max: number }>,
-  ): Promise<void> {
-    this.options.logger.warn(
-      { organizationId: input.organizationId, limitType: input.limitType },
-      "no mail gateway is composed, so this organization's administrators were not told it reached its seat limit",
-    );
+  /** Recorded as organization's seat-limit event; the worker tells billing's ops alert. */
+  notifySeatLimitReached(input: SeatLimitReached): Promise<void> {
+    return this.options.notices.record(input);
   }
 
   findUserIdByEmail(input: Readonly<{ email: string }>): Promise<string | null> {
@@ -547,7 +554,7 @@ function organizationDirectory(options: {
 function organizationInvitations(input: {
   prisma: ProcessMembers["prisma"];
   redis: RedisConnection;
-  logger: Logger;
+  notices: Pick<SeatLimitNoticeService, "record">;
   baseHost: string;
   identity: Pick<IdentityApi, "verifiedEmailsOf">;
   entitlement: Pick<EntitlementApi, "getActivePlan">;
@@ -577,7 +584,7 @@ function organizationInvitations(input: {
     baseHost: input.baseHost,
     identity: input.identity,
     userDirectory: PrismaOrganizationUserDirectoryRepository.create(input.prisma),
-    logger: input.logger,
+    notices: input.notices,
   });
 }
 
@@ -604,6 +611,8 @@ export function buildOrganizationInfrastructure(input: {
 }): OrganizationInfrastructure {
   const { prisma, logger, dependencies } = input;
   const baseHost = input.publicBaseUrl ?? "";
+  const signals = organizationSignals(logger);
+  const seatLimits = SeatLimitNoticeService.create({ signals });
 
   return {
     identities: PersonalWorkspaceIdentityService.create(),
@@ -618,12 +627,13 @@ export function buildOrganizationInfrastructure(input: {
     seats: EntitlementOrganizationSeatLicense.create({
       plans: dependencies.entitlement,
       memberships: PrismaOrganizationSeatRepository.create(prisma),
+      notices: seatLimits,
     }),
     seatCounts: PrismaOrganizationSeatRepository.create(prisma),
     invitations: organizationInvitations({
       prisma,
       redis: input.redis,
-      logger,
+      notices: seatLimits,
       baseHost,
       identity: dependencies.identity,
       entitlement: dependencies.entitlement,
@@ -639,7 +649,8 @@ export function buildOrganizationInfrastructure(input: {
     // Identity owns the join-request ledger; this feature serves its door.
     joinRequests: identityJoinRequests(dependencies.identity),
     plans: organizationPlanGate({ plans: dependencies.entitlement }),
-    signals: organizationSignals(logger),
+    signals,
+    seatLimits,
     ceremony: organizationCeremony({
       projects: dependencies.projects,
       governance: dependencies.governance,

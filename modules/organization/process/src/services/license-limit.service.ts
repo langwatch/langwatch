@@ -1,17 +1,12 @@
 import type { LimitCheckResult, LimitType } from "@langwatch/organization-contract";
 
-import type {
-  OrganizationInvitations,
-  OrganizationPlanUser,
-  OrganizationSeatLicense,
-  OrganizationSignals,
-} from "../app/organization.members.ts";
+import type { OrganizationPlanUser, OrganizationSeatLicense } from "../app/organization.members.ts";
+import type { SeatLimitNoticeService } from "./seat-limit-notice.service.ts";
 
 type LicenseLimitDependencies = {
   seats: Pick<OrganizationSeatLicense, "checkLimit">;
-  /** Where a reached limit is told; none when the deployment composes no invitations. */
-  notices: Pick<OrganizationInvitations, "notifySeatLimitReached"> | null;
-  signals: Pick<OrganizationSignals, "reportError">;
+  /** Where a reached limit is recorded as organization's event. */
+  notices: Pick<SeatLimitNoticeService, "reached">;
 };
 
 /** The `licenseEnforcement.*` answers: the seat limits a plan puts on an organization. */
@@ -48,13 +43,11 @@ export class LicenseLimitService {
     const result = await this.check(input, by);
     if (result.allowed) return;
 
-    void this.dependencies.notices
-      ?.notifySeatLimitReached({
-        organizationId: input.organizationId,
-        limitType: result.limitType,
-        current: result.current,
-        max: result.max,
-      })
-      .catch((failure: unknown) => this.dependencies.signals.reportError(failure));
+    this.dependencies.notices.reached({
+      organizationId: input.organizationId,
+      limitType: result.limitType,
+      current: result.current,
+      max: result.max,
+    });
   }
 }

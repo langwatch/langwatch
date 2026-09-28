@@ -9,6 +9,7 @@ import { InviteNotFoundError, type OrganizationInvite } from "@langwatch/organiz
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import type { RecordSeatLimitReachedCommandData } from "../../eventing/seat-limit.events.ts";
 import type {
   OrganizationInviteRepository,
   WriteInviteInput,
@@ -16,13 +17,19 @@ import type {
 import { PrismaOrganizationUserDirectoryRepository } from "../../repositories/prisma/prisma.organization-user-directory.repository.ts";
 import {
   FakeInviteRateLimit,
+  FakeSeatCensus,
   makeInviteDeps,
   makeOrganization,
+  makePlanProvider,
 } from "../../services/__tests__/support/invite-fakes.ts";
+import type { InviteCreationThrottleService } from "../../services/invite-creation-throttle.service.ts";
 import { InviteSendThrottleService } from "../../services/invite-send-throttle.service.ts";
 import { InviteService } from "../../services/invite.service.ts";
+import { OrganizationInvitationDoorService } from "../../services/organization-invitation-door.service.ts";
+import { SeatLimitNoticeService } from "../../services/seat-limit-notice.service.ts";
 import { InviteServiceOrganizationInvitations } from "../organization-composition.build.ts";
 import { type ServerOrganizationAppDependencies } from "../organization.app.ts";
+import type { OrganizationPlanGate, OrganizationSignals } from "../organization.members.ts";
 import { organizationAppForTesting } from "./support/organization-app-for-testing.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -140,11 +147,32 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
 
 /** The invitation door as the composed process would hand it to
  *  `OrganizationInvitationDoorService`. */
-function invitations(options: { teamsInOrganization?: readonly string[] } = {}) {
+function invitations(
+  options: {
+    teamsInOrganization?: readonly string[];
+    /** Seats already taken, full and lite, against a plan allowing exactly that many. */
+    seatsFull?: Readonly<{ members: number; membersLite: number }>;
+    notices?: Pick<SeatLimitNoticeService, "record">;
+  } = {},
+) {
   const repository = fakeInviteRepository(options);
   const throttle = InviteSendThrottleService.create(new FakeInviteRateLimit());
+  const seatsFull = options.seatsFull;
   const service = InviteService.create(
-    makeInviteDeps({ invites: repository, throttle, baseHost: BASE_HOST }),
+    makeInviteDeps({
+      invites: repository,
+      throttle,
+      baseHost: BASE_HOST,
+      ...(seatsFull
+        ? {
+            seats: new FakeSeatCensus(seatsFull.members, seatsFull.membersLite),
+            plans: makePlanProvider({
+              maxMembers: seatsFull.members,
+              maxMembersLite: seatsFull.membersLite,
+            }),
+          }
+        : {}),
+    }),
   );
 
   return InviteServiceOrganizationInvitations.create({
@@ -156,7 +184,7 @@ function invitations(options: { teamsInOrganization?: readonly string[] } = {}) 
     userDirectory: PrismaOrganizationUserDirectoryRepository.create({
       user: { findUnique: async () => null },
     } as never),
-    logger: { warn: () => {} },
+    notices: options.notices ?? { record: async () => {} },
   });
 }
 
@@ -328,5 +356,75 @@ describe("given a deployment that composed no invitation service", () => {
         ),
       ).rejects.toMatchObject({ code: "service_unavailable" });
     });
+  });
+});
+
+/** The door over the composed invitations, recording seat-limit events into `recorded`. */
+function doorWithFullSeats(seatsFull: Readonly<{ members: number; membersLite: number }>) {
+  const recorded: RecordSeatLimitReachedCommandData[] = [];
+  const signals = createApiFixture<OrganizationSignals>({ reportError: () => {} });
+  const notices = SeatLimitNoticeService.create({ signals });
+  notices.connect({
+    send: async (data: RecordSeatLimitReachedCommandData) => {
+      recorded.push(data);
+    },
+  });
+  const door = OrganizationInvitationDoorService.create({
+    invitations: invitations({ seatsFull, notices }),
+    joinRequests: null,
+    plans: createApiFixture<OrganizationPlanGate>(),
+    signals,
+    creationThrottle: createApiFixture<InviteCreationThrottleService>({
+      assertCreationAllowed: async () => {},
+    }),
+    ensurePersonalWorkspace: async () => undefined,
+  });
+  return { door, recorded };
+}
+
+describe("given an organization whose seats are all taken", () => {
+  /** @scenario "Member invite triggers notification when limit reached" */
+  it("refuses a full-member invite and records organization's seat-limit event", async () => {
+    const { door, recorded } = doorWithFullSeats({ members: 3, membersLite: 1 });
+
+    await expect(
+      door.create(
+        {
+          organizationId: ORGANIZATION_ID,
+          validation: "lenient",
+          invites: [{ email: "one-more@acme.test", role: "MEMBER", teamIds: "team-1" }],
+        },
+        { id: "user-1" },
+      ),
+    ).rejects.toMatchObject({ code: "member_seat_limit_reached" });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(recorded).toEqual([
+      expect.objectContaining({
+        organizationId: ORGANIZATION_ID,
+        limitType: "members",
+        current: 3,
+        max: 3,
+      }),
+    ]);
+  });
+
+  /** @scenario "Lite member invite triggers notification when limit reached" */
+  it("refuses a lite-member invite and records organization's seat-limit event", async () => {
+    const { door, recorded } = doorWithFullSeats({ members: 3, membersLite: 1 });
+
+    await expect(
+      door.create(
+        {
+          organizationId: ORGANIZATION_ID,
+          validation: "lenient",
+          invites: [{ email: "lite@acme.test", role: "EXTERNAL", teamIds: "team-1" }],
+        },
+        { id: "user-1" },
+      ),
+    ).rejects.toMatchObject({ code: "member_seat_limit_reached" });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(recorded).toEqual([
+      expect.objectContaining({ limitType: "membersLite", current: 1, max: 1 }),
+    ]);
   });
 });

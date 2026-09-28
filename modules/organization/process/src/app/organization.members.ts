@@ -360,11 +360,11 @@ export interface OrganizationInvitations {
   maskAddress(email: string): string;
   /** PENDING / ACCEPTED / EXPIRED / REVOKED, expiry included. */
   displayStatus(invite: OrganizationInvitationsStatusFacts): string;
-  /** Tells the organization's administrators a seat limit was reached. */
+  /** Records that a refused invitation reached a seat limit, for billing's ops alert. */
   notifySeatLimitReached(
     input: Readonly<{
       organizationId: string;
-      limitType: string;
+      limitType: LimitType;
       current: number;
       max: number;
     }>,

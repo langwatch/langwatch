@@ -3,6 +3,7 @@ import { EnterprisePlanRequiredError, isEnterpriseTier } from "@langwatch/entitl
 import { defineServerModule } from "@langwatch/kernel";
 
 import { ServerOrganizationApp } from "./app/organization.app.ts";
+import { seatLimitEventing } from "./eventing/seat-limit.pipeline.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
 import { groupsRest, groupsRestEnterpriseGate } from "./transport/group.rest.ts";
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
@@ -54,4 +55,5 @@ export const organizationServer = defineServerModule("organization")
       bindRestMiddleware(groupsRestEnterpriseGate, requireEnterprise),
       bindRestMiddleware(organizationManagementEnterpriseGate, requireEnterprise),
     ];
-  });
+  })
+  .withEventing(seatLimitEventing);

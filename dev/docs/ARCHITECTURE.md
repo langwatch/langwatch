@@ -1648,21 +1648,21 @@ depend on `@langwatch/enterprise-licensing-contract` and
 `@langwatch/feature-flag-contract` and asks a core module for facts through its
 `*Api` only — a core module never grows a supply token for a tier context.
 
----
-
-## 12. Errors
-
-Throw `HandledError` only when the cause is known **and** the caller can act;
-register the `code` in `packages/handled-error/src/app-codes.ts` and its
-A seat limit reached is organization's event; billing is told through its Api, by §9's
-subscriber on the owner's pipeline (Alex, 2026-09-28).
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`
 keep their wire path, but the contract and transport are organization's: it
 owns the membership rows a seat counts and already reads the plan through
 `EntitlementApi`. Licensing cannot depend on entitlement (it is entitlement's
 peer), so its members refused every call and `checkLimit` answered 500.
+A seat limit reached is organization's event; billing is told through its Api, by §9's
+subscriber on the owner's pipeline (Alex, 2026-09-28).
 
+---
+
+## 12. Errors
+
+Throw `HandledError` only when the cause is known **and** the caller can act;
+register the `code` in `packages/handled-error/src/app-codes.ts` and its
 customer copy in the presentation registry. Everything else stays a plain
 `Error` and degrades to "unknown" + trace id at the boundary — deliberately.
 `message` is customer-safe, never internals; the tRPC wire message is the

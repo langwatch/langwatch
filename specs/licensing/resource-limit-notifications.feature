@@ -25,15 +25,11 @@ Feature: Internal Slack Notifications for Resource Limit Reached
     And the call succeeds
     And the next report is not held back by the cooldown
 
-  # Organization's half waits on organization-process depending on
-  # @langwatch/eventing (not linked yet); see the screens-directory handoff.
-  @unimplemented
   Scenario: A confirmed blocked report records organization's seat-limit event
     Given the organization has used every member seat
     When a client reports its pre-check blocked somebody
     Then organization records a seat-limit-reached event
 
-  @unimplemented
   Scenario: Organization's seat-limit event tells billing
     When organization's seat-limit-reached event is handled
     Then billing is told the limit type, current and max
