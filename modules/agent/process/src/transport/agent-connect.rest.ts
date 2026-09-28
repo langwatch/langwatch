@@ -38,6 +38,9 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
   return defineRestRouter(AgentApi)
     .withNamespace("agents")
     .withVersion(MANAGEMENT_API_VERSION)
+    // Added with the move to `/api/v1/agents`; the bare `/api/agents` belongs
+    // to the deprecated legacy family, which never had these routes.
+    .withAddressing("v1-only")
 
     .post("/connect/register", "registerConnectedAgentInstance")
     .withInput(agentConnectRegisterInputSchema)
