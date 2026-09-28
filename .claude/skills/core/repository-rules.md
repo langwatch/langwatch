@@ -4,8 +4,8 @@ Canonical. Every agent working in this repository follows these, whether it was
 started by a person, by the coordinator, or by a skill. A brief or manifest may
 add rules; it may not relax one of these.
 
-The root `CLAUDE.md` is the architecture and command reference and is already in
-your context - this file does not restate it. What is here is the operating
+The root `CLAUDE.md` (always in your context) and the path-scoped
+`.claude/rules/*.md` are the architecture digest and command reference - this file does not restate it. What is here is the operating
 discipline: the things agents have actually got wrong, at cost.
 
 ## 1. Secrets
@@ -122,7 +122,7 @@ starting:
   Check with `tslsp-cli references` first.
 - Change a constructor's shape and every caller in the same step.
 
-After a step lands, read `haven logs backend --since 2m --agent`. A
+After a step lands, read `haven logs api --since 2m --agent`. A
 `SyntaxError`, an `ERR_MODULE_NOT_FOUND` or a fatal boot failure naming your
 files is your defect - fix it before doing anything else.
 

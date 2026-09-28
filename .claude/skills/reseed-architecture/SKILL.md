@@ -1,6 +1,6 @@
 ---
 name: reseed-architecture
-description: "Resync every teaching surface with dev/docs/ARCHITECTURE.md after rulings land in the record: CLAUDE.md, .claude/skills/*, dev/docs/best_practices/*, and the dev docs. The record is the single source of truth; this skill walks the surfaces that teach from it and removes drift — stale vocabulary, dead method names, superseded shapes, examples that no longer compile. Use after a design session amended the record, after a wave lands that renames vocabulary, or whenever a skill/doc is caught teaching something the record has overruled."
+description: "Resync every teaching surface with dev/docs/ARCHITECTURE.md after rulings land in the record: CLAUDE.md, .claude/rules/*, .claude/skills/*, dev/docs/best_practices/*, and the dev docs. The record is the single source of truth; this skill walks the surfaces that teach from it and removes drift — stale vocabulary, dead method names, superseded shapes, examples that no longer compile. Use after a design session amended the record, after a wave lands that renames vocabulary, or whenever a skill/doc is caught teaching something the record has overruled."
 user-invocable: true
 argument-hint: "[surface to reseed, or blank for all]"
 ---
@@ -15,8 +15,9 @@ them back.
 
 ## What is a teaching surface (sync these)
 
-- `CLAUDE.md` — the workspace instructions, especially its command tables and
-  the Common Mistakes rows that name vocabulary.
+- `CLAUDE.md` and `.claude/rules/*.md` — the always-loaded instructions and the
+  path-scoped architecture digests, especially command lines and rows that
+  name vocabulary.
 - `.claude/skills/*/SKILL.md` (+ their `references/`) — every skill that
   quotes a chain, a class name, a file path, or a code example.
 - `dev/docs/best_practices/*.md` — pattern docs whose examples name real
@@ -60,7 +61,7 @@ them back.
 
 ## Known drift-prone rows
 
-- CLAUDE.md's Common Mistakes rows that name method vocabulary
+- `.claude/rules/backend.md` rows that name method vocabulary
   (`withStores`, member names, per-store setters).
 - `.claude/skills/backend/SKILL.md` — quotes the whole compose chain and the
   Server preamble; stale the moment either changes.
