@@ -158,6 +158,7 @@ describe("memory safety of the generated analytics queries", () => {
 
   beforeAll(async () => {
     client = (await startMigratedClickHouse()).client;
+    await releaseMigratedCaches(client);
     await seedSpans(client, {
       tenantId: TENANT_ID,
       count: 10_000,
