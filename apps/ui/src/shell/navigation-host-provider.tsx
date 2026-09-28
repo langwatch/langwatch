@@ -278,9 +278,10 @@ function useNavigationHostReading({
           team,
           project,
           openableTeams,
-          // The graph is what every answer above is read off, so "still
-          // arriving" is exactly this query being unsettled.
-          isLoading: organizations.isLoading,
+          // The project comes off the scope, which settles after the session and
+          // after this graph: until both have, a missing project is not a not-found.
+          // specs/navigation/workspace-resolution.feature
+          isLoading: organizations.isLoading || !session.isSettled(),
           currentUser,
           organizationRole,
           rememberedProjectSlug: memory.selection.projectSlug,
