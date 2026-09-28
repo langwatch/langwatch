@@ -113,6 +113,7 @@ describe("model provider handled errors", () => {
     }).not.toThrow();
   });
 
+  /** @scenario Saving with a key that names no user is refused with a handled error */
   it("preserves default and credential refusal wires", () => {
     expect(() => {
       expectHandledWire(
@@ -130,15 +131,10 @@ describe("model provider handled errors", () => {
           },
         },
       );
-      /**
-       * @scenario Saving with a key that names no user is refused with a handled error
-       *
-       * 403 and not 401, deliberately. The request IS authenticated; telling an
-       * API caller otherwise sends them to inspect a key that is working, which
-       * is the exact confusion this error was written to end — `model-default
-       * list` answered and `model-default set` said "HTTP 400: Not
-       * authenticated" for the same key.
-       */
+      // 403 and not 401, deliberately. The request IS authenticated; telling an
+      // API caller otherwise sends them to inspect a key that is working
+      // (`model-default list` answered while `model-default set` said "HTTP 400:
+      // Not authenticated" for the same key).
       expectHandledWire(new ModelDefaultUserKeyRequiredError(), {
         code: "model_default_user_key_required",
         message:

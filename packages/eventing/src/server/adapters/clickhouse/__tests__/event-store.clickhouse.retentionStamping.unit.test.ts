@@ -15,8 +15,6 @@ import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 const INJECTED_DEFAULT_RETENTION_DAYS = 49;
 
 /**
- * @scenario Trace pipeline stamps _retention_days from traces category
- * @scenario No retention policy defaults to the platform default
  * @see specs/data-retention/ingestion-stamping.feature
  *
  * event_log is the source of truth for trace-pipeline events. If the retention
@@ -53,6 +51,7 @@ describe("EventStoreClickHouse retention stamping", () => {
   });
 
   describe("when retention resolver returns a policy with traces=30", () => {
+    /** @scenario Trace pipeline stamps _retention_days from traces category */
     it("stamps every event_log record with _retention_days = 30", async () => {
       const resolver: RetentionPolicyResolver = {
         resolve: vi.fn().mockResolvedValue({
@@ -188,6 +187,7 @@ describe("EventStoreClickHouse retention stamping", () => {
   });
 
   describe("when the tenant has no policy configured", () => {
+    /** @scenario No retention policy defaults to the platform default */
     it("falls back to the platform default", async () => {
       const resolver: RetentionPolicyResolver = {
         resolve: vi.fn().mockResolvedValue(null),

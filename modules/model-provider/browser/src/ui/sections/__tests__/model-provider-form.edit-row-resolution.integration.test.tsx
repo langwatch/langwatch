@@ -8,8 +8,8 @@
  *
  * Covers @regression @integration scenarios from
  * specs/model-providers/scope-and-multi-instance.feature:
- *   /** @scenario Editing a row shows its own saved credential, not another row's
- *   /** @scenario Saving an edited row updates it in place, not as a duplicate
+ *   - Editing a row shows its own saved credential, not another row's
+ *   - Saving an edited row updates it in place, not as a duplicate
  *
  * Root cause: `EditModelProviderForm` resolves the row being edited by
  * searching the COLLAPSED `Record<providerKey, entry>` returned by

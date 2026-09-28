@@ -155,7 +155,6 @@ function makeTestDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-cmd-err-"));
 }
 
-/** @scenario Common error conditions map to actionable messages for every CLI command */
 describe("CLI error propagation across commands", () => {
   let testDir: string;
 
@@ -168,6 +167,7 @@ describe("CLI error propagation across commands", () => {
   });
 
   describe("when running the agent create command", () => {
+    /** @scenario Common error conditions map to actionable messages for every CLI command */
     it("surfaces a 409 conflict body to the user", async () => {
       pushResponse("POST", "/api/v1/agents", {
         status: 409,
@@ -186,6 +186,7 @@ describe("CLI error propagation across commands", () => {
   });
 
   describe("when running the dataset get command", () => {
+    /** @scenario Common error conditions map to actionable messages for every CLI command */
     it("maps a 404 to a specific 'not found' message with the id", async () => {
       pushResponse("GET", "/api/v1/dataset/:slugOrId", {
         status: 404,
@@ -201,6 +202,7 @@ describe("CLI error propagation across commands", () => {
   });
 
   describe("when running the monitor create command", () => {
+    /** @scenario Common error conditions map to actionable messages for every CLI command */
     it("forwards a 422 validation error from the API", async () => {
       pushResponse("POST", "/api/v1/monitors", {
         status: 422,
@@ -229,6 +231,7 @@ describe("CLI error propagation across commands", () => {
   });
 
   describe("when running the secret create command", () => {
+    /** @scenario Common error conditions map to actionable messages for every CLI command */
     it("surfaces the raw body when the server omits error/message fields", async () => {
       pushResponse("POST", "/api/v1/secrets", {
         status: 500,
@@ -249,6 +252,7 @@ describe("CLI error propagation across commands", () => {
   });
 
   describe("when running the workflow run command", () => {
+    /** @scenario Common error conditions map to actionable messages for every CLI command */
     it("shows the specific error body, not a generic 500", async () => {
       pushResponse("POST", "/api/v1/workflows/:id/run", {
         status: 500,
@@ -266,6 +270,7 @@ describe("CLI error propagation across commands", () => {
   });
 
   describe("when running the scenario get command", () => {
+    /** @scenario Common error conditions map to actionable messages for every CLI command */
     it("includes the scenario id in the 'not found' message", async () => {
       pushResponse("GET", "/api/v1/scenarios/:id", {
         status: 404,

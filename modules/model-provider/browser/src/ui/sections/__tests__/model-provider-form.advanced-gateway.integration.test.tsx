@@ -6,9 +6,9 @@
  *
  * Covers @integration scenarios from
  * specs/ai-gateway/gateway-provider-settings.feature:
- *   /** @scenario Advanced (Gateway) is hidden when the AI gateway feature flag is off
- *   /** @scenario Advanced (Gateway) renders as a collapsed accordion when the flag is on
- *   /** @scenario Single Save persists basic credentials and advanced gateway fields together
+ *   - Advanced (Gateway) is hidden when the AI gateway feature flag is off
+ *   - Advanced (Gateway) renders as a collapsed accordion when the flag is on
+ *   - Single Save persists basic credentials and advanced gateway fields together
  *
  * The drawer renders the gateway fields inside a collapsible "Advanced"
  * accordion, gated on the `release_ui_ai_gateway_menu_enabled` flag for the
@@ -172,6 +172,7 @@ describe("Feature: Advanced (Gateway) accordion on ModelProvider drawer", () => 
       // assertion (the payload actually carries basic + advanced
       // together) lives in use-provider-form-submit.integration.test.tsx
       // and binds the same scenario name.
+      /** @scenario Single Save persists basic credentials and advanced gateway fields together */
       it("renders only one Save button (no separate Save Advanced)", async () => {
         await screen.findByText("Advanced");
         expect(screen.queryByText(/save advanced/i)).toBeNull();

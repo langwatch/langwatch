@@ -307,10 +307,8 @@ describe("pushPrompts", () => {
   });
 
   describe("when local config has runtime parameters", () => {
+    /** @scenario TypeScript local prompt files preserve runtime parameters */
     it("sends config to prompt sync", async () => {
-      /**
-       * @scenario TypeScript local prompt files preserve runtime parameters
-       */
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
         model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "test" }],
@@ -343,10 +341,8 @@ describe("pushPrompts", () => {
       );
     });
 
+    /** @scenario Syncing a local prompt detects runtime parameters conflicts */
     it("writes remote config when resolving a conflict with remote", async () => {
-      /**
-       * @scenario Syncing a local prompt detects runtime parameters conflicts
-       */
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
         model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "local" }],
