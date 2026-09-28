@@ -9,13 +9,12 @@ import type {
  * federation, and it rides the same platform SSO license gate as every other provider — a
  * domain-matched organization must not gain a member off a licensing store answer of "no
  */
-import { InviteNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
-  BetterAuthPendingInvite,
 } from "../../channels/better-auth.channel.ts";
 import { afterUserCreate } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import type {
@@ -36,12 +35,9 @@ class StubFederation implements BetterAuthFederation {
   }
 }
 
-class StubInvites implements BetterAuthPendingInvite {
-  getPendingByOrganizationAndEmail(): Promise<never> {
-    return Promise.reject(new InviteNotFoundError());
-  }
-  applyInvite(): Promise<void> {
-    return Promise.reject(new Error("unused"));
+class StubInvites implements Pick<OrganizationApi, "applyPendingInvite"> {
+  applyPendingInvite(): Promise<{ applied: false }> {
+    return Promise.resolve({ applied: false });
   }
 }
 

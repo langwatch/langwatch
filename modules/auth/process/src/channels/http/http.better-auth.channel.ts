@@ -39,7 +39,6 @@ import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
   BetterAuthIdentityCeremonies,
-  BetterAuthPendingInvite,
   BetterAuthStorage,
 } from "../better-auth.channel.ts";
 import {
@@ -782,7 +781,7 @@ export type BetterAuthTransportOptions = Readonly<{
   deployment: BetterAuthDeploymentConfiguration;
   federation: BetterAuthFederation;
   identity: BetterAuthIdentityCeremonies;
-  invites: BetterAuthPendingInvite;
+  invites: BetterAuthHookCollaborators["invites"];
   announcements: BetterAuthAnnouncements;
   shadow: SignInRouterShadow;
   /** The grant ledger an SSO auto-join writes its membership through. */

@@ -10,14 +10,13 @@ import type {
  * arriving through the wrong provider.
  * @see specs/auth/phase-1-better-auth-config.feature
  */
-import { InviteNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
-  BetterAuthPendingInvite,
 } from "../../channels/better-auth.channel.ts";
 import {
   afterUserCreate,
@@ -55,23 +54,19 @@ class LicensedFederation implements BetterAuthFederation {
   }
 }
 
-class NoInvites implements BetterAuthPendingInvite {
-  getPendingByOrganizationAndEmail(): Promise<never> {
-    return Promise.reject(new InviteNotFoundError());
-  }
-  applyInvite(): Promise<void> {
-    return Promise.reject(new Error("unused"));
+class NoInvites implements Pick<OrganizationApi, "applyPendingInvite"> {
+  applyPendingInvite(): Promise<{ applied: false }> {
+    return Promise.resolve({ applied: false });
   }
 }
 
-class StubPendingInvites implements BetterAuthPendingInvite {
-  readonly applyInvite = vi.fn().mockResolvedValue(undefined);
-  constructor(private readonly pending: { id: string } | null) {}
-  getPendingByOrganizationAndEmail(): Promise<{ id: string }> {
-    return this.pending === null
-      ? Promise.reject(new InviteNotFoundError())
-      : Promise.resolve(this.pending);
-  }
+/** The organization's pending-invite door, answering with the invite the address holds. */
+function pendingInvites(inviteId: string) {
+  return {
+    applyPendingInvite: vi
+      .fn<OrganizationApi["applyPendingInvite"]>()
+      .mockResolvedValue({ applied: true, inviteId }),
+  };
 }
 
 class RecordingAnnouncements implements BetterAuthAnnouncements {
@@ -184,6 +179,39 @@ describe("signing in through a domain-matched organization's identity provider",
         expect.objectContaining({ organizationId: "org_acme" }),
       );
     });
+
+    it("applies the pending invite the address holds there instead of the default membership", async () => {
+      const { double: repo, mocks } = signupRepo(ACME);
+      const invites = pendingInvites("invite_1");
+      const announcements = new RecordingAnnouncements();
+      const attachBindings = vi.fn().mockResolvedValue(undefined);
+
+      await afterUserCreate({
+        repo,
+        user: { id: "user_new", email: "invited@acme.com", name: "New User", emailVerified: true },
+        collaborators: {
+          federation: new LicensedFederation(),
+          invites,
+          announcements,
+          authzGrants: { attachBindings } as never,
+          arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
+          ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
+            record: async () => undefined,
+          }),
+          ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
+            decideAccountLink: async () => ({ kind: "not_migrating" }),
+          }),
+        },
+      });
+
+      expect(invites.applyPendingInvite).toHaveBeenCalledWith({
+        userId: "user_new",
+        organizationId: "org_acme",
+        email: "invited@acme.com",
+      });
+      expect(mocks.createOrganizationMembership).not.toHaveBeenCalled();
+      expect(attachBindings).not.toHaveBeenCalled();
+    });
   });
 
   describe("given a credential signup whose email nobody has verified", () => {
@@ -223,7 +251,7 @@ describe("signing in through a domain-matched organization's identity provider",
     /** @scenario Unverified signup does not claim a pending invite addressed to its email */
     it("leaves the pending invite unapplied and grants nothing", async () => {
       const { double: repo, mocks } = signupRepo(ACME);
-      const invites = new StubPendingInvites({ id: "invite_1" });
+      const invites = pendingInvites("invite_1");
       const attachBindings = vi.fn().mockResolvedValue(undefined);
 
       await afterUserCreate({
@@ -249,7 +277,7 @@ describe("signing in through a domain-matched organization's identity provider",
         },
       });
 
-      expect(invites.applyInvite).not.toHaveBeenCalled();
+      expect(invites.applyPendingInvite).not.toHaveBeenCalled();
       expect(mocks.createOrganizationMembership).not.toHaveBeenCalled();
       expect(attachBindings).not.toHaveBeenCalled();
     });

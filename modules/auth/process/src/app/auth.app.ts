@@ -70,6 +70,7 @@ import { UserApi } from "@langwatch/user-contract";
 
 import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
 import { isBornFinalizedSignUp } from "../channels/http/http.born-finalized-opt-in.channel.ts";
+import { passwordResetMailChannels } from "../channels/password-reset-mail-channels.registry.ts";
 import { signUpVerificationMailChannels } from "../channels/sign-up-verification-mail-channels.registry.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
@@ -124,7 +125,11 @@ import {
   type TwoStepProtocol,
 } from "../services/two-step-verification.service.ts";
 import type { AuthRestFederatedLogout } from "../transport/auth.rest.ts";
-import { buildBetterAuth, type BetterAuthDeploymentIdentity } from "./auth-composition.build.ts";
+import {
+  buildBetterAuth,
+  passwordResetSender,
+  type BetterAuthDeploymentIdentity,
+} from "./auth-composition.build.ts";
 
 /**
  * The invitation a landing page reads, and the reissue request behind it. Both
@@ -549,6 +554,12 @@ export class AuthApp implements AuthApiContract {
             redis: members.redis,
             auth: app,
             grants: dependencies.authz,
+            organizations: dependencies.organizations,
+            sendResetPassword: passwordResetSender({
+              mail: passwordResetMailChannels.ses.create({ mailer: members.mail }),
+              publicBaseUrl: members.publicBaseUrl,
+              processName: members.processName,
+            }),
             users: dependencies.users,
             identityApi: dependencies.identity,
             signInRouting: (input) => dependencies.identity.routeSignIn(input),

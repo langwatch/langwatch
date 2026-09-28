@@ -14,15 +14,12 @@ import type {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
-import type {
-  BetterAuthAnnouncements,
-  BetterAuthFederation,
-  BetterAuthPendingInvite,
-} from "../better-auth.channel.ts";
+import type { BetterAuthAnnouncements, BetterAuthFederation } from "../better-auth.channel.ts";
 
 /**
  * The KSUID resource prefix a role-binding row is minted under.
@@ -34,7 +31,8 @@ const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
  */
 export type BetterAuthHookCollaborators = Readonly<{
   federation: BetterAuthFederation;
-  invites: BetterAuthPendingInvite;
+  /** A pending invite at a domain-matched organization wins over the default membership. */
+  invites: Pick<OrganizationApi, "applyPendingInvite">;
   announcements: BetterAuthAnnouncements;
   /** The grant ledger an auto-joined membership is written through. */
   authzGrants: AuthzGrantsService;
@@ -151,13 +149,14 @@ const joinSsoOrganization = async ({
   org: { id: string; name: string };
 }): Promise<void> => {
   const { announcements, invites, authzGrants: writer } = collaborators;
-  const pendingInvite = await invites
-    .getPendingByOrganizationAndEmail({ organizationId: org.id, email: user.email })
-    .catch(skipOn("invite_not_found"));
+  const invite = await invites.applyPendingInvite({
+    userId: user.id,
+    organizationId: org.id,
+    email: user.email,
+  });
 
-  if (pendingInvite) {
-    await invites.applyInvite({ userId: user.id, invite: pendingInvite });
-    announceSsoAutoJoin({ announcements, user, org, inviteId: pendingInvite.id });
+  if (invite.applied) {
+    announceSsoAutoJoin({ announcements, user, org, inviteId: invite.inviteId });
     return;
   }
 
