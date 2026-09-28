@@ -32,6 +32,8 @@ let mockTriggerRow: Record<string, unknown> | null = null;
 // `getTriggerById` is what moves the server's row into the client's copy,
 // exactly as react-query's refetch-on-invalidate does.
 let mockServerTriggerRow: Record<string, unknown> | null = null;
+// The project's Slack connections; undefined while the list is loading.
+let mockSlackConnections: { id: string; name: string }[] | undefined = [];
 // Hoisted so these mock fns are initialized before any vi.mock factory runs —
 // a transitive import (AddParticipants -> ~/utils/api) triggers the api mock
 // during the hoisted import graph, before plain `const` declarations execute.
@@ -172,11 +174,13 @@ vi.mock("~/utils/api", () => ({
     slackIntegration: {
       list: {
         useQuery: () => ({
-          data: {
-            connections: [],
-            canManageProject: false,
-            canManageOrganization: false,
-          },
+          data: mockSlackConnections
+            ? {
+                connections: mockSlackConnections,
+                canManageProject: false,
+                canManageOrganization: false,
+              }
+            : undefined,
           refetch: vi.fn(),
         }),
       },
@@ -284,6 +288,7 @@ describe("AutomationDrawer", () => {
     vi.clearAllMocks();
     mockTriggerRow = null;
     mockServerTriggerRow = null;
+    mockSlackConnections = [];
     // Several tests hand `mutate` a save-simulating implementation; drop it
     // so the next test starts from an inert mutation.
     mockUpsertMutate.mockReset();
@@ -774,6 +779,51 @@ describe("AutomationDrawer", () => {
         );
 
         expect(mockUpsertMutate).not.toHaveBeenCalled();
+        expect(mockCloseDrawer).toHaveBeenCalled();
+      });
+    });
+
+    describe("given a saved Slack automation", () => {
+      const slackRow = () =>
+        savedRow({
+          action: "SEND_SLACK_MESSAGE",
+          actionParams: {
+            slackIntegrationId: "conn-bot",
+            slackDelivery: "bot",
+            slackChannelId: "C0123",
+          },
+        });
+
+      it("names the connection on the review line without opening the Slack step", async () => {
+        mockSlackConnections = [{ id: "conn-bot", name: "Alerts bot" }];
+        mockTriggerRow = slackRow();
+        renderDrawer({ automationId: "trigger-1" });
+
+        expect(
+          await screen.findByText("Slack → Alerts bot #C0123"),
+        ).toBeInTheDocument();
+      });
+
+      it("names it when the list arrives later, and closing without edits does not prompt", async () => {
+        const user = userEvent.setup();
+        mockSlackConnections = undefined;
+        mockTriggerRow = slackRow();
+        const opened = renderDrawer({ automationId: "trigger-1" });
+        expect(
+          await screen.findByText("Slack connection #C0123"),
+        ).toBeInTheDocument();
+
+        mockSlackConnections = [{ id: "conn-bot", name: "Alerts bot" }];
+        opened.rerender(<AutomationDrawer automationId="trigger-1" />);
+        expect(
+          await screen.findByText("Slack → Alerts bot #C0123"),
+        ).toBeInTheDocument();
+
+        await user.click(await screen.findByRole("button", { name: /close/i }));
+
+        expect(
+          screen.queryByText("Discard unsaved changes?"),
+        ).not.toBeInTheDocument();
         expect(mockCloseDrawer).toHaveBeenCalled();
       });
     });

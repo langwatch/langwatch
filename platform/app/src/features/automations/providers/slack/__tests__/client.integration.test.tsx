@@ -545,12 +545,17 @@ describe("SlackConfigForm connection", () => {
       // Leaving is not returning: nothing keeps the draft until it ends.
       expect(keepDraftOnReturnMock).not.toHaveBeenCalled();
       const props = connectionDrawerProps();
-      props.onSuccess({ connectionId: "conn-new", kind: "BOT" });
+      props.onSuccess({
+        connectionId: "conn-new",
+        name: "Ops room",
+        kind: "BOT",
+      });
       props.onClose();
 
       expect(onChangeSpy).toHaveBeenLastCalledWith(
         expect.objectContaining({
           slackIntegrationId: "conn-new",
+          connectionName: "Ops room",
           deliveryMethod: "bot",
         }),
       );
@@ -1082,6 +1087,69 @@ describe("Slack client slice contract", () => {
         channelId: "C0123",
         legacyParams: null,
       });
+    });
+  });
+
+  describe("given the connection's name is known", () => {
+    it("summarises a bot as the connection and its channel", () => {
+      expect(
+        slackClient.summary(botSlice({ connectionName: "Alerts bot" }), {
+          name: "Checkout alert",
+        }),
+      ).toBe("Slack → Alerts bot #C0123");
+    });
+
+    it("summarises a webhook as the connection alone", () => {
+      expect(
+        slackClient.summary(webhookSlice({ connectionName: "Ops webhook" }), {
+          name: "Checkout alert",
+        }),
+      ).toBe("Slack → Ops webhook");
+    });
+
+    it("never writes the name into the action params", () => {
+      expect(
+        slackClient.toActionParams(botSlice({ connectionName: "Alerts bot" })),
+      ).toEqual({
+        slackIntegrationId: "conn-bot",
+        slackDelivery: "bot",
+        slackChannelId: "C0123",
+      });
+    });
+  });
+
+  describe("given the connection's name is not known yet", () => {
+    it("says Slack connection, with the channel for a bot", () => {
+      expect(slackClient.summary(botSlice(), { name: "Checkout alert" })).toBe(
+        "Slack connection #C0123",
+      );
+      expect(
+        slackClient.summary(webhookSlice(), { name: "Checkout alert" }),
+      ).toBe("Slack connection");
+    });
+  });
+});
+
+describe("SlackConfigForm connection name", () => {
+  afterEach(() => {
+    cleanup();
+    connectionList.current = [BOT_CONNECTION, WEBHOOK_CONNECTION];
+  });
+
+  describe("when the author picks a connection", () => {
+    it("carries its name on the slice", async () => {
+      const user = userEvent.setup();
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
+
+      await chooseConnection({ user, name: /alerts bot/i });
+
+      expect(onChangeSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          slackIntegrationId: "conn-bot",
+          connectionName: "Alerts bot",
+        }),
+      );
     });
   });
 });

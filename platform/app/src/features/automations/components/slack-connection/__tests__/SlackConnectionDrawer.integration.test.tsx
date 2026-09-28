@@ -180,6 +180,7 @@ describe("SlackConnectionDrawer", () => {
       ]);
       expect(onSuccess).toHaveBeenCalledWith({
         connectionId: "conn-new",
+        name: "Alerts bot",
         kind: "BOT",
       });
       expect(onClose).toHaveBeenCalledTimes(1);

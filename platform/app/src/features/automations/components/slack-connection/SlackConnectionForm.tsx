@@ -218,7 +218,7 @@ function useSaveSlackConnection({
         {
           onSuccess: () =>
             done(
-              { connectionId: connection.id, kind: connection.kind },
+              { connectionId: connection.id, name, kind: connection.kind },
               "Slack connection saved",
             ),
         },
@@ -230,7 +230,7 @@ function useSaveSlackConnection({
       {
         onSuccess: (created) =>
           done(
-            { connectionId: created.id, kind: created.kind },
+            { connectionId: created.id, name, kind: created.kind },
             "Slack connection added",
           ),
       },

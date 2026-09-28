@@ -7,5 +7,6 @@ export type SlackConnection = SlackConnectionList["connections"][number];
 /** What the connection drawer hands back to whoever opened it. */
 export interface SlackConnectionSaved {
   connectionId: string;
+  name: string;
   kind: SlackIntegrationKind;
 }

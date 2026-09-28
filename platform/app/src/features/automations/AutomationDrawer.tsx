@@ -94,6 +94,10 @@ import {
 } from "./logic/draftReducer";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { nextStep, previousStep } from "./logic/wizardSteps";
+import {
+  useSlackConnectionName,
+  withSlackConnectionName,
+} from "./providers/slack/slackConnectionName";
 import { useAutomationStore } from "./state/automationStore";
 import {
   useConditionsSet,
@@ -196,6 +200,14 @@ function cadenceTodo(draft: AutomationDraft): string {
     case "trace":
       return "";
   }
+}
+
+/** The draft as the close guard compares it. The Slack connection's name is
+ *  filled in when the list loads, so it is display only, never an edit. */
+function draftFingerprint(draft: AutomationDraft): string {
+  return JSON.stringify(draft, (key, value) =>
+    key === "connectionName" ? undefined : value,
+  );
 }
 
 /**
@@ -518,6 +530,12 @@ export function AutomationDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawerIdentity]);
 
+  const slackConnections = useSlackConnectionName({
+    projectId,
+    draft,
+    dispatch,
+  });
+
   // Edit prefill from the saved trigger.
   const triggerQuery = api.automation.getTriggerById.useQuery(
     { triggerId: automationId ?? "", projectId },
@@ -537,7 +555,7 @@ export function AutomationDrawer({
       hydratedFromServerFor.current = automationId;
       // Their in-flight edits are genuinely unsaved relative to a blank
       // draft, so baseline against INITIAL_DRAFT and keep guarding them.
-      baselineRef.current ??= JSON.stringify(INITIAL_DRAFT);
+      baselineRef.current ??= draftFingerprint(INITIAL_DRAFT);
       return;
     }
     const action = row.action as TriggerAction;
@@ -625,9 +643,13 @@ export function AutomationDrawer({
         }),
       },
     };
-    hydrate(next);
+    const named = withSlackConnectionName({
+      draft: next,
+      connections: slackConnections,
+    });
+    hydrate(named);
     hydratedFromServerFor.current = automationId;
-    baselineRef.current = JSON.stringify(next);
+    baselineRef.current = draftFingerprint(named);
   }, [triggerQuery.data, automationId, hydrate]);
 
   // Capture the create-mode baseline once the synchronous prefills have had
@@ -638,7 +660,7 @@ export function AutomationDrawer({
   useEffect(() => {
     if (automationId) return;
     if (baselineRef.current !== null) return;
-    baselineRef.current = JSON.stringify(useAutomationStore.getState().draft);
+    baselineRef.current = draftFingerprint(useAutomationStore.getState().draft);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawerIdentity]);
 
@@ -1151,7 +1173,7 @@ export function AutomationDrawer({
   // draft as clean so a close during the first paint never prompts.
   const isDirty =
     baselineRef.current !== null &&
-    JSON.stringify(draft) !== baselineRef.current;
+    draftFingerprint(draft) !== baselineRef.current;
 
   // Which footer the drawer is showing. Save and test fire live on the review
   // overview; every other wizard step gets navigation instead. A schedule keeps

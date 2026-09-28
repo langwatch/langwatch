@@ -28,10 +28,12 @@ const NEW_CONNECTION = "__new_slack_connection__";
 export function selectConnection({
   slice,
   connectionId,
+  connectionName,
   kind,
 }: {
   slice: SlackSlice;
   connectionId: string;
+  connectionName: string;
   kind: SlackIntegrationKind;
 }): SlackSlice {
   const switchesConnection =
@@ -39,6 +41,7 @@ export function selectConnection({
   return {
     ...slice,
     slackIntegrationId: connectionId,
+    connectionName,
     deliveryMethod: kind === "BOT" ? "bot" : "webhook",
     channelId: switchesConnection ? "" : slice.channelId,
     legacyParams: null,
@@ -107,6 +110,7 @@ export function SlackConnectionPicker({
       selectConnection({
         slice,
         connectionId: connection.id,
+        connectionName: connection.name,
         kind: connection.kind,
       }),
     );
@@ -184,10 +188,17 @@ function useConnectionCreation({
     let hasCreatedConnection = false;
 
     openDrawer("slackConnection", {
-      onSuccess: ({ connectionId, kind }) => {
+      onSuccess: ({ connectionId, name, kind }) => {
         hasCreatedConnection = true;
         void refetch();
-        onChange(selectConnection({ slice, connectionId, kind }));
+        onChange(
+          selectConnection({
+            slice,
+            connectionId,
+            connectionName: name,
+            kind,
+          }),
+        );
       },
       onClose: () => {
         if (!hasCreatedConnection && previousConnectionId) {

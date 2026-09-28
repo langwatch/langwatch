@@ -64,6 +64,9 @@ export interface SlackSlice {
   /** The Slack connection this automation delivers through (ADR-093 §5a).
    *  Empty until one is picked. */
   slackIntegrationId: string;
+  /** The picked connection's name, for the summary line only. The drawer
+   *  fills it for a saved row; never written into `actionParams`. */
+  connectionName?: string;
   /** Follows the picked connection's kind: a bot posts to a channel and
    *  renders every block, a webhook posts to its own channel. */
   deliveryMethod: SlackDeliveryMethod;
@@ -105,13 +108,18 @@ function isComplete(slice: SlackSlice): boolean {
   return slice.deliveryMethod !== "bot" || slice.channelId.trim().length > 0;
 }
 
-function summary(slice: SlackSlice, identity: SummaryIdentity): string {
-  const name = identity.name || "(unnamed)";
-  if (usesLegacySecret(slice)) return `${name} → Slack (own secret)`;
-  if (!slice.slackIntegrationId) return `${name} → Slack (no connection)`;
-  if (slice.deliveryMethod === "webhook") return `${name} → Slack webhook`;
-  const channel = slice.channelId.trim();
-  return `${name} → Slack${channel ? ` ${channel}` : " (channel not set)"}`;
+/** Names where it posts: the connection, and for a bot the channel. */
+function summary(slice: SlackSlice, _identity: SummaryIdentity): string {
+  if (usesLegacySecret(slice)) return "Slack (own secret)";
+  if (!slice.slackIntegrationId) return "Slack (no connection)";
+  const connection = slice.connectionName
+    ? `Slack → ${slice.connectionName}`
+    : "Slack connection";
+  if (slice.deliveryMethod === "webhook") return connection;
+  const channel = slice.channelId.trim().replace(/^#/, "");
+  return channel
+    ? `${connection} #${channel}`
+    : `${connection} (channel not set)`;
 }
 
 function fromTriggerRow(row: SavedTriggerRow): SlackSlice {
