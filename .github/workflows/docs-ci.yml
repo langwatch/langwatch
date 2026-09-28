@@ -61,6 +61,10 @@ jobs:
               - 'cmd/docscheck/**'
               - 'go.mod'
               - 'go.sum'
+              # docscheck holds the release the docs name against the chart's
+              # appVersion, so bumping the chart without touching the docs is
+              # exactly the drift this job has to catch.
+              - 'charts/langwatch/Chart.yaml'
               # check_generated_files installs with --frozen-lockfile, and both
               # composites below shape how these jobs run — detect-changes is
               # the gate itself, so a change to it must re-run the gate.

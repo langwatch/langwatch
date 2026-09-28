@@ -148,31 +148,38 @@ func TestInternalDestinationBeginningWithHttpIsStillChecked(t *testing.T) {
 	}, docsscan.RedirectDeadEnd)
 }
 
-// @scenario "A pinned LangWatch release is reported"
-func TestPinnedVersionIsReported(t *testing.T) {
+// @scenario "A release version the chart no longer ships is reported"
+func TestVersionDriftIsReported(t *testing.T) {
 	findings := only(t, docsscan.Inputs{
 		ChartVersion: "3.12.0",
 		VersionRefs: []docsscan.VersionRef{
 			{File: "docs/self-hosting/deployment/docker-images.mdx", Line: 108, Version: "3.0.0"},
 		},
-	}, docsscan.PinnedVersion)
+	}, docsscan.VersionDrift)
 
 	if findings[0].Where != "docs/self-hosting/deployment/docker-images.mdx:108" {
 		t.Errorf("reported at %q, want the file and line", findings[0].Where)
 	}
-	if !strings.Contains(findings[0].Fix, "<version>") {
-		t.Errorf("remedy %q does not offer the placeholder", findings[0].Fix)
+	if !strings.Contains(findings[0].Fix, "3.12.0") {
+		t.Errorf("remedy %q does not name the release the chart ships", findings[0].Fix)
 	}
 }
 
-// @scenario "A pin matching the current chart is still reported"
-func TestPinMatchingTheChartIsStillReported(t *testing.T) {
+func TestVersionMatchingTheChartIsSound(t *testing.T) {
 	only(t, docsscan.Inputs{
 		ChartVersion: "3.12.0",
 		VersionRefs: []docsscan.VersionRef{
 			{File: "docs/a.mdx", Line: 3, Version: "3.12.0"},
 		},
-	}, docsscan.PinnedVersion)
+	})
+}
+
+func TestWithoutAChartVersionTheRuleJudgesNothing(t *testing.T) {
+	only(t, docsscan.Inputs{
+		VersionRefs: []docsscan.VersionRef{
+			{File: "docs/a.mdx", Line: 3, Version: "3.0.0"},
+		},
+	})
 }
 
 func TestAPageInTheNavigationWithAFileIsSound(t *testing.T) {
@@ -217,7 +224,7 @@ func TestOtherProjectsChartVersionIsLeftAlone(t *testing.T) {
 	}
 }
 
-// @scenario "A placeholder tag is not a pin"
+// @scenario "A placeholder tag cannot drift"
 func TestPlaceholderTagIsNotFound(t *testing.T) {
 	refs := docsscan.FindVersionRefs(
 		"docs/page.mdx",

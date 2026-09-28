@@ -88,21 +88,13 @@ Feature: Docs structure check
     When docscheck runs
     Then it is still resolved against the pages, so a dead end is reported
 
-  # Install and upgrade commands track the latest release, so a reader who
-  # copies one gets the newest chart and images. A concrete release number
-  # goes stale on the next release and would make every release PR edit docs.
   @unit
-  Scenario: A pinned LangWatch release is reported
-    Given a page names a concrete LangWatch release in a chart or image reference
+  Scenario: A release version the chart no longer ships is reported
+    Given a page names a LangWatch image tag
+    And the chart's appVersion is a different release
     When docscheck runs
-    Then it reports the pin with the file and line
-    And the remedy says to drop the pin or use a <version> placeholder
-
-  @unit
-  Scenario: A pin matching the current chart is still reported
-    Given a page names the release the chart ships today
-    When docscheck runs
-    Then it reports the pin, because it goes stale on the next release
+    Then it reports the drift with the file and line
+    And the remedy names the release the chart ships
 
   @unit
   Scenario: A version that is not a LangWatch release is left alone
@@ -123,7 +115,7 @@ Feature: Docs structure check
     Then it raises no finding
 
   @unit
-  Scenario: A placeholder tag is not a pin
+  Scenario: A placeholder tag cannot drift
     Given a rollback example names the release to roll back to as a placeholder
     When docscheck runs
     Then it raises no finding, because no concrete version is claimed
