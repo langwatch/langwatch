@@ -1097,6 +1097,12 @@ never thinks about resolution at all. The per-module resolver adapters
   port by the role that owns the children. The module resolves the public address itself, in its own
   app with an async create and a close, in the worker role only; other roles read it as
   `{ unavailable }`. It is never a module writing `process.env` (Alex, 2026-09-28).
+- Voice runs in a scenario child, the live "Talk to it" session included: the parent authenticates,
+  audits and bounds the session, then hands the socket to a child built for that one session (stripped
+  environment, egress policy, that session's credentials). On shutdown the parent admits nothing new
+  and each child ends its call cleanly, recorded as interrupted; phone jobs requeue. Every worker opens
+  a quick tunnel to the door port alone; nonces live in Redis and upgrades carry Twilio's signature
+  (Alex, 2026-09-28).
 - A protocol whose handler must write the raw Node response itself (hosted MCP's SDK transports) is a
   declared raw HTTP door, `RawHttpProtocol` (`@langwatch/api`): exact paths, prefixes claiming a path and
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
