@@ -140,7 +140,7 @@ jobs:
         env:
           LANGWATCH_API_KEY: ${{ secrets.MCP_SERVER_LANGWATCH_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.MCP_SERVER_ANTHROPIC_API_KEY }}
-        run: pnpm run test
+        run: pnpm run test && pnpm run test:integration && pnpm run test:scenario
 
   mcp-javascript-complete:
     needs: [changes, typecheck, build_and_test]

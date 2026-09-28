@@ -37,7 +37,9 @@
     "start": "tsx src/index.ts",
     "build": "tsup && node build.js",
     "prepublish": "pnpm run build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.js",
+    "test:scenario": "vitest run --config vitest.scenario.config.js"
   },
   "dependencies": {
     "@langwatch/evaluator-contract": "workspace:*",

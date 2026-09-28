@@ -26,6 +26,7 @@ import { lintComposedExports } from "./quality/composed-exports.ts";
 import { lintStrictContractBuildConfigs } from "./quality/contract-build-config.ts";
 import { lintDeclarationProjectReferences } from "./quality/declaration-project-references.ts";
 import { lintDeclarations } from "./quality/declarations.ts";
+import { lintDefaultTestLanes } from "./quality/default-test-lane.ts";
 import { lintServiceCeilings } from "./quality/service-ceilings.ts";
 import { lintServiceProjectionBoundaries } from "./quality/service-projection-boundaries.ts";
 import { lintUnusedModuleExports } from "./quality/unused-module-export.ts";
@@ -140,6 +141,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "architecture-records",
     spec: FEATURE_PACKAGE_BOUNDARIES,
     run: lintArchitectureRecords,
+  }),
+  definePolicy({
+    id: "default-test-lane",
+    spec: "specs/tooling/default-test-lane.feature",
+    run: lintDefaultTestLanes,
   }),
   definePolicy({
     id: "contract-build-config",
