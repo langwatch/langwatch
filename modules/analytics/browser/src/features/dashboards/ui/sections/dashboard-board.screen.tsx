@@ -89,7 +89,9 @@ function FlightDeckBoard() {
     >
       <BoardLangy board={FLIGHT_DECK_SUBJECT} period={period} projectId={projectId ?? ""} />
       {projectId && <FlightDeckPanels projectId={projectId} {...period} />}
-      {picker.isOpen && <BlockPickerDialog onClose={picker.close} />}
+      {picker.isOpen && (
+        <BlockPickerDialog board={FLIGHT_DECK_SUBJECT} period={period} onClose={picker.close} />
+      )}
     </BoardPage>
   );
 }
@@ -108,6 +110,7 @@ function OwnBoard({ board }: { board: SavedBoard }) {
   const picker = useBlockPickerAddress();
   const blocks = boardBlocks.blocksOn(board.id);
   const otherBoards = saved.boards.filter(({ id }) => id !== board.id);
+  const subject = ownBoardSubject({ board, blocks });
 
   return (
     <BoardPage
@@ -134,7 +137,7 @@ function OwnBoard({ board }: { board: SavedBoard }) {
       }
     >
       <BoardLangy
-        board={ownBoardSubject({ board, blocks })}
+        board={subject}
         period={period}
         projectId={projectId}
         watched={{ blocks, settled: boardBlocks.status === "success" }}
@@ -174,7 +177,9 @@ function OwnBoard({ board }: { board: SavedBoard }) {
           <AddBlockCard compact onClick={picker.open} />
         </VStack>
       )}
-      {picker.isOpen && <BlockPickerDialog targetDashboardId={board.id} onClose={picker.close} />}
+      {picker.isOpen && (
+        <BlockPickerDialog board={subject} period={period} onClose={picker.close} />
+      )}
     </BoardPage>
   );
 }

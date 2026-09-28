@@ -66,6 +66,20 @@ function periodText(period: BlockPeriod): string {
   return `${instant(period.periodStart)} to ${instant(period.periodEnd)}`;
 }
 
+const GRAIN_UNITS = [
+  { unit: "week", seconds: 604_800 },
+  { unit: "day", seconds: 86_400 },
+  { unit: "hour", seconds: 3_600 },
+  { unit: "minute", seconds: 60 },
+] as const;
+
+function grainText(granularitySeconds: number): string {
+  const found = GRAIN_UNITS.find(({ seconds }) => granularitySeconds % seconds === 0);
+  if (!found) return `${granularitySeconds} seconds`;
+  const count = granularitySeconds / found.seconds;
+  return count === 1 ? `1 ${found.unit}` : `${count} ${found.unit}s`;
+}
+
 function context({ ref, label }: { ref: string; label: string }): AnalyticsLangyContext {
   return {
     kind: "dashboard",
@@ -108,6 +122,22 @@ export function boardQuestion({
   period: BlockPeriod;
 }): AnalyticsLangyAskRequest {
   return { question: question.trim(), context: [boardAskContext({ board, period })] };
+}
+
+/** A picker question's prompt, asked with the board and its concrete window and grain. */
+export function boardPromptQuestion({
+  prompt,
+  board,
+  period,
+}: {
+  prompt: string;
+  board: BoardSubject;
+  period: BlockPeriod;
+}): AnalyticsLangyAskRequest {
+  const window =
+    `Dashboard period: ${periodText(period)} (UTC). ` +
+    `Dashboard grain: one bucket per ${grainText(period.granularitySeconds)}.`;
+  return boardQuestion({ question: `${prompt}\n\n${window}`, board, period });
 }
 
 function cellText(value: unknown): string {
