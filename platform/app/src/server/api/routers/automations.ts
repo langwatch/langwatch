@@ -17,6 +17,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   AlertType,
   type Prisma,
@@ -226,6 +227,40 @@ function validateEmailRecipientFormats(recipients: string[]): void {
   }
 }
 
+/**
+ * The legacy create path's Slack delivery: a connection id or a legacy
+ * secret, stored as a connection id, never the secret itself (ADR-093 §5a).
+ */
+async function connectLegacySlackParams({
+  prisma,
+  projectId,
+  actorId,
+  actionParams,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  actorId: string;
+  actionParams: { slackIntegrationId?: string; slackWebhook?: string };
+}): Promise<SlackActionParams> {
+  if (!actionParams.slackIntegrationId && !actionParams.slackWebhook) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "A Slack connection is required",
+    });
+  }
+  const connected = await createSlackIntegrationService({
+    prisma,
+  }).connectActionParams({ projectId, actorId, actionParams });
+  const parsed = slackActionParamsSchema.safeParse(connected);
+  if (!parsed.success) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: parsed.error.errors[0]?.message ?? "Invalid Slack delivery",
+    });
+  }
+  return parsed.data;
+}
+
 export const automationRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -308,35 +343,16 @@ export const automationRouter = createTRPCRouter({
         }
       }
 
-      let slackParams: SlackActionParams | null = null;
-      if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
-        if (
-          !input.actionParams.slackIntegrationId &&
-          !input.actionParams.slackWebhook
-        ) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "A Slack connection is required",
-          });
-        }
-        // ADR-093 §5a: store a connection id, never the webhook URL itself.
-        const connected = await createSlackIntegrationService({
-          prisma: ctx.prisma,
-        }).connectActionParams({
-          projectId: input.projectId,
-          actorId: ctx.session.user.id,
-          actionParams: input.actionParams,
-        });
-        const parsed = slackActionParamsSchema.safeParse(connected);
-        if (!parsed.success) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              parsed.error.errors[0]?.message ?? "Invalid Slack delivery",
-          });
-        }
-        slackParams = parsed.data;
-      } else if (input.action === TriggerAction.SEND_EMAIL) {
+      const slackParams =
+        input.action === TriggerAction.SEND_SLACK_MESSAGE
+          ? await connectLegacySlackParams({
+              prisma: ctx.prisma,
+              projectId: input.projectId,
+              actorId: ctx.session.user.id,
+              actionParams: input.actionParams,
+            })
+          : null;
+      if (input.action === TriggerAction.SEND_EMAIL) {
         // Align with `upsert` (and `validateEmailRecipientFormats`): RFC
         // shape only. External recipients are intentionally allowed; the
         // UI surfaces an "External" warning badge for any non-team

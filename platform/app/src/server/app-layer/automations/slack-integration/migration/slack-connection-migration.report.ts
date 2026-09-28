@@ -39,6 +39,21 @@ export function dryRunOutcome({
   };
 }
 
+function countConnection({
+  tally,
+  connection,
+}: {
+  tally: SlackMigrationTally;
+  connection: PlannedConnection;
+}): void {
+  if (connection.action === "create") {
+    tally.created += 1;
+    return;
+  }
+  tally.reused += 1;
+  if (connection.widenedFromProjectId) tally.widened += 1;
+}
+
 export function tallyOutcomes({
   outcomes,
 }: {
@@ -53,11 +68,7 @@ export function tallyOutcomes({
   };
   for (const { plan, linkedIds, skipped } of outcomes) {
     for (const connection of plan.connections) {
-      if (connection.action === "create") tally.created += 1;
-      else tally.reused += 1;
-      if (connection.action === "reuse" && connection.widenedFromProjectId) {
-        tally.widened += 1;
-      }
+      countConnection({ tally, connection });
     }
     tally.linked += linkedIds.length;
     for (const { reason } of skipped) {
