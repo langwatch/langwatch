@@ -79,6 +79,7 @@ describe("the ingestionKey tRPC namespace", () => {
         organizationId: "org_1",
         sourceType: "cursor",
         ingestionTemplateId: "tpl_1",
+        surface: "trpc",
       },
     ]);
   });
@@ -101,6 +102,18 @@ describe("the ingestionKey tRPC namespace", () => {
     await expect(caller.revoke({ organizationId: "org_1", apiKeyId: "ak_1" })).resolves.toEqual({
       success: true,
     });
-    expect(calls).toEqual([{ organizationId: "org_1", apiKeyId: "ak_1", userId: "user_1" }]);
+    expect(calls).toEqual([
+      { organizationId: "org_1", apiKeyId: "ak_1", userId: "user_1", surface: "trpc" },
+    ]);
+  });
+
+  /** @scenario "The web door's install, rotate and revoke audit rows carry the trpc surface" */
+  it("hands the trpc surface to install, rotate and revoke", async () => {
+    const { caller, calls } = mount();
+
+    await caller.install({ organizationId: "org_1", sourceType: "cursor" });
+    await caller.rotate({ organizationId: "org_1", sourceType: "cursor" });
+    await caller.revoke({ organizationId: "org_1", apiKeyId: "ak_1" });
+    expect(calls).toMatchObject([{ surface: "trpc" }, { surface: "trpc" }, { surface: "trpc" }]);
   });
 });

@@ -51,6 +51,7 @@ import {
   type PersonaResolution,
   type GovernanceOttlGateway,
   type OttlValidationResult,
+  type GovernanceCallSurface,
   type IssuedIngestionKey,
   type PersonalIngestionKeyListing,
   type PersonalIngestionKeyMint,
@@ -631,6 +632,7 @@ export class GovernanceApp implements GovernanceRestApi {
       apiKeys: dependencies.apiKeys,
       organizations: dependencies.organizations,
       templates: repositories.ingestionTemplates,
+      auditLog: dependencies.auditLog,
     });
     this.mcpTools = GovernanceMcpToolsService.create({
       projects: dependencies.projects,
@@ -1362,7 +1364,7 @@ export class GovernanceApp implements GovernanceRestApi {
   }
 
   async ingestionKeyInstall(input: PersonalIngestionKeyMint): Promise<IssuedIngestionKey> {
-    return this.ingestionKeys.mint(input);
+    return this.ingestionKeys.install(input);
   }
 
   async ingestionKeyRotate(input: PersonalIngestionKeyMint): Promise<RotatedIngestionKey> {
@@ -1373,6 +1375,7 @@ export class GovernanceApp implements GovernanceRestApi {
     organizationId: string;
     userId: string;
     apiKeyId: string;
+    surface?: GovernanceCallSurface;
   }): Promise<void> {
     return this.ingestionKeys.revoke(input);
   }

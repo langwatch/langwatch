@@ -333,6 +333,7 @@ export class GovernanceMcpToolsService {
             organizationId,
             sourceType: source_type,
             ingestionTemplateId: template_id ?? null,
+            surface: SURFACE,
           }),
         ),
     );
@@ -350,6 +351,7 @@ export class GovernanceMcpToolsService {
           userId: current.callerUserId,
           organizationId: current.organizationId,
           apiKeyId: api_key_id,
+          surface: SURFACE,
         });
         return text(`revoked ${api_key_id}`);
       },

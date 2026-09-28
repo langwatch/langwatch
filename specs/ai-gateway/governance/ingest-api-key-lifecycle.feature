@@ -340,6 +340,39 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     Then the request is refused with code "ingestion_key_not_found"
     And john's key is not revoked
 
+  # Main audits each door's mint, rotate and revoke, tagging the call surface.
+  # A CLI session's mint writes no row.
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: A door's install, rotate and revoke each record main's audit row
+    When a door installs, rotates and revokes one of jane's keys
+    Then the audit log records "ingestionKey.mint", "ingestionKey.rotate" and "ingestionKey.revoke"
+    And each row carries the key id and the door's surface
+    And the mint and rotate rows carry the source type, the rotate row the revoked count
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: The web door's install, rotate and revoke audit rows carry the trpc surface
+    When jane installs, rotates and revokes a key from the web app
+    Then each operation is handed the surface "trpc"
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: The MCP door's mint and revoke audit rows carry the mcp surface
+    When an agent mints and then revokes a key through the MCP tools
+    Then the "ingestionKey.mint" and "ingestionKey.revoke" rows carry the surface "mcp"
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: A failed mint audit write does not fail the mint
+    Given the audit log cannot be written
+    When a door installs a key
+    Then the minted token is still answered
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: A revoke answers only once its audit row is written
+    Given the audit log cannot be written
+    When a door revokes one of jane's keys
+    Then the key is revoked
+    And the revoke is refused
+
   @integration @ingest-api-key @issue @personal @create-only
   Scenario: A personal key is minted only for a tool the CLI wraps
     Given jane holds a device session

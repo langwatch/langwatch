@@ -3,6 +3,7 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
+import type { GovernanceCallSurface } from "./governance-audit.ts";
 import { issuedIngestionKeySchema } from "./ingestion-source-key.commands.ts";
 
 /** One of the caller's live personal ingestion keys, without its secret. */
@@ -61,4 +62,6 @@ export type PersonalIngestionKeyMint = {
   parentApiKeyId?: string | null;
   createdByDeviceLabel?: string | null;
   fromCliSession?: boolean;
+  /** The door that asked, stamped on the install and rotate audit rows. */
+  surface?: GovernanceCallSurface;
 };

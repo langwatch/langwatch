@@ -4,6 +4,7 @@ import {
   type ApiKeyApi,
   ApiKeyAlreadyRevokedError,
 } from "@langwatch/api-key-contract";
+import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -79,7 +80,7 @@ function ingestionKey(overrides: Partial<ApiKey>): ApiKey {
 }
 
 /** The tools over the real personal-key service, so the door answers what main's did. */
-function withIngestionKeys({
+async function withIngestionKeys({
   keys,
   alreadyRevoked = false,
 }: {
@@ -88,9 +89,36 @@ function withIngestionKeys({
 }) {
   const created: unknown[] = [];
   const revoked: unknown[] = [];
+  const audited: RecordAuditLogCommand[] = [];
+  const templates = MemoryIngestionTemplateRepository.create(MemoryGovernanceStore.create());
+  const template = await templates.createWithAudit({
+    template: {
+      slug: "cursor",
+      sourceType: "cursor",
+      displayName: "Cursor",
+      description: null,
+      iconAsset: null,
+      credentialSchema: null,
+      ottlRules: "",
+      organizationId: "org_1",
+    },
+    callerUserId: "seed",
+    surface: "hono",
+  });
   const ingestionKeys = PersonalIngestionKeyService.create({
-    templates: MemoryIngestionTemplateRepository.create(MemoryGovernanceStore.create()),
-    organizations: createApiFixture<OrganizationService>({}),
+    auditLog: {
+      record: async (command) => {
+        audited.push(command);
+        return { id: "audit_1", occurredAt: 0 };
+      },
+    },
+    templates,
+    organizations: createApiFixture<OrganizationService>({
+      getPersonalWorkspace: async () => ({
+        team: { id: "team_p", name: "Personal", slug: "personal", createdAtMs: 0 },
+        project: { id: "project_p", name: "Personal", slug: "p", apiKey: "k", createdAtMs: 0 },
+      }),
+    }),
     apiKeys: createApiFixture<ApiKeyApi>({
       findById: async ({ id }) => keys.find((key) => key.id === id) ?? null,
       create: async (input) => {
@@ -110,14 +138,14 @@ function withIngestionKeys({
       getOrganizationId: async () => "org_1",
     }),
     governance: createApiFixture<GovernanceRestApi>({
-      ingestionKeyInstall: (input) => ingestionKeys.mint(input),
+      ingestionKeyInstall: (input) => ingestionKeys.install(input),
       ingestionKeyRevoke: (input) => ingestionKeys.revoke(input),
     }),
     permissions: { holdsOrganizationPermission: async () => true },
   });
   const { server, tools } = recordingServer();
   service.register({ server, apiKey: "sk-lw-1", callerUserId: "user_1" });
-  return { tools, created, revoked };
+  return { tools, created, revoked, audited, templateId: template.id };
 }
 
 describe("GovernanceMcpToolsService", () => {
@@ -159,7 +187,7 @@ describe("GovernanceMcpToolsService", () => {
   describe("when an agent mints a key for a tool the CLI wraps", () => {
     /** @scenario "The MCP mint refuses a tool the CLI wraps" */
     it("refuses by code and creates no key", async () => {
-      const { tools, created } = withIngestionKeys({ keys: [] });
+      const { tools, created } = await withIngestionKeys({ keys: [] });
 
       await expect(
         tools.get("governance_ingestion_keys_mint")!({ source_type: "claude_code" }),
@@ -171,16 +199,31 @@ describe("GovernanceMcpToolsService", () => {
   describe("when an agent revokes one of the caller's keys", () => {
     /** @scenario "An agent revokes one of the caller's own keys through the MCP tool" */
     it("revokes it with cause user and answers main's line", async () => {
-      const { tools, revoked } = withIngestionKeys({ keys: [ingestionKey({})] });
+      const { tools, revoked } = await withIngestionKeys({ keys: [ingestionKey({})] });
 
       const result = await tools.get("governance_ingestion_keys_revoke")!({ api_key_id: "ak_1" });
       expect(revoked).toEqual([["ak_1", "user"]]);
       expect(result.content[0]!.text).toBe("revoked ak_1");
     });
 
+    /** @scenario "The MCP door's mint and revoke audit rows carry the mcp surface" */
+    it("records the mint and revoke rows with the mcp surface", async () => {
+      const { tools, audited, templateId } = await withIngestionKeys({ keys: [ingestionKey({})] });
+
+      await tools.get("governance_ingestion_keys_mint")!({
+        source_type: "cursor",
+        template_id: templateId,
+      });
+      await tools.get("governance_ingestion_keys_revoke")!({ api_key_id: "ak_1" });
+      expect(audited).toMatchObject([
+        { action: "ingestionKey.mint", metadata: { surface: "mcp" } },
+        { action: "ingestionKey.revoke", metadata: { surface: "mcp" } },
+      ]);
+    });
+
     /** @scenario "Revoking an already revoked key through the MCP tool is not an error" */
     it("answers revoked again when the key is already revoked", async () => {
-      const { tools } = withIngestionKeys({ keys: [ingestionKey({})], alreadyRevoked: true });
+      const { tools } = await withIngestionKeys({ keys: [ingestionKey({})], alreadyRevoked: true });
 
       const result = await tools.get("governance_ingestion_keys_revoke")!({ api_key_id: "ak_1" });
       expect(result.content[0]!.text).toBe("revoked ak_1");
@@ -188,7 +231,7 @@ describe("GovernanceMcpToolsService", () => {
 
     /** @scenario "Another person's key answers not found through the MCP tool" */
     it("refuses another person's key as not found and revokes nothing", async () => {
-      const { tools, revoked } = withIngestionKeys({
+      const { tools, revoked } = await withIngestionKeys({
         keys: [ingestionKey({ userId: "user_2" })],
       });
 

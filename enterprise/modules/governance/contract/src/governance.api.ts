@@ -311,6 +311,7 @@ export interface GovernanceRestApi {
     organizationId: string;
     userId: string;
     apiKeyId: string;
+    surface?: GovernanceCallSurface;
   }): Promise<void>;
   sessionPolicyGet(input: { organizationId: string }): Promise<OrganizationSessionPolicyShape>;
   sessionPolicySetMaxDuration(input: {
