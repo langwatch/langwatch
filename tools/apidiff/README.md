@@ -12,7 +12,7 @@ state never produces false diffs.
 
 ```text
 apidiff run   [-main-ref REF] [-branch-dir DIR] [-work-root DIR]
-              [-keep] [-reuse-worktrees] [-skip-install] [-boot-timeout DUR]
+              [-keep] [-reuse-worktrees] [-skip-install] [-branch-head] [-boot-timeout DUR]
               [-dry-run] [-no-haven] [-pg-url URL -ch-url URL -redis-url URL]
               [-compose-project NAME] [-parity-only] [probe flags...]
 
@@ -30,16 +30,17 @@ out `-branch-dir`'s own HEAD — with isolated Postgres/ClickHouse databases
 id derives from the work-root name) and two Redis logical DBs derived from the
 run id, migrates and seeds each, waits for health, probes, and tears
 everything down. Under `-no-haven` the branch side is `-branch-dir` itself,
-for the parity inventories and the boot alike. `probe`
-compares two already-running instances.
+for the parity inventories and the boot alike, unless `-branch-head` checks
+its HEAD out into a worktree too (see "Persistent worktrees and caches").
+`probe` compares two already-running instances.
 
 **Neither haven stack ever boots inside the invoking checkout.** haven
 registers one stack per directory: booting the branch instance in place used
 to let `haven up` there replace a developer's own stack registration for that
 directory, and the run's teardown `haven destroy` take it down with it (an
 incident on 2026-09-10 — a developer's own stack vanished mid-session). The
-branch side now checks out its own HEAD into `<work-root>/branch`, the same
-way the base side has always checked out into `<work-root>/main`, and a run
+branch side now checks out its own HEAD into `.apidiff/worktrees/branch`, the
+same way the base side checks out into `.apidiff/worktrees/main`, and a run
 refuses outright if either worktree path would resolve to the invoking
 checkout. `-dry-run` prints the plan — both refs, both worktree paths, both
 haven slugs, and the ordered commands a real run would issue — and starts
@@ -126,8 +127,9 @@ deterministic summary, or the machine report with `-json` (optionally to
   `pg_is_in_recovery()` is false — a fresh-volume postgres can still be in
   crash recovery when the container healthcheck goes green, and probing a
   recovering server produces false findings. On teardown without `-keep`,
-  compose `down -v` removes the managed stack; with external servers, exactly
-  the run-scoped databases are dropped. `-pg-url`/`-ch-url`/`-redis-url`
+  exactly the run-scoped databases are dropped and the two Redis DBs emptied,
+  on the compose stack and external servers alike: the compose stack stays up
+  for the next run (see "Persistent worktrees and caches"). `-pg-url`/`-ch-url`/`-redis-url`
   (given together) point at user-managed servers instead; external Postgres
   administration then needs `psql` on PATH.
 - Credentials default to the deterministic seed identity:
@@ -551,8 +553,8 @@ A full `-no-haven` run overlaps everything that does not depend on
 something else. Every boundary is logged as `timing +<elapsed>: <phase>`.
 
 1. Worktrees, then the infrastructure: compose (or the external servers) is
-   resolved and preflighted, then brought up and its databases recreated in
-   the background.
+   resolved and preflighted, then brought up (or found up from the last run)
+   and its databases recreated in the background.
 2. Both trees are prepared at once (see "Parity phase").
 3. The tRPC and route inventories of both sides run in the background, beside
    migrate and seed; the probes start only after they are written.
@@ -567,7 +569,46 @@ something else. Every boundary is logged as `timing +<elapsed>: <phase>`.
    `WARNING`. The collection checks and the permission probes run in a pool
    of six and are filed in probe order afterwards.
 6. Teardown, once, whichever of the parity cleanup and the boot's teardown
-   runs first.
+   runs first. It kills the instances, drops the run's databases and hands
+   the persistent worktrees back; nothing in it waits on a slow step.
+
+## Persistent worktrees and caches
+
+A run reuses what the last one left, the way visualdiff does
+(`tools/visualdiff/worktrees.go`):
+
+- **Worktrees.** main checks out into `.apidiff/worktrees/main`, and the
+  branch's HEAD into `.apidiff/worktrees/branch` on the haven path or with
+  `-branch-head`. The first run adds each worktree; later runs move it to
+  their commit with `git checkout --detach --force`, so `node_modules`,
+  generated files and dists stay warm. `.apidiff/worktrees/<side>.owner`
+  names the run holding it (work root, pid, `-keep`): a worktree another live
+  or kept run holds is not shared, and this run adds `<work-root>/<side>` of
+  its own instead. A kept run's hold ends when its work root is deleted.
+- **Prepare.** `.apidiff/worktrees/<side>.prepared` records the key of the
+  last finished prepare: the layout, the steps and the commit's tree, spelled
+  as visualdiff's `PrepareKey`. A worktree whose tree has not moved skips the
+  install, `start:prepare:files` and `ensure-built` entirely.
+- **Inventories.** A checked-out side's tRPC and route manifests are kept in
+  `.apidiff/inventory-cache/<side>-<key>-{trpc,routes}.json`, keyed on the
+  tree and the embedded inventory scripts. A manifest that recorded a failure
+  is never cached. `-branch-dir` booted in place is never cached, since its
+  working tree can differ from any commit.
+- **Compose.** The managed stack's override is
+  `.apidiff/compose-<project>.yml`. The next run reads its ports from there
+  and `docker compose up --wait` finds the stack already up. If that fails
+  (the stack was down and a port is taken), the run starts it on fresh ports.
+  Teardown only drops the run's databases; `docker compose -p apidiff down -v`
+  stops the stack.
+- **Teardown.** The monolith's `platform/app/.env.portless` overlay is deleted
+  when a worktree is released, because its env-load applies the file with
+  `override: true` and a stack later started there would read this run's
+  dropped database. A worktree added for one run alone is moved aside to
+  `<dir>.discarded`, pruned from git's list, and deleted by a detached `rm`
+  logged to `<work-root>/logs/teardown.log`.
+- haven's disk reclaim treats everything under `.apidiff/` as scratch, so it
+  can offer a persistent worktree idle for a day for reclaim; the next run
+  then adds it again.
 
 ## Parity phase
 
@@ -576,10 +617,10 @@ stack boots, so missing work is found in bulk and handed out per module
 before a single request is probed. `-parity-only` stops after it: no haven,
 no database, no stack — only the two worktrees.
 
-1. **Trees, prepared once.** main is checked out into `<work-root>/main`; the
-   branch side is `<work-root>/branch` (its HEAD) on the haven path and
-   `-branch-dir` itself under `-no-haven`, so parity always reads the tree the
-   probes boot. Both trees are prepared at the same time, with havenrun's
+1. **Trees, prepared once.** main is checked out into
+   `.apidiff/worktrees/main`; the branch side is `.apidiff/worktrees/branch`
+   (its HEAD) on the haven path or with `-branch-head`, and `-branch-dir`
+   itself otherwise, so parity always reads the tree the probes boot. Both trees are prepared at the same time, with havenrun's
    steps for each tree's own layout (`pnpm install`, `start:prepare:files`,
    and `ensure-built` on the modular layout). A full run boots those same
    trees and runs no install or build of its own; `-skip-install` takes both

@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -100,6 +101,9 @@ type BootConfig struct {
 	// ParityOnly stops the run after the parity phase, so it starts no
 	// infrastructure for a boot that will not follow.
 	ParityOnly bool
+	// BranchHead boots the branch from -branch-dir's HEAD in its persistent
+	// worktree under -no-haven too, leaving -branch-dir itself untouched.
+	BranchHead bool
 }
 
 // Instance is one booted API copy.
@@ -417,6 +421,8 @@ type DryRunPlan struct {
 	BranchDir  string
 	BranchSlug string // empty on the -no-haven path
 	UseHaven   bool
+	// BranchHead says the branch boots from its HEAD worktree, not in place.
+	BranchHead bool
 	Commands   []string
 }
 
@@ -438,37 +444,43 @@ func PlanBoot(cfg BootConfig) (DryRunPlan, error) {
 		return DryRunPlan{}, err
 	}
 	runID := RunID(workRoot)
-	mainDir := filepath.Join(workRoot, "main")
+	mainDir := persistentWorktree(invoking, "main")
 	plan := DryRunPlan{
 		WorkRoot: workRoot, RunID: runID, MainRef: cfg.MainRef, MainDir: mainDir,
 		BranchDir: invoking, UseHaven: cfg.UseHaven,
 	}
+	plan.Commands = []string{checkoutPlanLine(mainDir, cfg.MainRef, invoking)}
+	if cfg.UseHaven || cfg.BranchHead {
+		plan.BranchDir, plan.BranchHead = persistentWorktree(invoking, "branch"), true
+		plan.Commands = append(plan.Commands, checkoutPlanLine(plan.BranchDir, "HEAD", invoking))
+	}
+	release := "release both persistent worktrees for the next run, deleting the env overlay (a worktree another live run held is <work-root>/<side>, moved aside and deleted in the background)"
 	if !cfg.UseHaven {
-		plan.Commands = []string{
-			"git " + strings.Join(worktreeAddArgs(mainDir, cfg.MainRef), " ") + " (in " + invoking + ")",
+		plan.Commands = append(plan.Commands,
 			"pnpm install / migrate / seed / start, both instances (see README: Boot details)",
-		}
+			"drop the run's databases; the compose project stays up for the next run", release)
 		return plan, nil
 	}
-	plan.BranchDir = filepath.Join(workRoot, "branch")
 	plan.MainSlug = HavenSlug(runID, "main")
 	plan.BranchSlug = HavenSlug(runID, "branch")
 	if plan.MainDir == invoking || plan.BranchDir == invoking {
 		return plan, fmt.Errorf("refusing to boot a haven stack from the invoking checkout %s", invoking)
 	}
-	plan.Commands = []string{
-		"git " + strings.Join(worktreeAddArgs(mainDir, cfg.MainRef), " ") + " (in " + invoking + ")",
-		"git " + strings.Join(worktreeAddArgs(plan.BranchDir, "HEAD"), " ") + " (in " + invoking + ")",
+	plan.Commands = append(plan.Commands,
 		havenPrepareCommandLine(mainDir),
 		havenPrepareCommandLine(plan.BranchDir),
-		havenCommand + " " + strings.Join(havenUpArgs(), " ") + " (in " + mainDir + ", stack " + plan.MainSlug + ")",
-		havenCommand + " " + strings.Join(havenUpArgs(), " ") + " (in " + plan.BranchDir + ", stack " + plan.BranchSlug + ")",
-		havenCommand + " " + strings.Join(havenDestroyArgs(plan.MainSlug), " ") + " (in " + workRoot + ")",
-		havenCommand + " " + strings.Join(havenDestroyArgs(plan.BranchSlug), " ") + " (in " + workRoot + ")",
-		"git worktree remove --force " + mainDir,
-		"git worktree remove --force " + plan.BranchDir,
-	}
+		havenCommand+" "+strings.Join(havenUpArgs(), " ")+" (in "+mainDir+", stack "+plan.MainSlug+")",
+		havenCommand+" "+strings.Join(havenUpArgs(), " ")+" (in "+plan.BranchDir+", stack "+plan.BranchSlug+")",
+		havenCommand+" "+strings.Join(havenDestroyArgs(plan.MainSlug), " ")+" (in "+workRoot+")",
+		havenCommand+" "+strings.Join(havenDestroyArgs(plan.BranchSlug), " ")+" (in "+workRoot+")",
+		release,
+	)
 	return plan, nil
+}
+
+// checkoutPlanLine is how a side's persistent worktree reaches ref's commit.
+func checkoutPlanLine(dir, ref, invoking string) string {
+	return "git worktree add --force --detach " + dir + " <" + ref + ">, or git checkout --detach --force <" + ref + "> in it once it exists (in " + invoking + ")"
 }
 
 // WriteDryRunPlan renders a plan the way visualdiff's own -dry-run does: the
@@ -482,8 +494,10 @@ func WriteDryRunPlan(w io.Writer, plan DryRunPlan) {
 		fmt.Fprintf(w, "             haven stack %s\n", plan.MainSlug)
 		fmt.Fprintf(w, "  branch     HEAD -> %s\n", plan.BranchDir)
 		fmt.Fprintf(w, "             haven stack %s\n", plan.BranchSlug)
+	} else if plan.BranchHead {
+		fmt.Fprintf(w, "  branch     HEAD -> %s\n", plan.BranchDir)
 	} else {
-		fmt.Fprintf(w, "  branch     %s (booted in place; -no-haven has no stack for a worktree to isolate)\n", plan.BranchDir)
+		fmt.Fprintf(w, "  branch     %s (booted in place; -branch-head boots its HEAD in a worktree instead)\n", plan.BranchDir)
 	}
 	fmt.Fprintf(w, "  commands\n")
 	for _, command := range plan.Commands {
@@ -498,15 +512,22 @@ type bootState struct {
 	workRoot string
 	runID    string
 	mainDir  string
-	ownsMain bool
-	// branchDir and ownsBranch are the haven path only: the branch instance's
-	// own HEAD worktree, so it never boots inside the invoking checkout (see
+	// branchDir is the branch's own HEAD worktree, on the haven path and under
+	// -branch-head, so it never boots inside the invoking checkout (see
 	// refuseSelfCheckout and the package comment in haven.go).
-	branchDir  string
-	ownsBranch bool
-	override   string
-	infra      infraURLs
-	processes  []*exec.Cmd
+	branchDir string
+	// checkouts are the trees this run checked out (worktrees.go); teardown
+	// releases the persistent ones and discards the rest.
+	checkouts   []sideCheckout
+	checkoutsMu sync.Mutex
+	// detach starts a command that outlives the run; nil is detachCommand.
+	detach   func(spec commandSpec, log string) error
+	override string
+	// reusedPorts says override came from an earlier run, whose stack may
+	// still be up on its ports; startInfra falls back to fresh ones.
+	reusedPorts bool
+	infra       infraURLs
+	processes   []*exec.Cmd
 	// processesMu guards processes: a worker respawn appends from its own
 	// goroutine while teardown may be killing.
 	processesMu sync.Mutex
@@ -793,54 +814,32 @@ func cancelOnError(cancel context.CancelFunc, err error) error {
 	return err
 }
 
-// setupWorktree prepares the base-ref worktree everywhere, and — for the
-// haven path only — a second worktree checking out the branch's own HEAD.
-// haven registers one stack per directory: booting the branch instance in the
-// invoking checkout is what let `haven up` there replace a developer's own
-// stack registration for that directory, and `haven destroy` take it down
-// (01:36, 2026-09-10). The branch worktree removes that directory collision
-// the same way the main one always has.
+// setupWorktree checks the base ref out and, on the haven path or under
+// -branch-head, the branch's own HEAD: haven registers one stack per
+// directory, and a branch booted in the invoking checkout replaced and then
+// destroyed a developer's own stack (01:36, 2026-09-10). Both sides reuse
+// their persistent worktree (worktrees.go).
 func (state *bootState) setupWorktree(ctx context.Context) error {
-	dir, owned, err := state.addOrReuseWorktree(ctx, "main", state.cfg.MainRef)
+	main, err := state.checkOut(ctx, "main", state.cfg.MainRef)
 	if err != nil {
-		return fmt.Errorf("git worktree add: %w", err)
+		return err
 	}
-	state.mainDir, state.ownsMain = dir, owned
-	if !state.cfg.UseHaven {
+	state.mainDir = main.dir
+	if !state.cfg.UseHaven && !state.cfg.BranchHead {
 		return nil
 	}
-	dir, owned, err = state.addOrReuseWorktree(ctx, "branch", "HEAD")
+	branch, err := state.checkOut(ctx, "branch", "HEAD")
 	if err != nil {
-		return fmt.Errorf("git worktree add (branch): %w", err)
+		return err
 	}
-	state.branchDir, state.ownsBranch = dir, owned
+	state.branchDir = branch.dir
 	return state.refuseSelfCheckout()
-}
-
-// addOrReuseWorktree adds (or, with -reuse-worktrees, adopts) one
-// <workRoot>/<name> worktree at ref, run from the invoking checkout. The bool
-// result says whether this run owns the worktree and so must remove it at
-// teardown.
-func (state *bootState) addOrReuseWorktree(ctx context.Context, name, ref string) (string, bool, error) {
-	dir := filepath.Join(state.workRoot, name)
-	if state.cfg.ReuseWorktrees {
-		if _, err := os.Stat(dir); err == nil {
-			state.logf("reusing worktree %s", dir)
-			return dir, false, nil
-		}
-		return "", false, fmt.Errorf("-reuse-worktrees but %s does not exist", dir)
-	}
-	state.logf("git worktree add %s at %s", ref, dir)
-	if err := state.runHost(ctx, "git", worktreeAddArgs(dir, ref)...); err != nil {
-		return "", false, err
-	}
-	return dir, true, nil
 }
 
 // refuseSelfCheckout is the backstop the 01:36 incident argues for: whatever
 // computed a worktree path, it must never equal the invoking checkout. Both
-// are freshly built <workRoot>/... paths, so this only fires if a future
-// change makes one alias the checkout again.
+// are .apidiff/... paths, so this only fires if a future change makes one
+// alias the checkout again.
 func (state *bootState) refuseSelfCheckout() error {
 	invoking := filepath.Clean(state.cfg.BranchDir)
 	for _, dir := range []string{state.mainDir, state.branchDir} {
@@ -916,6 +915,21 @@ func (state *bootState) resolveInfra() error {
 		state.logf("infra: using external servers")
 		return nil
 	}
+	state.override = composeOverridePath(state.cfg.BranchDir, state.cfg.ComposeProject)
+	if ports, ok := readOverridePorts(state.override); ok {
+		state.infra.pgPort, state.infra.chPort, state.infra.redisPort = ports[0], ports[1], ports[2]
+		state.reusedPorts = true
+		state.logf("infra: reusing compose project %s's ports from %s", state.cfg.ComposeProject, state.override)
+	} else if err := state.allocateComposePorts(); err != nil {
+		return err
+	}
+	state.setComposeURLs()
+	return nil
+}
+
+// allocateComposePorts picks three free ports and writes the override that
+// publishes the stack on them.
+func (state *bootState) allocateComposePorts() error {
 	for _, port := range []*int{&state.infra.pgPort, &state.infra.chPort, &state.infra.redisPort} {
 		value, err := freePort()
 		if err != nil {
@@ -923,14 +937,18 @@ func (state *bootState) resolveInfra() error {
 		}
 		*port = value
 	}
-	state.override = filepath.Join(state.workRoot, "compose.apidiff.yml")
-	if err := os.WriteFile(state.override, []byte(portsOverrideYAML(state.infra.pgPort, state.infra.chPort, state.infra.redisPort)), 0o600); err != nil {
+	state.reusedPorts = false
+	if err := os.MkdirAll(filepath.Dir(state.override), 0o750); err != nil {
 		return err
 	}
+	return os.WriteFile(state.override, []byte(portsOverrideYAML(state.infra.pgPort, state.infra.chPort, state.infra.redisPort)), 0o600)
+}
+
+// setComposeURLs points the three servers at the managed stack's ports.
+func (state *bootState) setComposeURLs() {
 	state.infra.pgServer = fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/%s", pgUser, pgPass, state.infra.pgPort, pgAdminDB)
 	state.infra.chServer = fmt.Sprintf("http://%s:%s@127.0.0.1:%d", chUser, chPass, state.infra.chPort)
 	state.infra.redisServer = fmt.Sprintf("redis://127.0.0.1:%d", state.infra.redisPort)
-	return nil
 }
 
 // preflight validates external infrastructure BEFORE the two pnpm installs.
@@ -1008,12 +1026,54 @@ func (state *bootState) startInfra(ctx context.Context) error {
 	if state.override == "" {
 		return nil
 	}
+	err := state.composeUp(ctx)
+	if err == nil || !state.reusedPorts {
+		return err
+	}
+	state.logf("infra: compose up on the previous run's ports failed (%v); starting on fresh ports", err)
+	if err := state.allocateComposePorts(); err != nil {
+		return err
+	}
+	state.setComposeURLs()
+	return state.composeUp(ctx)
+}
+
+// composeUp starts the stack, or finds it already up from an earlier run.
+func (state *bootState) composeUp(ctx context.Context) error {
 	state.logf("infra: docker compose up (pg :%d, clickhouse :%d, redis :%d)", state.infra.pgPort, state.infra.chPort, state.infra.redisPort)
 	args := composeArgs(state.compose(), "up", "-d", "postgres", "redis", "clickhouse", "--wait")
 	if err := state.runHost(ctx, "docker", args...); err != nil {
 		return fmt.Errorf("compose up: %w", err)
 	}
 	return nil
+}
+
+// composeOverridePath is the managed stack's override, kept beside the
+// persistent worktrees so the next run finds the ports the stack is up on.
+func composeOverridePath(root, project string) string {
+	return filepath.Join(toolDir(root), "compose-"+project+".yml")
+}
+
+// overridePort reads one published port out of portsOverrideYAML's output.
+var overridePort = regexp.MustCompile(`"127\.0\.0\.1:(\d+):(5432|8123|6379)"`)
+
+// readOverridePorts answers the postgres, clickhouse and redis ports an
+// earlier run's override published, false unless it names all three.
+func readOverridePorts(path string) ([3]int, bool) {
+	content, err := os.ReadFile(path) // #nosec G304 -- the tool's own override under .apidiff.
+	if err != nil {
+		return [3]int{}, false
+	}
+	slots := map[string]int{"5432": 0, "8123": 1, "6379": 2}
+	var ports [3]int
+	for _, match := range overridePort.FindAllStringSubmatch(string(content), -1) {
+		port, err := strconv.Atoi(match[1])
+		if err != nil || port <= 0 {
+			return [3]int{}, false
+		}
+		ports[slots[match[2]]] = port
+	}
+	return ports, ports[0] > 0 && ports[1] > 0 && ports[2] > 0
 }
 
 // pgAdmin runs one SQL statement against the admin database, via compose exec
@@ -1507,11 +1567,11 @@ func healthy(ctx context.Context, client *http.Client, healthURL string) bool {
 	return response.StatusCode >= 200 && response.StatusCode < 300
 }
 
-// teardown stops the managed compose stack and removes the main worktree,
-// unless -keep is set. With -keep the API processes outlive the tool (the
-// context cancel kills the pnpm wrapper; the tsx child survives for
-// inspection); without it the whole process groups are killed here, before
-// the caller's cancel.
+// teardown kills the instances, drops the run's databases and hands the
+// worktrees back, unless -keep is set. With -keep the API processes outlive
+// the tool (the context cancel kills the pnpm wrapper; the tsx child survives
+// for inspection). Nothing slow runs here: the compose stack stays up for the
+// next run, and a worktree's files are deleted by a process of its own.
 func (state *bootState) teardown() {
 	state.teardownOnce.Do(state.teardownOnceOnly)
 }
@@ -1538,51 +1598,78 @@ func (state *bootState) teardownOnceOnly() {
 	}
 	if state.cfg.UseHaven {
 		state.destroyHavenStacks(ctx)
-		state.removeOwnedWorktrees(ctx)
+		state.releaseCheckouts(ctx)
 		return
 	}
 	state.killAPIProcesses()
 	state.teardownInfra(ctx)
-	state.removeOwnedWorktrees(ctx)
+	state.releaseCheckouts(ctx)
 }
 
-// teardownInfra takes the compose stack down, or on external servers drops
-// exactly the run-scoped databases and empties its two Redis logical DBs.
+// teardownInfra drops exactly the run-scoped databases and empties its two
+// Redis logical DBs. The managed compose stack stays up: the next run finds
+// its ports in the override file and skips the start (resolveInfra).
 func (state *bootState) teardownInfra(ctx context.Context) {
-	switch {
-	case state.infra.pgServer == "":
+	if state.infra.pgServer == "" {
 		// Nothing was provisioned: the run stopped before its infrastructure.
-	case state.override != "":
-		state.logf("teardown: docker compose down -v")
-		args := composeArgs(state.compose(), "down", "-v")
-		if err := state.runHost(ctx, "docker", args...); err != nil {
-			state.logf("teardown: compose down: %v", err)
-		}
-	default:
-		state.dropDatabases(ctx)
-		if err := state.flushRedis(ctx); err != nil {
-			state.logf("teardown: flush redis: %v", err)
+		return
+	}
+	state.dropDatabases(ctx)
+	if err := state.flushRedis(ctx); err != nil {
+		state.logf("teardown: flush redis: %v", err)
+	}
+	if state.override != "" {
+		state.logf("teardown: compose project %s stays up for the next run; `docker compose -p %s down -v` stops it",
+			state.cfg.ComposeProject, state.cfg.ComposeProject)
+	}
+}
+
+// releaseCheckouts hands each persistent worktree to the next run without the
+// env overlay this run wrote, and discards the worktrees added for this run
+// alone. A worktree adopted with -reuse-worktrees is left as it was.
+func (state *bootState) releaseCheckouts(ctx context.Context) {
+	state.checkoutsMu.Lock()
+	checkouts := append([]sideCheckout(nil), state.checkouts...)
+	state.checkoutsMu.Unlock()
+	for _, checkout := range checkouts {
+		switch {
+		case checkout.persistent:
+			removeOverlay(checkout.dir)
+			releaseWorktree(checkout.dir, state.workRoot)
+		case checkout.owned:
+			state.discardWorktree(ctx, checkout.dir)
 		}
 	}
 }
 
-// removeOwnedWorktrees removes every worktree this run added — the base-ref
-// one always, and the branch's own HEAD worktree on the haven path — and
-// leaves alone anything -reuse-worktrees adopted instead. The invoking
-// checkout itself is never a worktree this run owns, so it is never touched.
-func (state *bootState) removeOwnedWorktrees(ctx context.Context) {
-	if state.ownsMain {
-		state.removeWorktree(ctx, state.mainDir)
+// discardWorktree takes a worktree out of git's list at once and leaves its
+// files to a process of its own: removing some 2 200 packages in place ran
+// past the teardown deadline and leaked the worktree (r47).
+func (state *bootState) discardWorktree(ctx context.Context, dir string) {
+	discarded := dir + ".discarded"
+	if err := os.Rename(dir, discarded); err != nil {
+		state.logf("teardown: move %s aside: %v; removing it in place", dir, err)
+		if err := state.runHost(ctx, "git", "worktree", "remove", "--force", dir); err != nil {
+			state.logf("teardown: worktree remove: %v", err)
+		}
+		return
 	}
-	if state.ownsBranch {
-		state.removeWorktree(ctx, state.branchDir)
+	if err := state.runHost(ctx, "git", "worktree", "prune"); err != nil {
+		state.logf("teardown: worktree prune: %v", err)
+	}
+	log := filepath.Join(state.workRoot, "logs", "teardown.log")
+	state.logf("teardown: deleting %s in the background (log %s)", discarded, log)
+	if err := state.detachRun(commandSpec{name: "rm", args: []string{"-rf", discarded}, dir: state.workRoot}, log); err != nil {
+		state.logf("teardown: delete %s: %v", discarded, err)
 	}
 }
 
-func (state *bootState) removeWorktree(ctx context.Context, dir string) {
-	if err := state.runHost(ctx, "git", "worktree", "remove", "--force", dir); err != nil {
-		state.logf("teardown: worktree remove: %v", err)
+// detachRun starts a command that outlives the run.
+func (state *bootState) detachRun(spec commandSpec, log string) error {
+	if state.detach != nil {
+		return state.detach(spec, log)
 	}
+	return detachCommand(spec, log)
 }
 
 // killAPIProcesses kills each started API's whole process group — the pnpm
@@ -1615,7 +1702,7 @@ func (state *bootState) dropDatabases(ctx context.Context) {
 // allowedCommands are the only executables the boot orchestration runs; every
 // commandSpec in this package is built from these constants, and the
 // allowlist proves subprocess names are never tainted input.
-var allowedCommands = map[string]bool{"git": true, "docker": true, "pnpm": true, "psql": true, "node": true, "env": true, havenCommand: true}
+var allowedCommands = map[string]bool{"git": true, "docker": true, "pnpm": true, "psql": true, "node": true, "env": true, "rm": true, havenCommand: true}
 
 // execRunner runs one command, streaming output to log.
 func execRunner(ctx context.Context, spec commandSpec, log io.Writer) error {
@@ -1632,4 +1719,25 @@ func execRunner(ctx context.Context, spec commandSpec, log io.Writer) error {
 	command.Stdout = log
 	command.Stderr = log
 	return command.Run()
+}
+
+// detachCommand starts spec in a process group of its own, its output
+// appended to log, and returns without waiting (visualdiff's stagger.go).
+func detachCommand(spec commandSpec, log string) error {
+	if !allowedCommands[spec.name] {
+		return fmt.Errorf("refusing to run unlisted command %q", spec.name)
+	}
+	output, err := os.OpenFile(log, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600) // #nosec G304 -- the run's own teardown log.
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	// #nosec G204 -- spec.name is restricted to the allowedCommands allowlist above.
+	command := exec.CommandContext(context.Background(), spec.name, spec.args...)
+	command.Dir, command.Stdout, command.Stderr = spec.dir, output, output
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := command.Start(); err != nil {
+		return err
+	}
+	return command.Process.Release()
 }

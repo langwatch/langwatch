@@ -154,17 +154,57 @@ func (phase *parityPhase) inventory(ctx context.Context) error {
 	return nil
 }
 
-// inventorySide reads one side's tRPC procedures, then its served routes.
+// inventorySide reads one side's tRPC procedures, then its served routes,
+// unless the inventory cache holds both for the tree the side checked out.
 func (phase *parityPhase) inventorySide(ctx context.Context, side runSide) (sideInventory, error) {
+	outFiles := map[string]string{
+		"trpc":   filepath.Join(phase.dir, "trpc-"+side.name+".json"),
+		"routes": filepath.Join(phase.dir, "routes-"+side.name+".json"),
+	}
+	cache, key := phase.state.inventoryCacheFor(), ""
+	if checkout, ok := phase.state.checkoutOf(side.dir); ok {
+		key = inventoryCacheKey(checkout.tree)
+	}
+	if cache.restore(side.name, key, outFiles) {
+		if read, err := readSideInventory(outFiles); err == nil {
+			phase.state.logf("parity: %s inventories cached for this tree (%s)", side.name, side.dir)
+			return read, nil
+		}
+	}
+	read, err := phase.collectSide(ctx, side, outFiles)
+	if err != nil || key == "" || len(read.procedures.Failures) > 0 || len(read.routes.Failures) > 0 {
+		return read, err
+	}
+	if err := cache.store(side.name, key, outFiles); err != nil {
+		phase.state.logf("parity: cache %s inventories: %v", side.name, err)
+	}
+	return read, nil
+}
+
+// collectSide runs one side's two inventory scripts.
+func (phase *parityPhase) collectSide(ctx context.Context, side runSide, outFiles map[string]string) (sideInventory, error) {
 	log := phase.state.sideLog("parity " + side.name)
 	phase.state.logf("parity: inventory %s tRPC procedures and served routes (%s)", side.name, side.dir)
 	procedures, err := trpcInventory{run: phase.state.run, inherit: phase.state.environ(), log: log}.
-		collect(ctx, side.dir, filepath.Join(phase.dir, "trpc-"+side.name+".json"))
+		collect(ctx, side.dir, outFiles["trpc"])
 	if err != nil {
 		return sideInventory{}, err
 	}
 	routes, err := routeInventory{run: phase.state.run, inherit: phase.state.environ(), log: log}.
-		collect(ctx, side.dir, filepath.Join(phase.dir, "routes-"+side.name+".json"))
+		collect(ctx, side.dir, outFiles["routes"])
+	if err != nil {
+		return sideInventory{}, err
+	}
+	return sideInventory{procedures: procedures, routes: routes}, nil
+}
+
+// readSideInventory reads both manifests back from the files a side wrote.
+func readSideInventory(outFiles map[string]string) (sideInventory, error) {
+	procedures, err := readProcedureManifest(outFiles["trpc"])
+	if err != nil {
+		return sideInventory{}, err
+	}
+	routes, err := readRouteManifest(outFiles["routes"])
 	if err != nil {
 		return sideInventory{}, err
 	}

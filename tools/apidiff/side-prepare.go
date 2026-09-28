@@ -59,7 +59,14 @@ func (state *bootState) prepareTree(ctx context.Context, side runSide) error {
 	if err != nil {
 		return err
 	}
-	for _, step := range havenrun.PrepareCommands(profile.layout()) {
+	steps := havenrun.PrepareCommands(profile.layout())
+	key, cached := state.preparedAlready(side, profile.layout(), steps)
+	if cached {
+		state.logf("prepare %s: cached, %s already holds this tree's install and generated files", side.name, side.dir)
+		state.timing("%s prepared", side.name)
+		return nil
+	}
+	for _, step := range steps {
 		argv := step.Name + " " + strings.Join(step.Args, " ")
 		state.logf("prepare %s: %s (in %s)", side.name, argv, side.dir)
 		started := time.Now()
@@ -70,7 +77,28 @@ func (state *bootState) prepareTree(ctx context.Context, side runSide) error {
 		state.logf("prepare %s: %s done in %s", side.name, argv, time.Since(started).Round(time.Second))
 	}
 	state.timing("%s prepared", side.name)
-	return nil
+	if key == "" {
+		return nil
+	}
+	return recordPrepared(side.dir, key)
+}
+
+// preparedAlready reports a persistent worktree whose last finished prepare
+// had this key, and the key to record once this prepare finishes. The old
+// key is forgotten first, so a prepare that fails half-way is never cached.
+func (state *bootState) preparedAlready(side runSide, layout havenrun.Layout, steps []havenrun.PrepareStep) (string, bool) {
+	checkout, ok := state.checkoutOf(side.dir)
+	if !ok || !checkout.persistent || checkout.tree == "" {
+		return "", false
+	}
+	key := prepareKey(layout, checkout.tree, steps)
+	if preparedKey(side.dir) == key {
+		return key, true
+	}
+	if err := recordPrepared(side.dir, ""); err != nil {
+		state.logf("prepare %s: could not clear the old key: %v", side.name, err)
+	}
+	return key, false
 }
 
 // startInfraEarly resolves and preflights the infrastructure, then brings it

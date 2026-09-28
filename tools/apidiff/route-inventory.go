@@ -47,13 +47,17 @@ func (inventory routeInventory) collect(ctx context.Context, dir, outFile string
 	if err := scriptInventory(inventory).runScript(ctx, job); err != nil {
 		return RouteManifest{}, err
 	}
-	data, err := readInventoryFile(outFile)
+	return readRouteManifest(outFile)
+}
+
+func readRouteManifest(path string) (RouteManifest, error) {
+	data, err := readInventoryFile(path)
 	if err != nil {
 		return RouteManifest{}, err
 	}
 	var manifest RouteManifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
-		return RouteManifest{}, fmt.Errorf("route inventory %s: %w", outFile, err)
+		return RouteManifest{}, fmt.Errorf("route inventory %s: %w", path, err)
 	}
 	return manifest, nil
 }

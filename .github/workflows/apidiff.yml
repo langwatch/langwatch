@@ -13,8 +13,8 @@ name: apidiff
 # `apidiff` compose project) — GitHub-hosted ubuntu-latest runners ship
 # Docker + the compose plugin, so this needs no extra setup step.
 #
-# -no-haven checks the BASE side (`origin/main`) out into a fresh git
-# worktree, and uses `-branch-dir` (`.`, this checkout) as the CANDIDATE
+# -no-haven checks the BASE side (`origin/main`) out into
+# `.apidiff/worktrees/main`, and uses `-branch-dir` (`.`, this checkout) as the CANDIDATE
 # tree for both the parity inventories and the boot: each tree is installed
 # and prepared once, both at the same time, while compose comes up. That is
 # only safe on a clean tree, which a fresh `actions/checkout` always is.
@@ -122,6 +122,18 @@ jobs:
       # Both sides' clickhouse-migrate runs goose, which the runner lacks.
       - name: Install goose
         run: bash .github/scripts/install-goose.sh
+
+      - name: Name main's tree for the inventory cache
+        id: main-tree
+        run: echo "tree=$(git rev-parse 'origin/main^{tree}')" >> "$GITHUB_OUTPUT"
+
+      # main's parity inventories, keyed as apidiff keys them: main's tree and
+      # the embedded scripts. A PR run on an unmoved main reads them instead.
+      - name: Restore main's parity inventories
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .apidiff/inventory-cache/main-*
+          key: apidiff-inventory-${{ steps.main-tree.outputs.tree }}-${{ hashFiles('tools/apidiff/inventory/**') }}
 
       - name: Run apidiff
         id: run

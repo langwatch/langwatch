@@ -139,8 +139,8 @@ Feature: apidiff boots its instances through haven
     Scenario: apidiff runs and the developer's own stack is untouched
       Given a developer stack is up in the invoking checkout
       When apidiff run boots both instances through haven
-      Then the base instance checks out its ref into <work-root>/main, as it already did
-      And the branch instance checks out HEAD into <work-root>/branch, a worktree of its own
+      Then the base instance checks out its ref into .apidiff/worktrees/main, its persistent worktree
+      And the branch instance checks out HEAD into .apidiff/worktrees/branch, a worktree of its own
       And every haven up and haven destroy command names one of those two worktree directories
       And no haven command ever runs with the invoking checkout as its directory
       And the developer's own stack in the invoking checkout is never started, restarted or destroyed
@@ -156,11 +156,11 @@ Feature: apidiff boots its instances through haven
 
     @unit
     Scenario: Teardown never runs from the invoking checkout
-      Given both instances are up as haven stacks under their own worktrees
+      Given both instances are up as haven stacks under worktrees added for this run alone
       When the run tears down
       Then haven destroy runs for exactly the branch and base slugs
       And neither haven destroy command's directory is the invoking checkout
-      And both owned worktrees are removed, and the invoking checkout is not a worktree this run owns
+      And both owned worktrees leave git's list at once and are deleted in the background, and the invoking checkout is not a worktree this run owns
 
   Rule: -dry-run prints the plan and starts nothing
 
@@ -251,3 +251,27 @@ Feature: apidiff boots its instances through haven
     When each side's path is built
     Then both carry the resolved value
     And a placeholder nothing resolved is left as it was
+
+  Rule: A run reuses what the last one left
+
+    @unit
+    Scenario: Each side reuses one worktree between runs and prepares it only when its tree changed
+      Given a run whose sides checked out into .apidiff/worktrees/main and .apidiff/worktrees/branch
+      When the next run starts
+      Then it moves each worktree to its commit in place instead of adding a new one
+      And a worktree whose tree has not moved is not prepared again
+      And a worktree another live or kept run holds is not shared; that run gets one of its own
+      And teardown deletes the env overlay and removes no persistent worktree
+
+    @unit
+    Scenario: A side's inventories are read once per tree
+      Given a side whose checked-out tree was inventoried without a failure
+      When a later run checks the same tree out
+      Then its tRPC and route manifests come from .apidiff/inventory-cache and no script runs
+
+    @unit
+    Scenario: The compose stack stays up between runs
+      Given a -no-haven run on the managed compose stack
+      When it tears down
+      Then it drops only its own databases and leaves the stack up
+      And the next run finds the stack on the same ports, or starts it on fresh ones if those fail
