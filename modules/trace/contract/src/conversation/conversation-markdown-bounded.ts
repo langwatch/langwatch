@@ -8,7 +8,11 @@ import {
   type ConversationMarkdownChunk,
   joinConversationMarkdown,
 } from "./conversation-markdown.ts";
-import { type ConversationDetail, conversationDetailAtScale } from "./conversation-steps.ts";
+import {
+  type ConversationDetail,
+  conversationDetailAtScale,
+  type ConversationView,
+} from "./conversation-steps.ts";
 import type { ConversationTurnSource, ParsedTurn } from "./parsed-turns.ts";
 
 /**
@@ -48,19 +52,21 @@ export function renderConversationMarkdown({
   conversationId = "",
   turns,
   maxTokens,
+  view = "conversation",
 }: {
   conversationId?: string;
   turns: ParsedTurn<ConversationTurnSource>[];
   maxTokens?: number;
+  view?: ConversationView;
 }): RenderedConversationMarkdown {
-  const chunks = buildConversationMarkdownChunks({ conversationId, turns });
+  const chunks = buildConversationMarkdownChunks({ conversationId, turns, view });
   const full = joinConversationMarkdown(chunks);
   const fullTokens = estimateTokensFromBytes(full);
   if (maxTokens === undefined || fullTokens <= maxTokens) {
     return { text: full, isTruncated: false, estimatedTokens: fullTokens, omittedTurns: 0 };
   }
 
-  const shortened = shortenEveryTurn({ conversationId, turns, maxTokens });
+  const shortened = shortenEveryTurn({ conversationId, turns, maxTokens, view });
   if (shortened.fits) {
     return {
       text: shortened.text,
@@ -85,13 +91,15 @@ function shortenEveryTurn({
   conversationId,
   turns,
   maxTokens,
+  view,
 }: {
   conversationId: string;
   turns: ParsedTurn<ConversationTurnSource>[];
   maxTokens: number;
+  view: ConversationView;
 }): { fits: boolean; text: string; chunks: ConversationMarkdownChunk[] } {
   const attempt = (detail: ConversationDetail) => {
-    const chunks = buildConversationMarkdownChunks({ conversationId, turns, detail });
+    const chunks = buildConversationMarkdownChunks({ conversationId, turns, detail, view });
     const text = joinConversationMarkdown(chunks);
     return { fits: estimateTokensFromBytes(text) <= maxTokens, text, chunks };
   };

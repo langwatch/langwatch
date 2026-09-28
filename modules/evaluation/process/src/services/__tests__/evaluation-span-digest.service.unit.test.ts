@@ -18,7 +18,7 @@ const trace = ({ id, startedAt }: { id: string; startedAt: number }): Trace => (
 describe("EvaluationSpanDigestService.formatThread", () => {
   describe("given a thread whose traces arrive out of order", () => {
     /** @scenario "The formatted_traces source is the thread transcript under the judge's budget" */
-    it("renders one transcript of the thread in time order, under the thread digest budget", async () => {
+    it("renders the steps view of the thread in time order, under the thread digest budget", async () => {
       const calls: Parameters<TraceApi["renderThreadTranscript"]>[0][] = [];
       const service = EvaluationSpanDigestService.create(
         createApiFixture<Pick<TraceApi, "formatSpansDigest" | "renderThreadTranscript">>({
@@ -38,6 +38,7 @@ describe("EvaluationSpanDigestService.formatThread", () => {
       expect(calls).toHaveLength(1);
       expect(calls[0]!.threadKey).toBe("thread-1");
       expect(calls[0]!.traces.map((t) => t.trace_id)).toEqual(["early", "late"]);
+      expect(calls[0]!.view).toBe("steps");
       expect(calls[0]!.maxTokens).toBe(EVALUATION_THREAD_DIGEST_MAX_TOKENS);
       expect(EVALUATION_THREAD_DIGEST_MAX_TOKENS).toBeLessThan(128_000 / 1.5);
     });
