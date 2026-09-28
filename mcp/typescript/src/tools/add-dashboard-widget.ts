@@ -16,22 +16,20 @@
  * @see specs/mcp-server (dashboard widget tools)
  */
 
-import { getDashboard } from "../langwatch-api-dashboards.js";
 import {
   assignDashboardWidgetToDashboard,
   createDashboardWidget,
   deleteDashboardWidget,
   type DashboardWidgetQueryInput,
 } from "../langwatch-api-dashboard-widgets.js";
-import { LangWatchApiError } from "../langwatch-api.js";
+import { getDashboard } from "../langwatch-api-dashboards.js";
 import { getCurrentProject } from "../langwatch-api-projects.js";
+import { LangWatchApiError } from "../langwatch-api.js";
 
 /** A widget file rarely needs more than a couple of named queries (server bound). */
 export const MAX_DASHBOARD_WIDGET_QUERIES = 8;
 
-export type AddDashboardWidgetQueriesInput =
-  | DashboardWidgetQueryInput[]
-  | Record<string, string>;
+export type AddDashboardWidgetQueriesInput = DashboardWidgetQueryInput[] | Record<string, string>;
 
 export interface AddDashboardWidgetParams {
   dashboardId: string;
@@ -41,16 +39,12 @@ export interface AddDashboardWidgetParams {
 }
 
 /** Turns the `{ name: sql }` shorthand into the array shape the REST endpoint validates. */
-function normalizeQueries(
-  queries: AddDashboardWidgetQueriesInput,
-): DashboardWidgetQueryInput[] {
+function normalizeQueries(queries: AddDashboardWidgetQueriesInput): DashboardWidgetQueryInput[] {
   if (Array.isArray(queries)) return queries;
   return Object.entries(queries).map(([name, sql]) => ({ name, sql }));
 }
 
-export async function handleAddDashboardWidget(
-  params: AddDashboardWidgetParams,
-): Promise<string> {
+export async function handleAddDashboardWidget(params: AddDashboardWidgetParams): Promise<string> {
   const queries = normalizeQueries(params.queries);
   if (queries.length === 0) {
     throw new Error(

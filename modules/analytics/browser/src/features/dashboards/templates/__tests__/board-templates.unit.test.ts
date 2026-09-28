@@ -129,11 +129,14 @@ describe("BOARD_TEMPLATES", () => {
           for (let j = i + 1; j < widgets.length; j++) {
             const a = widgets[i]!.layout;
             const b = widgets[j]!.layout;
-            const columnsOverlap = a.gridColumn < b.gridColumn + b.colSpan && b.gridColumn < a.gridColumn + a.colSpan;
-            const rowsOverlap = a.gridRow < b.gridRow + b.rowSpan && b.gridRow < a.gridRow + a.rowSpan;
-            expect(columnsOverlap && rowsOverlap, `${widgets[i]!.name} vs ${widgets[j]!.name}`).toBe(
-              false,
-            );
+            const columnsOverlap =
+              a.gridColumn < b.gridColumn + b.colSpan && b.gridColumn < a.gridColumn + a.colSpan;
+            const rowsOverlap =
+              a.gridRow < b.gridRow + b.rowSpan && b.gridRow < a.gridRow + a.rowSpan;
+            expect(
+              columnsOverlap && rowsOverlap,
+              `${widgets[i]!.name} vs ${widgets[j]!.name}`,
+            ).toBe(false);
           }
         }
       });

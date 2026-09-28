@@ -17,21 +17,19 @@ vi.mock("../langwatch-api-projects.js", () => ({
   getCurrentProject: vi.fn(),
 }));
 
-import { getDashboard } from "../langwatch-api-dashboards.js";
 import {
   assignDashboardWidgetToDashboard,
   createDashboardWidget,
   deleteDashboardWidget,
 } from "../langwatch-api-dashboard-widgets.js";
-import { LangWatchApiError } from "../langwatch-api.js";
+import { getDashboard } from "../langwatch-api-dashboards.js";
 import { getCurrentProject } from "../langwatch-api-projects.js";
+import { LangWatchApiError } from "../langwatch-api.js";
 import { handleAddDashboardWidget } from "../tools/add-dashboard-widget.js";
 
 const mockGetDashboard = vi.mocked(getDashboard);
 const mockCreateDashboardWidget = vi.mocked(createDashboardWidget);
-const mockAssignDashboardWidgetToDashboard = vi.mocked(
-  assignDashboardWidgetToDashboard,
-);
+const mockAssignDashboardWidgetToDashboard = vi.mocked(assignDashboardWidgetToDashboard);
 const mockDeleteDashboardWidget = vi.mocked(deleteDashboardWidget);
 const mockGetCurrentProject = vi.mocked(getCurrentProject);
 
@@ -90,9 +88,7 @@ describe("handleAddDashboardWidget()", () => {
         projectId: "proj_abc123",
         name: "p95 latency",
         code: "export default () => null;",
-        queries: [
-          { name: "latency", sql: "SELECT quantile(0.95)(duration) FROM traces" },
-        ],
+        queries: [{ name: "latency", sql: "SELECT quantile(0.95)(duration) FROM traces" }],
       });
       expect(mockAssignDashboardWidgetToDashboard).toHaveBeenCalledWith({
         projectId: "proj_abc123",
@@ -146,11 +142,7 @@ describe("handleAddDashboardWidget()", () => {
   describe("when the create call fails", () => {
     it("propagates the server's error message", async () => {
       mockCreateDashboardWidget.mockRejectedValue(
-        new LangWatchApiError(
-          "LangWatch API error 400: code is too long",
-          400,
-          "{}",
-        ),
+        new LangWatchApiError("LangWatch API error 400: code is too long", 400, "{}"),
       );
 
       await expect(

@@ -1376,7 +1376,7 @@ function registerDashboardTools(server: McpServer): void {
       code: z
         .string()
         .describe(
-          "The widget's TSX source. Runs sandboxed with a global LW (LW.useChartQuery(name), LW.navigate, LW.theme) in scope."
+          "The widget's TSX source. Runs sandboxed with a global LW (LW.useChartQuery(name), LW.navigate, LW.theme) in scope.",
         ),
       queries: z
         .union([
@@ -1386,12 +1386,12 @@ function registerDashboardTools(server: McpServer): void {
               z.object({
                 name: z.string().describe('Referenced from code as LW.useChartQuery("name")'),
                 sql: z.string().describe("The LangWatchQL statement"),
-              })
+              }),
             )
             .describe("Named LWQL queries, array form"),
         ])
         .describe(
-          "The widget's named LangWatchQL queries: either {name: sql} or an array of {name, sql}. Max 8. Validate each statement with run_query first."
+          "The widget's named LangWatchQL queries: either {name: sql} or an array of {name, sql}. Max 8. Validate each statement with run_query first.",
         ),
     },
     withToolLogging("add_dashboard_widget", async (params) => {
