@@ -103,6 +103,28 @@ export const discover = (projects: PnpmProject[], root: string): DiscoveredPacka
   return found.toSorted((a, b) => a.name.localeCompare(b.name));
 };
 
+/**
+ * Parses `PACKAGE_SUITES_SHARD` (`<index>/<total>`, 1-based). Absent means one
+ * shard holding everything; a malformed value is an error, never a silent
+ * whole run on every leg.
+ */
+export const parseShard = (value: string | undefined): { index: number; total: number } => {
+  if (value === undefined || value === "") return { index: 1, total: 1 };
+  const match = /^(\d+)\/(\d+)$/.exec(value.trim());
+  const index = match ? Number(match[1]) : Number.NaN;
+  const total = match ? Number(match[2]) : Number.NaN;
+  if (!(index >= 1 && total >= 1 && index <= total)) {
+    throw new Error(
+      `PACKAGE_SUITES_SHARD='${value}' is not '<index>/<total>' with 1 <= index <= total.`,
+    );
+  }
+  return { index, total };
+};
+
+/** Round-robin over the sorted list, so every package lands on exactly one shard. */
+export const shardOf = <T>(items: readonly T[], shard: { index: number; total: number }): T[] =>
+  items.filter((_, position) => position % shard.total === shard.index - 1);
+
 /** Runs one package's scripts and reports the package's single verdict. */
 export const runPackage = (
   pkg: DiscoveredPackage,
@@ -208,11 +230,22 @@ if (isEntrypoint()) {
   if (stale.length > 0) process.exit(1);
 
   const excluded = new Map(entries.map((e) => [e.name, e.reason]));
+  let shard: { index: number; total: number };
+  try {
+    shard = parseShard(process.env.PACKAGE_SUITES_SHARD);
+  } catch (error) {
+    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+  const assigned = shardOf(discovered, shard);
+  console.log(
+    `Shard ${shard.index}/${shard.total}: ${assigned.length} of ${discovered.length} packages.`,
+  );
   // Serial on purpose. Each suite is its own vitest with its own worker pool,
   // so several at once oversubscribe a 4-core runner and turn real results into
   // "[vitest-pool]: Worker forks emitted error" — which looks like a broken
   // test and is not one.
-  const outcomes = discovered.map((pkg) =>
+  const outcomes = assigned.map((pkg) =>
     runPackage(
       pkg,
       excluded,

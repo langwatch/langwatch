@@ -4,8 +4,10 @@ import { describe, it } from "node:test";
 import {
   discover,
   parseRegister,
+  parseShard,
   runPackage,
   scriptsFor,
+  shardOf,
   staleEntries,
   summarise,
   type DiscoveredPackage,
@@ -248,6 +250,31 @@ void describe("given the outcomes of a whole run", () => {
     void it("names no failures", () => {
       const summary = summarise([{ name: "@fix/green", outcome: "passed" }]).join("\n");
       assert.doesNotMatch(summary, /Failed:/);
+    });
+  });
+});
+
+void describe("given the job is split into shards", () => {
+  void describe("when every shard of a split takes its share", () => {
+    void it("runs each package on exactly one shard", () => {
+      const names = ["a", "b", "c", "d", "e", "f", "g"];
+      const shares = [1, 2, 3].map((index) => shardOf(names, { index, total: 3 }));
+      assert.deepEqual(shares.flat().toSorted(), names);
+      assert.deepEqual(shares[0], ["a", "d", "g"]);
+    });
+  });
+
+  void describe("when no shard is named", () => {
+    void it("runs everything on one shard", () => {
+      assert.deepEqual(parseShard(undefined), { index: 1, total: 1 });
+    });
+  });
+
+  void describe("when the shard value is malformed", () => {
+    void it("refuses it rather than running everything on every leg", () => {
+      assert.throws(() => parseShard("0/4"));
+      assert.throws(() => parseShard("5/4"));
+      assert.throws(() => parseShard("two"));
     });
   });
 });

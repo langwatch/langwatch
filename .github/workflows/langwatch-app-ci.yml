@@ -873,10 +873,17 @@ jobs:
       VITEST_ISOLATE_WORKER_REDIS: "1"
       CI: "true"
     runs-on: ubuntu-latest
-    # No shards: a hundred and fifty small suites, run one after another.
-    # Serial is not thrift — each suite is its own vitest with its own worker
+    # Serial within a leg: each suite is its own vitest with its own worker
     # pool, and several at once on a 4-core runner produce "[vitest-pool]:
     # Worker forks emitted error", which reads as a broken test and is not one.
+    # Parallel across legs: over two hundred package suites run one after
+    # another take well past two hours, so the list is split round-robin
+    # (PACKAGE_SUITES_SHARD) over separate runners.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    name: package-suites (${{ matrix.shard }}/8)
     #
     # It DOES have services. This job absorbed the datastore lane at the
     # deployment cutover: `test-integration` existed to shard the monolith's
@@ -979,6 +986,7 @@ jobs:
       - name: Run every workspace package suite
         env:
           REQUIRE_HELM_TESTS: "1"
+          PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
         run: node --experimental-strip-types .github/scripts/run-package-suites.ts
 
   lint:
