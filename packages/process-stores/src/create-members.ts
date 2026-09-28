@@ -68,6 +68,108 @@ export interface MemberSource<Members> {
 
 export type ProcessMemberSource = MemberSource<ProcessMembers>;
 
+/** Reads a member through the one source, building it on first read. */
+type ReadMember = <Name extends MemberName>(name: Name) => ProcessMembers[Name];
+
+type TenantDirectory = ReturnType<typeof cachedTenantDirectory>;
+
+/** No key is a state, not a refusal: only a use of the cipher refuses. */
+function encryptionMember(config: ProcessConfig): Encryption {
+  const key = config.encryptionKey.trim();
+  return key ? aesEncryption(Buffer.from(key, "hex")) : refusingEncryption();
+}
+
+function prismaMember({
+  config,
+  read,
+}: {
+  config: ProcessConfig;
+  read: ReadMember;
+}): BuiltMember<ProcessMembers["prisma"]> {
+  const database = config.database;
+  if (!database?.url.trim()) {
+    throw new MemberNotConfiguredError("prisma", "set DATABASE_URL");
+  }
+  return buildPrisma({ config: database, logger: read("logger") });
+}
+
+function clickhouseMember({
+  config,
+  tenantDirectory,
+}: {
+  config: ProcessConfig;
+  tenantDirectory: () => TenantDirectory;
+}): BuiltMember<ProcessMembers["clickhouse"]> {
+  const clickhouse = config.clickhouse;
+  const configured =
+    Boolean(clickhouse?.url?.trim()) || (clickhouse?.privateRoutes?.length ?? 0) > 0;
+  if (!clickhouse || !configured) {
+    throw new MemberNotConfiguredError(
+      "clickhouse",
+      "set CLICKHOUSE_URL or CLICKHOUSE_PRIVATE_ROUTES",
+    );
+  }
+  return buildClickHouse({ config: clickhouse, directory: tenantDirectory() });
+}
+
+function objectStorageMember({
+  config,
+  read,
+  tenantDirectory,
+}: {
+  config: ProcessConfig;
+  read: ReadMember;
+  tenantDirectory: () => TenantDirectory;
+}): BuiltMember<ProcessMembers["objectStorage"]> {
+  if (!config.objectStorage) {
+    throw new MemberNotConfiguredError(
+      "objectStorage",
+      "set STORED_OBJECTS_BACKEND and its bucket, container or root",
+    );
+  }
+  return buildObjectStorage({
+    config: config.objectStorage,
+    directory: tenantDirectory(),
+    clock: read("clock"),
+  });
+}
+
+/** An override handed in as `undefined` is a misspelling, never a request to build. */
+function refuseUndefinedMembers(supplied: {
+  readonly [Name in MemberName]?: ProcessMembers[Name];
+}): void {
+  for (const member of MEMBER_NAMES) {
+    if (Object.hasOwn(supplied, member) && supplied[member] === undefined) {
+      throw new MemberSuppliedUndefinedError(member);
+    }
+  }
+}
+
+function eventingMember({
+  config,
+  read,
+}: {
+  config: ProcessConfig;
+  read: ReadMember;
+}): BuiltMember<ProcessMembers["eventing"]> {
+  const eventing = config.eventing;
+  if (!eventing) {
+    throw new MemberNotConfiguredError("eventing", "name this role's event store and queue");
+  }
+  // Read BEFORE the runtime is built, so the reverse close drains the
+  // queue before the clients it dispatches and appends through go away.
+  return buildEventing({
+    config: eventing,
+    processName: config.processName,
+    prisma: read("prisma"),
+    ...(eventing.participation === undefined ? {} : { participation: eventing.participation }),
+    ...(eventing.groupQueue === undefined ? {} : { redis: read("redis") }),
+    ...(eventing.store.kind === "producer-only"
+      ? {}
+      : { eventLog: { clickhouse: read("clickhouse") } }),
+  });
+}
+
 /** What each member is built from, and what closing it means. */
 type MemberBuilders = {
   readonly [Member in MemberName]: () => BuiltMember<ProcessMembers[Member]>;
@@ -83,11 +185,7 @@ export function createProcessMembers(options: {
 }): ProcessMemberSource {
   const { config } = options;
   const supplied = options.members ?? {};
-  for (const member of MEMBER_NAMES) {
-    if (Object.hasOwn(supplied, member) && supplied[member] === undefined) {
-      throw new MemberSuppliedUndefinedError(member);
-    }
-  }
+  refuseUndefinedMembers(supplied);
 
   const built = new Map<MemberName, unknown>();
   const opened: { member: MemberName; close: () => Promise<void> }[] = [];
@@ -108,8 +206,8 @@ export function createProcessMembers(options: {
    * `prisma`, never a peer Api — Project's own live tier reads ClickHouse,
    * so member-to-Api-to-repositories-back-to-member is a cycle.
    */
-  let directory: ReturnType<typeof cachedTenantDirectory> | undefined;
-  const tenantDirectory = (): ReturnType<typeof cachedTenantDirectory> => {
+  let directory: TenantDirectory | undefined;
+  const tenantDirectory = (): TenantDirectory => {
     directory ??= cachedTenantDirectory(
       prismaTenantDirectory(read("prisma")),
       config.clickhouse?.maxTenantCacheEntries,
@@ -121,72 +219,22 @@ export function createProcessMembers(options: {
     logger: () => ({ value: createLogger(config.processName) }),
     clock: () => ({ value: systemClock() }),
     secrets: () => ({ value: resolvedSecrets(config.secrets) }),
-    encryption: () => {
-      const key = config.encryptionKey.trim();
-      if (!key) return { value: refusingEncryption() };
-      return { value: aesEncryption(Buffer.from(key, "hex")) };
-    },
+    encryption: () => ({ value: encryptionMember(config) }),
     telemetry: () => ({ value: loggedTelemetry(read("logger")) }),
 
-    prisma: () => {
-      const database = config.database;
-      if (!database?.url.trim()) {
-        throw new MemberNotConfiguredError("prisma", "set DATABASE_URL");
-      }
-      return buildPrisma({ config: database, logger: read("logger") });
-    },
-    clickhouse: () => {
-      const clickhouse = config.clickhouse;
-      const configured =
-        Boolean(clickhouse?.url?.trim()) || (clickhouse?.privateRoutes?.length ?? 0) > 0;
-      if (!clickhouse || !configured) {
-        throw new MemberNotConfiguredError(
-          "clickhouse",
-          "set CLICKHOUSE_URL or CLICKHOUSE_PRIVATE_ROUTES",
-        );
-      }
-      return buildClickHouse({ config: clickhouse, directory: tenantDirectory() });
-    },
+    prisma: () => prismaMember({ config, read }),
+    clickhouse: () => clickhouseMember({ config, tenantDirectory }),
     // "Not configured" is an answer here, not a refusal: LangWatchQL is optional (ADR-159).
     clickhouseAdmin: () => buildClickHouseAdmin(config.clickhouse),
     databaseTarget: () => buildDatabaseTarget(config.database),
-    objectStorage: () => {
-      if (!config.objectStorage) {
-        throw new MemberNotConfiguredError(
-          "objectStorage",
-          "set STORED_OBJECTS_BACKEND and its bucket, container or root",
-        );
-      }
-      return buildObjectStorage({
-        config: config.objectStorage,
-        directory: tenantDirectory(),
-        clock: read("clock"),
-      });
-    },
+    objectStorage: () => objectStorageMember({ config, read, tenantDirectory }),
     redis: () => {
       if (!config.redis) {
         throw new MemberNotConfiguredError("redis", "set REDIS_URL or REDIS_CLUSTER_ENDPOINTS");
       }
       return buildRedis(config.redis);
     },
-    eventing: () => {
-      const eventing = config.eventing;
-      if (!eventing) {
-        throw new MemberNotConfiguredError("eventing", "name this role's event store and queue");
-      }
-      // Read BEFORE the runtime is built, so the reverse close drains the
-      // queue before the clients it dispatches and appends through go away.
-      return buildEventing({
-        config: eventing,
-        processName: config.processName,
-        prisma: read("prisma"),
-        ...(eventing.participation === undefined ? {} : { participation: eventing.participation }),
-        ...(eventing.groupQueue === undefined ? {} : { redis: read("redis") }),
-        ...(eventing.store.kind === "producer-only"
-          ? {}
-          : { eventLog: { clickhouse: read("clickhouse") } }),
-      });
-    },
+    eventing: () => eventingMember({ config, read }),
     // `off` is a state, not a refusal: the process boots and every send is
     // skipped with a log line naming it (ARCHITECTURE.md §6).
     mail: () =>

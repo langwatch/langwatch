@@ -12,6 +12,37 @@ const skillsRoot = path.resolve(__dirname, "..");
 const skills = listNativeSkills(skillsRoot);
 const publishedSkills = listPublishedSkills(skillsRoot);
 
+/** | user intent | `skill` | primary commands | — Langy's AGENTS.md rows that name a skill. */
+function routingRows(): { skill: string; commands: string }[] {
+  return fs
+    .readFileSync(
+      path.resolve(skillsRoot, "..", "services", "langyagent", "internal", "assets", "AGENTS.md"),
+      "utf8",
+    )
+    .split("\n")
+    .filter((row) => row.startsWith("|"))
+    .map((row) => row.split("|").map((cell) => cell.trim()))
+    .flatMap((cells) => {
+      const skill = cells[2]?.match(/^`([a-z0-9-]+)`$/)?.[1];
+      return skill ? [{ skill, commands: cells[3] ?? "" }] : [];
+    });
+}
+
+function expectSameSkillFile({
+  slug,
+  embedRoot,
+  nativeDir,
+}: {
+  slug: string;
+  embedRoot: string;
+  nativeDir: string;
+}) {
+  const embedded = fs.readFileSync(path.join(embedRoot, slug, "SKILL.md"), "utf8");
+  expect(embedded, `${slug}: Go embed copy is stale`).toBe(
+    fs.readFileSync(path.join(nativeDir, slug, "SKILL.md"), "utf8"),
+  );
+}
+
 // Backs specs/langy/langy-native-skills.feature. Langy loads every published
 // skill plus explicitly native-only skills, all from canonical root sources.
 
@@ -131,12 +162,7 @@ describe("native skill generation", () => {
         .map((e) => e.name)
         .toSorted();
       expect(embeddedDirs).toEqual(skills.map((s) => s.slug).toSorted());
-      for (const slug of embeddedDirs) {
-        const embedded = fs.readFileSync(path.join(embedRoot, slug, "SKILL.md"), "utf8");
-        expect(embedded, `${slug}: Go embed copy is stale`).toBe(
-          fs.readFileSync(path.join(nativeDir, slug, "SKILL.md"), "utf8"),
-        );
-      }
+      for (const slug of embeddedDirs) expectSameSkillFile({ slug, embedRoot, nativeDir });
     });
   });
 
@@ -220,23 +246,6 @@ describe("native skill generation", () => {
   // The image's skill set is the root-compiled native set Docker overlays into
   // the Go embed directory.
   describe("given Langy's AGENTS.md routing table", () => {
-    const readAgentsMd = () =>
-      fs.readFileSync(
-        path.resolve(skillsRoot, "..", "services", "langyagent", "internal", "assets", "AGENTS.md"),
-        "utf8",
-      );
-
-    /** | user intent | `skill` | primary commands | — rows that name a skill. */
-    const routingRows = (): { skill: string; commands: string }[] =>
-      readAgentsMd()
-        .split("\n")
-        .filter((row) => row.startsWith("|"))
-        .map((row) => row.split("|").map((cell) => cell.trim()))
-        .flatMap((cells) => {
-          const skill = cells[2]?.match(/^`([a-z0-9-]+)`$/)?.[1];
-          return skill ? [{ skill, commands: cells[3] ?? "" }] : [];
-        });
-
     it("routes only to skills that exist in the shipped image", () => {
       const routed = new Set(routingRows().map((row) => row.skill));
       expect(routed.size, "no skill rows found — did the routing table move?").toBeGreaterThan(0);
@@ -267,20 +276,17 @@ describe("native skill generation", () => {
           "the evaluation routing rows moved — this check is scanning nothing",
         ).toEqual([...EVALUATION_SKILLS].toSorted());
 
-        for (const row of rows) {
-          expect(row.commands, `${row.skill} does not name the evaluator type catalog`).toContain(
-            "langwatch evaluator types",
-          );
-        }
+        const withoutCatalog = rows
+          .filter((row) => !row.commands.includes("langwatch evaluator types"))
+          .map((row) => row.skill);
+        expect(withoutCatalog, "rows that do not name the evaluator type catalog").toEqual([]);
       });
 
       it("never names listing the project's saved evaluators as a step", () => {
-        for (const row of evaluationRows()) {
-          expect(
-            row.commands,
-            `${row.skill} sends the model to the evaluator library`,
-          ).not.toContain("langwatch evaluator list");
-        }
+        const toLibrary = evaluationRows()
+          .filter((row) => row.commands.includes("langwatch evaluator list"))
+          .map((row) => row.skill);
+        expect(toLibrary, "rows that send the model to the evaluator library").toEqual([]);
       });
     });
   });

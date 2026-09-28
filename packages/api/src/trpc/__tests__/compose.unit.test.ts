@@ -140,10 +140,11 @@ describe("given two routers built under one namespace", () => {
       expect(read?.access).toEqual({ kind: "permission", permission: "annotations:view" });
       expect(archive?.access).toEqual({ kind: "permission", permission: "annotations:update" });
 
-      const handle = archive?.handle as unknown as (args: {
-        app: ReviewApi;
-        input: { id: string };
-      }) => unknown;
+      const handle = z
+        .custom<(args: { app: ReviewApi; input: { id: string } }) => unknown>(
+          (value) => typeof value === "function",
+        )
+        .parse(archive?.handle);
 
       expect(handle({ app: application, input: { id: "review-1" } })).toEqual({ archived: true });
     });

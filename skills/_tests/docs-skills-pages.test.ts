@@ -58,6 +58,58 @@ const publishedPaths = new Set(
   listPublishedSkills(skillsRoot).map((s) => (s.isRecipe ? `recipes/${s.slug}` : s.slug)),
 );
 
+type PageFile = { name: string; content: string };
+
+/** One accordion, one prompt action and one non-trivial prompt fence per manifest entry. */
+function expectAccordionPerEntry({ name, content }: PageFile) {
+  const entries = Object.values(manifest[name]!).flat();
+  const accordions = content.match(ACCORDION_OPEN) ?? [];
+  expect(accordions.length, `${name} accordion count`).toBe(entries.length);
+  const copyActions = content.match(/data-copy-source="prompt"/g) ?? [];
+  expect(copyActions.length, `${name} prompt actions`).toBe(entries.length);
+  const promptBlocks = [...content.matchAll(/^(`{4,})text\n([\s\S]*?)^\1$/gm)];
+  expect(promptBlocks.length, `${name} prompt fences`).toBe(entries.length);
+  for (const block of promptBlocks) {
+    expect(block[2]!.length, `${name} prompt fence content`).toBeGreaterThan(200);
+  }
+}
+
+/** The section's generated block exists and lists its entries in manifest order. */
+function expectGeneratedSectionInOrder({
+  name,
+  content,
+  sectionId,
+  entries,
+}: PageFile & { sectionId: string; entries: { title: string }[] }) {
+  const start = content.indexOf(`{/* lw-generated:${sectionId}:start */}`);
+  const end = content.indexOf(`{/* lw-generated:${sectionId}:end */}`);
+  expect(start, `${name} ${sectionId} start marker`).toBeGreaterThanOrEqual(0);
+  expect(end, `${name} ${sectionId} end marker`).toBeGreaterThan(start);
+  const block = content.slice(start, end);
+  let cursor = -1;
+  for (const entry of entries) {
+    const idx = block.indexOf(`data-track-title={${JSON.stringify(entry.title)}}`);
+    expect(idx, `${name} ${sectionId}: "${entry.title}" present in order`).toBeGreaterThan(cursor);
+    cursor = idx;
+  }
+}
+
+/**
+ * Every interactive control carries button semantics. A static card never toggles, so its header
+ * is not one; the inert-header test pins that, which keeps this subtraction honest.
+ */
+function expectInteractiveControlsAreButtons({ name, content }: PageFile) {
+  const inertHeaders = content.match(STATIC_ACCORDION_HEADER)?.length ?? 0;
+  for (const cls of ["lw-accordion-header", "lw-accordion-action", "lw-accordion-cmd-box"]) {
+    const total = content.match(new RegExp(`className="${cls}[" ]`, "g"))?.length ?? 0;
+    const buttons =
+      content.match(new RegExp(`className="${cls}[" ][^>]*role="button" tabIndex=\\{0\\}`, "g"))
+        ?.length ?? 0;
+    const interactive = cls === "lw-accordion-header" ? total - inertHeaders : total;
+    expect(buttons, `${name}: ${cls} keyboard semantics`).toBe(interactive);
+  }
+}
+
 describe("docs skills directory pages", () => {
   describe("given the publish sync defines which skills exist in langwatch/skills", () => {
     const manifestSkills = Object.values(manifest).flatMap((sections) =>
@@ -105,18 +157,7 @@ describe("docs skills directory pages", () => {
     });
 
     it("renders every manifest accordion with its title and a server-rendered prompt block", () => {
-      for (const { name, content } of pageFiles) {
-        const entries = Object.values(manifest[name]!).flat();
-        const accordions = content.match(ACCORDION_OPEN) ?? [];
-        expect(accordions.length, `${name} accordion count`).toBe(entries.length);
-        const copyActions = content.match(/data-copy-source="prompt"/g) ?? [];
-        expect(copyActions.length, `${name} prompt actions`).toBe(entries.length);
-        const promptBlocks = [...content.matchAll(/^(`{4,})text\n([\s\S]*?)^\1$/gm)];
-        expect(promptBlocks.length, `${name} prompt fences`).toBe(entries.length);
-        for (const block of promptBlocks) {
-          expect(block[2]!.length, `${name} prompt fence content`).toBeGreaterThan(200);
-        }
-      }
+      for (const page of pageFiles) expectAccordionPerEntry(page);
     });
 
     it("keeps data attribute values ASCII-only because the renderer drops non-ASCII attributes", () => {
@@ -145,19 +186,7 @@ describe("docs skills directory pages", () => {
     it("keeps the generated blocks fresh with the manifest ordering", () => {
       for (const { name, content } of pageFiles) {
         for (const [sectionId, entries] of Object.entries(manifest[name]!)) {
-          const start = content.indexOf(`{/* lw-generated:${sectionId}:start */}`);
-          const end = content.indexOf(`{/* lw-generated:${sectionId}:end */}`);
-          expect(start, `${name} ${sectionId} start marker`).toBeGreaterThanOrEqual(0);
-          expect(end, `${name} ${sectionId} end marker`).toBeGreaterThan(start);
-          const block = content.slice(start, end);
-          let cursor = -1;
-          for (const entry of entries) {
-            const idx = block.indexOf(`data-track-title={${JSON.stringify(entry.title)}}`);
-            expect(idx, `${name} ${sectionId}: "${entry.title}" present in order`).toBeGreaterThan(
-              cursor,
-            );
-            cursor = idx;
-          }
+          expectGeneratedSectionInOrder({ name, content, sectionId, entries });
         }
       }
     });
@@ -221,21 +250,7 @@ describe("docs skills directory pages", () => {
     });
 
     it("marks every interactive control as a focusable button", () => {
-      for (const { name, content } of pageFiles) {
-        // A static card never toggles, so its header is not an interactive
-        // control. The next test pins that it stays inert, which is what keeps
-        // this subtraction from hiding a header that lost its semantics.
-        const inertHeaders = content.match(STATIC_ACCORDION_HEADER)?.length ?? 0;
-        for (const cls of ["lw-accordion-header", "lw-accordion-action", "lw-accordion-cmd-box"]) {
-          const total = content.match(new RegExp(`className="${cls}[" ]`, "g"))?.length ?? 0;
-          const buttons =
-            content.match(
-              new RegExp(`className="${cls}[" ][^>]*role="button" tabIndex=\\{0\\}`, "g"),
-            )?.length ?? 0;
-          const interactive = cls === "lw-accordion-header" ? total - inertHeaders : total;
-          expect(buttons, `${name}: ${cls} keyboard semantics`).toBe(interactive);
-        }
-      }
+      for (const page of pageFiles) expectInteractiveControlsAreButtons(page);
     });
 
     it("leaves the static card header inert because nothing handles its click", () => {

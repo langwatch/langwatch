@@ -163,6 +163,30 @@ const validateGuardWorkflow = (repoRoot: string, errors: string[]): void => {
 const displayPath = (repoRoot: string, path: string): string =>
   relative(resolve(repoRoot), path) || path;
 
+/** The pull_request_target jobs in one workflow that take a risk without a safe gate. */
+const unsafeJobs = ({ repoRoot, path }: { repoRoot: string; path: string }): string[] => {
+  const lines = readFileSync(path, "utf8").split(/\r?\n/);
+  if (!usesPullRequestTarget(lines)) return [];
+
+  const workflowHasSensitivePermissions = hasSensitivePermissions(lines.join("\n"));
+  return jobBlocks(lines).flatMap((job) => {
+    const jobText = job.lines.join("\n");
+    const risks = [
+      hasUnsafeCheckout(jobText) ? "checks out PR-head code" : undefined,
+      workflowHasSensitivePermissions || hasSensitivePermissions(jobText)
+        ? "has write permissions"
+        : undefined,
+      usesNonGithubTokenSecret(jobText) ? "uses non-GITHUB_TOKEN secrets" : undefined,
+    ].filter((risk) => risk !== undefined);
+
+    if (risks.length === 0 || hasSafeGate(job)) return [];
+    return [
+      `${displayPath(repoRoot, path)}:${job.startLine}: job \`${job.name}\` ${risks.join(", ")} ` +
+        "from pull_request_target without an `approved-ci` or same-repo gate",
+    ];
+  });
+};
+
 const main = (): number => {
   const repoRoot = process.argv[2] ?? defaultRepoRoot;
   const errors: string[] = [];
@@ -170,30 +194,7 @@ const main = (): number => {
   validateGuardWorkflow(repoRoot, errors);
 
   for (const path of workflowFiles(repoRoot)) {
-    const lines = readFileSync(path, "utf8").split(/\r?\n/);
-    if (!usesPullRequestTarget(lines)) {
-      continue;
-    }
-
-    const workflowHasSensitivePermissions = hasSensitivePermissions(lines.join("\n"));
-
-    for (const job of jobBlocks(lines)) {
-      const jobText = job.lines.join("\n");
-      const risks = [
-        hasUnsafeCheckout(jobText) ? "checks out PR-head code" : undefined,
-        workflowHasSensitivePermissions || hasSensitivePermissions(jobText)
-          ? "has write permissions"
-          : undefined,
-        usesNonGithubTokenSecret(jobText) ? "uses non-GITHUB_TOKEN secrets" : undefined,
-      ].filter((risk) => risk !== undefined);
-
-      if (risks.length > 0 && !hasSafeGate(job)) {
-        errors.push(
-          `${displayPath(repoRoot, path)}:${job.startLine}: job \`${job.name}\` ${risks.join(", ")} ` +
-            "from pull_request_target without an `approved-ci` or same-repo gate",
-        );
-      }
-    }
+    errors.push(...unsafeJobs({ repoRoot, path }));
   }
 
   if (errors.length > 0) {
