@@ -180,7 +180,8 @@ RUN npm install -g pnpm@10.24.0
 COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
 # The scenario SDK opens a voice worker's quick tunnel with a bare `cloudflared` spawn, so the
 # binary is on the image's PATH; the worker never writes its own environment (Alex, 2026-09-28).
-COPY --from=cloudflare/cloudflared:latest /usr/local/bin/cloudflared /usr/local/bin/cloudflared
+# Pinned to a release and its multi-arch index digest; bump both together.
+COPY --from=cloudflare/cloudflared:2026.9.3@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 
 WORKDIR /app
 
