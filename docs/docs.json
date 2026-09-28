@@ -169,6 +169,7 @@
                 ]
               },
               "features/querying-your-data",
+              "features/dashboards",
               "features/automations",
               "features/embedded-analytics"
             ]
