@@ -128,3 +128,20 @@ Feature: Canonical user lifecycle
     Given a member of the organization
     When the CLI asks for its bootstrap
     Then governance resolves the bootstrap for that member
+
+  # main's handler passed scope, scope id, limit, spend and period through
+  # unchecked, and its mail rendered each one blank rather than refusing.
+  @unit
+  Scenario: A request whose scope, limit or spend is blank still emails the admin
+    Given the page was opened with the scope, the scope ID, the limit or the spend left blank
+    When the user clicks "Send request"
+    Then the mutation resolves with the admin it was sent to
+    And the email renders that field blank, with no share of the limit stated
+
+  @unit
+  Scenario: A blank field does not hide a delivery failure
+    Given the page was opened with the limit and the spend left blank
+    And the server names no public base URL to link the budgets page
+    When the user clicks "Send request"
+    Then the mutation refuses the request as not delivered
+    And no email is sent

@@ -2,7 +2,7 @@
  * @vitest-environment node
  * A budget-increase request is main's mail to the organization's first
  * administrator, linking the gateway's budgets page on this deployment.
- * @see specs/ai-governance/cli-wrappers/request-increase.feature
+ * @see specs/ai-governance/cli-wrappers/request-increase.feature, modules/user/specs/user.feature
  */
 import { EmailDelivery, type EmailContent } from "@langwatch/mail";
 import { UserBudgetRequestNotDeliveredError } from "@langwatch/user-contract";
@@ -36,6 +36,7 @@ const REQUEST = {
 async function requestIncrease(input: {
   organizationName: string | null;
   publicBaseUrl: string | undefined;
+  request?: Partial<typeof REQUEST>;
 }) {
   const mail = new RecordingMailer();
   const members = createUserTestInfrastructure({
@@ -53,7 +54,11 @@ async function requestIncrease(input: {
     passwordHash: "hashed:first",
   });
 
-  const outcome = app.requestBudgetIncrease({ ...REQUEST, userId: requester.id });
+  const outcome = app.requestBudgetIncrease({
+    ...REQUEST,
+    ...input.request,
+    userId: requester.id,
+  });
 
   return { mail, outcome };
 }
@@ -86,6 +91,37 @@ describe("user.requestBudgetIncrease", () => {
 
       await expect(outcome).resolves.toEqual({ ok: true, sentTo: "admin@acme.test" });
       expect(mail.sent).toHaveLength(1);
+    });
+  });
+
+  describe.each(["scope", "scopeId", "limitUsd", "spentUsd", "period"] as const)(
+    "given a request whose %s is blank",
+    (field) => {
+      /** @scenario "A request whose scope, limit or spend is blank still emails the admin" */
+      it("still mails the administrator, as main did", async () => {
+        const { mail, outcome } = await requestIncrease({
+          organizationName: "Acme",
+          publicBaseUrl: "https://langwatch.example.com",
+          request: { [field]: "" },
+        });
+
+        await expect(outcome).resolves.toEqual({ ok: true, sentTo: "admin@acme.test" });
+        expect(mail.sent).toHaveLength(1);
+      });
+    },
+  );
+
+  describe("given a blank limit and spend and no public base URL", () => {
+    /** @scenario "A blank field does not hide a delivery failure" */
+    it("refuses as not delivered and mails nothing", async () => {
+      const { mail, outcome } = await requestIncrease({
+        organizationName: "Acme",
+        publicBaseUrl: undefined,
+        request: { limitUsd: "", spentUsd: "" },
+      });
+
+      await expect(outcome).rejects.toBeInstanceOf(UserBudgetRequestNotDeliveredError);
+      expect(mail.sent).toEqual([]);
     });
   });
 
