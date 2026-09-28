@@ -7,15 +7,27 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockResetPassword, searchParamsRef } = vi.hoisted(() => ({
-  mockResetPassword: vi.fn(),
-  searchParamsRef: {
-    current: new URLSearchParams("token=tok_valid") as URLSearchParams | null,
-  },
-}));
+const { mockResetPassword, mockRegisterPasskey, publicEnvRef, searchParamsRef } = vi.hoisted(
+  () => ({
+    mockResetPassword: vi.fn(),
+    mockRegisterPasskey: vi.fn(),
+    publicEnvRef: { current: { PASSKEYS_ENABLED: true } as Record<string, unknown> },
+    searchParamsRef: {
+      current: new URLSearchParams("token=tok_valid") as URLSearchParams | null,
+    },
+  }),
+);
 
 vi.mock("../../../behavior/auth-client.tsx", () => ({
   authClient: { resetPassword: mockResetPassword },
+}));
+
+vi.mock("../../../behavior/ui-passkeys.ts", () => ({
+  registerUiPasskey: mockRegisterPasskey,
+}));
+
+vi.mock("../../../behavior/use-public-env.ts", () => ({
+  usePublicEnv: () => ({ data: publicEnvRef.current }),
 }));
 
 vi.mock("../../../behavior/use-route.ts", () => ({
@@ -63,6 +75,7 @@ describe("ResetPassword page", () => {
       error: null,
     });
     setToken("tok_valid");
+    publicEnvRef.current = { PASSKEYS_ENABLED: true };
   });
 
   afterEach(() => {
@@ -70,8 +83,8 @@ describe("ResetPassword page", () => {
   });
 
   describe("when the token is valid and the passwords match", () => {
-    /** @scenario Submitting a valid new password with a token resets it and returns to sign-in */
-    it("calls resetPassword with the new password and token, then confirms with a sign-in link", async () => {
+    /** @scenario Submitting a valid new password with a token resets it and signs me in */
+    it("calls resetPassword with the new password and token, then offers to continue", async () => {
       const { container } = renderPage();
       fillAndSubmit({
         container,
@@ -86,9 +99,63 @@ describe("ResetPassword page", () => {
         });
       });
 
-      expect(await screen.findByText(/your password has been reset/i)).toBeTruthy();
-      const signInLink = screen.getByRole("link", { name: /sign in/i });
-      expect(signInLink.getAttribute("href")).toBe("/auth/signin");
+      expect(await screen.findByRole("heading", { name: /password updated/i })).toBeTruthy();
+      expect(screen.getByTestId("reset-sign-in").getAttribute("href")).toBe("/");
+    });
+
+    /** @scenario A completed reset offers a passkey rather than assuming one */
+    it("offers a passkey without opening a device prompt", async () => {
+      const { container } = renderPage();
+      fillAndSubmit({ container, password: "newsecret123", confirm: "newsecret123" });
+
+      expect(await screen.findByTestId("post-reset-passkey-offer")).toBeTruthy();
+      expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+      expect(mockRegisterPasskey).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Declining the offer costs nothing */
+    it("drops the offer when declined and keeps the way on", async () => {
+      const { container } = renderPage();
+      fillAndSubmit({ container, password: "newsecret123", confirm: "newsecret123" });
+
+      fireEvent.click(await screen.findByTestId("reset-dismiss-passkey"));
+
+      expect(screen.queryByTestId("post-reset-passkey-offer")).toBeNull();
+      expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+    });
+
+    /** @scenario Accepting the offer adds the passkey on this screen */
+    it("adds the passkey in place when accepted", async () => {
+      mockRegisterPasskey.mockResolvedValue({ ok: true });
+      const { container } = renderPage();
+      fillAndSubmit({ container, password: "newsecret123", confirm: "newsecret123" });
+
+      fireEvent.click(await screen.findByTestId("reset-add-passkey"));
+
+      expect(await screen.findByTestId("reset-passkey-added")).toBeTruthy();
+      expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+    });
+
+    /** @scenario A refused ceremony says so in words and leaves the way on */
+    it("says a refused ceremony in words and keeps the way on", async () => {
+      mockRegisterPasskey.mockResolvedValue({ ok: false, cancelled: false });
+      const { container } = renderPage();
+      fillAndSubmit({ container, password: "newsecret123", confirm: "newsecret123" });
+
+      fireEvent.click(await screen.findByTestId("reset-add-passkey"));
+
+      expect(await screen.findByText(/that passkey attempt didn't finish/i)).toBeTruthy();
+      expect(screen.queryByText(/identity_passkey/)).toBeNull();
+      expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+    });
+
+    it("offers no passkey where the deployment mounted none", async () => {
+      publicEnvRef.current = {};
+      const { container } = renderPage();
+      fillAndSubmit({ container, password: "newsecret123", confirm: "newsecret123" });
+
+      await screen.findByRole("heading", { name: /password updated/i });
+      expect(screen.queryByTestId("post-reset-passkey-offer")).toBeNull();
     });
   });
 
@@ -134,7 +201,7 @@ describe("ResetPassword page", () => {
         confirm: "newsecret123",
       });
 
-      expect(await screen.findByText(/invalid or has expired/i)).toBeTruthy();
+      expect(await screen.findByText(/reset link/i)).toBeTruthy();
       const retry = screen.getByRole("link", {
         name: /request a new reset link/i,
       });
@@ -148,7 +215,7 @@ describe("ResetPassword page", () => {
       setToken(null);
       const { container } = renderPage();
 
-      expect(screen.getByRole("heading", { name: /invalid reset link/i })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: /reset link didn't work/i })).toBeTruthy();
       expect(screen.getByRole("link", { name: /request a new reset link/i })).toBeTruthy();
       // No password form is rendered without a token.
       expect(passwordInputs(container)).toHaveLength(0);
