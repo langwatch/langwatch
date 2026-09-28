@@ -29,6 +29,7 @@ import {
   type ReportUsageForMonthCommandData,
   type ScenarioCreatedSignal,
   type SeatChangeBillingOutcome,
+  type ResourceLimitNotifierInput,
   type SubscriptionPlanInput,
   type BillingPricingModel,
   type USAGE_UNKNOWN,
@@ -62,6 +63,7 @@ import {
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
 import { fireScenarioCreated } from "../rules/nurturing-feature-adoption-service.rules.ts";
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
+import { resourceLimitCooldown } from "../services/billing-alert-cooldown.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
 import {
@@ -89,6 +91,7 @@ import { LicensingLicenseGeneratorService } from "../services/licensing-license-
 import { MeteredUsageWarningService } from "../services/metered-usage-warning.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
+import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
 import {
   ScenarioCreatedSignalService,
   type ScenarioSignalOrganizations,
@@ -240,6 +243,7 @@ export class BillingApp
         peers: setup.dependencies,
         stripeSecretKey,
         usageWarnings: BillingApp.#composeUsageWarnings(setup, notices),
+        resourceLimitAlerts: BillingApp.#composeResourceLimitAlerts(setup, notices),
         webhook: {
           signing,
           host: billingWebhookHostChannels.slack.create({ notices }),
@@ -294,6 +298,26 @@ export class BillingApp
     });
   }
 
+  /** Main's resource-limit Slack alert, over the same notices and admin read as the warning. */
+  static #composeResourceLimitAlerts(
+    setup: BillingSetup,
+    notices: BillingUsageNoticeService,
+  ): ResourceLimitAlertService {
+    const { organizations, projects } = setup.dependencies;
+    const { isSaas } = setup.members;
+    return ResourceLimitAlertService.create({
+      isSaas,
+      cooldown: resourceLimitCooldown,
+      organizations: UsageLimitOrganizationService.create({ organizations, projects }),
+      plans: SaaSPlanProviderService.create({
+        subscriptions: setup.repositories.subscriptions,
+        isSaas,
+      }),
+      notices,
+      errors: BillingErrorReporterService.create(),
+    });
+  }
+
   /** The construction once the payment provider's key has resolved, or not. */
   static assemble({
     members,
@@ -303,6 +327,7 @@ export class BillingApp
     stripeSecretKey,
     statementMail,
     usageWarnings,
+    resourceLimitAlerts,
     webhook,
     subscription,
   }: {
@@ -327,6 +352,7 @@ export class BillingApp
     /** No process composes the statement mail yet; absent, statements wait. */
     statementMail?: ConnectedStatementMailChannel;
     usageWarnings: MeteredUsageWarningService;
+    resourceLimitAlerts: ResourceLimitAlertService;
     /** The Stripe callback's signing secret and outside reach; absent, the callback answers 404. */
     webhook?: StripeWebhookComposition;
     /** Main's subscription door; absent, every `subscription.*` procedure answers not found. */
@@ -358,6 +384,7 @@ export class BillingApp
       }),
       isSaas,
       usageWarnings,
+      resourceLimitAlerts,
       billableEvents: BillableEventsQueryService.create(repositories.billableEvents),
       pricing: OrganizationPricingService.create(repositories.organizationPricing),
       reporting: BillingApp.#composeReporting({
@@ -657,6 +684,7 @@ export class BillingApp
   readonly #pricing: OrganizationPricingService;
   readonly #reporting: BillingReportingPipeline;
   readonly #usageWarnings: MeteredUsageWarningService;
+  readonly #resourceLimitAlerts: ResourceLimitAlertService;
 
   private constructor({
     stripeWebhook,
@@ -672,6 +700,7 @@ export class BillingApp
     pricing,
     reporting,
     usageWarnings,
+    resourceLimitAlerts,
   }: {
     stripeWebhook: StripeWebhookReceiptService;
     subscriptions: SubscriptionDoor | undefined;
@@ -686,6 +715,7 @@ export class BillingApp
     pricing: OrganizationPricingService;
     reporting: BillingReportingPipeline;
     usageWarnings: MeteredUsageWarningService;
+    resourceLimitAlerts: ResourceLimitAlertService;
   }) {
     this.#stripeWebhook = stripeWebhook;
     this.#subscriptions = subscriptions;
@@ -700,6 +730,11 @@ export class BillingApp
     this.#pricing = pricing;
     this.#reporting = reporting;
     this.#usageWarnings = usageWarnings;
+    this.#resourceLimitAlerts = resourceLimitAlerts;
+  }
+
+  notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> {
+    return this.#resourceLimitAlerts.notifyResourceLimitReached(input);
   }
 
   checkAndSendUsageWarning(input: {

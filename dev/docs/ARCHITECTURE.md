@@ -1654,6 +1654,8 @@ depend on `@langwatch/enterprise-licensing-contract` and
 
 Throw `HandledError` only when the cause is known **and** the caller can act;
 register the `code` in `packages/handled-error/src/app-codes.ts` and its
+A seat limit reached is organization's event; billing is told through its Api, by §9's
+subscriber on the owner's pipeline (Alex, 2026-09-28).
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`
 keep their wire path, but the contract and transport are organization's: it

@@ -5,6 +5,7 @@ import { BillingApp, type ConnectedBillingPeers } from "../../app/billing.app.ts
 import { billingServer } from "../../billing.server.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
 import type { MeteredUsageWarningService } from "../../services/metered-usage-warning.service.ts";
+import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
 import { StripeUsageReportingUnavailable } from "../../services/usage-reporting.service.ts";
 import { billingReportingEventing } from "../billing-reporting.pipeline.ts";
 
@@ -22,6 +23,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
     it("still mounts the command-only roll-up, with no meter beside it", () => {
       const app = BillingApp.assemble({
         usageWarnings: createApiFixture<MeteredUsageWarningService>({}),
+        resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
         members: { isSaas: false, nodeEnvironment: "test" },
         repositories: MemoryBillingRepositories.create(),
         config: { bankDetails: undefined, licensePaymentLinkId: undefined },
@@ -42,6 +44,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
     const composeSaas = () =>
       BillingApp.assemble({
         usageWarnings: createApiFixture<MeteredUsageWarningService>({}),
+        resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
         members: { isSaas: true, nodeEnvironment: "test" },
         repositories: MemoryBillingRepositories.create(),
         config: { bankDetails: undefined, licensePaymentLinkId: undefined },
