@@ -16,6 +16,8 @@ import { HandledError } from "@langwatch/handled-error";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import type {
+  LimitCheckResult,
+  LimitType,
   OrganizationInvite,
   OrganizationPendingInviteApplied,
 } from "@langwatch/organization-contract";
@@ -60,14 +62,6 @@ import type {
   OrganizationSignals,
 } from "./organization.members.ts";
 
-/** What a seat decision answers when every field is known. */
-type OrganizationSeatAnswer = Readonly<{
-  allowed: boolean;
-  limitType: "members" | "membersLite";
-  current: number;
-  max: number;
-}>;
-
 /** Seat licence over the same plan and membership counts; all fields answered. */
 class EntitlementOrganizationSeatLicense {
   static create(options: {
@@ -86,9 +80,9 @@ class EntitlementOrganizationSeatLicense {
 
   async checkLimit(input: {
     organizationId: string;
-    resource: "members" | "membersLite";
+    resource: LimitType;
     user?: OrganizationPlanUser | undefined;
-  }): Promise<OrganizationSeatAnswer> {
+  }): Promise<LimitCheckResult> {
     const plan = await this.activePlan(input.organizationId, input.user);
     const max = this.allowance(plan, input.resource);
     if (plan.overrideAddingLimitations) {
@@ -158,11 +152,11 @@ class EntitlementOrganizationSeatLicense {
     });
   }
 
-  private allowance(plan: Plan, resource: "members" | "membersLite"): number {
+  private allowance(plan: Plan, resource: LimitType): number {
     return resource === "members" ? plan.maxMembers : plan.maxMembersLite;
   }
 
-  private seatsTaken(organizationId: string, resource: "members" | "membersLite"): Promise<number> {
+  private seatsTaken(organizationId: string, resource: LimitType): Promise<number> {
     return resource === "members"
       ? this.options.memberships.getMemberCount(organizationId)
       : this.options.memberships.getMembersLiteCount(organizationId);

@@ -14,7 +14,6 @@ export * from "./license.queries.ts";
 export * from "./license.service.ts";
 export * from "./licensing.api.ts";
 export * from "./licensing.trpc.ts";
-export * from "./license-enforcement.trpc.ts";
 
 /** The enforcement half: what a limit is called, and how it refuses. Was
  * `platform/app/src/server/license-enforcement/{constants,errors}.ts`. */

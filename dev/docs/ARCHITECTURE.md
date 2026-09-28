@@ -1648,6 +1648,13 @@ depend on `@langwatch/enterprise-licensing-contract` and
 
 Throw `HandledError` only when the cause is known **and** the caller can act;
 register the `code` in `packages/handled-error/src/app-codes.ts` and its
+**Seat limits are organization's to answer** (Alex, 2026-09-28).
+`licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`
+keep their wire path, but the contract and transport are organization's: it
+owns the membership rows a seat counts and already reads the plan through
+`EntitlementApi`. Licensing cannot depend on entitlement (it is entitlement's
+peer), so its members refused every call and `checkLimit` answered 500.
+
 customer copy in the presentation registry. Everything else stays a plain
 `Error` and degrades to "unknown" + trace id at the boundary — deliberately.
 `message` is customer-safe, never internals; the tRPC wire message is the

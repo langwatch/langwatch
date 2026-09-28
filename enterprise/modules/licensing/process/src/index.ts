@@ -2,14 +2,7 @@ export { NodeLicenseCryptographyService } from "./services/node-license-cryptogr
 export type { LicensingInfrastructure, LicensingRuntime } from "./app/licensing.app.ts";
 export { licensingServer } from "./licensing.server.ts";
 export { LicensingInfrastructureService } from "./services/licensing-infrastructure.service.ts";
-/**
- * The two declared tRPC surfaces, and the one fact the enforcement half asks
- * the process to resolve. A mount binds the fact; nothing else may.
- */
-export {
-  callerEmailFact,
-  licenseEnforcementTrpcTransport,
-} from "./transport/license-enforcement.trpc.ts";
+/** The declared licence tRPC surface. */
 export { licenseTrpcTransport } from "./transport/licensing.trpc.ts";
 /** The signed-license source an API-role process supplies to plan resolution. */
 export {

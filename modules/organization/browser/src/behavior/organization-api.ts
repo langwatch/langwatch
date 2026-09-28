@@ -4,11 +4,17 @@
  * one stops sharing a cache with `api.organization.*` call sites that haven't moved.
  */
 
-import { createModuleApi, type ModuleApi, type OutputsFromMap } from "@langwatch/api/web";
+import {
+  createModuleApi,
+  type ContractApiMap,
+  type ModuleApi,
+  type OutputsFromMap,
+} from "@langwatch/api/web";
 import type { Plan } from "@langwatch/entitlement-contract";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import type {
   EnrichedAuditLog,
+  licenseEnforcementTrpc,
   JoinRequestAutomaticJoins,
   JoinRequestMine,
   JoinRequestPending,
@@ -244,7 +250,8 @@ export type JoinRequestReading = {
   expiresAt: NonNullable<JoinRequestPending[number]["expiresAt"]>;
 };
 
-export type OrganizationApiMap = {
+/** `licenseEnforcement.*` is organization's own contract; the rest is still hand-written. */
+export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> & {
   organization: {
     /**
      * `pageOffset`/`pageSize` are real offset paging — a Prisma `skip` read,
@@ -482,33 +489,6 @@ export type OrganizationApiMap = {
      */
     getActivePlan: {
       query: { input: { organizationId: string }; output: Plan };
-    };
-  };
-
-  licenseEnforcement: {
-    /**
-     * Answered optimistically while it is still arriving — the write
-     * enforces the limit again — and invalidated by any page here that
-     * frees a seat.
-     */
-    checkLimit: {
-      query: {
-        input: { organizationId: string; limitType?: string };
-        output: { allowed: boolean; current: number; max: number };
-      };
-    };
-
-    /** Fire-and-forget: a UI pre-check refused somebody, so somebody wanted more. */
-    reportLimitBlocked: {
-      mutation: {
-        input: {
-          organizationId: string;
-          limitType: string;
-          current?: number;
-          max?: number;
-        };
-        output: unknown;
-      };
     };
   };
 

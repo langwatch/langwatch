@@ -33,7 +33,6 @@ import type {
   SeatChangeResult,
   SignedIssuedLicense,
 } from "./issued-license.ts";
-import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type { PlanInfo } from "./license-plan.ts";
 import type { IssueLicenseInput } from "./license-registry.ts";
 import type {
@@ -60,20 +59,6 @@ import type {
   SelfHostedSignal,
 } from "./self-hosted-instance.ts";
 
-/**
- * The caller, as the enforcement service classifies them: a lite member is
- * counted differently from a full one, and a deployment's operator allow-list
- * is keyed by address, so an id alone cannot answer a limit.
- */
-export type LicensingCaller = Readonly<{ id: string; email?: string | null }>;
-
-/** One limit, asked about one organization on behalf of one caller. */
-export type LicenseLimitCheck = Readonly<{
-  organizationId: string;
-  limitType: LimitType;
-  user: LicensingCaller;
-}>;
-
 /** The portable signed-license capability supplied to process peers. */
 export interface LicensingApi {
   resolve(input: ResolvePlanInput): Promise<EntitlementGrant>;
@@ -98,17 +83,6 @@ export interface LicensingApi {
    * minted, through the same validation as a pasted key.
    */
   activateLicenseWithCode(input: { organizationId: string; code: string }): Promise<PlanInfo>;
-  /** Whether one limit still admits another resource, for this caller. */
-  checkLimit(input: LicenseLimitCheck): Promise<LimitCheckResult>;
-  /** Every enforced limit at once, keyed by limit type. */
-  checkAllLimits(
-    input: Readonly<{ organizationId: string; user: LicensingCaller }>,
-  ): Promise<Record<LimitType, LimitCheckResult>>;
-  /**
-   * A client pre-check refused somebody. The limit is checked again here, so a
-   * fabricated report cannot raise an alert nobody can retract.
-   */
-  reportLimitBlocked(input: LicenseLimitCheck): Promise<void>;
 
   /**
    * The license registry (ADR-156). Every issue path writes a row here, so a

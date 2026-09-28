@@ -8,6 +8,7 @@ import { groupsRest, groupsRestEnterpriseGate } from "./transport/group.rest.ts"
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
 import { inviteTrpcTransport } from "./transport/invite.trpc.ts";
 import { joinRequestTrpcTransport } from "./transport/join-request.trpc.ts";
+import { licenseEnforcementTrpcTransport } from "./transport/license-enforcement.trpc.ts";
 import {
   organizationManagementEnterpriseGate,
   organizationManagementRest,
@@ -27,6 +28,7 @@ export const organizationServer = defineServerModule("organization")
     teamTrpcTransport,
     groupTrpcTransport,
     joinRequestTrpcTransport,
+    licenseEnforcementTrpcTransport,
     personalWorkspaceFeaturesTrpcTransport,
     organizationManagementRest,
     organizationsProvisioningRest,

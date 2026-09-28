@@ -110,6 +110,8 @@ import {
   type OrganizationGroupService,
   type OrganizationFounding,
   type OrganizationMemberSeats,
+  type LimitCheckResult,
+  type LimitType,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
@@ -124,6 +126,7 @@ import type { OrganizationRepositories } from "../repositories/organization.repo
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
 import type { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
+import { LicenseLimitService } from "../services/license-limit.service.ts";
 import { MemberProvenanceService } from "../services/member-provenance.service.ts";
 import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
 import { OrganizationInitializationService } from "../services/organization-initialization.service.ts";
@@ -154,6 +157,7 @@ import type {
   OrganizationInvitations,
   OrganizationJoinRequests,
   OrganizationPlanGate,
+  OrganizationPlanUser,
   OrganizationSignals,
 } from "./organization.members.ts";
 
@@ -364,6 +368,11 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     });
 
     application.#members = members;
+    application.#licenseLimits = LicenseLimitService.create({
+      seats: members.seats,
+      notices: members.invitations,
+      signals: members.signals,
+    });
     application.#memberProvenance = MemberProvenanceService.create({
       members: membershipRepository,
       admissions: {
@@ -436,6 +445,11 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     const { members } = setup;
 
     application.#members = members;
+    application.#licenseLimits = LicenseLimitService.create({
+      seats: members.seats,
+      notices: members.invitations,
+      signals: members.signals,
+    });
     application.#memberProvenance = setup.memberProvenance;
     application.#visibility = OrganizationVisibilityService.create({
       reader: {
@@ -489,6 +503,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   // hand them.
   #members!: OrganizationInfrastructure;
   #memberProvenance!: MemberProvenanceService;
+  #licenseLimits!: LicenseLimitService;
   #visibility!: OrganizationVisibilityService;
   #personalTeamScope!: PersonalTeamScopeService;
   #invitationDoor!: OrganizationInvitationDoorService | null;
@@ -1424,6 +1439,27 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       this.#members.seatCounts.getMembersLiteCount(input.organizationId),
     ]);
     return { fullMembers, liteMembers };
+  }
+
+  async checkLimit(
+    input: Readonly<{ organizationId: string; limitType: LimitType }>,
+    by: OrganizationPlanUser,
+  ): Promise<LimitCheckResult> {
+    return this.#licenseLimits.check(input, by);
+  }
+
+  async checkAllLimits(
+    input: Readonly<{ organizationId: string }>,
+    by: OrganizationPlanUser,
+  ): Promise<Record<LimitType, LimitCheckResult>> {
+    return this.#licenseLimits.checkAll(input, by);
+  }
+
+  async reportLimitBlocked(
+    input: Readonly<{ organizationId: string; limitType: LimitType }>,
+    by: OrganizationPlanUser,
+  ): Promise<void> {
+    return this.#licenseLimits.reportBlocked(input, by);
   }
 
   async approvePaymentPendingInvites(

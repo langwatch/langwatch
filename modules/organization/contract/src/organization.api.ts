@@ -35,6 +35,7 @@ import type {
   JoinRequestMine,
   JoinRequestPending,
 } from "./join-request.responses.ts";
+import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
   OrganizationInviteAccepted,
   OrganizationInviteCreated,
@@ -637,6 +638,21 @@ export interface OrganizationApi {
    * included, disabled memberships excluded. The one count a licence and a plan read.
    */
   countMemberSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationMemberSeats>;
+  /** Whether one more of a limited resource fits the organization's plan, for this caller. */
+  checkLimit(
+    input: Readonly<{ organizationId: string; limitType: LimitType }>,
+    by: OrganizationCaller,
+  ): Promise<LimitCheckResult>;
+  /** Every enforced limit at once, keyed by limit type. */
+  checkAllLimits(
+    input: Readonly<{ organizationId: string }>,
+    by: OrganizationCaller,
+  ): Promise<Record<LimitType, LimitCheckResult>>;
+  /** A client pre-check refused somebody: re-checked, so a fabricated report raises nothing. */
+  reportLimitBlocked(
+    input: Readonly<{ organizationId: string; limitType: LimitType }>,
+    by: OrganizationCaller,
+  ): Promise<void>;
   /** Opens the invitations a completed seat checkout paid for, as main's billing webhook did. */
   approvePaymentPendingInvites(
     input: Readonly<{ subscriptionId: string; organizationId: string }>,

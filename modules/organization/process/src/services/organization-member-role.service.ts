@@ -107,20 +107,9 @@ export class OrganizationMemberRoleService {
         user: actingUser ?? undefined,
       });
       if (!result.allowed) {
-        // The counts ride along only when the decision carried them: a port
-        // that refused without them must not report a limit of `undefined`
-        // as if it were a number the customer could read.
-        throw new MemberSeatLimitReachedError(
-          result.limitType !== undefined && result.current !== undefined && result.max !== undefined
-            ? {
-                meta: {
-                  limitType: result.limitType,
-                  current: result.current,
-                  max: result.max,
-                },
-              }
-            : {},
-        );
+        throw new MemberSeatLimitReachedError({
+          meta: { limitType: result.limitType, current: result.current, max: result.max },
+        });
       }
     }
 

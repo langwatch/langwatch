@@ -45,9 +45,6 @@ export class LicensingInfrastructureService {
       platformSsoAllowed: () => Promise.resolve(false),
       authProviderIsMounted: () => false,
       reportSigningFailure: () => void 0,
-      checkLimit: () => Promise.reject(unavailable()),
-      notifyLimitReached: () => Promise.reject(unavailable()),
-      reportError: () => void 0,
     };
   }
 

@@ -1,6 +1,8 @@
 import type {
   JoinRequestJoining,
   JoinRequestAdmitted,
+  LimitCheckResult,
+  LimitType,
   OrganizationInvite,
   OrganizationInviteValidation,
   OrganizationListedInvite,
@@ -96,13 +98,8 @@ export type OrganizationPlanUser = Readonly<{
 /** Which seat kind a role change is asking the organization to spend. */
 export type OrganizationSeatChangeType = string;
 
-/** What a seat check answers when it refuses. */
-export type OrganizationSeatDecision = Readonly<{
-  allowed: boolean;
-  limitType?: string;
-  current?: number;
-  max?: number;
-}>;
+/** What a seat check answers, counts included: the `licenseEnforcement.*` answer. */
+export type OrganizationSeatDecision = LimitCheckResult;
 
 /**
  * The seat and plan gates on a membership write. Deliberately two methods rather than the
@@ -114,7 +111,7 @@ export interface OrganizationSeatLicense {
    * throws, since only the caller knows how to turn a refusal into a named error. */
   checkLimit(input: {
     organizationId: string;
-    resource: "members" | "membersLite";
+    resource: LimitType;
     user?: OrganizationPlanUser | undefined;
   }): Promise<OrganizationSeatDecision>;
 
