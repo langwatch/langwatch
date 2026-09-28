@@ -26,8 +26,20 @@ import type {
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createDashboardTestAnalytics } from "../../app/__tests__/dashboard.fixture.ts";
+import type { DashboardBoardAudience } from "../../app/dashboard.members.ts";
 import { PrismaDashboardWidgetRepository } from "../../repositories/prisma/prisma.dashboard-widget.repository.ts";
 import { DashboardWidgetService } from "../dashboard-widget.service.ts";
+
+/** Visibility is the dashboard service's; these cases are about grid rows and project scope. */
+class EveryBoardVisible implements DashboardBoardAudience {
+  async isVisibleTo(): Promise<boolean> {
+    return true;
+  }
+
+  async findVisibleDashboardIds(): Promise<string[]> {
+    throw new Error("these cases never list widgets");
+  }
+}
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -110,6 +122,7 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
     service = DashboardWidgetService.create({
       repository: PrismaDashboardWidgetRepository.create({ prisma: database() }),
       analytics: createDashboardTestAnalytics(),
+      boards: new EveryBoardVisible(),
     });
     organization = await database().organization.create({
       data: { name: "Test Org", slug: `test-org-${randomUUID()}` },

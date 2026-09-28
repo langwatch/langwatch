@@ -162,6 +162,29 @@ describe("DashboardService", () => {
     });
   });
 
+  describe("given a board with no recorded creator and a project credential", () => {
+    it("refuses only me and team, having nobody to record, and allows organisation", async () => {
+      const { service, repository } = serviceWith();
+      const board = await repository.createDashboard({
+        id: "creatorless",
+        projectId: PROJECT,
+        name: "Reports",
+        order: 0,
+      });
+      const ref = { projectId: PROJECT, dashboardId: board.id };
+
+      await expect(service.setVisibility({ ...ref, visibility: "only_me" })).rejects.toMatchObject({
+        code: "dashboard_owner_only",
+      });
+      await expect(service.setVisibility({ ...ref, visibility: "team" })).rejects.toMatchObject({
+        code: "dashboard_owner_only",
+      });
+      await expect(
+        service.setVisibility({ ...ref, visibility: "organisation" }),
+      ).resolves.toMatchObject({ visibility: "organisation", createdById: null });
+    });
+  });
+
   describe("given a graph belonging to another project", () => {
     it("refuses the read as one this project does not have", async () => {
       const { service } = serviceWith();
