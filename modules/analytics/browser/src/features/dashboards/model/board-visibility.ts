@@ -54,7 +54,7 @@ const GROUP_LABELS: Readonly<Record<DashboardVisibility, string>> = {
 
 /**
  * The prototype's sidebar groups, Mine then Team then Organisation, each
- * listed only when it has a board; Mine always, since the Flight Deck leads it.
+ * listed only when it has a board.
  */
 export function boardVisibilityGroups<Board extends { visibility: DashboardVisibility }>(
   boards: readonly Board[],
@@ -63,5 +63,5 @@ export function boardVisibilityGroups<Board extends { visibility: DashboardVisib
     key,
     label: GROUP_LABELS[key],
     boards: boards.filter((board) => board.visibility === key),
-  })).filter((group) => group.key === "only_me" || group.boards.length > 0);
+  })).filter((group) => group.boards.length > 0);
 }

@@ -78,7 +78,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Custom Events](https://langwatch.ai/docs/user-events/custom.md): Track custom user events in your LLM application using LangWatch to support analytics, evaluations, and agent testing workflows.
 
 - [Querying your data](https://langwatch.ai/docs/features/querying-your-data.md): LangWatch answers two query languages, analytics SQL and the trace filter. One endpoint describes both, and the CLI runs either without a browser.
-- [Dashboards](https://langwatch.ai/docs/features/dashboards.md): Build custom boards of charts over your LangWatch data, or use the built-in Agent Flight Deck for an at-a-glance view of your project.
+- [Dashboards](https://langwatch.ai/docs/features/dashboards.md): Build boards of charts over your LangWatch data, or start one from the Agent Flight Deck template for an at-a-glance view of your project.
 - [Alerts and Automations](https://langwatch.ai/docs/features/automations.md): Configure Alerts and Automations in LangWatch to detect regressions, notify teams, and enforce automated guardrails for AI agent testing.
 - [Exporting Analytics](https://langwatch.ai/docs/features/embedded-analytics.md): Export LangWatch analytics into your own dashboards to monitor LLM quality, agent testing metrics, and evaluation performance.
 

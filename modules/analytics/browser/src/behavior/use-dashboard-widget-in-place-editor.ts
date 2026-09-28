@@ -1,3 +1,4 @@
+import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
 import { useState } from "react";
 
 import type { DashboardWidgetDraft } from "../model/dashboard-widget-definition.ts";
@@ -15,6 +16,7 @@ export function useDashboardWidgetInPlaceEditor({
   projectId,
   projectSlug,
   timeWindow,
+  granularitySeconds,
   onClose,
   onSave,
 }: {
@@ -23,6 +25,7 @@ export function useDashboardWidgetInPlaceEditor({
   projectId: string;
   projectSlug: string;
   timeWindow: { start: number; end: number };
+  granularitySeconds?: LangWatchQLAcceptedGranularityStep;
   onClose: () => void;
   onSave: (args: { draft: DashboardWidgetDraft; onSuccess: () => void }) => void;
 }) {
@@ -34,6 +37,7 @@ export function useDashboardWidgetInPlaceEditor({
     projectId,
     projectSlug,
     timeWindow,
+    ...(granularitySeconds ? { granularitySeconds } : {}),
     widgetId: id,
   });
 

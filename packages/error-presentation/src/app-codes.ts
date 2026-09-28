@@ -174,7 +174,6 @@ export const APP_ERROR_CODES = [
   "custom_role_not_found",
   "dashboard_not_found",
   "dashboard_owner_only",
-  "dashboard_read_only",
   "dashboard_reorder_unknown_ids",
   "dashboard_widget_definition_invalid",
   "dashboard_widget_not_found",

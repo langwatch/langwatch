@@ -1,21 +1,15 @@
 /**
- * The picker's questions, the prompts they ask Langy, and how a block is stored on a board.
+ * The picker's questions, the prompts they ask Langy, and how a board reads its stored widgets.
  * @see modules/dashboard/specs/dashboards-v1.feature
  */
 
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { findBlock, LIBRARY_BLOCKS } from "../blocks/index.ts";
 import * as blockQueries from "../blocks/model/block-queries.ts";
-import { boardPromptQuestion, FLIGHT_DECK_SUBJECT } from "../langy/model/board-langy.ts";
+import { boardPromptQuestion, boardSubject } from "../langy/model/board-langy.ts";
 import { BLOCK_QUESTION_SECTIONS, searchBlockQuestions } from "../model/block-questions.ts";
-import {
-  blockOfWidgetCode,
-  blockWidgetDefinition,
-  boardBlocksOf,
-  nextBlockSlot,
-} from "../model/board-blocks.ts";
+import { boardWidgetsOf, duplicateSlot } from "../model/board-widgets.ts";
 
 const every = BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions);
 
@@ -29,7 +23,7 @@ const QUERIED_VIEWS = new Set(
 const PERIOD = {
   periodStart: Temporal.Instant.from("2026-09-01T00:00:00Z").epochMilliseconds,
   periodEnd: Temporal.Instant.from("2026-09-08T00:00:00Z").epochMilliseconds,
-  granularitySeconds: 86_400,
+  granularitySeconds: 86_400 as const,
 };
 
 describe("the picker's questions", () => {
@@ -58,7 +52,10 @@ describe("the picker's questions", () => {
       const [first] = every;
       const request = boardPromptQuestion({
         prompt: first!.prompt,
-        board: FLIGHT_DECK_SUBJECT,
+        board: boardSubject({
+          board: { id: "board-1", name: "Weekly review" },
+          widgets: [{ name: "Status" }],
+        }),
         period: PERIOD,
       });
 
@@ -67,7 +64,8 @@ describe("the picker's questions", () => {
         "Dashboard period: 2026-09-01T00:00:00Z to 2026-09-08T00:00:00Z",
       );
       expect(request.question).toContain("one bucket per 1 day");
-      expect(request.context[0]?.ref).toContain("read-only");
+      expect(request.context[0]?.ref).toContain('dashboard "Weekly review" (id board-1)');
+      expect(request.context[0]?.ref).toContain("widgets: Status");
     });
 
     it("ships How do I… as its own section", () => {
@@ -76,15 +74,6 @@ describe("the picker's questions", () => {
 
     it("gives every question a unique id", () => {
       expect(new Set(every.map(({ id }) => id)).size).toBe(every.length);
-    });
-
-    /** @scenario "AC12 Only working questions are offered" */
-    it("stores every library block in a form the board reads back as that block", () => {
-      for (const block of LIBRARY_BLOCKS) {
-        const { code, queries } = blockWidgetDefinition({ block });
-        expect(blockOfWidgetCode(code)?.id).toBe(block.id);
-        expect(queries).toEqual(block.queries);
-      }
     });
   });
 
@@ -102,46 +91,44 @@ describe("the picker's questions", () => {
   });
 });
 
-describe("blocks on a board", () => {
-  const half = findBlock("trace-count-over-time")!;
-  const full = findBlock("previous-period-comparison")!;
+describe("widgets on a board", () => {
+  const definition = { version: 1 as const, code: "export default () => null;", queries: [] };
+  const stored = (id: string, dashboardId: string, gridRow: number, gridColumn: number) => ({
+    id,
+    name: `Widget ${id}`,
+    dashboardId,
+    gridColumn,
+    gridRow,
+    colSpan: 4,
+    rowSpan: 3,
+    graph: definition,
+  });
 
-  it("reads only this board's block widgets, leaving other widgets out", () => {
-    const code = blockWidgetDefinition({ block: half }).code;
-    const place = { gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 4 };
-    const blocks = boardBlocksOf({
+  /** @scenario "AC15 Widget menu actions persist after reload" */
+  it("reads only this board's widgets, top to bottom and left to right", () => {
+    const widgets = boardWidgetsOf({
       dashboardId: "board-1",
       widgets: [
-        { id: "a", dashboardId: "board-1", ...place, graph: { code } },
-        { id: "b", dashboardId: "board-2", ...place, graph: { code } },
-        { id: "c", dashboardId: "board-1", ...place, graph: { code: "export default 1" } },
+        stored("c", "board-1", 3, 0),
+        stored("b", "board-2", 0, 0),
+        stored("a2", "board-1", 0, 4),
+        stored("a1", "board-1", 0, 0),
       ],
     });
 
-    expect(blocks.map(({ widgetId }) => widgetId)).toEqual(["a"]);
+    expect(widgets.map(({ id }) => id)).toEqual(["a1", "a2", "c"]);
+    expect(widgets[0]).toMatchObject({ name: "Widget a1", definition });
   });
 
-  it("fills the right half of the last row before starting a new one", () => {
-    const left = { graphId: "a", gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 4 };
+  /** @scenario "AC15 Widget menu actions persist after reload" */
+  it("lands a copy at the bottom of the board at the original's size", () => {
+    const original = { graphId: "a", gridColumn: 4, gridRow: 0, colSpan: 4, rowSpan: 3 };
+    const below = { graphId: "b", gridColumn: 0, gridRow: 3, colSpan: 8, rowSpan: 2 };
 
-    expect(nextBlockSlot({ placements: [left], block: half })).toEqual({
-      gridColumn: 4,
-      gridRow: 0,
-      colSpan: 4,
-      rowSpan: 4,
-    });
-    expect(
-      nextBlockSlot({ placements: [left, { ...left, graphId: "b", gridColumn: 4 }], block: half }),
-    ).toEqual({ gridColumn: 0, gridRow: 4, colSpan: 4, rowSpan: 4 });
-  });
-
-  it("puts a full-width block on its own row", () => {
-    const left = { graphId: "a", gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 4 };
-
-    expect(nextBlockSlot({ placements: [left], block: full })).toEqual({
+    expect(duplicateSlot({ placements: [original, below], original })).toEqual({
       gridColumn: 0,
-      gridRow: 4,
-      colSpan: 8,
+      gridRow: 5,
+      colSpan: 4,
       rowSpan: 3,
     });
   });

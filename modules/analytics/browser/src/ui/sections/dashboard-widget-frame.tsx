@@ -6,6 +6,7 @@
 
 import { Box, Text } from "@chakra-ui/react";
 import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
+import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
 import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useMemo } from "react";
@@ -33,19 +34,9 @@ export interface DashboardWidgetFrameProps {
   readonly widgetName?: string;
 }
 
-export function DashboardWidgetFrame({
-  id,
-  graph,
-  projectId,
-  projectSlug,
-  maxHeight,
-  dashboardId,
-  widgetName,
-}: DashboardWidgetFrameProps) {
-  const { colorMode } = useColorMode();
+/** A widget over the page's period selector, as the analytics dashboard draws it. */
+export function DashboardWidgetFrame(props: DashboardWidgetFrameProps) {
   const { period } = usePeriodSelector();
-  const refreshedAt = useDashboardRefreshedAt();
-  const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
 
   // Epoch milliseconds, not the `Date` objects `usePeriodSelector` hands
   // back: two `Date`s for the same instant are never `Object.is`-equal, so a
@@ -59,6 +50,31 @@ export function DashboardWidgetFrame({
     [period.startDate, period.endDate],
   );
 
+  return <DashboardWidgetFrameOverWindow {...props} timeWindow={timeWindow} />;
+}
+
+/**
+ * A widget over a window its caller owns, such as a Dashboards board's period.
+ * `granularitySeconds`, when given, is the step the reserved parameters carry.
+ */
+export function DashboardWidgetFrameOverWindow({
+  id,
+  graph,
+  projectId,
+  projectSlug,
+  maxHeight,
+  dashboardId,
+  widgetName,
+  timeWindow,
+  granularitySeconds,
+}: DashboardWidgetFrameProps & {
+  readonly timeWindow: { start: number; end: number };
+  readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+}) {
+  const { colorMode } = useColorMode();
+  const refreshedAt = useDashboardRefreshedAt();
+  const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
+
   // A row this build never wrote — an old shape, a hand-edited one — fails
   // safeParse and degrades to an empty file with no queries rather than
   // crashing the grid.
@@ -68,7 +84,7 @@ export function DashboardWidgetFrame({
   const { executeQuery, params: hostParams } = useDashboardWidgetExecutor(
     projectId,
     definition.queries,
-    { timeWindow },
+    granularitySeconds === void 0 ? { timeWindow } : { timeWindow, granularitySeconds },
   );
 
   // Known host-side at this boundary; timezone reads the browser's own zone

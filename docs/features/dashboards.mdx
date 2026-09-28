@@ -1,6 +1,6 @@
 ---
 title: Dashboards
-description: Build custom boards of charts over your LangWatch data, or use the built-in Agent Flight Deck for an at-a-glance view of your project.
+description: Build boards of charts over your LangWatch data, or start one from the Agent Flight Deck template for an at-a-glance view of your project.
 ---
 
 ## Turn on Dashboards
@@ -8,15 +8,23 @@ description: Build custom boards of charts over your LangWatch data, or use the 
 Dashboards is a product in the product switcher at the top left of LangWatch.
 It sits behind the `release_dashboards` feature flag, which is off by default.
 
+## Your first board
+
+Opening Dashboards takes you to the first board you created. If you can see no
+board yet, LangWatch makes one for you, called "My dashboard", that only you can
+see.
+
 ## The sidebar
 
 The sidebar has a quick search box and the list of saved boards, grouped into
 Mine, Team and Organisation. The **+** button creates a new board.
 
-## Agent Flight Deck
+## Start from the Agent Flight Deck template
 
-Agent Flight Deck is the built-in default board. It is read-only, and gives a
-project-wide view across ten panels:
+A board with nothing on it offers the Agent Flight Deck under "Start from a
+template". Choosing it creates a new board called "Agent Flight Deck" (numbered
+"Agent Flight Deck 2" and so on if the name is taken), visible only to you, with
+ten widgets:
 
 - Status
 - Throughput, latency and errors
@@ -29,19 +37,26 @@ project-wide view across ten panels:
 - Your coding agents
 - Most impactful traces
 
-If a panel's data source is not connected yet, it shows a call to action that
-links to where you set it up.
+The new board is yours like any other: every widget on it can be edited,
+duplicated, moved, resized or deleted, and nothing you change affects the
+template.
 
 ## Period and grain
 
 Every board has a period, from one hour to one year, defaulting to 30 days,
-and a grain: auto, hour, day or week.
+and a grain: auto, hour, day or week. Every widget on the board reads over that
+period and grain.
 
 ## Building your own board
 
-On a board you own, you can rename it, add a description, and add blocks from
-the Blocks list. Move and resize blocks on the grid, and use each block's menu
-for further options.
+On a board, you can rename it and add a description. **Add chart** opens the
+widget editor, where you write the widget's code and its LangWatchQL queries.
+Move a widget by its drag handle and resize it from its corner. Each widget's
+menu offers:
+
+- **Edit**: opens the widget editor on that widget's code and queries.
+- **Duplicate**: adds a copy at the bottom of the board.
+- **Delete**: removes the widget.
 
 A board's visibility is Only me, Team or Organisation. Only the board's
 creator or a project admin can change its visibility or delete it.
@@ -49,9 +64,10 @@ creator or a project admin can change its visibility or delete it.
 ## Asking questions
 
 The question picker lists suggested questions. Picking one sends a detailed
-prompt to Langy, with the board as context. Langy answers in its own panel. No
-block is added to the board. There is also an ask bar at the top of every board for asking Langy
-about that board directly. Both need Langy to be enabled for your project.
+prompt to Langy, with the board as context. Langy answers in its own panel.
+Nothing is added to the board. There is also an ask bar at the top of every
+board for asking Langy about that board directly. Both need Langy to be enabled
+for your project.
 
 ## How the data is read
 

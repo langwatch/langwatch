@@ -1,6 +1,6 @@
 /**
  * One board in the saved-dashboards list, after the prototype's sidebar row:
- * one truncated line, an optional tag, and for a board the member owns a "⋮"
+ * one truncated line, and for a board the member owns a "⋮"
  * menu. Rename swaps in an inline field; Enter or blur saves, Escape cancels.
  */
 
@@ -27,14 +27,12 @@ export function SavedDashboardRow({
   href,
   icon,
   isActive,
-  tag,
   actions,
 }: {
   name: string;
   href: string;
   icon: ReactNode;
   isActive: boolean;
-  tag?: string;
   actions?: SavedDashboardRowActions;
 }) {
   const host = useAnalyticsHost();
@@ -79,31 +77,9 @@ export function SavedDashboardRow({
         <Text as="span" truncate minWidth={0}>
           {name}
         </Text>
-        {tag && <RowTag>{tag}</RowTag>}
-        {!tag && actions && <Box width="20px" flexShrink={0} marginLeft="auto" />}
+        {actions && <Box width="20px" flexShrink={0} marginLeft="auto" />}
       </ChakraLink>
       {actions && <RowMenu name={name} isActive={isActive} actions={actions} />}
-    </Box>
-  );
-}
-
-function RowTag({ children }: { children: string }) {
-  return (
-    <Box
-      as="span"
-      marginLeft="auto"
-      flexShrink={0}
-      borderRadius="sm"
-      background="bg.muted"
-      paddingX={1}
-      paddingY={0.5}
-      fontSize="9px"
-      fontWeight="semibold"
-      letterSpacing="wide"
-      textTransform="uppercase"
-      color="gray.400"
-    >
-      {children}
     </Box>
   );
 }

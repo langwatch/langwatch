@@ -36,7 +36,6 @@ import type {
   DashboardGraphKind,
   DashboardRepository,
 } from "../repositories/dashboard.repository.ts";
-import { refuseCodeDefinedDashboard } from "../rules/code-defined-dashboard.rules.ts";
 import {
   isDashboardManageable,
   isDashboardVisible,
@@ -224,7 +223,6 @@ export class DashboardService {
   }): Promise<{ success: true }> {
     const { viewer, ...fields } = input;
     const parsed = dashboardReorderInputSchema.parse(fields);
-    for (const dashboardId of parsed.dashboardIds) refuseCodeDefinedDashboard(dashboardId);
 
     const dashboards = await this.#repository.findAllDashboards({
       projectId: parsed.projectId,
@@ -465,20 +463,18 @@ export class DashboardService {
     return { success: true as const };
   }
 
-  /** The board once it is known writable: not code-defined, and visible to the viewer. */
+  /** The board once it is known writable: visible to the viewer. */
   async #writable(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
     const ref = dashboardRef(input);
-    refuseCodeDefinedDashboard(ref.dashboardId);
-
     return this.getById({ ...ref, viewer: input.viewer });
   }
 
   /**
-   * Visible and not code-defined, and the viewer may change its visibility or
+   * Visible, and the viewer may change its visibility or
    * delete it. An admin passes even when the board is outside their audience,
    * so a departed member's private boards are never orphaned.
    */
@@ -488,7 +484,6 @@ export class DashboardService {
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
     const ref = dashboardRef(input);
-    refuseCodeDefinedDashboard(ref.dashboardId);
     const { viewer } = input;
 
     const dashboard = await this.#repository.findDashboard(ref);

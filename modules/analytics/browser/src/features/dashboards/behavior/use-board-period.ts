@@ -1,15 +1,15 @@
 /**
- * The period every block on a board reads over, from the address's `range`
+ * The period every widget on a board reads over, from the address's `range`
  * and `grain`, and the writes the header control makes. One reading per
- * board, so every block updates together (AC13).
+ * board, so every widget updates together (AC13).
  */
 
 import { nowInstant } from "@langwatch/time";
 import { useMemo } from "react";
 
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import type { BlockPeriod } from "../blocks/index.ts";
 import {
+  type BoardPeriod,
   boardPeriodBounds,
   boardPeriodGranularity,
   type BoardPeriodGrain,
@@ -24,12 +24,12 @@ export function useBoardPeriod() {
   const range = parseBoardPeriodRange(query.range);
   const grain = parseBoardPeriodGrain(query.grain);
 
-  // Fixed once per range change, not every render, so blocks don't refetch on each rerender.
+  // Fixed once per range change, not every render, so widgets do not refetch on each rerender.
   const { periodStart, periodEnd } = useMemo(
     () => boardPeriodBounds({ range, now: nowInstant().epochMilliseconds }),
     [range],
   );
-  const period: BlockPeriod = useMemo(
+  const period: BoardPeriod = useMemo(
     () => ({
       periodStart,
       periodEnd,

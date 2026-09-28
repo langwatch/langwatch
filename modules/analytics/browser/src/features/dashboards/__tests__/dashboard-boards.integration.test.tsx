@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
- * A member's own boards against an in-memory dashboards and widgets server:
- * the header, the blank board, the picker (questions for Langy), the period
- * and the block menu. @see modules/dashboard/specs/dashboards-v1.feature
+ * A member's boards against an in-memory dashboards and widgets server: the
+ * header, the blank board and its template, the picker (questions for Langy),
+ * the period and the widget menu. @see modules/dashboard/specs/dashboards-v1.feature
  */
 
 import {
@@ -16,15 +16,16 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
-import { findBlock } from "../blocks/index.ts";
-import { TRACE_COUNT_SQL } from "../blocks/model/block-queries.ts";
 import { BLOCK_QUESTION_SECTIONS } from "../model/block-questions.ts";
-import { blockWidgetDefinition } from "../model/board-blocks.ts";
 import { BOARD_VISIBILITY_LOCKED_REASON } from "../model/board-visibility.ts";
-import { FLIGHT_DECK } from "../model/boards.ts";
+import { AGENT_FLIGHT_DECK_TEMPLATE } from "../templates/index.ts";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
-import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
+import {
+  NO_PROCEDURES,
+  recordWidgetFrames,
+  renderDashboards,
+} from "./render-dashboards.test-helpers.tsx";
 
 type Board = {
   id: string;
@@ -45,31 +46,33 @@ type Widget = {
 };
 type Input = Record<string, unknown>;
 
-/** A widget as the store holds one library block. */
-function storedBlock({
+const WIDGET_CODE = "export default function Widget() { return null; }";
+
+/** An ordinary stored widget, as the create drawer or a template leaves one. */
+function storedWidget({
   id,
   dashboardId,
-  blockId,
+  name,
+  gridRow = 0,
 }: {
   id: string;
   dashboardId: string;
-  blockId: string;
+  name: string;
+  gridRow?: number;
 }): Widget {
-  const block = findBlock(blockId)!;
-  const { name, code, queries } = blockWidgetDefinition({ block });
   return {
     id,
     dashboardId,
     name,
-    graph: { version: 1 as const, code, queries },
+    graph: { version: 1, code: WIDGET_CODE, queries: [{ name: "main", sql: "SELECT 1" }] },
     gridColumn: 0,
-    gridRow: 0,
+    gridRow,
     colSpan: 4,
-    rowSpan: 4,
+    rowSpan: 3,
   };
 }
 
-/** The dashboards, widgets and LangWatchQL procedures, answered from memory across reloads. */
+/** The dashboards and widgets procedures, answered from memory across reloads. */
 function inMemoryServer({
   boards,
   widgets = [],
@@ -94,7 +97,18 @@ function inMemoryServer({
     const input = (call.input ?? {}) as Input;
     switch (call.path) {
       case "dashboards.getAll":
-        return Promise.resolve(state.boards.map((board) => ({ ...board })));
+        return Promise.resolve(state.boards.map((each) => ({ ...each })));
+      case "dashboards.create": {
+        const created: Board = {
+          id: `board-new-${state.boards.length + 1}`,
+          name: String(input.name),
+          description: null,
+          visibility: input.visibility as DashboardVisibility,
+          createdById: "user-1",
+        };
+        state.boards.push(created);
+        return Promise.resolve({ ...created });
+      }
       case "dashboards.rename": {
         const renamed = board(input.dashboardId);
         renamed.name = String(input.name);
@@ -113,15 +127,6 @@ function inMemoryServer({
         shared.visibility = input.visibility as DashboardVisibility;
         return Promise.resolve({ ...shared });
       }
-      case "dashboards.sourcePresence":
-        return Promise.resolve({
-          traces: "present",
-          scenarios: "absent",
-          judges: "absent",
-          feedback: "absent",
-          gateway: "absent",
-          codingAgents: "absent",
-        });
       case "dashboardWidgets.list":
         return Promise.resolve(state.widgets.map((widget) => ({ ...widget })));
       case "dashboardWidgets.create": {
@@ -136,7 +141,7 @@ function inMemoryServer({
             queries: input.queries as Widget["graph"]["queries"],
           },
           gridColumn: 0,
-          gridRow: 99,
+          gridRow: 0,
           colSpan: 4,
           rowSpan: 3,
         };
@@ -148,25 +153,20 @@ function inMemoryServer({
         Object.assign(find(graphId), { gridColumn, gridRow, colSpan, rowSpan });
         return Promise.resolve({ success: true });
       }
-      case "dashboardWidgets.assignDashboard":
-        find(input.id).dashboardId = String(input.dashboardId);
+      case "dashboardWidgets.batchUpdateLayouts": {
+        for (const { graphId, ...placement } of input.layouts as (Input & { graphId: string })[]) {
+          Object.assign(find(graphId), placement);
+        }
         return Promise.resolve({ success: true });
+      }
       case "dashboardWidgets.delete":
         state.widgets = state.widgets.filter((widget) => widget.id !== input.id);
         return Promise.resolve({ success: true });
-      case "analytics.lwql.query":
-        return Promise.resolve({ columns: [], rows: lwqlRows(String(input.sql)), diagnostics: [] });
       default:
         return NO_PROCEDURES(call);
     }
   };
   return { state, answer };
-}
-
-/** The trace count has one bucket; everything else is empty. */
-function lwqlRows(sql: string): Record<string, unknown>[] {
-  if (sql === TRACE_COUNT_SQL) return [{ bucket: "2026-09-01 00:00:00", traces: 7 }];
-  return [];
 }
 
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -175,7 +175,7 @@ const FLAG_ON = { release_dashboards: true };
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
 const MEMBER = ["analytics:view", "cost:view", "traces:view"];
 const LANGY_MEMBER = [...MEMBER, "langy:create"];
-const WRITES = /^dashboards\.(?!getAll|sourcePresence)|^dashboardWidgets\.(?!list)/;
+const WRITES = /^dashboards\.(?!getAll)|^dashboardWidgets\.(?!list)/;
 const OWN_BOARDS: Board[] = [
   {
     id: "board-1",
@@ -245,35 +245,61 @@ async function pickerRegions() {
 
 afterEach(cleanup);
 
-describe("a member's own board", () => {
-  describe("given a member creates a new dashboard", () => {
-    describe("when it opens", () => {
-      /** @scenario "AC10 Blank board matches the reference" */
-      it("shows the blank-board state with the template strip", async () => {
-        openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
+describe("a member's board", () => {
+  describe("given a member opens a board with nothing on it", () => {
+    /** @scenario "AC10 Blank board matches the reference" */
+    it("shows the blank-board state with the Agent Flight Deck template", async () => {
+      openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
-        expect(await screen.findByRole("button", { name: /Add a block/ })).toBeInTheDocument();
-        expect(screen.getByText("Add a description")).toBeInTheDocument();
-        expect(screen.getByText("Start from the question you need answered.")).toBeInTheDocument();
-        expect(screen.getByText("Start from a template")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: /Agent Flight Deck/ })).toBeInTheDocument();
-      });
+      expect(await screen.findByRole("button", { name: /Add a block/ })).toBeInTheDocument();
+      expect(screen.getByText("Add a description")).toBeInTheDocument();
+      expect(screen.getByText("Start from the question you need answered.")).toBeInTheDocument();
+      expect(screen.getByText("Start from a template")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: new RegExp(escape(AGENT_FLIGHT_DECK_TEMPLATE.name)) }),
+      ).toBeInTheDocument();
+    });
 
-      /** @scenario "AC10 Blank board matches the reference" */
-      it("opens the picker from the Add a block area and the Flight Deck from the template", async () => {
-        const user = userEvent.setup();
-        const { host } = openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
+    /** @scenario "AC10 Blank board matches the reference" */
+    it("opens the picker from the Add a block area", async () => {
+      const user = userEvent.setup();
+      const { host } = openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
-        await user.click(await screen.findByRole("button", { name: /Add a block/ }));
-        expect(host.lastQuery).toEqual({ addBlock: "open" });
+      await user.click(await screen.findByRole("button", { name: /Add a block/ }));
 
-        await user.click(screen.getByRole("button", { name: /Agent Flight Deck/ }));
-        expect(host.navigations).toEqual([`/test-project/dashboards/${FLIGHT_DECK.id}`]);
-      });
+      expect(host.lastQuery).toEqual({ addBlock: "open" });
     });
   });
 
-  describe("given the picker is open on the member's own board with Langy", () => {
+  describe("when the member starts from the Agent Flight Deck template", () => {
+    /** @scenario "AC8 Starting from the template makes a new board of editable widgets" */
+    it("makes a new board only they see, with every template widget, and opens it", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const { host } = openBoard({ server });
+
+      await user.click(
+        await screen.findByRole("button", {
+          name: new RegExp(escape(AGENT_FLIGHT_DECK_TEMPLATE.name)),
+        }),
+      );
+
+      await waitFor(() => expect(host.navigations).toHaveLength(1));
+      const [created] = server.state.boards.slice(OWN_BOARDS.length);
+      expect(created).toMatchObject({
+        name: AGENT_FLIGHT_DECK_TEMPLATE.name,
+        visibility: "only_me",
+        description: AGENT_FLIGHT_DECK_TEMPLATE.description,
+      });
+      expect(host.navigations).toEqual([`/test-project/dashboards/${created!.id}`]);
+      const onBoard = server.state.widgets.filter(({ dashboardId }) => dashboardId === created!.id);
+      expect(onBoard.map(({ name }) => name).toSorted()).toEqual(
+        AGENT_FLIGHT_DECK_TEMPLATE.widgets.map(({ name }) => name).toSorted(),
+      );
+    });
+  });
+
+  describe("given the picker is open on the member's board with Langy", () => {
     const openPicker = (server = inMemoryServer({ boards: OWN_BOARDS })) => ({
       server,
       ...openBoard({
@@ -322,7 +348,7 @@ describe("a member's own board", () => {
         expect(ask?.question.startsWith(traffic.prompt)).toBe(true);
         expect(ask?.question).toContain("Dashboard period:");
         expect(ask?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
-        expect(ask?.context[0]?.ref).toContain("the member's own dashboard");
+        expect(ask?.context[0]?.ref).toContain('dashboard "Weekly review" (id board-1)');
         expect(writesTo(server)).toEqual([]);
       });
     });
@@ -349,44 +375,49 @@ describe("a member's own board", () => {
     });
   });
 
-  describe("given a board with time-series blocks", () => {
-    const boardWithTwoBlocks = () =>
+  describe("when the member presses Add chart", () => {
+    it("opens the widget drawer on a new widget, not the picker", async () => {
+      const user = userEvent.setup();
+      const { host } = openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
+
+      await user.click(await screen.findByRole("button", { name: /Add chart/ }));
+
+      expect(await screen.findByRole("dialog")).toHaveTextContent("New widget");
+      expect(host.queries).toEqual([]);
+    });
+  });
+
+  describe("given a board with widgets", () => {
+    const boardWithTwoWidgets = () =>
       inMemoryServer({
         boards: OWN_BOARDS,
         widgets: [
-          storedBlock({ id: "w-1", dashboardId: "board-1", blockId: "trace-count-over-time" }),
-          storedBlock({ id: "w-2", dashboardId: "board-1", blockId: "total-cost-over-time" }),
+          storedWidget({ id: "w-1", dashboardId: "board-1", name: "Traces" }),
+          storedWidget({ id: "w-2", dashboardId: "board-1", name: "Cost", gridRow: 3 }),
         ],
       });
 
-    /** The period each block's data statement was asked for, by statement. */
-    const periodsAsked = async (server: ReturnType<typeof inMemoryServer>) => {
-      await waitFor(() =>
-        expect(callsTo(server, "analytics.lwql.query").filter(hasWindow)).toHaveLength(2),
-      );
-      return callsTo(server, "analytics.lwql.query")
-        .filter(hasWindow)
-        .map((call) => {
-          const { timeWindow, granularitySeconds } = call.input as Input & {
-            timeWindow: { start: string; end: string };
-          };
-          const spanMs = Date.parse(timeWindow.end) - Date.parse(timeWindow.start);
-          return { spanMs, granularitySeconds };
-        });
+    /** The window and grain each widget's frame was handed to bind its reserved parameters. */
+    const contextsHanded = async (query: Record<string, string>) => {
+      const frames = recordWidgetFrames();
+      try {
+        openBoard({ server: boardWithTwoWidgets(), query });
+        const iframes = await screen.findAllByTitle("Custom chart");
+        return frames.loadAll(iframes).map(({ dashboardContext }) => ({
+          spanMs: dashboardContext.timeWindow.end - dashboardContext.timeWindow.start,
+          granularitySeconds: dashboardContext.granularitySeconds,
+        }));
+      } finally {
+        frames.restore();
+      }
     };
-    const hasWindow = (call: UiProcedureCall) => (call.input as Input).timeWindow !== void 0;
 
     describe("when the member changes the period", () => {
       /** @scenario "AC13 Period and grain update every block" */
-      it("reads every block over the chosen period", async () => {
-        const dayServer = boardWithTwoBlocks();
-        openBoard({ server: dayServer, query: { range: "24h" } });
-        const day = await periodsAsked(dayServer);
+      it("reads every widget over the chosen period", async () => {
+        const day = await contextsHanded({ range: "24h" });
         cleanup();
-
-        const weekServer = boardWithTwoBlocks();
-        openBoard({ server: weekServer, query: { range: "7d" } });
-        const week = await periodsAsked(weekServer);
+        const week = await contextsHanded({ range: "7d" });
 
         expect(day.map(({ spanMs }) => spanMs)).toEqual([86_400_000, 86_400_000]);
         expect(week.map(({ spanMs }) => spanMs)).toEqual([604_800_000, 604_800_000]);
@@ -395,7 +426,7 @@ describe("a member's own board", () => {
       /** @scenario "AC13 Period and grain update every block" */
       it("writes the chosen range to the address the whole board reads", async () => {
         const user = userEvent.setup({ pointerEventsCheck: 0 });
-        const { host } = openBoard({ server: boardWithTwoBlocks() });
+        const { host } = openBoard({ server: boardWithTwoWidgets() });
 
         await user.click(await screen.findByRole("button", { name: "Period" }));
         await user.click(await screen.findByRole("menuitem", { name: /^7d/ }));
@@ -410,12 +441,10 @@ describe("a member's own board", () => {
         ["1h", "24h", 3600],
         ["1d", "30d", 86_400],
         ["1w", "90d", 604_800],
-      ])("reads every block at %s buckets", async (grain, range, seconds) => {
-        const server = boardWithTwoBlocks();
-        openBoard({ server, query: { range, grain } });
+      ])("reads every widget at %s buckets", async (grain, range, seconds) => {
+        const handed = await contextsHanded({ range, grain });
 
-        const asked = await periodsAsked(server);
-        expect(asked.map(({ granularitySeconds }) => granularitySeconds)).toEqual([
+        expect(handed.map(({ granularitySeconds }) => granularitySeconds)).toEqual([
           seconds,
           seconds,
         ]);
@@ -424,7 +453,7 @@ describe("a member's own board", () => {
       /** @scenario "AC13 Grain choices update every block" */
       it("offers auto, 1h, 1d and 1w, none of them held back", async () => {
         const user = userEvent.setup({ pointerEventsCheck: 0 });
-        const { host } = openBoard({ server: boardWithTwoBlocks() });
+        const { host } = openBoard({ server: boardWithTwoWidgets() });
 
         await user.click(await screen.findByRole("button", { name: "Period" }));
         const grains = within(await screen.findByRole("group", { name: "Grain" }));
@@ -570,146 +599,90 @@ describe("a member's own board", () => {
     });
   });
 
-  describe("given a block on a user board", () => {
-    const boardWithOneBlock = () =>
+  describe("given a widget on a board", () => {
+    const boardWithOneWidget = () =>
       inMemoryServer({
         boards: OWN_BOARDS,
-        widgets: [
-          storedBlock({ id: "w-1", dashboardId: "board-1", blockId: "trace-count-over-time" }),
-        ],
+        widgets: [storedWidget({ id: "w-1", dashboardId: "board-1", name: "Traces" })],
       });
 
-    const chooseFromBlockMenu = async ({ name }: { name: RegExp }) => {
+    const chooseFromWidgetMenu = async ({ name }: { name: RegExp }) => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
-      await user.click(
-        await screen.findByRole("button", { name: "Actions for Trace count over time" }),
-      );
+      await user.click(await screen.findByRole("button", { name: "Actions for Traces" }));
       await user.click(await screen.findByRole("menuitem", { name }));
     };
 
     /** Unmounts everything, then opens the board again on fresh caches. */
-    const reload = ({
-      server,
-      dashboardId,
-    }: {
-      server: ReturnType<typeof inMemoryServer>;
-      dashboardId: string;
-    }) => {
+    const reload = (server: ReturnType<typeof inMemoryServer>) => {
       cleanup();
-      openBoard({ server, dashboardId });
+      openBoard({ server });
     };
 
-    describe("when the member duplicates it", () => {
-      /** @scenario "AC15 Block menu actions persist after reload" */
-      it("shows both copies after reload", async () => {
-        const server = boardWithOneBlock();
-        openBoard({ server });
+    describe("when the member opens its menu", () => {
+      /** @scenario "AC15 Widget menu actions persist after reload" */
+      it("offers Edit, Duplicate and Delete, and nothing else", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        openBoard({ server: boardWithOneWidget() });
 
-        await chooseFromBlockMenu({ name: /Duplicate/ });
-        await waitFor(() =>
-          expect(callsTo(server, "dashboardWidgets.updateLayout")).toHaveLength(1),
-        );
-        reload({ server, dashboardId: "board-1" });
+        await user.click(await screen.findByRole("button", { name: "Actions for Traces" }));
 
-        await waitFor(() =>
-          expect(screen.getAllByTestId("dashboard-block-trace-count-over-time")).toHaveLength(2),
-        );
+        const items = await screen.findAllByRole("menuitem");
+        expect(items.map((item) => item.textContent?.trim())).toEqual([
+          "Edit",
+          "Duplicate",
+          "Delete",
+        ]);
       });
     });
 
-    describe("when the member moves it to another dashboard", () => {
-      /** @scenario "AC15 Block menu actions persist after reload" */
-      it("shows it on the other board and not on this one after reload", async () => {
-        const server = boardWithOneBlock();
+    describe("when the member edits it", () => {
+      /** @scenario "AC15 Widget menu actions persist after reload" */
+      it("opens the widget drawer on that widget", async () => {
+        openBoard({ server: boardWithOneWidget() });
+
+        await chooseFromWidgetMenu({ name: /Edit/ });
+
+        expect(await screen.findByRole("dialog")).toHaveTextContent("Traces");
+      });
+    });
+
+    describe("when the member duplicates it", () => {
+      /** @scenario "AC15 Widget menu actions persist after reload" */
+      it("shows both copies after reload, the copy below the original", async () => {
+        const server = boardWithOneWidget();
         openBoard({ server });
 
-        await chooseFromBlockMenu({ name: /Latency/ });
+        await chooseFromWidgetMenu({ name: /Duplicate/ });
         await waitFor(() =>
           expect(callsTo(server, "dashboardWidgets.updateLayout")).toHaveLength(1),
         );
-        reload({ server, dashboardId: "board-1" });
-        expect(await screen.findByRole("button", { name: /Add a block/ })).toBeInTheDocument();
-        expect(screen.queryByTestId("dashboard-block-trace-count-over-time")).toBeNull();
+        reload(server);
 
-        reload({ server, dashboardId: "board-2" });
-        expect(
-          await screen.findByTestId("dashboard-block-trace-count-over-time"),
-        ).toBeInTheDocument();
+        await waitFor(() =>
+          expect(screen.getAllByRole("button", { name: "Actions for Traces" })).toHaveLength(2),
+        );
+        expect(callsTo(server, "dashboardWidgets.create")[0]?.input).toMatchObject({
+          dashboardId: "board-1",
+          name: "Traces",
+          code: WIDGET_CODE,
+        });
+        expect(server.state.widgets.map(({ gridRow }) => gridRow)).toEqual([0, 3]);
       });
     });
 
     describe("when the member deletes it", () => {
-      /** @scenario "AC15 Block menu actions persist after reload" */
+      /** @scenario "AC15 Widget menu actions persist after reload" */
       it("shows the blank board after reload", async () => {
-        const server = boardWithOneBlock();
+        const server = boardWithOneWidget();
         openBoard({ server });
 
-        await chooseFromBlockMenu({ name: /Delete/ });
+        await chooseFromWidgetMenu({ name: /Delete/ });
         await waitFor(() => expect(callsTo(server, "dashboardWidgets.delete")).toHaveLength(1));
-        reload({ server, dashboardId: "board-1" });
+        reload(server);
 
         expect(await screen.findByRole("button", { name: /Add a block/ })).toBeInTheDocument();
-        expect(screen.queryByTestId("dashboard-block-trace-count-over-time")).toBeNull();
+        expect(screen.queryByRole("button", { name: "Actions for Traces" })).toBeNull();
       });
-    });
-  });
-});
-
-describe("the Agent Flight Deck", () => {
-  const openFlightDeck = ({
-    server,
-    query = {},
-  }: {
-    server: ReturnType<typeof inMemoryServer>;
-    query?: Record<string, string>;
-  }) => openBoard({ server, dashboardId: FLIGHT_DECK.id, query });
-
-  describe("given any member views it", () => {
-    /** @scenario "AC8 No edit controls appear on the Flight Deck" */
-    it("offers no rename control and no block menu", async () => {
-      openFlightDeck({ server: inMemoryServer({ boards: OWN_BOARDS }) });
-
-      expect(await screen.findByRole("heading", { name: FLIGHT_DECK.name })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Rename dashboard" })).toBeNull();
-      expect(screen.queryByText("Add a description")).toBeNull();
-      expect(screen.queryByRole("button", { name: /^Actions for/ })).toBeNull();
-      expect(screen.queryByRole("button", { name: /^Visibility/ })).toBeNull();
-    });
-  });
-
-  describe("when the member adds a chart from it", () => {
-    /** @scenario "AC11 Ask Langy by question" */
-    it("asks Langy a question with the deck attached as read-only, writing nothing", async () => {
-      const user = userEvent.setup();
-      const server = inMemoryServer({ boards: OWN_BOARDS });
-      const { host } = openBoard({
-        server,
-        dashboardId: FLIGHT_DECK.id,
-        query: { addBlock: "open" },
-        flags: LANGY_ON,
-        permissions: LANGY_MEMBER,
-      });
-
-      await user.click(
-        await screen.findByRole("button", { name: /What are my agents spending\?/ }),
-      );
-
-      expect(host.lastQuery).toEqual({ addBlock: void 0 });
-      expect(host.langyAsks).toHaveLength(1);
-      const [ask] = host.langyAsks;
-      expect(ask?.question).toContain("model_usage_by_minute");
-      expect(ask?.context[0]).toMatchObject({ label: FLIGHT_DECK.name });
-      expect(ask?.context[0]?.ref).toContain("read-only");
-      expect(writesTo(server)).toEqual([]);
-    });
-
-    it("writes the picker's address when Add chart is pressed", async () => {
-      const user = userEvent.setup();
-      const { host } = openFlightDeck({ server: inMemoryServer({ boards: OWN_BOARDS }) });
-
-      await user.click(await screen.findByRole("button", { name: /Add chart/ }));
-
-      expect(host.lastQuery).toEqual({ addBlock: "open" });
     });
   });
 });

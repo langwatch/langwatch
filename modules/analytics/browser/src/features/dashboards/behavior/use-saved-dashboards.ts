@@ -57,21 +57,6 @@ export function useSavedDashboards() {
     );
   };
 
-  /** Creates an untitled board without opening it; undefined when the create failed. */
-  const createUntitledBoard = async (): Promise<SavedBoard | undefined> => {
-    try {
-      const created = await create.mutateAsync({
-        projectId,
-        name: untitledBoardName({ existingCount: boards.length }),
-      });
-      void refresh();
-      return savedBoardOf(created);
-    } catch (error) {
-      host.failed({ error, fallbackTitle: "Couldn't create the dashboard" });
-      return void 0;
-    }
-  };
-
   const renameBoard = ({ dashboardId, name }: { dashboardId: string; name: string }) => {
     rename.mutate(
       { projectId, dashboardId, name },
@@ -108,10 +93,10 @@ export function useSavedDashboards() {
     boards,
     /** True until the first list answer arrives, so a board lookup never reads "missing" early. */
     isLoading: list.data === void 0 && !list.isError,
+    loadError: list.error,
     isCreating: create.isPending,
     isDeleting: remove.isPending,
     createBoard,
-    createUntitledBoard,
     renameBoard,
     deleteBoard,
   };

@@ -52,7 +52,6 @@ import {
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
-import { refuseCodeDefinedDashboard } from "../rules/code-defined-dashboard.rules.ts";
 import { dashboardPlatformUrl } from "../rules/dashboard-platform-url.rules.ts";
 import { DashboardWidgetService } from "../services/dashboard-widget.service.ts";
 import { DashboardService } from "../services/dashboard.service.ts";
@@ -508,7 +507,6 @@ export class DashboardApp implements DashboardApi {
       viewer?: DashboardViewer;
     } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget> {
-    if (input.dashboardId !== undefined) refuseCodeDefinedDashboard(input.dashboardId);
     return this.#widgets.createWidget({
       projectId: input.projectId,
       ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
@@ -545,7 +543,6 @@ export class DashboardApp implements DashboardApi {
     dashboardId: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget> {
-    refuseCodeDefinedDashboard(input.dashboardId);
     return this.#widgets.assignToDashboard(input);
   }
 
@@ -758,7 +755,6 @@ export class DashboardApp implements DashboardApi {
     viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
     const { viewer, ...placement } = input;
-    refuseCodeDefinedDashboard(placement.dashboardId);
     const { projectId, chartId, dashboardId } = placement;
     if (!(await this.#dashboards.isVisibleTo({ projectId, dashboardId, viewer }))) {
       throw new SavedWorkbenchChartDashboardNotFoundError();

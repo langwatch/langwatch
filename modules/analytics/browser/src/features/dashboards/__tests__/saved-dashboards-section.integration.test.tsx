@@ -55,7 +55,8 @@ function renderSection({
   return { host, calls: project.calls };
 }
 
-const mine = () => screen.getByRole("list", { name: "Mine" });
+/** The Mine group, which appears once the list has answered with a board of the member's. */
+const mine = () => screen.findByRole("list", { name: "Mine" });
 
 describe("the saved-dashboards list in the sidebar", () => {
   describe("given the release_dashboards flag is on for the project", () => {
@@ -69,35 +70,33 @@ describe("the saved-dashboards list in the sidebar", () => {
       });
 
       /** @scenario "AC3 Sidebar matches the reference" */
-      it("lists the Agent Flight Deck first, tagged Default, then the member's own boards", async () => {
+      it("lists only the stored boards, with no built-in board and no Default tag", async () => {
         renderSection();
 
-        await within(mine()).findByRole("link", { name: /Latency/ });
-        const links = within(mine()).getAllByRole("link");
+        await within(await mine()).findByRole("link", { name: /Latency/ });
+        const links = within(await mine()).getAllByRole("link");
         expect(links.map((link) => link.getAttribute("href"))).toEqual([
-          "/test-project/dashboards/agent-flight-deck",
           "/test-project/dashboards/board-1",
           "/test-project/dashboards/board-2",
         ]);
-        expect(links[0]).toHaveTextContent("Agent Flight Deck");
-        expect(links[0]).toHaveTextContent("Default");
+        expect(screen.queryByText("Agent Flight Deck")).toBeNull();
+        expect(screen.queryByText("Default")).toBeNull();
       });
 
       /** @scenario "AC3 Sidebar matches the reference" */
-      it("gives each of the member's own boards a menu, and the Flight Deck none", async () => {
+      it("gives each of the member's own boards a menu", async () => {
         renderSection();
 
         expect(
           await screen.findByRole("button", { name: "Actions for Weekly review" }),
         ).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Actions for Latency" })).toBeInTheDocument();
-        expect(screen.queryByRole("button", { name: "Actions for Agent Flight Deck" })).toBeNull();
       });
     });
 
     describe("when boards are shared with the team or the organisation", () => {
       /** @scenario "AC3 Sidebar matches the reference" */
-      it("groups them Mine, Team and Organisation, the Flight Deck leading Mine", async () => {
+      it("groups them Mine, Team and Organisation", async () => {
         renderSection({
           boards: [
             board({ id: "board-1", name: "Weekly review", visibility: "organisation" }),
@@ -111,10 +110,7 @@ describe("the saved-dashboards list in the sidebar", () => {
             .getAllByRole("link")
             .map((link) => link.getAttribute("href"));
         await screen.findByRole("list", { name: "Team" });
-        expect(hrefsIn("Mine")).toEqual([
-          "/test-project/dashboards/agent-flight-deck",
-          "/test-project/dashboards/board-3",
-        ]);
+        expect(hrefsIn("Mine")).toEqual(["/test-project/dashboards/board-3"]);
         expect(hrefsIn("Team")).toEqual(["/test-project/dashboards/board-2"]);
         expect(hrefsIn("Organisation")).toEqual(["/test-project/dashboards/board-1"]);
       });
@@ -145,7 +141,7 @@ describe("the saved-dashboards list in the sidebar", () => {
     describe("when the member presses the create button", () => {
       it("creates an untitled board and opens it", async () => {
         const { host, calls } = renderSection();
-        await within(mine()).findByRole("link", { name: /Latency/ });
+        await within(await mine()).findByRole("link", { name: /Latency/ });
 
         fireEvent.click(screen.getByRole("button", { name: "New dashboard" }));
 

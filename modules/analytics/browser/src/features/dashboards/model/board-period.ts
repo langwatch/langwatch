@@ -13,6 +13,13 @@ export type BoardPeriodRange = (typeof BOARD_PERIOD_RANGES)[number];
 export const BOARD_PERIOD_GRAINS = ["auto", "1h", "1d", "1w"] as const;
 export type BoardPeriodGrain = (typeof BOARD_PERIOD_GRAINS)[number];
 
+/** The one period every widget on a board reads over, in epoch milliseconds, at a legal step. */
+export interface BoardPeriod {
+  readonly periodStart: number;
+  readonly periodEnd: number;
+  readonly granularitySeconds: LangWatchQLAcceptedGranularityStep;
+}
+
 export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";
 export const DEFAULT_BOARD_PERIOD_GRAIN: BoardPeriodGrain = "auto";
 
