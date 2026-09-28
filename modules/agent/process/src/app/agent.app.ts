@@ -12,6 +12,7 @@ import {
   type AgentProjectInput,
   type GetAgentInput,
   type AgentIdsInput,
+  type AgentCreationWindowInput,
   type ListAgentsInput,
   type CreateAgentCommand,
   type UpdateAgentCommand,
@@ -259,6 +260,9 @@ export class AgentApp implements AgentApi {
   }
   touchLastSeenAt(input: GetAgentInput & { at: Instant }): Promise<void> {
     return this.#agents.touchLastSeenAt(input);
+  }
+  findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]> {
+    return this.#agents.findIdsCreatedInWindow(input);
   }
   getConnectedByName(input: ConnectedAgentsInput): Promise<Agent[]> {
     return this.#agents.getConnectedByName(input);

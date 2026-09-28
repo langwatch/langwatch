@@ -14,6 +14,7 @@ import {
   type GetAgentInput,
   type AgentProjectInput,
   type AgentIdsInput,
+  type AgentCreationWindowInput,
   type ListAgentsInput,
   type CreateAgentCommand,
   type UpdateAgentCommand,
@@ -193,5 +194,9 @@ export class AgentService {
 
   touchLastSeenAt(input: AgentPresenceInput): Promise<void> {
     return this.#repository.touchLastSeenAt(input);
+  }
+
+  findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]> {
+    return this.#repository.findIdsCreatedInWindow(input);
   }
 }

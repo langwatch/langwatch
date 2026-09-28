@@ -281,3 +281,37 @@ describe("MemoryAgentRepository", () => {
     expect(found.map((row) => row.id).toSorted()).toEqual(["a", "b"]);
   });
 });
+
+describe("given agents created around a pre-fix audit entry", () => {
+  describe("when the backfill asks for the ids created in its window", () => {
+    it("answers archived agents too, and narrows to copies of one source when asked", async () => {
+      const repository = MemoryAgentRepository.create();
+      const from = nowInstant().subtract({ minutes: 1 });
+      await repository.create(agent("source"));
+      await repository.create({ ...agent("copy"), copiedFromAgentId: "source" });
+      await repository.create(agent("archived"));
+      await repository.archive(agent("archived"));
+      await repository.create(agent("elsewhere", "project-b"));
+      const to = nowInstant().add({ minutes: 1 });
+
+      expect(
+        (await repository.findIdsCreatedInWindow({ projectId: "project-a", from, to })).toSorted(),
+      ).toEqual(["archived", "copy", "source"]);
+      expect(
+        await repository.findIdsCreatedInWindow({
+          projectId: "project-a",
+          from,
+          to,
+          copiedFromAgentId: "source",
+        }),
+      ).toEqual(["copy"]);
+      expect(
+        await repository.findIdsCreatedInWindow({
+          projectId: "project-a",
+          from: to,
+          to: to.add({ minutes: 1 }),
+        }),
+      ).toEqual([]);
+    });
+  });
+});
