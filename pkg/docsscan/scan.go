@@ -40,9 +40,9 @@ const (
 	// RedirectDeadEnd is a redirect whose destination is neither a page nor
 	// another redirect's source.
 	RedirectDeadEnd Kind = "redirect-dead-end"
-	// VersionDrift is a release version in the docs that no longer matches the
-	// chart's appVersion.
-	VersionDrift Kind = "version-drift"
+	// PinnedVersion is a concrete LangWatch release named in the docs. Install
+	// and upgrade commands track the latest release instead.
+	PinnedVersion Kind = "pinned-version"
 )
 
 // Finding is one rule violation, with the remedy spelled out. Problem says what
@@ -84,7 +84,7 @@ type Inputs struct {
 	Redirects []Redirect
 	// VersionRefs is every release version found in the pages.
 	VersionRefs []VersionRef
-	// ChartVersion is the chart's appVersion, the release the docs should name.
+	// ChartVersion is the chart's appVersion, reported in the summary line.
 	ChartVersion string
 }
 
@@ -414,22 +414,13 @@ func hasPathParameter(path string) bool {
 }
 
 func checkVersions(in Inputs) []Finding {
-	if in.ChartVersion == "" {
-		return nil
-	}
 	var findings []Finding
 	for _, ref := range in.VersionRefs {
-		if ref.Version == in.ChartVersion {
-			continue
-		}
 		findings = append(findings, Finding{
-			Kind:  VersionDrift,
-			Where: fmt.Sprintf("%s:%d", ref.File, ref.Line),
-			Problem: fmt.Sprintf(
-				"names release %s, but the chart ships %s",
-				ref.Version, in.ChartVersion,
-			),
-			Fix: fmt.Sprintf("update it to %s", in.ChartVersion),
+			Kind:    PinnedVersion,
+			Where:   fmt.Sprintf("%s:%d", ref.File, ref.Line),
+			Problem: fmt.Sprintf("pins release %s, which goes stale on the next release", ref.Version),
+			Fix:     "drop the pin so the command installs the latest release, or write <version>",
 		})
 	}
 	return findings

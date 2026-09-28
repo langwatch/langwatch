@@ -24,7 +24,7 @@ helm repo add langwatch https://langwatch.github.io/langwatch
 helm repo update
 
 # Install with auto-generated secrets (development only)
-helm install langwatch langwatch/langwatch --version 3.18.0 \
+helm install langwatch langwatch/langwatch \
   --namespace langwatch --create-namespace \
   --set autogen.enabled=true \
   --wait --timeout 10m
@@ -67,7 +67,7 @@ Experimental features stay off until an operator turns them on in **Ops > Featur
 The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.6 CPU and ~6.7 Gi RAM**:
 
 ```bash
-helm pull langwatch/langwatch --version 3.18.0 --untar
+helm pull langwatch/langwatch --untar
 
 helm install langwatch ./langwatch \
   --namespace langwatch --create-namespace \

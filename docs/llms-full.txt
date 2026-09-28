@@ -61863,7 +61863,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.18.0
+    targetRevision: "*" # the latest release
     helm:
       releaseName: langwatch
       values: |
@@ -61912,7 +61912,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.18.0
+      targetRevision: "*" # the latest release
       helm:
         releaseName: langwatch
         valueFiles:
@@ -62277,7 +62277,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.18.0
+VERSION="<version>"
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -62293,13 +62293,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.18.0"
+    tag: "<version>"
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.18.0"
+    tag: "<version>"
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.18.0"
+    tag: "<version>"
 
 imagePullSecrets:
   - name: registry-credentials
@@ -62335,7 +62335,7 @@ helm repo add langwatch https://langwatch.github.io/langwatch
 helm repo update
 
 # Install with auto-generated secrets (development only)
-helm install langwatch langwatch/langwatch --version 3.18.0 \
+helm install langwatch langwatch/langwatch \
   --namespace langwatch --create-namespace \
   --set autogen.enabled=true \
   --wait --timeout 10m
@@ -62378,7 +62378,7 @@ Experimental features stay off until an operator turns them on in **Ops > Featur
 The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.6 CPU and ~6.7 Gi RAM**:
 
 ```bash
-helm pull langwatch/langwatch --version 3.18.0 --untar
+helm pull langwatch/langwatch --untar
 
 helm install langwatch ./langwatch \
   --namespace langwatch --create-namespace \
@@ -65033,7 +65033,7 @@ Without a license, self-hosted LangWatch is uncapped: unlimited members, teams, 
 ```bash
 helm repo add langwatch https://langwatch.github.io/langwatch
 helm repo update
-helm pull langwatch/langwatch --version 3.18.0 --untar
+helm pull langwatch/langwatch --untar
 helm install langwatch ./langwatch \
   --namespace langwatch --create-namespace \
   --set autogen.enabled=true \
@@ -66135,7 +66135,6 @@ helm repo update
 
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.18.0 \
   -f values-production.yaml \
   --wait --timeout 10m
 ```
@@ -66581,7 +66580,7 @@ helm search repo langwatch/langwatch --versions
 # Install a specific chart version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.18.0 \
+  --version <version> \
   -f values-production.yaml
 ```
 

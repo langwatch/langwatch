@@ -13,7 +13,7 @@ Without a license, self-hosted LangWatch is uncapped: unlimited members, teams, 
 ```bash
 helm repo add langwatch https://langwatch.github.io/langwatch
 helm repo update
-helm pull langwatch/langwatch --version 3.18.0 --untar
+helm pull langwatch/langwatch --untar
 helm install langwatch ./langwatch \
   --namespace langwatch --create-namespace \
   --set autogen.enabled=true \
