@@ -15,7 +15,7 @@ Feature: Dashboards v1
     Given the release_dashboards flag is off for the project
     When a member opens /[project]/dashboards
     Then they get the not-found page
-    And the sidebar shows no Dashboards entry
+    And the product switcher does not offer Dashboards
 
   @e2e
   Scenario: AC2 Landing on the Flight Deck
@@ -29,10 +29,11 @@ Feature: Dashboards v1
   @integration
   Scenario: AC3 Sidebar matches the reference
     Given the release_dashboards flag is on for the project
-    When the member looks at the sidebar
+    When the member looks at the Dashboards product sidebar
     Then they see "Saved dashboards" with a create button
     And the Agent Flight Deck is listed first
     And each of their own boards is listed with a menu
+    And the sidebar shows nothing else besides Quick Search
 
   # ---------------------------------------------------------------------------
   # Agent Flight Deck
