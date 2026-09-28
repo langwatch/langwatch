@@ -29,6 +29,7 @@ Feature: Oversized span attribute values keep a readable preview
 
   Rule: A human-readable oversized value keeps a partial preview
 
+    @unimplemented
     Scenario: A user input larger than the size cap still shows real content
       Given a span whose captured user input exceeds the attribute size cap
       When the span is ingested
@@ -38,6 +39,7 @@ Feature: Oversized span attribute values keep a readable preview
       And the Trace Explorer displays that partial input instead of only a
         byte count
 
+    @unimplemented
     Scenario: A large custom attribute also keeps a smaller preview
       Given a span carrying an oversized custom (non-input/output) attribute
       When the span is ingested
@@ -46,6 +48,7 @@ Feature: Oversized span attribute values keep a readable preview
         since arbitrary attributes are not bounded in count the way input
         and output are
 
+    @unimplemented
     Scenario: A non-base64 data URL is treated as readable text, not binary
       Given a span whose input is an oversized "data:" URL that is not
         base64-encoded (e.g. inline percent-encoded text or SVG markup)
@@ -56,6 +59,7 @@ Feature: Oversized span attribute values keep a readable preview
 
   Rule: Binary content still has no useful partial preview
 
+    @unit
     Scenario: An oversized inline image is still replaced entirely
       Given a span whose input embeds a base64-encoded image data URL larger
         than the attribute size cap

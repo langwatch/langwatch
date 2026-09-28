@@ -452,7 +452,6 @@ const LEGACY_INERT: string[] = [
   "packages/group-queue/specs/payload-envelope.feature",
   "specs/automations/dispatch-error-contract.feature",
   "specs/billing/global-projections.feature",
-  "specs/trace-processing/oversized-attribute-value-preview.feature",
   "specs/experiments-v3/autosave-status.feature",
   "specs/experiments-v3/dataset-inline-editing.feature",
   "specs/experiments-v3/evaluation-creation-entrypoints.feature",

@@ -31,6 +31,7 @@ function oversizedDataUrl(): string {
 }
 
 describe("capOversizedAttributes", () => {
+  /** @scenario "An oversized inline image is still replaced entirely" */
   it("caps an oversized base64 data-url attribute and names the mime type", () => {
     const url = oversizedDataUrl();
     const span = makeSpan([{ key: "langwatch.input", value: { stringValue: url } }]);
