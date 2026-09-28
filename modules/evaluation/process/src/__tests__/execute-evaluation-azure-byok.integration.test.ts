@@ -50,15 +50,10 @@ function buildCommandWithMocks({
         }
       : null,
   });
+  const azureSafetyCredentials = vi.spyOn(deps.azureSafetyCredentials, "resolveForTenant");
   const command = EvaluationExecutionIntentService.create(deps);
 
-  return {
-    command,
-    evaluations: deps.evaluations,
-    azureSafetyCredentials: (
-      ...args: Parameters<typeof deps.azureSafetyCredentials.resolveForTenant>
-    ) => deps.azureSafetyCredentials.resolveForTenant(...args),
-  };
+  return { command, evaluations: deps.evaluations, azureSafetyCredentials };
 }
 
 describe("Feature: ExecuteEvaluationCommand — Azure Safety BYOK gate", () => {

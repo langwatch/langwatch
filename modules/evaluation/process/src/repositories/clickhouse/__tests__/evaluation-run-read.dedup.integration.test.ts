@@ -33,6 +33,16 @@ const CREATE_TABLE = `
   ORDER BY (TenantId, EvaluationId)
 `;
 
+/**
+ * An hour ago, as ClickHouse's DateTime64 text: the by-trace read only looks
+ * back seven days, so a fixed date would age out of it.
+ */
+const SCHEDULED_AT_MS = Date.now() - 60 * 60 * 1000;
+
+function clickHouseTime(offsetMs: number): string {
+  return new Date(SCHEDULED_AT_MS + offsetMs).toISOString().replace("T", " ").replace("Z", "");
+}
+
 function row(overrides: Record<string, unknown>): Record<string, unknown> {
   return {
     ProjectionId: "projection_1",
@@ -46,9 +56,9 @@ function row(overrides: Record<string, unknown>): Record<string, unknown> {
     IsGuardrail: 0,
     Status: "scheduled",
     LastProcessedEventId: "event_1",
-    ScheduledAt: "2026-09-04 20:00:00.000",
-    CreatedAt: "2026-09-04 20:00:00.000",
-    UpdatedAt: "2026-09-04 20:00:00.000",
+    ScheduledAt: clickHouseTime(0),
+    CreatedAt: clickHouseTime(0),
+    UpdatedAt: clickHouseTime(0),
     ...overrides,
   };
 }
@@ -75,9 +85,9 @@ describe("given an evaluation whose row was rewritten as it progressed", () => {
           Status: "processed",
           Score: 1,
           Passed: 1,
-          StartedAt: "2026-09-04 20:00:01.000",
-          CompletedAt: "2026-09-04 20:00:02.000",
-          UpdatedAt: "2026-09-04 20:00:02.500",
+          StartedAt: clickHouseTime(1000),
+          CompletedAt: clickHouseTime(2000),
+          UpdatedAt: clickHouseTime(2500),
         }),
       ],
     });
