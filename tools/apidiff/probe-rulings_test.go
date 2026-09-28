@@ -130,3 +130,41 @@ func TestRuledFindingsLeaveTheDifferenceCountAndTheLedger(t *testing.T) {
 		}
 	}
 }
+
+func TestRulingRulesADatabaseNameWhateverTheRunIsCalled(t *testing.T) {
+	cut := func(database string) string {
+		body := `{"database":"` + database + `","functions":["` + strings.Repeat("abs", bodyCaptureCap) + `"]}`
+		return body[:bodyCaptureCap]
+	}
+	findings := compareOperation("GET", "/api/query/reference", cut("apidiff_apidiff_run45g_main"), cut("apidiff_apidiff_run45g_branch"))
+
+	onlyFinding(t, findings, FindingRuled)
+}
+
+func TestRulingRulesTheLangyApprovalsPerSideFieldsAndKeepsTheRest(t *testing.T) {
+	findings := CompareResults(Comparison{Method: "POST", Path: "/api/langy/control/requests/{requestId}/approve", Case: "mutation"},
+		SideResult{Status: 200, Body: `{"sessionKey":"sk-lw-abc_1","endpoint":"http://localhost:61874","conversation":{"title":"Apidiff question"}}`},
+		SideResult{Status: 200, Body: `{"sessionKey":"sk-lw-xyz-2","endpoint":"http://localhost:61873","conversation":{"title":"apidiff question"}}`}).Findings
+
+	if len(findings) != 2 {
+		t.Fatalf("want a kept and a ruled finding, got %+v", findings)
+	}
+	kept, ruled := findings[0], findings[1]
+	if kept.Kind != FindingBodyValueDiff || len(kept.Fields) != 1 || kept.Fields["/conversation/title"] == [2]any{} {
+		t.Fatalf("kept = %+v", kept)
+	}
+	if ruled.Kind != FindingRuled || len(ruled.Fields) != 2 {
+		t.Fatalf("ruled = %+v", ruled)
+	}
+}
+
+func TestRulingRulesALangyConversationLinkButNotAnotherHost(t *testing.T) {
+	link := func(host, id string) string {
+		return `{"requests":[{"conversationUrl":"` + host + `/local-dev-project?langyConversation=langyconv_` + id + `"}]}`
+	}
+	findings := compareOperation("GET", "/api/langy/control/requests", link("http://localhost:61874", "A1"), link("http://localhost:61873", "B2"))
+	onlyFinding(t, findings, FindingRuled)
+
+	findings = compareOperation("GET", "/api/langy/control/requests", link("http://localhost:61874", "A1"), link("https://example.com", "B2"))
+	onlyFinding(t, findings, FindingBodyValueDiff)
+}

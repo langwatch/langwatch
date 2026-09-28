@@ -198,9 +198,10 @@ func chDatabaseURL(serverURL, database string) (string, error) {
 // (the dev stack's 4g does not fit a 4 GiB VM beside everything else) and
 // postgres raised to 512m — the dev stack's 256m cgroup limit is a plausible
 // kill reason when 297 migrations run while two Node APIs boot. ClickHouse
-// also gets what the LangWatchQL access model needs: access management for
-// the default user and the custom_ settings prefix (inline, as a compose
-// config, since the run's work root is not mounted into a container VM).
+// also gets what the LangWatchQL access model needs: access management and
+// named-collection control for the default user, and the custom_ settings
+// prefix (inline, as compose configs, since the run's work root is not
+// mounted into a container VM).
 func portsOverrideYAML(pgPort, chPort, redisPort int) string {
 	return fmt.Sprintf(`services:
   postgres:
@@ -224,6 +225,8 @@ func portsOverrideYAML(pgPort, chPort, redisPort int) string {
     configs:
       - source: apidiff-lwql-prefixes
         target: /etc/clickhouse-server/config.d/apidiff-lwql.xml
+      - source: apidiff-lwql-grants
+        target: /etc/clickhouse-server/users.d/apidiff-lwql.xml
     ports: !override
       - "127.0.0.1:%d:8123"
     volumes: !override
@@ -237,6 +240,9 @@ configs:
   apidiff-lwql-prefixes:
     content: |
       <clickhouse><custom_settings_prefixes>custom_</custom_settings_prefixes></clickhouse>
+  apidiff-lwql-grants:
+    content: |
+      <clickhouse><users><default><named_collection_control>1</named_collection_control></default></users></clickhouse>
 volumes:
   apidiff-pg-data:
   apidiff-redis-data:

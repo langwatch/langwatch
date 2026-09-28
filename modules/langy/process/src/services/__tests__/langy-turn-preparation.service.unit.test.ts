@@ -224,6 +224,23 @@ describe("LangyTurnPreparationService golden path", () => {
     );
   });
 
+  /** @scenario "A new conversation takes its placeholder title in sentence case" */
+  it("starts a new conversation with its first message as a sentence-case title", async () => {
+    const fixture = makeFixture();
+
+    await LangyTurnService.create(fixture.deps).startConversationTurn({
+      ...input,
+      messages: [{ role: "user", parts: [{ type: "text", text: "apidiff question" }] }],
+    });
+
+    expect(fixture.acceptTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationStart: expect.objectContaining({ title: "Apidiff question" }),
+        userMessage: expect.objectContaining({ title: "Apidiff question" }),
+      }),
+    );
+  });
+
   it("omits message_recorded when explicitly re-driving an existing message", async () => {
     const fixture = makeFixture();
 

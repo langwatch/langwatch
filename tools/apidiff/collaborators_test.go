@@ -72,6 +72,9 @@ func TestComposeOverrideLetsTheRunCreateLwqlUsers(t *testing.T) {
 	if !strings.Contains(override, "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT") {
 		t.Fatal("the default ClickHouse user cannot create the LangWatchQL identity")
 	}
+	if !strings.Contains(override, "<named_collection_control>1</named_collection_control>") {
+		t.Fatal("the default ClickHouse user cannot drop and create the lwql_postgres named collection")
+	}
 	if !strings.Contains(override, "<custom_settings_prefixes>custom_</custom_settings_prefixes>") {
 		t.Fatal("the server refuses the LangWatchQL settings profile without the custom_ prefix")
 	}

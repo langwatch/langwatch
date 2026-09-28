@@ -3,7 +3,6 @@ import {
   LangyAgentUnavailableError,
   LangyModelNotAllowedError,
   LangyTurnInProgressError,
-  extractLangyTextFromParts,
   stripGithubCredentials,
   type LangyCredentials,
   type LangyMessageRow,
@@ -18,6 +17,7 @@ import {
   renderLangyConversationMemory,
   renderLangyConversationTranscript,
 } from "../rules/langy-conversation-memory.rules.ts";
+import { placeholderTitleOf } from "../rules/langy-conversation-title.rules.ts";
 import { mintRunToken } from "../rules/langy-frame-auth.rules.ts";
 import type { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnOverrideService } from "./langy-turn-override.service.ts";
@@ -378,9 +378,7 @@ export class LangyTurnPreparationService {
     mintedRunToken: string | null,
   ) {
     const title =
-      extractLangyTextFromParts(
-        args.messages.find((message) => message.role === "user")?.parts,
-      ).slice(0, 80) || null;
+      placeholderTitleOf(args.messages.find((message) => message.role === "user")?.parts) || null;
     try {
       await this.deps.conversations.acceptTurn({
         projectId: args.projectId,

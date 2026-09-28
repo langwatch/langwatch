@@ -19,6 +19,7 @@ const (
 	rulingTiming        = "timing: fold, run and delivery clocks differ per side (r43 triage)"
 	rulingRecordFields  = "branch superset: a created dataset record also carries datasetId, projectId and updatedAt (r49 triage)"
 	rulingTestFireError = "deliberate: a test fire the receiver refused also carries error beside response_body (r43 triage)"
+	rulingPerSide       = "per side: each instance answers on its own port and mints its own langy session key and conversation id (r45 triage)"
 )
 
 // probeRuling rules one triaged body difference. It is keyed by operation, JSON
@@ -35,7 +36,10 @@ type probeRuling struct {
 
 var (
 	seededAdminEmail  = regexp.MustCompile(`^admin@(haven|mail\.langwatch)\.localhost$`)
-	apidiffDatabase   = regexp.MustCompile(`apidiff_apidiff_run\d+_(main|branch)`)
+	apidiffDatabase   = regexp.MustCompile(`apidiff_[a-z0-9_]+_(main|branch)`)
+	localOrigin       = regexp.MustCompile(`^http://localhost:\d+$`)
+	langySessionKey   = regexp.MustCompile(`^sk-lw-[A-Za-z0-9_-]+$`)
+	langyConversation = regexp.MustCompile(`^http://localhost:\d+/[a-z0-9-]+\?langyConversation=langyconv_[A-Za-z0-9]+$`)
 	apiKeyRoleName    = regexp.MustCompile(`^apikey:`)
 	seededKeyNote     = regexp.MustCompile(`^Static local-dev .* seeded by `)
 	anyInstant        = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$`)
@@ -82,6 +86,9 @@ var probeRulings = []probeRuling{
 	{operation: "GET /api/query/reference", pointer: "", change: "value", values: apidiffDatabase, reason: rulingSeedValue},
 	{operation: "GET /api/query/schema", pointer: "/database", change: "value", values: apidiffDatabase, reason: rulingSeedValue},
 	{operation: "GET /api/query/reference", pointer: "/lwql/schema/database", change: "value", values: apidiffDatabase, reason: rulingSeedValue},
+	{operation: "POST /api/langy/control/requests/{requestId}/approve", pointer: "/endpoint", change: "value", values: localOrigin, reason: rulingPerSide},
+	{operation: "POST /api/langy/control/requests/{requestId}/approve", pointer: "/sessionKey", change: "value", values: langySessionKey, reason: rulingPerSide},
+	{operation: "GET /api/langy/control/requests", pointer: "/requests/*/conversationUrl", change: "value", values: langyConversation, reason: rulingPerSide},
 	{operation: "POST /api/dataset/{slugOrId}/records", pointer: "/data/*/datasetId", change: "absent->string", reason: rulingRecordFields},
 	{operation: "POST /api/dataset/{slugOrId}/records", pointer: "/data/*/projectId", change: "absent->string", reason: rulingRecordFields},
 	{operation: "POST /api/dataset/{slugOrId}/records", pointer: "/data/*/updatedAt", change: "absent->string", reason: rulingRecordFields},

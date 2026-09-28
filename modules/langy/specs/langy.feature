@@ -72,3 +72,10 @@ Feature: Langy service capability
     Given the worker boots with live eventing and langy's rows in a test database
     When langy's conversation pipeline is sent a created conversation
     Then the conversation is readable through its projection
+
+  @unit
+  Scenario: A new conversation takes its placeholder title in sentence case
+    Given a new conversation whose first user message reads "apidiff question"
+    When its first turn is accepted
+    Then the conversation starts with the title "Apidiff question"
+    And the recorded message carries the same title

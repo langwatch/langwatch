@@ -150,8 +150,15 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 
 	findings := make([]Finding, 0)
 	probed := 0
+	collectionsVerified := false
 	for index := range selected {
 		operation := selected[index]
+		// Deletes run last and remove what the creates made, so the lists are
+		// read for the created entities before the first delete, not after.
+		if !collectionsVerified && operation.Method == http.MethodDelete {
+			findings = append(findings, engine.verifyCollections(selected)...)
+			collectionsVerified = true
+		}
 		if skip := notProbed(operation, options.ExcludePrefixes); skip != "" {
 			engine.progress("skip %s %s (%s) [%d/%d]\n", operation.Method, operation.Path, skip, index+1, len(selected))
 			continue
@@ -166,7 +173,9 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 	}
 
 	// Post passes, after every mutation has had its chance to land.
-	findings = append(findings, engine.verifyCollections(selected)...)
+	if !collectionsVerified {
+		findings = append(findings, engine.verifyCollections(selected)...)
+	}
 	findings = append(findings, engine.permissionProbes(selected)...)
 	findings = append(findings, engine.markUnverifiedLists(selected)...)
 	findings = append(findings, engine.entitledPass()...)

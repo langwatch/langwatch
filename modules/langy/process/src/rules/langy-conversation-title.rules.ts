@@ -4,7 +4,7 @@
  * @see specs/langy/langy-conversation-title.feature
  */
 
-import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
+import { extractLangyTextFromParts, LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 
 /**
  * Words that keep their capital mid-sentence: product/company/language names
@@ -39,6 +39,11 @@ const ALWAYS_CAPITALISED = new Set([
 
 /** An ordinary capitalised word: one capital, then lower case letters only. */
 const CAPITALISED_WORD = /^[A-Z][a-z]*(?:['’][a-z]+)?$/;
+
+/** The placeholder a new conversation takes from its first user message; empty without text. */
+export function placeholderTitleOf(parts: unknown): string {
+  return normalizeLangyConversationTitle(extractLangyTextFromParts(parts));
+}
 
 /** Bring a raw title into the one style. Empty string means "no title". */
 export function normalizeLangyConversationTitle(raw: string): string {
