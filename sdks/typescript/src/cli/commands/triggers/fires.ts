@@ -9,12 +9,13 @@ import type { CommandResult } from "../../utils/output";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { readFirePage } from "./summary";
 
 /** What an automation has done, newest first. Metadata only: no trace ids and
  *  no trace content, the same contract the dashboard's fire panel reads. */
 export const triggerFiresCommand = async (
   id: string,
-  options: { limit?: string } = {},
+  options: { limit?: string; cursor?: string } = {},
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -24,11 +25,12 @@ export const triggerFiresCommand = async (
   const spinner = createSpinner(`Fetching fires for "${id}"...`).start();
 
   try {
-    const limit = options.limit
-      ? `?limit=${encodeURIComponent(options.limit)}`
-      : "";
+    const query = new URLSearchParams();
+    if (options.limit) query.set("limit", options.limit);
+    if (options.cursor) query.set("cursor", options.cursor);
+    const search = query.toString() ? `?${query.toString()}` : "";
     const response = await langwatchFetch(
-      `${endpoint}/api/triggers/${encodeURIComponent(id)}/fires${limit}`,
+      `${endpoint}/api/triggers/${encodeURIComponent(id)}/fires${search}`,
       {
         headers: buildAuthHeaders({ apiKey }),
         signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
@@ -45,18 +47,22 @@ export const triggerFiresCommand = async (
       process.exit(1);
     }
 
-    const fires = (await response.json()) as {
+    const { fires, nextCursor } = readFirePage<{
       id: string;
       firedAt: string;
       resolvedAt: string | null;
-    }[];
+    }>(await response.json());
     spinner.succeed(`Found ${fires.length} fire(s)`);
 
     return {
-      data: fires,
+      data: { fires, nextCursor },
       table: () => {
         if (fires.length === 0) {
-          console.log("\n  This automation has not fired yet.\n");
+          console.log(
+            options.cursor
+              ? "\n  No more fires.\n"
+              : "\n  This automation has not fired yet.\n",
+          );
           return;
         }
         console.log();
@@ -69,6 +75,10 @@ export const triggerFiresCommand = async (
           headers: ["ID", "Fired", "Resolved"],
         });
         console.log();
+        if (nextCursor) {
+          console.log(`  Next page: --cursor ${nextCursor}`);
+          console.log();
+        }
       },
     };
   } catch (error) {

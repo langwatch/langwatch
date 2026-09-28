@@ -4105,13 +4105,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description("Create a new trigger (automation)")
       .requiredOption("--action <action>", "Trigger action: SEND_EMAIL, ADD_TO_DATASET, ADD_TO_ANNOTATION_QUEUE, SEND_SLACK_MESSAGE, SEND_WEBHOOK")
       .option("--action-params <json>", "Delivery configuration for the chosen action, as JSON")
-      .option("--filters <json>", "Trigger filter conditions as JSON")
-      .option("--filter-query <query>", "Trace query in the syntax the traces view uses, e.g. status:error")
+      .option("--filters <json>", "Trace conditions as a JSON object. Unkeyed fields take a list, e.g. {\"traces.error\":[\"true\"]}. Keyed fields nest the key: evaluations.* keys by MONITOR id (the `id` from `langwatch monitor list`, not the evaluator id), e.g. {\"evaluations.passed\":{\"<monitorId>\":[\"false\"]}}; metadata.value keys by metadata key, e.g. {\"metadata.value\":{\"<key>\":[\"true\"]}}. A keyed field sent flat is refused")
+      .option("--filter-query <query>", "Trace query in the syntax the traces view uses, e.g. status:error. Supersedes --filters")
+      .option("--custom-graph-id <id>", "Make this an alert on that graph. Needs --graph-alert and --alert-type")
+      .option("--graph-alert <json>", "The rule an alert fires by, as JSON: {\"seriesName\":\"...\",\"operator\":\"gt|gte|lt|lte|eq\",\"threshold\":0.5,\"timePeriod\":5} (minutes: 1, 5, 15, 30, 60, 1440)")
+      .option("--report <json>", "Make this a scheduled report, as JSON: {\"source\":{\"kind\":\"dashboard\",\"dashboardId\":\"...\"},\"schedule\":{\"cron\":\"0 9 * * 1\",\"timezone\":\"UTC\"}}. source.kind is dashboard, customGraph or traceQuery")
       .option("--message <text>", "Custom alert message")
       .option("--alert-type <type>", "Alert severity: CRITICAL, WARNING, INFO")
       .option("--slack-webhook <url>", "Slack webhook URL (for SEND_SLACK_MESSAGE action)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { action: string; actionParams?: string; filters?: string; filterQuery?: string; message?: string; alertType?: string; slackWebhook?: string }) => {
+    async (name: string, options: { action: string; actionParams?: string; filters?: string; filterQuery?: string; message?: string; alertType?: string; slackWebhook?: string; customGraphId?: string; graphAlert?: string; report?: string }) => {
       const { createTriggerCommand: impl } = await import("./commands/triggers/create.js");
       return impl(name, options);
     },
@@ -4125,11 +4128,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--active <boolean>", "Enable or disable the trigger (true/false)")
       .option("--message <text>", "New alert message")
       .option("--alert-type <type>", "New alert severity")
-      .option("--filters <json>", "Trigger filter conditions as JSON")
-      .option("--filter-query <query>", "Trace query in the syntax the traces view uses")
+      .option("--filters <json>", "Trace conditions as a JSON object. Unkeyed fields take a list, e.g. {\"traces.error\":[\"true\"]}. Keyed fields nest the key: evaluations.* keys by MONITOR id (the `id` from `langwatch monitor list`, not the evaluator id), e.g. {\"evaluations.passed\":{\"<monitorId>\":[\"false\"]}}; metadata.value keys by metadata key, e.g. {\"metadata.value\":{\"<key>\":[\"true\"]}}. A keyed field sent flat is refused")
+      .option("--filter-query <query>", "Trace query in the syntax the traces view uses. An empty value clears it")
+      .option("--graph-alert <json>", "The rule an alert fires by, as JSON (only for an automation that is already an alert)")
+      .option("--report <json>", "What a report renders and when, as JSON (only for an automation that is already a report)")
       .option("--action-params <json>", "The delivery configuration this trigger should have from now on, as JSON. Replaces the stored one; send [redacted] back for a credential to keep it")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; active?: string; message?: string; alertType?: string; filters?: string; filterQuery?: string; actionParams?: string }) => {
+    async (id: string, options: { name?: string; active?: string; message?: string; alertType?: string; filters?: string; filterQuery?: string; actionParams?: string; graphAlert?: string; report?: string }) => {
       const { updateTriggerCommand: impl } = await import("./commands/triggers/update.js");
       return impl(id, options);
     },
@@ -4173,8 +4178,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("fires <id>")
       .description("What the trigger has done, newest first")
       .option("--limit <n>", "How many fires to read")
+      .option("--cursor <cursor>", "Read the page after this one: the next cursor a previous call printed")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { limit?: string }) => {
+    async (id: string, options: { limit?: string; cursor?: string }) => {
       const { triggerFiresCommand: impl } = await import("./commands/triggers/fires.js");
       return impl(id, options);
     },

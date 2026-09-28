@@ -26,6 +26,8 @@ export const updateTriggerCommand = async (
     filters?: string;
     filterQuery?: string;
     actionParams?: string;
+    graphAlert?: string;
+    report?: string;
   },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
@@ -39,6 +41,8 @@ export const updateTriggerCommand = async (
   // must not misread a non-JSON API response as a flag the user never passed.
   let parsedFilters: Record<string, unknown> | undefined;
   let parsedActionParams: Record<string, unknown> | undefined;
+  let parsedGraphAlert: Record<string, unknown> | undefined;
+  let parsedReport: Record<string, unknown> | undefined;
   try {
     if (options.filters) {
       parsedFilters = parseJsonObject(options.filters);
@@ -46,11 +50,13 @@ export const updateTriggerCommand = async (
     if (options.actionParams) {
       parsedActionParams = parseJsonObject(options.actionParams);
     }
+    if (options.graphAlert) parsedGraphAlert = parseJsonObject(options.graphAlert);
+    if (options.report) parsedReport = parseJsonObject(options.report);
   } catch {
     failSpinner({
       spinner,
       error: commandValidationError(
-        "--filters and --action-params must be valid JSON objects",
+        "--filters, --action-params, --graph-alert and --report must be valid JSON objects",
       ),
       action: "update trigger",
     });
@@ -71,12 +77,14 @@ export const updateTriggerCommand = async (
     // replaces the stored one rather than merging into it. A credential the
     // read hid comes back as `[redacted]`; send that to keep the stored value.
     if (parsedActionParams) body.actionParams = parsedActionParams;
+    if (parsedGraphAlert) body.graphAlert = parsedGraphAlert;
+    if (parsedReport) body.report = parsedReport;
 
     if (Object.keys(body).length === 0) {
       failSpinner({
         spinner,
         error: commandValidationError(
-          "No fields to update. Use --name, --active, --message, --alert-type, --filters, --filter-query or --action-params.",
+          "No fields to update. Use --name, --active, --message, --alert-type, --filters, --filter-query, --action-params, --graph-alert or --report.",
         ),
         action: "update trigger",
       });

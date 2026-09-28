@@ -7,6 +7,7 @@ import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
+import { summariseRule } from "./summary";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -41,6 +42,11 @@ export const listTriggersCommand = async (): Promise<CommandResult | void> => {
       action: string;
       active: boolean;
       alertType: string | null;
+      kind?: string;
+      filterQuery?: string | null;
+      customGraphId?: string | null;
+      graphAlert?: Record<string, unknown> | null;
+      report?: Record<string, unknown> | null;
     }>;
 
     spinner.succeed(`Found ${triggers.length} trigger${triggers.length !== 1 ? "s" : ""}`);
@@ -63,14 +69,17 @@ export const listTriggersCommand = async (): Promise<CommandResult | void> => {
         const tableData = triggers.map((t) => ({
           Name: t.name,
           ID: t.id,
+          Kind: t.kind ?? "-",
           Action: t.action,
           Status: t.active ? chalk.green("active") : chalk.gray("inactive"),
           Alert: t.alertType ?? chalk.gray("—"),
+          Rule: summariseRule(t),
+          Query: t.filterQuery ?? "-",
         }));
 
         formatTable({
           data: tableData,
-          headers: ["Name", "ID", "Action", "Status", "Alert"],
+          headers: ["Name", "ID", "Kind", "Action", "Status", "Alert", "Rule", "Query"],
           colorMap: {
             Name: chalk.cyan,
             ID: chalk.green,

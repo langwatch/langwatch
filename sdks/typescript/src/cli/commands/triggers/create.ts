@@ -27,6 +27,9 @@ export const createTriggerCommand = async (
     alertType?: string;
     slackWebhook?: string;
     actionParams?: string;
+    customGraphId?: string;
+    graphAlert?: string;
+    report?: string;
   },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
@@ -50,6 +53,8 @@ export const createTriggerCommand = async (
   // must not misread a non-JSON API response as a flag the user never passed.
   let filters: Record<string, unknown> | undefined;
   let actionParams: Record<string, unknown> = {};
+  let graphAlert: Record<string, unknown> | undefined;
+  let report: Record<string, unknown> | undefined;
   try {
     if (options.filters) {
       filters = parseJsonObject(options.filters);
@@ -57,11 +62,13 @@ export const createTriggerCommand = async (
     if (options.actionParams) {
       actionParams = parseJsonObject(options.actionParams);
     }
+    if (options.graphAlert) graphAlert = parseJsonObject(options.graphAlert);
+    if (options.report) report = parseJsonObject(options.report);
   } catch {
     failSpinner({
       spinner,
       error: commandValidationError(
-        "--filters and --action-params must each be a JSON object",
+        "--filters, --action-params, --graph-alert and --report must each be a JSON object",
       ),
       action: "create trigger",
     });
@@ -89,6 +96,9 @@ export const createTriggerCommand = async (
         actionParams,
         message: options.message,
         alertType: options.alertType,
+        customGraphId: options.customGraphId,
+        graphAlert,
+        report,
       }),
     });
 
@@ -97,7 +107,7 @@ export const createTriggerCommand = async (
       process.exit(1);
     }
 
-    const trigger = await response.json() as { id: string; name: string; action: string; platformUrl?: string };
+    const trigger = await response.json() as { id: string; name: string; action: string; kind?: string; platformUrl?: string };
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     return {
@@ -108,6 +118,7 @@ export const createTriggerCommand = async (
         console.log();
         console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
         console.log(`  ${chalk.gray("Action:")} ${trigger.action}`);
+        if (trigger.kind) console.log(`  ${chalk.gray("Kind:")}   ${trigger.kind}`);
         if (trigger.platformUrl) {
           console.log(`  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`);
         }

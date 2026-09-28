@@ -14,8 +14,14 @@ import {
 import {
   actionParamsSchema,
   reportSchema,
+  SLACK_DELIVERY_NOTE,
+  TRIGGER_FILTER_QUERY_DESCRIPTION,
+  TRIGGER_FILTERS_DESCRIPTION,
   validateActionParamsForAction,
 } from "../schemas/triggers.js";
+import { handleCreateTrigger } from "../tools/create-trigger.js";
+import { handleListTriggerFires } from "../tools/list-trigger-fires.js";
+import { handleListTriggers } from "../tools/list-triggers.js";
 
 const request = vi.mocked(makeRequest);
 
@@ -296,7 +302,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       ]);
 
       expect(
-        await listTriggerFires({ id: "trigger-1", limit: 5 }),
+        (await listTriggerFires({ id: "trigger-1", limit: 5 })).fires,
       ).toHaveLength(1);
       expect(request).toHaveBeenCalledWith(
         "GET",
@@ -318,6 +324,183 @@ describe("Feature: an agent configures an automation over MCP", () => {
         "POST",
         "/api/triggers/trigger-1/enable",
       );
+    });
+  });
+
+  describe("when an automation is created without a delivery configuration", () => {
+    it("sends the empty configuration older callers relied on", async () => {
+      request.mockResolvedValue(TRIGGER);
+
+      const text = await handleCreateTrigger({
+        name: "Errors to Slack",
+        action: "SEND_SLACK_MESSAGE",
+        filters: '{"traces.error":["true"]}',
+      });
+
+      expect(text).toContain("created");
+      expect(request).toHaveBeenCalledWith(
+        "POST",
+        "/api/triggers",
+        expect.objectContaining({
+          actionParams: {},
+          filters: { "traces.error": ["true"] },
+        }),
+      );
+    });
+
+    it("accepts Slack bot delivery naming only the channel", async () => {
+      request.mockResolvedValue(TRIGGER);
+
+      await handleCreateTrigger({
+        name: "Errors to Slack",
+        action: "SEND_SLACK_MESSAGE",
+        actionParams: { slackDelivery: "bot", slackChannelId: "C123" },
+      });
+
+      expect(request).toHaveBeenCalledWith(
+        "POST",
+        "/api/triggers",
+        expect.objectContaining({
+          actionParams: { slackDelivery: "bot", slackChannelId: "C123" },
+        }),
+      );
+    });
+
+    it("refuses a stated Slack configuration with nowhere to post", async () => {
+      const text = await handleCreateTrigger({
+        name: "Errors to Slack",
+        action: "SEND_SLACK_MESSAGE",
+        actionParams: { slackDelivery: "bot" },
+      });
+
+      expect(text).toMatch(/^Error:/);
+      expect(request).not.toHaveBeenCalled();
+    });
+
+    it("refuses filters that are not a JSON object", async () => {
+      const text = await handleCreateTrigger({
+        name: "Bad",
+        action: "SEND_EMAIL",
+        filters: '["traces.error"]',
+      });
+
+      expect(text).toBe("Error: filters must be a JSON object");
+      expect(request).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an alert or a report is created", () => {
+    it("sends the graph and its rule for an alert", async () => {
+      request.mockResolvedValue({ ...TRIGGER, kind: "ALERT" });
+
+      const text = await handleCreateTrigger({
+        name: "Latency",
+        action: "SEND_EMAIL",
+        actionParams: { members: ["team@example.com"] },
+        customGraphId: "graph_1",
+        graphAlert: {
+          seriesName: "p95",
+          operator: "gt",
+          threshold: 2000,
+          timePeriod: 5,
+        },
+        alertType: "WARNING",
+      });
+
+      expect(text).toContain("Kind: ALERT");
+      expect(request).toHaveBeenCalledWith(
+        "POST",
+        "/api/triggers",
+        expect.objectContaining({
+          customGraphId: "graph_1",
+          graphAlert: expect.objectContaining({ threshold: 2000 }),
+        }),
+      );
+    });
+  });
+
+  describe("when the tool descriptions explain conditions", () => {
+    it("spells out the keyed shape, keyed by the monitor id", () => {
+      expect(TRIGGER_FILTERS_DESCRIPTION).toContain(
+        '{"evaluations.passed":{"<monitorId>":["false"]}}',
+      );
+      expect(TRIGGER_FILTERS_DESCRIPTION).toContain(
+        '{"metadata.value":{"<key>":["true"]}}',
+      );
+      expect(TRIGGER_FILTERS_DESCRIPTION).toContain('{"traces.error":["true"]}');
+      expect(TRIGGER_FILTERS_DESCRIPTION).toContain("not its evaluatorId");
+      expect(TRIGGER_FILTER_QUERY_DESCRIPTION).toContain("evaluatorVerdict:fail");
+    });
+
+    it("says a Slack automation needs a webhook or bot delivery", () => {
+      expect(SLACK_DELIVERY_NOTE).toContain("slackWebhook");
+      expect(SLACK_DELIVERY_NOTE).toContain('"slackDelivery":"bot"');
+      expect(SLACK_DELIVERY_NOTE).toContain("never post");
+    });
+  });
+
+  describe("when automations are listed as a digest", () => {
+    it("states each one's kind, query and rule", async () => {
+      request.mockResolvedValue([
+        { ...TRIGGER, filterQuery: "status:error" },
+        {
+          ...TRIGGER,
+          id: "trigger-2",
+          kind: "ALERT",
+          customGraphId: "graph_1",
+          graphAlert: {
+            seriesName: "p95",
+            operator: "gt",
+            threshold: 2000,
+            timePeriod: 5,
+          },
+        },
+      ]);
+
+      const text = await handleListTriggers({});
+
+      expect(text).toContain("**Kind**: AUTOMATION");
+      expect(text).toContain("**Filter query**: status:error");
+      expect(text).toContain("**Kind**: ALERT");
+      expect(text).toContain("p95 gt 2000 over 5m on graph graph_1");
+    });
+  });
+
+  describe("when fires are read a page at a time", () => {
+    it("passes the cursor through and answers with the next one", async () => {
+      request.mockResolvedValue({
+        fires: [
+          {
+            id: "fire-2",
+            triggerId: "trigger-1",
+            customGraphId: null,
+            firedAt: "2026-08-12T00:00:00.000Z",
+            resolvedAt: null,
+          },
+        ],
+        nextCursor: "cursor-3",
+      });
+
+      const text = await handleListTriggerFires({
+        id: "trigger-1",
+        limit: 1,
+        cursor: "cursor-2",
+      });
+
+      expect(request).toHaveBeenCalledWith(
+        "GET",
+        "/api/triggers/trigger-1/fires?limit=1&cursor=cursor-2",
+      );
+      expect(JSON.parse(text)).toMatchObject({ nextCursor: "cursor-3" });
+    });
+
+    it("reads an older deployment's bare list as the last page", async () => {
+      request.mockResolvedValue([]);
+
+      expect(await listTriggerFires({ id: "trigger-1" })).toEqual({
+        fires: [],
+        nextCursor: null,
+      });
     });
   });
 });

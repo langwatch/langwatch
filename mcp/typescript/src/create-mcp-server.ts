@@ -9,7 +9,10 @@ import {
   graphAlertSchema,
   notificationCadenceSchema,
   reportSchema,
+  SLACK_DELIVERY_NOTE,
   templatesSchema,
+  TRIGGER_FILTER_QUERY_DESCRIPTION,
+  TRIGGER_FILTERS_DESCRIPTION,
   triggerActionSchema,
   validateActionParamsForAction,
 } from "./schemas/triggers.js";
@@ -1585,24 +1588,8 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_list_triggers", async (params) => {
       requireApiKey();
-      const { listTriggers } = await import("./langwatch-api-triggers.js");
-      const triggers = await listTriggers();
-      if (params.format === "json") {
-        return { content: [{ type: "text", text: JSON.stringify(triggers, null, 2) }] };
-      }
-      if (triggers.length === 0) {
-        return { content: [{ type: "text", text: "No triggers found. Use `platform_create_trigger` to create one." }] };
-      }
-      const lines = [`# Triggers (${triggers.length} total)\n`];
-      for (const t of triggers) {
-        lines.push(`## ${t.name}`);
-        lines.push(`**ID**: ${t.id}`);
-        lines.push(`**Action**: ${t.action}`);
-        lines.push(`**Status**: ${t.active ? "active" : "inactive"}`);
-        if (t.alertType) lines.push(`**Alert**: ${t.alertType}`);
-        lines.push("");
-      }
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      const { handleListTriggers } = await import("./tools/list-triggers.js");
+      return { content: [{ type: "text", text: await handleListTriggers(params) }] };
     })
   );
 
@@ -1625,16 +1612,18 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     [
       "Create a trigger (automation).",
       "",
-      "It is about one of three things: matching traces (send `filters` or `filterQuery`), a metric crossing a threshold on a graph (send `customGraphId`, `graphAlert` and `alertType`), or a schedule (send `report`, on an email or Slack channel).",
-      "`actionParams` is the delivery configuration for the channel named in `action` — recipients for SEND_EMAIL, a destination for SEND_SLACK_MESSAGE, a URL for SEND_WEBHOOK, a dataset and mapping for ADD_TO_DATASET, annotators for ADD_TO_ANNOTATION_QUEUE. It is required: a channel with no configuration cannot deliver, and the save is refused.",
+      "It is about one of three things: matching traces (send `filters` or `filterQuery`), a metric crossing a threshold on a graph (an Alert: send `customGraphId`, `graphAlert` and `alertType`), or a schedule (a Report: send `report`, on an email or Slack channel).",
+      "`actionParams` is the delivery configuration for the channel named in `action` — recipients for SEND_EMAIL, a destination for SEND_SLACK_MESSAGE, a URL for SEND_WEBHOOK, a dataset and mapping for ADD_TO_DATASET, annotators for ADD_TO_ANNOTATION_QUEUE. Omitted, it is sent as {} and the server refuses a channel that cannot deliver without one.",
+      SLACK_DELIVERY_NOTE,
+      `filters: ${TRIGGER_FILTERS_DESCRIPTION}`,
       "The delivery channel cannot be changed afterwards.",
     ].join("\n"),
     {
       name: z.string().describe("Trigger name"),
       action: triggerActionSchema.describe("Which channel it delivers on"),
-      actionParams: actionParamsSchema.describe("The delivery configuration the channel named in `action` reads"),
-      filters: z.string().optional().describe("Trace conditions as a JSON object string, e.g. {\"metadata.labels\":[\"prod\"]}"),
-      filterQuery: z.string().optional().describe("Trace query in the syntax the traces view uses, e.g. status:error. Supersedes `filters`."),
+      actionParams: actionParamsSchema.optional().describe("The delivery configuration the channel named in `action` reads. Defaults to {}"),
+      filters: z.string().optional().describe(TRIGGER_FILTERS_DESCRIPTION),
+      filterQuery: z.string().optional().describe(TRIGGER_FILTER_QUERY_DESCRIPTION),
       customGraphId: z.string().optional().describe("Set to make this an alert on that graph"),
       graphAlert: graphAlertSchema.optional(),
       report: reportSchema.optional().describe("Set to make this a scheduled report"),
@@ -1645,34 +1634,8 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_create_trigger", async (params) => {
       requireApiKey();
-      const { createTrigger } = await import("./langwatch-api-triggers.js");
-      const boundParams = validateActionParamsForAction({
-        action: params.action,
-        actionParams: params.actionParams,
-      });
-      if (!boundParams.ok) {
-        return { content: [{ type: "text", text: `Error: ${boundParams.message}` }] };
-      }
-      let filters: Record<string, unknown> | undefined;
-      if (params.filters) {
-        try { filters = JSON.parse(params.filters) as Record<string, unknown>; }
-        catch { return { content: [{ type: "text", text: "Error: filters must be valid JSON" }] }; }
-      }
-      const trigger = await createTrigger({
-        name: params.name,
-        action: params.action,
-        actionParams: params.actionParams,
-        filters,
-        filterQuery: params.filterQuery,
-        customGraphId: params.customGraphId,
-        graphAlert: params.graphAlert,
-        report: params.report,
-        templates: params.templates,
-        notificationCadence: params.notificationCadence,
-        message: params.message,
-        alertType: params.alertType,
-      });
-      return { content: [{ type: "text", text: `Trigger "${trigger.name}" created (ID: ${trigger.id}, Action: ${trigger.action}).` }] };
+      const { handleCreateTrigger } = await import("./tools/create-trigger.js");
+      return { content: [{ type: "text", text: await handleCreateTrigger(params) }] };
     })
   );
 
@@ -1689,8 +1652,8 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       name: z.string().optional().describe("New name"),
       active: z.boolean().optional().describe("Resume or pause it"),
       actionParams: actionParamsSchema.optional().describe("The delivery configuration this automation should have from now on"),
-      filters: z.string().optional().describe("Trace conditions as a JSON object string"),
-      filterQuery: z.string().nullable().optional().describe("Trace query in the syntax the traces view uses. null clears the saved query"),
+      filters: z.string().optional().describe(TRIGGER_FILTERS_DESCRIPTION),
+      filterQuery: z.string().nullable().optional().describe(`${TRIGGER_FILTER_QUERY_DESCRIPTION} null clears the saved query.`),
       graphAlert: graphAlertSchema.optional().describe("Only for an automation that is already a graph alert"),
       report: reportSchema.optional().describe("Only for an automation that is already a scheduled report"),
       templates: templatesSchema.optional(),
@@ -1739,19 +1702,16 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_list_trigger_fires",
-    "What an automation has done, newest first. Metadata only — no message content.",
+    "What an automation has done, newest first. Metadata only — no message content. Answers with `nextCursor`; pass it back as `cursor` for the next page (null means there is none).",
     {
       id: z.string().describe("The trigger ID"),
       limit: z.number().int().positive().optional().describe("How many fires to return"),
+      cursor: z.string().optional().describe("The `nextCursor` a previous call answered with"),
     },
     withToolLogging("platform_list_trigger_fires", async (params) => {
       requireApiKey();
-      const { listTriggerFires } = await import("./langwatch-api-triggers.js");
-      const fires = await listTriggerFires({ id: params.id, limit: params.limit });
-      if (fires.length === 0) {
-        return { content: [{ type: "text", text: "This automation has not fired yet." }] };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(fires, null, 2) }] };
+      const { handleListTriggerFires } = await import("./tools/list-trigger-fires.js");
+      return { content: [{ type: "text", text: await handleListTriggerFires(params) }] };
     })
   );
 

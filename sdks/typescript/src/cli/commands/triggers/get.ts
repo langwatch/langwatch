@@ -6,6 +6,7 @@ import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
+import { summariseGraphAlert, summariseReport } from "./summary";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -44,6 +45,11 @@ export const getTriggerCommand = async (
       action: string;
       actionParams: Record<string, unknown>;
       filters: Record<string, unknown>;
+      filterQuery?: string | null;
+      kind?: string;
+      customGraphId?: string | null;
+      graphAlert?: Record<string, unknown> | null;
+      report?: Record<string, unknown> | null;
       active: boolean;
       message: string | null;
       alertType: string | null;
@@ -64,12 +70,23 @@ export const getTriggerCommand = async (
         console.log(`    ${chalk.gray("ID:")}      ${chalk.green(trigger.id)}`);
         console.log(`    ${chalk.gray("Name:")}    ${chalk.cyan(trigger.name)}`);
         console.log(`    ${chalk.gray("Action:")}  ${trigger.action}`);
+        if (trigger.kind) console.log(`    ${chalk.gray("Kind:")}    ${trigger.kind}`);
         console.log(`    ${chalk.gray("Status:")}  ${trigger.active ? chalk.green("active") : chalk.gray("inactive")}`);
         console.log(`    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`);
         console.log(`    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`);
         console.log(`    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`);
         if (trigger.platformUrl) {
           console.log(`    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`);
+        }
+        const alert = summariseGraphAlert({
+          graphAlert: trigger.graphAlert,
+          customGraphId: trigger.customGraphId,
+        });
+        if (alert) console.log(`    ${chalk.gray("Fires when:")} ${alert}`);
+        const report = summariseReport({ report: trigger.report });
+        if (report) console.log(`    ${chalk.gray("Report:")}  ${report}`);
+        if (trigger.filterQuery) {
+          console.log(`    ${chalk.gray("Query:")}   ${trigger.filterQuery}`);
         }
 
         if (Object.keys(trigger.filters).length > 0) {

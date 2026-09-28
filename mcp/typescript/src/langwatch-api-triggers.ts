@@ -10,10 +10,10 @@ import {
   type TriggerAction,
   type TriggerActionParams,
   type TriggerAlertType,
-  type TriggerFire,
+  type TriggerFirePage,
   type TriggerTemplates,
   testFireResultSchema,
-  triggerFireSchema,
+  triggerFirePageSchema,
   triggerSchema,
 } from "./schemas/triggers.js";
 
@@ -27,7 +27,8 @@ import {
 export interface CreateTriggerInput {
   name: string;
   action: TriggerAction;
-  actionParams: TriggerActionParams;
+  /** Omitted sends `{}`, as before `actionParams` was stated per channel. */
+  actionParams?: TriggerActionParams;
   filters?: Record<string, unknown>;
   filterQuery?: string | null;
   message?: string;
@@ -71,7 +72,12 @@ export async function getTrigger(id: string): Promise<Trigger> {
 export async function createTrigger(
   input: CreateTriggerInput,
 ): Promise<Trigger> {
-  return triggerSchema.parse(await makeRequest("POST", "/api/triggers", input));
+  return triggerSchema.parse(
+    await makeRequest("POST", "/api/triggers", {
+      ...input,
+      actionParams: input.actionParams ?? {},
+    }),
+  );
 }
 
 export async function updateTrigger({
@@ -110,23 +116,27 @@ export async function testFireTrigger(id: string): Promise<TestFireResult> {
   );
 }
 
-/** What the automation has done, newest first. Metadata only. */
+/** What the automation has done, newest first. Metadata only. `cursor` reads
+ *  the page after the one that answered with it as `nextCursor`. */
 export async function listTriggerFires({
   id,
   limit,
+  cursor,
 }: {
   id: string;
   limit?: number;
-}): Promise<TriggerFire[]> {
-  const query = limit === undefined ? "" : `?limit=${limit}`;
-  return z
-    .array(triggerFireSchema)
-    .parse(
-      await makeRequest(
-        "GET",
-        `/api/triggers/${encodeURIComponent(id)}/fires${query}`,
-      ),
-    );
+  cursor?: string;
+}): Promise<TriggerFirePage> {
+  const query = new URLSearchParams();
+  if (limit !== undefined) query.set("limit", String(limit));
+  if (cursor) query.set("cursor", cursor);
+  const search = query.toString() ? `?${query.toString()}` : "";
+  return triggerFirePageSchema.parse(
+    await makeRequest(
+      "GET",
+      `/api/triggers/${encodeURIComponent(id)}/fires${search}`,
+    ),
+  );
 }
 
 export async function deleteTrigger(

@@ -201,6 +201,25 @@ export function validateActionParamsForAction({
   };
 }
 
+/** How `filters` is written. A keyed field sent flat never matches, so each
+ *  keyed shape is spelled out; see the `/api/triggers` 422 for the refusal. */
+export const TRIGGER_FILTERS_DESCRIPTION = [
+  "Trace conditions as a JSON object string.",
+  'Unkeyed fields take a list of values: {"traces.error":["true"]}.',
+  'Keyed fields nest a key above the list. evaluations.* is keyed by the MONITOR id (the `id` from `platform_list_monitors` / GET /api/monitors, not its evaluatorId): {"evaluations.passed":{"<monitorId>":["false"]}}.',
+  'metadata.value is keyed by the metadata key: {"metadata.value":{"<key>":["true"]}}.',
+  "A keyed field sent as a bare list, or keyed by anything but a monitor id, is refused.",
+].join(" ");
+
+export const TRIGGER_FILTER_QUERY_DESCRIPTION = [
+  "Trace query in the syntax the traces view uses; the alternative to `filters`, and it supersedes them.",
+  'Examples: status:error · evaluator:"<evaluator name>" AND evaluatorVerdict:fail · trace.attribute.<key>:<value>.',
+].join(" ");
+
+/** Stated on the create tool: Slack needs a destination or it never posts. */
+export const SLACK_DELIVERY_NOTE =
+  'For SEND_SLACK_MESSAGE, send either {"slackWebhook":"https://hooks.slack.com/..."} or {"slackDelivery":"bot","slackChannelId":"C..."} (bot delivery uses the project\'s Slack integration token when none is sent). A Slack automation with neither will never post.';
+
 export const graphAlertSchema = z
   .object({
     seriesName: z.string().describe("The series on the graph to watch."),
@@ -332,6 +351,24 @@ export const triggerFireSchema = z
   })
   .passthrough();
 
+/** A page of fires: `{ fires, nextCursor }`, or the bare array an older
+ *  deployment answers with, which has no next page. */
+export const triggerFirePageSchema = z.union([
+  z
+    .array(triggerFireSchema)
+    .transform((fires) => ({ fires, nextCursor: null })),
+  z
+    .object({
+      fires: z.array(triggerFireSchema).optional(),
+      data: z.array(triggerFireSchema).optional(),
+      nextCursor: z.string().nullable().optional(),
+    })
+    .transform(({ fires, data, nextCursor }) => ({
+      fires: fires ?? data ?? [],
+      nextCursor: nextCursor ?? null,
+    })),
+]);
+
 export const testFireResultSchema = z
   .object({
     channel: z.string(),
@@ -350,6 +387,7 @@ export const deletedTriggerSchema = z.object({
 
 export type Trigger = z.infer<typeof triggerSchema>;
 export type TriggerFire = z.infer<typeof triggerFireSchema>;
+export type TriggerFirePage = z.infer<typeof triggerFirePageSchema>;
 export type TestFireResult = z.infer<typeof testFireResultSchema>;
 export type TriggerAction = z.infer<typeof triggerActionSchema>;
 export type TriggerAlertType = z.infer<typeof alertTypeSchema>;
