@@ -38,7 +38,6 @@ export interface ConversationDetail {
   toolOutputChars: number;
   proseChars: number;
   turnTextChars: number;
-  isNestedShown: boolean;
   /** Steps kept per turn; the rest are elided from its middle, model calls first. */
   maxStepsPerTurn: number;
 }
@@ -49,7 +48,6 @@ export const FULL_CONVERSATION_DETAIL: ConversationDetail = {
   toolOutputChars: 16_000,
   proseChars: 2_000,
   turnTextChars: Number.POSITIVE_INFINITY,
-  isNestedShown: true,
   maxStepsPerTurn: Number.POSITIVE_INFINITY,
 };
 
@@ -67,7 +65,6 @@ export function conversationDetailAtScale(scale: number): ConversationDetail {
     toolOutputChars: at(FULL_CONVERSATION_DETAIL.toolOutputChars, MIN_CAPS.toolOutputChars),
     proseChars: scale >= 0.1 ? Math.floor(FULL_CONVERSATION_DETAIL.proseChars * scale) : 0,
     turnTextChars: at(12_000, MIN_CAPS.turnTextChars),
-    isNestedShown: scale >= 0.02,
     maxStepsPerTurn: Number.POSITIVE_INFINITY,
   };
 }
@@ -98,8 +95,7 @@ export function renderConversationSteps({
   steps: readonly ConversationStep[];
   detail: ConversationDetail;
 }): string {
-  const shown = steps.filter((step) => step.depth === 0 || detail.isNestedShown);
-  const kept = keepSteps({ steps: shown, max: detail.maxStepsPerTurn });
+  const kept = keepSteps({ steps: [...steps], max: detail.maxStepsPerTurn });
   const quietModels = kept.flatMap((entry) =>
     "omitted" in entry && entry.omitted.every((step) => step.kind === "model") ? entry.omitted : [],
   );

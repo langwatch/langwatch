@@ -72,8 +72,9 @@ export function renderConversationMarkdown({
   return dropMiddleTurns({ chunks: shortened.chunks, maxTokens });
 }
 
-/** Below this, a scale step changes too little to be worth another render. */
-const SCALE_PRECISION = 0.01;
+/** The scale search runs over the logarithm, down to this smallest scale, in this many halvings. */
+const SMALLEST_SCALE = 0.001;
+const SCALE_SEARCH_STEPS = 14;
 
 /**
  * The most detail that fits: every value cap scaled down together, then, at
@@ -97,11 +98,11 @@ function shortenEveryTurn({
   const smallest = attempt(conversationDetailAtScale(0));
   if (smallest.fits) {
     let best = smallest;
-    let low = 0;
-    let high = 1;
-    while (high - low > SCALE_PRECISION) {
+    let low = Math.log(SMALLEST_SCALE);
+    let high = 0;
+    for (let step = 0; step < SCALE_SEARCH_STEPS; step++) {
       const mid = (low + high) / 2;
-      const tried = attempt(conversationDetailAtScale(mid));
+      const tried = attempt(conversationDetailAtScale(Math.exp(mid)));
       if (tried.fits) {
         best = tried;
         low = mid;
