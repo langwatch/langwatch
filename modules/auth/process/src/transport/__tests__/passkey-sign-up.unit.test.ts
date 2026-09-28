@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BetterAuthAnnouncements } from "../../channels/better-auth.channel.ts";
 import {
+  PASSKEY_SIGNUP_ALREADY_SIGNED_IN,
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   PASSKEY_SIGNUP_VERIFICATION_REQUIRED,
   passkeySignUpRegistration,
+  type PasskeyCeremonyCaller,
   type PasskeySignUpDirectory,
   type SignUpVerification,
 } from "../../channels/http/http.passkey-sign-up.channel.ts";
@@ -72,11 +74,15 @@ const fakeContext = () => {
   };
 };
 
+/** Who the ceremony's request is signed in as; nobody unless a test says otherwise. */
+const signedInAs: { current: PasskeyCeremonyCaller } = { current: { signedIn: false } };
+
 const registration = passkeySignUpRegistration({
   announcements,
   handleSecret: "test-secret",
   users,
   verification,
+  sessionOf: async () => signedInAs.current,
 });
 const resolveUser = registration.resolveUser;
 const afterVerification = registration.afterVerification;
@@ -89,6 +95,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
     verification.live.set("proof_1", "someone@example.com");
     verification.live.set("proof_victim", "victim@corp.com");
     findByEmail.mockResolvedValue(null);
+    signedInAs.current = { signedIn: false };
   });
 
   describe("when the address already has an account", () => {
@@ -276,6 +283,30 @@ describe("given passkey sign-up, which creates an account with no session", () =
           context: JSON.stringify({ email: "someone@example.com" }),
         }),
       ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_INVALID } });
+    });
+  });
+
+  describe("when the ceremony runs for somebody already signed in", () => {
+    beforeEach(() => {
+      signedInAs.current = { signedIn: true, user: { id: "user_sam", email: "sam@acme.com" } };
+    });
+
+    /** @scenario Adding a passkey while signed in attaches it to that account */
+    it("attaches the passkey to that account and creates nothing", async () => {
+      const result = await afterVerification({ ctx: fakeContext().ctx, context: null });
+
+      expect(result).toEqual({ userId: "user_sam", name: "sam@acme.com" });
+      expect(createPasskeyUser).not.toHaveBeenCalled();
+      expect(journal).toEqual([]);
+    });
+
+    /** @scenario A signed-in browser cannot sign up a different address's passkey */
+    it("refuses a sign-up ceremony for another address, creating nothing", async () => {
+      await expect(
+        afterVerification({ ctx: fakeContext().ctx, context: signUp("someone@example.com") }),
+      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_ALREADY_SIGNED_IN } });
+      expect(createPasskeyUser).not.toHaveBeenCalled();
+      expect(journal).toEqual([]);
     });
   });
 });
