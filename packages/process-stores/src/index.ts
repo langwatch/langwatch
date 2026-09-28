@@ -33,6 +33,7 @@ export {
   MemberSuppliedUndefinedError,
   type MemberSource,
   type ProcessMemberSource,
+  type ProcessStores,
 } from "./create-members.ts";
 export type {
   ClickHouseConfig,

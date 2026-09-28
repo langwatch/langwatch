@@ -2,7 +2,7 @@ import type { ScopedSecrets } from "@langwatch/secrets";
 
 import { storesOwner, type StoresConfig } from "./config-owner.ts";
 import type { ObjectStorageConfig, ProcessConfig } from "./config.ts";
-import { createProcessMembers, type ProcessMemberSource } from "./create-members.ts";
+import { createProcessStores, type ProcessStores } from "./create-members.ts";
 import type { PipelineParticipation } from "./pipeline-selection.ts";
 
 /** The documented single-replica root, when a filesystem deployment names none. */
@@ -115,7 +115,7 @@ export function openProcessStores(options: {
   secrets: ScopedSecrets;
   pipelines: PipelineParticipation;
   production: boolean;
-}): Promise<ProcessMemberSource> {
+}): Promise<ProcessStores> {
   const { name, config, secrets, pipelines, production } = options;
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
@@ -123,7 +123,7 @@ export function openProcessStores(options: {
         secrets.into(storesOwner.secrets.encryption, (credentials) =>
           secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
             withStorageSecrets(secrets, (storage) =>
-              createProcessMembers({
+              createProcessStores({
                 config: processConfigOf({
                   name,
                   config,

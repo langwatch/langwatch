@@ -25,7 +25,7 @@ type OrgScopedModelConfig = {
  * Prisma's read actions — scoping a hatch to these keeps a future write
  * from riding through it, since a read-only hatch safely resolves one org.
  */
-const READ_ACTIONS = new Set([
+export const PRISMA_READ_ACTIONS = [
   "findUnique",
   "findUniqueOrThrow",
   "findFirst",
@@ -34,7 +34,9 @@ const READ_ACTIONS = new Set([
   "count",
   "aggregate",
   "groupBy",
-]);
+] as const;
+
+const READ_ACTIONS = new Set<string>(PRISMA_READ_ACTIONS);
 
 /**
  * A reserved, system-managed key name. `ApiKeyService.create` refuses any

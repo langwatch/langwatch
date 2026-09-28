@@ -1040,6 +1040,16 @@ env alone in its Helm job (Alex, 2026-09-28).
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path.
 
+**A read across organizations is declared, never exempted** (Alex, 2026-09-28). The guarded
+client stays strict for every model. The module that owns the table declares
+`static readonly operatorReads = { syncs: OperatorRead.of("ScimSyncState", { actions: ["findMany", "count"] }) }`
+beside its secrets. The root scopes the stores' mint to each module's own handles and seals it
+after boot, as it does secrets. The handle's client admits only that model and those actions,
+refuses writes, other models and raw SQL, and logs each read at info with `{ module, model,
+action }` and no row data. Its live repository registry resolves it by requiring the
+`operatorReads` member (`operatorReads.into(handle, build)`); the memory twin needs none.
+Spec: `specs/server/operator-reads.feature`.
+
 **Object storage is a store, like the other three** (ruled 2026-09-24,
 ADR-158). The `objectStorage` member is one client over S3, Azure Blob and the
 local filesystem. It routes per project inside the client, as the ClickHouse

@@ -7,6 +7,7 @@ import {
   type TransportPeers,
 } from "@langwatch/kernel";
 import { otlpHeadersFrom, resourceAttributesFrom } from "@langwatch/observability/node";
+import { OperatorReadsResolver } from "@langwatch/prisma-client";
 import {
   MEMBER_NAMES,
   hostedMembers,
@@ -119,20 +120,25 @@ export class ProcessServer implements ProcessBoot {
     const config = this.config.stores as StoresConfig;
     const secrets = this.resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets));
     let members: ProcessMemberSource | undefined;
+    let operatorReads: OperatorReadsResolver | undefined;
     try {
       const telemetryExporter = await this.resolver
         .scopeTo(observabilityOwner.name, Object.values(observabilityOwner.secrets))
         .into(observabilityOwner.secrets.otlpHeaders, (rawHeaders) =>
           telemetryExporterOf({ observability: this.config.observability, rawHeaders }),
         );
-      const opened = await openProcessStores({
+      const stores = await openProcessStores({
         name: this.server.name,
         config,
         secrets,
         pipelines,
         production: this.production,
       });
+      const opened = stores.members;
       members = opened;
+      // The mint stays here: only the root scopes it, per module, and seals it below.
+      const operatorReadsResolver = OperatorReadsResolver.over({ mint: stores.operatorReads });
+      operatorReads = operatorReadsResolver;
       let surface: ((peers: TransportPeers) => ExposedSurface<unknown, unknown>) | undefined;
       let doors: RawHttpHost | undefined;
       if (role === "api" && transports) {
@@ -169,6 +175,7 @@ export class ProcessServer implements ProcessBoot {
         // A module resolves only the handles it declared; `seal()` below then
         // refuses every resolve attempted after boot.
         secrets: (owner, declared) => this.resolver.scopeTo(owner, declared),
+        operatorReads: (scope) => operatorReadsResolver.scopeTo(scope),
         // The stores answer the declared members; what this process composed
         // itself overrides them and extends the order, so a module naming a
         // member no store carries is answered rather than refused at boot.
@@ -217,6 +224,7 @@ export class ProcessServer implements ProcessBoot {
       throw error;
     } finally {
       this.resolver.seal();
+      operatorReads?.seal();
     }
   }
 
