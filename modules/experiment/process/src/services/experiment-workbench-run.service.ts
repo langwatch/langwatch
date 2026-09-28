@@ -8,6 +8,7 @@ import {
   ExperimentRunNotFoundError as RunNotFoundError,
   InvalidExperimentConfigurationError,
   createInitialUIState,
+  generateHumanReadableId,
   persistedEvaluationsV3StateSchema,
   runInputsBodySchema,
   runsSavedDataset,
@@ -27,6 +28,7 @@ import {
 } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 
 import type {
@@ -37,33 +39,43 @@ import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.proce
 import { runLoopOf, runProgressOf } from "../rules/experiment-run-loop.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 import { ExperimentExecutionDataService } from "./experiment-execution-data.service.ts";
+import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service.ts";
-import { ExperimentRunResultsWriterService } from "./experiment-run-results-writer.service.ts";
-import { ExperimentRunStateMirrorService } from "./experiment-run-state-mirror.service.ts";
+import { ExperimentRunPlanService } from "./experiment-run-plan.service.ts";
 import { ExperimentSavedStateExecutionService } from "./experiment-saved-state-execution.service.ts";
+import {
+  ExperimentWorkbenchPipelineRunService,
+  type WorkbenchRunPipeline,
+} from "./experiment-workbench-pipeline-run.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
 
 export type WorkbenchExecutionRequest = z.infer<typeof executionRequestSchema>;
 
-export class ExperimentWorkbenchRunService {
-  private constructor(
-    private readonly experiments: ExperimentService,
-    private readonly runLoop: ExperimentV3RunLoop,
-    private readonly observer: ExperimentWorkbenchObserver,
-  ) {}
+type WorkbenchRunDeps = {
+  experiments: ExperimentService;
+  runLoop: ExperimentV3RunLoop;
+  observer: ExperimentWorkbenchObserver;
+  /** Absent where a suite builds no run pipeline; a pipeline run is then refused by name. */
+  runs?: WorkbenchRunPipeline;
+};
 
-  static create(options: {
-    experiments: ExperimentService;
-    runLoop: ExperimentV3RunLoop;
-    observer: ExperimentWorkbenchObserver;
-  }): ExperimentWorkbenchRunService {
-    return new ExperimentWorkbenchRunService(
-      options.experiments,
-      options.runLoop,
-      options.observer,
-    );
+export class ExperimentWorkbenchRunService {
+  private readonly experiments: ExperimentService;
+  private readonly runLoop: ExperimentV3RunLoop;
+  private readonly observer: ExperimentWorkbenchObserver;
+  private readonly runs: WorkbenchRunPipeline | undefined;
+
+  private constructor(deps: WorkbenchRunDeps) {
+    this.experiments = deps.experiments;
+    this.runLoop = deps.runLoop;
+    this.observer = deps.observer;
+    this.runs = deps.runs;
+  }
+
+  static create(deps: WorkbenchRunDeps): ExperimentWorkbenchRunService {
+    return new ExperimentWorkbenchRunService(deps);
   }
 
   /** `POST /:slug/run`: a polled run by default, a streamed one when the caller accepts events. */
@@ -188,7 +200,7 @@ export class ExperimentWorkbenchRunService {
     return { kind: "started", runId, status: "running", total, runUrl };
   }
 
-  /** `POST /execute`: the browser's run, mirrored onto the run store and the saved cells. */
+  /** `POST /execute`: the browser's run, planned here and executed by the worker's run pipeline. */
   async executeWorkbenchRun(
     input: WorkbenchExecutionRequest,
     by: Readonly<{ id: string }>,
@@ -197,7 +209,9 @@ export class ExperimentWorkbenchRunService {
 
     logger.info({ projectId, scope: input.scope }, "Starting experiment execution");
 
-    const { ports, progress } = runLoopOf(this.runLoop);
+    // The refusal a process without Redis or a public address owes, as before the pipeline.
+    const { ports } = runLoopOf(this.runLoop);
+    const runs = this.#pipeline();
 
     const dataResult = await ExperimentExecutionDataService.create().loadExecutionData({
       projectId,
@@ -233,54 +247,56 @@ export class ExperimentWorkbenchRunService {
       ui: createInitialUIState(),
     };
 
-    const mirror = ExperimentRunStateMirrorService.create({
-      projectId,
-      experimentId: input.experimentId,
-      experimentSlug: input.experimentSlug ?? "",
-      progress,
-    });
-
-    // The page saves these cells too, and it is the faster of the two. The
-    // server writes them so the board does not depend on the tab surviving.
-    const resultsWriter = ExperimentRunResultsWriterService.findWriterFor({
-      persistence: { experiments: this.experiments, actor: { userId: by.id, label: "user" } },
-      projectId,
-      experimentId: input.experimentId,
-      scope: input.scope,
-      data: input.data,
-      datasetId: input.dataset_id,
-      parameters: input.parameters,
-    });
-
-    const orchestrator = ExperimentRunOrchestratorService.create().runOrchestrator({
-      projectId,
-      experimentId: input.experimentId,
-      scope: input.scope,
-      state,
-      datasetRows: dataResult.datasetRows,
-      datasetColumns: dataResult.datasetColumns,
-      loadedPrompts: dataResult.loadedPrompts,
-      loadedAgents: dataResult.loadedAgents,
-      loadedEvaluators: dataResult.loadedEvaluators,
-      loadedWorkflows: dataResult.loadedWorkflows,
-      ports,
-      workflows: this.runLoop.workflows,
-      defaultConcurrency: this.runLoop.defaultConcurrency,
-      concurrency: input.concurrency,
-      seedTargetOutputs: input.seedTargetOutputs,
-      carriedOverCells: input.carriedOverCells,
+    const experimentId = input.experimentId ?? "";
+    const plan = ExperimentRunPlanService.create().buildPlan({
+      request: {
+        state,
+        scope: input.scope,
+        ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
+      },
+      data: dataResult,
+      concurrency: input.concurrency ?? this.runLoop.defaultConcurrency,
+      origin: "workbench",
+      // The page saves these cells too; the server writes them so the board outlives the tab.
+      persistResults:
+        experimentId !== "" &&
+        runsSavedDataset({
+          ...(input.data !== undefined ? { data: input.data } : {}),
+          ...(input.dataset_id !== undefined ? { dataset_id: input.dataset_id } : {}),
+          ...(input.parameters !== undefined ? { parameters: input.parameters } : {}),
+        }),
+      actor: { userId: by.id, label: "user" },
+      ...(input.experimentSlug !== undefined ? { experimentSlug: input.experimentSlug } : {}),
     });
 
     return {
       kind: "streaming",
-      events: this.#workbenchRunEvents({
-        orchestrator,
-        projectId,
-        experimentId: input.experimentId,
-        isFullRun: input.scope.type === "full",
+      events: ExperimentWorkbenchPipelineRunService.create({
+        experiments: this.experiments,
+        observer: this.observer,
+        runs,
+      }).streamRun({
+        start: {
+          tenantId: projectId,
+          occurredAt: nowInstant().epochMilliseconds,
+          runId: generateHumanReadableId(),
+          experimentId,
+          workflowVersionId: null,
+          total: plan.cells.length,
+          targets: ExperimentResultDispatchService.create().buildTargetMetadata({
+            targets: state.targets,
+            loadedPrompts: dataResult.loadedPrompts,
+            loadedAgents: dataResult.loadedAgents,
+            loadedEvaluators: dataResult.loadedEvaluators,
+            loadedWorkflows: dataResult.loadedWorkflows,
+          }),
+          plan,
+        },
+        ownership: ports.connectedAgentOwnership,
+        data: dataResult,
+        state,
+        input,
         userId: by.id,
-        mirror,
-        resultsWriter,
       }),
     };
   }
@@ -438,48 +454,12 @@ export class ExperimentWorkbenchRunService {
     }
   }
 
-  /** The `execute` stream: the board first, then the run store, then the customer. */
-  async *#workbenchRunEvents(options: {
-    orchestrator: AsyncIterable<EvaluationV3Event>;
-    projectId: string;
-    experimentId: string | undefined;
-    isFullRun: boolean;
-    userId: string;
-    mirror: ReturnType<typeof ExperimentRunStateMirrorService.create>;
-    resultsWriter: ReturnType<typeof ExperimentRunResultsWriterService.findWriterFor>;
-  }): AsyncGenerator<EvaluationV3Event> {
-    const { projectId, mirror, resultsWriter } = options;
-
-    try {
-      for await (const event of options.orchestrator) {
-        await resultsWriter?.record(event);
-        await mirror.record(event);
-        yield event;
-
-        if (event.type === "done" || event.type === "stopped") {
-          this.observer.recordExperimentRan({
-            userId: options.userId,
-            projectId,
-            experimentId: options.experimentId,
-            isFullRun: options.isFullRun,
-          });
-          break;
-        }
-      }
-    } catch (error) {
-      logger.error({ error, projectId }, "Orchestrator error");
-      this.observer.reportError(error, { projectId });
-
-      const failure = mapThrownErrorEvent({ error });
-      if (failure.type === "error") {
-        await mirror.fail({
-          code: failure.message,
-          domainError: failure.domainError,
-          traceId: failure.traceId,
-        });
-      }
-      yield failure;
+  #pipeline(): WorkbenchRunPipeline {
+    if (!this.runs) {
+      throw new Error("Experiment was asked to start a run on its pipeline, but none was built");
     }
+
+    return this.runs;
   }
 }
 

@@ -10,6 +10,9 @@ export const EXPERIMENT_RUN_EXECUTION_PROCESS_NAME = "experimentRunExecution";
 /** A run with no finished cell for this long has lost its cells (precedent: scenario's stall). */
 export const EXPERIMENT_RUN_STALL_MS = 15 * 60_000;
 
+/** Deliveries of one intent before the outbox retires it; the board write knows its last. */
+export const EXPERIMENT_RUN_INTENT_ATTEMPTS = 5;
+
 export const experimentRunExecutionStateSchema = z.object({
   status: z.enum(["idle", "running", "terminal"]),
   runId: z.string(),
@@ -84,6 +87,8 @@ export const completeRunIntentSchema = z.object({
   runId: z.string(),
   experimentId: z.string(),
   outcome: z.enum(["finished", "stopped"]),
+  /** The cells the manager counted finished, so the board write waits until the fold has them. */
+  finishedCells: z.number().int().nonnegative(),
 });
 
 export type ExecuteCellIntent = z.infer<typeof executeCellIntentSchema>;

@@ -10,6 +10,7 @@ import {
   generateHumanReadableId,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -24,8 +25,7 @@ import {
 
 import type { ExperimentV3RunLoop } from "../app/experiment-workbench.members.ts";
 import type { WorkflowEvaluationRequestedEventData } from "../eventing/experiment-run-events.process.ts";
-import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
-import { runLoopOf, runProgressOf } from "../rules/experiment-run-loop.rules.ts";
+import { runProgressOf } from "../rules/experiment-run-loop.rules.ts";
 import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
 import { requestedRunIsUntouched } from "../rules/experiment-workflow-evaluation.rules.ts";
 import type {
@@ -34,9 +34,10 @@ import type {
   LoadedExecutionData,
 } from "./experiment-execution-data.service.ts";
 import { ExperimentExecutionDataService } from "./experiment-execution-data.service.ts";
-import { ExperimentPollingRunService } from "./experiment-polling-run.service.ts";
+import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "./experiment-run-command-dispatcher.service.ts";
 import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service.ts";
+import { ExperimentRunPlanService } from "./experiment-run-plan.service.ts";
 import type { ExperimentRunErrorReporting } from "./experiment-run-results-writer.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
@@ -58,10 +59,13 @@ export type WorkflowEvaluationDependencies = {
   workflowSource: ExperimentWorkflowDsl;
   /** The datasets, prompts, agents and evaluators the load reads through. */
   services: ExecutionDataServices;
-  /** The run loop and its progress store, as this process composed them. */
+  /** The progress store a request registers its run in, and the run's default concurrency. */
   runLoop: ExperimentV3RunLoop;
-  /** Where the request is sent for the worker to run. */
-  requests: Pick<ExperimentRunCommandDispatcherService, "requestWorkflowEvaluation">;
+  /** Where the request is sent for the worker, and where the worker starts or fails the run. */
+  requests: Pick<
+    ExperimentRunCommandDispatcherService,
+    "requestWorkflowEvaluation" | "startExperimentRun" | "completeExperimentRun"
+  >;
   /** The deployment's public base URL, for the shareable results link. */
   baseUrl: string | undefined;
   errorReporting?: ExperimentRunErrorReporting;
@@ -140,7 +144,7 @@ export class WorkflowEvaluationService {
     };
   }
 
-  /** Runs a requested evaluation to its end, once: a redelivery finds the run already touched. */
+  /** Plans a requested evaluation and starts it on the run's pipeline, once; a refusal fails it. */
   async run(request: WorkflowEvaluationRequestedEventData & { tenantId: string }): Promise<void> {
     const progress = runProgressOf(this.dependencies.runLoop);
     if (!requestedRunIsUntouched(await progress.findRunState(request.runId))) {
@@ -148,10 +152,9 @@ export class WorkflowEvaluationService {
       return;
     }
 
-    let started: { ports: ExperimentRunCollaborators; prepared: PreparedEvaluation };
+    let started: { prepared: PreparedEvaluation; runUrl: string };
     try {
       started = {
-        ports: runLoopOf(this.dependencies.runLoop).ports,
         prepared: await this.prepare({
           projectId: request.tenantId,
           workflowId: request.workflowId,
@@ -160,47 +163,73 @@ export class WorkflowEvaluationService {
           datasetId: request.datasetId,
           parameters: request.parameters,
         }),
+        runUrl: getRunUrl({
+          baseUrl: this.#baseUrl(),
+          projectSlug: request.projectSlug,
+          experimentSlug: request.experimentSlug,
+          runId: request.runId,
+        }),
       };
     } catch (error) {
-      await ExperimentPollingRunService.create().failRegistered({
-        error,
-        runId: request.runId,
-        experimentSlug: request.experimentSlug,
-        projectId: request.tenantId,
-        progress,
-        ...(this.dependencies.errorReporting
-          ? { errorReporting: this.dependencies.errorReporting }
-          : {}),
-      });
+      await this.failRequested({ request, error });
       return;
     }
-    const { ports, prepared } = started;
+    const { prepared, runUrl } = started;
     const { state, dataResult } = prepared;
-
-    await ExperimentPollingRunService.create().runRegistered({
-      runId: request.runId,
-      projectId: request.tenantId,
-      projectSlug: request.projectSlug,
-      experimentId: request.experimentId,
+    const plan = ExperimentRunPlanService.create().buildPlan({
+      request: {
+        state,
+        scope: request.rowIndices
+          ? { type: "rows", rowIndices: request.rowIndices }
+          : { type: "full" },
+      },
+      data: dataResult,
+      concurrency: this.dependencies.runLoop.defaultConcurrency,
+      origin: "workflow",
+      persistResults: false,
       experimentSlug: request.experimentSlug,
-      scope: request.rowIndices
-        ? { type: "rows", rowIndices: request.rowIndices }
-        : { type: "full" },
-      state,
-      datasetRows: dataResult.datasetRows,
-      datasetColumns: dataResult.datasetColumns,
-      loadedPrompts: dataResult.loadedPrompts,
-      loadedAgents: dataResult.loadedAgents,
-      ports,
-      workflows: this.dependencies.runLoop.workflows,
-      loadedEvaluators: dataResult.loadedEvaluators,
-      loadedWorkflows: dataResult.loadedWorkflows,
-      defaultConcurrency: this.dependencies.runLoop.defaultConcurrency,
-      baseUrl: this.#baseUrl(),
-      progress,
-      ...(this.dependencies.errorReporting
-        ? { errorReporting: this.dependencies.errorReporting }
-        : {}),
+      runUrl,
+    });
+
+    await this.dependencies.requests.startExperimentRun({
+      tenantId: request.tenantId,
+      occurredAt: nowInstant().epochMilliseconds,
+      runId: request.runId,
+      experimentId: request.experimentId,
+      workflowVersionId: prepared.version.id,
+      total: plan.cells.length,
+      targets: ExperimentResultDispatchService.create().buildTargetMetadata({
+        targets: state.targets,
+        loadedPrompts: dataResult.loadedPrompts,
+        loadedAgents: dataResult.loadedAgents,
+        loadedEvaluators: dataResult.loadedEvaluators,
+        loadedWorkflows: dataResult.loadedWorkflows,
+      }),
+      plan,
+    });
+  }
+
+  /** A request the worker cannot prepare completes failed, with the refusal when it is handled. */
+  private async failRequested({
+    request,
+    error,
+  }: {
+    request: WorkflowEvaluationRequestedEventData & { tenantId: string };
+    error: unknown;
+  }): Promise<void> {
+    const { runId, experimentSlug, tenantId: projectId } = request;
+    logger.error({ error, runId, experimentSlug, projectId }, "Execution error");
+    this.dependencies.errorReporting?.captureException(error, {
+      extra: { runId, experimentSlug, projectId },
+    });
+
+    await this.dependencies.requests.completeExperimentRun({
+      tenantId: projectId,
+      occurredAt: nowInstant().epochMilliseconds,
+      runId,
+      experimentId: request.experimentId,
+      outcome: "failed",
+      ...(HandledError.isHandled(error) ? { error: error.serialize() } : {}),
     });
   }
 

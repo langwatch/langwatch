@@ -1,5 +1,6 @@
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import { COMPARISON_EVALUATOR_TYPE, type ExperimentRunPlan } from "@langwatch/experiment-contract";
+import { WorkflowVersionRequiredError } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
@@ -18,6 +19,7 @@ import type {
   ExperimentRunStartedEvent,
   TargetResultEvent,
   TargetResultEventData,
+  WorkflowEvaluationRequestedEvent,
 } from "../experiment-run-events.process.ts";
 import { ExperimentRunPlanFoldProjection } from "../experiment-run-plan.projection.ts";
 import { ExperimentRunPlanStore } from "../experiment-run-plan.store.ts";
@@ -137,6 +139,25 @@ function completed(data: Partial<ExperimentRunCompletedEventData>): ExperimentRu
     version: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
     data: { ...run, finishedAt: 4_000, ...data },
     occurredAt: 4_000,
+  });
+}
+
+function workflowEvaluationRequested(): WorkflowEvaluationRequestedEvent {
+  return EventUtils.createEvent<WorkflowEvaluationRequestedEvent>({
+    aggregateType: "experiment_run",
+    aggregateId,
+    tenantId,
+    type: EXPERIMENT_RUN_EVENT_TYPES.WORKFLOW_EVALUATION_REQUESTED,
+    version: "2026-09-25",
+    data: {
+      ...run,
+      experimentSlug: "evaluate-me",
+      projectSlug: "project-one",
+      workflowId: "workflow_1",
+      workflowVersionId: "version_1",
+      total: 3,
+    },
+    occurredAt: 500,
   });
 }
 
@@ -342,6 +363,48 @@ describe("the run's progress fold as main's poller JSON", () => {
       const state = progressAfter([started(plan), completed({ outcome: "failed" })]);
 
       expect(state).toMatchObject({ status: "failed", error: "lw.unnamed_failure" });
+    });
+  });
+
+  describe("when a workflow evaluation the worker could not prepare completes failed", () => {
+    /** @scenario "A requested evaluation the worker cannot prepare completes failed with its code" */
+    it("is stored failed with the refusal's code and the requested total, for the poller", async () => {
+      const refusal = new WorkflowVersionRequiredError().serialize();
+      const state = progressAfter([
+        workflowEvaluationRequested(),
+        completed({ outcome: "failed", error: refusal }),
+      ]);
+      const folds = MemoryExperimentRunFoldRepository.create();
+      await ExperimentRunProgressStore.create({ repository: folds }).store(state, {
+        aggregateId,
+        tenantId,
+      });
+
+      expect(state).toMatchObject({
+        projectId: "project_alpha",
+        runId: "run_1",
+        experimentId: "experiment_1",
+        experimentSlug: "evaluate-me",
+        status: "failed",
+        total: 3,
+        startedAt: 500,
+        finishedAt: 4_000,
+        error: "workflow_version_required",
+        domainError: refusal,
+      });
+      expect((await folds.readRunProgress({ runId: "run_1" })).kind).toBe("folded");
+    });
+
+    it("stores nothing for a request whose run has not started or failed", async () => {
+      const folds = MemoryExperimentRunFoldRepository.create();
+      const state = progressAfter([workflowEvaluationRequested()]);
+      await ExperimentRunProgressStore.create({ repository: folds }).store(state, {
+        aggregateId,
+        tenantId,
+      });
+
+      expect(state.status).toBe("pending");
+      expect((await folds.readRunProgress({ runId: "run_1" })).kind).toBe("empty");
     });
   });
 

@@ -11,7 +11,11 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import type { WorkflowEvaluationRequestedEventData } from "../../eventing/experiment-run-events.process.ts";
+import type {
+  ExperimentRunCompletedEventData,
+  ExperimentRunStartedEventData,
+  WorkflowEvaluationRequestedEventData,
+} from "../../eventing/experiment-run-events.process.ts";
 import {
   ExperimentRunProgressRepository,
   type ExperimentRunProgressFailure,
@@ -79,7 +83,8 @@ function entryDsl(inline: { question: string[] } = { question: ["a", "b", "c"] }
 
 type FakeVersion = { id: string; version: string; dsl: unknown };
 type FakeWorkflow = { id: string; name: string; archived?: boolean; versions: FakeVersion[] };
-type SentRequest = WorkflowEvaluationRequestedEventData & { tenantId: string; occurredAt: number };
+type Enveloped<Data> = Data & { tenantId: string; occurredAt: number };
+type SentRequest = Enveloped<WorkflowEvaluationRequestedEventData>;
 
 /** Version selection belongs to the source, so this one answers the last version by default. */
 function buildWorkflowSource(workflows: Record<string, FakeWorkflow>): ExperimentWorkflowDsl {
@@ -169,6 +174,8 @@ function buildService(
   const workflowSource = buildWorkflowSource(workflows);
   const experimentsAsked: FindOrCreateWorkflowExperimentInput[] = [];
   const sent: SentRequest[] = [];
+  const startsSent: unknown[] = [];
+  const completionsSent: unknown[] = [];
   const progress = new RecordedRunProgress();
   const services = {
     datasets: createApiFixture<DatasetApi>({}),
@@ -205,12 +212,33 @@ function buildService(
       requestWorkflowEvaluation: async (input) => {
         sent.push(input);
       },
+      startExperimentRun: async (input) => {
+        startsSent.push(input);
+      },
+      completeExperimentRun: async (input) => {
+        completionsSent.push(input);
+      },
     },
     baseUrl: "https://app.langwatch.test",
   });
 
-  return { service, experimentsAsked, sent, progress };
+  return {
+    service,
+    experimentsAsked,
+    sent,
+    progress,
+    starts: () => z.array(startSchema).parse(startsSent),
+    completions: () => z.array(completionSchema).parse(completionsSent),
+  };
 }
+
+/** What the tests read of a start the worker sent; the plan is the contract's to parse. */
+const startSchema = z.custom<Enveloped<ExperimentRunStartedEventData>>(
+  (value) => typeof value === "object" && value !== null && "plan" in value,
+);
+const completionSchema = z.custom<Enveloped<ExperimentRunCompletedEventData>>(
+  (value) => typeof value === "object" && value !== null && "outcome" in value,
+);
 
 const baseInput = {
   projectId: PROJECT_ID,
@@ -342,27 +370,67 @@ describe("WorkflowEvaluationService.request", () => {
 describe("WorkflowEvaluationService.run", () => {
   describe("given a request whose run already moved on", () => {
     /** @scenario A redelivered evaluation request does not run twice */
-    it("skips it without failing the run", async () => {
-      const { service, progress } = buildService();
+    it("skips it without starting or failing the run", async () => {
+      const { service, progress, starts, completions } = buildService();
       const started = await service.request(baseInput);
       const registered = progress.runs.get(started.runId);
       if (registered) progress.runs.set(started.runId, { ...registered, status: "completed" });
 
       await service.run(requestFor(started.runId));
 
-      expect(progress.failures.size).toBe(0);
+      expect(starts()).toEqual([]);
+      expect(completions()).toEqual([]);
     });
   });
 
-  describe("given a process that composed no run loop", () => {
-    /** @scenario A worker without a run loop fails the run it was sent */
-    it("records the run as failed rather than retrying it", async () => {
-      const { service, progress } = buildService();
+  describe("given a registered request for a workflow with a committed version", () => {
+    /** @scenario The worker starts a requested evaluation on the run's pipeline with its plan */
+    it("starts the run under its id with a plan of one cell per row", async () => {
+      const { service, starts } = buildService();
       const started = await service.request(baseInput);
 
       await service.run(requestFor(started.runId));
 
-      expect(progress.failures.has(started.runId)).toBe(true);
+      const [start] = starts();
+      expect(start).toMatchObject({
+        tenantId: PROJECT_ID,
+        runId: started.runId,
+        experimentId: "experiment_1",
+        workflowVersionId: "version_2",
+        total: 3,
+      });
+      expect(start?.plan).toMatchObject({
+        origin: "workflow",
+        persistResults: false,
+        concurrency: 1,
+        experimentSlug: "evaluate-me",
+        runUrl: `https://app.langwatch.test/${PROJECT_SLUG}/experiments/evaluate-me?runId=${started.runId}`,
+      });
+      expect(start?.plan?.cells.map((cell) => cell.rowIndex)).toEqual([0, 1, 2]);
+    });
+  });
+
+  describe("given a request the worker cannot prepare", () => {
+    /** @scenario A requested evaluation the worker cannot prepare completes failed with its code */
+    it("completes the run failed with the refusal, and starts nothing", async () => {
+      const { service, progress, starts, completions } = buildService({
+        workflows: { [WORKFLOW_ID]: { id: WORKFLOW_ID, name: "Evaluate me", versions: [] } },
+      });
+      await progress.createRun({
+        runId: "run_1",
+        projectId: PROJECT_ID,
+        experimentId: "experiment_1",
+        experimentSlug: "evaluate-me",
+        total: 3,
+      });
+
+      await service.run(requestFor("run_1"));
+
+      expect(starts()).toEqual([]);
+      expect(completions()).toMatchObject([
+        { tenantId: PROJECT_ID, runId: "run_1", experimentId: "experiment_1", outcome: "failed" },
+      ]);
+      expect(completions()[0]?.error?.code).toBe("workflow_version_required");
     });
   });
 });

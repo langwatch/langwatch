@@ -32,7 +32,6 @@ import {
   HttpExperimentAttachmentLinkChannel,
   type ExperimentAttachmentEgressPolicy,
 } from "../channels/http/http.experiment-attachment-link.channel.ts";
-import { createExperimentRunBoardWriteBackSubscriber } from "../eventing/experiment-run-board-write-back.subscriber.ts";
 import { ExecuteExperimentCellCommand } from "../eventing/experiment-run-cell.commands.ts";
 import {
   completeRun,
@@ -320,7 +319,7 @@ function attachmentInputs(input: {
   });
 }
 
-/** What the worker runs a run's cells with, and what reacts to its progress fold. */
+/** A run's folds, cells and board write-back, and the channel its frames travel on. */
 export type ExperimentRunCells = Readonly<{
   folds: ExperimentRunFoldRepository;
   cells: ExperimentRunCellService;
@@ -419,12 +418,9 @@ export function buildExperimentRunProcessing(input: {
     runExecution: {
       executeCell: executeCell(commands),
       failCell: failLostCell(commands),
-      complete: completeRun(commands),
+      complete: completeRun({ commands, boardWriteBack: runCells.boardWriteBack }),
     },
     runFrames: createExperimentRunFramesSubscriber({ stream: runCells.stream }),
-    runBoardWriteBack: createExperimentRunBoardWriteBackSubscriber({
-      boardWriteBack: runCells.boardWriteBack,
-    }),
   };
   if (redis) {
     const cached = RedisExperimentRunProcessingRepository.create({

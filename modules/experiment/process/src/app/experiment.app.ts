@@ -104,6 +104,7 @@ import type {
   ExperimentWorkbenchObserver,
 } from "#app/experiment-workbench.members";
 
+import type { ExperimentRunEventStream } from "../channels/experiment-run-event-stream.channel.ts";
 import type { ExperimentRunProcessingPipeline } from "../eventing/experiment-run-processing.pipeline.ts";
 import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
@@ -237,6 +238,8 @@ export interface ExperimentAppDependencies {
     pipeline: ExperimentRunProcessingPipeline;
     commands: ExperimentRunCommandDispatcherService;
     idLookup: ExperimentIdLookupRepository;
+    /** The channel a run's frames reach the process streaming it on. */
+    stream: ExperimentRunEventStream;
   }>;
 }
 
@@ -305,6 +308,12 @@ export class ExperimentApp implements ExperimentApi {
       attachmentEgress,
       dependencies,
     });
+    const runCells = buildExperimentRunCells({
+      redis: members.redis,
+      experiments: built.experiments,
+      attachmentEgress,
+      dependencies,
+    });
     return new ExperimentApp({
       ...built,
       runLookup: ExperimentFindOrCreateService.create(built.experiments),
@@ -314,16 +323,12 @@ export class ExperimentApp implements ExperimentApi {
           redis: members.redis,
           defaultRetentionDays: () => dependencies.retention.getPlatformDefaultRetentionDays(),
           workflowEvaluations: built.workflowEvaluations,
-          runCells: buildExperimentRunCells({
-            redis: members.redis,
-            experiments: built.experiments,
-            attachmentEgress,
-            dependencies,
-          }),
+          runCells,
           commands,
         }),
         commands,
         idLookup: buildExperimentIdLookup(members.clickhouse),
+        stream: runCells.stream,
       },
     });
   }
@@ -350,6 +355,7 @@ export class ExperimentApp implements ExperimentApi {
       experiments: dependencies.experiments,
       runLoop: dependencies.runLoop,
       observer: dependencies.workbenchObserver,
+      ...(dependencies.runProcessing ? { runs: dependencies.runProcessing } : {}),
     });
     this.#workbenchVersions = ExperimentWorkbenchVersionService.create({
       experiments: dependencies.experiments,

@@ -6,11 +6,13 @@ import type { IntentExecutor } from "@langwatch/eventing";
 import { ExperimentCellLostError } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
 
+import type { ExperimentRunBoardWriteBackService } from "../services/experiment-run-board-write-back.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
-import type {
-  CompleteRunIntent,
-  ExecuteCellIntent,
-  FailCellIntent,
+import {
+  type CompleteRunIntent,
+  EXPERIMENT_RUN_INTENT_ATTEMPTS,
+  type ExecuteCellIntent,
+  type FailCellIntent,
 } from "./experiment-run-execution.schemas.ts";
 
 type RunCommands = Pick<
@@ -42,9 +44,21 @@ export function failLostCell(commands: RunCommands): IntentExecutor<FailCellInte
   };
 }
 
-/** The run's `completed`, stamped finished or stopped as the manager decided. */
-export function completeRun(commands: RunCommands): IntentExecutor<CompleteRunIntent> {
+/** The run's cells onto the board, then its `completed`, stamped as the manager decided (R4). */
+export function completeRun({
+  commands,
+  boardWriteBack,
+}: {
+  commands: RunCommands;
+  boardWriteBack: Pick<ExperimentRunBoardWriteBackService, "writeBack">;
+}): IntentExecutor<CompleteRunIntent> {
   return async (payload, context) => {
+    await boardWriteBack.writeBack({
+      runId: payload.runId,
+      experimentId: payload.experimentId,
+      finishedCells: payload.finishedCells,
+      lastAttempt: context.attempt >= EXPERIMENT_RUN_INTENT_ATTEMPTS,
+    });
     const at = nowInstant().epochMilliseconds;
     await commands.completeExperimentRun({
       tenantId: context.tenantId,

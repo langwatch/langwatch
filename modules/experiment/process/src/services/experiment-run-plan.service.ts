@@ -14,7 +14,6 @@ import {
   type ExperimentRunTargetCell,
 } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { RunActor } from "@langwatch/scenario-contract";
 
 import { promptLoadKey, workflowLoadKey } from "../rules/experiment-execution-data.rules.ts";
 import {
@@ -58,13 +57,18 @@ export class ExperimentRunPlanService {
     origin,
     persistResults,
     actor,
+    experimentSlug,
+    runUrl,
   }: {
     request: ExperimentRunPlanRequest;
     data: ExperimentRunPlanData;
     concurrency: number;
     origin: ExperimentRunOrigin;
     persistResults: boolean;
-    actor?: RunActor;
+    actor?: ExperimentRunPlan["actor"];
+    /** What a poll of the run answers with; a browser's run names no project slug, so no link. */
+    experimentSlug?: string;
+    runUrl?: string;
   }): ExperimentRunPlan {
     const { state, scope, seedTargetOutputs } = request;
     const targetCells = this.cellPlan
@@ -82,6 +86,8 @@ export class ExperimentRunPlanService {
       origin,
       persistResults,
       ...(actor ? { actor } : {}),
+      ...(experimentSlug !== undefined ? { experimentSlug } : {}),
+      ...(runUrl !== undefined ? { runUrl } : {}),
       scope,
       mappingDatasetId: this.cellPlan.resolveMappingDatasetId(state),
       targets: state.targets,

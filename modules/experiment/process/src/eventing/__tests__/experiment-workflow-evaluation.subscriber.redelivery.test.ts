@@ -15,7 +15,7 @@ import { WorkflowEvaluationService } from "../../services/experiment-workflow-ev
 import { workflowEvaluationRequestedEventSchema } from "../experiment-run-events.process.ts";
 import { createWorkflowEvaluationRequestedSubscriber } from "../experiment-workflow-evaluation.subscriber.ts";
 
-/** A registered run whose failure moves it on, as the Redis store does. */
+/** A registered run; the progress fold's failure lands under the same key the poll reads. */
 class OneRegisteredRun extends ExperimentRunProgressRepository {
   state: ExperimentRunProgressState = {
     runId: "run_1",
@@ -35,6 +35,10 @@ class OneRegisteredRun extends ExperimentRunProgressRepository {
   async completeRun(): Promise<void> {}
   async failRun(_runId: string, failure: ExperimentRunProgressFailure): Promise<void> {
     this.failures.push(failure);
+  }
+  /** The fold folding a `completed{failed}`, as it does onto main's poller key. */
+  foldFailure(): void {
+    this.failures.push({ code: "lw.unnamed_failure" });
     this.state = { ...this.state, status: "failed" };
   }
   async stopRun(): Promise<void> {}
@@ -81,7 +85,13 @@ describe("workflowEvaluationRequested redelivery", () => {
           defaultConcurrency: 1,
           startRun: () => Promise.reject(new Error("not reached")),
         },
-        requests: { requestWorkflowEvaluation: () => Promise.reject(new Error("not reached")) },
+        requests: {
+          requestWorkflowEvaluation: () => Promise.reject(new Error("not reached")),
+          startExperimentRun: () => Promise.reject(new Error("not reached")),
+          completeExperimentRun: async () => {
+            progress.foldFailure();
+          },
+        },
         baseUrl: "https://app.langwatch.test",
       }),
     );

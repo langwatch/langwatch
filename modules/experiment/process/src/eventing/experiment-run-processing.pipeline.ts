@@ -91,9 +91,8 @@ export interface ClickhouseExperimentRunProcessingRepository {
   executeCell: ExecuteExperimentCellCommand;
   /** What the run's execution manager's intents send. */
   runExecution: ExperimentRunExecutionEffects;
-  /** The progress fold's reactions: live frames, and an ended run's board write-back. */
+  /** The progress fold's reaction: each event's frames, live on the run's channel. */
   runFrames: ExperimentRunProgressSubscriber;
-  runBoardWriteBack: ExperimentRunProgressSubscriber;
 }
 
 export type ExperimentRunProcessingPipeline = StaticPipelineDefinition<
@@ -154,8 +153,7 @@ export function buildExperimentRunProcessingPipeline(
       EXPERIMENT_RUN_EXECUTION_PROCESS_NAME,
       experimentRunExecutionProcess(deps.runExecution),
     )
-    .withProjectionSubscriber(deps.runFrames.name, deps.runFrames.spec)
-    .withProjectionSubscriber(deps.runBoardWriteBack.name, deps.runBoardWriteBack.spec);
+    .withProjectionSubscriber(deps.runFrames.name, deps.runFrames.spec);
 
   return builder
     .withCommand("startExperimentRun", StartExperimentRunCommand)

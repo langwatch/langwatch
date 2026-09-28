@@ -358,6 +358,36 @@ Feature: An experiment run executes on its pipeline
     When it is read by the run's id
     Then it is found, and another experiment's run with the same id reads as empty
 
+  # The start path (switchover step 5a, spec sections 7 and 9).
+  @integration
+  Scenario: A streamed workbench run subscribes to its frames, then starts on the run's pipeline
+    Given a workbench run posted to execute
+    When the api plans it and sends its start
+    Then the start carries the plan, credited to the person who posted it
+    And the stream carries the run's frames once each, in seq order, and ends with done
+
+  @integration
+  Scenario: A workbench run against someone else's personal agent streams its refusal and starts nothing
+    Given a workbench whose target is another person's personal development agent
+    When the workbench posts it to execute
+    Then the stream carries main's error frame with code "agent_owner_only"
+    And no start is sent
+
+  @unit
+  Scenario: A run's cells land on the board before it is completed
+    Given a finished or stopped run that writes its results back
+    When the run manager completes it
+    Then the run's result frames are merged into the board, credited to whoever the plan credits
+    And only then is the run completed
+    And a run that keeps its results off the board writes nothing
+
+  @unit
+  Scenario: The board write waits until the progress fold has every finished cell
+    Given a run whose manager counted more finished cells than its progress fold has folded
+    When the completion is delivered
+    Then it throws and is retried, writing and completing nothing
+    And its last attempt writes what is folded and completes the run
+
   # The run's plan, built in the request before StartExperimentRun (spec sections 2, 4 and 8, D4, D5).
   @unit
   Scenario: A run's plan lists its target cells, then its comparison cells, in one ordinal order
@@ -393,6 +423,13 @@ Feature: An experiment run executes on its pipeline
     When its plan is built
     Then each output is a cell that skips its target and carries the output and its trace
     And no comparison cell is planned
+
+  @unit
+  Scenario: A run's plan credits whoever started it and names its slug and link
+    Given a run started by a person, a Langy session or a key that names no person
+    When its plan is built
+    Then the plan credits each as it was
+    And it carries the experiment's slug and the run's link for the poller
 
   @unit
   Scenario: The comparison set is planned from the run's configuration alone

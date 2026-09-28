@@ -22,9 +22,12 @@ import {
   experimentRunStartedEventSchema,
   type TargetResultEvent,
   targetResultEventSchema,
+  type WorkflowEvaluationRequestedEvent,
+  workflowEvaluationRequestedEventSchema,
 } from "./experiment-run-events.process.ts";
 
 const experimentRunProgressEvents = [
+  workflowEvaluationRequestedEventSchema,
   experimentRunStartedEventSchema,
   targetResultEventSchema,
   evaluatorResultEventSchema,
@@ -84,6 +87,25 @@ export class ExperimentRunProgressFoldProjection
       failed: 0,
       persistResults: false,
       resultFrames: {},
+    };
+  }
+
+  /** A workflow evaluation before its start: what a failure to prepare it reports, never stored. */
+  handleExperimentRunWorkflowEvaluationRequested(
+    event: WorkflowEvaluationRequestedEvent,
+    state: ExperimentRunProgressState,
+  ): ExperimentRunProgressState {
+    if (state.status !== "pending") return state;
+
+    const { data } = event;
+    return {
+      ...state,
+      projectId: String(event.tenantId),
+      runId: data.runId,
+      experimentId: data.experimentId,
+      experimentSlug: data.experimentSlug,
+      total: data.total,
+      startedAt: event.occurredAt,
     };
   }
 
@@ -209,9 +231,10 @@ export class ExperimentRunProgressFoldProjection
     event: ExperimentRunCompletedEvent,
     state: ExperimentRunProgressState,
   ): ExperimentRunProgressState {
-    if (state.status !== "running") return state;
-
     const { outcome, error } = event.data;
+    const refusedBeforeStart = state.status === "pending" && outcome === "failed";
+    if (state.status !== "running" && !refusedBeforeStart) return state;
+
     const finishedAt = event.data.finishedAt ?? event.data.stoppedAt ?? event.occurredAt;
     if (outcome === "stopped") {
       return this.streamed({ event, state: { ...state, status: "stopped", finishedAt } });
@@ -219,6 +242,16 @@ export class ExperimentRunProgressFoldProjection
     if (outcome === "failed") {
       const failed = {
         ...state,
+        // A run the worker could not prepare is stored all the same, so the poller reads why.
+        ...(refusedBeforeStart
+          ? {
+              projectId: String(event.tenantId),
+              runId: event.data.runId,
+              experimentId: event.data.experimentId,
+              startedAt: state.startedAt || event.occurredAt,
+              planned: true,
+            }
+          : {}),
         status: "failed" as const,
         finishedAt,
         error: error?.code ?? UNNAMED_FAILURE,

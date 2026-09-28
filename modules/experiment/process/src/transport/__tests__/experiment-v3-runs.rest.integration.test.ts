@@ -3,6 +3,7 @@
  * The workbench's run doors over a real `ExperimentApp`, pinned to the wire
  * main published: every status, JSON body, event-stream header and frame.
  */
+import { AgentOwnerOnlyError } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
@@ -12,14 +13,18 @@ import {
   RestHost,
 } from "@langwatch/api/rest";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { Experiment, ExperimentRun } from "@langwatch/experiment-contract";
+import type { ExecutionSummary, Experiment, ExperimentRun } from "@langwatch/experiment-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ExperimentV3RunLoop } from "../../app/experiment-workbench.members.ts";
 import { ExperimentApp, type ExperimentAppDependencies } from "../../app/experiment.app.ts";
+import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
+import type { ExperimentRunStreamMessage } from "../../channels/experiment-run-event-stream.channel.ts";
+import type { ExperimentRunProcessingPipeline } from "../../eventing/experiment-run-processing.pipeline.ts";
 import { experimentServer } from "../../experiment.server.ts";
+import type { ExperimentIdLookupRepository } from "../../repositories/experiment-id-lookup.repository.ts";
 import type {
   ExperimentRunProgressRepository,
   ExperimentRunProgressState,
@@ -27,6 +32,7 @@ import type {
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
 import type { ExperimentWorkflowDsl } from "../../services/experiment-execution-data.service.ts";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
+import { ExperimentRunCommandDispatcherService } from "../../services/experiment-run-command-dispatcher.service.ts";
 import type { WorkflowEvaluationService } from "../../services/experiment-workflow-evaluation.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
 import {
@@ -38,6 +44,15 @@ import { experimentWorkbenchRunRest } from "../experiment-workbench-run.rest.ts"
 import { experimentRestCredential } from "../experiment.rest.ts";
 
 const PROJECT = "project-1";
+
+const doneSummary = (runId: string): ExecutionSummary => ({
+  runId,
+  totalCells: 0,
+  completedCells: 0,
+  failedCells: 0,
+  duration: 1,
+  timestamps: { startedAt: 1, finishedAt: 2 },
+});
 
 const inlineDataset = {
   id: "dataset-1",
@@ -84,9 +99,37 @@ type Harness = {
   experiments?: Partial<ExperimentService>;
   progress?: Partial<ExperimentRunProgressRepository> | null;
   ports?: ExperimentRunCollaborators | null;
+  /** What the run pipeline's worker publishes on the run's channel once a start is sent. */
+  worker?: (start: { runId: string }) => ExperimentRunStreamMessage[];
 };
 
-function harness({ experiments = {}, progress = null, ports = null }: Harness = {}) {
+/** The run pipeline as the api process holds it: its senders, and the channel of its frames. */
+function runPipeline(worker: NonNullable<Harness["worker"]>) {
+  const stream = experimentRunEventStreamChannels.memory.create();
+  const commands = ExperimentRunCommandDispatcherService.create();
+  const starts: unknown[] = [];
+  commands.connect({
+    startExperimentRun: {
+      send: async (start: { runId: string }) => {
+        starts.push(start);
+        for (const message of worker(start))
+          await stream.publish({ runId: start.runId, ...message });
+      },
+    },
+  });
+  return {
+    starts,
+    runProcessing: {
+      pipeline: createApiFixture<ExperimentRunProcessingPipeline>({}, "pipeline"),
+      commands,
+      idLookup: createApiFixture<ExperimentIdLookupRepository>({}, "idLookup"),
+      stream,
+    },
+  };
+}
+
+function harness({ experiments = {}, progress = null, ports = null, worker }: Harness = {}) {
+  const pipeline = worker ? runPipeline(worker) : undefined;
   const experimentService = createApiFixture<ExperimentService>(experiments, "ExperimentService");
   const startRun = vi.fn(async () => ({
     runId: "run-9",
@@ -127,6 +170,7 @@ function harness({ experiments = {}, progress = null, ports = null }: Harness = 
     runLoop,
     workbenchObserver: { recordExperimentRan: vi.fn(), reportError: vi.fn() },
     workflowEvaluations: createApiFixture<WorkflowEvaluationService>({}, "workflowEvaluations"),
+    ...(pipeline ? { runProcessing: pipeline.runProcessing } : {}),
   };
   const app = ExperimentApp.createForTesting(dependencies);
 
@@ -191,6 +235,7 @@ function harness({ experiments = {}, progress = null, ports = null }: Harness = 
 
   return {
     startRun,
+    starts: pipeline?.starts ?? [],
     request: (path: string, init?: RequestInit) =>
       keyed.fetch(new Request(`http://api.test/api/experiments${path}`, init)),
     mounted: (path: string) =>
@@ -545,11 +590,19 @@ describe("POST /api/experiments/execute", () => {
     scope: { type: "full" },
   };
 
-  it("streams data frames under the framework's event-stream headers", async () => {
-    const { execute } = harness({
-      ports: createApiFixture<ExperimentRunCollaborators>(),
-      progress: {},
-    });
+  const runnable = createApiFixture<ExperimentRunCollaborators>({
+    connectedAgentOwnership: { assertConnectedAgentsRunnable: async () => {} },
+  });
+  const worker = ({ runId }: { runId: string }): ExperimentRunStreamMessage[] => [
+    { seq: 1, frame: { type: "execution_started", runId, total: 0 } },
+    { seq: 1, frame: { type: "execution_started", runId, total: 0 } },
+    { seq: 2, frame: { type: "done", summary: doneSummary(runId) } },
+    { seq: 3, frame: { type: "progress", completed: 1, total: 1 } },
+  ];
+
+  /** @scenario "A streamed workbench run subscribes to its frames, then starts on the run's pipeline" */
+  it("streams the run's frames under the framework's event-stream headers until done", async () => {
+    const { execute } = harness({ ports: runnable, progress: {}, worker });
 
     const response = await execute(request);
 
@@ -559,14 +612,48 @@ describe("POST /api/experiments/execute", () => {
       cacheControl: "no-cache, no-transform",
       connection: "keep-alive",
     });
-    expect(await framesOf(response)).toMatchInlineSnapshot(`
-      [
-        {
-          "message": "lw.unnamed_failure",
-          "type": "error",
+    expect((await framesOf(response)).map((frame) => frame.type)).toEqual([
+      "execution_started",
+      "done",
+    ]);
+  });
+
+  /** @scenario "A streamed workbench run subscribes to its frames, then starts on the run's pipeline" */
+  it("starts the run with its plan, credited to the person who started it", async () => {
+    const { execute, starts } = harness({ ports: runnable, progress: {}, worker });
+
+    await (await execute(request)).text();
+
+    expect(starts).toMatchObject([
+      {
+        tenantId: PROJECT,
+        experimentId: "experiment-1",
+        total: 0,
+        plan: { origin: "workbench", actor: { userId: "user-1", label: "user" }, cells: [] },
+      },
+    ]);
+  });
+
+  /** @scenario "A workbench run against someone else's personal agent streams its refusal and starts nothing" */
+  it("streams the ownership refusal as main's error frame and sends no start", async () => {
+    const refused = createApiFixture<ExperimentRunCollaborators>({
+      connectedAgentOwnership: {
+        assertConnectedAgentsRunnable: async () => {
+          throw new AgentOwnerOnlyError({
+            agentId: "agent-1",
+            agentName: "Laptop agent",
+            ownerUserId: "user-2",
+            ownerName: "Someone else",
+          });
         },
-      ]
-    `);
+      },
+    });
+    const { execute, starts } = harness({ ports: refused, progress: {}, worker });
+
+    const frames = await framesOf(await execute(request));
+
+    expect(frames).toMatchObject([{ type: "error", message: "agent_owner_only" }]);
+    expect(starts).toEqual([]);
   });
 
   it("refuses with the run-loop refusal where no run loop was composed", async () => {

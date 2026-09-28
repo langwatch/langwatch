@@ -137,13 +137,19 @@ the durable record the manager honours, and the flag is the fast signal. The fla
   - Latency: one queue hop and one publish, roughly 50 to 300 ms per frame against main's
     in-process zero.
 - **Polled `GET /runs/:runId`** and `/results` read the fold. Wire unchanged.
-- **Board write-back:** a projection subscriber `experimentRunBoardWriteBack` on `completed`, for a run
-  whose plan persists results, folds the kept result frames into main's draft and writes it through
-  `ExperimentRunResultsWriterService` when the run finished or stopped; a failed run writes nothing,
-  as main's did. It is attributed to the plan's actor (else the API).
+- **Board write-back, before `completed` (main's order):** the manager's `complete` intent carries
+  the cells it counted finished. Its executor, for a run whose plan persists results, first folds the
+  progress fold's kept result frames into main's draft and writes it through
+  `ExperimentRunResultsWriterService`, then sends CompleteExperimentRun. While the progress fold has
+  folded fewer finished cells than the manager counted, the executor throws and the outbox retries
+  it; the intent's last attempt writes what is folded, so the run always completes. The manager
+  completes only finished or stopped runs, so a failed run writes nothing, as main's did. The write
+  is credited to the plan's actor (a person, a Langy session or a key with no person), else the API.
 - **Workflow evaluations:** the api still registers the run and sends RequestWorkflowEvaluation. The
-  worker's subscriber now prepares the run (workflow, version, dataset) and sends StartExperimentRun;
-  a refusal appends `completed{failed}` with the code.
+  worker's subscriber now prepares the run (workflow, version, dataset), plans it with its slug and
+  link, and sends StartExperimentRun; a refusal appends `completed{failed}` with the serialised
+  HandledError (none for an unnamed failure). The progress fold folds the request's slug and total,
+  so a run refused before its start is stored failed for the poller with its code and total.
 
 ## 8. Collaborators per handler, and what is deleted
 
@@ -186,8 +192,9 @@ foreign run, and GET runs' bodies. Differences:
    main loaded everything once at start and never noticed.
 10. An evaluator that throws streams as its `evaluator_result` with an `error` result, where main
     sent an `error` frame naming the evaluator; the board renders both alike (`applyRunEvent`).
-11. The board write-back runs after the fold reads `completed`, so a poller can see `completed` a
-    moment before the board holds the cells; main wrote the cells before marking the run completed.
+11. The board write lands before `completed`, as main's did, but a slow progress fold can delay the
+    completion by up to the intent's retries (about 15 s); past them the run completes with the
+    cells the fold had, where main's in-process writer always had every cell.
 12. A redelivered result event streams its frame again under a new `seq` (the fold keeps no applied
     event ids); the board shows the same cell. A redelivered finish, start or completion streams
     nothing.

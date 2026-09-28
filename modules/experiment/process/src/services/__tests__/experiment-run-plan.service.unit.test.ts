@@ -129,7 +129,7 @@ function planOf(request: ExperimentRunPlanRequest) {
     concurrency: 4,
     origin: "workbench",
     persistResults: true,
-    actor: { id: "user_1", label: "user" },
+    actor: { userId: "user_1", label: "user" },
   });
 }
 
@@ -182,11 +182,49 @@ describe("ExperimentRunPlanService.buildPlan", () => {
         concurrency: 4,
         origin: "workbench",
         persistResults: true,
-        actor: { id: "user_1", label: "user" },
+        actor: { userId: "user_1", label: "user" },
         scope: { type: "full" },
       });
       expect(plan.targets.map((target) => target.id)).toEqual(["target_a", "target_b"]);
       expect(plan.evaluators.map((evaluator) => evaluator.id)).toEqual(["exact", "judge"]);
+    });
+  });
+
+  describe("given a run started by a Langy session or by a key that names no person", () => {
+    /** @scenario "A run's plan credits whoever started it and names its slug and link" */
+    it.each([
+      ["a Langy session", { userId: "user_1", label: "langy" as const }],
+      ["a key with no person", { label: "api" as const }],
+    ])("credits %s as it was", (_case, actor) => {
+      const plan = ExperimentRunPlanService.create().buildPlan({
+        request: requestWith(),
+        data,
+        concurrency: 4,
+        origin: "saved",
+        persistResults: true,
+        actor,
+      });
+
+      expect(plan.actor).toEqual(actor);
+    });
+
+    /** @scenario "A run's plan credits whoever started it and names its slug and link" */
+    it("carries the experiment's slug and the run's link for the poller", () => {
+      const plan = ExperimentRunPlanService.create().buildPlan({
+        request: requestWith(),
+        data,
+        concurrency: 4,
+        origin: "workflow",
+        persistResults: false,
+        experimentSlug: "checkout-eval",
+        runUrl: "https://app.langwatch.test/acme/experiments/checkout-eval?runId=run_1",
+      });
+
+      expect(plan).toMatchObject({
+        experimentSlug: "checkout-eval",
+        runUrl: "https://app.langwatch.test/acme/experiments/checkout-eval?runId=run_1",
+      });
+      expect(plan).not.toHaveProperty("actor");
     });
   });
 

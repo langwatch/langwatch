@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
@@ -8,8 +7,6 @@ import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../../rules/experiment-run-event-types.rules.ts";
-import type { ExperimentRunBoardWriteBackService } from "../../services/experiment-run-board-write-back.service.ts";
-import { createExperimentRunBoardWriteBackSubscriber } from "../experiment-run-board-write-back.subscriber.ts";
 import type { CellFinishedEvent } from "../experiment-run-events.process.ts";
 import { createExperimentRunFramesSubscriber } from "../experiment-run-frames.subscriber.ts";
 
@@ -103,26 +100,5 @@ describe("the run's frames subscriber", () => {
 
       expect(stream.published.get("run_1")).toBeUndefined();
     });
-  });
-});
-
-describe("the run's board write-back subscriber", () => {
-  it("hands the ended run's fold to the write-back under its aggregate key", async () => {
-    const calls: string[] = [];
-    const boardWriteBack = createApiFixture<ExperimentRunBoardWriteBackService>(
-      {
-        writeBack: async ({ runKey }) => {
-          calls.push(runKey);
-        },
-      },
-      "boardWriteBack",
-    );
-    const { spec } = createExperimentRunBoardWriteBackSubscriber({ boardWriteBack });
-    const event = cellFinished();
-
-    await spec.handler(event, { tenantId, aggregateId, state: folded(event, {}) });
-
-    expect(spec.events).toEqual([EXPERIMENT_RUN_EVENT_TYPES.COMPLETED]);
-    expect(calls).toEqual([aggregateId]);
   });
 });
