@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -9,11 +9,14 @@ import { describe, expect, it } from "vitest";
  */
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-// The API process is the composition root now. The platform application was
-// the one that composed identity when this guard was written, and it is gone.
-const APP_SRC = join(REPO_ROOT, "apps", "api", "src");
+/** Every tree that ships application code; the identity module composes itself in its app. */
+const APPLICATION_ROOTS = ["apps", "modules", "enterprise", "packages"];
+/** The word boundary keeps `CryptoIdentifierIdentityService.create(` from matching. */
+const CONSTRUCTS_IDENTITY_SERVICE = /(?:\bnew IdentityService\(|\bIdentityService\.create\()/;
 const IDENTITY_SRC = join(REPO_ROOT, "modules", "identity", "contract", "src");
 const IDENTITY_SERVER_SRC = join(REPO_ROOT, "modules", "identity", "process", "src");
+
+const SKIPPED_DIRECTORIES = new Set(["__tests__", "node_modules", "dist"]);
 
 function sourceFiles(root: string): string[] {
   const files: string[] = [];
@@ -21,7 +24,7 @@ function sourceFiles(root: string): string[] {
     for (const entry of readdirSync(dir)) {
       const path = join(dir, entry);
       if (statSync(path).isDirectory()) {
-        if (entry !== "__tests__" && entry !== "node_modules") walk(path);
+        if (!SKIPPED_DIRECTORIES.has(entry)) walk(path);
         continue;
       }
       if (path.endsWith(".ts") && !path.endsWith(".test.ts")) files.push(path);
@@ -98,18 +101,24 @@ describe("identity package boundaries", () => {
     });
   });
 
-  describe("when the API process's sources are scanned", () => {
-    /** @scenario "The app composes the identity services in exactly one place" */
-    it("construct IdentityService only in the identity composition", () => {
+  describe("when every process, module and package is scanned", () => {
+    /** @scenario "Only the identity module's app composes an IdentityService" */
+    it("construct IdentityService only in the identity module's app", () => {
       const constructors: string[] = [];
-      for (const file of sourceFiles(APP_SRC)) {
-        if (
-          /(?:new IdentityService\(|IdentityService\.create\()/.test(readFileSync(file, "utf8"))
-        ) {
-          constructors.push(relative(APP_SRC, file));
+      for (const root of APPLICATION_ROOTS) {
+        for (const file of sourceFiles(join(REPO_ROOT, root))) {
+          const source = readFileSync(file, "utf8");
+          // The class's own static factory is the constructor, not a composition of it.
+          if (/\bclass IdentityService\b/.test(source)) continue;
+          if (CONSTRUCTS_IDENTITY_SERVICE.test(source)) {
+            constructors.push(relative(REPO_ROOT, file).split(sep).join("/"));
+          }
         }
       }
-      expect(constructors).toEqual(["features/user/user.composition.ts"]);
+      expect(constructors.sort()).toEqual([
+        "modules/identity/process/src/app/identity-migrations-composition.build.ts",
+        "modules/identity/process/src/app/identity.app.ts",
+      ]);
     });
   });
 });
