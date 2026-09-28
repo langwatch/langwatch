@@ -42,7 +42,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
 
   .procedure("saveExperiment")
   .withPermission("workflows:create")
-  .handle(({ app, input }) => app.saveWithWorkflow(input))
+  .handle(({ app, input, actor }) => app.saveWithWorkflow(input, { id: actor.id }))
 
   .procedure("saveEvaluationsV3")
   .withPermission("experiments:update")

@@ -237,7 +237,10 @@ export interface ExperimentApi {
   /** One experiment by its id when given, else by its slug; neither is a 400. */
   getByIdOrSlug(input: ExperimentIdOrSlugInput): Promise<Experiment>;
   /** Saves the wizard's setup, writing a version of its graph into the experiment's workflow. */
-  saveWithWorkflow(input: ExperimentWizardSaveInput): Promise<Experiment>;
+  saveWithWorkflow(
+    input: ExperimentWizardSaveInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<Experiment>;
   /** Publishes a wizard experiment's evaluator as a monitor, refusing one not ready to be. */
   saveAsMonitor(
     input: Readonly<{ projectId: string; experimentId: string }>,
@@ -256,16 +259,20 @@ export interface ExperimentApi {
   findWorkflow(
     input: Readonly<{ id: string; projectId: string; includeVersion?: boolean }>,
   ): Promise<WorkflowWithVersion | null>;
-  /** Creates the workflow a new wizard experiment writes its versions into. */
+  /** Creates the workflow a new wizard experiment writes into, its first graph as version one. */
   createWorkflow(
     input: Readonly<{
       projectId: string;
-      name: string;
-      icon?: string | null;
-      description?: string | null;
+      dsl: StudioWorkflow;
+      commitMessage: string;
+      autoSaved: boolean;
     }>,
+    by: Readonly<{ id: string }>,
   ): Promise<Readonly<{ id: string }>>;
-  saveWorkflowVersion(input: ExperimentWorkflowVersionInput): Promise<void>;
+  saveWorkflowVersion(
+    input: ExperimentWorkflowVersionInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<void>;
   copyWorkflowWithDatasets(
     input: ExperimentWorkflowCopyInput,
   ): Promise<Readonly<{ workflowId: string; dsl: StudioWorkflow }>>;

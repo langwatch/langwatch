@@ -25,9 +25,22 @@ type MonitorWrites = Options["monitors"];
 type MonitorInput = Parameters<MonitorWrites["upsertForExperiment"]>[0];
 
 const NOW = new Date("2026-09-24T00:00:00.000Z");
+const CALLER = { id: "user-1" };
 
 const graph = parseStudioWorkflow({
   workflow_id: "workflow-1",
+  spec_version: "1.4",
+  name: "Support classifier",
+  icon: "x",
+  description: "x",
+  version: "1",
+  nodes: [],
+  edges: [],
+  state: {},
+});
+
+/** The graph a brand-new wizard sends: nothing links it to a workflow yet. */
+const draftGraph = parseStudioWorkflow({
   spec_version: "1.4",
   name: "Support classifier",
   icon: "x",
@@ -134,13 +147,21 @@ class Workflows implements WorkflowReads {
   }
 }
 
+type CreateCall = Parameters<WorkflowAuthoring["create"]>;
+type VersionCall = Parameters<WorkflowAuthoring["saveVersion"]>;
+
 class Authoring implements WorkflowAuthoring {
-  versions = 0;
-  create(): Promise<{ id: string }> {
+  created: CreateCall[] = [];
+  saved: VersionCall[] = [];
+  get versions(): number {
+    return this.saved.length;
+  }
+  create(...call: CreateCall): Promise<{ id: string }> {
+    this.created.push(call);
     return Promise.resolve({ id: "workflow-new" });
   }
-  saveVersion(): Promise<void> {
-    this.versions += 1;
+  saveVersion(...call: VersionCall): Promise<void> {
+    this.saved.push(call);
     return Promise.resolve();
   }
 }
@@ -184,15 +205,78 @@ describe("ExperimentWorkflowLinkService", () => {
       const { links, authoring, experiments } = service({ row: experiment(), found: null });
 
       await expect(
-        links.saveWithWorkflow({
+        links.saveWithWorkflow(
+          {
+            projectId: "project-1",
+            experimentId: "experiment-1",
+            workbenchState: { name: "Support classifier" },
+            dsl: graph,
+          },
+          CALLER,
+        ),
+      ).rejects.toMatchObject({ code: "experiment_workflow_not_found", httpStatus: 404 });
+      expect(authoring.versions).toBe(0);
+      expect(experiments.saved).toEqual([]);
+    });
+  });
+
+  describe("given a new wizard experiment with no workflow yet", () => {
+    /** @scenario "A new wizard experiment's first save creates its workflow with one version" */
+    it("creates the workflow with the graph as its first version and writes no second", async () => {
+      const { links, authoring, experiments } = service({ row: experiment(), found: null });
+
+      await links.saveWithWorkflow(
+        {
+          projectId: "project-1",
+          workbenchState: { name: "Support classifier" },
+          dsl: draftGraph,
+        },
+        CALLER,
+      );
+
+      expect(authoring.created).toEqual([
+        [
+          {
+            projectId: "project-1",
+            dsl: expect.objectContaining({ name: "Support classifier - Workflow" }),
+            commitMessage: "Autosaved",
+            autoSaved: true,
+          },
+          CALLER,
+        ],
+      ]);
+      expect(authoring.versions).toBe(0);
+      expect(experiments.saved).toMatchObject([{ workflowId: "workflow-new" }]);
+    });
+  });
+
+  describe("given a wizard experiment whose workflow resolves", () => {
+    /** @scenario "A wizard experiment's later save writes a version into its existing workflow" */
+    it("autosaves one version into that workflow, attributed to the caller", async () => {
+      const { links, authoring } = service({ row: experiment(), found: workflow(graph) });
+
+      await links.saveWithWorkflow(
+        {
           projectId: "project-1",
           experimentId: "experiment-1",
           workbenchState: { name: "Support classifier" },
           dsl: graph,
-        }),
-      ).rejects.toMatchObject({ code: "experiment_workflow_not_found", httpStatus: 404 });
-      expect(authoring.versions).toBe(0);
-      expect(experiments.saved).toEqual([]);
+        },
+        CALLER,
+      );
+
+      expect(authoring.created).toEqual([]);
+      expect(authoring.saved).toEqual([
+        [
+          expect.objectContaining({
+            workflowId: "workflow-1",
+            autoSaved: true,
+            commitMessage: "Autosaved",
+            setAsLatestVersion: true,
+          }),
+          CALLER,
+        ],
+      ]);
     });
   });
 

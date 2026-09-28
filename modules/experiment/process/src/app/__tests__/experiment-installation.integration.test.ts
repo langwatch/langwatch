@@ -30,8 +30,13 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createTestLogger } from "@langwatch/test-harness";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { describe, expect, it } from "vitest";
+import {
+  parseStudioWorkflow,
+  type WorkflowApi,
+  type WorkflowVersion,
+  type WorkflowWithVersion,
+} from "@langwatch/workflow-contract";
+import { describe, expect, it, vi } from "vitest";
 
 import { experimentServer } from "../../experiment.server.ts";
 
@@ -67,7 +72,7 @@ const customCost: ModelCost = {
   updatedAt: new Date(0),
 };
 
-async function bootWorker() {
+async function bootWorker(workflow = createApiFixture<WorkflowApi>({})) {
   let retentionReads = 0;
   const eventing = new EventSourcing({
     enabled: false,
@@ -89,7 +94,7 @@ async function bootWorker() {
     .withMember("isSaas", false)
     .withObservability((observability) => observability.withLogging(createTestLogger().logger))
     .provide({
-      workflow: createApiFixture<WorkflowApi>({}),
+      workflow,
       dataset: createApiFixture<DatasetApi>({}),
       monitor: createApiFixture<MonitorApi>({}),
       agent: createApiFixture<AgentApi>({}),
@@ -175,5 +180,102 @@ describe("experiment installed in the worker", () => {
     } finally {
       await runtime.stop();
     }
+  });
+
+  describe("when the legacy wizard writes its workflow", () => {
+    const caller = { id: "user_1" };
+    const dsl = parseStudioWorkflow({
+      spec_version: "1.4",
+      name: "Draft 1 - Workflow",
+      icon: "x",
+      description: "x",
+      version: "1",
+      nodes: [],
+      edges: [],
+      state: {},
+    });
+    const version: WorkflowVersion = {
+      id: "version_1",
+      workflowId: "workflow_1",
+      projectId: "project_1",
+      version: "1",
+      autoSaved: false,
+      commitMessage: "Autosaved",
+      authorId: caller.id,
+      parentId: null,
+      dsl,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    };
+    const created: WorkflowWithVersion = {
+      id: "workflow_1",
+      projectId: "project_1",
+      name: dsl.name,
+      icon: dsl.icon,
+      description: dsl.description,
+      latestVersionId: version.id,
+      currentVersionId: version.id,
+      publishedId: null,
+      publishedById: null,
+      copiedFromWorkflowId: null,
+      isEvaluator: false,
+      isComponent: false,
+      archivedAt: null,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+      currentVersion: version,
+    };
+
+    /** @scenario "A new wizard experiment's first save creates its workflow with one version" */
+    it("creates the workflow with its prepared graph as version one, as the caller", async () => {
+      const prepared = { ...dsl, description: "prepared" };
+      const create = vi.fn(async () => ({ workflow: created, version }));
+      const saveStudioVersion = vi.fn(async () => version);
+      const { runtime } = await bootWorker(
+        createApiFixture<WorkflowApi>({
+          prepareStudioDsl: async () => prepared,
+          create,
+          saveStudioVersion,
+        }),
+      );
+
+      try {
+        await expect(
+          runtime
+            .service(ExperimentApi)
+            .createWorkflow(
+              { projectId: "project_1", dsl, commitMessage: "Autosaved", autoSaved: true },
+              caller,
+            ),
+        ).resolves.toEqual({ id: "workflow_1" });
+        expect(create).toHaveBeenCalledWith(
+          { projectId: "project_1", dsl: prepared, commitMessage: "Autosaved", autoSaved: true },
+          caller,
+        );
+        expect(saveStudioVersion).not.toHaveBeenCalled();
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    it("saves a later version through the Studio's own save, as the caller", async () => {
+      const saveStudioVersion = vi.fn(async () => version);
+      const { runtime } = await bootWorker(createApiFixture<WorkflowApi>({ saveStudioVersion }));
+      const input = {
+        projectId: "project_1",
+        workflowId: "workflow_1",
+        dsl,
+        autoSaved: true,
+        commitMessage: "Autosaved",
+        setAsLatestVersion: true,
+      };
+
+      try {
+        await runtime.service(ExperimentApi).saveWorkflowVersion(input, caller);
+        expect(saveStudioVersion).toHaveBeenCalledWith(input, caller);
+      } finally {
+        await runtime.stop();
+      }
+    });
   });
 });

@@ -175,12 +175,13 @@ export type ExperimentWorkflowAuthoring = Readonly<{
   create(
     input: Readonly<{
       projectId: string;
-      name: string;
-      icon?: string | null;
-      description?: string | null;
+      dsl: StudioWorkflow;
+      commitMessage: string;
+      autoSaved: boolean;
     }>,
+    by: Readonly<{ id: string }>,
   ): Promise<Readonly<{ id: string }>>;
-  saveVersion(input: ExperimentWorkflowVersionInput): Promise<void>;
+  saveVersion(input: ExperimentWorkflowVersionInput, by: Readonly<{ id: string }>): Promise<void>;
   copyWithDatasets(
     input: ExperimentWorkflowCopyInput,
   ): Promise<Readonly<{ workflowId: string; dsl: StudioWorkflow }>>;
@@ -750,8 +751,11 @@ export class ExperimentApp implements ExperimentApi {
   }
 
   /** Saves the wizard's setup, writing a version of its graph into the experiment's workflow. */
-  saveWithWorkflow(input: ExperimentWizardSaveInput): Promise<Experiment> {
-    return this.#workflowLinks.saveWithWorkflow(input);
+  saveWithWorkflow(
+    input: ExperimentWizardSaveInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<Experiment> {
+    return this.#workflowLinks.saveWithWorkflow(input, by);
   }
 
   /** Publishes a wizard experiment's evaluator as a monitor, refusing one not ready to be. */
@@ -827,21 +831,25 @@ export class ExperimentApp implements ExperimentApi {
 
   // ── Studio writes ──────────────────────────────────────────────
 
-  /** Creates the workflow a new wizard experiment writes its versions into. */
+  /** Creates the workflow a new wizard experiment writes into, its first graph as version one. */
   createWorkflow(
     input: Readonly<{
       projectId: string;
-      name: string;
-      icon?: string | null;
-      description?: string | null;
+      dsl: StudioWorkflow;
+      commitMessage: string;
+      autoSaved: boolean;
     }>,
+    by: Readonly<{ id: string }>,
   ): Promise<Readonly<{ id: string }>> {
-    return this.#dependencies.workflowAuthoring.create(input);
+    return this.#dependencies.workflowAuthoring.create(input, by);
   }
 
   /** Writes a workflow version, autosaved or committed. */
-  saveWorkflowVersion(input: ExperimentWorkflowVersionInput): Promise<void> {
-    return this.#dependencies.workflowAuthoring.saveVersion(input);
+  saveWorkflowVersion(
+    input: ExperimentWorkflowVersionInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<void> {
+    return this.#dependencies.workflowAuthoring.saveVersion(input, by);
   }
 
   /** Copies a workflow, and optionally its datasets, into another project. */

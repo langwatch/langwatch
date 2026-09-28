@@ -101,21 +101,24 @@ function slugifyExperimentName(value: string): string {
 }
 
 /**
- * The capability this process composed no builder for. A plain `Error`, not a
- * `HandledError` — see the handoff's `Risks` for why.
+ * The wizard's workflow writes, over the SAME workflow application the Studio
+ * saves through: a new workflow carries the prepared first graph as version one.
  */
-class ExperimentCapabilityUnavailableError extends Error {
-  constructor(capability: string) {
-    super(`This deployment has no ${capability}.`);
-    this.name = "ExperimentCapabilityUnavailableError";
-  }
-}
-
-/** Wizard workflow authoring this deployment composed nothing behind: every member rejects. */
-function unavailableWorkflowAuthoring(): ExperimentWorkflowAuthoring {
-  const unavailable = (): Promise<never> =>
-    Promise.reject(new ExperimentCapabilityUnavailableError("wizard workflow authoring"));
-  return { create: unavailable, saveVersion: unavailable, copyWithDatasets: unavailable };
+function workflowAuthoring(workflows: WorkflowApi): ExperimentWorkflowAuthoring {
+  return {
+    create: async ({ projectId, dsl, commitMessage, autoSaved }, by) => {
+      const prepared = await workflows.prepareStudioDsl({ projectId, dsl });
+      const created = await workflows.create(
+        { projectId, dsl: prepared, commitMessage, autoSaved },
+        by,
+      );
+      return { id: created.workflow.id };
+    },
+    saveVersion: async (input, by) => {
+      await workflows.saveStudioVersion(input, by);
+    },
+    copyWithDatasets: (input) => workflows.copyStudioWorkflow(input),
+  };
 }
 
 /**
@@ -502,7 +505,7 @@ export function buildExperimentInfrastructure(input: {
     permissions: authz,
     people: PrismaExperimentPeopleRepository.create(prisma),
     modelCosts: modelCostCatalogue(dependencies.modelProviders),
-    workflowAuthoring: unavailableWorkflowAuthoring(),
+    workflowAuthoring: workflowAuthoring(dependencies.workflows),
     runLoop,
     workflowEvaluations: WorkflowEvaluationService.create({
       experiments,
