@@ -130,7 +130,7 @@ skills/_compiled/*.txt
 # Skills test artifacts
 skills/_tests/helpers/.mcp-config.json
 preprocessed_configs/
-status
+/status
 uuid
 .claude/worktrees/
 
