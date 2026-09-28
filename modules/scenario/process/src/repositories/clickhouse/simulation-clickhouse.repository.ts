@@ -21,7 +21,7 @@ import {
   EVALUATION_LIST_COLUMNS_SQL,
 } from "../../rules/simulation-evaluation-columns.rules.ts";
 import { SimulationRepository } from "../simulation.repository.ts";
-import { CRITERIA_COLUMNS_SQL, CRITERIA_LIST_COLUMNS_SQL } from "./simulation-criteria.mapper.ts";
+import { CRITERIA_COLUMNS_SQL } from "./simulation-criteria.mapper.ts";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
@@ -132,7 +132,7 @@ const LIST_COLUMNS = `
   MetCriteria, UnmetCriteria, InconclusiveCriteria,
   CAST(NULL AS Nullable(String)) AS Error,
   ${EVALUATION_LIST_COLUMNS_SQL},
-  ${CRITERIA_LIST_COLUMNS_SQL},
+  ${CRITERIA_COLUMNS_SQL},
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,

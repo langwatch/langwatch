@@ -12,17 +12,10 @@ export interface ClickHouseCriteriaColumns {
   "Criteria.Reasoning": string[];
 }
 
-/** The columns as a SELECT fragment. */
+/** The columns as a SELECT fragment, for list and single-run reads alike. */
 export const CRITERIA_COLUMNS_SQL = `
   \`Criteria.Criterion\`, \`Criteria.Requirement\`,
   \`Criteria.Status\`, \`Criteria.Reasoning\``;
-
-/** The columns a list read selects: statuses without the prose, which belongs to the run drawer. */
-export const CRITERIA_LIST_COLUMNS_SQL = `
-  \`Criteria.Criterion\`,
-  CAST([] AS Array(String)) AS \`Criteria.Requirement\`,
-  \`Criteria.Status\`,
-  CAST([] AS Array(String)) AS \`Criteria.Reasoning\``;
 
 /** The criteria of a run as the parallel arrays its row stores. */
 export function criteriaToColumns(criteria: ScenarioCriterionResult[]): ClickHouseCriteriaColumns {

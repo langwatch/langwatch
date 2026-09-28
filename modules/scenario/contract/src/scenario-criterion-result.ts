@@ -16,10 +16,10 @@ export const scenarioCriterionResultSchema = z.object({
 export type ScenarioCriterionResult = z.infer<typeof scenarioCriterionResultSchema>;
 
 /**
- * The per-criterion view of a run's results: the entries it stored, then one
- * derived entry, with empty reasoning, for every listed criterion they miss.
+ * The per-criterion view of a run's results: the entries it stored plus one derived
+ * entry, with empty reasoning, for every listed criterion they miss, in declared order.
  */
-export function resolveCriterionResults({
+export function deriveCriterionResults({
   criteria = [],
   metCriteria,
   unmetCriteria,
@@ -30,29 +30,83 @@ export function resolveCriterionResults({
   unmetCriteria: readonly string[];
   inconclusiveCriteria?: readonly string[];
 }): ScenarioCriterionResult[] {
-  const stored = new Set(criteria.map((result) => result.criterion));
+  const byCriterion = new Map(criteria.map((result) => [result.criterion, result]));
   const inconclusive = new Set(inconclusiveCriteria ?? []);
-  const derived = (criterion: string, status: ScenarioCriterionStatus) =>
-    stored.has(criterion) ? [] : [{ criterion, status, reasoning: "" }];
-  return [
-    ...criteria,
-    ...metCriteria.flatMap((criterion) => derived(criterion, "passed")),
-    ...unmetCriteria.flatMap((criterion) =>
-      derived(criterion, inconclusive.has(criterion) ? "inconclusive" : "failed"),
-    ),
-  ];
+  const met = new Set(metCriteria);
+  const order = mergeDeclaredOrder([
+    criteria.map((result) => result.criterion),
+    [...metCriteria],
+    [...unmetCriteria],
+  ]);
+  return order.map(
+    (criterion) =>
+      byCriterion.get(criterion) ?? {
+        criterion,
+        status: listedStatusOf({ criterion, met, inconclusive }),
+        reasoning: "",
+      },
+  );
 }
 
-/** The inconclusive criteria of a run: the list it sent, else those its criteria mark so. */
-export function resolveInconclusiveCriteria({
-  criteria,
-  inconclusiveCriteria,
+function listedStatusOf({
+  criterion,
+  met,
+  inconclusive,
+}: {
+  criterion: string;
+  met: ReadonlySet<string>;
+  inconclusive: ReadonlySet<string>;
+}): ScenarioCriterionStatus {
+  if (met.has(criterion)) return "passed";
+  return inconclusive.has(criterion) ? "inconclusive" : "failed";
+}
+
+/**
+ * One order holding every chain as a subsequence, each chain a slice of the declared
+ * order. A criterion goes next once all it follows are placed; first seen wins ties.
+ */
+function mergeDeclaredOrder(chains: string[][]): string[] {
+  const pending = [...new Set(chains.flat())];
+  const follows = new Map(pending.map((criterion) => [criterion, new Set<string>()]));
+  for (const chain of chains) {
+    let previous: string | undefined;
+    for (const criterion of chain) {
+      if (previous !== undefined && previous !== criterion) follows.get(criterion)?.add(previous);
+      previous = criterion;
+    }
+  }
+  const placed = new Set<string>();
+  while (placed.size < pending.length) {
+    const unplaced = pending.filter((criterion) => !placed.has(criterion));
+    const ready = unplaced.filter((criterion) =>
+      [...(follows.get(criterion) ?? [])].every((before) => placed.has(before)),
+    );
+    const [next] = ready.length > 0 ? ready : unplaced;
+    if (next === undefined) break;
+    placed.add(next);
+  }
+  return [...placed];
+}
+
+/** The met, unmet and inconclusive criteria of a run: each list it sent, else its criteria's. */
+export function deriveCriteriaLists({
+  criteria = [],
+  metCriteria = [],
+  unmetCriteria = [],
+  inconclusiveCriteria = [],
 }: {
   criteria?: readonly ScenarioCriterionResult[];
+  metCriteria?: readonly string[];
+  unmetCriteria?: readonly string[];
   inconclusiveCriteria?: readonly string[];
-}): string[] {
-  if (inconclusiveCriteria && inconclusiveCriteria.length > 0) return [...inconclusiveCriteria];
-  return (criteria ?? [])
-    .filter((result) => result.status === "inconclusive")
-    .map((result) => result.criterion);
+}): { metCriteria: string[]; unmetCriteria: string[]; inconclusiveCriteria: string[] } {
+  const withStatus = (statuses: readonly ScenarioCriterionStatus[]) =>
+    criteria.filter((result) => statuses.includes(result.status)).map((result) => result.criterion);
+  const listOr = (sent: readonly string[], derived: () => string[]) =>
+    sent.length > 0 ? [...sent] : derived();
+  return {
+    metCriteria: listOr(metCriteria, () => withStatus(["passed"])),
+    unmetCriteria: listOr(unmetCriteria, () => withStatus(["failed", "inconclusive"])),
+    inconclusiveCriteria: listOr(inconclusiveCriteria, () => withStatus(["inconclusive"])),
+  };
 }

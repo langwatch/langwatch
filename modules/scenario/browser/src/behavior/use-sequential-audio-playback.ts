@@ -2,7 +2,7 @@
  * useSequentialAudioPlayback — per-renderer-instance audio playback coordinator.
  */
 
-import type { MediaAudioPlayback } from "@langwatch/scenario-contract";
+import type { MediaAudioElement, MediaAudioPlayback } from "@langwatch/scenario-contract";
 import { useCallback, useRef } from "react";
 
 interface SequentialAudioPlaybackOptions {
@@ -22,7 +22,7 @@ export interface SequentialAudioPlayback {
   getAudioProps: (id: string) => MediaAudioPlayback;
 }
 
-function pauseOtherAudio(registry: Map<string, HTMLAudioElement>, playingId: string): void {
+function pauseOtherAudio(registry: Map<string, MediaAudioElement>, playingId: string): void {
   for (const [entryId, element] of registry.entries()) {
     if (entryId !== playingId && !element.paused) element.pause();
   }
@@ -36,8 +36,8 @@ export function useSequentialAudioPlayback({
   const orderedIdsRef = useRef<string[]>(orderedIds);
   orderedIdsRef.current = orderedIds;
 
-  // Map from stable audio id → registered HTMLAudioElement.
-  const registryRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  // Map from stable audio id → registered audio element.
+  const registryRef = useRef<Map<string, MediaAudioElement>>(new Map());
 
   const handlePlay = useCallback((id: string) => {
     pauseOtherAudio(registryRef.current, id);
@@ -63,7 +63,7 @@ export function useSequentialAudioPlayback({
 
   const getAudioProps = useCallback(
     (id: string): MediaAudioPlayback => ({
-      ref: (el: HTMLAudioElement | null) => {
+      ref: (el: MediaAudioElement | null) => {
         if (el) {
           registryRef.current.set(id, el);
         } else {

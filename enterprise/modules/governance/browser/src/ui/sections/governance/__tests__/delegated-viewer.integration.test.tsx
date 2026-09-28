@@ -100,7 +100,7 @@ vi.mock("../../../../behavior/governance-api.ts", () => {
   return { api, governanceApi: api };
 });
 
-import AnomalyRulesPage from "../governance-anomaly-rules.screen.tsx";
+import { AnomalyRulesTab } from "../../../../features/ingestion-sources/anomaly-rules-tab.tsx";
 import IngestionSourceDetailPage from "../governance-ingestion-source.screen.tsx";
 import InventoryPage from "../governance-inventory.screen.tsx";
 import GovernanceOverviewPage from "../governance-overview.screen.tsx";
@@ -108,7 +108,6 @@ import PeoplePage from "../governance-people.screen.tsx";
 import TeamDetailPage from "../governance-team.screen.tsx";
 import TeamsListPage from "../governance-teams.screen.tsx";
 import UserDetailPage from "../governance-user.screen.tsx";
-import UsersListPage from "../governance-users.screen.tsx";
 
 /** Every page the Governance section navigation lists, plus its drill-ins. */
 const GOVERNANCE_PAGES: [string, React.ComponentType][] = [
@@ -117,11 +116,9 @@ const GOVERNANCE_PAGES: [string, React.ComponentType][] = [
   // the Catalog tab (the old tool-catalog page) — one entry covers both.
   ["/governance/inventory", InventoryPage],
   ["/governance/inventory/:id", IngestionSourceDetailPage],
-  ["/governance/anomaly-rules", AnomalyRulesPage],
   ["/governance/people", PeoplePage],
   ["/governance/teams", TeamsListPage],
   ["/governance/teams/:id", TeamDetailPage],
-  ["/governance/users", UsersListPage],
   ["/governance/users/:id", UserDetailPage],
 ];
 
@@ -239,7 +236,7 @@ describe("governance pages for a delegated viewer", () => {
     /** @scenario "Anomaly rules offers no controls a viewer cannot use" */
     it("offers no rule authoring controls", () => {
       renderPage({
-        Page: AnomalyRulesPage,
+        Page: AnomalyRulesTab,
         permissions: [...DELEGATED_VIEWER, "anomalyRules:view"],
       });
 

@@ -7,7 +7,7 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatScore } from "@langwatch/design-system/metric-value-formatters";
 import {
-  resolveCriterionResults,
+  deriveCriterionResults,
   ScenarioRunStatus,
   resolveScenarioError,
   type ScenarioCriterionResult,
@@ -676,7 +676,7 @@ export function RunVerdictPanel({
   const showsReasoning = !!reasoning && !(!!error && restatesFailure(reasoning));
   const showsFailurePanel = reasoningIsError && !!reasoning;
   const showsJudgeReasoning = !showsFailurePanel && showsReasoning;
-  const results = resolveCriterionResults({
+  const results = deriveCriterionResults({
     criteria,
     metCriteria,
     unmetCriteria,

@@ -1,6 +1,6 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import {
-  resolveCriterionResults,
+  deriveCriterionResults,
   type ScenarioCriterionResult,
   type ScenarioCriterionStatus,
   type SimulationRunResult as ScenarioResults,
@@ -70,7 +70,7 @@ function CriteriaGroup({
 
 export function CriteriaDetails({ results }: CriteriaDetailsProps) {
   if (!results) return null;
-  const criteria = resolveCriterionResults({
+  const criteria = deriveCriterionResults({
     criteria: results.criteria,
     metCriteria: results.metCriteria ?? [],
     unmetCriteria: results.unmetCriteria ?? [],

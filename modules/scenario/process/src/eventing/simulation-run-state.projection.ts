@@ -26,7 +26,7 @@ import {
   SimulationRunStartedEventSchema,
   SimulationTextMessageEndEventSchema,
   SimulationTextMessageStartEventSchema,
-  resolveInconclusiveCriteria,
+  deriveCriteriaLists,
   type ScenarioCriterionResult,
   type ScenarioEvaluationResult,
   type SimulationMessageSnapshotEvent,
@@ -647,6 +647,12 @@ export class SimulationRunStateFoldProjection
     if (state.FinishedAt != null) return state;
 
     const results = event.data.results;
+    const lists = deriveCriteriaLists({
+      criteria: results?.criteria,
+      metCriteria: results?.metCriteria,
+      unmetCriteria: results?.unmetCriteria,
+      inconclusiveCriteria: results?.inconclusiveCriteria,
+    });
     const verdict = results?.verdict ?? null;
     const judgeStatus = SimulationRunStateFoldProjection.finishedStatusOf({
       explicitStatus: event.data.status,
@@ -666,12 +672,9 @@ export class SimulationRunStateFoldProjection
       Status: settled.status,
       Verdict: settled.verdict,
       Reasoning: results?.reasoning ?? null,
-      MetCriteria: results?.metCriteria ?? [],
-      UnmetCriteria: results?.unmetCriteria ?? [],
-      InconclusiveCriteria: resolveInconclusiveCriteria({
-        criteria: results?.criteria,
-        inconclusiveCriteria: results?.inconclusiveCriteria,
-      }),
+      MetCriteria: lists.metCriteria,
+      UnmetCriteria: lists.unmetCriteria,
+      InconclusiveCriteria: lists.inconclusiveCriteria,
       Criteria: results?.criteria ?? [],
       Error: results?.error ?? null,
       // A scenario run from code sends its evaluations with the finished

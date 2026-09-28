@@ -1,3 +1,4 @@
+import copy
 import os
 from tempfile import mkdtemp
 from typing import Optional
@@ -215,34 +216,43 @@ def with_reminder(kwargs: dict) -> dict:
 def auto_tool_choice_attempts(kwargs: dict):
     """The retries once a forced tool_choice is refused: tool_choice "auto",
     then, if that answer skipped the function or left a field out, once more
-    with a reminder. Callers stop at the first complete call."""
+    with a reminder. Callers stop at the first complete call. A stream cannot
+    be read before it is handed back, so it gets the first attempt only."""
     relaxed = {**kwargs, "tool_choice": "auto"}
     yield relaxed
-    yield with_reminder(relaxed)
+    if not kwargs.get("stream"):
+        yield with_reminder(relaxed)
 
 
 USAGE_FIELDS = ("prompt_tokens", "completion_tokens", "total_tokens")
 
 
 def with_usage_of(response, earlier: list):
-    """`response` with the token usage of the `earlier` attempts added, so the
-    cost read from the answer covers every call it took."""
+    """A copy of `response` with the token usage of the `earlier` attempts
+    added, so the cost read from the answer covers every call it took. The
+    provider's own response and usage objects are left as they came."""
     usage = getattr(response, "usage", None)
-    if usage is None:
+    if usage is None or not earlier:
         return response
+    combined = copy.copy(usage)
     for previous in earlier:
         previous_usage = getattr(previous, "usage", None)
         for field in USAGE_FIELDS:
             added = getattr(previous_usage, field, None)
             if isinstance(added, int):
-                setattr(usage, field, (getattr(usage, field, None) or 0) + added)
-    return response
+                setattr(combined, field, (getattr(combined, field, None) or 0) + added)
+    summed = copy.copy(response)
+    summed.usage = combined
+    return summed
 
 
 def needs_reminder(response, kwargs: dict) -> bool:
     """A forced call that reached the function without every required field.
     An answer with no call at all (a refusal, a content filter) is not asked
-    again: the reminder would not change it."""
+    again: the reminder would not change it, and neither is a stream, which
+    cannot be read before it is handed back."""
+    if kwargs.get("stream"):
+        return False
     if not kwargs.get("tools") or not is_forced_tool_choice(kwargs.get("tool_choice")):
         return False
     if not calls_tool(response, forced_tool_name(kwargs)):
