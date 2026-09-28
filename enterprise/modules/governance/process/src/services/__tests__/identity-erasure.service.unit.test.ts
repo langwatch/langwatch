@@ -146,7 +146,7 @@ describe("given a provider-named person an organization has asked us to erase", 
 
       await service.erase({ organizationId: ORG, discoveredPersonId: personId });
 
-      const suppressed = await repositories.erasedIdentifierSuppressions.findAll();
+      const suppressed = await repositories.suppressionSnapshot.findAllSuppressions();
       expect(suppressed).toHaveLength(2);
       expect(suppressed.map((row) => row.identifierHash)).toContain(
         erasureDigest({ secret: SECRET, identifier: "Leaver Person" }),
@@ -416,7 +416,7 @@ describe("given a provider-named person an organization has asked us to erase", 
       await expect(
         service.erase({ organizationId: ORG, discoveredPersonId: personId }),
       ).rejects.toThrow(ErasureSecretMissingError);
-      await expect(repositories.erasedIdentifierSuppressions.findAll()).resolves.toEqual([]);
+      await expect(repositories.suppressionSnapshot.findAllSuppressions()).resolves.toEqual([]);
       expect(deleteRows).not.toHaveBeenCalled();
     });
   });

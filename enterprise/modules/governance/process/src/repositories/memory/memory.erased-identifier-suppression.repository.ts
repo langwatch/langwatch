@@ -27,10 +27,6 @@ export class MemoryErasedIdentifierSuppressionRepository extends ErasedIdentifie
       .map((row) => ({ ...row }));
   }
 
-  async findAll(): Promise<ErasedIdentifierSuppressionRow[]> {
-    return this.store.suppressions.map((row) => ({ ...row }));
-  }
-
   async recordAll(input: {
     organizationId: string;
     provider: string;

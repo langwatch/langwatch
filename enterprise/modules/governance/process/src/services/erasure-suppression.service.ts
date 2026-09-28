@@ -4,7 +4,7 @@ import { ErasureSecretMissingError } from "@langwatch/enterprise-governance-cont
 import { createLogger, type Logger } from "@langwatch/observability";
 
 import type { ErasedIdentifierSuppressionRepository } from "../repositories/erased-identifier-suppression.repository.ts";
-import type { GovernanceTenantHistoryRepository } from "../repositories/governance-tenant-history.repository.ts";
+import type { SuppressionSnapshotRepository } from "../repositories/suppression-snapshot.repository.ts";
 import { erasureDigest, getErasureSecret } from "../rules/erasure-digest.rules.ts";
 import {
   type ErasureSuppressionCheck,
@@ -22,34 +22,34 @@ import type {
  */
 export class ErasureSuppressionService {
   private readonly suppressions: ErasedIdentifierSuppressionRepository;
-  private readonly tenantHistory: GovernanceTenantHistoryRepository;
+  private readonly snapshot: SuppressionSnapshotRepository;
   private readonly erasureSecret: string | undefined;
   private readonly logger: Logger;
 
   private constructor(deps: {
     suppressions: ErasedIdentifierSuppressionRepository;
-    tenantHistory: GovernanceTenantHistoryRepository;
+    snapshot: SuppressionSnapshotRepository;
     erasureSecret: string | undefined;
     logger: Logger;
   }) {
     this.suppressions = deps.suppressions;
-    this.tenantHistory = deps.tenantHistory;
+    this.snapshot = deps.snapshot;
     this.erasureSecret = deps.erasureSecret;
     this.logger = deps.logger;
   }
 
   static create({
     suppressions,
-    tenantHistory,
+    snapshot,
     erasureSecret,
     logger = createLogger("langwatch:governance:erasure-suppression"),
   }: {
     suppressions: ErasedIdentifierSuppressionRepository;
-    tenantHistory: GovernanceTenantHistoryRepository;
+    snapshot: SuppressionSnapshotRepository;
     erasureSecret: string | undefined;
     logger?: Logger;
   }): ErasureSuppressionService {
-    return new ErasureSuppressionService({ suppressions, tenantHistory, erasureSecret, logger });
+    return new ErasureSuppressionService({ suppressions, snapshot, erasureSecret, logger });
   }
 
   /**
@@ -101,8 +101,8 @@ export class ErasureSuppressionService {
   /** The snapshot's loader: every suppression row and tenant, deployment-wide; provider dropped. */
   async loadSnapshot(): Promise<SuppressionSnapshotData> {
     const [suppressions, tenants] = await Promise.all([
-      this.suppressions.findAll(),
-      this.tenantHistory.findAll(),
+      this.snapshot.findAllSuppressions(),
+      this.snapshot.findAllTenants(),
     ]);
     const digestsByOrganization = new Map<string, Set<string>>();
     for (const row of suppressions) {

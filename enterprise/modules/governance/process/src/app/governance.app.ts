@@ -191,6 +191,7 @@ import {
   type PulledUsageDefinition,
 } from "../eventing/pulled-usage.pipeline.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
+import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
 import { nextIngestionPullRunAt } from "../rules/ingestion-pull-schedule.rules.ts";
 import { toPullLifecycleSource } from "../rules/pull-schedule.rules.ts";
@@ -455,6 +456,7 @@ export class GovernanceApp implements GovernanceRestApi {
   };
   static readonly config = governanceConfig;
   static readonly secrets = governanceSecrets;
+  static readonly operatorReads = governanceOperatorReads;
 
   static async create({
     config,
@@ -468,7 +470,7 @@ export class GovernanceApp implements GovernanceRestApi {
       (erasureSecret) =>
         ErasureSuppressionService.create({
           suppressions: repositories.erasedIdentifierSuppressions,
-          tenantHistory: repositories.tenantHistory,
+          snapshot: repositories.suppressionSnapshot,
           erasureSecret,
         }),
     );

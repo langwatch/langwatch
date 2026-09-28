@@ -33,6 +33,7 @@ import type { IngestionTemplateRepository } from "./ingestion-template.repositor
 import type { OrganizationSupportContactRepository } from "./organization-support-contact.repository.ts";
 import type { RollupErasureRepository } from "./rollup-erasure.repository.ts";
 import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.repository.ts";
+import type { SuppressionSnapshotRepository } from "./suppression-snapshot.repository.ts";
 
 /**
  * The rows the governance module owns, chosen once at boot.
@@ -67,6 +68,7 @@ export interface GovernanceRepositories {
   readonly setupState: GovernanceSetupStateRepository;
   readonly spendSpikeAnomalies: SpendSpikeAnomalyRepository;
   readonly supportContacts: OrganizationSupportContactRepository;
+  readonly suppressionSnapshot: SuppressionSnapshotRepository;
   readonly tenantHistory: GovernanceTenantHistoryRepository;
 }
 

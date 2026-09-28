@@ -33,12 +33,6 @@ export class PrismaGovernanceTenantHistoryRepository extends GovernanceTenantHis
     });
   }
 
-  findAll(): Promise<GovernanceTenantRow[]> {
-    return this.prisma.governanceTenantHistory.findMany({
-      select: { organizationId: true, tenantId: true },
-    });
-  }
-
   async touch({
     organizationId,
     tenantId,

@@ -12,8 +12,6 @@ export interface GovernanceTenantRow {
 export abstract class GovernanceTenantHistoryRepository {
   /** Oldest first: personal data does not stop existing in a tenant that stopped being current. */
   abstract findAllByOrganization(input: { organizationId: string }): Promise<GovernanceTenantRow[]>;
-  /** Every recorded (organization, tenant) pair — the suppression snapshot's read. */
-  abstract findAll(): Promise<GovernanceTenantRow[]>;
   /** Moves `lastUsedAt` forward on a recorded tenant; false is the caller's signal to append. */
   abstract touch(input: {
     organizationId: string;

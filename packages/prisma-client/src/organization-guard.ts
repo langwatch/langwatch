@@ -244,19 +244,13 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // findMany over everyone's links is exactly what the guard should refuse.
   DepartmentMembershipHistory: {},
   // Governance tenants an org has written rows under. tenantId resolves to exactly one
-  // organization; same snapshot read pattern as other audit tables below.
+  // organization; the snapshot's read across organizations is governance's operator read.
   GovernanceTenantHistory: {
-    platformScopeActions: ["findMany"],
     extraBound: ({ clause }) => typeof clauseField(clause, "tenantId") === "string",
   },
-  // Digests of erased identifiers (ADR-128 §9). Same snapshot read, same
-  // reasoning, and this table is the one place in the codebase that holds no
-  // customer data BY CONSTRUCTION: it stores hashes precisely so it is not a
-  // copy of the identifiers it exists to keep out. Every other access names its
-  // organization.
-  ErasedIdentifierSuppression: {
-    platformScopeActions: ["findMany"],
-  },
+  // Digests of erased identifiers (ADR-128 §9). Every access names its organization;
+  // the snapshot's read across organizations is governance's operator read.
+  ErasedIdentifierSuppression: {},
   // The grants ledger's projection tables (ADR-092 §13). Written only by
   // the authz_grants fold (plus revocation enforcement); read by the engine
   // per organization. Row id / organizationId cover every access pattern.
