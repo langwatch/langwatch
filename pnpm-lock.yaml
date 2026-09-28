@@ -3277,6 +3277,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../../packages/ksuid
+      '@langwatch/ops-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/ops/contract
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../../../modules/organization/contract
@@ -15085,6 +15088,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/monitor-contract':
+        specifier: workspace:*
+        version: link:../../monitor/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
