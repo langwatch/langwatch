@@ -59,8 +59,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Optimize with DSPy Using Scenarios as the Metric](https://langwatch.ai/docs/improve-your-agent/optimize-with-dspy.md): Scores every candidate on full multi-turn conversations with your agent, running the agent improvement loop automatically with DSPy algorithms.
 - [Optimization Algorithms](https://langwatch.ai/docs/improve-your-agent/algorithms.md): What each optimization algorithm changes, what it needs, how many suite runs it costs, and when to use it.
 
-- [Voice Agent Testing](https://langwatch.ai/docs/agent-testing/voice-agents.md): Scenario tests voice agents end to end over real audio, with the same scenario.run() and the same judge you use for text.
-- [Voice Agents in the App](https://langwatch.ai/docs/agent-testing/voice-agents-in-app.md): Test an ElevenLabs Conversational AI agent from the LangWatch app: talk to it, call it from a run, or run scenarios with a simulated caller.
+- [Voice Agents](https://langwatch.ai/docs/agent-testing/voice-agents.md): Test a voice agent over real audio. A simulated caller talks to your agent, and a judge scores the call against your criteria.
 - [Red Teaming](https://langwatch.ai/docs/agent-testing/red-teaming.md): RedTeamAgent replaces the user simulator with a multi-turn attacker, in the same scenario.run() loop and the same judge as your functional tests.
 
 ## Observability

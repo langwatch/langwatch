@@ -148,7 +148,6 @@
                 ]
               },
               "agent-testing/voice-agents",
-              "agent-testing/voice-agents-in-app",
               "agent-testing/red-teaming"
             ]
           },
@@ -2047,6 +2046,10 @@
     },
     {
       "source": "/agent-simulations/voice-agents",
+      "destination": "/agent-testing/voice-agents"
+    },
+    {
+      "source": "/agent-testing/voice-agents-in-app",
       "destination": "/agent-testing/voice-agents"
     },
     {
