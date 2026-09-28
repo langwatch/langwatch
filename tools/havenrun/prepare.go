@@ -2,6 +2,7 @@ package havenrun
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -206,4 +207,31 @@ func StackLogTailOrError(slug string, count int) (string, error) {
 		return "", err
 	}
 	return LastLines(string(data), count), nil
+}
+
+// AppOrigin is the address haven serves a stack's app at (app.<slug>.langwatch.localhost).
+func AppOrigin(slug string) string {
+	return "https://app." + slug + ".langwatch.localhost"
+}
+
+// PinDotenvOrigin names origin as BASE_HOST and NEXTAUTH_URL in every copied .env of dir.
+// A monolith's start script rewrites both to localhost:PORT and then reloads .env with
+// override, so only a value in the file survives to BetterAuth's trusted-origin check.
+func PinDotenvOrigin(dir, origin string) error {
+	for _, target := range envCopyTargets(dir) {
+		path := filepath.Join(target, envDotfilePrefix)
+		data, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		pinned := strings.TrimRight(string(data), "\n") +
+			"\n# pinned by haven for this stack\nBASE_HOST=" + origin + "\nNEXTAUTH_URL=" + origin + "\n"
+		if err := os.WriteFile(path, []byte(pinned), 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -210,6 +210,11 @@ func (run *session) havenPrepare(ctx context.Context, stack Stack) error {
 		return fmt.Errorf("copy env for %s: %w", stack.Name, err)
 	}
 	fmt.Fprintf(run.streams.Err, "%s: prepare: copy .env files exit=ok (copied %d)\n", stack.Name, copied)
+	if stack.Layout == LayoutMonolith && stack.HavenSlug != "" {
+		if err := havenrun.PinDotenvOrigin(stack.Dir, havenrun.AppOrigin(stack.HavenSlug)); err != nil {
+			return fmt.Errorf("pin origin for %s: %w", stack.Name, err)
+		}
+	}
 	substituted, err := EnsureGatewaySecrets(stack.Dir, run.runID)
 	if err != nil {
 		return fmt.Errorf("gateway secrets for %s: %w", stack.Name, err)
