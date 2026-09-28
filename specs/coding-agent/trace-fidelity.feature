@@ -267,6 +267,13 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     And the helper's turn span, ingested in a later batch, is stored as it came
 
   @unit
+  Scenario: A codex app-server helper request is stored with its thread id
+    Given a codex helper thread's request span and its queue child exported under the app-server scope
+    When the batch is ingested
+    Then the request span is stored carrying the helper's thread id and marks its session auxiliary
+    And the user's own request span under that scope is filtered out
+
+  @unit
   Scenario: A codex turn of the user's own is not marked
     Given a codex turn/start span whose request id is the client's own counter
     When the turn's spans are ingested
