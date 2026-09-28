@@ -3,6 +3,7 @@ import "./app.css";
 import {
   applyThemeChoice,
   Callout,
+  consoleLinks,
   IconMonitor,
   IconMoon,
   IconSun,
@@ -346,9 +347,13 @@ function StudioTopBar({
   previewScheme: PreviewScheme;
   onPreviewSchemeChange: (scheme: PreviewScheme) => void;
 }): JSX.Element {
+  const chrome = useMemo(() => consoleLinks({ location: window.location }), []);
   return (
     <TopBar
       name="Mail room"
+      slug={chrome.slug}
+      homeHref={chrome.homeHref}
+      links={chrome.links}
       themeToggle={false}
       actions={
         <>

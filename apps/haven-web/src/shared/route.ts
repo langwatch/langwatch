@@ -48,9 +48,3 @@ export const logsPath = ({ stack = "", lane = "" }: { stack?: string; lane?: str
     .filter((part) => part.length > 0)
     .map((part, index) => (index === 0 ? part : encodeURIComponent(part)))
     .join("/");
-
-/** The hub beside a home, `hub.` in place of the slug, until the daemon names it. */
-export const hubUrlBeside = ({ location }: { location: Pick<Location, "protocol" | "host"> }) => {
-  const [, ...domain] = location.host.split(".");
-  return `${location.protocol}//${["hub", ...domain].join(".")}`;
-};

@@ -21,6 +21,7 @@ export { Text, type TextProps } from "./components/text.tsx";
 export { Panel, type PanelProps } from "./components/panel.tsx";
 export { EmptyState, type EmptyStateProps } from "./components/empty-state.tsx";
 export { Callout, type CalloutProps } from "./components/callout.tsx";
+export { ScrollArea, type ScrollAreaProps } from "./components/scroll-area.tsx";
 
 export { Table, type TableColumn, type TableProps } from "./components/table.tsx";
 export { KeyValue, type KeyValueItem, type KeyValueProps } from "./components/key-value.tsx";

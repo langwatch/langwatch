@@ -7,6 +7,7 @@ import {
   Link,
   Page,
   Panel,
+  ScrollArea,
   SegmentedControl,
   Stack,
   Text,
@@ -98,32 +99,25 @@ export const InspectView = ({
       title={template?.title ?? "Inspect"}
       subtitle={template?.sentWhen}
       actions={
-        <Inline gap={2} wrap justify="end">
-          <SegmentedControl
-            label="Part"
-            size="sm"
-            options={TAB_OPTIONS}
-            value={tab}
-            onChange={setTab}
-          />
+        <>
+          <SegmentedControl label="Part" options={TAB_OPTIONS} value={tab} onChange={setTab} />
           <SegmentedControl
             label="Width"
-            size="sm"
             options={WIDTH_OPTIONS}
             value={width}
             onChange={onWidthChange}
           />
-          <CopyButton value={rendered?.html ?? ""} label="Copy HTML" showLabel />
+          <CopyButton value={rendered?.html ?? ""} label="Copy HTML" size="md" showLabel />
           <Link href={documentUrl} external>
             Open in new tab
           </Link>
-        </Inline>
+        </>
       }
     >
       <div className="mailroom-inspect">
         <div className="mailroom-messages">
           <Panel title="Messages" meta={`${templates.length}`}>
-            <div className="mailroom-message-list">
+            <ScrollArea className="mailroom-message-list" label="Messages">
               <Stack gap={4}>
                 {templates.map((entry) => (
                   <TemplateNavEntry
@@ -134,7 +128,7 @@ export const InspectView = ({
                   />
                 ))}
               </Stack>
-            </div>
+            </ScrollArea>
           </Panel>
         </div>
 

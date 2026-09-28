@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hubUrlBeside, logsPath, readRoute } from "../route.ts";
+import { logsPath, readRoute } from "../route.ts";
 
 describe("readRoute", () => {
   it.each([
@@ -26,13 +26,5 @@ describe("logsPath", () => {
     expect(logsPath({ stack: "feat-x", lane: "api" })).toBe("/logs/feat-x/api");
     expect(logsPath({ stack: "feat-x" })).toBe("/logs/feat-x");
     expect(logsPath({ lane: "api" })).toBe("/logs");
-  });
-});
-
-describe("hubUrlBeside", () => {
-  it("puts hub in place of the slug, keeping the port", () => {
-    expect(
-      hubUrlBeside({ location: { protocol: "http:", host: "feat-x.langwatch.localhost:5572" } }),
-    ).toBe("http://hub.langwatch.localhost:5572");
   });
 });

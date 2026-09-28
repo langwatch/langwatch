@@ -1,6 +1,12 @@
-import { Button, EmptyState, Page, TopBar } from "@langwatch/design-system-internal";
+import {
+  Button,
+  EmptyState,
+  Page,
+  Panel,
+  TopBar,
+  consoleLinks,
+} from "@langwatch/design-system-internal";
 
-import { consoleLinks } from "./console-links.ts";
 import { Landing } from "./landing.tsx";
 import { routeOf } from "./route.ts";
 import { SignIn } from "./sign-in.tsx";
@@ -30,11 +36,13 @@ export const App = ({ location }: { location: AppLocation }) => {
     case "not-found":
       return (
         <Page nav={nav} title="Nothing here">
-          <EmptyState
-            title="This simulator serves no page at this address"
-            description={location.pathname}
-            action={<Button href="/">All providers</Button>}
-          />
+          <Panel>
+            <EmptyState
+              title="This simulator serves no page at this address"
+              description={location.pathname}
+              action={<Button href="/">All providers</Button>}
+            />
+          </Panel>
         </Page>
       );
   }

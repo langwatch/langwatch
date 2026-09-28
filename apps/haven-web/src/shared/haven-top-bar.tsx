@@ -1,4 +1,4 @@
-import { TopBar, type ConsoleLink } from "@langwatch/design-system-internal";
+import { TopBar, consoleLinks, type ConsoleLink } from "@langwatch/design-system-internal";
 import type { ReactNode } from "react";
 
 import type { Surface } from "./contract.ts";
@@ -17,27 +17,64 @@ export type HavenTopBarProps = {
 
 const trimSlash = ({ href }: { href: string }) => href.replace(/\/+$/, "");
 
-/** One bar for every haven page: the hub, its logs, this stack's home and its consoles. */
+const hostOf = ({ href }: { href: string }) => {
+  try {
+    return new URL(href).hostname;
+  } catch {
+    return "";
+  }
+};
+
+/** The kit's consoles for this stack, less those the daemon reports as not answering. */
+const answering = ({ links, surfaces }: { links: ConsoleLink[]; surfaces: Surface[] }) => {
+  const live = new Set(consolesOf({ surfaces }).map((link) => hostOf({ href: link.href })));
+  const known = new Set(surfaces.map((surface) => hostOf({ href: surface.url })));
+  return links.filter((link) => {
+    const host = hostOf({ href: link.href });
+    return !known.has(host) || live.has(host);
+  });
+};
+
+/** Off the scheme (a dev server on localhost), the hub and the home haven was told about. */
+const fallback = ({
+  hub,
+  home,
+  current,
+}: Pick<HavenTopBarProps, "home" | "current"> & { hub: string }) => [
+  { label: "Hub", href: hub === "" ? "/" : hub, current: current === "hub" },
+  ...(home === undefined ? [] : [{ label: "Home", href: home.href, current: current === "home" }]),
+];
+
+/**
+ * One bar for every haven page: the kit's links for this address (the hub,
+ * or this stack's consoles that answer), then haven's own, Logs and Grafana.
+ */
 export const HavenTopBar = ({ current, hubHref, home, actions }: HavenTopBarProps) => {
   const hub = trimSlash({ href: hubHref });
-  const links: ConsoleLink[] = [
-    { label: "Hub", href: hub === "" ? "/" : hub, current: current === "hub" },
-    {
-      label: "Logs",
-      href: home === undefined ? `${hub}/logs` : `${hub}/logs/${encodeURIComponent(home.slug)}`,
-      current: current === "logs",
-    },
-  ];
-  if (home !== undefined) {
-    links.push({ label: "Home", href: home.href, current: current === "home" });
-    links.push(...consolesOf({ surfaces: home.surfaces }));
-  }
+  const { slug, links, homeHref, hubHref: kitHub } = consoleLinks({ location: window.location });
+  const found =
+    home === undefined
+      ? links.filter((link) => link.href === homeHref || link.href === kitHub)
+      : answering({ links, surfaces: home.surfaces });
+  const kit = current === "logs" ? found.map(({ label, href }) => ({ label, href })) : found;
+  const logs: ConsoleLink = {
+    label: "Logs",
+    href: home === undefined ? `${hub}/logs` : `${hub}/logs/${encodeURIComponent(home.slug)}`,
+    current: current === "logs",
+  };
+  const hosts = new Set(kit.map((link) => hostOf({ href: link.href })));
+  const extras =
+    home === undefined
+      ? []
+      : consolesOf({ surfaces: home.surfaces }).filter(
+          (link) => !hosts.has(hostOf({ href: link.href })),
+        );
   return (
     <TopBar
       name="haven"
-      slug={home?.slug}
+      slug={home?.slug ?? slug}
       homeHref={home === undefined ? "/" : home.href}
-      links={links}
+      links={[...(kit.length === 0 ? fallback({ hub, home, current }) : kit), logs, ...extras]}
       actions={actions}
     />
   );

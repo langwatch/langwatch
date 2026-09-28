@@ -19,7 +19,6 @@
 /* Twenty-odd messages would push the props a screen down; the list scrolls instead. */
 .mailroom-message-list {
   max-height: 440px;
-  overflow-y: auto;
 }
 
 .mailroom-preview {

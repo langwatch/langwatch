@@ -68,11 +68,7 @@ export const TenantPage = ({ nav, tenantId }: { nav: ReactNode; tenantId: number
           ? "A simulated identity provider."
           : `A simulated identity provider that owns ${data.domain}. It speaks OIDC and SAML, provisions over SCIM, and can prove it owns its domain over DNS or HTTP.`
       }
-      actions={
-        <Button href="/" size="sm" variant="ghost">
-          All providers
-        </Button>
-      }
+      actions={<Button href="/">All providers</Button>}
     >
       <Stack gap={6}>
         <RefusalCallout refusal={refusal} />

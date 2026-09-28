@@ -18,6 +18,7 @@ describe("consoleLinks", () => {
       const chrome = at({ hostname: "mail.feat-x.langwatch.localhost" });
       expect(chrome.slug).toBe("feat-x");
       expect(chrome.homeHref).toBe("https://feat-x.langwatch.localhost:1355");
+      expect(chrome.hubHref).toBe("https://hub.langwatch.localhost:1355");
       expect(chrome.links).toEqual([
         { label: "Home", href: "https://feat-x.langwatch.localhost:1355" },
         { label: "Hub", href: "https://hub.langwatch.localhost:1355" },
@@ -61,13 +62,31 @@ describe("consoleLinks", () => {
     });
   });
 
+  describe("given a machine-wide host", () => {
+    it.each([
+      "idp.langwatch.localhost",
+      "langwatch.localhost",
+      "observability.langwatch.localhost",
+    ])("links the hub alone from %s", (hostname) => {
+      expect(at({ hostname, port: "" })).toEqual({
+        hubHref: "https://hub.langwatch.localhost",
+        links: [{ label: "Hub", href: "https://hub.langwatch.localhost" }],
+      });
+    });
+
+    it("marks the hub current on the hub", () => {
+      expect(at({ hostname: "hub.langwatch.localhost" })).toEqual({
+        hubHref: "https://hub.langwatch.localhost:1355",
+        links: [{ label: "Hub", href: "https://hub.langwatch.localhost:1355", current: true }],
+      });
+    });
+  });
+
   describe("given a host outside the scheme", () => {
     it.each([
       "localhost",
       "127.0.0.1",
-      "hub.langwatch.localhost",
-      "idp.langwatch.localhost",
-      "langwatch.localhost",
+      "idp.hub.langwatch.localhost",
       "a.b.feat-x.langwatch.localhost",
       "app.langwatch.ai",
     ])("links nowhere from %s", (hostname) => {

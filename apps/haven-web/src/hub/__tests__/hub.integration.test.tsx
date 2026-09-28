@@ -88,6 +88,24 @@ describe("the hub", () => {
     });
   });
 
+  describe("when a filter matches inside a line", () => {
+    /** @scenario "A search says where it matched, not only which lines it kept" */
+    it("marks the matching text and writes captured markup as characters", async () => {
+      await openAt({ path: "/logs/feat-x" });
+      const filter = await screen.findByRole("searchbox", { name: "Filter" });
+      const log = screen.getByRole("log", { name: "Captured service logs" });
+
+      fireEvent.change(filter, { target: { value: "request" } });
+      const marks = within(log).getAllByText("request", { selector: "mark" });
+      expect(marks.length).toBeGreaterThan(0);
+
+      fireEvent.change(filter, { target: { value: "script" } });
+      expect(log.querySelector("script")).toBeNull();
+      expect(log.textContent).toContain("<script>alert(1)</script>");
+      expect(within(log).getAllByText("script", { selector: "mark" }).length).toBeGreaterThan(0);
+    });
+  });
+
   describe("when a developer presses slash", () => {
     /** @scenario "The log viewer is driven from the keyboard" */
     it("opens the log filter from anywhere, escape clears it, and it stands down while typing", async () => {

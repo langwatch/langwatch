@@ -82,6 +82,7 @@
   --row-line: var(--space-4);
   --radius-inner: calc(var(--radius-sm) - 2px);
   --page-max: 1200px;
+  --page-narrow: 560px;
   --text-mono: calc(var(--text-md) - 1px);
 }
 
@@ -252,9 +253,19 @@ textarea {
   max-width: none;
 }
 
+.ds-page-frame[data-width="narrow"] {
+  max-width: calc(var(--page-narrow) + 2 * var(--space-8));
+}
+
+/* A full-width page takes its top bar with it, so the bar's edges line up with the page's. */
+.ds-page:has(> .ds-page-frame[data-width="full"]) .ds-topbar-inner {
+  max-width: none;
+}
+
+/* Actions sit right, level with the title's top; under 720px they wrap under the heading. */
 .ds-page-header {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--space-4);
@@ -283,8 +294,11 @@ textarea {
 
 .ds-page-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .ds-topbar {
@@ -606,8 +620,39 @@ a.ds-topbar-brand {
 }
 
 .ds-panel-body[data-flush],
-.ds-panel-body:has(> :is(.ds-table-wrap, .ds-list, .ds-kv, .ds-logview, .ds-empty):only-child) {
+.ds-panel-body:has(
+  > :is(.ds-table-wrap, .ds-list, .ds-kv, .ds-logview, .ds-empty, .ds-scroll):only-child
+) {
   padding: 0;
+}
+
+.ds-scroll {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Flush in a panel, so the fade meets the panel's edge; the scroller carries the inset. */
+.ds-panel-body > .ds-scroll:only-child {
+  padding: var(--space-4);
+}
+
+/* Only the mask's alpha counts, so its colour is no colour choice. */
+.ds-scroll[data-more-end] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--space-8)), transparent);
+}
+
+.ds-scroll[data-more-start] {
+  mask-image: linear-gradient(to top, #000 calc(100% - var(--space-8)), transparent);
+}
+
+.ds-scroll[data-more-start][data-more-end] {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--space-8),
+    #000 calc(100% - var(--space-8)),
+    transparent
+  );
 }
 
 .ds-panel-body[data-flush] > :is(.ds-table-wrap, .ds-list, .ds-kv, .ds-logview),
@@ -1945,6 +1990,15 @@ button.ds-list-row {
 @media (max-width: 719px) {
   .ds-page-frame {
     padding: var(--space-4);
+  }
+
+  .ds-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ds-page-actions {
+    justify-content: flex-start;
   }
 
   .ds-topbar-inner {

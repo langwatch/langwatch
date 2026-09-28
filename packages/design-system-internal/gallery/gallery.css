@@ -30,6 +30,10 @@
   min-height: 190px;
 }
 
+.gallery-scroll {
+  max-height: 160px;
+}
+
 .gallery-narrow {
   max-width: 320px;
 }

@@ -7,8 +7,11 @@ export type PageProps = {
   actions?: ReactNode;
   /** The site navigation above the frame, full bleed: normally a `TopBar`. */
   nav?: ReactNode;
-  /** `full` lifts the 1200px cap, for a log or a wide table. */
-  width?: "default" | "full";
+  /**
+   * `full` lifts the 1200px cap, for a log or a wide table; `narrow` is a
+   * centred 560px column, for a form or a picker.
+   */
+  width?: "default" | "full" | "narrow";
 };
 
 export const Page = ({ children, title, subtitle, actions, nav, width = "default" }: PageProps) => {

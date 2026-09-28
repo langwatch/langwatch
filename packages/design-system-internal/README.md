@@ -24,8 +24,8 @@ one `app.css`, using the tokens.
 ## Tokens
 
 All are CSS custom properties on `:root`, with a dark set under
-`@media (prefers-color-scheme: dark)` and `[data-theme="dark"]`. Values start
-from the hub's (`tools/thuishaven/adapters/dashboard/template.go:16-32`).
+`@media (prefers-color-scheme: dark)` and `[data-theme="dark"]`. Values started
+from the Go-rendered hub's, which this kit replaced; `src/tokens.ts` mirrors them.
 
 - **Paper:** `--paper` (page), `--paper-soft` (panel header, table head,
   hover), `--paper-deep` (pressed, code).
@@ -88,17 +88,26 @@ These are where consoles drift, so they are rules, not taste.
 8. **Truncate, don't wrap, in rows.** Hostnames, paths and ids in a row
    truncate with an ellipsis and carry the full value in `title`; they never
    push a row to a second line or the page wider than the viewport.
+9. **Page actions sit in one place.** Actions on the whole page go in
+   `Page`'s actions slot (a toolbar for one view stays with that view): right
+   of the title block and level with its top, `md` controls; under 720px they
+   wrap under the heading, left-aligned.
+   A full-width page takes its top bar full width too, so their edges align.
+10. **A clipped scroller says so.** A list that scrolls inside a panel is a
+    `ScrollArea`: flush in the panel, and each edge with more past it fades,
+    so a control cut at the edge reads as "more", never as a broken layout.
 
 ## Components
 
 Each is small, typed with named props, and styled only by `styles.css`
 classes (`ds-` prefix).
 
-- **Layout:** `Page` (frame, title, subtitle, actions slot, nav slot),
+- **Layout:** `Page` (frame, title, subtitle, actions slot, nav slot; width
+  `default`, `full` or `narrow`, a centred 560px column for a picker or form),
   `TopBar` (console name, stack slug, links to the other consoles, theme
   toggle), `Section`, `Stack`, `Inline`, `Grid`.
 - **Surfaces:** `Panel` (optional `title`, `meta`, `actions`, `flush`),
-  `EmptyState`, `Callout` (info / warning / error).
+  `EmptyState`, `Callout` (info / warning / error), `ScrollArea`.
 - **Data:** `Table` (sticky head, flush in a panel, row hover, empty row),
   `KeyValue` (label column + value column, mono values, copy button), `List`,
   `Code` (inline) and `CodeBlock` (with copy), `LogView` (mono, level
@@ -111,6 +120,9 @@ classes (`ds-` prefix).
   within 3 s confirms; used for restart, down and destroy), `Link` (external
   links show an arrow and open in a new tab).
 - **Overlays:** `Menu`, `Dialog`, `Toast`.
+- **Console links:** `consoleLinks({ location })` gives every console's
+  `TopBar` its links (and `slug`, `homeHref`, `hubHref`) from the page's own
+  host; a console appends its own extras after them, and parses no host itself.
 - **Theme:** `ThemeToggle` (system / light / dark, persisted in
   `localStorage` under `lw-internal-theme`, set as `data-theme` on `<html>`).
 

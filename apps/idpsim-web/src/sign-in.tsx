@@ -62,6 +62,7 @@ export const SignIn = ({
   return (
     <Page
       nav={nav}
+      width="narrow"
       title={notice === undefined ? "Choose an account" : notice.title}
       subtitle={subtitle}
     >

@@ -1,10 +1,16 @@
-import { Button, Callout, EmptyState, Page, Panel } from "@langwatch/design-system-internal";
+import {
+  Button,
+  Callout,
+  EmptyState,
+  Page,
+  Panel,
+  consoleLinks,
+} from "@langwatch/design-system-internal";
 
 import { getStackHome } from "../shared/api.ts";
 import { nowMs } from "../shared/clock.ts";
 import { Connection } from "../shared/connection.tsx";
 import { HavenTopBar } from "../shared/haven-top-bar.tsx";
-import { hubUrlBeside } from "../shared/route.ts";
 import { usePoll } from "../shared/use-poll.ts";
 import { StackHome } from "./stack-home.tsx";
 
@@ -29,7 +35,8 @@ export const StackHomeApp = ({ slug }: { slug: string }) => {
     );
   }
 
-  const hubHref = answer?.notFound.hubUrl ?? hubUrlBeside({ location: window.location });
+  const hubHref =
+    answer?.notFound.hubUrl ?? consoleLinks({ location: window.location }).hubHref ?? "/";
   const nav = <HavenTopBar current="home" hubHref={hubHref} />;
   if (answer?.found === false) {
     return (

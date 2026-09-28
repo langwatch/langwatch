@@ -1,8 +1,9 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 import { tokens } from "../tokens.ts";
 import { flag } from "./class-names.ts";
 import { ThemeToggle } from "./theme-toggle.tsx";
+import { useScrollEdges } from "./use-scroll-edges.ts";
 
 export type ConsoleLink = { label: string; href: string; current?: boolean };
 
@@ -39,13 +40,6 @@ const Brand = ({ name, slug, homeHref }: Pick<TopBarProps, "name" | "slug" | "ho
   );
 };
 
-type Edges = { start: boolean; end: boolean };
-
-const edgesOf = ({ element }: { element: HTMLElement }): Edges => ({
-  start: element.scrollLeft > 1,
-  end: element.scrollLeft + element.clientWidth < element.scrollWidth - 1,
-});
-
 /** The width of an edge's fade (`--space-8` in styles.css). */
 const FADE = Number.parseFloat(tokens.space[8]);
 
@@ -62,22 +56,10 @@ const revealCurrent = ({ nav }: { nav: HTMLElement }) => {
 /** Scrolls sideways when the links outgrow the bar; a faded edge says there is more. */
 const ConsoleNav = ({ links }: { links: ConsoleLink[] }) => {
   const ref = useRef<HTMLElement>(null);
-  const [edges, setEdges] = useState<Edges>({ start: false, end: false });
   useLayoutEffect(() => {
-    const nav = ref.current;
-    if (nav === null) return;
-    const measure = () => setEdges(edgesOf({ element: nav }));
-    revealCurrent({ nav });
-    measure();
-    nav.addEventListener("scroll", measure, { passive: true });
-    const observer =
-      typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
-    observer?.observe(nav);
-    return () => {
-      nav.removeEventListener("scroll", measure);
-      observer?.disconnect();
-    };
+    if (ref.current !== null) revealCurrent({ nav: ref.current });
   }, [links]);
+  const edges = useScrollEdges({ ref, axis: "x", watch: links });
   return (
     <nav
       ref={ref}

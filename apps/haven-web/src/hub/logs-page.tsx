@@ -217,7 +217,13 @@ export const LogsPage = ({ stacks, stack, lane, onSelect, focusRequest }: LogsPa
             </Inline>
           </fieldset>
         )}
-        <LogView lines={viewLines} label="Captured service logs" height="lg" empty={empty} />
+        <LogView
+          lines={viewLines}
+          label="Captured service logs"
+          height="lg"
+          empty={empty}
+          highlight={search}
+        />
       </Stack>
     </Page>
   );

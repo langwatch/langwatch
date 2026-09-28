@@ -2,7 +2,6 @@ import {
   Callout,
   IconArrowUpRight,
   IconButton,
-  Inline,
   Page,
   Panel,
   SegmentedControl,
@@ -63,29 +62,26 @@ export const GalleryView = ({
     title="Gallery"
     subtitle={`${entries?.length ?? 0} messages`}
     actions={
-      <Inline gap={2} wrap justify="end">
+      <>
         <SegmentedControl
           label="Fixtures"
-          size="sm"
           options={FIXTURE_OPTIONS}
           value={everyFixture ? "all" : "first"}
           onChange={(next) => onEveryFixtureChange(next === "all")}
         />
         <SegmentedControl
           label="Width"
-          size="sm"
           options={WIDTH_OPTIONS}
           value={width}
           onChange={onWidthChange}
         />
         <SegmentedControl
           label="Density"
-          size="sm"
           options={DENSITY_OPTIONS}
           value={density}
           onChange={onDensityChange}
         />
-      </Inline>
+      </>
     }
   >
     {failure && (
@@ -179,7 +175,6 @@ const GalleryCard = ({
         <IconButton
           label={`Open ${entry.title}, ${entry.fixture}, in Inspect`}
           icon={<IconArrowUpRight />}
-          size="sm"
           onClick={open}
         />
       }

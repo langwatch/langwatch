@@ -30,6 +30,7 @@ import {
   Meter,
   Page,
   Panel,
+  ScrollArea,
   Section,
   SegmentedControl,
   Select,
@@ -388,6 +389,20 @@ const PanelsCase = () => (
             <Text>A panel's body is inset 16px, the same as its header and its rows.</Text>
             <Text tone="secondary">Stacked panels meet with a gap, never touching borders.</Text>
           </Stack>
+        </Panel>
+      </Grid>
+      <Grid columns={2} gap={4}>
+        <Panel title="Scrolled" meta="edge fades while more is past it">
+          <ScrollArea className="gallery-scroll" label="Scrolled rows">
+            <Stack gap={3}>
+              {["Invitation", "Reset", "Verify", "Welcome", "Usage limit", "Digest"].map((name) => (
+                <Inline key={name} gap={2}>
+                  <Text weight="semibold">{name}</Text>
+                  <Button size="sm">default</Button>
+                </Inline>
+              ))}
+            </Stack>
+          </ScrollArea>
         </Panel>
       </Grid>
     </Stack>
