@@ -255,10 +255,11 @@ Feature: Reading a trace the way the drawer reads it
     And a child span whose input or output differs is listed under its tool
 
   @unit
-  Scenario: A turn whose only step is the model call that wrote the reply lists no steps
+  Scenario: A turn whose only step is the model call that wrote the reply does not repeat it
     Given a chat turn with one model call whose output is the reply
     When the thread is rendered as a conversation
-    Then the turn shows the user message and the reply with no step list
+    Then the model call is listed with its token counts but not its output
+    And a turn whose model call reported no token counts lists no steps
 
   @unit
   Scenario: A conversation over the budget shortens every turn before it drops one

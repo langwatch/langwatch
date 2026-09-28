@@ -61,7 +61,7 @@ function findStepsOfSpan({
   ];
 }
 
-/** A turn whose one step is the model call that wrote the reply says nothing the reply does not. */
+/** A turn whose one step is the model call that wrote the reply, uncounted, adds nothing. */
 function isOnlyTheReply(steps: readonly ConversationStep[]): boolean {
   const [only] = steps;
   return (
@@ -69,6 +69,7 @@ function isOnlyTheReply(steps: readonly ConversationStep[]): boolean {
     only!.kind === "model" &&
     !only!.output &&
     (only!.calls ?? []).length === 0 &&
+    !only!.usage &&
     !only!.error
   );
 }
@@ -193,18 +194,52 @@ function toolCallsOf(message: ChatMessage): string[] {
   return [...fromCalls, ...fromBlocks].filter((name) => name !== "");
 }
 
-/** The token counts a model call reported; empty when it reported none. */
+/**
+ * The token counts a model call reported; empty when it reported none. The
+ * span's own usage attributes fill what the metrics lack: ingestion lifts
+ * only non-zero counts, and a zero cache read is exactly what a reader asks about.
+ */
 function usageOf(span: Span): ConversationStepUsage {
-  const metrics = span.metrics;
+  const metrics = span.metrics ?? {};
+  const params = span.params ?? {};
   const usage: ConversationStepUsage = {};
-  if (!metrics) return usage;
-  if (metrics.prompt_tokens != null) usage.input = metrics.prompt_tokens;
-  if (metrics.cache_read_input_tokens != null) usage.cacheRead = metrics.cache_read_input_tokens;
-  if (metrics.cache_creation_input_tokens != null) {
-    usage.cacheWrite = metrics.cache_creation_input_tokens;
-  }
-  if (metrics.completion_tokens != null) usage.output = metrics.completion_tokens;
+  const pick = (fromMetrics: unknown, paths: readonly string[]) =>
+    typeof fromMetrics === "number"
+      ? fromMetrics
+      : paths.flatMap((path) => findNumbersAt({ params, path }))[0];
+  const input = pick(metrics.prompt_tokens, ["gen_ai.usage.input_tokens", "input_tokens"]);
+  const cacheRead = pick(metrics.cache_read_input_tokens, [
+    "gen_ai.usage.cache_read.input_tokens",
+    "cache_read_tokens",
+  ]);
+  const cacheWrite = pick(metrics.cache_creation_input_tokens, [
+    "gen_ai.usage.cache_creation.input_tokens",
+    "cache_creation_tokens",
+  ]);
+  const output = pick(metrics.completion_tokens, ["gen_ai.usage.output_tokens", "output_tokens"]);
+  if (input !== undefined) usage.input = input;
+  if (cacheRead !== undefined) usage.cacheRead = cacheRead;
+  if (cacheWrite !== undefined) usage.cacheWrite = cacheWrite;
+  if (output !== undefined) usage.output = output;
   return usage;
+}
+
+/** The number at a dotted path, read flat first and then nested, as span params hold either. */
+function findNumbersAt({
+  params,
+  path,
+}: {
+  params: Record<string, unknown>;
+  path: string;
+}): number[] {
+  const flat = params[path];
+  if (typeof flat === "number") return [flat];
+  let node: unknown = params;
+  for (const key of path.split(".")) {
+    if (typeof node !== "object" || node === null) return [];
+    node = (node as Record<string, unknown>)[key];
+  }
+  return typeof node === "number" ? [node] : [];
 }
 
 function ioText(io: LegacySpanInputOutput | null | undefined): string {

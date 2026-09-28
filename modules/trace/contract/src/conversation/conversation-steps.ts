@@ -126,13 +126,14 @@ type KeptStep = { step: ConversationStep } | { omitted: ConversationStep[] };
  */
 function keepSteps({ steps, max }: { steps: ConversationStep[]; max: number }): KeptStep[] {
   if (steps.length <= max) return steps.map((step) => ({ step }));
+  const outliers = usageOutliers(steps);
+  const keepFirst = (step: ConversationStep) => {
+    if (outliers.has(step)) return 2;
+    return step.kind === "model" ? 0 : 1;
+  };
   const middleOut = steps
     .map((step, index) => ({ step, index, distance: Math.abs(index - (steps.length - 1) * 0.4) }))
-    .toSorted(
-      (a, b) =>
-        Number(b.step.kind === "model") - Number(a.step.kind === "model") ||
-        a.distance - b.distance,
-    );
+    .toSorted((a, b) => keepFirst(a.step) - keepFirst(b.step) || a.distance - b.distance);
   const dropped = new Set(middleOut.slice(0, steps.length - max).map(({ index }) => index));
   const kept: KeptStep[] = [];
   let run: ConversationStep[] = [];
@@ -147,6 +148,18 @@ function keepSteps({ steps, max }: { steps: ConversationStep[]; max: number }): 
   });
   if (run.length > 0) kept.push({ omitted: run });
   return kept;
+}
+
+/** The calls with the largest context and the smallest cache read: what usage questions ask. */
+function usageOutliers(steps: ConversationStep[]): Set<ConversationStep> {
+  const counted = steps.filter((step) => step.kind === "model" && step.usage);
+  const context = (step: ConversationStep) =>
+    (step.usage?.input ?? 0) + (step.usage?.cacheRead ?? 0) + (step.usage?.cacheWrite ?? 0);
+  const largest = counted.toSorted((a, b) => context(b) - context(a))[0];
+  const coldest = counted
+    .filter((step) => step.usage?.cacheRead !== undefined)
+    .toSorted((a, b) => (a.usage?.cacheRead ?? 0) - (b.usage?.cacheRead ?? 0))[0];
+  return new Set([largest, coldest].filter((step): step is ConversationStep => step !== undefined));
 }
 
 /** What the omitted model calls carried, so a question about context size still has an answer. */

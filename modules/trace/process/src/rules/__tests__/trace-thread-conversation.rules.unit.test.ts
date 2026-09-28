@@ -174,15 +174,27 @@ describe("renderThreadConversation", () => {
   });
 
   describe("given a chat turn with one model call whose output is the reply", () => {
-    /** @scenario "A turn whose only step is the model call that wrote the reply lists no steps" */
-    it("shows the user message and the reply with no step list", () => {
+    /** @scenario "A turn whose only step is the model call that wrote the reply does not repeat it" */
+    it("lists the model call with its token counts, not its output", () => {
       const text = renderThreadConversation({
         threadKey: "thread-1",
         traces: thread({ turns: 2 }),
       }).text;
 
+      expect(text).toContain("model gpt-5-mini (in 940, out 8)");
+      expect(text.split("Activity 1 runs every day.").length - 1).toBe(1);
+    });
+
+    /** @scenario "A turn whose only step is the model call that wrote the reply does not repeat it" */
+    it("lists no steps when that model call reported no token counts", () => {
+      const traces = thread({ turns: 2 }).map((trace) => ({
+        ...trace,
+        spans: trace.spans.map((each) => ({ ...each, metrics: null })),
+      }));
+
+      const text = renderThreadConversation({ threadKey: "thread-1", traces }).text;
+
       expect(text).not.toContain("**Steps:**");
-      expect(text).toContain("Activity 1 runs every day.");
     });
   });
 
@@ -271,7 +283,11 @@ describe("renderThreadConversation on one coding turn of hundreds of steps", () 
           model: "claude-opus-5",
           timestamps: { started_at: T0 + i * 10, finished_at: T0 + i * 10 + 5 },
           output: { type: "text", value: "[tool_use: Read]\n{}" },
-          metrics: { prompt_tokens: 2, cache_read_input_tokens: 40_000 + i, completion_tokens: 50 },
+          metrics: {
+            prompt_tokens: 2,
+            cache_read_input_tokens: i === 120 ? 0 : 40_000 + i,
+            completion_tokens: 50,
+          },
         }),
         span({
           span_id: `tool-${i}`,
@@ -301,6 +317,8 @@ describe("renderThreadConversation on one coding turn of hundreds of steps", () 
     expect(cut.text).toContain("Read the files.");
     expect(cut.text).toMatch(/model calls? omitted/);
     for (const i of [0, 150, 299]) expect(cut.text).toContain(`src/file-${i}.ts`);
+    expect(cut.text).toContain("cache read 0,");
+    expect(cut.text).toContain("cache read 40299,");
   });
 });
 
