@@ -110,7 +110,8 @@ Feature: Dashboards v1
     When it opens
     Then they see "Add a description"
     And they see the "Add a block" area with "Start from the question you need answered."
-    And they see "Start from a template" listing the Agent Flight Deck template
+    And they see "Start from a template" listing the Agent Flight Deck and one
+      template per question group of the picker
 
   @e2e
   Scenario: AC11 Ask Langy by question
@@ -350,6 +351,18 @@ Feature: Dashboards v1
     Then the server accepts the write
     And the board is still not listed or opened for the admin
 
+  @unit
+  Scenario: AC27 Each question group of the picker is also a template
+    Given the blank board
+    When the member starts a board from a question group's template, such as
+      "What changed?"
+    Then a new board is made with the group's title and why-line as its name
+      and description
+    And it holds a stored, editable widget for each question in the group
+    And each widget reads only through LangWatchQL
+    And a widget whose source has no rows in the period names what to set up,
+      with a button to the page that sets it up
+
   # --- AC Coverage Map ---
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
   # AC 2: "Landing" (changed: the member's own board, or a new "My dashboard"; no built-in board) → Scenario: AC2 Landing on the member's first own board; Scenario: AC2 A member with no board gets My dashboard
@@ -377,3 +390,4 @@ Feature: Dashboards v1
   # AC 24: "Boards created before this change keep working" (sharpened) → Scenario: AC24 Boards created before this change keep working
   # AC 25: "Every optional source has its own call to action" → Scenario: AC25 Scenario results shows its own call to action before any row exists; Scenario: AC25 Quality signal shows its own call to action before any row exists; Scenario: AC25 User feedback shows its own call to action before any row exists; Scenario: AC25 Gateway routing shows its own call to action before any row exists; Scenario: AC25 Your coding agents shows its own call to action before any row exists
   # AC 26: "Visibility changes who can see a board, not who can edit it" → Scenario: AC26 A member inside the audience with the edit permission can edit; Scenario: AC26 A member inside the audience without the edit permission sees no edit controls; Scenario: AC26 Only the creator or an admin can change visibility or delete the board; Scenario: AC26 The server refuses every write from a member outside the audience; Scenario: AC26 Narrowing a board with no recorded creator records who narrowed it; Scenario: AC26 An admin can manage a board they cannot see
+  # AC 27: "Each question group of the picker is also a template" → Scenario: AC27 Each question group of the picker is also a template
