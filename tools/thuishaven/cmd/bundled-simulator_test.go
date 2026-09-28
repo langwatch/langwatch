@@ -99,7 +99,8 @@ func TestBundledSimulatorsWithoutCheckout(t *testing.T) {
 		if len(state.Tenants) != 1 || state.Tenants[0].ID != 1 {
 			t.Fatalf("IdP state does not carry its tenant: %+v", state)
 		}
-		assertConsoleServed(t, baseURL+"/")
+		// The IdP front page is still server-rendered; apps/idpsim-web holds no console yet.
+		simulatorGET(t, baseURL+"/")
 		var discovery struct{ Issuer string }
 		if err := json.Unmarshal(simulatorGET(t, baseURL+"/t/1/.well-known/openid-configuration"), &discovery); err != nil {
 			t.Fatal(err)
