@@ -58,19 +58,23 @@ async function keyMapRowsFor(tenantId: string) {
   return result.json<{ KeyHash: string; TenantId: string }>();
 }
 
-/** The one row a project should own: its own key hash, mapped to itself. */
-async function expectKeyMapRow(projectId: string) {
+/**
+ * A project's key-map rows, next to the one row it should own: its own key
+ * hash, mapped to itself.
+ */
+async function keyMapRowsAndExpected(projectId: string) {
   const project = await prisma.project.findUniqueOrThrow({
     where: { id: projectId },
     select: { lwqlKey: true },
   });
   const rows = await keyMapRowsFor(projectId);
-  expect(rows).toEqual([
+  const expected = [
     {
       KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
       TenantId: projectId,
     },
-  ]);
+  ];
+  return { rows, expected };
 }
 
 async function seedUser(label: string) {
@@ -193,7 +197,8 @@ describe("LangWatchQL key-map row on project creation", () => {
         select: { id: true },
       });
 
-      await expectKeyMapRow(firstProject.id);
+      const { rows, expected } = await keyMapRowsAndExpected(firstProject.id);
+      expect(rows).toEqual(expected);
     });
   });
 
@@ -214,7 +219,8 @@ describe("LangWatchQL key-map row on project creation", () => {
         select: { id: true },
       });
 
-      await expectKeyMapRow(project.id);
+      const { rows, expected } = await keyMapRowsAndExpected(project.id);
+      expect(rows).toEqual(expected);
     });
   });
 
@@ -252,7 +258,8 @@ describe("LangWatchQL key-map row on project creation", () => {
       expect(response.status).toBe(201);
       const body = (await response.json()) as { id: string };
 
-      await expectKeyMapRow(body.id);
+      const { rows, expected } = await keyMapRowsAndExpected(body.id);
+      expect(rows).toEqual(expected);
     });
   });
 
@@ -267,7 +274,10 @@ describe("LangWatchQL key-map row on project creation", () => {
       });
       expect(workspace.created).toBe(true);
 
-      await expectKeyMapRow(workspace.project.id);
+      const { rows, expected } = await keyMapRowsAndExpected(
+        workspace.project.id,
+      );
+      expect(rows).toEqual(expected);
     });
   });
 });

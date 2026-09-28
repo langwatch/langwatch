@@ -349,44 +349,72 @@ export async function waitForClickHouseReady({
   let lastLogAt: number | undefined;
 
   for (;;) {
-    try {
-      await ping();
-      return;
-    } catch (error) {
-      const reason = describeError(error);
-      const cause = error instanceof Error ? error : undefined;
-      if (!isConnectionError(error)) {
-        throw new MigrationError(
-          `ClickHouse at ${displayUrl} failed the connection check: ${reason}`,
-          "preflight",
-          cause,
-        );
-      }
-      const current = now();
-      if (current >= deadline) {
-        const waited =
-          waitSeconds > 0
-            ? ` after waiting ${waitSeconds}s (CLICKHOUSE_MIGRATE_WAIT_SECONDS)`
-            : "";
-        throw new MigrationError(
-          `Cannot connect to ClickHouse at ${displayUrl}${waited}: ${reason}`,
-          "preflight",
-          cause,
-        );
-      }
-      if (
-        lastLogAt === undefined ||
-        current - lastLogAt >= WAIT_LOG_INTERVAL_MS
-      ) {
-        const elapsed = Math.round((current - startedAt) / 1000);
-        log(
-          `Waiting for ClickHouse at ${displayUrl} to accept connections (${elapsed}s of ${waitSeconds}s): ${reason}`,
-        );
-        lastLogAt = current;
-      }
-      await sleep(Math.min(WAIT_RETRY_INTERVAL_MS, deadline - current));
+    const failure = await pingFailure(ping);
+    if (!failure) return;
+    const current = now();
+    throwUnlessRetryable({
+      error: failure.error,
+      timedOut: current >= deadline,
+      displayUrl,
+      waitSeconds,
+    });
+    if (
+      lastLogAt === undefined ||
+      current - lastLogAt >= WAIT_LOG_INTERVAL_MS
+    ) {
+      const elapsed = Math.round((current - startedAt) / 1000);
+      log(
+        `Waiting for ClickHouse at ${displayUrl} to accept connections (${elapsed}s of ${waitSeconds}s): ${describeError(failure.error)}`,
+      );
+      lastLogAt = current;
     }
+    await sleep(Math.min(WAIT_RETRY_INTERVAL_MS, deadline - current));
   }
+}
+
+/** The ping's rejection, or null when it succeeded. */
+async function pingFailure(
+  ping: () => Promise<void>,
+): Promise<{ error: unknown } | null> {
+  try {
+    await ping();
+    return null;
+  } catch (error) {
+    return { error };
+  }
+}
+
+/** Throws the preflight failure unless the error is worth another attempt. */
+function throwUnlessRetryable({
+  error,
+  timedOut,
+  displayUrl,
+  waitSeconds,
+}: {
+  error: unknown;
+  timedOut: boolean;
+  displayUrl: string;
+  waitSeconds: number;
+}): void {
+  const reason = describeError(error);
+  const cause = error instanceof Error ? error : undefined;
+  if (!isConnectionError(error)) {
+    throw new MigrationError(
+      `ClickHouse at ${displayUrl} failed the connection check: ${reason}`,
+      "preflight",
+      cause,
+    );
+  }
+  if (!timedOut) return;
+  const waited =
+    waitSeconds > 0
+      ? ` after waiting ${waitSeconds}s (CLICKHOUSE_MIGRATE_WAIT_SECONDS)`
+      : "";
+  throw new MigrationError(
+    `Cannot connect to ClickHouse at ${displayUrl}${waited}: ${reason}`,
+    "preflight",
+    cause,
+  );
 }
 
 /**
