@@ -32,10 +32,16 @@ const SCANNED_ROOTS = ["apps", "packages", "dev", "tools", "mcp", "sdks", "plugi
 const isSourceFile = (file: string): boolean =>
   /\.(?:mts|cts|tsx?|jsx?|mjs|cjs)$/.test(file) && !/\.d\.(?:mts|cts|ts)$/.test(file);
 
+/**
+ * Test code: colocated tests, the test harness's never-connected client doubles,
+ * and the end-to-end suites, which read a running stack's Redis from outside it.
+ */
 const isTestFile = (file: string): boolean =>
   file.includes(`${sep}__tests__${sep}`) ||
   /\.(test|spec)\.[cm]?tsx?$/.test(file) ||
-  file.includes(`${sep}test-utils${sep}`);
+  file.includes(`${sep}test-utils${sep}`) ||
+  file.startsWith(join(PACKAGES_ROOT, "test-harness", "src", "client-doubles") + sep) ||
+  file.startsWith(join(REPO_ROOT, "dev", "tests") + sep);
 
 /**
  * Every way an ioredis client gets constructed. The trailing member access

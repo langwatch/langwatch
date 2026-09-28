@@ -19,6 +19,9 @@ const (
 	// ClassMissingBase is a screen the candidate captured and the base never did:
 	// nothing was compared, so it is never read as a change.
 	ClassMissingBase Classification = "missing-base"
+	// ClassCaptureFailed is a screen whose own modules did not load on a side,
+	// even taken again alone: the tool's failure, so it is never read as blank.
+	ClassCaptureFailed Classification = "capture-failed"
 	// ClassBrokenBoth is a route or flow step that fails on both refs.
 	ClassBrokenBoth Classification = "broken-both"
 	// ClassRegression is the candidate throwing, or failing a step, where the base does not.
@@ -51,7 +54,7 @@ const (
 )
 
 var findingClasses = map[Classification]bool{
-	ClassMissingCandidate: true, ClassMissingBase: true, ClassBrokenBoth: true,
+	ClassMissingCandidate: true, ClassMissingBase: true, ClassCaptureFailed: true, ClassBrokenBoth: true,
 	ClassRegression: true, ClassNotFound: true, ClassBlank: true, ClassRedirect: true,
 	ClassAPIError: true, ClassControls: true, ClassUncovered: true,
 }
@@ -98,6 +101,9 @@ func Classify(row Row) (Classification, string) {
 	}
 	if base == nil {
 		return ClassMissingBase, "no capture on the base: nothing to compare against"
+	}
+	if why := moduleFailure(row); why != "" {
+		return ClassCaptureFailed, why
 	}
 	if class, why := classifyFailure(row); class != "" {
 		return class, why
@@ -150,6 +156,19 @@ func classifyFailure(row Row) (Classification, string) {
 		return ClassAPIError, "candidate request the base does not fail: " + head(hits[0])
 	}
 	return "", ""
+}
+
+// moduleFailure says which side could not load its own modules, or "".
+func moduleFailure(row Row) string {
+	for _, side := range []struct {
+		name    string
+		capture *Capture
+	}{{"candidate", row.Candidate}, {"base", row.Base}} {
+		if failures := side.capture.ModuleFailures; len(failures) > 0 {
+			return fmt.Sprintf("the %s's dev server did not serve its modules (%d failed): %s", side.name, len(failures), head(failures[0]))
+		}
+	}
+	return ""
 }
 
 func blankWhy(baseBlank bool) string {

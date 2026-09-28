@@ -32,8 +32,8 @@ describe("namesCreatedResource", () => {
     });
   });
 
-  /** @scenario A create that only scaffolded a local file is not a platform create */
   describe("given a payload that scaffolds a local file", () => {
+    /** @scenario A create that only scaffolded a local file is not a platform create */
     it("rejects the prompt create scaffold shape", () => {
       expect(
         namesCreatedResource({

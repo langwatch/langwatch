@@ -31,10 +31,10 @@ beforeEach(() => {
 });
 
 describe("drawerStore.setWidthPx", () => {
-  /** @scenario Drag the left-edge grip to resize the drawer */
-  /** @scenario Width is clamped to a minimum */
   describe("given a width below the minimum", () => {
     describe("when setWidthPx is called", () => {
+      /** @scenario Drag the left-edge grip to resize the drawer */
+      /** @scenario Width is clamped to a minimum */
       it("clamps to DRAWER_MIN_WIDTH_PX", () => {
         useDrawerStore.getState().setWidthPx(100);
         expect(useDrawerStore.getState().widthPx).toBe(DRAWER_MIN_WIDTH_PX);
@@ -42,9 +42,9 @@ describe("drawerStore.setWidthPx", () => {
     });
   });
 
-  /** @scenario Width persists across sessions */
   describe("given a valid width", () => {
     describe("when setWidthPx is called", () => {
+      /** @scenario Width persists across sessions */
       it("persists to localStorage", () => {
         useDrawerStore.getState().setWidthPx(900);
         expect(useDrawerStore.getState().widthPx).toBe(900);
@@ -66,9 +66,9 @@ describe("drawerStore.setWidthPx", () => {
 });
 
 describe("drawerStore.toggleSnapMaximize", () => {
-  /** @scenario Double-click the grip toggles maximize and restore */
   describe("given a non-snapped width", () => {
     describe("when toggleSnapMaximize fires", () => {
+      /** @scenario Double-click the grip toggles maximize and restore */
       it("snaps to viewport - edge and records the previous width", () => {
         useDrawerStore.getState().setWidthPx(700);
         useDrawerStore.getState().toggleSnapMaximize(VIEWPORT_WIDTH);
@@ -80,9 +80,9 @@ describe("drawerStore.toggleSnapMaximize", () => {
     });
   });
 
-  /** @scenario Double-click the grip toggles maximize and restore */
   describe("given an already-snapped width", () => {
     describe("when toggleSnapMaximize fires a second time", () => {
+      /** @scenario Double-click the grip toggles maximize and restore */
       it("restores the remembered width", () => {
         useDrawerStore.getState().setWidthPx(700);
         useDrawerStore.getState().toggleSnapMaximize(VIEWPORT_WIDTH);
@@ -113,9 +113,9 @@ describe("drawerStore.toggleSnapMaximize", () => {
 });
 
 describe("drawerStore pane controls", () => {
-  /** @scenario Collapsing a pane reduces it to header-only */
   describe("given a default pane", () => {
     describe("when togglePaneCollapsed fires", () => {
+      /** @scenario Collapsing a pane reduces it to header-only */
       it("flips the collapsed flag and persists to localStorage", () => {
         useDrawerStore.getState().togglePaneCollapsed("visualization");
         expect(useDrawerStore.getState().paneState.visualization.collapsed).toBe(true);
@@ -124,9 +124,9 @@ describe("drawerStore pane controls", () => {
     });
   });
 
-  /** @scenario Maximize-within-group hides siblings */
   describe("given a pane and its sibling", () => {
     describe("when togglePaneMaximized fires", () => {
+      /** @scenario Maximize-within-group hides siblings */
       it("flips only that pane's maximized flag (the consumer hides siblings)", () => {
         useDrawerStore.getState().togglePaneMaximized("visualization");
         const state = useDrawerStore.getState().paneState;
@@ -148,9 +148,9 @@ describe("drawerStore pane controls", () => {
     });
   });
 
-  /** @scenario Span-detail collapse round-trip preserves the selection */
   describe("given a selected span", () => {
     describe("when togglePaneCollapsed(spanDetail) fires twice", () => {
+      // Span-detail collapse round-trip preserves the selection
       it("keeps selectedSpanId so re-opening lands on the same span", () => {
         useDrawerStore.getState().selectSpan("span-abc");
         expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
@@ -219,9 +219,9 @@ describe("drawerStore persistence is idempotent", () => {
 });
 
 describe("drawerStore.backfillOccurredAtMs", () => {
-  /** @scenario Deep link / refresh opens the drawer without a `t` hint */
   describe("given the drawer was opened without an occurredAtMs hint", () => {
     describe("when the resolved header timestamp is backfilled", () => {
+      // Deep link / refresh opens the drawer without a `t` hint
       it("sets occurredAtMs so per-trace reads can prune", () => {
         useDrawerStore.getState().openTrace("trace-1");
         expect(useDrawerStore.getState().occurredAtMs).toBeNull();

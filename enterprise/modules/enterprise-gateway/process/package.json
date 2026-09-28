@@ -42,7 +42,7 @@
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
-    "nanoid": "^6.0.0",
+    "nanoid": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

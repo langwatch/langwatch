@@ -60,8 +60,8 @@ Naming these is worth many turns: a lane with no exemplar greps for one.>
 of routes - concrete enough to compare against. Link the reference rather than
 restating it:
 
-Follow `.claude/skills/module/references/convert.md`. End shape:
-defineModule("trace").withRepositories(...).withApp(TraceApp).withTransports(...)
+Follow `.claude/skills/backend/SKILL.md` and record section 3.2. End shape:
+defineProcessModule("trace").withRepositories(...).withApi(TraceModule).withTransports(...)
 
 If this section needs more than about fifteen lines, the guidance belongs in a
 skill reference and this section should link to it.>

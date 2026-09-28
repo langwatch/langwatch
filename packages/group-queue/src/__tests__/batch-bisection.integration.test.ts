@@ -67,7 +67,10 @@ function processBatchBisecting(
   queue: GroupQueueProcessor<TestPayload>,
   args: Parameters<BisectingQueue["processBatchBisecting"]>[0],
 ): Promise<void> {
-  const bisect: BisectingQueue["processBatchBisecting"] = Reflect.get(queue, "processBatchBisecting");
+  const bisect: BisectingQueue["processBatchBisecting"] = Reflect.get(
+    queue,
+    "processBatchBisecting",
+  );
   return bisect.call(queue, args);
 }
 

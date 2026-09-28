@@ -26,7 +26,10 @@ import {
   sqlString,
   sqlStringArray,
 } from "./instant-eval-sql.rules.ts";
-import { instantEvalTextBudget } from "./instant-eval-token-budget.rules.ts";
+import {
+  instantEvalTextBudget,
+  instantEvalTranscriptRenderTokens,
+} from "./instant-eval-token-budget.rules.ts";
 
 /** A column name: a letter or underscore, then letters, digits or underscores. */
 const QUESTION_ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -222,7 +225,7 @@ interface TargetTemplate {
   readonly groupBy?: string;
   readonly orderBy: string;
   /** The extraction call whose value each question judges. */
-  readonly text: (budgetTokens: number) => string;
+  readonly text: (budget: TextBudget) => string;
   readonly filterPlacement: "inline" | "trace-subquery";
   /**
    * The view's own trace column, as a subquery's left-hand side must spell it:
@@ -238,7 +241,7 @@ const TEMPLATES: Readonly<Record<InstantEvalTarget, TargetTemplate>> = {
     projection: ["TraceId", "Attributes['gen_ai.conversation.id'] AS ThreadId", "OccurredAt"],
     conditions: [],
     orderBy: "TraceId",
-    text: (budget) => `llm_readable_trace(TraceId, ${sqlInteger(budget)})`,
+    text: (budget) => `llm_readable_trace(TraceId, ${sqlInteger(budget.shorthandTokens)})`,
     filterPlacement: "inline",
   },
   threads: {
@@ -256,9 +259,13 @@ const TEMPLATES: Readonly<Record<InstantEvalTarget, TargetTemplate>> = {
     conditions: ["m.ConversationId != ''"],
     groupBy: "m.ConversationId",
     orderBy: "ThreadId",
-    // Unbounded: the eval function cuts to whatever the judge's state leaves,
-    // so an ordinary conversation reaches it whole.
-    text: () => "conversation(m.ConversationId)",
+    // Bounded at everything the judge's state leaves, so an ordinary
+    // conversation reaches it whole and a long one is shortened turn by turn
+    // rather than cut in its middle.
+    text: (budget) =>
+      `conversation_bounded(m.ConversationId, ${sqlInteger(
+        instantEvalTranscriptRenderTokens({ textBudgetTokens: budget.availableTokens }),
+      )}, '')`,
     filterPlacement: "trace-subquery",
     filterTraceColumn: "m.TraceId",
   },
@@ -311,12 +318,20 @@ function classifierQuestions(
   });
 }
 
+/** The text budgets a statement is written with, in the judge's tokens. */
+interface TextBudget {
+  /** The shipped default, capped by what the questions leave. */
+  readonly shorthandTokens: number;
+  /** Everything the questions leave of the judge's state. */
+  readonly availableTokens: number;
+}
+
 /**
- * The token budget the extraction call is written with: the shipped default,
+ * The token budgets the extraction call is written with: the shipped default,
  * unless the questions are large enough that the judge's state would not hold
  * both, and a list that leaves nothing is refused here.
  */
-function textBudgetFor(questions: readonly InstantEvalShorthandQuestion[]): number {
+function textBudgetFor(questions: readonly InstantEvalShorthandQuestion[]): TextBudget {
   const available = instantEvalTextBudget({ questions: classifierQuestions(questions) });
   if (available === 0) {
     throw new InstantEvalQueryInvalidError({
@@ -325,7 +340,10 @@ function textBudgetFor(questions: readonly InstantEvalShorthandQuestion[]): numb
       fields: ["questions"],
     });
   }
-  return Math.min(INSTANT_EVAL_SHORTHAND_TEXT_BUDGET, available);
+  return {
+    shorthandTokens: Math.min(INSTANT_EVAL_SHORTHAND_TEXT_BUDGET, available),
+    availableTokens: available,
+  };
 }
 
 /** The window a shorthand judges, resolved to two absolute instants. */

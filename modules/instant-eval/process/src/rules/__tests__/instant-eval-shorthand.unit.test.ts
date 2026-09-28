@@ -15,6 +15,10 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { expandInstantEvalShorthand } from "../instant-eval-shorthand.rules.ts";
+import {
+  instantEvalTextBudget,
+  instantEvalTranscriptRenderTokens,
+} from "../instant-eval-token-budget.rules.ts";
 
 const NOW = Temporal.Instant.from("2026-09-18T12:00:00.000Z");
 
@@ -59,8 +63,12 @@ describe("given a target and some questions", () => {
       expect(sql).toContain("max(m.OccurredAt) AS OccurredAt");
       expect(sql).toContain("GROUP BY m.ConversationId");
       expect(sql).toContain("m.ConversationId != ''");
-      expect(sql).toContain("conversation(m.ConversationId)");
-      expect(sql).not.toContain("conversation_bounded");
+      const available = instantEvalTextBudget({
+        questions: [{ id: "q1", kind: "boolean", instructions: "The customer sounds annoyed" }],
+      });
+      expect(sql).toContain(
+        `conversation_bounded(m.ConversationId, ${instantEvalTranscriptRenderTokens({ textBudgetTokens: available })}, '')`,
+      );
     });
   });
 

@@ -31,6 +31,7 @@ function oversizedDataUrl(): string {
 }
 
 describe("capOversizedAttributes", () => {
+  /** @scenario "An oversized inline image is still replaced entirely" */
   it("caps an oversized base64 data-url attribute and names the mime type", () => {
     const url = oversizedDataUrl();
     const span = makeSpan([{ key: "langwatch.input", value: { stringValue: url } }]);
@@ -477,5 +478,71 @@ describe("hasOversizedAttribute", () => {
         expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(false);
       });
     });
+  });
+});
+
+describe("capOversizedAttributes on a message history", () => {
+  const maxBytes = DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES;
+  /** A long conversation as a model call records it: system prompt, turns, latest question. */
+  function history({ turns, lastBytes = 40 }: { turns: number; lastBytes?: number }) {
+    const messages: { role: string; parts: { type: string; content: string }[] }[] = [
+      { role: "system", parts: [{ type: "text", content: "You are the booking copilot." }] },
+      {
+        role: "user",
+        parts: [{ type: "text", content: "FIRST: quote cottage C-114 for week 42." }],
+      },
+    ];
+    for (let i = 0; i < turns; i++) {
+      messages.push(
+        {
+          role: "assistant",
+          parts: [{ type: "text", content: `reply ${i} ${"x".repeat(2_000)}` }],
+        },
+        { role: "user", parts: [{ type: "text", content: `question ${i}` }] },
+      );
+    }
+    messages.push({
+      role: "user",
+      parts: [{ type: "text", content: `LATEST ${"y".repeat(lastBytes)}` }],
+    });
+    return messages;
+  }
+
+  /** @scenario "An oversized message history drops whole messages from its middle" */
+  it("keeps the system prompt, the first user message and the latest messages, and counts the rest", () => {
+    const messages = history({ turns: 400 });
+    const span = makeSpan([
+      { key: "gen_ai.input.messages", value: { stringValue: JSON.stringify(messages) } },
+    ]);
+
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
+
+    expect(cappedCount).toBe(1);
+    const value = span.attributes[0]!.value.stringValue!;
+    expect(Buffer.byteLength(value)).toBeLessThanOrEqual(maxBytes);
+    const kept = JSON.parse(value) as typeof messages;
+    expect(kept[0]!.parts[0]!.content).toBe("You are the booking copilot.");
+    expect(kept[1]!.parts[0]!.content).toContain("FIRST");
+    expect(kept[2]!.role).toBe("system");
+    expect(kept[2]!.parts[0]!.content).toMatch(
+      /^\[\d+ messages omitted to fit the \d+-byte attribute cap\]$/,
+    );
+    expect(kept.at(-1)!.parts[0]!.content).toContain("LATEST");
+    const dropped = Number(/\[(\d+) messages/.exec(kept[2]!.parts[0]!.content)![1]);
+    expect(dropped + kept.length - 1).toBe(messages.length);
+  });
+
+  /** @scenario "A message history whose latest message alone is over the cap falls back to the placeholder" */
+  it("falls back to the byte-count placeholder when the latest message alone is over the cap", () => {
+    const span = makeSpan([
+      {
+        key: "gen_ai.input.messages",
+        value: { stringValue: JSON.stringify(history({ turns: 2, lastBytes: maxBytes + 10 })) },
+      },
+    ]);
+
+    traceAttributeCapService.capOversizedAttributes(span, null);
+
+    expect(span.attributes[0]!.value.stringValue).toMatch(/^\[truncated: \d+ bytes\]$/);
   });
 });

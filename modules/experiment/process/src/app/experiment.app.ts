@@ -124,6 +124,7 @@ import type { ExperimentService } from "../services/experiment.service.ts";
 import {
   buildExperimentIdLookup,
   buildExperimentInfrastructure,
+  buildExperimentRunCells,
   buildExperimentRunProcessing,
 } from "./experiment-composition.build.ts";
 
@@ -287,6 +288,11 @@ export class ExperimentApp implements ExperimentApi {
   static create(setup: ExperimentSetup): ExperimentApp {
     const { members, dependencies, config } = setup;
     const commands = ExperimentRunCommandDispatcherService.create();
+    const attachmentEgress = {
+      blockLocal: config.blockLocalHttpCalls,
+      allowedHosts: config.allowedProxyHosts,
+      verifyTls: members.isSaas,
+    };
     const built = buildExperimentInfrastructure({
       prisma: members.prisma,
       clickhouse: members.clickhouse,
@@ -296,11 +302,7 @@ export class ExperimentApp implements ExperimentApi {
       publicBaseUrl: members.publicBaseUrl,
       processName: members.processName,
       runConcurrency: config.runConcurrency,
-      attachmentEgress: {
-        blockLocal: config.blockLocalHttpCalls,
-        allowedHosts: config.allowedProxyHosts,
-        verifyTls: members.isSaas,
-      },
+      attachmentEgress,
       dependencies,
     });
     return new ExperimentApp({
@@ -312,6 +314,13 @@ export class ExperimentApp implements ExperimentApi {
           redis: members.redis,
           defaultRetentionDays: () => dependencies.retention.getPlatformDefaultRetentionDays(),
           workflowEvaluations: built.workflowEvaluations,
+          runCells: buildExperimentRunCells({
+            redis: members.redis,
+            experiments: built.experiments,
+            attachmentEgress,
+            dependencies,
+          }),
+          commands,
         }),
         commands,
         idLookup: buildExperimentIdLookup(members.clickhouse),

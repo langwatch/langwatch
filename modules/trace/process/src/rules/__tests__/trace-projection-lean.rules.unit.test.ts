@@ -185,10 +185,6 @@ function extractLogBody(event: Event): string {
 // Test suite
 // ---------------------------------------------------------------------------
 
-/**
- * @scenario leanForProjection is the single source
- * of truth for the lean shape
- */
 describe("given a SpanReceived event with a 100 KB langwatch.output", () => {
   describe("when leanForProjection is applied", () => {
     let attrs: Record<string, string>;
@@ -202,6 +198,7 @@ describe("given a SpanReceived event with a 100 KB langwatch.output", () => {
       attrs = extractSpanAttributes(leaned);
     });
 
+    /** @scenario leanForProjection is the single source of truth for the lean shape */
     it("returns event with langwatch.output length ≤ IO_PREVIEW_BYTES + 4 bytes for ellipsis", () => {
       expect(Buffer.byteLength(attrs["langwatch.output"] ?? "", "utf-8")).toBeLessThanOrEqual(
         IO_PREVIEW_BYTES + 4,
@@ -461,7 +458,7 @@ describe("buildStructuredIoPreview", () => {
 const NON_IO_OVER_256KB = "z".repeat(300 * 1024);
 
 /**
- * @scenario non-IO stringValue over 256 KB is capped in the lean output (spool-path fix)
+ * non-IO stringValue over 256 KB is capped in the lean output (spool-path fix)
  */
 describe("given a SpanReceived event with a non-IO attribute (langwatch.params) whose stringValue exceeds 256 KB", () => {
   describe("when leanForProjection is applied", () => {
@@ -516,7 +513,7 @@ describe("given a SpanReceived event with a non-IO attribute (langwatch.params) 
 });
 
 /**
- * @scenario >256KB blob nested inside arrayValue of a NON-IO attribute is capped (spool-path fix)
+ * >256KB blob nested inside arrayValue of a NON-IO attribute is capped (spool-path fix)
  */
 describe("given a SpanReceived event with a >256KB blob nested inside an arrayValue of a non-IO attribute", () => {
   describe("when leanForProjection is applied", () => {
@@ -591,7 +588,7 @@ describe("given a SpanReceived event with a >256KB blob nested inside an arrayVa
 });
 
 /**
- * @scenario IO attr (gen_ai.input.messages) with >64KB stringValue is still
+ * IO attr (gen_ai.input.messages) with >64KB stringValue is still
  *           IO-previewed with eventref. Regression guard: new non-IO capping
  *           must not break IO preview path.
  */
@@ -638,7 +635,7 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
 });
 
 /**
- * @scenario sub-threshold event — no-op, no allocations (hot-path guard)
+ * sub-threshold event — no-op, no allocations (hot-path guard)
  */
 describe("given a SpanReceived event where all attributes are under both thresholds", () => {
   describe("when leanForProjection is applied", () => {
@@ -751,7 +748,7 @@ function makeSpanReceivedEventWithOversizedResourceAttr(): Event {
 // ---------------------------------------------------------------------------
 
 /**
- * @scenario REGRESSION — >256KB value ONLY in span.events[].attributes, nothing oversized at
+ * REGRESSION — >256KB value ONLY in span.events[].attributes, nothing oversized at
  *   span top-level, no large IO attr. Before the fix the Step-2 gate only scanned
  *   span.attributes, so this span returned the original event un-cloned and the cap
  *   never fired, letting the oversized blob flow into the projection queue.
@@ -818,7 +815,7 @@ describe("given a SpanReceived event with a >256KB value only in span.events[0].
 });
 
 /**
- * @scenario REGRESSION sibling — >256KB value ONLY in resource.attributes, nothing oversized
+ * REGRESSION sibling — >256KB value ONLY in resource.attributes, nothing oversized
  *   at span top-level, no large IO attr.
  */
 describe("given a SpanReceived event with a >256KB value only in resource.attributes (not at span top-level, not IO)", () => {
@@ -861,7 +858,7 @@ describe("given a SpanReceived event with a >256KB value only in resource.attrib
 });
 
 /**
- * @scenario small structured non-IO attr — must not trigger clone (hot-path guard)
+ * small structured non-IO attr — must not trigger clone (hot-path guard)
  *
  * Before the fix, ANY non-IO arrayValue/kvlistValue with length > 0 forced a
  * structuredClone regardless of the actual content size. After the fix,

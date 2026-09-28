@@ -76,6 +76,7 @@ Feature: The Instant Eval shorthand, a target and a filter expanded into one sta
     Then the statement selects from the LangWatchQL trace metrics view
     And it groups by ConversationId and projects the conversation's last trace as TraceId
     And each question is an eval function over conversation_bounded of the conversation id
+    And the bound is the judge's whole text budget at the transcript ratio, so an ordinary conversation arrives whole
     And rows with no conversation id are left out
 
   @unit

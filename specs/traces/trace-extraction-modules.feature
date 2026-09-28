@@ -42,7 +42,7 @@ Feature: Reading a trace the way the drawer reads it
 
   @unit
   Scenario: A conversation over the budget keeps its head and tail and marks the cut
-    Given a parsed conversation larger than the budget
+    Given a parsed conversation larger than the budget even with every turn shortened
     When it is rendered with that budget
     Then the conversation heading and its real turn count are kept
     And turns are kept from the start and from the end
@@ -225,3 +225,52 @@ Feature: Reading a trace the way the drawer reads it
     When it is rendered at two different times
     Then both renderings are identical
     And each turn heading carries the turn's absolute start time
+
+  # =========================================================================
+  # Rendering a thread for a judge
+  # =========================================================================
+  # Measured on the judge-lab long-horizon split (langwatch/tasks#905): a
+  # judge reading a long thread needs every turn once, with its tool calls and
+  # results, and a budget that shortens every turn before it drops one.
+
+  @unit
+  Scenario: A conversation turn lists its tool calls with their results
+    Given a thread whose first turn called a tool that returned a price
+    When the thread is rendered as a conversation
+    Then the first turn lists the tool call with its arguments and its result
+    And the model call that asked for the tool names it, with its token counts
+
+  @unit
+  Scenario: A thread transcript grows with the thread, not with its square
+    Given a thread of many turns whose every model call carries the whole history
+    When the thread is rendered as a conversation
+    Then the first user message appears once
+    And doubling the turns roughly doubles the transcript
+
+  @unit
+  Scenario: A child span that repeats its parent's input and output is folded into the parent
+    Given a tool span with execution and blocked-on-user children that repeat its input and output
+    When the turn's steps are extracted
+    Then the tool call is listed once
+    And a child span whose input or output differs is listed under its tool
+
+  @unit
+  Scenario: A turn whose only step is the model call that wrote the reply does not repeat it
+    Given a chat turn with one model call whose output is the reply
+    When the thread is rendered as a conversation
+    Then the model call is listed with its token counts but not its output
+    And a turn whose model call reported no token counts lists no steps
+
+  @unit
+  Scenario: A conversation over the budget shortens every turn before it drops one
+    Given a long thread whose correction sits in a tool result in the middle
+    When it is rendered with a budget smaller than the whole
+    Then every turn is still present with its tool calls
+    And the correction in the middle is still on the page
+    And the result fits the budget and is reported as truncated
+
+  @unit
+  Scenario: The turn heading names the model that did the work
+    Given a coding agent turn whose first model call is a title call on a small model
+    When the thread is rendered as a conversation
+    Then the turn heading names the model that wrote the most output first

@@ -21,7 +21,6 @@ const hasRedis = !!redisUrl;
 
 type TestPayload = { id: string; groupId: string };
 
-/** @scenario P50 and P99 reflect recent job durations after completion */
 describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
   let redis: Redis;
   const queues: GroupQueueProcessor<TestPayload>[] = [];
@@ -86,6 +85,7 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
   describe("given completions recorded into the time-bucketed histograms", () => {
     describe("when the writer's detail cycle runs", () => {
       /** @scenario "Windowed percentiles ride the detail artifact" */
+      /** @scenario P50 and P99 reflect recent job durations after completion */
       it("publishes hour, day, week, and all-time percentiles a reader can serve", async () => {
         const { queue, name } = createQueue({
           process: async () => {

@@ -16,7 +16,7 @@
     "jsx": "react-jsx"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["**/__mocks__/**"],
+  "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
   "references": [
     {
       "path": "../../modules/agent/contract/tsconfig.build.json"

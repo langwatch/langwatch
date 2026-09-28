@@ -61,6 +61,7 @@ const ACCOUNT_CREATED_FALLBACK =
 export function SignUpCredentialForm({
   email,
   addressProof,
+  addressConfirmed = true,
   callbackUrl,
   onUseDifferentEmail,
   onAddressAlreadyRegistered,
@@ -68,6 +69,8 @@ export function SignUpCredentialForm({
   email: string;
   /** The proof the spent link returned; registering spends it. */
   addressProof: string;
+  /** False on an installation that sends no email: only a password is offered there. */
+  addressConfirmed?: boolean;
   callbackUrl: string;
   /** Back to the address step, for the address that was typed wrong. */
   onUseDifferentEmail: () => void;
@@ -111,7 +114,7 @@ export function SignUpCredentialForm({
   // passkey against an endpoint that was never registered is an offer we
   // cannot honour.
   const publicEnv = usePublicEnv();
-  const offersPasskeys = publicEnv.data?.PASSKEYS_ENABLED === true;
+  const offersPasskeys = addressConfirmed && publicEnv.data?.PASSKEYS_ENABLED === true;
 
   const onSubmit = async (values: SignUpValues) => {
     setSubmitError(null);

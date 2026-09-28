@@ -103,9 +103,6 @@ function makeChResolver(
 // getFromEventLog — happy path
 // ---------------------------------------------------------------------------
 
-/**
- * @scenario Cross-tenant event_log read is structurally denied
- */
 describe("given an event_log row stored under tenantA with a known EventPayload", () => {
   describe("when getFromEventLog is called with matching (TenantId, AggregateType, AggregateId, EventId) and field", () => {
     let sqlCaptures: string[];
@@ -130,6 +127,7 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
       });
     });
 
+    /** @scenario Cross-tenant event_log read is structurally denied */
     it("issues a CH SELECT with TenantId as the FIRST predicate and returns the correct field value", async () => {
       const result = await blobStore.getFromEventLog({
         eventId: EVENT_ID,
@@ -253,6 +251,7 @@ describe("given a non-KSUID EventId (legacy / unparseable id)", () => {
 
 describe("given an event_log row under tenantA when tenantB attempts to read it", () => {
   describe("when getFromEventLog is called with tenantB's context and the same EventId", () => {
+    /** @scenario Cross-tenant event_log read is structurally denied */
     it("returns no rows (because TenantId predicate mismatches) and throws BlobNotFoundError", async () => {
       // No rows returned — cross-tenant query returns empty set
       const { client } = makeMockChClient({ rows: [] });
@@ -539,7 +538,7 @@ describe("given a SpanReceivedEvent written through eventToRecord (real write pa
 // ---------------------------------------------------------------------------
 
 /**
- * @scenario Read path is object-storage-independent (ADR-022 on-prem / no-object-storage).
+ * Read path is object-storage-independent (ADR-022 on-prem / no-object-storage).
  * Proves that TraceBlobStoreService.getFromEventLog never calls resolveS3Client, so deployments
  * with no object storage can still serve "show full" and online-eval reads.
  */

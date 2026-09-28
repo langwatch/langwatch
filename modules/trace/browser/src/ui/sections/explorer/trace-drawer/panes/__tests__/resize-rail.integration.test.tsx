@@ -50,9 +50,9 @@ function getRail(): HTMLElement {
 }
 
 describe("ResizeRail", () => {
-  /** @scenario Hit area covers full drawer height */
   describe("given the rail is mounted", () => {
     describe("when looked up via the data-edge-grip selector", () => {
+      /** @scenario Hit area covers full drawer height */
       it("renders into the DOM as a pointer-only grip hidden from assistive tech", () => {
         render(<ResizeRail />, { wrapper });
         const el = getRail();
@@ -63,9 +63,9 @@ describe("ResizeRail", () => {
     });
   });
 
-  /** @scenario Rail is not keyboard-focusable */
   describe("given the rail is mounted", () => {
     describe("when checked for keyboard focus", () => {
+      /** @scenario Rail is not keyboard-focusable */
       it("does not have tabIndex set so Tab never lands on it", () => {
         render(<ResizeRail />, { wrapper });
         const el = getRail();
@@ -74,9 +74,9 @@ describe("ResizeRail", () => {
     });
   });
 
-  /** @scenario Drag the left-edge grip to resize the drawer */
   describe("given the user drags the rail", () => {
     describe("when pointermove fires with a leftward delta", () => {
+      /** @scenario Drag the left-edge grip to resize the drawer */
       it("updates drawerStore.widthPx to current + |dx|", () => {
         // Start from a known width so the math is checkable.
         useDrawerStore.getState().setWidthPx(640);
@@ -96,8 +96,8 @@ describe("ResizeRail", () => {
       });
     });
 
-    /** @scenario Width is clamped to a minimum */
     describe("when pointermove drags past the min clamp", () => {
+      /** @scenario Width is clamped to a minimum */
       it("does not let widthPx drop below DRAWER_MIN_WIDTH_PX", () => {
         useDrawerStore.getState().setWidthPx(400);
 
@@ -114,8 +114,8 @@ describe("ResizeRail", () => {
       });
     });
 
-    /** @scenario Width is clamped to a maximum */
     describe("when pointermove drags past the max clamp", () => {
+      /** @scenario Width is clamped to a maximum */
       it("does not let widthPx exceed viewport - edge", () => {
         useDrawerStore.getState().setWidthPx(800);
 
@@ -133,9 +133,9 @@ describe("ResizeRail", () => {
     });
   });
 
-  /** @scenario Double-click the grip toggles maximize and restore */
   describe("given the user double-clicks the rail without dragging", () => {
     describe("when double-click fires", () => {
+      /** @scenario Double-click the grip toggles maximize and restore */
       it("snaps the width to viewport - edge", () => {
         useDrawerStore.getState().setWidthPx(700);
         render(<ResizeRail />, { wrapper });
@@ -146,9 +146,9 @@ describe("ResizeRail", () => {
     });
   });
 
-  /** @scenario Single-click the grip does NOT toggle width */
   describe("given the user single-clicks the rail without dragging", () => {
     describe("when only a pointerdown/up fires (no double click)", () => {
+      /** @scenario Single-click the grip does NOT toggle width */
       it("does not change the width", () => {
         useDrawerStore.getState().setWidthPx(700);
         render(<ResizeRail />, { wrapper });

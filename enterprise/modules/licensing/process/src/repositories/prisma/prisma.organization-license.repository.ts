@@ -1,9 +1,11 @@
 import { OrganizationNotFoundError } from "@langwatch/enterprise-licensing-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate } from "@langwatch/time";
 
 import type {
   OrganizationLicenseCandidate,
-  OrganizationLicenseReads,
+  OrganizationLicenseStorage,
+  StoredLicense,
 } from "../../app/licensing.members.ts";
 
 /**
@@ -12,8 +14,8 @@ import type {
  */
 export type OrganizationLicenseDatabase = Pick<PrismaClient, "organization">;
 
-/** The activated licence key, read off the organization row it is stored on. */
-export class PrismaOrganizationLicenseRepository implements OrganizationLicenseReads {
+/** The activated licence key, read off and written onto the organization row it is stored on. */
+export class PrismaOrganizationLicenseRepository implements OrganizationLicenseStorage {
   static create(database: OrganizationLicenseDatabase): PrismaOrganizationLicenseRepository {
     return new PrismaOrganizationLicenseRepository(database);
   }
@@ -41,5 +43,31 @@ export class PrismaOrganizationLicenseRepository implements OrganizationLicenseR
         ? []
         : [{ organizationId: organization.id, licenseKey: organization.license }],
     );
+  }
+
+  async organizationExists(organizationId: string): Promise<boolean> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true },
+    });
+    return organization !== null;
+  }
+
+  async storeLicense(organizationId: string, license: StoredLicense): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        license: license.licenseKey,
+        licenseExpiresAt: toDate(license.expiresAt),
+        licenseLastValidatedAt: toDate(license.validatedAt),
+      },
+    });
+  }
+
+  async removeLicense(organizationId: string): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
+    });
   }
 }

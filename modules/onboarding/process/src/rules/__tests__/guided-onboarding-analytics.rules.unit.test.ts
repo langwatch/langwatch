@@ -1,6 +1,6 @@
 /**
- * @scenario "guided event properties carry only the named payload fields"
- * @scenario "conversation attached and virtual key minted are not tracked"
+ * Guided event properties carry only the named payload fields; conversation
+ * attached and virtual key minted are not tracked.
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
 import { EMPTY_GUIDED_ONBOARDING_STATE } from "@langwatch/onboarding-contract";

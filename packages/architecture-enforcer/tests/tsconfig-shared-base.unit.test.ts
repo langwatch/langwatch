@@ -64,17 +64,24 @@ type Resolved = Readonly<{
   options: Record<string, unknown>;
 }>;
 
-/** The effective configuration, following `extends` the way the compiler does. */
+/**
+ * The effective configuration, following `extends` the way the compiler does: a
+ * list of parents applies in order, so a later parent's option wins.
+ */
 function resolveTsconfig(file: string): Resolved {
   const own = readTsconfig(file);
-  const parent = typeof own.extends === "string" ? resolve(dirname(file), own.extends) : undefined;
-  const inherited = parent ? resolveTsconfig(parent) : { chain: [], options: {} };
+  const named = Array.isArray(own.extends) ? own.extends : [own.extends];
+  const parents = named
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => resolve(dirname(file), entry));
+  const inherited = parents.map((parent) => resolveTsconfig(parent));
   return {
-    chain: [...(parent ? [parent] : []), ...inherited.chain],
-    options: {
-      ...inherited.options,
-      ...(own.compilerOptions as Record<string, unknown> | undefined),
-    },
+    chain: parents.flatMap((parent, at) => [parent, ...inherited[at]!.chain]),
+    options: Object.assign(
+      {},
+      ...inherited.map((parent) => parent.options),
+      own.compilerOptions as Record<string, unknown> | undefined,
+    ) as Record<string, unknown>,
   };
 }
 
@@ -113,7 +120,11 @@ const subjects = execFileSync(
 )
   .split("\0")
   .filter((file) => file.length > 0 && !file.includes("node_modules/"))
-  .filter((file) => file !== "tsconfig.base.json" && file !== "tsconfig.shared.json")
+  // The shared bases themselves; tsconfig.emit.json is the emit half every
+  // tsconfig.build.json lists after its own tsconfig.json.
+  .filter(
+    (file) => !["tsconfig.base.json", "tsconfig.shared.json", "tsconfig.emit.json"].includes(file),
+  )
   // Not a project of the workspace graph: it emits the published artefact under
   // the pinned sdk toolchain and deliberately inherits none of the repo's
   // options, which is what its own comment says and why it extends nothing.

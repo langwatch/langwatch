@@ -117,19 +117,44 @@ describe("ClaudeCodeCanonicaliserService.apply (span side)", () => {
     expect(ctx.recordRule).toHaveBeenCalledWith("claude-code/llm_request");
   });
 
-  it("does nothing for a span that isn't claude_code.llm_request", () => {
-    // Gateway-proxied traffic (and every other claude_code span, like the
-    // tool span) must not be touched here — this method exists ONLY for the
-    // CLI's own native model-call span.
+  it("lifts no model attributes from a span that isn't claude_code.llm_request", () => {
+    // Gateway-proxied traffic and the tool call's phases must not be touched
+    // here: token and model lifting exists ONLY for the native model-call span.
     const ctx = createExtractorContext(
       { model: "claude-opus-4-7", input_tokens: 120 },
-      { name: "claude_code.tool" },
+      { name: "claude_code.tool.execution" },
     );
 
     ClaudeCodeCanonicaliserService.create().apply(ctx);
 
     expect(ctx.out).toEqual({});
     expect(ctx.recordRule).not.toHaveBeenCalled();
+  });
+
+  describe("given a claude_code.tool span that carries no span type", () => {
+    /** @scenario "A Claude Code tool span is typed as a tool" */
+    it("types it as a tool and lifts nothing else", () => {
+      const ctx = createExtractorContext(
+        { tool_name: "Bash", model: "claude-opus-4-7", input_tokens: 120 },
+        { name: "claude_code.tool" },
+      );
+
+      ClaudeCodeCanonicaliserService.create().apply(ctx);
+
+      expect(ctx.out).toEqual({ "langwatch.span.type": "tool" });
+      expect(ctx.recordRule).toHaveBeenCalledWith("claude-code/tool");
+    });
+
+    /** @scenario "A Claude Code tool span is typed as a tool" */
+    it("leaves its execution and blocked-on-user children to their own type", () => {
+      for (const name of ["claude_code.tool.execution", "claude_code.tool.blocked_on_user"]) {
+        const ctx = createExtractorContext({ tool_name: "Bash" }, { name });
+
+        ClaudeCodeCanonicaliserService.create().apply(ctx);
+
+        expect(ctx.out).toEqual({});
+      }
+    });
   });
 
   it("never overwrites a canonical attribute a gateway-proxied gen_ai.* span already set", () => {

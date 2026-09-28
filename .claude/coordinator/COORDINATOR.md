@@ -75,9 +75,8 @@ Haiku remain for really simple work, to save usage:
 | `lane-opus`        | high   | Architecture decisions, cross-module integration, security-bearing ports, difficult debugging, review.  |
 | `lane-opus-medium` | medium | Scoped module ports onto an established exemplar, pattern-following UI, transport declarations, sweeps. |
 | `lane-opus-low`    | low    | Renames, one-line wiring, inventories, formatting-only and other mechanical checks.                     |
-
-| `lane` + `sonnet` | — | Really simple work, to save usage: a mechanical port with no judgement left, a straightforward test. |
-| `lane` + `haiku` | — | The simplest: file inventories, narrow validation, formatting, repetitive checks. |
+| `lane` + `sonnet`  | -      | Really simple work, to save usage: a mechanical port with no judgement left, a straightforward test.    |
+| `lane` + `haiku`   | -      | The simplest: file inventories, narrow validation, formatting, repetitive checks.                       |
 
 Opus 5.5 is the default; reach for Sonnet or Haiku only when the task has no
 judgement left in it. A manifest's `Model:` line names one of these. Opus 5.5 needs

@@ -508,14 +508,16 @@ async function openSignUp(): Promise<void> {
 
 /**
  * Sign-up asks for the address first and collects a credential only once the
- * emailed link is opened; the link's token is read from Postgres.
+ * emailed link is opened; the link's token is read from Postgres. A stack with
+ * no email provider (CI) sends no link and asks for the password straight away.
  */
 async function reachTheSignUpCredentialForm(email: string): Promise<void> {
   await openSignUp();
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.getByTestId("verification-sent")).toBeVisible({ timeout: 30000 });
-  await whenIOpenTheConfirmationLinkFor(page, email);
+  const sent = page.getByTestId("verification-sent");
+  await expect(sent.or(page.getByTestId("unconfirmed-address"))).toBeVisible({ timeout: 30000 });
+  if (await sent.isVisible()) await whenIOpenTheConfirmationLinkFor(page, email);
   await expect(page.getByTestId("signup-identifier")).toContainText(email, { timeout: 60000 });
 }
 

@@ -252,3 +252,15 @@ func TestABaselineIsKeyedOnWhatChangesACapture(t *testing.T) {
 		}
 	})
 }
+
+// @scenario "A screen whose modules still did not load is a capture failure, not a blank page"
+func TestABaseWhoseModulesDidNotLoadIsNeverCached(t *testing.T) {
+	captures := []Capture{
+		{Side: "base", Key: "/a"},
+		{Side: "base", Key: "/b", ModuleFailures: []string{"FAIL GET /@fs/x.tsx net::ERR_CONNECTION_CLOSED"}},
+		{Side: "candidate", Key: "/b", ModuleFailures: []string{"FAIL GET /@fs/x.tsx net::ERR_CONNECTION_CLOSED"}},
+	}
+	if got := UnloadedBaseCaptures(captures); got != 1 {
+		t.Fatalf("unloaded base captures: %d", got)
+	}
+}

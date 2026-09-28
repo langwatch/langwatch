@@ -79,11 +79,8 @@ describe("given a text longer than its budget", () => {
     });
 
     /** @scenario "A text is cut at the densest ratio judged text has shown" */
-    it("cuts it to the budget times the densest measured bytes per token", () => {
-      const prepared = prepareInstantEvalText({
-        text: `User: I want a refund. ${"filler. ".repeat(10_000)}Assistant: refund issued.`,
-        budgetTokens: 1_000,
-      });
+    it("cuts a JSON-heavy text to the budget times the densest measured bytes per token", () => {
+      const prepared = prepareInstantEvalText({ text: jsonHeavy(10_000), budgetTokens: 1_000 });
 
       const bytes = new TextEncoder().encode(prepared.text).length;
       expect(bytes).toBeLessThanOrEqual(
@@ -94,13 +91,39 @@ describe("given a text longer than its budget", () => {
     });
 
     /** @scenario "A text is cut at the densest ratio judged text has shown" */
-    it("sends whole a text that fits at the densest ratio", () => {
-      const text = "x".repeat(1_000 * INSTANT_EVAL_CLASSIFIER_LIMITS.fitBytesPerInputToken);
+    it("sends whole a JSON-heavy text that fits at the densest ratio", () => {
+      const text = jsonHeavy(40);
+      const budgetTokens = Math.ceil(
+        new TextEncoder().encode(text).length /
+          INSTANT_EVAL_CLASSIFIER_LIMITS.fitBytesPerInputToken,
+      );
 
-      expect(prepareInstantEvalText({ text, budgetTokens: 1_000 })).toEqual({
-        text,
-        isTruncated: false,
-      });
+      expect(prepareInstantEvalText({ text, budgetTokens })).toEqual({ text, isTruncated: false });
+    });
+
+    /** @scenario "A transcript is fitted at the ratio transcripts measure" */
+    it("sends whole a transcript that fits at the transcript ratio but not at the densest one", () => {
+      const text = transcript(200);
+      const bytes = new TextEncoder().encode(text).length;
+      const budgetTokens = Math.ceil(
+        bytes / INSTANT_EVAL_CLASSIFIER_LIMITS.transcriptFitBytesPerInputToken,
+      );
+      expect(bytes).toBeGreaterThan(
+        budgetTokens * INSTANT_EVAL_CLASSIFIER_LIMITS.fitBytesPerInputToken,
+      );
+
+      expect(prepareInstantEvalText({ text, budgetTokens })).toEqual({ text, isTruncated: false });
+    });
+
+    /** @scenario "A transcript is fitted at the ratio transcripts measure" */
+    it("cuts a longer transcript at the transcript ratio", () => {
+      const prepared = prepareInstantEvalText({ text: transcript(2_000), budgetTokens: 1_000 });
+
+      const bytes = new TextEncoder().encode(prepared.text).length;
+      const ratio = INSTANT_EVAL_CLASSIFIER_LIMITS.transcriptFitBytesPerInputToken;
+      expect(prepared.isTruncated).toBe(true);
+      expect(bytes).toBeLessThanOrEqual(1_000 * ratio);
+      expect(bytes).toBeGreaterThan(1_000 * INSTANT_EVAL_CLASSIFIER_LIMITS.fitBytesPerInputToken);
     });
 
     it("leaves a text inside its budget exactly as it was", () => {
@@ -185,3 +208,19 @@ describe("given a text the judge refused as too large", () => {
     });
   });
 });
+
+/** A digest-like text, mostly JSON. */
+function jsonHeavy(rows: number): string {
+  return Array.from({ length: rows }, (_, i) =>
+    JSON.stringify({ id: i, status: "ok", lines: [{ sku: `S-${i}`, qty: 1 }] }),
+  ).join("\n");
+}
+
+/** A markdown transcript, mostly prose. */
+function transcript(turns: number): string {
+  return Array.from(
+    { length: turns },
+    (_, i) =>
+      `## Turn ${i + 1}\n\n**User:**\n\nWhat time does activity ${i} start tomorrow?\n\n**Assistant:**\n\nActivity ${i} starts at nine at the reception.`,
+  ).join("\n\n");
+}

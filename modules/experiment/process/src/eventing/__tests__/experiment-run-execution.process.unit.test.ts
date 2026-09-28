@@ -5,6 +5,7 @@ import {
   type ProcessEvolution,
   type ProcessIntent,
 } from "@langwatch/eventing";
+import type { ExperimentRunPlan, ExperimentRunPlanCell } from "@langwatch/experiment-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -23,7 +24,6 @@ import {
   type ExperimentRunExecutionView,
   INITIAL_EXPERIMENT_RUN_EXECUTION_STATE,
 } from "../experiment-run-execution.schemas.ts";
-import type { ExperimentRunPlan, ExperimentRunPlanCell } from "../experiment-run-plan.schemas.ts";
 
 const definition = buildProcessManager({
   name: "experimentRunExecution",

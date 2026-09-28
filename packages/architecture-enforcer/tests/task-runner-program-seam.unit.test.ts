@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
- * The same ratchet the router type carries, on the process that composes the least: how many
- * workspace source files the task runner has to load, following type-only imports too.
+ * The same ratchet the module procedure maps carry, on the task runner: what it loads beyond the
+ * installed module list it boots, following type-only imports too.
  */
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,31 +13,24 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
-/**
- * Barrels the runner used to import for a single symbol each. Reaching one
- * again puts its whole package, and everything that package depends on, back
- * into the runner's program.
- */
-const BARRELS_THE_RUNNER_DOES_NOT_NEED = [
-  join(REPO_ROOT, "modules", "scenario", "server", "src", "index.ts"),
-  join(REPO_ROOT, "modules", "trace", "server", "src", "index.ts"),
-] as const;
+/** The generated list every process boots (record section 4); the runner pays for it by design. */
+const INSTALLED_MODULES = join(
+  REPO_ROOT,
+  "packages",
+  "installed-server-modules",
+  "src",
+  "server-modules.generated.ts",
+);
 
 /**
- * Measured at 2,191 when the two barrels above were replaced by
- * `./composition/*` subpaths (the runner's own tests included). A ceiling,
- * not a target — lower it when earned; never raise it without saying why.
+ * Measured at 73 when the runner started booting the installed list in the tasks role (the
+ * runner's own sources and tests included). A ceiling, not a target. Lower it when earned;
+ * never raise it without saying why.
  */
-const CEILING = 2_300;
+const CEILING = 100;
 
-let walked: ReadonlySet<string> | undefined;
-
-function taskRunnerModules(): ReadonlySet<string> {
-  walked ??= reachableWorkspaceModules({
-    roots: walkFiles(join(REPO_ROOT, "apps", "tasks", "src"), (path) => /\.tsx?$/.test(path)),
-  });
-  return walked;
-}
+const workspaceSource = (files: ReadonlySet<string>) =>
+  new Set([...files].filter((file) => !file.includes(`${sep}node_modules${sep}`)));
 
 /** Everything the compiler loads to answer what the modules at `roots` are. */
 function reachableWorkspaceModules({ roots }: { roots: readonly string[] }): ReadonlySet<string> {
@@ -59,35 +52,22 @@ function reachableWorkspaceModules({ roots }: { roots: readonly string[] }): Rea
 
 describe("given the task runner is compiled", () => {
   describe("when the modules its own program loads are walked", () => {
-    /** @scenario "A composition imports the module it needs, not its feature's barrel" */
-    it(
-      "reaches no feature server barrel it only needed one module from",
-      { timeout: 240_000 },
-      () => {
-        const reached = taskRunnerModules();
-
-        const rejoined = BARRELS_THE_RUNNER_DOES_NOT_NEED.filter((barrel) => reached.has(barrel));
-
-        expect(
-          rejoined.map((file) => file.slice(REPO_ROOT.length + 1)),
-          "The task runner reached a feature server barrel again. Import the module the " +
-            "composition names through its `./composition/*` subpath instead.",
-        ).toEqual([]);
-      },
-    );
-
     /** @scenario "The task runner's module graph stays under its ceiling" */
-    it("stays under the recorded ceiling", { timeout: 240_000 }, () => {
-      const reached = taskRunnerModules();
-
-      const workspaceSource = [...reached].filter(
-        (file) => !file.includes(`${sep}node_modules${sep}`),
+    it("loads little beyond the installed module list", { timeout: 240_000 }, () => {
+      const runner = workspaceSource(
+        reachableWorkspaceModules({
+          roots: walkFiles(join(REPO_ROOT, "apps", "tasks", "src"), (path) => /\.tsx?$/.test(path)),
+        }),
       );
+      const installed = workspaceSource(reachableWorkspaceModules({ roots: [INSTALLED_MODULES] }));
+      expect(runner.has(INSTALLED_MODULES)).toBe(true);
+
+      const beyond = [...runner].filter((file) => !installed.has(file));
 
       expect(
-        workspaceSource.length,
-        `The task runner now loads ${workspaceSource.length} workspace source files ` +
-          `(ceiling ${CEILING}). Something widened its graph.`,
+        beyond.length,
+        `The task runner now loads ${beyond.length} workspace source files beyond the installed ` +
+          `module list (ceiling ${CEILING}). Something widened its own graph.`,
       ).toBeLessThan(CEILING);
     });
   });

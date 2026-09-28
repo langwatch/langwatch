@@ -46,7 +46,10 @@ function buildService(
     readThreadsTraces: vi.fn().mockResolvedValue([]),
     readEvaluations: vi.fn().mockResolvedValue({}),
   };
-  const spanDigest = { format: vi.fn().mockResolvedValue("") };
+  const spanDigest = {
+    format: vi.fn().mockResolvedValue(""),
+    formatThread: vi.fn().mockResolvedValue(""),
+  };
   const modelEnvResolver = { resolveForEvaluator };
   const langevalsClient = { evaluate };
 

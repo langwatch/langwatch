@@ -6,6 +6,7 @@ import type {
   StartExperimentRunInput,
 } from "@langwatch/experiment-contract";
 
+import type { ExecuteExperimentCellCommandData } from "../eventing/experiment-run-cell.commands.ts";
 import type {
   AbortRequestedEventData,
   CellFinishedEventData,
@@ -71,6 +72,10 @@ export class ExperimentRunCommandDispatcherService extends ExperimentExecution {
 
   async abortExperimentRun(input: Enveloped<AbortRequestedEventData>): Promise<void> {
     await this.#send("abortExperimentRun", input);
+  }
+
+  async executeExperimentCell(input: ExecuteExperimentCellCommandData): Promise<void> {
+    await this.#send("executeExperimentCell", input);
   }
 
   async computeRunMetrics(input: ComputeExperimentRunMetricsCommandData): Promise<void> {

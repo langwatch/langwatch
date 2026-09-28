@@ -14,6 +14,10 @@ import {
 
 const spanDigest: EvaluationSpanDigest = {
   format: vi.fn(async (spans: Span[]) => spans.map((span) => span.name ?? "span").join(" ")),
+  formatThread: vi.fn(
+    async ({ threadKey, traces }: { threadKey: string; traces: readonly Trace[] }) =>
+      [threadKey, ...traces.map((t) => t.trace_id)].join(" "),
+  ),
 };
 
 function trace(overrides: Partial<Trace> = {}): Trace {
@@ -113,7 +117,7 @@ describe("thread mappings inside a trace-level evaluation", () => {
       });
 
       expect(data.input).toBe("Hello");
-      expect(data.conversation).toBe("root\n\n---\n\nroot");
+      expect(data.conversation).toBe("abc trace-1 trace-2");
     });
   });
 

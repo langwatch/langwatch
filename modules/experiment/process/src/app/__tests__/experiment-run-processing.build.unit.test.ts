@@ -8,6 +8,9 @@ import {
 import { describe, expect, it } from "vitest";
 
 import type { WorkflowEvaluationRunner } from "../../eventing/experiment-workflow-evaluation.subscriber.ts";
+import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
+import type { ExperimentRunCellService } from "../../services/experiment-run-cell.service.ts";
+import { ExperimentRunCommandDispatcherService } from "../../services/experiment-run-command-dispatcher.service.ts";
 import { buildExperimentRunProcessing } from "../experiment-composition.build.ts";
 
 class SilentDriver implements QueryDriver {
@@ -37,6 +40,11 @@ function build() {
       return 49;
     },
     workflowEvaluations: createApiFixture<WorkflowEvaluationRunner>({}, "workflowEvaluations"),
+    runCells: {
+      folds: MemoryExperimentRunFoldRepository.create(),
+      cells: createApiFixture<ExperimentRunCellService>({}, "cells"),
+    },
+    commands: ExperimentRunCommandDispatcherService.create(),
   });
   return { pipeline, retentionReads: () => retentionReads };
 }
@@ -48,6 +56,18 @@ describe("buildExperimentRunProcessing", () => {
 
       expect(pipeline.metadata.name).toBe("experiment_run_processing");
       expect(pipeline.foldProjections.get("experimentRunState")).toBeDefined();
+    });
+
+    /** @scenario "The worker runs an opened cell by its ordinal and phase" */
+    it("runs the run's cells from its plan and progress folds under its execution manager", () => {
+      const { pipeline } = build();
+
+      expect(pipeline.foldProjections.get("experimentRunPlan")).toBeDefined();
+      expect(pipeline.foldProjections.get("experimentRunProgress")).toBeDefined();
+      expect(pipeline.processManagers.has("experimentRunExecution")).toBe(true);
+      expect(pipeline.commands.map((command) => command.definition.name)).toContain(
+        "executeExperimentCell",
+      );
     });
 
     it("reads the retention default only when a row is written, never while composing", () => {

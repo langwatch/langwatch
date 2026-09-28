@@ -23,7 +23,7 @@ export const EXPERIMENT_RUN_EVENT_TYPES = {
 export const EXPERIMENT_RUN_EVENT_VERSIONS = {
   STARTED: "2026-09-28",
   TARGET_RESULT: "2025-02-01",
-  EVALUATOR_RESULT: "2025-02-01",
+  EVALUATOR_RESULT: "2026-09-28",
   COMPLETED: "2026-09-28",
   TRACE_METRICS_COMPUTED: "2026-04-15",
   WORKFLOW_EVALUATION_REQUESTED: "2026-09-25",
@@ -58,6 +58,7 @@ export const EXPERIMENT_RUN_COMMAND_TYPES = {
   REQUEST_WORKFLOW_EVALUATION: "lw.experiment_run.request_workflow_evaluation",
   FAIL_CELL: "lw.experiment_run.fail_cell",
   ABORT: "lw.experiment_run.abort",
+  EXECUTE_CELL: "lw.experiment_run.execute_cell",
 } as const;
 
 export const EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES = [
@@ -69,6 +70,7 @@ export const EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES = [
   EXPERIMENT_RUN_COMMAND_TYPES.REQUEST_WORKFLOW_EVALUATION,
   EXPERIMENT_RUN_COMMAND_TYPES.FAIL_CELL,
   EXPERIMENT_RUN_COMMAND_TYPES.ABORT,
+  EXPERIMENT_RUN_COMMAND_TYPES.EXECUTE_CELL,
 ] as const;
 
 export type ExperimentRunProcessingCommandType =
@@ -79,4 +81,5 @@ export type ExperimentRunProcessingCommandType =
  */
 export const EXPERIMENT_RUN_PROJECTION_VERSIONS = {
   RUN_STATE: "2025-02-01",
+  RUN_PROGRESS: "2026-09-28",
 } as const;

@@ -1,16 +1,27 @@
 /**
  * The plan a run's `started` event carries (ARCHITECTURE §9, D4 and D5): everything a cell reads
  * from the run's fold to execute, fixed when the run starts.
- * Design: specs/experiment-run-execution.md.
+ * Design: modules/experiment/specs/experiment-run-execution.md.
  */
-import {
-  datasetColumnSchema,
-  evaluatorConfigSchema,
-  executionScopeSchema,
-  targetConfigSchema,
-} from "@langwatch/experiment-contract";
 import { runActorSchema } from "@langwatch/scenario-contract";
 import { z } from "zod";
+
+import {
+  datasetColumnSchema,
+  type EvaluatorConfig,
+  evaluatorConfigSchema,
+  type TargetConfig,
+  targetConfigSchema,
+} from "./experiment-workbench.ts";
+import { executionScopeSchema } from "./workbench/execution/types.ts";
+
+/** A target as the workbench state types it; its object schema checks the shape. */
+const planTargetSchema = z.custom<TargetConfig>((value) => targetConfigSchema.validate(value));
+
+/** An evaluator as the workbench state types it; its object schema checks the shape. */
+const planEvaluatorSchema = z.custom<EvaluatorConfig>((value) =>
+  evaluatorConfigSchema.validate(value),
+);
 
 /** Where a run was started from, which decides what its results write back to. */
 export const experimentRunOriginSchema = z.enum(["workbench", "saved", "workflow"]);
@@ -68,8 +79,8 @@ export const experimentRunPlanSchema = z.object({
   scope: executionScopeSchema,
   /** The dataset id a cell reads its mapping buckets from. */
   mappingDatasetId: z.string(),
-  targets: z.array(targetConfigSchema),
-  evaluators: z.array(evaluatorConfigSchema),
+  targets: z.array(planTargetSchema),
+  evaluators: z.array(planEvaluatorSchema),
   datasetColumns: z.array(datasetColumnSchema),
   /** The rows the run's cells touch, each once. */
   rows: z.array(

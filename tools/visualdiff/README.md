@@ -19,6 +19,7 @@ visualdiff run [-base REF] [-candidate REF] [-routes-only] [-flows a,b]
 visualdiff recapture -run RUNID [-routes a,b] [-flows x,y] [-edition E]
 visualdiff coverage [-base REF] [-candidate REF] [-config PATH]
 visualdiff gc [-kept] [-no-haven]
+visualdiff publish -run-dir DIR [-pr N] [-link URL] [-base REF] [-candidate REF]
 ```
 
 Read `<run-dir>/summary.txt` first (a run also prints it; `-agent` leads it
@@ -50,16 +51,16 @@ not be completed — the same ladder as `apidiff`.
    A persistent worktree skips the install and generated files when its
    commit's tree matches the last prepare that finished
    (`.visualdiff/worktrees/<side>.prepared`) - and only then does it become a `haven up --agent --detach` stack under
-     its own run-scoped slug, with haven's own automatic prep doing migrate and
-     seed. With `-no-haven`, visualdiff provisions the old way instead:
-     `pnpm install --prefer-offline` and `pnpm run start:prepare:files` in each
-     worktree, then each ref's stack starts on its own ports - the base at
-     `-base-port` (5670 by default), the candidate ten above it, so the two can
-     never collide. A modular checkout runs `dev:ui`, `dev:api` and
-     `dev:worker`; a monolith checkout runs `dev:app` with the Prisma,
-     ClickHouse and provisioning steps skipped, because both refs share your
-     local databases and the older ref must not re-apply its own migration set
-     over them.
+   its own run-scoped slug, with haven's own automatic prep doing migrate and
+   seed. With `-no-haven`, visualdiff provisions the old way instead:
+   `pnpm install --prefer-offline` and `pnpm run start:prepare:files` in each
+   worktree, then each ref's stack starts on its own ports - the base at
+   `-base-port` (5670 by default), the candidate ten above it, so the two can
+   never collide. A modular checkout runs `dev:ui`, `dev:api` and
+   `dev:worker`; a monolith checkout runs `dev:app` with the Prisma,
+   ClickHouse and provisioning steps skipped, because both refs share your
+   local databases and the older ref must not re-apply its own migration set
+   over them.
 3. Polls both stacks until they answer, then seeds each through its own API.
    On haven, when both sides boot live and the first edition is the seeded
    one, the candidate is captured as soon as it is up: the base boots and
@@ -214,6 +215,7 @@ overrule it. The finding classes fail the run (exit 1):
 | ------------------- | ------------------------------------------------------------------------------- |
 | `missing-candidate` | the base captured the screen and the candidate never did                        |
 | `missing-base`      | the candidate captured the screen and the base never did - nothing compared     |
+| `capture-failed`    | a side's own modules did not load, even taken again alone - the tool's failure  |
 | `broken-both`       | the route or flow step fails on both refs                                       |
 | `regression`        | the candidate fails, or logs a console error, where the base does not           |
 | `not-found`         | the candidate shows its not-found page where the base renders the screen        |
@@ -259,13 +261,62 @@ branch (`gh pr list --head <branch>`), in one comment marked
 only by posting, so the run posts the comment with `gh pr comment --attach`,
 copies the posted body (its images now uploaded assets) over the marked
 comment, and deletes the post. The comment carries the run id, both commits,
-the counts by class and up to `publish.screens` screens: the largest changes,
-then the candidate's failures, then `publish.keyPages`. The base is shown
+the counts by class and up to `publish.screens` screens: every
+`publish.keyPages` page first, then the findings and then the other changes,
+largest first, one screen per area (project, traces, analytics, settings,
+governance, ops, me, auth, ...) before any area repeats. A blank, failed or
+`capture-failed` capture is never shown. The base is shown
 beside the candidate only where it is readable. Each image is scaled to
 `publish.width` and cut at `publish.maxHeight`. A screen whose text on either
 side looks like a key, a token or a local file path is never published.
 `-no-publish` skips it, and so does a branch with no open PR or a gh that is
 not signed in; a failed publish never changes the run's exit code.
+`visualdiff publish -run-dir DIR` publishes a finished run afterwards, from
+its `report/*/findings.json`: `-pr` names the pull request and `-link` adds
+the full report's address. It exits 0 when it published, 1 when it skipped
+and said why, 2 when it failed.
+
+## Running in CI
+
+`.github/workflows/visualdiff.yml` runs on every non-draft pull request that
+touches the application, and on `workflow_dispatch`. One run per PR: a newer
+push cancels the one still going. It follows `apidiff.yml` and `e2e-ci.yml`:
+
+1. Postgres, ClickHouse and Redis are job services; the secrets are throwaway
+   values in the job's environment. Nothing needs a repository secret.
+2. The candidate's own migrations and seed run against them from the checkout
+   (`pnpm prisma:migrate`, `pnpm clickhouse:migrate`, `pnpm prisma:seed`):
+   the state a developer's database is in before a `-no-haven` run. The base
+   then boots on the candidate's schema with its migrations skipped, the same
+   as every rolling deploy's old release does.
+3. `visualdiff run -no-haven -no-publish -no-baseline` boots both refs on
+   plain ports from worktrees under the runner's temp directory, captures the
+   enterprise edition and writes the report. The Playwright browser is cached
+   by version.
+4. The run directory's report, screenshots and logs upload as the
+   `visualdiff-report` artifact (7 days): `report/<edition>/report.html`
+   addresses its screenshots relative to itself, so it opens from the
+   download. `summary.txt` becomes the job summary.
+5. `visualdiff publish -pr <n> -link <artifact>` edits the PR's one marked
+   comment. When no screen went up (the run broke, nothing was selected, or
+   gh could not attach images with the workflow's token) the workflow writes
+   the run's status into the same marked comment instead. A fork's PR has a
+   read-only token: it gets the job summary and the artifact, no comment.
+
+Findings are for review and never fail the job; exit 2 does, and prints the
+end of every stack log into the step's output.
+
+## Capturing under concurrency
+
+A cold Vite dev server fed four pages at once drops module requests
+(`net::ERR_HTTP2_PROTOCOL_ERROR`, `ERR_CONNECTION_CLOSED` on `/@fs/...`), and
+the page renders white. So each side captures its first three routes one at a
+time (the fail-fast probe, and the warm-up that compiles the shell's module
+graph), then the rest across its pages. A capture that comes back blank, or
+whose own module requests failed, is held back and taken again alone once the
+pool is done; only that retake is kept. A capture whose modules still did not
+load is `capture-failed`, never `blank`, and a live base holding one is not
+cached as a baseline.
 
 ## Cleaning up
 

@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AppendStore, Projection, ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
+import type { ExperimentRunPlan } from "@langwatch/experiment-contract";
 import { describe, expect, it } from "vitest";
 
 import type { ExperimentRunStateRepository } from "../../repositories/experiment-run-state.repository.ts";
@@ -14,7 +15,6 @@ import {
   experimentRunStartedEventSchema,
   type TargetResultEvent,
 } from "../experiment-run-events.process.ts";
-import type { ExperimentRunPlan } from "../experiment-run-plan.schemas.ts";
 import {
   AbortExperimentRunCommand,
   FailExperimentCellCommand,
@@ -35,7 +35,7 @@ const plan: ExperimentRunPlan = {
   persistResults: true,
   scope: { type: "full" },
   mappingDatasetId: "dataset_1",
-  targets: [{ id: "target_a", type: "prompt", mappings: {} }],
+  targets: [{ id: "target_a", type: "prompt", inputs: [], outputs: [], mappings: {} }],
   evaluators: [],
   datasetColumns: [{ id: "question", name: "question", type: "string" }],
   rows: [{ rowIndex: 0, entry: { question: "What is 2 + 2?" } }],

@@ -1,7 +1,35 @@
 import type { Span, Trace } from "@langwatch/trace-contract";
-import type { ConversationTurnSource } from "@langwatch/trace-contract/conversation";
+import {
+  buildParsedTurns,
+  type ConversationTurnSource,
+  type RenderedConversationMarkdown,
+  renderConversationMarkdown,
+} from "@langwatch/trace-contract/conversation";
+import { extractReadableText } from "@langwatch/trace-contract/transcript";
 
+import { extractConversationSteps } from "./trace-conversation-steps.rules.ts";
 import { extractLlmMessagesForTrace } from "./trace-llm-messages.rules.ts";
+
+/**
+ * A thread as the one transcript a reader that is a model gets: every turn
+ * once, in the order given, with its steps, shortened to the budget when one
+ * is given. The drawer's copy, LangWatchQL and evaluators all read this.
+ */
+export function renderThreadConversation({
+  threadKey,
+  traces,
+  maxTokens,
+}: {
+  threadKey: string;
+  traces: readonly Trace[];
+  maxTokens?: number;
+}): RenderedConversationMarkdown {
+  return renderConversationMarkdown({
+    conversationId: threadKey,
+    turns: buildParsedTurns({ turns: traces.map((trace) => traceToConversationTurn({ trace })) }),
+    ...(maxTokens === undefined ? {} : { maxTokens }),
+  });
+}
 
 /**
  * A trace as one conversation turn. Captured text is empty on a large share of
@@ -15,6 +43,11 @@ export function traceToConversationTurn({ trace }: { trace: Trace }): Conversati
   const fallback =
     input === "" || output === "" ? extractLlmMessagesForTrace({ trace, spans }) : null;
 
+  const turnOutput = output !== "" ? output : toMessagesJson(fallback?.output);
+  const steps = extractConversationSteps({
+    spans,
+    replyText: extractReadableText(turnOutput, "assistant"),
+  });
   return {
     traceId: trace.trace_id,
     timestamp: trace.timestamps.started_at,
@@ -23,20 +56,29 @@ export function traceToConversationTurn({ trace }: { trace: Trace }): Conversati
     totalCost: trace.metrics?.total_cost ?? null,
     totalTokens: tokensOf(trace),
     input: input !== "" ? input : toMessagesJson(fallback?.input),
-    output: output !== "" ? output : toMessagesJson(fallback?.output),
+    output: turnOutput,
     ...(trace.error?.message ? { error: trace.error.message } : {}),
+    ...(steps.length > 0 ? { steps } : {}),
   };
 }
 
-/** The models an LLM span of this trace reported, in first-seen order. */
+/**
+ * The models an LLM span of this trace reported, the one that wrote the most
+ * output first: a coding agent's first call is often a title call on a small
+ * model, not the model that did the work.
+ */
 function modelsOf(spans: readonly Span[]): string[] {
-  const models: string[] = [];
+  const outputTokens = new Map<string, number>();
   for (const span of spans) {
     const model = "model" in span ? span.model : null;
     if (typeof model !== "string" || model === "") continue;
-    if (!models.includes(model)) models.push(model);
+    const written = span.metrics?.completion_tokens ?? 0;
+    outputTokens.set(model, (outputTokens.get(model) ?? 0) + written);
   }
-  return models;
+  return [...outputTokens.entries()]
+    .map(([model, written], firstSeen) => ({ model, written, firstSeen }))
+    .toSorted((a, b) => b.written - a.written || a.firstSeen - b.firstSeen)
+    .map(({ model }) => model);
 }
 
 function tokensOf(trace: Trace): number {

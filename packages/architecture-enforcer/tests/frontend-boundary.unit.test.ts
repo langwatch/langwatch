@@ -3,7 +3,8 @@
  * @see specs/setup/memory-footprint.feature
  * Transitive: one type-name import once pulled 2,020 browser-only modules into the API/worker.
  */
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -52,24 +53,16 @@ const show = (path: string): string =>
 
 const API_SRC = join(REPO_ROOT, "apps", "api", "src");
 const WORKER_SRC = join(REPO_ROOT, "apps", "worker", "src");
+const TASKS_SRC = join(REPO_ROOT, "apps", "tasks", "src");
 
-/**
- * The process entrypoints, and every composition module: a composition is wired into a
- * process by name, so a browser package on one is a browser package in the process that
- * composes it, whether or not today's entrypoint happens to reach it.
- */
-const applicationRoots = (): string[] => {
-  const roots: string[] = [];
-  for (const entrypoint of [join(API_SRC, "main.ts"), join(WORKER_SRC, "main.ts")]) {
-    if (existsSync(entrypoint)) roots.push(entrypoint);
-  }
-  for (const source of [API_SRC, WORKER_SRC]) {
-    for (const file of walkFiles(source, isProductionSource)) {
-      if (file.endsWith(".composition.ts")) roots.push(file);
-    }
-  }
-  return roots;
-};
+/** Every production source of the node processes: an app is its entrypoint and config. */
+const applicationRoots = (): string[] =>
+  [API_SRC, WORKER_SRC, TASKS_SRC].flatMap((source) =>
+    existsSync(source) ? walkFiles(source, isProductionSource) : [],
+  );
+
+/** Every module tree, open-source and enterprise alike. */
+const MODULE_TREES = [join(REPO_ROOT, "modules"), join(REPO_ROOT, "enterprise", "modules")];
 
 /**
  * Every server-side source tree a feature or platform package owns — derived, not listed.
@@ -78,9 +71,11 @@ const applicationRoots = (): string[] => {
  */
 const serverPackageRoots = (): string[] => {
   const roots: string[] = [];
-  for (const feature of subdirectories(join(REPO_ROOT, "modules"))) {
-    const source = join(REPO_ROOT, "modules", feature, "process", "src");
-    if (existsSync(source)) roots.push(source);
+  for (const tree of MODULE_TREES) {
+    for (const feature of subdirectories(tree)) {
+      const source = join(tree, feature, "process", "src");
+      if (existsSync(source)) roots.push(source);
+    }
   }
   for (const packageName of subdirectories(join(REPO_ROOT, "packages"))) {
     const source = join(REPO_ROOT, "packages", packageName, "src", "server");
@@ -105,9 +100,13 @@ const BACKEND_ROOTS = [
  */
 const browserModuleRoots = (): string[] => {
   const roots = [join(REPO_ROOT, "apps", "ui")];
-  for (const feature of subdirectories(join(REPO_ROOT, "modules"))) {
-    const web = join(REPO_ROOT, "modules", feature, "web");
-    if (existsSync(web)) roots.push(web);
+  for (const tree of MODULE_TREES) {
+    for (const feature of subdirectories(tree)) {
+      for (const half of ["browser", "browser-kit"]) {
+        const browser = join(tree, feature, half);
+        if (existsSync(browser)) roots.push(browser);
+      }
+    }
   }
   return roots.map((root) => root + sep);
 };
@@ -187,19 +186,27 @@ const chainFromFile = ({
 const PACKAGE_GRAPH = graphReaching({ roots: BACKEND_ROOTS, packages: true, modules: false });
 
 describe("browser-only UI never reaches backend code", () => {
-  describe("given the value-import graph rooted at every backend entrypoint, composition and server package source", () => {
+  describe("given the value-import graph rooted at every process source and server package source", () => {
     // Without this, a roots list that silently emptied — a renamed entrypoint,
     // a moved package tree — would make every assertion below pass over
     // nothing, which reads exactly like finding nothing.
-    it("roots the walk at the process entrypoints, the compositions and every server package", () => {
+    it("roots the walk at the process sources and every server package, and bans every browser half", () => {
       expect(BACKEND_ROOTS).toContain(join(API_SRC, "main.ts"));
       expect(BACKEND_ROOTS).toContain(join(WORKER_SRC, "main.ts"));
-      expect(
-        BACKEND_ROOTS.filter((file) => file.endsWith(".composition.ts")).length,
-      ).toBeGreaterThan(50);
-      expect(SERVER_PACKAGE_ROOTS.length).toBeGreaterThan(30);
+      expect(BACKEND_ROOTS).toContain(join(TASKS_SRC, "main.ts"));
+      expect(SERVER_PACKAGE_ROOTS.length).toBeGreaterThan(50);
       expect(SERVER_PACKAGE_ROOTS).toContain(
         join(REPO_ROOT, "packages", "eventing", "src", "server"),
+      );
+      expect(SERVER_PACKAGE_ROOTS).toContain(
+        join(REPO_ROOT, "enterprise", "modules", "billing", "process", "src"),
+      );
+      expect(BROWSER_MODULE_ROOTS).toContain(join(REPO_ROOT, "modules", "trace", "browser") + sep);
+      expect(BROWSER_MODULE_ROOTS).toContain(
+        join(REPO_ROOT, "modules", "trace", "browser-kit") + sep,
+      );
+      expect(BROWSER_MODULE_ROOTS).toContain(
+        join(REPO_ROOT, "enterprise", "modules", "sso", "browser") + sep,
       );
       expect(PACKAGE_GRAPH.children.size).toBeGreaterThan(BACKEND_ROOTS.length);
     });
@@ -210,7 +217,7 @@ describe("browser-only UI never reaches backend code", () => {
     });
 
     /** @scenario "Backend code never imports a module out of a browser package" */
-    it("finds no chain from backend code into an apps/ui or feature web module", () => {
+    it("finds no chain from backend code into an apps/ui or module browser half", () => {
       expect(chains({ roots: BACKEND_ROOTS, packages: false, modules: true })).toEqual([]);
     });
   });
@@ -219,10 +226,7 @@ describe("browser-only UI never reaches backend code", () => {
   // assertions above pass vacuously.
   describe("given a component that genuinely renders Chakra", () => {
     it("still reports a chain, proving the walker resolves imports", () => {
-      const component = join(
-        REPO_ROOT,
-        "modules/agent/browser/src/features/management/ui/blocks/agent-card.tsx",
-      );
+      const component = join(REPO_ROOT, "modules/agent/browser/src/ui/blocks/agent-card.tsx");
       expect(existsSync(component)).toBe(true);
 
       expect(chainFromFile({ file: component })).toBeDefined();
@@ -234,7 +238,7 @@ describe("browser-only UI never reaches backend code", () => {
   // statement whatsoever, so without this rule it is a dead end in the walk
   // rather than the React leaf it actually is.
   describe("given a component whose only React edge is the JSX runtime", () => {
-    const icon = join(REPO_ROOT, "modules/auth/browser/src/ui/elements/logo-icon.tsx");
+    const icon = join(REPO_ROOT, "modules/auth/browser/src/ui/elements/github-icon.tsx");
 
     it("reports a chain, even with no import statement in the file", () => {
       expect(existsSync(icon)).toBe(true);
@@ -310,7 +314,7 @@ describe("browser-only UI never reaches backend code", () => {
       const specifiers = valueImports({
         file: join(
           REPO_ROOT,
-          "apps/worker/src/platform/infrastructure/worker-pii-analysis.adapter.ts",
+          "modules/data-privacy/process/src/channels/http/http.google-dlp.channel.ts",
         ),
       }).map((entry) => entry.specifier);
 
@@ -318,9 +322,14 @@ describe("browser-only UI never reaches backend code", () => {
     });
 
     it("ignores one in type position, because the annotation is erased", () => {
+      // No production file writes a type query any more, so the subject is a fixture.
       const adapter = join(
-        REPO_ROOT,
-        "modules/analytics/process/src/adapters/analytics.adapter.ts",
+        mkdtempSync(join(tmpdir(), "frontend-boundary-")),
+        "type-query.adapter.ts",
+      );
+      writeFileSync(
+        adapter,
+        'export type Client = import("@clickhouse/client").ClickHouseClient;\n',
       );
 
       // Both halves, so the case cannot pass by losing its subject: the file
@@ -337,16 +346,13 @@ describe("browser-only UI never reaches backend code", () => {
   // edge is a hole in the guard that looks exactly like a clean graph.
   describe("given a package-internal subpath import", () => {
     it("resolves it through the owning manifest's imports map", () => {
-      const transport = join(
-        REPO_ROOT,
-        "modules/dashboard/process/src/transport/api-rest/dashboard.api.ts",
-      );
-      expect(valueImports({ file: transport }).map((entry) => entry.specifier)).toContain(
-        "#app/dashboard.app",
+      const server = join(REPO_ROOT, "modules/agent/process/src/agent.server.ts");
+      expect(valueImports({ file: server }).map((entry) => entry.specifier)).toContain(
+        "#app/agent.app",
       );
 
-      expect(resolver.resolve({ specifier: "#app/dashboard.app", file: transport })).toBe(
-        join(REPO_ROOT, "modules/dashboard/process/src/app/dashboard.app.ts"),
+      expect(resolver.resolve({ specifier: "#app/agent.app", file: server })).toBe(
+        join(REPO_ROOT, "modules/agent/process/src/app/agent.app.ts"),
       );
     });
   });
@@ -373,10 +379,7 @@ describe("browser-only UI never reaches backend code", () => {
       // this package already held; it moved here, which is what made the exception mean
       // something. This case asks the same question of a file outside the package instead —
       // a terminal widened to "anything that renders mail" would take the guard's teeth with it.
-      const outside = join(
-        REPO_ROOT,
-        "modules/agent/browser/src/features/management/ui/blocks/agent-card.tsx",
-      );
+      const outside = join(REPO_ROOT, "modules/agent/browser/src/ui/blocks/agent-card.tsx");
       expect(existsSync(outside)).toBe(true);
 
       expect(isMailTerminal({ file: outside })).toBe(false);
@@ -389,9 +392,12 @@ describe("browser-only UI never reaches backend code", () => {
     // processes that rendered it wrote their own templates — so the terminal
     // was inert and the twins it should have prevented already existed.
     it("is reached by a real backend root, so the terminal is exercised", () => {
-      const composition = join(REPO_ROOT, "apps/worker/src/app/worker-mail.composition.ts");
-      expect(BACKEND_ROOTS).toContain(composition);
-      expect(valueImports({ file: composition }).map((entry) => entry.specifier)).toContain(
+      const mailChannel = join(
+        REPO_ROOT,
+        "modules/auth/process/src/channels/ses/ses.password-reset-mail.channel.ts",
+      );
+      expect(BACKEND_ROOTS).toContain(mailChannel);
+      expect(valueImports({ file: mailChannel }).map((entry) => entry.specifier)).toContain(
         "@langwatch/mail",
       );
 
@@ -408,9 +414,9 @@ describe("browser-only UI never reaches backend code", () => {
       expect(isMailTerminal({ file: entry })).toBe(true);
       expect(isMailTerminal({ file: template })).toBe(true);
 
-      // And the walk stops there: the composition reaches the package, the
+      // And the walk stops there: the channel reaches the package, the
       // package renders React, and no chain is reported for either.
-      expect(chainFromFile({ file: composition })).toBeUndefined();
+      expect(chainFromFile({ file: mailChannel })).toBeUndefined();
       expect(chainFromFile({ file: join(WORKER_SRC, "main.ts") })).toBeUndefined();
     });
   });

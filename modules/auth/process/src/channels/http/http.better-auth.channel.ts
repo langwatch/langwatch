@@ -434,6 +434,8 @@ export const createAuthOptions = ({
     },
     additionalFields: {
       impersonating: { type: "string", required: false, input: false },
+      // What the minting sign-in proved (D06), written by the session create hook only.
+      amr: { type: "string[]", required: false, input: false },
     },
     // Preserve NextAuth's 30-day session TTL. BetterAuth defaults to 7 days,
     // which would force users to re-auth more often than before. Match the

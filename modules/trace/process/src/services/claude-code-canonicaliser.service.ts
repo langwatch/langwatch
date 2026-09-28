@@ -19,6 +19,9 @@ export const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
   "com.anthropic.claude_code.events",
 ]);
 
+/** One tool call; its `.execution` and `.blocked_on_user` children are phases of it, not tools. */
+const CLAUDE_CODE_TOOL_SPAN_NAME = "claude_code.tool";
+
 const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
 
@@ -32,6 +35,11 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
   readonly id = "claude-code";
 
   apply(ctx: ExtractorContext): void {
+    if (ctx.span.name === CLAUDE_CODE_TOOL_SPAN_NAME) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "tool");
+      ctx.recordRule("claude-code/tool");
+      return;
+    }
     // Gateway-proxied claude_code traffic already arrives as gen_ai.* spans
     // (GenAICanonicaliserService's job) — only the CLI's own native span needs lifting.
     if (ctx.span.name !== CLAUDE_CODE_LLM_REQUEST_SPAN_NAME) {

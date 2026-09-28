@@ -73,6 +73,10 @@ jobs:
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/langwatch"
       IS_OPENSEARCH: "true"
       REDIS_URL: "redis://localhost:6380"
+      # The api below starts without dev-stack.sh, so nothing derives a database
+      # from its port; the front-door suite reads Better Auth's tokens from the
+      # same database only when both are told which one it is.
+      REDIS_DB_INDEX: "0"
       LANGWATCH_NLP_SERVICE: "http://localhost:5563"
       LANGEVALS_ENDPOINT: "http://localhost:5564"
       NEXTAUTH_SECRET: "test-secret-for-e2e-testing"

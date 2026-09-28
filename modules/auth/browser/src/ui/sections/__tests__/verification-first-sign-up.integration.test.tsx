@@ -291,6 +291,21 @@ describe("given the sign-up screen", () => {
       });
       await waitFor(() => expect(signInMock).toHaveBeenCalled());
     });
+
+    it("offers no passkey even where the deployment offers passkeys", async () => {
+      publicEnvRef.current = { IS_SAAS: true, PASSKEYS_ENABLED: true };
+      requestVerificationMock.mockResolvedValue({ sent: false, addressProof: "unconfirmed_proof" });
+
+      const { container } = renderScreen();
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+      await screen.findByTestId("unconfirmed-address");
+      await waitFor(() => {
+        expect(container.querySelector('input[type="password"]')).not.toBeNull();
+      });
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
+    });
   });
 
   describe("when a confirmation link comes back for an account that exists", () => {

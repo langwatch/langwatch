@@ -8,6 +8,7 @@ import {
   type ConversationMarkdownChunk,
   joinConversationMarkdown,
 } from "./conversation-markdown.ts";
+import { type ConversationDetail, conversationDetailAtScale } from "./conversation-steps.ts";
 import type { ConversationTurnSource, ParsedTurn } from "./parsed-turns.ts";
 
 /**
@@ -39,9 +40,9 @@ export interface RenderedConversationMarkdown {
 }
 
 /**
- * A parsed conversation as one markdown string, optionally under a budget. The
- * preamble always survives, turns are kept from both ends, and the gap carries
- * a marker: a cut conversation must never read as a short one.
+ * A parsed conversation as one markdown string, optionally under a budget.
+ * Every turn is shortened level by level first, since a judge's evidence sits
+ * anywhere; only then are middle turns dropped, under a marker.
  */
 export function renderConversationMarkdown({
   conversationId = "",
@@ -59,6 +60,84 @@ export function renderConversationMarkdown({
     return { text: full, isTruncated: false, estimatedTokens: fullTokens, omittedTurns: 0 };
   }
 
+  const shortened = shortenEveryTurn({ conversationId, turns, maxTokens });
+  if (shortened.fits) {
+    return {
+      text: shortened.text,
+      isTruncated: true,
+      estimatedTokens: estimateTokensFromBytes(shortened.text),
+      omittedTurns: 0,
+    };
+  }
+  return dropMiddleTurns({ chunks: shortened.chunks, maxTokens });
+}
+
+/** The scale search runs over the logarithm, down to this smallest scale, in this many halvings. */
+const SMALLEST_SCALE = 0.001;
+const SCALE_SEARCH_STEPS = 14;
+
+/**
+ * The most detail that fits: every value cap scaled down together, then, at
+ * the smallest caps, fewer steps per turn. Both searches are binary, since a
+ * render is linear in the thread and the fit is monotone in either knob.
+ */
+function shortenEveryTurn({
+  conversationId,
+  turns,
+  maxTokens,
+}: {
+  conversationId: string;
+  turns: ParsedTurn<ConversationTurnSource>[];
+  maxTokens: number;
+}): { fits: boolean; text: string; chunks: ConversationMarkdownChunk[] } {
+  const attempt = (detail: ConversationDetail) => {
+    const chunks = buildConversationMarkdownChunks({ conversationId, turns, detail });
+    const text = joinConversationMarkdown(chunks);
+    return { fits: estimateTokensFromBytes(text) <= maxTokens, text, chunks };
+  };
+  const smallest = attempt(conversationDetailAtScale(0));
+  if (smallest.fits) {
+    let best = smallest;
+    let low = Math.log(SMALLEST_SCALE);
+    let high = 0;
+    for (let step = 0; step < SCALE_SEARCH_STEPS; step++) {
+      const mid = (low + high) / 2;
+      const tried = attempt(conversationDetailAtScale(Math.exp(mid)));
+      if (tried.fits) {
+        best = tried;
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+    return best;
+  }
+  const mostSteps = Math.max(0, ...turns.map((parsed) => parsed.turn.steps?.length ?? 0));
+  let best = smallest;
+  let low = 0;
+  let high = mostSteps;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    const tried = attempt({ ...conversationDetailAtScale(0), maxStepsPerTurn: mid });
+    if (tried.fits) {
+      best = tried;
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+  if (!best.fits) best = attempt({ ...conversationDetailAtScale(0), maxStepsPerTurn: 0 });
+  return best;
+}
+
+/** The last resort: keep turns from both ends at the lowest detail level. */
+function dropMiddleTurns({
+  chunks,
+  maxTokens,
+}: {
+  chunks: ConversationMarkdownChunk[];
+  maxTokens: number;
+}): RenderedConversationMarkdown {
   const preamble = chunks.filter((chunk) => chunk.turnNumber === undefined);
   const turnGroups = groupByTurn(chunks);
   // Reserved up front at the length it takes for every turn being dropped, so
@@ -179,7 +258,7 @@ function keepWithinBudget({
 /**
  * Turns taken from the start, and what they cost. The share is not a cap: one
  * turn bigger than it would otherwise starve the opening entirely, so the
- * first turn is kept whenever the budget as a whole can afford it.
+ * first turn is kept whenever the budget can afford it beside the last one.
  */
 function takeFromHead({
   turnGroups,
@@ -200,7 +279,9 @@ function takeFromHead({
   if (kept.size > 0) return spent;
 
   const first = turnGroups[0];
-  if (first && first.tokens <= available) {
+  const last = turnGroups[turnGroups.length - 1];
+  const alongsideLast = turnGroups.length > 1 && last ? last.tokens : 0;
+  if (first && first.tokens + alongsideLast <= available) {
     kept.add(0);
     return first.tokens;
   }

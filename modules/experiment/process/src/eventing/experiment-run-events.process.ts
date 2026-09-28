@@ -1,5 +1,8 @@
 import { EventSchema } from "@langwatch/eventing";
-import { experimentRunEventingTargetSchema as targetSchema } from "@langwatch/experiment-contract";
+import {
+  experimentRunEventingTargetSchema as targetSchema,
+  experimentRunPlanSchema,
+} from "@langwatch/experiment-contract";
 import {
   type SerializedHandledError,
   serializedHandledErrorSchema,
@@ -7,7 +10,6 @@ import {
 import { z } from "zod";
 
 import { EXPERIMENT_RUN_EVENT_TYPES } from "../rules/experiment-run-event-types.rules.ts";
-import { experimentRunPlanSchema } from "./experiment-run-plan.schemas.ts";
 
 /**
  * Base metadata for experiment run events.
@@ -100,6 +102,16 @@ export const evaluatorResultEventDataSchema = z.object({
   cost: z.number().nullable().optional(),
   inputs: z.record(z.string(), z.unknown()).nullable().optional(),
   duration: z.number().nullable().optional(),
+  /** What a failed evaluator's frame showed (ARCHITECTURE §9): its error type, trace and code. */
+  errorType: z.string().nullable().optional(),
+  traceback: z.array(z.string()).nullable().optional(),
+  domainError: z
+    .custom<SerializedHandledError>((value) => typeof value === "object" && value !== null)
+    .nullable()
+    .optional(),
+  /** The evaluator's raw answer, and the currency its cost is in. */
+  rawResponse: z.unknown().optional(),
+  costCurrency: z.string().nullable().optional(),
   /**
    * True when the verdict was copied into this run from the board rather than
    * produced by it. See `targetResultEventDataSchema.carriedOver`.

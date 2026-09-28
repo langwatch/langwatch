@@ -11,8 +11,8 @@ import {
  * specs/data-retention/ingestion-stamping.feature.
  */
 describe("classifyEventLogRowRetention", () => {
-  /** @scenario "Security events are retained indefinitely" */
   describe("given a row on a security aggregate", () => {
+    /** @scenario "Security events are retained indefinitely" */
     it.each([
       ["authz_grant", "lw.authz.grant.attached"],
       ["user_identity", "lw.identity.user.created"],
@@ -26,8 +26,8 @@ describe("classifyEventLogRowRetention", () => {
     });
   });
 
-  /** @scenario "Security events are retained indefinitely" */
   describe("given a row whose event type carries a security prefix", () => {
+    /** @scenario "Security events are retained indefinitely" */
     it.each([
       ["lw.identity.mfa.enrolled", "trace"],
       ["lw.identity.passkey.registered", "unknown_future_aggregate"],
@@ -74,8 +74,8 @@ describe("classifyEventLogRowRetention", () => {
     ).toBe("traces");
   });
 
-  /** @scenario "Non-security event families remain policy-bound" */
   describe("given a row on a non-security aggregate", () => {
+    /** @scenario "Non-security event families remain policy-bound" */
     it.each([
       ["trace", "traces"],
       ["log", "traces"],
@@ -102,8 +102,8 @@ describe("classifyEventLogRowRetention", () => {
     );
   });
 
-  /** @scenario "Event log rows use the workload's retention category" */
   describe("given a row on a scenario or experiment aggregate", () => {
+    /** @scenario "Event log rows use the workload's retention category" */
     it.each([
       ["simulation_run", "scenarios"],
       ["simulation_set", "scenarios"],
