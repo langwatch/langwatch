@@ -166,9 +166,9 @@ describe("virtual keys table", () => {
     /** @scenario "Virtual key list shows a key's own budget under its month spend" */
     it("draws a period bar for a key with a budget of its own", () => {
       renderPage();
-      const bar = screen.getByTestId("vk-budget-bar-vk-none");
-      expect(bar).toHaveAttribute("aria-valuenow", "0.5");
-      expect(bar).toHaveAttribute("aria-valuemax", "1");
+      const bar = within(screen.getByTestId("vk-budget-bar-vk-none")).getByRole("progressbar");
+      expect(bar).toHaveAttribute("value", "0.5");
+      expect(bar).toHaveAttribute("max", "1");
       // Amounts go through the shared gateway money formatter, the same
       // one the month total above the bar uses, so one number is never
       // written two ways inside one cell.

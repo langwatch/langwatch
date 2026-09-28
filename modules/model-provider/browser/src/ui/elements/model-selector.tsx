@@ -473,7 +473,9 @@ export const ModelSelector = React.memo(function ModelSelector({
               borderColor="border"
             >
               <Input
-                variant={"plain" as any}
+                variant="outline"
+                borderWidth="0"
+                focusVisibleRing="none"
                 size="sm"
                 placeholder="Search models"
                 type="search"

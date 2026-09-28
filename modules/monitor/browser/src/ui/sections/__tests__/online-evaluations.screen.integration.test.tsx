@@ -221,7 +221,7 @@ describe("given the performance read failed", () => {
       renderWithMonitorHost(<OnlineEvaluationsScreen />);
 
       expect(screen.getByText("Performance unavailable")).toBeInTheDocument();
-      expect(screen.queryByRole("img", { name: /Performance trend/ })).toBeNull();
+      expect(screen.queryByRole("figure", { name: /Performance trend/ })).toBeNull();
     });
   });
 });
