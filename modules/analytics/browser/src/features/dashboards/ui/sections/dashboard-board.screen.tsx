@@ -6,8 +6,8 @@
  */
 
 import { Box, Spinner, VStack } from "@chakra-ui/react";
-import { UiPageLoading, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
 import { nowInstant } from "@langwatch/time";
+import { UiPageLoading, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
 import { useState, type ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";

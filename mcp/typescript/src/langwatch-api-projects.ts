@@ -56,10 +56,7 @@ export interface CurrentProjectIdentity {
  * caller's own project — there is no "current project" shorthand there.
  */
 export async function getCurrentProject(): Promise<CurrentProjectIdentity> {
-  return makeRequest(
-    "GET",
-    "/api/me/project",
-  ) as Promise<CurrentProjectIdentity>;
+  return makeRequest("GET", "/api/me/project") as Promise<CurrentProjectIdentity>;
 }
 
 export async function createProject(data: {
