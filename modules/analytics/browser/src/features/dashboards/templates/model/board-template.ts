@@ -14,8 +14,20 @@ export interface BoardTemplateWidget {
   readonly layout: { gridColumn: number; gridRow: number; colSpan: number; rowSpan: number };
 }
 
+/** The Agent Flight Deck, then one template per question-picker section, by section id. */
+export type BoardTemplateId =
+  | "agent-flight-deck"
+  | "happen"
+  | "change"
+  | "threshold"
+  | "compare"
+  | "cost-source"
+  | "tradeoff"
+  | "why"
+  | "howto";
+
 export interface BoardTemplate {
-  readonly id: "agent-flight-deck";
+  readonly id: BoardTemplateId;
   readonly name: string;
   readonly description: string;
   readonly widgets: readonly BoardTemplateWidget[];

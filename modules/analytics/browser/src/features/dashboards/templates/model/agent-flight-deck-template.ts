@@ -4,10 +4,6 @@
  * in pairs. Row spans are 44px board rows, sized to each panel's content.
  */
 
-import {
-  DASHBOARD_WIDGET_DEFINITION_VERSION,
-  type DashboardWidgetDefinition,
-} from "../../../../model/dashboard-widget-definition.ts";
 import type { BoardTemplate, BoardTemplateWidget } from "./board-template.ts";
 import {
   FEEDBACK_CODE,
@@ -24,49 +20,20 @@ import {
   IMPACTFUL_TRACES_CODE,
   SCENARIOS_CODE,
 } from "./flight-deck-table-widgets.ts";
-
-function definition({
-  code,
-  queries,
-}: {
-  code: string;
-  queries: Readonly<Record<string, string>>;
-}): DashboardWidgetDefinition {
-  return {
-    version: DASHBOARD_WIDGET_DEFINITION_VERSION,
-    code,
-    queries: Object.entries(queries).map(([name, text]) => ({ name, sql: text, parameters: [] })),
-  };
-}
-
-const FULL = 8;
-const HALF = 4;
-
-/** A widget in a pair: left or right half of the rows that start at `gridRow`. */
-function half({
-  side,
-  gridRow,
-  rowSpan = 5,
-}: {
-  side: "left" | "right";
-  gridRow: number;
-  rowSpan?: number;
-}) {
-  return { gridColumn: side === "left" ? 0 : HALF, gridRow, colSpan: HALF, rowSpan };
-}
+import { definition, full, half } from "./template-widget.ts";
 
 const WIDGETS: readonly BoardTemplateWidget[] = [
   {
     key: "status",
     name: "Status",
     definition: definition({ code: STATUS_CODE, queries: { main: sql.PERIOD_COMPARISON_SQL } }),
-    layout: { gridColumn: 0, gridRow: 0, colSpan: FULL, rowSpan: 3 },
+    layout: full({ gridRow: 0, rowSpan: 3 }),
   },
   {
     key: "throughput",
     name: "Throughput, latency & errors",
     definition: definition({ code: THROUGHPUT_CODE, queries: { main: sql.THROUGHPUT_SQL } }),
-    layout: { gridColumn: 0, gridRow: 3, colSpan: FULL, rowSpan: 6 },
+    layout: full({ gridRow: 3, rowSpan: 6 }),
   },
   {
     key: "cost-efficiency",
@@ -123,7 +90,7 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: CODING_AGENTS_CODE,
       queries: { agents: sql.CODING_AGENTS_SQL, trend: sql.CODING_AGENT_TREND_SQL },
     }),
-    layout: { gridColumn: 0, gridRow: 24, colSpan: FULL, rowSpan: 5 },
+    layout: full({ gridRow: 24, rowSpan: 5 }),
   },
   {
     key: "impactful-traces",
@@ -132,7 +99,7 @@ const WIDGETS: readonly BoardTemplateWidget[] = [
       code: IMPACTFUL_TRACES_CODE,
       queries: { main: sql.IMPACTFUL_TRACES_SQL },
     }),
-    layout: { gridColumn: 0, gridRow: 29, colSpan: FULL, rowSpan: 6 },
+    layout: full({ gridRow: 29, rowSpan: 6 }),
   },
 ];
 

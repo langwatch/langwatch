@@ -4,23 +4,9 @@
  * page period only through the reserved parameters (ADR-130).
  */
 
-const START = "{dashboard_context_period_start:DateTime}";
-const END = "{dashboard_context_period_end:DateTime}";
-const GRAIN = "{dashboard_context_granularity_seconds:UInt32}";
-/** The start of the equally long window right before the page period. */
-const PREVIOUS_START = `subtractSeconds(${START}, dateDiff('second', ${START}, ${END}))`;
+import { bucketOf, inPeriod, inPeriodAndPrevious, START } from "./lwql-period.ts";
 
-/** Seconds from the epoch (a Thursday) to the first Monday: pins week buckets to Monday. */
-const MONDAY_OFFSET_SECONDS = 345_600;
-
-const inPeriod = (column: string) => `${column} >= ${START} AND ${column} < ${END}`;
-const bucketOf = (column: string) => {
-  const shifted = `subtractSeconds(${column}, ${MONDAY_OFFSET_SECONDS})`;
-  const bucket = `toStartOfInterval(${shifted}, INTERVAL ${GRAIN} SECOND)`;
-  return `addSeconds(${bucket}, ${MONDAY_OFFSET_SECONDS})`;
-};
-
-const COMPARISON_WINDOW = `BucketStart >= ${PREVIOUS_START} AND BucketStart < ${END}`;
+const COMPARISON_WINDOW = inPeriodAndPrevious("BucketStart");
 
 export const PERIOD_COMPARISON_SQL = `SELECT
   uniqExactIf(TraceId, OccurredAt >= ${START}) AS requests,
@@ -32,7 +18,7 @@ export const PERIOD_COMPARISON_SQL = `SELECT
   (SELECT sumIf(CostSum, BucketStart >= ${START}) FROM trace_metrics_by_minute WHERE ${COMPARISON_WINDOW}) AS cost,
   (SELECT sumIf(CostSum, BucketStart < ${START}) FROM trace_metrics_by_minute WHERE ${COMPARISON_WINDOW}) AS cost_prev
 FROM trace_metrics
-WHERE OccurredAt >= ${PREVIOUS_START} AND OccurredAt < ${END}`;
+WHERE ${inPeriodAndPrevious("OccurredAt")}`;
 
 export const THROUGHPUT_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket,
   uniqExact(TraceId) AS throughput,

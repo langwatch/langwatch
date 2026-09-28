@@ -20,7 +20,7 @@ import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { boardSubject } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
-import { AGENT_FLIGHT_DECK_TEMPLATE } from "../../templates/index.ts";
+import { BOARD_TEMPLATES } from "../../templates/index.ts";
 import { AddBlockCard, BlankBoard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
@@ -106,12 +106,12 @@ function OpenBoard({ board }: { board: SavedBoard }) {
       )}
       {boardWidgets.status === "success" && widgets.length === 0 && (
         <BlankBoard
-          template={AGENT_FLIGHT_DECK_TEMPLATE}
-          isCreatingFromTemplate={fromTemplate.creatingId === AGENT_FLIGHT_DECK_TEMPLATE.id}
+          templates={BOARD_TEMPLATES}
+          creatingTemplateId={fromTemplate.creatingId}
           onAddBlock={picker.open}
-          onOpenTemplate={() =>
+          onOpenTemplate={(template) =>
             void fromTemplate.createFromTemplate({
-              template: AGENT_FLIGHT_DECK_TEMPLATE,
+              template,
               existingNames: saved.boards.map(({ name }) => name),
             })
           }
