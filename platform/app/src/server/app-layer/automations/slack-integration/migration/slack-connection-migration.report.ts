@@ -39,21 +39,6 @@ export function dryRunOutcome({
   };
 }
 
-function countConnection({
-  tally,
-  connection,
-}: {
-  tally: SlackMigrationTally;
-  connection: PlannedConnection;
-}): void {
-  if (connection.action === "create") {
-    tally.created += 1;
-    return;
-  }
-  tally.reused += 1;
-  if (connection.widenedFromProjectId) tally.widened += 1;
-}
-
 export function tallyOutcomes({
   outcomes,
 }: {
@@ -68,7 +53,11 @@ export function tallyOutcomes({
   };
   for (const { plan, linkedIds, skipped } of outcomes) {
     for (const connection of plan.connections) {
-      countConnection({ tally, connection });
+      if (connection.action === "create") tally.created += 1;
+      else tally.reused += 1;
+      if (connection.action === "reuse" && connection.widenedFromProjectId) {
+        tally.widened += 1;
+      }
     }
     tally.linked += linkedIds.length;
     for (const { reason } of skipped) {
@@ -76,12 +65,6 @@ export function tallyOutcomes({
     }
   }
   return tally;
-}
-
-function scopeLabel({ connection }: { connection: PlannedConnection }): string {
-  return connection.scopeType === SlackIntegrationScopeType.ORGANIZATION
-    ? "organization"
-    : `project ${connection.scopeId}`;
 }
 
 /** One connection's line. Names carry only the hint, never the secret. */
@@ -92,7 +75,10 @@ function connectionLine({
 }): string {
   const kind = connection.kind === SlackIntegrationKind.BOT ? "bot" : "webhook";
   const count = `${connection.members.length} automation${connection.members.length === 1 ? "" : "s"}`;
-  const scope = scopeLabel({ connection });
+  const scope =
+    connection.scopeType === SlackIntegrationScopeType.ORGANIZATION
+      ? "organization"
+      : `project ${connection.scopeId}`;
   if (connection.action === "create") {
     return `  create  "${connection.name}"  ${kind}  ${scope}  ${count}`;
   }

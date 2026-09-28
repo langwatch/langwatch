@@ -23,13 +23,9 @@ export const CADENCE_LABELS: Record<NotificationCadence, string> = {
   hourly_digest: "Every hour",
 };
 
-/**
- * The same cadences phrased as answers to "how do you want to receive
- * messages?" — used on the choosing surface and in sentences built around the
- * author's pick, where "Immediate" would wrongly promise instant delivery
- * (every message still waits for its trace to settle). `CADENCE_LABELS` stays
- * the compact form for table cells and the wizard's step summary.
- */
+/** The cadences as answers to "how do you want to receive messages?".
+ *  "Immediate" would promise instant delivery, yet every message waits for its
+ *  trace to settle; `CADENCE_LABELS` stays the compact form for table cells. */
 export const CADENCE_CHOICE_LABELS: Record<NotificationCadence, string> = {
   immediate: "One message per matching trace",
   "5min_digest": "In batches, every 5 minutes",

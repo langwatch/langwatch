@@ -1,14 +1,10 @@
 import chalk from "chalk";
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
-import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import type { CommandResult } from "../../utils/output";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { triggerRequest } from "./triggerRequest";
 
 /**
  * Send an automation's message to the destination it is configured with, so
@@ -20,43 +16,28 @@ export const testFireTriggerCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = resolveControlPlaneUrl();
-
   const spinner = createSpinner(`Test-firing trigger "${id}"...`).start();
 
   try {
-    const response = await langwatchFetch(
-      `${endpoint}/api/triggers/${encodeURIComponent(id)}/test-fire`,
-      {
-        signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey }),
-        },
-      },
-    );
+    const response = await triggerRequest({
+      path: `/${encodeURIComponent(id)}/test-fire`,
+      method: "POST",
+    });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({
-        spinner,
-        error: new Error(message),
-        action: "test-fire trigger",
-      });
+      await failSpinnerFromResponse({ spinner, response, action: "test-fire trigger" });
       process.exit(1);
     }
 
-    const parsed = (await response.json()) as {
+    const parsed: {
       channel: string;
       recipientCount: number;
       usedDefault: boolean;
       missingVariables?: string[];
       errors?: string[];
       httpStatus?: number;
-    };
-    // The cast is not validation: a control plane that omits either array
+    } = await response.json();
+    // The annotation is not validation: a control plane that omits either array
     // must not make the CLI throw after reporting success.
     const result = {
       ...parsed,

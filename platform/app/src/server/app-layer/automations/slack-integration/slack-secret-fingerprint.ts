@@ -18,3 +18,15 @@ export function slackSecretFingerprint({ secret }: { secret: string }): string {
 export function slackSecretHint({ secret }: { secret: string }): string {
   return secret.trim().slice(-4);
 }
+
+/** `Slack bot ••••abcd` / `Slack webhook ••••abcd`: a connection's default name. */
+export function defaultSlackConnectionName({
+  kind,
+  secret,
+}: {
+  kind: "BOT" | "INCOMING_WEBHOOK";
+  secret: string;
+}): string {
+  const noun = kind === "BOT" ? "bot" : "webhook";
+  return `Slack ${noun} ••••${slackSecretHint({ secret })}`;
+}

@@ -1,17 +1,13 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { parseJsonObject } from "./parseJsonObject";
-import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
-import { slackShorthands } from "./slackShorthands";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
+import { parseJsonFlags } from "./parseJsonObject";
+import { slackShorthands } from "./slackShorthands";
+import type { TriggerRecord } from "./summary";
+import { triggerRequest } from "./triggerRequest";
 
 /**
  * Returns the updated trigger rather than printing it: the output port renders
@@ -35,36 +31,8 @@ export const updateTriggerCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = resolveControlPlaneUrl();
-
   const spinner = createSpinner(`Updating trigger "${id}"...`).start();
-
-  // Parsed BEFORE the request, in their own narrow guard — the outer catch
-  // must not misread a non-JSON API response as a flag the user never passed.
-  let parsedFilters: Record<string, unknown> | undefined;
-  let parsedActionParams: Record<string, unknown> | undefined;
-  let parsedGraphAlert: Record<string, unknown> | undefined;
-  let parsedReport: Record<string, unknown> | undefined;
-  try {
-    if (options.filters) {
-      parsedFilters = parseJsonObject(options.filters);
-    }
-    if (options.actionParams) {
-      parsedActionParams = parseJsonObject(options.actionParams);
-    }
-    if (options.graphAlert) parsedGraphAlert = parseJsonObject(options.graphAlert);
-    if (options.report) parsedReport = parseJsonObject(options.report);
-  } catch {
-    failSpinner({
-      spinner,
-      error: commandValidationError(
-        "--filters, --action-params, --graph-alert and --report must be valid JSON objects",
-      ),
-      action: "update trigger",
-    });
-    process.exit(1);
-  }
+  const flags = parseJsonFlags({ options, spinner, action: "update trigger" });
 
   try {
     const body: Record<string, unknown> = {};
@@ -72,7 +40,7 @@ export const updateTriggerCommand = async (
     if (options.active !== undefined) body.active = options.active === "true";
     if (options.message !== undefined) body.message = options.message || null;
     if (options.alertType) body.alertType = options.alertType;
-    if (parsedFilters) body.filters = parsedFilters;
+    if (flags.filters) body.filters = flags.filters;
     if (options.filterQuery !== undefined) {
       body.filterQuery = options.filterQuery || null;
     }
@@ -80,11 +48,11 @@ export const updateTriggerCommand = async (
     // replaces the stored one rather than merging into it. A credential the
     // read hid comes back as `[redacted]`; send that to keep the stored value.
     const slack = slackShorthands(options);
-    if (parsedActionParams || Object.keys(slack).length > 0) {
-      body.actionParams = { ...parsedActionParams, ...slack };
+    if (flags.actionParams || Object.keys(slack).length > 0) {
+      body.actionParams = { ...flags.actionParams, ...slack };
     }
-    if (parsedGraphAlert) body.graphAlert = parsedGraphAlert;
-    if (parsedReport) body.report = parsedReport;
+    if (flags.graphAlert) body.graphAlert = flags.graphAlert;
+    if (flags.report) body.report = flags.report;
 
     if (Object.keys(body).length === 0) {
       failSpinner({
@@ -97,14 +65,10 @@ export const updateTriggerCommand = async (
       process.exit(1);
     }
 
-    const response = await langwatchFetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
-      signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
+    const response = await triggerRequest({
+      path: `/${encodeURIComponent(id)}`,
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify(body),
+      body,
     });
 
     if (!response.ok) {
@@ -112,7 +76,7 @@ export const updateTriggerCommand = async (
       process.exit(1);
     }
 
-    const trigger = await response.json() as { id: string; name: string; active: boolean };
+    const trigger: TriggerRecord = await response.json();
     spinner.succeed(`Trigger "${trigger.name}" updated`);
 
     return {

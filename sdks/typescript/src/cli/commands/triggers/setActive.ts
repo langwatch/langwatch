@@ -1,13 +1,10 @@
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
-import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import type { CommandResult } from "../../utils/output";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import type { TriggerRecord } from "./summary";
+import { triggerRequest } from "./triggerRequest";
 
 /**
  * Resume or pause an automation. A report's schedule follows: pausing retires
@@ -21,9 +18,6 @@ export const setTriggerActiveCommand = async ({
   active: boolean;
 }): Promise<CommandResult | void> => {
   await resolveCredentials();
-
-  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = resolveControlPlaneUrl();
   const verb = active ? "enable" : "disable";
 
   const spinner = createSpinner(
@@ -31,33 +25,18 @@ export const setTriggerActiveCommand = async ({
   ).start();
 
   try {
-    const response = await langwatchFetch(
-      `${endpoint}/api/triggers/${encodeURIComponent(id)}/${verb}`,
-      {
-        signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey }),
-        },
-      },
-    );
+    const response = await triggerRequest({
+      path: `/${encodeURIComponent(id)}/${verb}`,
+      method: "POST",
+    });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({
-        spinner,
-        error: new Error(message),
-        action: `${verb} trigger`,
-      });
+      await failSpinnerFromResponse({ spinner, response, action: `${verb} trigger` });
       process.exit(1);
     }
 
-    const trigger = (await response.json()) as {
-      id: string;
-      name: string;
-      active: boolean;
-    };
+    const trigger: Pick<TriggerRecord, "id" | "name" | "active"> =
+      await response.json();
     spinner.succeed(
       `Trigger "${trigger.name}" is now ${trigger.active ? "running" : "paused"}`,
     );

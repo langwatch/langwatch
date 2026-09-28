@@ -39,17 +39,9 @@ async function renderJsonBody({
   };
 }
 
-/**
- * A non-JSON body: whatever the template rendered, byte for byte.
- *
- * There is no parse to validate against and no framework default to fall back
- * to — a JSON envelope is exactly what an endpoint that asked for another type
- * cannot read, and re-sending the unrendered template would post
- * `{{ trigger.name }}` as if it were content. A render failure therefore
- * degrades to an EMPTY body, carrying the same diagnostics the JSON path
- * records, so the author sees what broke and the receiver sees nothing it has
- * to guess at.
- */
+/** A non-JSON body: the render output byte for byte. There is no default to
+ *  fall back to (a JSON envelope is what such an endpoint cannot read), so a
+ *  render failure sends an EMPTY body and keeps the diagnostics. */
 async function renderTextBody({
   template,
   context,
@@ -78,20 +70,10 @@ async function renderTextBody({
   }
 }
 
-/**
- * Renders a webhook automation's body (ADR-040 §2) — the same Liquid engine and
- * contexts Slack/email render against.
- *
- * A JSON content type keeps the Block Kit fall-back discipline: the output
- * must `JSON.parse`, and a render throw or parse failure on the customer's
- * template falls back to the framework default body, with the error captured
- * for the operator. If even the default fails (it shouldn't — it is ours), a
- * minimal static envelope is sent rather than nothing, so a delivery is never
- * silently dropped over a template.
- *
- * Any other content type has no shape to validate and no default to fall back
- * to; see {@link renderTextBody}.
- */
+/** Renders a webhook automation's body (ADR-040 §2). A JSON type must parse:
+ *  a failing custom template falls back to the default body, and a failing
+ *  default to a minimal static envelope, so no delivery is dropped over a
+ *  template. Any other type goes through {@link renderTextBody}. */
 export async function renderWebhookBody({
   template,
   context,

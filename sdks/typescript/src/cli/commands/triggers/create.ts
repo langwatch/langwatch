@@ -1,19 +1,14 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { parseJsonObject } from "./parseJsonObject";
-import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
-import { slackShorthands } from "./slackShorthands";
-import { summariseSlackConnection } from "./summary";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
+import { parseJsonFlags } from "./parseJsonObject";
+import { slackShorthands } from "./slackShorthands";
+import { summariseSlackConnection, type TriggerRecord } from "./summary";
+import { triggerRequest } from "./triggerRequest";
 
 /**
  * Returns the created trigger rather than printing it: the output port renders
@@ -48,61 +43,26 @@ export const createTriggerCommand = async (
     process.exit(1);
   }
 
-  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = resolveControlPlaneUrl();
-
   const spinner = createSpinner(`Creating trigger "${name}"...`).start();
-
-  // Parsed BEFORE the request, in their own narrow guard — the outer catch
-  // must not misread a non-JSON API response as a flag the user never passed.
-  let filters: Record<string, unknown> | undefined;
-  let actionParams: Record<string, unknown> = {};
-  let graphAlert: Record<string, unknown> | undefined;
-  let report: Record<string, unknown> | undefined;
-  try {
-    if (options.filters) {
-      filters = parseJsonObject(options.filters);
-    }
-    if (options.actionParams) {
-      actionParams = parseJsonObject(options.actionParams);
-    }
-    if (options.graphAlert) graphAlert = parseJsonObject(options.graphAlert);
-    if (options.report) report = parseJsonObject(options.report);
-  } catch {
-    failSpinner({
-      spinner,
-      error: commandValidationError(
-        "--filters, --action-params, --graph-alert and --report must each be a JSON object",
-      ),
-      action: "create trigger",
-    });
-    process.exit(1);
-  }
-  // Shorthands for the Slack fields; everything else goes in `--action-params`.
+  const flags = parseJsonFlags({ options, spinner, action: "create trigger" });
   // `--slack-webhook` is legacy: the server stores the URL as a connection.
-  Object.assign(actionParams, slackShorthands(options));
+  const actionParams = { ...flags.actionParams, ...slackShorthands(options) };
 
   try {
-
-    const response = await langwatchFetch(`${endpoint}/api/triggers`, {
-      signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
+    const response = await triggerRequest({
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify({
+      body: {
         name,
         action: options.action,
-        filters,
+        filters: flags.filters,
         filterQuery: options.filterQuery,
         actionParams,
         message: options.message,
         alertType: options.alertType,
         customGraphId: options.customGraphId,
-        graphAlert,
-        report,
-      }),
+        graphAlert: flags.graphAlert,
+        report: flags.report,
+      },
     });
 
     if (!response.ok) {
@@ -110,7 +70,7 @@ export const createTriggerCommand = async (
       process.exit(1);
     }
 
-    const trigger = await response.json() as { id: string; name: string; action: string; kind?: string; actionParams?: Record<string, unknown>; platformUrl?: string };
+    const trigger: TriggerRecord = await response.json();
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     return {

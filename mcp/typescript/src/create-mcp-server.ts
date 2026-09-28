@@ -1676,10 +1676,10 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           return { content: [{ type: "text", text: `Error: ${boundParams.message}` }] };
         }
       }
-      let filters: Record<string, unknown> | undefined;
-      if (params.filters) {
-        try { filters = JSON.parse(params.filters) as Record<string, unknown>; }
-        catch { return { content: [{ type: "text", text: "Error: filters must be valid JSON" }] }; }
+      const { parseJsonObject } = await import("./tools/create-trigger.js");
+      const filters = params.filters ? parseJsonObject(params.filters) : undefined;
+      if (params.filters && !filters) {
+        return { content: [{ type: "text", text: "Error: filters must be a JSON object" }] };
       }
       const trigger = await updateTrigger({ ...params, filters });
       return { content: [{ type: "text", text: `Trigger "${trigger.name}" updated (active: ${trigger.active}).` }] };

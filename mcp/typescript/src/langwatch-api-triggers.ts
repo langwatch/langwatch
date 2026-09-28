@@ -40,22 +40,16 @@ export interface CreateTriggerInput {
   notificationCadence?: NotificationCadence;
 }
 
-export interface UpdateTriggerInput {
+/** `actionParams` replaces the delivery configuration as a whole; a credential
+ *  sent back as `[redacted]` keeps the stored one. The channel cannot change. */
+type UpdateTriggerInput = Partial<
+  Omit<CreateTriggerInput, "action" | "customGraphId" | "message" | "alertType">
+> & {
   id: string;
-  name?: string;
   active?: boolean;
   message?: string | null;
   alertType?: TriggerAlertType | null;
-  filters?: Record<string, unknown>;
-  filterQuery?: string | null;
-  /** Replaces the delivery configuration as a whole. A credential sent back as
-   *  `[redacted]` keeps the stored one. The channel itself cannot change. */
-  actionParams?: TriggerActionParams;
-  graphAlert?: GraphAlertRule;
-  report?: ReportRule;
-  templates?: TriggerTemplates;
-  notificationCadence?: NotificationCadence;
-}
+};
 
 export async function listTriggers(): Promise<Trigger[]> {
   return z
@@ -86,23 +80,6 @@ export async function updateTrigger({
 }: UpdateTriggerInput): Promise<Trigger> {
   return triggerSchema.parse(
     await makeRequest("PATCH", `/api/triggers/${encodeURIComponent(id)}`, data),
-  );
-}
-
-/** Resume or pause an automation. A report's schedule follows: pausing retires
- *  its calendar entry and resuming puts it back. */
-export async function setTriggerActive({
-  id,
-  active,
-}: {
-  id: string;
-  active: boolean;
-}): Promise<Trigger> {
-  return triggerSchema.parse(
-    await makeRequest(
-      "POST",
-      `/api/triggers/${encodeURIComponent(id)}/${active ? "enable" : "disable"}`,
-    ),
   );
 }
 

@@ -6,6 +6,26 @@
 
 type Loose = Record<string, unknown> | null | undefined;
 
+/** An automation as `/api/triggers` answers with it, credentials redacted. */
+export interface TriggerRecord {
+  id: string;
+  name: string;
+  action: string;
+  actionParams: Record<string, unknown>;
+  filters: Record<string, unknown>;
+  filterQuery?: string | null;
+  kind?: string;
+  customGraphId?: string | null;
+  graphAlert?: Loose;
+  report?: Loose;
+  active: boolean;
+  message: string | null;
+  alertType: string | null;
+  createdAt: string;
+  updatedAt: string;
+  platformUrl?: string;
+}
+
 const OPERATOR_SYMBOLS: Record<string, string> = {
   gt: ">",
   gte: ">=",
@@ -76,28 +96,6 @@ export function summariseRule(trigger: {
   );
 }
 
-export interface FirePage<T> {
-  fires: T[];
-  nextCursor: string | null;
-}
-
-/** Reads a fires page: the paginated `{ fires, nextCursor }` body, or the bare
- *  array an older deployment answers with (which has no next page). */
-export function readFirePage<T>(body: unknown): FirePage<T> {
-  if (Array.isArray(body)) return { fires: body, nextCursor: null };
-  if (isRecord(body)) {
-    const list = Array.isArray(body.fires)
-      ? body.fires
-      : Array.isArray(body.data)
-        ? body.data
-        : [];
-    const nextCursor =
-      typeof body.nextCursor === "string" ? body.nextCursor : null;
-    return { fires: list, nextCursor };
-  }
-  return { fires: [], nextCursor: null };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

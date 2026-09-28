@@ -7,7 +7,6 @@ import {
   createTrigger,
   getTrigger,
   listTriggerFires,
-  setTriggerActive,
   testFireTrigger,
   updateTrigger,
 } from "../langwatch-api-triggers.js";
@@ -354,22 +353,6 @@ describe("Feature: an agent configures an automation over MCP", () => {
       expect(request).toHaveBeenCalledWith(
         "GET",
         "/api/triggers/trigger-1/fires?limit=5",
-      );
-    });
-
-    it("resumes and pauses it through the verb that says so", async () => {
-      request.mockResolvedValue(TRIGGER);
-
-      await setTriggerActive({ id: "trigger-1", active: false });
-      expect(request).toHaveBeenCalledWith(
-        "POST",
-        "/api/triggers/trigger-1/disable",
-      );
-
-      await setTriggerActive({ id: "trigger-1", active: true });
-      expect(request).toHaveBeenCalledWith(
-        "POST",
-        "/api/triggers/trigger-1/enable",
       );
     });
   });

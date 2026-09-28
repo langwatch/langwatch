@@ -1,16 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
-import { summariseGraphAlert, summariseReport, summariseSlackConnection } from "./summary";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
+import {
+  summariseGraphAlert,
+  summariseReport,
+  summariseSlackConnection,
+  type TriggerRecord,
+} from "./summary";
+import { triggerRequest } from "./triggerRequest";
 
 /**
  * Returns the trigger rather than printing it: the output port renders it in
@@ -23,40 +23,17 @@ export const getTriggerCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = resolveControlPlaneUrl();
-
   const spinner = createSpinner(`Fetching trigger "${id}"...`).start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
-      signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
-      headers: buildAuthHeaders({ apiKey }),
-    });
+    const response = await triggerRequest({ path: `/${encodeURIComponent(id)}` });
 
     if (!response.ok) {
       await failSpinnerFromResponse({ spinner, response, action: `fetch trigger "${id}"` });
       process.exit(1);
     }
 
-    const trigger = await response.json() as {
-      id: string;
-      name: string;
-      action: string;
-      actionParams: Record<string, unknown>;
-      filters: Record<string, unknown>;
-      filterQuery?: string | null;
-      kind?: string;
-      customGraphId?: string | null;
-      graphAlert?: Record<string, unknown> | null;
-      report?: Record<string, unknown> | null;
-      active: boolean;
-      message: string | null;
-      alertType: string | null;
-      createdAt: string;
-      updatedAt: string;
-      platformUrl?: string;
-    };
+    const trigger: TriggerRecord = await response.json();
 
     spinner.succeed(`Found trigger "${trigger.name}"`);
 

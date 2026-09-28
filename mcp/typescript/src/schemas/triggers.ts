@@ -1,41 +1,23 @@
 import { z } from "zod";
 
-/**
- * The shape of an automation on the `/api/triggers` surface, stated once for
- * both the tool registrations and the API client.
- *
- * A hand-copied interface is how a field the API returns stops reaching the
- * caller, and how a field it never returns starts being promised to one — so
- * every type here is inferred from the schema next to it rather than written
- * out a second time.
- */
+/** The shape of an automation on the `/api/triggers` surface, stated once for
+ *  the tool registrations and the API client. Every type is inferred from its
+ *  schema, so what the API sends and what a caller reads cannot drift. */
 
-/** What a delivery credential reads as. Sending it back on an update keeps the
- *  stored value, so a read-modify-write never overwrites a live credential. */
-export const REDACTED_CREDENTIAL = "[redacted]";
-
-export const TRIGGER_ACTIONS = [
+export const triggerActionSchema = z.enum([
   "SEND_EMAIL",
   "SEND_SLACK_MESSAGE",
   "SEND_WEBHOOK",
   "ADD_TO_DATASET",
   "ADD_TO_ANNOTATION_QUEUE",
-] as const;
-
-export const triggerActionSchema = z.enum(TRIGGER_ACTIONS);
+]);
 export const alertTypeSchema = z.enum(["CRITICAL", "WARNING", "INFO"]);
 
-/**
- * The delivery configuration each channel reads. Stated per channel so an
- * agent can configure one without a round trip: an email automation states its
- * recipients, a Slack one its destination, a webhook one where the request
- * goes.
- *
- * Each member carries the fields it was given rather than dropping the ones it
- * does not declare — every Slack field is optional, so a webhook destination
- * would otherwise read as an empty Slack one and be sent as nothing.
- */
-export const emailActionParamsSchema = z
+/** The delivery configuration each channel reads, stated per channel so an agent
+ *  can configure one without a round trip. Each passes unknown fields through:
+ *  every Slack field is optional, so a webhook destination would otherwise read
+ *  as an empty Slack one and be sent as nothing. */
+const emailActionParamsSchema = z
   .object({
     members: z
       .array(z.string())
@@ -44,7 +26,7 @@ export const emailActionParamsSchema = z
   })
   .passthrough();
 
-export const slackActionParamsSchema = z
+const slackActionParamsSchema = z
   .object({
     slackIntegrationId: z
       .string()
@@ -85,7 +67,7 @@ export const slackActionParamsSchema = z
   })
   .passthrough();
 
-export const webhookActionParamsSchema = z
+const webhookActionParamsSchema = z
   .object({
     url: z
       .string()
@@ -112,7 +94,7 @@ export const webhookActionParamsSchema = z
   })
   .passthrough();
 
-export const datasetActionParamsSchema = z
+const datasetActionParamsSchema = z
   .object({
     datasetId: z
       .string()
@@ -126,7 +108,7 @@ export const datasetActionParamsSchema = z
   })
   .passthrough();
 
-export const annotationQueueActionParamsSchema = z
+const annotationQueueActionParamsSchema = z
   .object({
     annotators: z
       .array(z.object({ id: z.string(), name: z.string() }))
@@ -143,37 +125,28 @@ export const actionParamsSchema = z.union([
   annotationQueueActionParamsSchema,
 ]);
 
-/**
- * The write-side Slack shape. Every field on the read schema is optional so a
- * redacted read round-trips, but a WRITE with no destination cannot deliver,
- * so refuse it here with the field named. A connection decides its own kind;
- * without one, the legacy fields need a webhook URL, or a channel and a token.
- */
+/** The write-side Slack shape: a redacted read round-trips, but a WRITE with no
+ *  destination cannot deliver, so it is refused with the field named. A
+ *  connection decides its own kind; without one, the legacy fields need a
+ *  webhook URL, or a channel and a token. */
 const slackActionParamsWriteSchema = slackActionParamsSchema.superRefine(
   (params, ctx) => {
     const delivery = params.slackDelivery ?? "webhook";
-    if (params.slackIntegrationId) {
-      if (delivery === "bot" && !params.slackChannelId) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["slackChannelId"],
-          message: "a bot connection needs the channel to post in",
-        });
-      }
-      return;
+    if (delivery === "bot" && !params.slackChannelId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["slackChannelId"],
+        message: params.slackIntegrationId
+          ? "a bot connection needs the channel to post in"
+          : "bot delivery needs the channel to post in",
+      });
     }
+    if (params.slackIntegrationId) return;
     if (delivery === "webhook" && !params.slackWebhook) {
       ctx.addIssue({
         code: "custom",
         path: ["slackIntegrationId"],
         message: "name the Slack connection to post through",
-      });
-    }
-    if (delivery === "bot" && !params.slackChannelId) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["slackChannelId"],
-        message: "bot delivery needs the channel to post in",
       });
     }
     if (
@@ -200,15 +173,10 @@ const ACTION_PARAMS_SCHEMA_BY_ACTION: Partial<
   ADD_TO_ANNOTATION_QUEUE: annotationQueueActionParamsSchema,
 };
 
-/**
- * The write-side contract the tool description states: `actionParams` is the
- * configuration for the channel named in `action`. The union above stays for
- * tolerant reads, but a WRITE is bound to its channel here — otherwise a
- * `SEND_WEBHOOK` with `{}` (or with email fields) slips through the
- * all-optional Slack shape and is refused server-side with worse words. An
- * action this build does not know validates against the loose union, the
- * same deployment tolerance reads keep.
- */
+/** A WRITE's `actionParams` is bound to the channel named in `action`, or a
+ *  `SEND_WEBHOOK` with `{}` slips through the all-optional Slack shape and is
+ *  refused server-side with worse words. An action this build does not know
+ *  validates against the loose union, the tolerance reads keep. */
 export function validateActionParamsForAction({
   action,
   actionParams,
@@ -270,15 +238,9 @@ export const graphAlertSchema = z
     "The rule an alert fires by. Send it with `customGraphId` and `alertType`.",
   );
 
-/**
- * What a scheduled report renders and when it sends.
- *
- * Structured, like `graphAlert`, rather than a loose record: an agent that
- * cannot see the field names has to guess them, and a guess here is a 422. The
- * version tolerance this file keeps for READS does not apply to a write — the
- * server validates the payload against this same shape either way, so a loose
- * one would only move the rejection later and describe it worse.
- */
+/** What a scheduled report renders and when. Structured, not a loose record: an
+ *  agent that cannot see the field names guesses them, and a guess is a 422.
+ *  The server holds a write to this same shape, so looseness only delays it. */
 export const reportSchema = z
   .object({
     source: z
@@ -371,7 +333,7 @@ export const triggerSchema = z
   })
   .passthrough();
 
-export const triggerFireSchema = z
+const triggerFireSchema = z
   .object({
     id: z.string(),
     triggerId: z.string(),
@@ -416,7 +378,6 @@ export const deletedTriggerSchema = z.object({
 });
 
 export type Trigger = z.infer<typeof triggerSchema>;
-export type TriggerFire = z.infer<typeof triggerFireSchema>;
 export type TriggerFirePage = z.infer<typeof triggerFirePageSchema>;
 export type TestFireResult = z.infer<typeof testFireResultSchema>;
 export type TriggerAction = z.infer<typeof triggerActionSchema>;

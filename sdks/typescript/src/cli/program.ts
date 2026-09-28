@@ -113,6 +113,9 @@ const TARGET_FLAG_HELP =
 const RUN_NAME_FLAG_HELP =
   "The run plan to file this run under. A name already in use takes this configuration and the run joins that plan's history; a new name creates the plan. Left out, the platform derives one from what the run covers and what it runs against.";
 
+const TRIGGER_FILTERS_HELP =
+  "Trace conditions as a JSON object. Unkeyed fields take a list, e.g. {\"traces.error\":[\"true\"]}. Keyed fields nest the key: evaluations.* keys by MONITOR id (the `id` from `langwatch monitor list`, not the evaluator id), e.g. {\"evaluations.passed\":{\"<monitorId>\":[\"false\"]}}; metadata.value keys by metadata key, e.g. {\"metadata.value\":{\"<key>\":[\"true\"]}}. A keyed field sent flat is refused";
+
 const REPEAT_FLAG_HELP =
   "How many times to run each scenario against each target, from 1 to 5.";
 
@@ -4105,7 +4108,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description("Create a new trigger (automation)")
       .requiredOption("--action <action>", "Trigger action: SEND_EMAIL, ADD_TO_DATASET, ADD_TO_ANNOTATION_QUEUE, SEND_SLACK_MESSAGE, SEND_WEBHOOK")
       .option("--action-params <json>", "Delivery configuration for the chosen action, as JSON")
-      .option("--filters <json>", "Trace conditions as a JSON object. Unkeyed fields take a list, e.g. {\"traces.error\":[\"true\"]}. Keyed fields nest the key: evaluations.* keys by MONITOR id (the `id` from `langwatch monitor list`, not the evaluator id), e.g. {\"evaluations.passed\":{\"<monitorId>\":[\"false\"]}}; metadata.value keys by metadata key, e.g. {\"metadata.value\":{\"<key>\":[\"true\"]}}. A keyed field sent flat is refused")
+      .option("--filters <json>", TRIGGER_FILTERS_HELP)
       .option("--filter-query <query>", "Trace query in the syntax the traces view uses, e.g. status:error. Supersedes --filters")
       .option("--custom-graph-id <id>", "Make this an alert on that graph. Needs --graph-alert and --alert-type")
       .option("--graph-alert <json>", "The rule an alert fires by, as JSON: {\"seriesName\":\"...\",\"operator\":\"gt|gte|lt|lte|eq\",\"threshold\":0.5,\"timePeriod\":5} (minutes: 1, 5, 15, 30, 60, 1440)")
@@ -4130,7 +4133,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--active <boolean>", "Enable or disable the trigger (true/false)")
       .option("--message <text>", "New alert message")
       .option("--alert-type <type>", "New alert severity")
-      .option("--filters <json>", "Trace conditions as a JSON object. Unkeyed fields take a list, e.g. {\"traces.error\":[\"true\"]}. Keyed fields nest the key: evaluations.* keys by MONITOR id (the `id` from `langwatch monitor list`, not the evaluator id), e.g. {\"evaluations.passed\":{\"<monitorId>\":[\"false\"]}}; metadata.value keys by metadata key, e.g. {\"metadata.value\":{\"<key>\":[\"true\"]}}. A keyed field sent flat is refused")
+      .option("--filters <json>", TRIGGER_FILTERS_HELP)
       .option("--filter-query <query>", "Trace query in the syntax the traces view uses. An empty value clears it")
       .option("--graph-alert <json>", "The rule an alert fires by, as JSON (only for an automation that is already an alert)")
       .option("--report <json>", "What a report renders and when, as JSON (only for an automation that is already a report)")
@@ -4144,27 +4147,21 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  emitsResult(
-    triggerCmd
-      .command("enable <id>")
-      .description("Resume a paused trigger")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
-      const { setTriggerActiveCommand: impl } = await import("./commands/triggers/setActive.js");
-      return impl({ id, active: true });
-    },
-  );
-
-  emitsResult(
-    triggerCmd
-      .command("disable <id>")
-      .description("Pause a trigger")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
-      const { setTriggerActiveCommand: impl } = await import("./commands/triggers/setActive.js");
-      return impl({ id, active: false });
-    },
-  );
+  for (const [verb, description, active] of [
+    ["enable", "Resume a paused trigger", true],
+    ["disable", "Pause a trigger", false],
+  ] as const) {
+    emitsResult(
+      triggerCmd
+        .command(`${verb} <id>`)
+        .description(description)
+        .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+      async (id: string) => {
+        const { setTriggerActiveCommand: impl } = await import("./commands/triggers/setActive.js");
+        return impl({ id, active });
+      },
+    );
+  }
 
   emitsResult(
     triggerCmd

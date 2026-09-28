@@ -4,17 +4,10 @@ import type { PreviewEnvelope, SharedDef } from "./types";
 
 export const WEBHOOK_METHODS = ["POST", "PUT", "PATCH"] as const;
 
-/**
- * The `Content-Type` a delivery announces, and with it how the body is
- * treated: a JSON type renders Liquid into JSON and re-serializes it (the
- * original and still the default), any other type sends whatever the template
- * rendered, byte for byte — plain prose, a form encoding, XML, a
- * line-oriented log format. One field decides both, so the announced type and
- * the body's treatment can never disagree. It has its own field (and
- * `content-type` stays reserved among the custom header rows) because custom
- * header values are secrets — encrypted at rest and never echoed back — and
- * the declared type must survive a round-trip into the editor.
- */
+/** The `Content-Type` a delivery announces also decides the body's treatment:
+ *  JSON is rendered, parsed and re-serialized; any other type is sent as it
+ *  renders. It is its own field, not a header row, because header values are
+ *  secrets that never read back, and the type must round-trip to the editor. */
 export const DEFAULT_WEBHOOK_CONTENT_TYPE = "application/json";
 
 /** JSON semantics — the parse check, the re-serialize, the framework default
@@ -188,10 +181,8 @@ export const webhookActionParamsSchema = z.object({
    *  no envelope worth guessing at. Stored inside `actionParams` (not a
    *  Trigger template column) — ADR-040 §1. */
   bodyTemplate: z.string().nullable().default(null),
-  /** The `Content-Type` the delivery announces (see
-   *  {@link DEFAULT_WEBHOOK_CONTENT_TYPE} above for how it also decides the
-   *  body's treatment). Absent or empty means JSON, which is what every
-   *  webhook automation was before the field existed. */
+  /** See {@link DEFAULT_WEBHOOK_CONTENT_TYPE}. Absent or empty means JSON,
+   *  what every webhook automation was before the field existed. */
   contentType: z
     .string()
     .trim()

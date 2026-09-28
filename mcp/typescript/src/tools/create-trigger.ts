@@ -1,34 +1,17 @@
-import { createTrigger as apiCreateTrigger } from "../langwatch-api-triggers.js";
 import {
-  type GraphAlertRule,
-  type NotificationCadence,
-  type ReportRule,
-  type TriggerAction,
-  type TriggerActionParams,
-  type TriggerAlertType,
-  type TriggerTemplates,
-  validateActionParamsForAction,
-} from "../schemas/triggers.js";
+  createTrigger as apiCreateTrigger,
+  type CreateTriggerInput,
+} from "../langwatch-api-triggers.js";
+import { validateActionParamsForAction } from "../schemas/triggers.js";
 
 /**
  * Handles the platform_create_trigger MCP tool invocation. `actionParams` is
  * optional, as it was before it was stated per channel: omitted sends `{}` and
  * the server decides; stated, it is checked against the channel first.
  */
-export async function handleCreateTrigger(params: {
-  name: string;
-  action: TriggerAction;
-  actionParams?: TriggerActionParams;
-  filters?: string;
-  filterQuery?: string;
-  customGraphId?: string;
-  graphAlert?: GraphAlertRule;
-  report?: ReportRule;
-  templates?: TriggerTemplates;
-  notificationCadence?: NotificationCadence;
-  message?: string;
-  alertType?: TriggerAlertType;
-}): Promise<string> {
+export async function handleCreateTrigger(
+  params: Omit<CreateTriggerInput, "filters"> & { filters?: string },
+): Promise<string> {
   if (params.actionParams !== undefined) {
     const verdict = validateActionParamsForAction({
       action: params.action,
@@ -46,7 +29,10 @@ export async function handleCreateTrigger(params: {
   return `Trigger "${trigger.name}" created (ID: ${trigger.id}, Kind: ${trigger.kind ?? "AUTOMATION"}, Action: ${trigger.action}).`;
 }
 
-function parseJsonObject(raw: string): Record<string, unknown> | undefined {
+/** A flag value that must be a JSON object; undefined for anything else. */
+export function parseJsonObject(
+  raw: string,
+): Record<string, unknown> | undefined {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {

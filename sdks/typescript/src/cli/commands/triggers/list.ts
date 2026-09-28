@@ -1,17 +1,12 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
-import { summariseRule } from "./summary";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
+import { summariseRule, type TriggerRecord } from "./summary";
+import { triggerRequest } from "./triggerRequest";
 
 /**
  * Returns the listing rather than printing it: the output port renders it in
@@ -20,34 +15,17 @@ import { langwatchFetch } from "@/internal/http/langwatchFetch";
 export const listTriggersCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = resolveControlPlaneUrl();
-
   const spinner = createSpinner("Fetching triggers...").start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/triggers`, {
-      signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
-      headers: buildAuthHeaders({ apiKey }),
-    });
+    const response = await triggerRequest({});
 
     if (!response.ok) {
       await failSpinnerFromResponse({ spinner, response, action: "fetch triggers" });
       process.exit(1);
     }
 
-    const triggers = await response.json() as Array<{
-      id: string;
-      name: string;
-      action: string;
-      active: boolean;
-      alertType: string | null;
-      kind?: string;
-      filterQuery?: string | null;
-      customGraphId?: string | null;
-      graphAlert?: Record<string, unknown> | null;
-      report?: Record<string, unknown> | null;
-    }>;
+    const triggers: TriggerRecord[] = await response.json();
 
     spinner.succeed(`Found ${triggers.length} trigger${triggers.length !== 1 ? "s" : ""}`);
 

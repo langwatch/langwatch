@@ -4,7 +4,10 @@ import {
   SlackIntegrationKind,
   SlackIntegrationScopeType,
 } from "~/generated/prisma/client";
-import { slackSecretHint } from "../slack-secret-fingerprint";
+import {
+  defaultSlackConnectionName,
+  slackSecretHint,
+} from "../slack-secret-fingerprint";
 
 /**
  * The pure half of `migrateSlackConnections` (ADR-093 §5a): from one
@@ -20,18 +23,14 @@ const storedSlackParamsSchema = z.object({
   slackIntegrationId: z.string().nullish(),
 });
 
-export const SLACK_MIGRATION_SKIP_REASONS = [
-  "archived project",
-  "no secret",
-  "cannot decrypt",
-  "unreadable settings",
-  "ambiguous project connection",
-  "kind conflict",
-  "changed during migration",
-] as const;
-
 export type SlackMigrationSkipReason =
-  (typeof SLACK_MIGRATION_SKIP_REASONS)[number];
+  | "archived project"
+  | "no secret"
+  | "cannot decrypt"
+  | "unreadable settings"
+  | "ambiguous project connection"
+  | "kind conflict"
+  | "changed during migration";
 
 export interface MigrationAutomation {
   id: string;
@@ -119,39 +118,6 @@ export function isLinkedToConnection({
   return parsed.success && !!parsed.data.slackIntegrationId?.trim();
 }
 
-/** The PROJECT-scoped bot connections of one project, the §5 row a tokenless bot posted through. */
-function projectBotConnections({
-  connections,
-  projectId,
-}: {
-  connections: MigrationConnection[];
-  projectId: string;
-}): MigrationConnection[] {
-  return connections.filter(
-    (connection) =>
-      connection.scopeType === SlackIntegrationScopeType.PROJECT &&
-      connection.scopeId === projectId &&
-      connection.kind === SlackIntegrationKind.BOT,
-  );
-}
-
-function ownSecret({
-  kind,
-  secret,
-  fingerprintSecret,
-}: {
-  kind: SlackIntegrationKind;
-  secret: string;
-  fingerprintSecret: Fingerprinter;
-}): Joined {
-  return {
-    outcome: "join",
-    kind,
-    secret,
-    fingerprint: fingerprintSecret({ secret }),
-  };
-}
-
 /** A tokenless bot posted through its project's §5 row, so it joins that row. */
 function joinProjectConnection({
   automation,
@@ -160,10 +126,12 @@ function joinProjectConnection({
   automation: MigrationAutomation;
   connections: MigrationConnection[];
 }): Classified {
-  const projectRows = projectBotConnections({
-    connections,
-    projectId: automation.projectId,
-  });
+  const projectRows = connections.filter(
+    (connection) =>
+      connection.scopeType === SlackIntegrationScopeType.PROJECT &&
+      connection.scopeId === automation.projectId &&
+      connection.kind === SlackIntegrationKind.BOT,
+  );
   const [only] = projectRows;
   if (!only) return { outcome: "skip", reason: "no secret" };
   if (projectRows.length > 1) {
@@ -174,20 +142,6 @@ function joinProjectConnection({
     kind: only.kind,
     fingerprint: only.secretFingerprint,
   };
-}
-
-function decryptOrUndefined({
-  ciphertext,
-  decryptSecret,
-}: {
-  ciphertext: string;
-  decryptSecret: SecretReader;
-}): string | undefined {
-  try {
-    return decryptSecret({ ciphertext }).trim();
-  } catch {
-    return undefined;
-  }
 }
 
 function classify({
@@ -212,23 +166,26 @@ function classify({
   if (isArchived) return { outcome: "skip", reason: "archived project" };
 
   if ((params.slackDelivery ?? "webhook") === "webhook") {
-    const url = params.slackWebhook?.trim();
-    if (!url) return { outcome: "skip", reason: "no secret" };
+    const secret = params.slackWebhook?.trim();
+    if (!secret) return { outcome: "skip", reason: "no secret" };
     const kind = SlackIntegrationKind.INCOMING_WEBHOOK;
-    return ownSecret({ kind, secret: url, fingerprintSecret });
+    const fingerprint = fingerprintSecret({ secret });
+    return { outcome: "join", kind, secret, fingerprint };
   }
 
   if (!params.slackBotToken) {
     return joinProjectConnection({ automation, connections });
   }
-  const token = decryptOrUndefined({
-    ciphertext: params.slackBotToken,
-    decryptSecret,
-  });
-  if (token === undefined) return { outcome: "skip", reason: "cannot decrypt" };
-  if (!token) return joinProjectConnection({ automation, connections });
+  let secret: string;
+  try {
+    secret = decryptSecret({ ciphertext: params.slackBotToken }).trim();
+  } catch {
+    return { outcome: "skip", reason: "cannot decrypt" };
+  }
+  if (!secret) return joinProjectConnection({ automation, connections });
   const kind = SlackIntegrationKind.BOT;
-  return ownSecret({ kind, secret: token, fingerprintSecret });
+  const fingerprint = fingerprintSecret({ secret });
+  return { outcome: "join", kind, secret, fingerprint };
 }
 
 /** One project when every member (and the reused row) sits in it, else the organization. */
@@ -252,18 +209,6 @@ function scopeFor({
     scopeType: SlackIntegrationScopeType.ORGANIZATION,
     scopeId: organizationId,
   };
-}
-
-/** `Slack bot ••••abcd` / `Slack webhook ••••abcd`. */
-export function defaultConnectionName({
-  kind,
-  hint,
-}: {
-  kind: SlackIntegrationKind;
-  hint: string;
-}): string {
-  const noun = kind === SlackIntegrationKind.BOT ? "bot" : "webhook";
-  return `Slack ${noun} ••••${hint}`;
 }
 
 function plannedConnectionFor({
@@ -295,7 +240,7 @@ function plannedConnectionFor({
     secret: group.secret,
     secretFingerprint: group.fingerprint,
     secretHint,
-    name: defaultConnectionName({ kind: group.kind, hint: secretHint }),
+    name: defaultSlackConnectionName({ kind: group.kind, secret: group.secret }),
     kind: group.kind,
     ...scope,
     members: group.members,
