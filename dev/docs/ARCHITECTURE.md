@@ -1188,6 +1188,8 @@ parsing with its own schema at the queue boundary — never `any`, never a rule 
 Per-payload routing (group key, score, coalesce size, dedup id) travels in one reserved `__routing` field on
 the job envelope; `withEvents([])` types a pipeline's events as `never`; a command's lane parse is its only
 validation, handed to `processCommand` (Alex, 2026-09-27).
+A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
+registers with `.on(eventSchema, handler)` (or reads its `.toPayload(schema, map)` view); no cast (Alex, 2026-09-27).
 Per-entity calendar work (a report's cron) is a keyed process manager on its owner's pipeline; the
 eventing `ScheduledJob` scheduler is retired, its table dropped a release after its code (Alex, 2026-09-26).
 An experiment run executes on its pipeline, never in a request: `StartRun` is a command, a process manager
@@ -1202,8 +1204,6 @@ or finishes skipped, so the manager stays pure over counts (Alex, 2026-09-28).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
-A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
-registers with `.on(eventSchema, handler)` (or reads its `.toPayload(schema, map)` view); no cast (Alex, 2026-09-27).
 repositories. The process builds, registers and connects them one at a time in
 the order declared, so a later pipeline's `build` may read senders an earlier
 one's `connect` handed the app. Each still follows the role table below — the
@@ -1674,6 +1674,10 @@ A raw client (Prisma, ClickHouse, ioredis, Stripe) is never cast into a test: it
 lives once in `@langwatch/test-harness`, throwing by name on anything unscripted, and every test
 uses that one (Alex, 2026-09-24). A module class with private members is built for real over its
 memory twins, or reached through its `*Api` with `createApiFixture` — never cast.
+A test proving how code handles a wrong-typed input may cast it, marked `// wrong-typed input: <why>`
+directly above; the marker, not the test's name, excuses that one cast (Alex, 2026-09-27).
+Production code has no marker: a cast only the compiler cannot prove is listed by file and target,
+with its reason, in the stand-in-cast rule's audited boundaries (Alex, 2026-09-28).
 
 The installation test is the same chain as production:
 
@@ -1681,10 +1685,6 @@ The installation test is the same chain as production:
 const runtime = await createApp({ role: "api" }) // no server: nothing to tear down
   .withModules([annotationProcessModule, traceProcessModule, presenceProcessModule])
   .withConfig({ annotation: {}, trace: {}, presence: {} })
-A test proving how code handles a wrong-typed input may cast it, marked `// wrong-typed input: <why>`
-directly above; the marker, not the test's name, excuses that one cast (Alex, 2026-09-27).
-Production code has no marker: a cast only the compiler cannot prove is listed by file and target,
-with its reason, in the stand-in-cast rule's audited boundaries (Alex, 2026-09-28).
   .withStores(memoryStores()) // branded → memory tier everywhere
   .boot();
 
@@ -1808,6 +1808,8 @@ this document; all earlier composition ADRs are historical. When someone
 finds this document teaching something the tree refuses, the fix is a change
 to this file in the same commit as the code — an out-of-date architecture
 document is worse than none, because it reads authoritative.
+`typescript/no-misused-spread` is off in `packages/*/type-tests/**` only, where the spread is what
+the type test asserts (Alex, 2026-09-27).
 
 ## 18. Running work
 
@@ -1815,8 +1817,6 @@ Nx is the workspace task runner (ADR-150). It reads the workspace that
 already exists: projects come from `pnpm-workspace.yaml`, targets from each
 package's `scripts` block. No package carries a `project.json`, no script is
 an Nx executor, and Nx generates nothing — a module is still installed by
-`typescript/no-misused-spread` is off in `packages/*/type-tests/**` only, where the spread is what
-the type test asserts (Alex, 2026-09-27).
 editing `modules/catalogue.json` and running `pnpm generate:modules`. The
 whole configuration is `nx.json` at the root.
 
