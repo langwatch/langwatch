@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { routeOf } from "../route.ts";
+import { routeOf } from "../app.tsx";
 
 describe("routeOf", () => {
   it("reads the landing page, a tenant's page and the account picker off the address", () => {

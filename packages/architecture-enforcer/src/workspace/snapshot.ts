@@ -43,6 +43,14 @@ const APPLICATION_PACKAGES: readonly {
  */
 const STANDALONE_PROGRAMS = new Set(["scenario-child"]);
 
+/** The internal consoles: React bundles their Go owner embeds and serves (ADR-160). */
+const INTERNAL_CONSOLES = new Set(["haven-web", "idpsim-web", "mailsim-web"]);
+
+const isKnownApplicationDirectory = (directory: string) =>
+  APPLICATION_PACKAGES.some(({ path }) => path === directory) ||
+  STANDALONE_PROGRAMS.has(directory) ||
+  INTERNAL_CONSOLES.has(directory);
+
 const ENTERPRISE_COMPOSITION_PACKAGES: readonly {
   role: EnterpriseCompositionRole;
   name: string;
@@ -228,8 +236,7 @@ function discoverApplications(discovery: Discovery): void {
   const applicationsRoot = join(root, "apps");
 
   for (const directory of directories(applicationsRoot)) {
-    if (APPLICATION_PACKAGES.some(({ path }) => path === directory)) continue;
-    if (STANDALONE_PROGRAMS.has(directory)) continue;
+    if (isKnownApplicationDirectory(directory)) continue;
 
     const unexpectedManifest = join(applicationsRoot, directory, "package.json");
     if (!existsSync(unexpectedManifest) || directory === "shared") continue;
@@ -239,7 +246,7 @@ function discoverApplications(discovery: Discovery): void {
       file: unexpectedManifest,
       message: `Unknown application workspace apps/${directory}.`,
       allowed:
-        "The fixed application roots are ui, api, worker, server, and tasks, beside the standalone scenario-child program.",
+        "The fixed application roots are ui, api, worker, server, and tasks, beside the standalone scenario-child program and the internal consoles haven-web, idpsim-web and mailsim-web (ADR-160).",
     });
   }
 
