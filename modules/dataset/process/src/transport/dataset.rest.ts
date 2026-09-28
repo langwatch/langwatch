@@ -126,7 +126,13 @@ export function createDatasetRest(): DatasetRestDeclaration {
         return {
           ...result,
           data: result.data.map((dataset) => ({
-            ...dataset,
+            id: dataset.id,
+            name: dataset.name,
+            slug: dataset.slug,
+            columnTypes: dataset.columnTypes,
+            createdAt: dataset.createdAt,
+            updatedAt: dataset.updatedAt,
+            recordCount: dataset.recordCount,
             platformUrl: datasetUrl(app, project.projectSlug, dataset.id),
           })),
         };

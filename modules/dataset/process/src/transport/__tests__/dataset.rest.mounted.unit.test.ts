@@ -15,8 +15,10 @@ import {
   DatasetNotReadyError,
   MAX_FILE_SIZE_BYTES,
   type DatasetApi,
+  type DatasetSummary,
 } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { completeDatasetApi } from "../../app/__tests__/dataset-api.fake.ts";
 import { createDatasetRest } from "../dataset.rest.ts";
@@ -182,6 +184,52 @@ function multipartBody(fields: Record<string, string>, file?: string) {
 
 describe("the mounted dataset REST family", () => {
   describe("when the project's datasets are listed", () => {
+    it("answers main's fields only, never the storage internals", async () => {
+      const storedRow: DatasetSummary = {
+        ...dataset,
+        columnTypes: [{ name: "input", type: "string" }],
+        projectId: "project-1",
+        archivedAt: null,
+        mapping: null,
+        useS3: true,
+        s3RecordCount: 2,
+        contentLayout: "s3_jsonl",
+        status: "ready",
+        statusError: null,
+        stagingKey: "staging/key",
+        uploadFilename: null,
+        rowCount: 2,
+        sizeBytes: null,
+        chunkCount: 1,
+        chunkOffsets: null,
+        recordCount: 2,
+      };
+      const { send } = mount({
+        listDatasets: vi.fn(async () => ({
+          data: [storedRow],
+          pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
+        })),
+      });
+
+      const response = await send("GET", "/api/dataset");
+      const body = z
+        .object({ data: z.array(z.record(z.string(), z.unknown())) })
+        .parse(await response.json());
+
+      expect(Object.keys(body.data[0] ?? {}).toSorted()).toEqual(
+        [
+          "columnTypes",
+          "createdAt",
+          "id",
+          "name",
+          "platformUrl",
+          "recordCount",
+          "slug",
+          "updatedAt",
+        ].toSorted(),
+      );
+    });
+
     /** @scenario "List datasets with page and limit parameters" */
     it("passes the page window through and links each row into the platform", async () => {
       const { send, stub } = mount();
