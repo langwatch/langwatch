@@ -15,7 +15,6 @@ import { TestCasesTab } from "../../../../sections/agent-testing/cases/test-case
 import { AgentTestingRunDrawer } from "../../../../sections/agent-testing/drawers/agent-testing-run-drawer.tsx";
 import { RunDialog } from "../../../../sections/agent-testing/run/run-dialog.tsx";
 import { useAgentTestingStore } from "../../../../sections/agent-testing/use-agent-testing-store.ts";
-import { ScenarioWorkflowHostBridge } from "../../../../sections/workflow-host-bridge.tsx";
 
 const mockGetRunState = vi.hoisted(() => vi.fn());
 const mockGetScenario = vi.hoisted(() => vi.fn());
@@ -241,15 +240,8 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   }),
 }));
 
-/**
- * The period control the tab draws reads the address through the workflow
- * host, so the bridge this family mounts above the page is part of the
- * harness — not the studio, just the port that control was published against.
- */
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
-    <ScenarioWorkflowHostBridge>{children}</ScenarioWorkflowHostBridge>
-  </ChakraProvider>
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
 /** The run set of the plan a single-scenario run resolves onto. */

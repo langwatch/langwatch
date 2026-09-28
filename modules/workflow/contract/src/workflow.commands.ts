@@ -9,6 +9,8 @@ export const createWorkflowCommandSchema = z.object({
   commitMessage: z.string(),
   publish: z.boolean().optional(),
   authorId: z.string().optional(),
+  /** Stores version one as an autosave that later autosaves update in place; default committed. */
+  autoSaved: z.boolean().optional(),
 });
 
 export const saveWorkflowVersionCommandSchema = z.object({

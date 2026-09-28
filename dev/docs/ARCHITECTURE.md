@@ -1273,6 +1273,17 @@ time** — the api knows the deployment, which is how the browser gets its
 config without a second channel. Absent `dist/` (local dev, Vite owns the
 browser), it serves nothing.
 
+**A screen declares the grant it needs, and the router guards it** (ruled
+2026-09-28). A screen a viewer may be refused names the permission in its
+declaration, `.withScreens({ key: { load, requires: "workflows:view" } })`,
+and `installedModuleScreens` wraps what that loader resolves in
+`withUiPageGuard`, with the shell's one fallback trio, for every module. The
+screen never guards itself and the application names no page. The case that
+forced it: main wrapped the workflows list in
+`withPermissionGuard("workflows:view")`, and the move into
+`modules/workflow/browser` dropped it ("chrome/guard no longer travel"), so a
+viewer without the grant opened the list. specs/ui/ui-page-composition.feature.
+
 Drawers are URL-routed singletons with a navigation stack, opened through the
 host capability, registered through the declaration. One tRPC client for the
 whole browser.

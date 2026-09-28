@@ -34,19 +34,10 @@ import { usePreloadDrawer } from "../../../behavior/use-preload-drawer.ts";
 import { useScenarioTabFollow } from "../../../behavior/use-scenario-tab-follow.ts";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
 import { DashboardLayout } from "../dashboard-layout.tsx";
-import { ScenarioWorkflowHostBridge } from "../workflow-host-bridge.tsx";
 import { ExternalSetDetailPanel } from "./external-set-detail-panel.tsx";
 import { RunHistoryPanel } from "./run-history-panel.tsx";
 import { SuiteDetailPanel, SuiteEmptyState } from "./suite-detail-panel.tsx";
 import { SuiteSidebar } from "./suite-sidebar.tsx";
-
-export default function SimulationsPage() {
-  return (
-    <ScenarioWorkflowHostBridge>
-      <SimulationsBoard />
-    </ScenarioWorkflowHostBridge>
-  );
-}
 
 const expandedPeriodDays = (daysAgo: number): number => {
   if (daysAgo <= 30) return 30;
@@ -54,10 +45,7 @@ const expandedPeriodDays = (daysAgo: number): number => {
   return 365;
 };
 
-/**
- * The period control's host, bridged from this family's own.
- */
-function SimulationsBoard() {
+export default function SimulationsPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, setFlowCallbacks } = useDrawer();
   // The rows open a run's detail and the sidebar opens the run plan editor,

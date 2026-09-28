@@ -5,14 +5,18 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * Tests the monitor application layer over the memory repository.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
   MonitorNotFoundError,
   type MonitorPatchInput,
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
+import { buildMonitorInfrastructure } from "../monitor-composition.build.ts";
 import {
   createMonitorTestApp,
   createMonitorTestRepositories,
@@ -297,6 +301,37 @@ describe("MonitorApp", () => {
       expect(replication.deletedWorkflows).toEqual([
         { workflowId: "workflow-copied", projectId: "project-2" },
       ]);
+    });
+
+    describe("when the process composes its own replication", () => {
+      it("deletes the uncommitted workflow the refused replica copied", async () => {
+        const copied: Evaluator = {
+          id: "evaluator-copied",
+          projectId: "project-2",
+          name: "Toxicity",
+          slug: null,
+          type: "workflow",
+          config: null,
+          workflowId: "workflow-copied",
+          copiedFromEvaluatorId: "evaluator-1",
+          archivedAt: null,
+          createdAt: NOW,
+          updatedAt: NOW,
+        };
+        const deleteUncommitted = vi.fn(async () => undefined);
+        const built = buildMonitorInfrastructure({
+          evaluators: createApiFixture<EvaluatorApi>({ copy: async () => copied }),
+          evaluation: createApiFixture<EvaluationApi>(),
+          workflows: createApiFixture<WorkflowApi>({ deleteUncommitted }),
+        });
+        const { app } = harness({ replication: built.replication });
+
+        await expect(app.copy(copy)).rejects.toMatchObject({ code: "evaluator_not_found" });
+        expect(deleteUncommitted).toHaveBeenCalledWith({
+          workflowId: "workflow-copied",
+          projectId: "project-2",
+        });
+      });
     });
   });
 

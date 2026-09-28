@@ -34,6 +34,12 @@ Feature: Workflow service boundary
     And callers receive portable Workflow contract values
 
   @unit
+  Scenario: A workflow created as an autosave keeps one version across later autosaves
+    Given a workflow created with its first version marked autosaved
+    When a second autosave is written into it
+    Then the first version is updated in place and the workflow still has one version
+
+  @unit
   Scenario: Published version selection is tenant scoped
     Given a workflow with a published version in a project
     When the service resolves its published version

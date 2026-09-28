@@ -13,7 +13,6 @@ import { api } from "../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer.ts";
 import { DashboardLayout } from "../dashboard-layout.tsx";
-import { ScenarioWorkflowHostBridge } from "../workflow-host-bridge.tsx";
 import { AgentTestingHeader } from "./agent-testing-header.tsx";
 import { AgentTestingCaseEditor } from "./cases/agent-testing-case-editor.tsx";
 import { TestCasesTab } from "./cases/test-cases-tab.tsx";
@@ -42,17 +41,6 @@ function useTabCounts(projectId: string) {
 }
 
 export function AgentTestingPage() {
-  return (
-    <ScenarioWorkflowHostBridge>
-      <AgentTestingBoard />
-    </ScenarioWorkflowHostBridge>
-  );
-}
-
-/**
- * The period control's host, bridged from this family's own.
- */
-function AgentTestingBoard() {
   const { project } = useOrganizationTeamProject();
   // The rows open a run's detail; fetch it while the person reads the page.
   usePreloadDrawer("scenarioRunDetail");

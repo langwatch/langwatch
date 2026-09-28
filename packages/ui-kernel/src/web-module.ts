@@ -35,6 +35,8 @@ export type WebScreen = Readonly<{
   label?: string;
   icon?: unknown;
   load?: () => Promise<unknown>;
+  /** The grant the shell's router checks before this screen renders (§10). */
+  requires?: string;
 }>;
 
 export type WebScreens = Readonly<Record<string, WebScreen>>;

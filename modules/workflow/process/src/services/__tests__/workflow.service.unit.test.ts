@@ -299,6 +299,52 @@ describe("WorkflowService", () => {
     });
   });
 
+  describe("when a workflow is created with its first version autosaved", () => {
+    /** @scenario "A workflow created as an autosave keeps one version across later autosaves" */
+    it("stores version 1 as the autosave the next autosave updates in place", async () => {
+      const repository = new FakeWorkflowRepository();
+      const workflowService = service(repository);
+      const dsl = { version: "7", name: "Draft 1 - Workflow", nodes: [], edges: [] };
+
+      const created = await workflowService.create({
+        projectId: "project_1",
+        dsl,
+        commitMessage: "Autosaved",
+        autoSaved: true,
+      });
+      await workflowService.saveVersion({
+        projectId: "project_1",
+        workflowId: created.workflow.id,
+        dsl: { ...dsl, nodes: [{ id: "end" }] },
+        commitMessage: "Autosaved",
+        autoSaved: true,
+      });
+
+      const versions = await repository.findVersions({
+        workflowId: created.workflow.id,
+        projectId: "project_1",
+      });
+      expect(created.version).toMatchObject({ version: "1", autoSaved: true });
+      expect(versions).toHaveLength(1);
+      expect(versions[0]).toMatchObject({
+        id: created.version.id,
+        dsl: { nodes: [{ id: "end" }] },
+      });
+    });
+
+    it("stays committed under the graph's own version when autoSaved is not asked for", async () => {
+      const workflowService = service(new FakeWorkflowRepository());
+
+      const created = await workflowService.create({
+        projectId: "project_1",
+        dsl: { version: "7", name: "Triage", nodes: [], edges: [] },
+        commitMessage: "first",
+      });
+
+      expect(created.version).toMatchObject({ version: "7", autoSaved: false });
+    });
+  });
+
   /** @scenario "Published version selection is tenant scoped" */
   it("does not resolve a published version for another project", async () => {
     const repository = new FakeWorkflowRepository();

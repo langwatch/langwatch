@@ -3,6 +3,7 @@
  * @vitest-environment jsdom
  */
 
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   BrowserUiDocumentTitle,
   UiCapabilityContextProvider,
@@ -19,7 +20,9 @@ import {
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { installedModuleScreens } from "../ui-module-screens.ts";
 import { resolveUiPageAccess, withUiPageGuard } from "../ui-page-guard.tsx";
+import { defineWebModule } from "../web-module.ts";
 
 class SilentNavigation extends UiNavigation {
   navigate(): void {}
@@ -269,5 +272,53 @@ describe("given a page behind a flag and a permission", () => {
         "release_ui_governance_billed_cost_enabled",
       ]);
     });
+  });
+});
+
+describe("given a module declaring a screen that requires a grant", () => {
+  const probeWeb = defineWebModule("probe").withScreens({
+    "pages/[project]/probe": {
+      load: async () => ({ default: Page }),
+      requires: "workflows:view",
+    },
+    "pages/[project]/open": { load: async () => ({ default: Page }) },
+  });
+
+  async function renderDeclared(page: string, permissions: readonly string[]) {
+    const load = installedModuleScreens([probeWeb]).loaders[page];
+    if (!load) throw new Error(`no loader for ${page}`);
+    const { default: Screen } = await load();
+
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <UiCapabilityContextProvider
+          value={capabilities(new AnsweringSession({ flags: {}, permissions, settled: true }))}
+        >
+          <Screen />
+        </UiCapabilityContextProvider>
+      </ChakraProvider>,
+    );
+  }
+
+  /** @scenario "A declared screen that requires a grant refuses a viewer without it" */
+  it("shows the missing grant instead of the screen to a viewer without it", async () => {
+    await renderDeclared("pages/[project]/probe", []);
+
+    expect(screen.getByText("Missing permission: workflows:view")).toBeDefined();
+    expect(screen.queryByText("the page")).toBeNull();
+  });
+
+  /** @scenario "A declared screen that requires a grant opens for a viewer holding it" */
+  it("opens the screen for a viewer holding the grant", async () => {
+    await renderDeclared("pages/[project]/probe", ["workflows:view"]);
+
+    expect(screen.getByText("the page")).toBeDefined();
+  });
+
+  /** @scenario "A declared screen that requires nothing mounts no guard" */
+  it("mounts no guard around a screen that requires nothing", async () => {
+    const load = installedModuleScreens([probeWeb]).loaders["pages/[project]/open"];
+
+    await expect(load?.()).resolves.toEqual({ default: Page });
   });
 });

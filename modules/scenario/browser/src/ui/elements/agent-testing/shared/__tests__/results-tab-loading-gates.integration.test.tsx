@@ -10,7 +10,6 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ResultsTab } from "../../../../sections/agent-testing/results/results-tab.tsx";
-import { ScenarioWorkflowHostBridge } from "../../../../sections/workflow-host-bridge.tsx";
 
 const routerState = vi.hoisted(() => ({
   query: {} as Record<string, string | string[] | undefined>,
@@ -111,15 +110,8 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   }),
 }));
 
-/**
- * The period control the tab draws reads the address through the workflow
- * host, so the bridge this family mounts above the page is part of the
- * harness — not the studio, just the port that control was published against.
- */
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
-    <ScenarioWorkflowHostBridge>{children}</ScenarioWorkflowHostBridge>
-  </ChakraProvider>
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
 describe("the Results tab loading gate", () => {

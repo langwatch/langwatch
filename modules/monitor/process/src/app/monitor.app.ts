@@ -41,6 +41,7 @@ import {
   type MonitorSummary,
 } from "@langwatch/monitor-contract";
 import { nowInstant } from "@langwatch/time";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { MonitorRepositories } from "../repositories/monitor.repositories.ts";
 import { monitorPlatformUrl } from "../rules/monitor-platform-url.rules.ts";
@@ -101,6 +102,8 @@ export class MonitorApp implements MonitorApi {
     evaluators: EvaluatorApi,
     /** Seven-day trend, read through the evaluation application. */
     evaluation: EvaluationApi,
+    /** Removes the workflow a monitor copy replicated when the replica is refused. */
+    workflows: WorkflowApi,
   };
   static readonly reads = ["monitor", "publicBaseUrl"] as const;
 
@@ -143,6 +146,7 @@ export class MonitorApp implements MonitorApi {
       buildMonitorInfrastructure({
         evaluators: setup.dependencies.evaluators,
         evaluation: setup.dependencies.evaluation,
+        workflows: setup.dependencies.workflows,
       });
 
     return MonitorApp.fromInfrastructure({

@@ -6,8 +6,8 @@ import { analyticsComparisonWindow } from "@langwatch/analytics-contract";
 import type { EvaluationApi, MonitorPerformanceQuery } from "@langwatch/evaluation-contract";
 import { newEvaluatorId, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import { generate } from "@langwatch/ksuid";
-import { MonitorCapabilityUnavailableError } from "@langwatch/monitor-contract";
 import { Temporal } from "@langwatch/time";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type {
   MonitorAppInfrastructure,
@@ -30,28 +30,6 @@ class ProcessMonitorEvaluators implements MonitorEvaluator {
 }
 
 /**
- * Deleting a workflow a copy created, on a process that composed no
- * replication of the graph behind it. Refuses by name — an orphaned workflow
- * left behind by a failed monitor insert cannot be cleaned up here.
- */
-type MonitorWorkflowCleanup = Readonly<{
-  deleteReplicatedWorkflow(
-    input: Readonly<{ workflowId: string; projectId: string }>,
-  ): Promise<void>;
-}>;
-
-function unreplicatedEvaluatorWorkflows(): MonitorWorkflowCleanup {
-  return {
-    deleteReplicatedWorkflow: () =>
-      Promise.reject(
-        new MonitorCapabilityUnavailableError(
-          "evaluator workflow replication, so a monitor's copied workflow cannot be cleaned up",
-        ),
-      ),
-  };
-}
-
-/**
  * The evaluator copy, over `EvaluatorApi.copy` — the SAME replication
  * `evaluators.copy` itself runs, so a monitor's copy and an evaluator's own
  * copy replicate a workflow evaluator's graph identically.
@@ -59,7 +37,7 @@ function unreplicatedEvaluatorWorkflows(): MonitorWorkflowCleanup {
 class ProcessMonitorReplication implements MonitorReplicationReader {
   constructor(
     private readonly evaluators: EvaluatorApi,
-    private readonly workflows: MonitorWorkflowCleanup,
+    private readonly workflows: Pick<WorkflowApi, "deleteUncommitted">,
   ) {}
 
   async copyEvaluatorToProject(input: {
@@ -80,7 +58,7 @@ class ProcessMonitorReplication implements MonitorReplicationReader {
   }
 
   deleteReplicatedWorkflow(input: { workflowId: string; projectId: string }) {
-    return this.workflows.deleteReplicatedWorkflow(input);
+    return this.workflows.deleteUncommitted(input);
   }
 }
 
@@ -123,13 +101,14 @@ const MONITOR_KSUID_RESOURCE = "monitor";
 export function buildMonitorInfrastructure(input: {
   evaluators: EvaluatorApi;
   evaluation: Pick<EvaluationApi, "getMonitorPerformance">;
+  workflows: Pick<WorkflowApi, "deleteUncommitted">;
 }): MonitorAppInfrastructure {
-  const { evaluators, evaluation } = input;
+  const { evaluators, evaluation, workflows } = input;
 
   return {
     evaluators: new ProcessMonitorEvaluators(evaluators),
     performance: composeMonitorPerformance(evaluation),
-    replication: new ProcessMonitorReplication(evaluators, unreplicatedEvaluatorWorkflows()),
+    replication: new ProcessMonitorReplication(evaluators, workflows),
     generateId: () => generate(MONITOR_KSUID_RESOURCE).toString(),
   };
 }

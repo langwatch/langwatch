@@ -36,3 +36,21 @@ Feature: One page helper composes every routed page
     Given the page asks for a feature flag and no grant
     When the page loader resolves
     Then the guard is mounted around the screen
+
+  @integration
+  Scenario: A declared screen that requires a grant refuses a viewer without it
+    Given a module declares a screen that requires "workflows:view"
+    When a viewer without that grant opens it
+    Then the router shows the missing permission instead of the screen
+
+  @integration
+  Scenario: A declared screen that requires a grant opens for a viewer holding it
+    Given a module declares a screen that requires "workflows:view"
+    When a viewer holding that grant opens it
+    Then the screen renders
+
+  @integration
+  Scenario: A declared screen that requires nothing mounts no guard
+    Given a module declares a screen with no grant
+    When the router loads it
+    Then the screen is mounted as the module declared it

@@ -13,7 +13,6 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { targetColor } from "../../../../elements/agent-testing/shared/target-colors.ts";
-import { ScenarioWorkflowHostBridge } from "../../../workflow-host-bridge.tsx";
 import { TestCasesTab } from "../../cases/test-cases-tab.tsx";
 import { useAgentTestingStore } from "../../use-agent-testing-store.ts";
 import { COMPARE_HINT } from "../compare-agents-section.tsx";
@@ -164,9 +163,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
-    <ScenarioWorkflowHostBridge>{children}</ScenarioWorkflowHostBridge>
-  </ChakraProvider>
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
 const ONLINE_AGENT = {
