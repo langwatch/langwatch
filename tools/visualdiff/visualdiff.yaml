@@ -15,10 +15,15 @@ settle:
   deadlineMillis: 20000
 
 # Ids the run seeds deterministically (seed.go), filling a route's {name}.
+# team and actor are the seeded identity's, the same on main and the branch.
+# {dataset} {experiment} {monitor} {graph} {virtualKey} {budget} need no line:
+# each stack's seed fills them with its own ids (seed_entities.go).
 fixtures:
   trace: trace_visualdiff_0
   openTab: spans
   span: trace_visualdiff_0_llm
+  team: local-dev-team
+  actor: admin@mail.langwatch.localhost
 
 # Every route either ref declares is rendered above or excluded here with a
 # reason; anything else is an `uncovered` finding (coverage.go).
@@ -27,6 +32,16 @@ coverage:
   excluded:
     - route: /dev/error-test
       reason: a development page that throws on purpose to exercise the error boundary
+    - route: /{slug}/studio/{workflow}
+      reason: no REST route creates a workflow on main (/api/workflows lists, reads, patches, deletes and evaluates one; /api/agents only links an existing workflowId), so neither side has one to open
+    - route: /{slug}/chat/{workflow}
+      reason: needs a published workflow, which no REST route creates on main (see /{slug}/studio/{workflow})
+    - route: /share/{id}
+      reason: a share token is minted only by the signed-in share tRPC mutation; no REST route creates one on main
+    - route: /ops/projections/{runId}
+      reason: a run id exists only once an operator starts a projection replay, which rebuilds the stack's projections under the capture
+    - route: /governance/inventory/{id}
+      reason: declared by the candidate only, and the ingestion source it opens is created only through the governance tRPC; no REST route creates one on either ref
 
 routes:
   - /{slug}
@@ -167,6 +182,18 @@ routes:
   - /{slug}/messages/{trace}
   - /{slug}/messages/{trace}/{openTab}
   - /{slug}/messages/{trace}/{openTab}/{span}
+  - /{slug}/datasets/{dataset}
+  - /{slug}/experiments/workbench/{experiment}
+  - /{slug}/evaluations/wizard/{experiment}
+  - /{slug}/evaluations/{monitor}/edit
+  - /{slug}/evaluations/{monitor}/edit/choose
+  - /{slug}/analytics/custom/{graph}
+  - /gateway/virtual-keys/{virtualKey}
+  - /gateway/budgets/{budget}
+  - /settings/teams/{team}
+  - /onboarding/{team}/project
+  - /governance/teams/{team}
+  - /governance/users/{actor}
   - /onboarding
   - /onboarding/product
   - /onboarding/welcome

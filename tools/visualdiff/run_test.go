@@ -244,7 +244,7 @@ func TestSeedPostsTracesAndADatasetThroughTheCandidateAPI(t *testing.T) {
 	if len(result.TraceIDs) != 2 || !result.DatasetOK {
 		t.Fatalf("result: %+v", result)
 	}
-	if len(calls) != 3 || calls[0].path != "/api/collector" || calls[2].path != "/api/dataset" {
+	if len(calls) < 3 || calls[0].path != "/api/collector" || calls[2].path != "/api/dataset" {
 		t.Fatalf("calls: %+v", calls)
 	}
 	for _, call := range calls {

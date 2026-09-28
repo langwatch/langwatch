@@ -65,21 +65,24 @@ type SeedRequest struct {
 	TraceCount int
 }
 
-// SeedResult reports what the seeding step created.
+// SeedResult reports what the seeding step created. Fixtures are the ids
+// this stack generated for the dynamic routes' entities; Warnings name the
+// entities it could not create.
 type SeedResult struct {
 	TraceIDs  []string
 	DatasetOK bool
+	Fixtures  map[string]string
+	Warnings  []string
 }
 
 // SeedTraceIDPrefix names the traces a run creates, so a flow can open one by
 // name and a person can tell a fixture from real data at a glance.
 const SeedTraceIDPrefix = "trace_visualdiff_"
 
-// Seed posts the run's fixtures through the candidate API: traces on
-// /api/collector and one dataset on /api/dataset. Both stacks read the same
-// database, so seeding once through the candidate is enough — and doing it
-// through the candidate rather than the base means the fixtures exist in the
-// shape the newer code writes.
+// Seed posts the run's fixtures through one stack's API: traces on
+// /api/collector, one dataset on /api/dataset, then the entities the dynamic
+// routes open (seed_entities.go). The ids the stack generates come back as
+// Fixtures, since each stack that owns a database generates its own.
 func Seed(ctx context.Context, request SeedRequest) (SeedResult, error) {
 	client := request.Client
 	if client == nil {
@@ -103,10 +106,19 @@ func Seed(ctx context.Context, request SeedRequest) (SeedResult, error) {
 			{"name": "expected_output", "type": "string"},
 		},
 	}
-	if err := post(ctx, client, postSpec{url: request.APIURL + "/api/dataset", key: request.Identity.ProjectKey, body: dataset}); err != nil {
+	answer, err := postReading(ctx, client, postSpec{url: request.APIURL + "/api/dataset", key: request.Identity.ProjectKey, body: dataset})
+	if err != nil {
 		return result, fmt.Errorf("seed dataset: %w", err)
 	}
 	result.DatasetOK = true
+	result.Fixtures, result.Warnings = seedEntities(ctx, entityRequest{
+		client: client, apiURL: request.APIURL, key: request.Identity.ProjectKey, seeds: entitySeeds,
+	})
+	if id, err := StringAt(answer, "id"); err == nil {
+		result.Fixtures[FixtureDataset] = id
+	} else {
+		result.Warnings = append(result.Warnings, fmt.Sprintf("%s not seeded: /api/dataset answered without id: %v", FixtureDataset, err))
+	}
 	return result, nil
 }
 
@@ -147,25 +159,30 @@ type postSpec struct {
 }
 
 func post(ctx context.Context, client *http.Client, spec postSpec) error {
+	_, err := postReading(ctx, client, spec)
+	return err
+}
+
+// postReading posts one fixture and returns the answer's body.
+func postReading(ctx context.Context, client *http.Client, spec postSpec) ([]byte, error) {
 	encoded, err := json.Marshal(spec.body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	outgoing, err := http.NewRequestWithContext(ctx, http.MethodPost, spec.url, bytes.NewReader(encoded))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	outgoing.Header.Set("Content-Type", "application/json")
 	outgoing.Header.Set("X-Auth-Token", spec.key)
 	response, err := client.Do(outgoing)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer response.Body.Close()
 	if response.StatusCode >= 300 {
 		detail, _ := io.ReadAll(io.LimitReader(response.Body, 400))
-		return fmt.Errorf("%s answered %d: %s", spec.url, response.StatusCode, bytes.TrimSpace(detail))
+		return nil, fmt.Errorf("%s answered %d: %s", spec.url, response.StatusCode, bytes.TrimSpace(detail))
 	}
-	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
-	return nil
+	return io.ReadAll(io.LimitReader(response.Body, 1<<20))
 }

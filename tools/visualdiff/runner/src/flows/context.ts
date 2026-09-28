@@ -1,7 +1,7 @@
 import type { Locator, Page } from "playwright";
 
 import type { Side } from "../capture";
-import type { Credential } from "../protocol";
+import type { Credential, Plan } from "../protocol";
 
 export interface ActionContext {
   side: Side;
@@ -55,6 +55,18 @@ export const fillPath = ({
     (filled, [name, value]) => filled.replaceAll(`{${name}}`, value),
     path.replaceAll("{slug}", slug),
   );
+
+/** sideFixtures are the plan's static fixtures with one side's seeded ids over them. */
+export const sideFixtures = ({
+  plan,
+  side,
+}: {
+  plan: Pick<Plan, "fixtures" | "sides">;
+  side: string;
+}): Record<string, string> => ({
+  ...plan.fixtures,
+  ...plan.sides.find((candidate) => candidate.name === side)?.fixtures,
+});
 
 export const argument = ({
   context,

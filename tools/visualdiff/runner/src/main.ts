@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { openSide, captureMessage, type Side } from "./capture";
 import { diffScreenshots } from "./diff";
 import { signIn } from "./flows/actions";
-import { fillPath } from "./flows/context";
+import { fillPath, sideFixtures } from "./flows/context";
 import { resolveAction } from "./flows/registry";
 import { Pairing, readReplay, safeName } from "./pairing";
 import {
@@ -45,8 +45,9 @@ const captureRoutes = async ({
 }): Promise<void> => {
   const probes: ShellProbe[] = [];
   const probing = plan.failFast === true && side.name === "candidate";
+  const fixtures = sideFixtures({ plan, side: side.name });
   for (const route of plan.routes) {
-    const path = fillPath({ path: route, slug: plan.slug, fixtures: plan.fixtures });
+    const path = fillPath({ path: route, slug: plan.slug, fixtures });
     const file = join(plan.outDir, side.name, "routes", `${safeName(path)}.png`);
     const startedAt = Date.now();
     let error = "";

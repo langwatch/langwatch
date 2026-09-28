@@ -348,6 +348,8 @@ type session struct {
 	// havenSlugs are the stacks this run started, in order. Teardown destroys
 	// these and nothing else.
 	havenSlugs []string
+	// sideFixtures are the ids each side's seed generated, by stack name.
+	sideFixtures map[string]map[string]string
 	// logOffsets are each started stack's log size at its `haven up`, so a
 	// fatal line an earlier up of the same slug wrote is never read as this one's.
 	logOffsets map[string]int64
@@ -440,36 +442,65 @@ func (run *session) editionStacks() []EditionStack {
 
 // seed posts the fixtures. Haven stacks each own their database, so every
 // live one is seeded; the port-based stacks share one, seeded once through
-// the candidate so the rows are in the shape the newer code writes.
+// the candidate so the rows are in the shape the newer code writes. The ids
+// each side generated are kept in the marker, so a resumed run renders them.
 func (run *session) seed(ctx context.Context) error {
 	options, deps := run.request.Options, run.request.Deps
 	marker := filepath.Join(options.RunDir, "seeded")
-	if _, err := os.Stat(marker); err == nil {
+	if recorded, err := os.ReadFile(marker); err == nil {
 		fmt.Fprintln(run.streams.Err, "seed: this run's stacks are already seeded")
+		run.sideFixtures = ReadSeededMarker(recorded)
 		return nil
 	}
-	if err := run.seedStacks(ctx, options, deps); err != nil {
+	fixtures, err := run.seedStacks(ctx, options, deps)
+	if err != nil {
 		return err
 	}
+	run.sideFixtures = fixtures
 	if err := os.MkdirAll(options.RunDir, 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(marker, nil, 0o600)
+	encoded, err := json.Marshal(fixtures)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(marker, encoded, 0o600)
 }
 
-// seedStacks posts the fixtures to each stack that owns a database.
-func (run *session) seedStacks(ctx context.Context, options Options, deps Deps) error {
+// seedStacks posts the fixtures to each stack that owns a database and
+// returns each side's seeded ids. A shared database gives both sides the
+// candidate's.
+func (run *session) seedStacks(ctx context.Context, options Options, deps Deps) (map[string]map[string]string, error) {
 	stacks := []*Stack{&run.plan.Candidate}
 	if options.UseHaven {
 		stacks = run.liveStacks()
 	}
+	fixtures := map[string]map[string]string{}
 	for _, stack := range stacks {
 		seed := SeedRequest{APIURL: stack.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount}
-		if _, err := deps.Seed(ctx, seed); err != nil {
-			return fmt.Errorf("seed %s: %w", stack.Name, err)
+		result, err := deps.Seed(ctx, seed)
+		if err != nil {
+			return nil, fmt.Errorf("seed %s: %w", stack.Name, err)
 		}
+		for _, warning := range result.Warnings {
+			fmt.Fprintf(run.streams.Err, "seed %s: %s\n", stack.Name, warning)
+		}
+		fixtures[stack.Name] = result.Fixtures
 	}
-	return nil
+	if !options.UseHaven {
+		fixtures[run.plan.Base.Name] = fixtures[run.plan.Candidate.Name]
+	}
+	return fixtures, nil
+}
+
+// ReadSeededMarker reads the per-side fixtures a seed recorded. A marker an
+// older run left empty reads as no fixtures.
+func ReadSeededMarker(recorded []byte) map[string]map[string]string {
+	fixtures := map[string]map[string]string{}
+	if len(recorded) > 0 {
+		_ = json.Unmarshal(recorded, &fixtures)
+	}
+	return fixtures
 }
 
 // captureEditions seeds once, then runs one capture pass per edition on the
@@ -539,7 +570,7 @@ func (run *session) cacheBaseline(baseline Baseline, stream RunnerStream) {
 func (run *session) capture(ctx context.Context, edition Edition, baseline Baseline) (RunnerStream, error) {
 	options, config, deps := run.request.Options, run.request.Config, run.request.Deps
 	plan := run.plan
-	base := RunnerSide{Name: "base", BaseURL: plan.Base.URL()}
+	base := RunnerSide{Name: "base", BaseURL: plan.Base.URL(), Fixtures: run.sideFixtures[plan.Base.Name]}
 	if baseline.Cached {
 		base = RunnerSide{Name: "base", Replay: baseline.CapturesPath()}
 		fmt.Fprintf(run.streams.Err, "%s: base replayed from %s\n", edition, baseline.Dir)
@@ -547,7 +578,7 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 	runnerPlan := RunnerPlan{
 		Viewport:   options.Viewport,
 		Settle:     config.Settle,
-		Sides:      []RunnerSide{base, {Name: "candidate", BaseURL: plan.Candidate.URL()}},
+		Sides:      []RunnerSide{base, {Name: "candidate", BaseURL: plan.Candidate.URL(), Fixtures: run.sideFixtures[plan.Candidate.Name]}},
 		OutDir:     filepath.Join(options.RunDir, "shots", string(edition)),
 		Slug:       options.Identity.Slug,
 		Routes:     config.Routes,

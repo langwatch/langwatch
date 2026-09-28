@@ -81,6 +81,27 @@ Feature: visualdiff catches regressions and reports its own coverage
       Then the trace route is covered and the dataset route is uncovered
 
     @unit
+    Scenario: Each stack seeds the entities its dynamic routes open and keeps its own ids
+      Given a stack that answers the dataset, experiment, evaluator, monitor, graph, virtual key and budget REST routes
+      When the run seeds that stack
+      Then each entity's id the stack generated fills that side's route placeholder
+      And the monitor is posted with the seeded evaluator's id and the budget with the seeded virtual key's id
+
+    @unit
+    Scenario: An entity a stack refuses is a warning, not a dead run
+      Given a stack that refuses the evaluator
+      When the run seeds that stack
+      Then the seed still succeeds with the other entities' ids
+      And a warning names the monitor as not seeded because the evaluator was not
+
+    @unit
+    Scenario: A side renders the ids its own seed generated, and a resumed run keeps them
+      Given the seed generated a dataset id
+      When the run hands the runner its plan
+      Then that side's fixtures carry the dataset id over the static fixtures
+      And the seeded marker records the ids, so a resumed run renders the same ones
+
+    @unit
     Scenario: A candidate screen's declared path wins over its key
       Given a screen keyed "pages/governance/inventory.enterprise" declaring path "/governance/inventory"
       Then its pattern is "/governance/inventory"

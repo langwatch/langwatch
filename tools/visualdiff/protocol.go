@@ -144,4 +144,7 @@ type RunnerSide struct {
 	Name    string `json:"name"`
 	BaseURL string `json:"baseUrl"`
 	Replay  string `json:"replay,omitempty"`
+	// Fixtures are the ids this side's seed generated; they fill a route's
+	// {name} over the plan's static fixtures.
+	Fixtures map[string]string `json:"fixtures,omitempty"`
 }

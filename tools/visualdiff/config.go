@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -155,12 +156,12 @@ func (config *Config) validateFlows() error {
 
 var placeholder = regexp.MustCompile(`\{([^}]+)\}`)
 
-// validateRoutes refuses a placeholder no fixture fills and an exclusion
+// validateRoutes refuses a placeholder no fixture, static or seeded, fills and an exclusion
 // with no reason: an unexplained gap is the thing coverage exists to stop.
 func (config *Config) validateRoutes() error {
 	for _, route := range config.Routes {
 		for _, match := range placeholder.FindAllStringSubmatch(route, -1) {
-			if _, ok := config.Fixtures[match[1]]; !ok && match[1] != "slug" {
+			if _, ok := config.Fixtures[match[1]]; !ok && match[1] != "slug" && !slices.Contains(SeededFixtureNames, match[1]) {
 				return fmt.Errorf("route %s: no fixture fills {%s}", route, match[1])
 			}
 		}

@@ -31,6 +31,8 @@ export interface PlanSide {
   baseUrl: string;
   /** replay names a cached captures.jsonl this side is read from instead of rendered. */
   replay?: string;
+  /** fixtures are the ids this side's seed generated; they win over the plan's. */
+  fixtures?: Record<string, string>;
 }
 
 export interface Credential {
