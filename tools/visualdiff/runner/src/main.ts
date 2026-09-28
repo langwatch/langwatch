@@ -5,6 +5,7 @@ import { openSide, captureMessage, type Side } from "./capture";
 import { diffScreenshots } from "./diff";
 import { signIn } from "./flows/actions";
 import { fillPath, sideFixtures } from "./flows/context";
+import { declinePasskeyOffer } from "./flows/primitives";
 import { resolveAction } from "./flows/registry";
 import { Pairing, readReplay, safeName } from "./pairing";
 import {
@@ -167,6 +168,8 @@ const signInSide = async ({ plan, side }: { plan: Plan; side: Side }): Promise<v
     );
     await side.waitUntilQuiet();
     if (failure === "" && !new URL(side.page.url()).pathname.startsWith("/auth/")) {
+      await declinePasskeyOffer(side.page);
+      await side.waitUntilQuiet();
       side.drain();
       return;
     }
