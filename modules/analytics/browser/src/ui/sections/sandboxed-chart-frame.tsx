@@ -31,8 +31,9 @@ export interface SandboxedChartFrameProps {
   code: string;
   executeQuery: ChartFrameExecuteQuery;
   /**
-   * Initial host-supplied dashboard context (time window, granularity,
-   * theme, ids); later changes are pushed as `lw:dashboard-context-change`.
+   * Host-supplied dashboard context (time window, granularity, theme, ids);
+   * changes are pushed as `lw:dashboard-context-change`, except a theme change,
+   * which remounts the frame because widgets read `LW.theme` once.
    */
   dashboardContext: ChartFrameDashboardContext;
   /** Author-declared parameter defaults, delivered once on `lw:init`. */
@@ -99,22 +100,23 @@ export function SandboxedChartFrame({
   onLogRef.current = onLog;
   const onNavigateRef = useRef(onNavigate);
   onNavigateRef.current = onNavigate;
-  const initialDashboardContextRef = useRef(dashboardContext);
+  const dashboardContextRef = useRef(dashboardContext);
+  dashboardContextRef.current = dashboardContext;
+  const { theme } = dashboardContext;
   const paramsRef = useRef(params);
   paramsRef.current = params;
   const bridgeRef = useRef<FrameBridge | null>(null);
 
-  // generation and codeGeneration re-key the frame; dashboardContext/params are
-  // deliberately not dependencies (initial values only — dashboardContext
-  // updates travel as lw:dashboard-context-change; params has no live update
-  // path yet).
+  // generation, codeGeneration and theme re-key the frame; the rest of
+  // dashboardContext travels as lw:dashboard-context-change, and params has
+  // no live update path yet.
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
     const bridge = FrameBridgeSession.create({
       iframe,
       executeQuery: (args) => executeQueryRef.current(args),
-      dashboardContext: initialDashboardContextRef.current,
+      dashboardContext: dashboardContextRef.current,
       params: paramsRef.current,
       source: codeRef.current,
       onLog: (entry) => onLogRef.current(entry),
@@ -128,11 +130,10 @@ export function SandboxedChartFrame({
       bridgeRef.current = null;
       bridge.dispose();
     };
-  }, [generation, codeGeneration, noteTornDown, noteFrameMounted]);
+  }, [generation, codeGeneration, theme, noteTornDown, noteFrameMounted]);
 
   // Push dashboard context updates into the live frame without re-mounting it.
   useEffect(() => {
-    initialDashboardContextRef.current = dashboardContext;
     bridgeRef.current?.postDashboardContextChange(dashboardContext);
   }, [dashboardContext]);
 
@@ -163,7 +164,7 @@ export function SandboxedChartFrame({
   return (
     <Box overflow="hidden">
       <iframe
-        key={`${generation}:${codeGeneration}`}
+        key={`${generation}:${codeGeneration}:${theme}`}
         ref={iframeRef}
         sandbox="allow-scripts"
         title="Custom chart"
@@ -171,6 +172,9 @@ export function SandboxedChartFrame({
           width: "100%",
           border: "none",
           display: "block",
+          // The frame document declares no color-scheme; an iframe whose scheme
+          // differs from it gets an opaque canvas, white behind a dark card.
+          colorScheme: "light",
           height: `${Math.max(
             CHART_FRAME_MIN_HEIGHT_PX,
             Math.min(Math.min(CHART_FRAME_MAX_HEIGHT_PX, maxHeight), height),

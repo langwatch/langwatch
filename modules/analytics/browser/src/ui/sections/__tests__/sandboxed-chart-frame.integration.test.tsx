@@ -28,12 +28,12 @@ const dashboardContext = {
   theme: "light" as const,
 };
 
-const ui = (code: string) => (
-  <DesignSystemProvider forcedTheme="light">
+const ui = (code: string, theme: "light" | "dark" = "light") => (
+  <ChakraProvider value={defaultSystem}>
     <SandboxedChartFrame
       code={code}
       executeQuery={vi.fn()}
-      dashboardContext={dashboardContext}
+      dashboardContext={{ ...dashboardContext, theme }}
       onLog={vi.fn()}
     />
   </DesignSystemProvider>
@@ -68,6 +68,21 @@ describe("given a sandboxed chart frame", () => {
 
       expect(second).not.toBe(first);
       expect(bridgeMock).toHaveBeenLastCalledWith(expect.objectContaining({ source: "B" }));
+    });
+  });
+
+  describe("when the host theme changes", () => {
+    it("remounts the iframe and re-inits the bridge with the new theme", () => {
+      const { container, rerender } = render(ui("A", "light"));
+      const first = container.querySelector("iframe");
+
+      rerender(ui("A", "dark"));
+      const second = container.querySelector("iframe");
+
+      expect(second).not.toBe(first);
+      expect(bridgeMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ dashboardContext: expect.objectContaining({ theme: "dark" }) }),
+      );
     });
   });
 });
