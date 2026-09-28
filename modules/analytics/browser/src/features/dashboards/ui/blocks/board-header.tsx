@@ -4,9 +4,8 @@
  * on the second. Without `onRename`/`onDescribe` the board is read-only.
  */
 
-import { Box, Button, HStack, IconButton, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, IconButton, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { DashboardVisibility } from "@langwatch/dashboard-contract";
-import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Building2, Gauge, type LucideIcon, Pencil, Plus, Star, Users } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -30,7 +29,7 @@ export function BoardHeader({
   onDescribe,
   onAddChart,
   periodControl,
-  visibilityControl,
+  shareControl,
 }: {
   name: string;
   isDefault: boolean;
@@ -41,8 +40,8 @@ export function BoardHeader({
   onDescribe?: (description: string) => void;
   onAddChart: () => void;
   periodControl: ReactNode;
-  /** The share control; the Flight Deck has none. */
-  visibilityControl?: ReactNode;
+  /** The share icon: the visibility menu on a member's board, a copy-link on the Flight Deck. */
+  shareControl: ReactNode;
 }) {
   return (
     <VStack align="stretch" gap={2} marginBottom={5}>
@@ -70,8 +69,8 @@ export function BoardHeader({
           )}
           {visibility && <SharedChip visibility={visibility} />}
         </HStack>
-        <HStack gap={2} flexShrink={0}>
-          {visibilityControl}
+        <HStack gap={3} flexShrink={0}>
+          {shareControl}
           <Button
             variant="outline"
             height={8}
@@ -143,9 +142,10 @@ function BoardTitle({ name, onRename }: { name: string; onRename?: (name: string
 
   return (
     <>
-      <PageLayout.Heading truncate fontWeight="semibold" letterSpacing="tight">
+      {/* The reference's 19px board title, a step under the standard page heading. */}
+      <Heading as="h1" truncate fontSize="19px" fontWeight="semibold" letterSpacing="tight">
         {name}
-      </PageLayout.Heading>
+      </Heading>
       {onRename && (
         <IconButton
           aria-label="Rename dashboard"

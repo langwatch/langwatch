@@ -56,6 +56,30 @@ export const CHART_COLORS = {
   grid: "var(--chakra-colors-border)",
 } as const;
 
+/** The prototype's fixed ramp slots: a headline entity keeps its hue on every chart. */
+const FIXED_RAMP_SLOTS: Readonly<Record<string, number>> = {
+  "gpt-5": 0,
+  "claude-sonnet-4.5": 1,
+  "llama-4-70b": 2,
+  "gemini-2.5-pro": 3,
+  "claude-opus-4.5": 4,
+  "gpt-5-mini": 5,
+};
+
+/** A ranked row's hue: its fixed slot when it has one, otherwise its rank's. */
+export function rampColor({ label, index }: { label: string; index: number }): string {
+  const slot = FIXED_RAMP_SLOTS[label] ?? index;
+  return CHART_COLORS.ramp[slot % CHART_COLORS.ramp.length] ?? CHART_COLORS.primary;
+}
+
+/**
+ * The plot's size: fixed on the Flight Deck, and growing to fill the card on
+ * a member's board, where the grid sets the card's height.
+ */
+function plotSize({ fill, height }: { fill: boolean; height: string }) {
+  return fill ? { flex: 1, minHeight: height } : { height };
+}
+
 const AXIS_TICK = {
   fontSize: 10.5,
   fontFamily: "var(--chakra-fonts-mono)",
@@ -118,6 +142,8 @@ export interface ChartViewProps {
   readonly rows: BlockRows;
   readonly unit: BlockUnit;
   readonly granularitySeconds: number;
+  /** Grow the plot to the card's height rather than keep its fixed one. */
+  readonly fill?: boolean;
 }
 
 function LegendItem({
@@ -156,7 +182,7 @@ function byBucket(rows: readonly BlockRow[], granularitySeconds: number): Map<st
 }
 
 /** Every numeric column after `bucket` becomes one line. */
-export function LineView({ rows, unit, granularitySeconds }: ChartViewProps) {
+export function LineView({ rows, unit, granularitySeconds, fill = false }: ChartViewProps) {
   const answer = rows.main ?? [];
   const seriesKeys = Object.keys(answer[0] ?? {}).filter((key) => key !== "bucket");
   const data = answer.map((row) => ({
@@ -164,7 +190,7 @@ export function LineView({ rows, unit, granularitySeconds }: ChartViewProps) {
     ...Object.fromEntries(seriesKeys.map((key) => [key, rowNumber(row, key)])),
   }));
   return (
-    <Box height="220px">
+    <Box {...plotSize({ fill, height: "220px" })}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
@@ -180,7 +206,7 @@ export function LineView({ rows, unit, granularitySeconds }: ChartViewProps) {
             tick={AXIS_TICK}
             tickLine={false}
             axisLine={false}
-            width={52}
+            width="auto"
             tickFormatter={(value: number) => formatValue({ value, unit })}
           />
           <Tooltip
@@ -242,7 +268,7 @@ export function RankingList({ rows, unit }: { rows: readonly BlockRow[]; unit: B
                 left={0}
                 borderRadius="4px"
                 opacity={0.8}
-                background={CHART_COLORS.ramp[index % CHART_COLORS.ramp.length]}
+                background={rampColor({ label: rowText(row, labelKey), index })}
                 width={`${(value / max) * 100}%`}
               />
             </Box>
@@ -267,7 +293,7 @@ export function RankingView({ rows, unit }: ChartViewProps) {
 }
 
 /** Bars of throughput, a p95 latency line and a low error-rate ribbon on one time axis. */
-export function ThroughputView({ rows, granularitySeconds }: ChartViewProps) {
+export function ThroughputView({ rows, granularitySeconds, fill = false }: ChartViewProps) {
   const data = (rows.main ?? []).map((row) => ({
     x: formatBucket({ value: row.bucket, granularitySeconds }),
     throughput: rowNumber(row, "throughput"),
@@ -276,13 +302,13 @@ export function ThroughputView({ rows, granularitySeconds }: ChartViewProps) {
   }));
   const maxRate = Math.max(0.01, ...data.map((point) => point.errorRate));
   return (
-    <VStack align="stretch" gap={0}>
+    <VStack align="stretch" gap={0} flex={1}>
       <Legend>
         <LegendItem color={CHART_COLORS.primary} label="throughput" />
         <LegendItem color={CHART_COLORS.accent} label="p95 latency" />
         <LegendItem color={CHART_COLORS.danger} label="error rate" />
       </Legend>
-      <Box height="256px">
+      <Box {...plotSize({ fill, height: "256px" })}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
@@ -299,7 +325,7 @@ export function ThroughputView({ rows, granularitySeconds }: ChartViewProps) {
               tick={AXIS_TICK}
               tickLine={false}
               axisLine={false}
-              width={44}
+              width="auto"
               tickFormatter={formatCount}
             />
             <YAxis
@@ -308,10 +334,11 @@ export function ThroughputView({ rows, granularitySeconds }: ChartViewProps) {
               tick={AXIS_TICK}
               tickLine={false}
               axisLine={false}
-              width={48}
+              width="auto"
               tickFormatter={formatMs}
             />
-            <YAxis yAxisId="rate" hide domain={[0, maxRate * 4]} />
+            {/* Zero width: hidden, it still takes its 60px and pushes the labels out. */}
+            <YAxis yAxisId="rate" hide width={0} domain={[0, maxRate * 4]} />
             <Tooltip
               cursor={TOOLTIP_CURSOR}
               content={
@@ -362,7 +389,7 @@ export function ThroughputView({ rows, granularitySeconds }: ChartViewProps) {
 }
 
 /** Evaluator pass rate against the trace error rate, both as shares of the same buckets. */
-export function QualityView({ rows, granularitySeconds }: ChartViewProps) {
+export function QualityView({ rows, granularitySeconds, fill = false }: ChartViewProps) {
   const errors = byBucket(rows.errorRate ?? [], granularitySeconds);
   const data = (rows.passRate ?? []).map((row) => {
     const x = formatBucket({ value: row.bucket, granularitySeconds });
@@ -373,12 +400,12 @@ export function QualityView({ rows, granularitySeconds }: ChartViewProps) {
     };
   });
   return (
-    <VStack align="stretch" gap={0}>
+    <VStack align="stretch" gap={0} flex={1}>
       <Legend>
         <LegendItem color={CHART_COLORS.accent} label="evaluator pass rate" />
         <LegendItem color={CHART_COLORS.danger} label="error rate" dashed />
       </Legend>
-      <Box height="160px">
+      <Box {...plotSize({ fill, height: "160px" })}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
@@ -394,7 +421,7 @@ export function QualityView({ rows, granularitySeconds }: ChartViewProps) {
               tick={AXIS_TICK}
               tickLine={false}
               axisLine={false}
-              width={40}
+              width="auto"
               domain={[0, 1]}
               tickFormatter={(value: number) => formatRatio(value, 0)}
             />
@@ -436,7 +463,7 @@ export function QualityView({ rows, granularitySeconds }: ChartViewProps) {
 }
 
 /** Thumbs totals, then the positive share over time. */
-export function FeedbackView({ rows, granularitySeconds }: ChartViewProps) {
+export function FeedbackView({ rows, granularitySeconds, fill = false }: ChartViewProps) {
   const summary = rows.summary?.[0];
   const up = rowNumber(summary, "thumbs_up");
   const down = rowNumber(summary, "thumbs_down");
@@ -445,7 +472,7 @@ export function FeedbackView({ rows, granularitySeconds }: ChartViewProps) {
     positive: rowNumber(row, "positive_rate"),
   }));
   return (
-    <VStack align="stretch" gap={0}>
+    <VStack align="stretch" gap={0} flex={1}>
       <HStack gap={4} marginBottom={3}>
         <Text fontSize="22px" fontWeight="semibold" fontVariantNumeric="tabular-nums">
           {formatRatio(up + down > 0 ? up / (up + down) : 0, 0)}
@@ -460,7 +487,7 @@ export function FeedbackView({ rows, granularitySeconds }: ChartViewProps) {
       <Legend>
         <LegendItem color={CHART_COLORS.ramp[4]} label="positive feedback rate" dashed />
       </Legend>
-      <Box height="128px">
+      <Box {...plotSize({ fill, height: "128px" })}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
@@ -476,7 +503,7 @@ export function FeedbackView({ rows, granularitySeconds }: ChartViewProps) {
               tick={AXIS_TICK}
               tickLine={false}
               axisLine={false}
-              width={40}
+              width="auto"
               domain={[0, 1]}
               tickFormatter={(value: number) => formatRatio(value, 0)}
             />

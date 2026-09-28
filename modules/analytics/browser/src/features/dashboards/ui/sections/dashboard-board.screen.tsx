@@ -22,6 +22,7 @@ import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
 import { dashboardsPath, FLIGHT_DECK } from "../../model/boards.ts";
 import { AddBlockCard, BlankBoard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
+import { BoardLinkButton } from "../blocks/board-link-button.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { BoardVisibilityControl } from "../blocks/board-visibility-control.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
@@ -47,6 +48,7 @@ function BoardPage({
       marginX="auto"
       paddingX={8}
       paddingY={6}
+      lineHeight="1.45"
     >
       {header}
       <Box as="section" aria-label={areaLabel} minHeight="240px">
@@ -84,6 +86,7 @@ function FlightDeckBoard() {
           description={FLIGHT_DECK.description}
           onAddChart={picker.open}
           periodControl={control}
+          shareControl={<BoardLinkButton dashboardId={FLIGHT_DECK.id} />}
         />
       }
     >
@@ -130,7 +133,7 @@ function OwnBoard({ board }: { board: SavedBoard }) {
           onDescribe={saveDescription}
           onAddChart={picker.open}
           periodControl={control}
-          visibilityControl={
+          shareControl={
             <BoardVisibilityControl
               visibility={visibility.visibility}
               canChange={visibility.canChange}

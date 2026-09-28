@@ -45,10 +45,10 @@ export function BoardPeriodControl({
           variant="outline"
           aria-label="Period"
           title="Time range & grain"
-          height="auto"
+          height="26px"
           minWidth={0}
           paddingX={2.5}
-          paddingY={1}
+          paddingY={0}
           gap={1.5}
           borderRadius="lg"
           borderColor="border"
