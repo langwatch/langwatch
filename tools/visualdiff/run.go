@@ -829,6 +829,12 @@ func StartStack(ctx context.Context, stack Stack, logDir string) (func(), error)
 	return stop, nil
 }
 
+// laneLogName names a lane's log file. actions/upload-artifact refuses a
+// colon in a file name, and pnpm scripts are named like dev:app.
+func laneLogName(stackName, script string) string {
+	return stackName + "-" + strings.ReplaceAll(script, ":", "-") + ".log"
+}
+
 // lane is one process of a stack: the pnpm script and where its log goes.
 type lane struct {
 	argv   []string
@@ -837,7 +843,7 @@ type lane struct {
 
 func startLane(ctx context.Context, stack Stack, one lane) (*exec.Cmd, error) {
 	argv := one.argv
-	logPath := filepath.Join(one.logDir, stack.Name+"-"+argv[0]+".log")
+	logPath := filepath.Join(one.logDir, laneLogName(stack.Name, argv[0]))
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600) // #nosec G304 -- path built from the run dir and the stack's own lane name.
 	if err != nil {
 		return nil, err
