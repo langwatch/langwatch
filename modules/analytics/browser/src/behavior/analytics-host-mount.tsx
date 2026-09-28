@@ -65,6 +65,10 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     return this.organizationId_;
   }
 
+  userId(): string | undefined {
+    return this.session.currentUser()?.id;
+  }
+
   hasPermission(permission: string): boolean {
     return this.session.hasPermission(permission);
   }

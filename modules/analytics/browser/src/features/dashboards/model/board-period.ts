@@ -4,8 +4,8 @@
  */
 
 import {
-  LWQL_GRANULARITY_STEPS,
-  type LangWatchQLGranularityStep,
+  LWQL_ACCEPTED_GRANULARITY_STEPS,
+  type LangWatchQLAcceptedGranularityStep,
 } from "@langwatch/analytics-contract";
 
 import { fitGranularity } from "../blocks/index.ts";
@@ -35,11 +35,6 @@ const GRAIN_REQUESTED_SECONDS: Readonly<Record<Exclude<BoardPeriodGrain, "auto">
   "1w": 7 * 86_400,
 };
 
-/** Whether the server has this exact step today, so the menu can grey it out. */
-export function boardPeriodGrainIsSupported(grain: Exclude<BoardPeriodGrain, "auto">): boolean {
-  return (LWQL_GRANULARITY_STEPS as readonly number[]).includes(GRAIN_REQUESTED_SECONDS[grain]);
-}
-
 /** `[periodStart, periodEnd]` in epoch milliseconds for a range ending at `now`. */
 export function boardPeriodBounds({ range, now }: { range: BoardPeriodRange; now: number }): {
   periodStart: number;
@@ -50,8 +45,8 @@ export function boardPeriodBounds({ range, now }: { range: BoardPeriodRange; now
 
 /**
  * The granularity actually sent to the server. "Auto" asks for the finest
- * offered step and lets {@link fitGranularity} widen it to the bucket budget;
- * a fixed grain the server cannot take today widens the same way.
+ * accepted step and lets {@link fitGranularity} widen it to the bucket budget;
+ * a fixed grain too fine for the range widens the same way.
  */
 export function boardPeriodGranularity({
   grain,
@@ -61,8 +56,9 @@ export function boardPeriodGranularity({
   grain: BoardPeriodGrain;
   periodStart: number;
   periodEnd: number;
-}): LangWatchQLGranularityStep {
-  const requested = grain === "auto" ? LWQL_GRANULARITY_STEPS[0] : GRAIN_REQUESTED_SECONDS[grain];
+}): LangWatchQLAcceptedGranularityStep {
+  const requested =
+    grain === "auto" ? LWQL_ACCEPTED_GRANULARITY_STEPS[0] : GRAIN_REQUESTED_SECONDS[grain];
   return fitGranularity({ periodStart, periodEnd, requested });
 }
 

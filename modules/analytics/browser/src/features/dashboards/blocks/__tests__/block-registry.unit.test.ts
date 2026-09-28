@@ -6,12 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  blockDefinitionSchema,
-  blockState,
-  periodDelta,
-  SOURCE_EXISTENCE_SQL,
-} from "../model/block-definition.ts";
+import { blockDefinitionSchema, blockState, periodDelta } from "../model/block-definition.ts";
 import { BLOCK_REGISTRY, FLIGHT_DECK_BLOCKS } from "../model/block-registry.ts";
 
 /** The views these blocks read, as `lwql-view-catalog.rules.ts` names them. */
@@ -64,10 +59,7 @@ describe("the block registry", () => {
 
   /** @scenario "AC5 Status tiles compare with the previous period" */
   it("gives every block non-empty statements that read only catalog views", () => {
-    const statements = [
-      ...BLOCK_REGISTRY.flatMap((block) => block.queries.map((query) => query.sql)),
-      ...Object.values(SOURCE_EXISTENCE_SQL),
-    ];
+    const statements = BLOCK_REGISTRY.flatMap((block) => block.queries.map((query) => query.sql));
     for (const sql of statements) {
       const views = viewsRead(sql);
       expect(sql.trim().length).toBeGreaterThan(0);

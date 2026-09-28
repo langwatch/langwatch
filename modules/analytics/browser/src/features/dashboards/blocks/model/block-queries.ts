@@ -10,8 +10,18 @@ const GRAIN = "{dashboard_context_granularity_seconds:UInt32}";
 /** The start of the equally long window right before the page period. */
 const PREVIOUS_START = `subtractSeconds(${START}, dateDiff('second', ${START}, ${END}))`;
 
+/**
+ * Seconds from the epoch (a Thursday) to the first Monday. Every accepted step
+ * divides it, so shifting by it moves only week buckets, onto Mondays (UTC).
+ */
+const MONDAY_OFFSET_SECONDS = 345_600;
+
 const inPeriod = (column: string) => `${column} >= ${START} AND ${column} < ${END}`;
-const bucketOf = (column: string) => `toStartOfInterval(${column}, INTERVAL ${GRAIN} SECOND)`;
+const bucketOf = (column: string) => {
+  const shifted = `subtractSeconds(${column}, ${MONDAY_OFFSET_SECONDS})`;
+  const bucket = `toStartOfInterval(${shifted}, INTERVAL ${GRAIN} SECOND)`;
+  return `addSeconds(${bucket}, ${MONDAY_OFFSET_SECONDS})`;
+};
 
 export const TRACE_COUNT_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket, uniqExact(TraceId) AS traces
 FROM trace_metrics

@@ -15,12 +15,14 @@ import { useBlockPickerAddress } from "../../behavior/use-block-picker-address.t
 import { useBoardBlocks } from "../../behavior/use-board-blocks.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
 import { useBoardPeriod } from "../../behavior/use-board-period.ts";
+import { useBoardVisibility } from "../../behavior/use-board-visibility.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { FlightDeckPanels } from "../../blocks/index.ts";
 import { dashboardsPath, FLIGHT_DECK } from "../../model/boards.ts";
 import { AddBlockCard, BlankBoard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
+import { BoardVisibilityControl } from "../blocks/board-visibility-control.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { BoardBlocksGrid } from "./board-blocks-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
@@ -88,7 +90,11 @@ function OwnBoard({ board }: { board: SavedBoard }) {
   const projectId = host.project()?.id ?? "";
   const saved = useSavedDashboards();
   const boardBlocks = useBoardBlocks();
-  const { description, saveDescription } = useBoardDescription();
+  const { description, saveDescription } = useBoardDescription({
+    dashboardId: board.id,
+    stored: board.description,
+  });
+  const visibility = useBoardVisibility({ board });
   const { period, control } = usePeriodControl();
   const picker = useBlockPickerAddress();
   const blocks = boardBlocks.blocksOn(board.id);
@@ -106,6 +112,14 @@ function OwnBoard({ board }: { board: SavedBoard }) {
           onDescribe={saveDescription}
           onAddChart={picker.open}
           periodControl={control}
+          visibilityControl={
+            <BoardVisibilityControl
+              visibility={visibility.visibility}
+              canChange={visibility.canChange}
+              refusal={visibility.refusal}
+              onChange={visibility.setVisibility}
+            />
+          }
         />
       }
     >
@@ -154,7 +168,7 @@ function SavedBoardScreen({ dashboardId }: { dashboardId: string | undefined }) 
   if (isLoading) return <UiPageLoading />;
   const board = boards.find(({ id }) => id === dashboardId);
   if (!board) return <UiPageNotFound />;
-  // Keyed so a board's visit-only state never leaks into the next board.
+  // Keyed so a board's in-flight edits never leak into the next board.
   return <OwnBoard key={board.id} board={board} />;
 }
 
