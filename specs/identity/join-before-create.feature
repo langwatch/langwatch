@@ -168,3 +168,9 @@ Feature: Join before create - the choice happens before an organization is minte
     When the join screen asks what they are waiting on
     Then a read bounded by that one user passes the org-tenancy guard
     And a read naming neither an organization nor a user is still refused
+
+  @unit
+  Scenario: With no join offer to make, a password account is offered a passkey
+    Given "sam" signed in with a password and has no organization to join
+    When any app page opens
+    Then the account-security offer is drawn where the join offer would be
