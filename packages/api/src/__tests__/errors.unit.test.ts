@@ -1,4 +1,5 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describe, expect, it, vi } from "vitest";
 import { type ZodError, z } from "zod";
@@ -434,15 +435,13 @@ describe("createErrorHandler", () => {
       });
     });
 
-    it("does not leak the cause into the response", () => {
+    it("does not leak the cause into the response", async () => {
       const handler = createErrorHandler();
+      const context = new Context(new Request("http://localhost/api/things", { method: "POST" }));
 
-      const res = handler(
-        new Error("secret internal details"),
-        fakeContext() as never,
-      ) as unknown as { body: { message: string } };
+      const res = await handler(new Error("secret internal details"), context);
 
-      expect(res.body.message).toBe("An unknown error occurred");
+      await expect(res.json()).resolves.toMatchObject({ message: "An unknown error occurred" });
     });
   });
 

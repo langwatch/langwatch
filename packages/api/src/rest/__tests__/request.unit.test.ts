@@ -5,8 +5,8 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { Temporal, nowInstant } from "@langwatch/time";
-import { Hono } from "hono";
-import type { Context, ErrorHandler, Next } from "hono";
+import { Context, Hono } from "hono";
+import type { ErrorHandler, Next } from "hono";
 import { generateSpecs } from "hono-openapi";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -327,10 +327,7 @@ function cappedRequest({
   return new Request(ECHO_URL, { method: "POST", headers, body: payload });
 }
 
-/**
- * Drives the middleware over a stand-in for the Hono context, which is all of
- * it the middleware touches, and reports what the route would have seen.
- */
+/** Drives the middleware over a real Hono context and reports what the route would have seen. */
 async function capped({ maxSize, incoming }: { maxSize: number; incoming: Request }): Promise<{
   status: number;
   reachedRoute: boolean;
@@ -338,19 +335,17 @@ async function capped({ maxSize, incoming }: { maxSize: number; incoming: Reques
   drained: boolean;
   body: string | null;
 }> {
-  const context = { req: { raw: incoming } };
+  const context = new Context(incoming);
   let reachedRoute = false;
 
-  const next = (() => {
+  const next: Next = async () => {
     reachedRoute = true;
-
-    return Promise.resolve();
-  }) as Next;
+  };
 
   let status = 200;
 
   try {
-    await bodyLimit({ maxSize })(context as unknown as Context, next);
+    await bodyLimit({ maxSize })(context, next);
   } catch (error) {
     if (!(error instanceof HTTPException)) throw error;
 

@@ -6,7 +6,7 @@ import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { trace } from "@opentelemetry/api";
 import type { Context, ErrorHandler } from "hono";
-import { resolver, type DescribeRouteOptions } from "hono-openapi";
+import { resolver, type DescribeRouteOptions, type ResponsesWithResolver } from "hono-openapi";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z, type ZodType } from "zod";
 
@@ -45,7 +45,7 @@ export const DECLARED_ANSWER = "declaredAnswer" as const;
 export type EndpointVariables = {
   // Validated at runtime by the declared SSE query schema; inference from
   // the trailing define callback is not expressible in TypeScript.
-  query?: any;
+  query?: unknown;
 };
 
 /** Authenticated principal exposed directly to handlers. */
@@ -97,12 +97,17 @@ export interface EndpointDocs {
   requestBody?: DescribeRouteOptions["requestBody"];
 }
 
+/** A schema as hono-openapi publishes one: its resolver's output, a JSON schema or a reference. */
+export type PublishedSchema = NonNullable<
+  NonNullable<Exclude<ResponsesWithResolver[string], { $ref: string }>["content"]>[string]["schema"]
+>;
+
 export interface RouteResponse {
   // If the description is missing, it will break our documentations
   description: string;
   // A media type with no schema is what a route that writes its own bytes
   // publishes: the type is the whole of what it can promise.
-  content: Record<string, { schema?: any }>;
+  content: Record<string, { schema?: PublishedSchema }>;
   // Response headers a caller can read something from. Only worth declaring
   // for a header that carries meaning the body does not.
   headers?: Record<string, { description: string; schema: { type: "string"; enum?: string[] } }>;
@@ -832,14 +837,14 @@ export function createCanonicalFamilyErrorHandler(options: {
   /** Overrides the canonical mapping. A family almost never needs its own. */
   mapError?: (
     error: unknown,
-    c: Context<any>,
+    c: Context,
   ) => { status: ContentfulStatusCode; body: ApiErrorBody };
 }): ErrorHandler {
   const logger = createLogger(options.loggerName);
 
   const mapError =
     options.mapError ??
-    ((error: unknown, c: Context<any>) => canonicalErrorFor(error, requestTraceIds(c)));
+    ((error: unknown, c: Context) => canonicalErrorFor(error, requestTraceIds(c)));
 
   return async (error, c) => {
     const { status, body } = mapError(error, c);
