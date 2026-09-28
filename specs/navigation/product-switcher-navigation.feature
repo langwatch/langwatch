@@ -55,6 +55,7 @@ Feature: Product switcher navigation
     Given I belong to one organization
     When the product-switcher top bar renders
     Then the organization name is plain text with no menu
+    And an organization mark sits before the name, which carries a name's weight
 
   @integration
   Scenario: A multi-organization user switches organization in place

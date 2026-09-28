@@ -29,6 +29,15 @@ function groupIdsIn(gates: Partial<SettingsMenuGates>): string[] {
 
 describe("given a reader with no grants on a self-hosted deployment", () => {
   describe("when the menu is built", () => {
+    it("opens with the reader's own Profile and Security pages", () => {
+      const [first] = settingsMenu(EVERYTHING_CLOSED);
+      expect(first?.id).toBe("settings-you");
+      expect(first?.items.map((item) => item.href)).toEqual([
+        "/settings/profile",
+        "/settings/security",
+      ]);
+    });
+
     it("offers the license page rather than the subscription one", () => {
       expect(hrefsIn({})).toContain("/settings/license");
       expect(hrefsIn({})).not.toContain("/settings/subscription");
@@ -83,7 +92,11 @@ describe("given a lite member", () => {
     });
 
     it("keeps the pages that are not", () => {
-      expect(hrefsIn({ isLiteMember: true })).toContain("/settings/authentication");
+      const hrefs = hrefsIn({ isLiteMember: true, hasPermission: () => true });
+      expect(hrefs).toContain("/settings/profile");
+      expect(hrefs).toContain("/settings/security");
+      expect(hrefs).toContain("/settings/model-providers");
+      expect(hrefs).not.toContain("/settings/authentication");
     });
   });
 });
@@ -96,6 +109,16 @@ describe("given an enterprise plan", () => {
       expect(hrefs).toContain("/settings/roles");
       expect(hrefs).toContain("/settings/role-bindings");
       expect(hrefs).toContain("/settings/scim");
+    });
+
+    it("offers Authentication only to a reader who may see single sign-on", () => {
+      expect(hrefsIn({ showEnterpriseNav: true })).not.toContain("/settings/authentication");
+      expect(
+        hrefsIn({ showEnterpriseNav: true, hasPermission: (p) => p === "sso:view" }),
+      ).toContain("/settings/authentication");
+      expect(hrefsIn({ hasPermission: (p) => p === "sso:view" })).not.toContain(
+        "/settings/authentication",
+      );
     });
 
     it("still withholds the audit log without the grant that reads it", () => {

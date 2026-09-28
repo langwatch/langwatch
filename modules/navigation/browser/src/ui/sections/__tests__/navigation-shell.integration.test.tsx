@@ -317,6 +317,15 @@ describe("the product-switcher top bar", () => {
       expect(screen.getByText("ACME")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Switch organization" })).not.toBeInTheDocument();
     });
+
+    /** @scenario A single organization shows as plain text */
+    it("marks the name with the organization icon, so it never reads as a missing switcher", () => {
+      renderShell();
+
+      const name = screen.getByText("ACME");
+      expect(name.parentElement?.querySelector("svg.lucide-building-2")).not.toBeNull();
+      expect(name).toHaveStyle({ fontWeight: "var(--chakra-font-weights-medium)" });
+    });
   });
 
   describe("when the user belongs to two organizations", () => {
