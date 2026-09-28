@@ -135,7 +135,7 @@ Feature: SCIM Group Mapping
     Then the Group record is removed
     And all GroupMembership and RoleBinding records for the group are removed
 
-  @integration @unimplemented
+  @unit
   Scenario: Non-enterprise org cannot access group management endpoints
     Given the organization plan is not ENTERPRISE
     When the admin attempts to list groups

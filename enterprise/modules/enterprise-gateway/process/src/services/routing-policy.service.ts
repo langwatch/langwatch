@@ -121,6 +121,20 @@ export class RoutingPolicyService {
     return this.repository.findDefaultForUser(resolveDefaultRoutingPolicyInputSchema.parse(input));
   }
 
+  /** The personal team's default (when there is one), then the organization's. */
+  async findDefaults(input: ResolveDefaultRoutingPolicyInput): Promise<RoutingPolicy[]> {
+    const parsed = resolveDefaultRoutingPolicyInputSchema.parse(input);
+    const [nearest, organization] = await Promise.all([
+      this.repository.findDefaultForUser(parsed),
+      this.repository.findDefaultForUser({ organizationId: parsed.organizationId }),
+    ]);
+    const defaults = [nearest, organization].filter((policy) => policy !== null);
+
+    return defaults.filter(
+      (policy, index) => defaults.findIndex((other) => other.id === policy.id) === index,
+    );
+  }
+
   private async getOwn(id: string, organizationId: string): Promise<RoutingPolicy> {
     return this.getById({ id, organizationId });
   }

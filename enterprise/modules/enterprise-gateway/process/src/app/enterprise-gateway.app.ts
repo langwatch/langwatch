@@ -15,6 +15,7 @@ import {
   type IssuePersonalVirtualKeyInput,
   type ListPersonalVirtualKeysInput,
   type ListRoutingPoliciesInput,
+  type ResolveDefaultRoutingPolicyInput,
   type PersonalVirtualKey,
   type RoutingPolicy,
   RoutingPolicyModelMustBeConcreteError,
@@ -113,6 +114,10 @@ export class EnterpriseGatewayApp implements EnterpriseGatewayApiContract {
 
   getRoutingPolicy(input: FindRoutingPolicyInput): Promise<RoutingPolicy> {
     return this.#policies.getById(input);
+  }
+
+  findDefaultRoutingPolicies(input: ResolveDefaultRoutingPolicyInput): Promise<RoutingPolicy[]> {
+    return this.#policies.findDefaults(input);
   }
 
   countRoutingPolicies(input: { organizationId: string }): Promise<number> {

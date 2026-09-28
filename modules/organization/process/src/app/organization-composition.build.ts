@@ -419,9 +419,9 @@ class LoggedOrganizationPromptSeed implements OrganizationPromptSeed {
 }
 
 /**
- * Both Enterprise plan gates, over the ONE plan application this process
- * resolves every allowance through. SCIM and the seat guard are read out of
- * stores this process does not hold, so both refuse by name.
+ * The Enterprise plan gates, over the ONE plan application this process
+ * resolves every allowance through. The seat guard for a team-role change is
+ * not ported yet, so it refuses by name.
  */
 function organizationPlanGate(options: {
   plans: Pick<EntitlementApi, "getActivePlan">;
@@ -436,12 +436,8 @@ function organizationPlanGate(options: {
       assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.RBAC),
     assertAuditLogsAllowed: ({ organizationId }) =>
       assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS),
-    assertScimAllowed: () =>
-      Promise.reject(
-        new OrganizationCapabilityUnavailableError(
-          "Enterprise plan store, so it cannot confirm this organization carries SCIM",
-        ),
-      ),
+    assertScimAllowed: ({ organizationId }) =>
+      assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.SCIM),
     assertTeamRoleChangeWithinSeatLimits: () =>
       Promise.reject(
         new OrganizationCapabilityUnavailableError(
