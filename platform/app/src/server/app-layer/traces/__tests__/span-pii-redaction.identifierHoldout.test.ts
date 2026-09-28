@@ -29,11 +29,17 @@ vi.mock("~/server/tracer/collector/piiCheck", () => ({
   ],
 }));
 
+import {
+  batchPresidioClearPII,
+  googleDLPClearPII,
+} from "~/server/tracer/collector/piiCheck";
 import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
+import { OtlpSpanPiiRedactionService } from "../span-pii-redaction.service";
 import {
   attr,
   DECIMAL_TRACE_ID_READ_AS_A_PHONE_NUMBER,
   makeService,
+  resolverFor,
   resourceAttr,
   STRICT_POLICY,
   shortTokenCorpus,
@@ -435,6 +441,34 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
           PROSE_THAT_MUST_BE_ANALYSED,
         ]),
       );
+    });
+
+    describe("when the analysis service fails", () => {
+      /** @scenario "The fallback detector also keeps a model name's name findings" */
+      it("asks the fallback detector to spare names on the model name only", async () => {
+        vi.mocked(batchPresidioClearPII).mockRejectedValueOnce(
+          new Error("analysis service unavailable"),
+        );
+        const service = new OtlpSpanPiiRedactionService({
+          isLangevalsConfigured: true,
+          isProduction: false,
+          dataPrivacyResolver: resolverFor(STRICT_POLICY),
+        });
+        const span = spanWith({
+          "ai.model.id": "claude-sonnet-4-6",
+          "app.support_note": PROSE_THAT_MUST_BE_ANALYSED,
+        });
+
+        await service.redactSpan(span, null, "STRICT", TENANT);
+
+        const sparedFor = (text: string) =>
+          vi
+            .mocked(googleDLPClearPII)
+            .mock.calls.find(([args]) => args.currentObject.value === text)?.[0]
+            .spareNamesAndPlaces;
+        expect(sparedFor("claude-sonnet-4-6")).toBe(true);
+        expect(sparedFor(PROSE_THAT_MUST_BE_ANALYSED)).toBe(false);
+      });
     });
   });
 
