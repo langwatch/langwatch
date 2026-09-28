@@ -9,6 +9,7 @@ import { z } from "zod";
 import {
   appendStoredObjectToDatasetInputSchema,
   createDatasetFromStoredObjectInputSchema,
+  DATASET_PAGE_LIMIT_MAX,
   datasetColumnsSchema,
   datasetColumnTypeSchema,
   datasetPaginationSchema,
@@ -36,7 +37,7 @@ export const datasetRestUpdateSchema = z.object({
 
 export const datasetRestPaginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().positive().max(1000).optional().default(50),
+  limit: z.coerce.number().int().positive().max(DATASET_PAGE_LIMIT_MAX).optional().default(50),
 });
 
 export const datasetRestBatchCreateRecordsSchema = z.object({
