@@ -336,3 +336,45 @@ Feature: An experiment run executes on its pipeline
     Given a stream subscribed to one run and another subscribed to a second run
     When frames are published for the first run
     Then the first stream hears them in order and the second hears none
+
+  # The run's plan, built in the request before StartExperimentRun (spec sections 2, 4 and 8, D4, D5).
+  @unit
+  Scenario: A run's plan lists its target cells, then its comparison cells, in one ordinal order
+    Given a full run over two targets with a comparison between them
+    When its plan is built
+    Then its target cells come first, row by row, each with its non-comparison evaluators
+    And one comparison cell per row follows them, numbered on from the last target cell
+    And every row a cell touches is kept once, and mappings read from the active dataset
+
+  @unit
+  Scenario: A run's plan pins each prompt and workflow at the version the run loaded
+    Given a prompt target and a workflow target loaded at their current versions
+    When the run's plan is built
+    Then the plan pins each target to the version that was loaded
+
+  @unit
+  Scenario: A comparison that cannot be built is planned skipped for every row it covers
+    Given a comparison with too few variants, no golden field, or a variant that no longer exists
+    When the run's plan is built
+    Then each non-empty row in scope has a comparison cell carrying that setup skip
+    And a chip comparison's cells sit under its first column that still exists
+
+  @unit
+  Scenario: A run scoped to some rows plans only those rows
+    Given a run scoped to rows 2 and 0 of three
+    When its plan is built
+    Then its target and comparison cells cover only those rows, in the order asked
+    And a target whose output a scoped comparison reuses is not run again
+
+  @unit
+  Scenario: An evaluator re-run plans its precomputed outputs and no comparison
+    Given an evaluator re-run over outputs the targets already produced
+    When its plan is built
+    Then each output is a cell that skips its target and carries the output and its trace
+    And no comparison cell is planned
+
+  @unit
+  Scenario: The comparison set is planned from the run's configuration alone
+    Given a chip comparison and a column comparison, and no target output yet
+    When the comparison set is built
+    Then each comparison is listed under its verdict column with the rows in scope it covers
