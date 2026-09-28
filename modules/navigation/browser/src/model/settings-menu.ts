@@ -17,13 +17,10 @@ import {
   Server,
   Fingerprint,
   Flag,
-  FolderKanban,
   FolderOpen,
   Gauge,
   KeyRound,
-  Link2,
   Lock,
-  type LucideIcon,
   MailX,
   Network,
   RefreshCw,
@@ -34,10 +31,10 @@ import {
   Stethoscope,
   UserCog,
   UserRound,
-  Users,
-  UsersRound,
   Workflow,
   UserSearch,
+  BookUser,
+  type LucideIcon,
 } from "lucide-react";
 
 import { isPathUnder } from "./products.ts";
@@ -184,15 +181,19 @@ function accessGroup({ showEnterpriseNav, isLiteMember }: SettingsMenuGates): Se
     label: "People & access",
     items: [
       {
-        label: "Members",
-        href: "/settings/members",
-        includePath: "/settings/members",
-        icon: Users,
-      },
-      {
-        label: "Teams & Projects",
-        href: "/settings/teams",
-        icon: FolderKanban,
+        // On every plan: members, teams and groups are tabs of this one page,
+        // and each old address forwards onto its tab, as on main.
+        label: "Directory",
+        href: "/settings/directory",
+        includePath: "/settings/directory",
+        icon: BookUser,
+        alsoActiveAt: [
+          "/settings/scim",
+          "/settings/groups",
+          "/settings/members",
+          "/settings/teams",
+          "/settings/access",
+        ],
       },
       ...(showEnterpriseNav && !isLiteMember ? enterpriseAccessItems() : []),
     ],
@@ -202,27 +203,11 @@ function accessGroup({ showEnterpriseNav, isLiteMember }: SettingsMenuGates): Se
 function enterpriseAccessItems(): SettingsMenuItem[] {
   return [
     {
-      label: "Groups",
-      href: "/settings/groups",
-      icon: UsersRound,
-      isEnterprise: true,
-    },
-    {
+      // Definitions and their assignments are two tabs of one page.
       label: "Roles",
       href: "/settings/roles",
       icon: ShieldCheck,
-      isEnterprise: true,
-    },
-    {
-      label: "Role Bindings",
-      href: "/settings/role-bindings",
-      icon: Link2,
-      isEnterprise: true,
-    },
-    {
-      label: "SCIM Provisioning",
-      href: "/settings/scim",
-      icon: RefreshCw,
+      alsoActiveAt: ["/settings/role-bindings"],
       isEnterprise: true,
     },
   ];

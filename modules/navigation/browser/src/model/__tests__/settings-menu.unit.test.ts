@@ -105,10 +105,23 @@ describe("given an enterprise plan", () => {
   describe("when the menu is built with the enterprise entries shown", () => {
     it("offers the enterprise access entries", () => {
       const hrefs = hrefsIn({ showEnterpriseNav: true });
-      expect(hrefs).toContain("/settings/groups");
       expect(hrefs).toContain("/settings/roles");
-      expect(hrefs).toContain("/settings/role-bindings");
-      expect(hrefs).toContain("/settings/scim");
+      expect(hrefs).not.toContain("/settings/role-bindings");
+    });
+
+    it("offers Directory on every plan, in place of Members, Teams, Groups and SCIM", () => {
+      for (const showEnterpriseNav of [false, true]) {
+        const hrefs = hrefsIn({ showEnterpriseNav });
+        expect(hrefs).toContain("/settings/directory");
+        for (const old of [
+          "/settings/members",
+          "/settings/teams",
+          "/settings/groups",
+          "/settings/scim",
+        ]) {
+          expect(hrefs).not.toContain(old);
+        }
+      }
     });
 
     it("offers Authentication only to a reader who may see single sign-on", () => {

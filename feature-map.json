@@ -1358,7 +1358,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/members",
+              "ui": "/settings/directory",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1394,7 +1394,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/teams",
+              "ui": "/settings/directory",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1433,7 +1433,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/groups",
+              "ui": "/settings/directory",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1499,7 +1499,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/role-bindings",
+              "ui": "/settings/roles",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1526,7 +1526,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/scim",
+              "ui": "/settings/directory",
               "mcp": null,
               "skill": null,
               "docs": null
