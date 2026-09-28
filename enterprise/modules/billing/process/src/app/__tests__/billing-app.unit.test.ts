@@ -311,14 +311,16 @@ describe("the Stripe callback BillingApp answers", () => {
 
 describe("the currency BillingApp detects", () => {
   describe("given LangWatch Cloud", () => {
+    /** @scenario "LangWatch Cloud detects the currency a reader's prices are shown in" */
     it("answers from the request, falling back when nothing names a country", () => {
       const { app } = billingApp({ isSaas: true, stripeSecretKey: undefined });
 
-      expect(app.detectCurrency({ headers: {} })).toMatchObject({ country: null });
+      expect(app.detectCurrency({ headers: {} })).toEqual({ currency: "EUR", country: null });
     });
   });
 
   describe("given a self-hosted deployment", () => {
+    /** @scenario "A self-hosted deployment serves no currency detection" */
     it("serves no detection, as main mounted none", () => {
       const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
 

@@ -84,3 +84,15 @@ Feature: Enterprise billing compatibility
     Given an organization metered in events whose second project sent nothing this month
     When its billable events are counted for both projects
     Then the first project reports its events and the second reports zero
+
+  @unit
+  Scenario: LangWatch Cloud detects the currency a reader's prices are shown in
+    Given LangWatch Cloud and a request that names no country
+    When the plans page asks which currency to show
+    Then billing answers the default currency with no country
+
+  @unit
+  Scenario: A self-hosted deployment serves no currency detection
+    Given a self-hosted deployment, where main mounted an empty currency router
+    When the plans page asks which currency to show
+    Then billing refuses with the handled not_found, the 404 main's missing procedure answered
