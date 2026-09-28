@@ -7,6 +7,10 @@ import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { authTrpc } from "@langwatch/auth-contract";
 import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
 import type { personalVirtualKeysTrpc } from "@langwatch/enterprise-gateway-contract";
+import type {
+  ingestionKeyTrpc,
+  personalSessionsTrpc,
+} from "@langwatch/enterprise-governance-contract";
 import type { identityTrpc } from "@langwatch/identity-contract";
 import type { userTrpc } from "@langwatch/user-contract";
 
@@ -49,17 +53,6 @@ export type PersonalBudgetState =
       adminEmail: string | null;
     };
 
-/** One device the CLI is signed in on. Every instant is EPOCH MILLISECONDS. */
-export type PersonalCliSession = {
-  sessionStartedAtMs: number;
-  deviceLabel: string;
-  hostname: string | null;
-  uname: string | null;
-  platform: string | null;
-  lastSeenMs: number;
-  expiresAtMs: number;
-};
-
 /** Which of the optional workspace features are turned on. */
 export type PersonalWorkspaceFeatures = {
   evaluations: boolean;
@@ -81,22 +74,6 @@ export type IngestionTemplateView = {
   platformPublished: boolean;
   enabled: boolean;
   organizationId: string | null;
-};
-
-/** An ingestion key this person already holds. */
-export type PersonalIngestionKeyView = {
-  apiKeyId: string;
-  sourceType: string;
-  lookupId: string;
-  ingestionTemplateId: string | null;
-};
-
-/** A freshly minted ingestion key, secret and all, returned exactly once. */
-export type IssuedIngestionKeyView = {
-  token: string;
-  apiKeyId: string;
-  prefix: string;
-  sourceType: string;
 };
 
 /** Where this person should land, and why. */
@@ -153,23 +130,6 @@ type BorrowedProcedures = {
       };
     };
   };
-  personalSessions: {
-    list: {
-      query: { input: { organizationId: string }; output: PersonalCliSession[] };
-    };
-    revoke: {
-      mutation: {
-        input: { organizationId: string; sessionStartedAtMs: number };
-        output: { ok: boolean; revokedTokens: number };
-      };
-    };
-    revokeAll: {
-      mutation: {
-        input: { organizationId: string };
-        output: { ok: boolean; revokedTokens: number };
-      };
-    };
-  };
   personalWorkspaceFeatures: {
     get: {
       query: { input: { projectId: string }; output: PersonalWorkspaceFeatures };
@@ -195,23 +155,6 @@ type BorrowedProcedures = {
   ingestionTemplates: {
     list: {
       query: { input: { organizationId: string }; output: IngestionTemplateView[] };
-    };
-  };
-  ingestionKey: {
-    list: {
-      query: { input: { organizationId: string }; output: PersonalIngestionKeyView[] };
-    };
-    install: {
-      mutation: {
-        input: { organizationId: string; sourceType: string; templateId?: string };
-        output: IssuedIngestionKeyView;
-      };
-    };
-    rotate: {
-      mutation: {
-        input: { organizationId: string; sourceType: string; templateId?: string };
-        output: IssuedIngestionKeyView;
-      };
     };
   };
   governance: {
@@ -254,6 +197,8 @@ export type PersonalWorkspaceApiMap = ContractApiMap<typeof userTrpc> &
   ContractApiMap<typeof authTrpc> &
   ContractApiMap<typeof identityTrpc> &
   ContractApiMap<typeof personalVirtualKeysTrpc> &
+  ContractApiMap<typeof personalSessionsTrpc> &
+  ContractApiMap<typeof ingestionKeyTrpc> &
   BorrowedProcedures;
 
 /**

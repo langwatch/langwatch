@@ -181,7 +181,7 @@ describe("PersonalConfigureScreen", () => {
       renderScreen();
       expect(screen.getByRole("button", { name: "+ Add a new key" })).toBeInTheDocument();
 
-      await userEvent.click(screen.getByRole("tab", { name: "Devices" }));
+      await userEvent.click(screen.getByRole("tab", { name: "Devices and keys" }));
       expect(await screen.findByTestId("devices-panel")).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("tab", { name: "Virtual keys" }));
