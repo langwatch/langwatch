@@ -88,7 +88,7 @@ What `actionParams` holds for each channel:
 A `SEND_SLACK_MESSAGE` automation posts through a Slack connection, named by `actionParams.slackIntegrationId`. Connections are listed and added in the dashboard under **Settings → Integrations → Slack**; the API can use any connection the project can use, which is its own project connections and its organization's organization connections.
 
 - A **bot** connection also needs `slackChannelId`, the channel the LangWatch Slack app posts in.
-- An **incoming webhook** connection needs nothing else: the webhook posts to the channel Slack tied it to.
+- An **incoming webhook** connection needs no further setup: the webhook posts to the channel Slack tied it to.
 
 ```json
 { "action": "SEND_SLACK_MESSAGE", "actionParams": { "slackIntegrationId": "<connectionId>", "slackChannelId": "C0123456789" } }

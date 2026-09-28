@@ -285,7 +285,7 @@ describe("SlackIntegrationService", () => {
         organizationId: "org-1",
         projectId: "project-1",
         kind: "BOT",
-        secret: "xoxb-revoked-5678",
+        secret: "xoxb-bad-5678",
         actorId: "user-1",
       });
 

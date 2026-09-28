@@ -42,10 +42,10 @@ export function summariseGraphAlert({
   customGraphId?: string | null;
 }): string | undefined {
   if (!graphAlert) return undefined;
-  const operator = String(graphAlert.operator ?? "");
+  const operator = text({ value: graphAlert.operator, fallback: "" });
   const symbol = OPERATOR_SYMBOLS[operator] ?? operator;
   const graph = customGraphId ? ` on graph ${customGraphId}` : "";
-  return `${String(graphAlert.seriesName ?? "series")} ${symbol} ${String(graphAlert.threshold ?? "?")} over ${String(graphAlert.timePeriod ?? "?")}m${graph}`;
+  return `${text({ value: graphAlert.seriesName, fallback: "series" })} ${symbol} ${text({ value: graphAlert.threshold, fallback: "?" })} over ${text({ value: graphAlert.timePeriod, fallback: "?" })}m${graph}`;
 }
 
 export function summariseReport({ report }: { report: Loose }): string | undefined {
@@ -54,14 +54,14 @@ export function summariseReport({ report }: { report: Loose }): string | undefin
   const schedule = isRecord(report.schedule) ? report.schedule : {};
   const target =
     source.kind === "dashboard"
-      ? `dashboard ${String(source.dashboardId ?? "?")}`
+      ? `dashboard ${text({ value: source.dashboardId, fallback: "?" })}`
       : source.kind === "customGraph"
-        ? `graph ${String(source.customGraphId ?? "?")}`
+        ? `graph ${text({ value: source.customGraphId, fallback: "?" })}`
         : source.kind === "traceQuery"
           ? "trace table"
-          : String(source.kind ?? "report");
+          : text({ value: source.kind, fallback: "report" });
   const compare = report.compareToPrevious ? ", vs previous" : "";
-  return `${target} at "${String(schedule.cron ?? "?")}" ${String(schedule.timezone ?? "")}${compare}`.trimEnd();
+  return `${target} at "${text({ value: schedule.cron, fallback: "?" })}" ${text({ value: schedule.timezone, fallback: "" })}${compare}`.trimEnd();
 }
 
 /** The Slack connection (and channel) an automation posts through, if any. */
@@ -94,6 +94,13 @@ export function summariseRule(trigger: {
     summariseReport({ report: trigger.report }) ??
     "-"
   );
+}
+
+/** A scalar field as text; objects and absent values read as the fallback. */
+function text({ value, fallback }: { value: unknown; fallback: string }): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

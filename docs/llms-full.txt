@@ -38942,7 +38942,7 @@ Each connection has a scope:
 A token or URL is stored once per organization: adding a connection with a secret another connection already holds is refused, naming that connection. Replacing a connection's token or URL takes effect for every automation that uses it, with no automation edited. Deleting a connection that active automations use asks you to confirm how many stop delivering.
 
 <Note>
-Automations used to carry their own webhook URL or bot token, and a project had one Slack integration. Each of those secrets is now a connection, and every automation points at the connection holding its secret: automations that shared a secret within one project share a project connection, and a secret shared across projects became an organization connection. Nothing needs re-entering.
+Automations used to carry their own webhook URL or bot token, and a project had one Slack integration. Each of those secrets is now a connection, and every automation points at the connection holding its secret: automations that shared a secret within one project share a project connection, and a secret shared across projects became an organization connection. You do not need to re-enter any secret.
 </Note>
 
 ## Alerts and reports
@@ -67643,6 +67643,15 @@ openapi: "GET /api/dataset/{slugOrId}"
 
 ---
 
+# FILE: ./api-reference/datasets/get-entries.mdx
+
+---
+title: "List entries of a dataset"
+openapi: "GET /api/dataset/{slug}/entries"
+---
+
+---
+
 # FILE: ./api-reference/datasets/get-records.mdx
 
 ---
@@ -72205,7 +72214,7 @@ What `actionParams` holds for each channel:
 A `SEND_SLACK_MESSAGE` automation posts through a Slack connection, named by `actionParams.slackIntegrationId`. Connections are listed and added in the dashboard under **Settings → Integrations → Slack**; the API can use any connection the project can use, which is its own project connections and its organization's organization connections.
 
 - A **bot** connection also needs `slackChannelId`, the channel the LangWatch Slack app posts in.
-- An **incoming webhook** connection needs nothing else: the webhook posts to the channel Slack tied it to.
+- An **incoming webhook** connection needs no further setup: the webhook posts to the channel Slack tied it to.
 
 ```json
 { "action": "SEND_SLACK_MESSAGE", "actionParams": { "slackIntegrationId": "<connectionId>", "slackChannelId": "C0123456789" } }
