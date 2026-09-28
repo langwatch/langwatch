@@ -49,10 +49,12 @@ function makeService({
   holder = null,
   decision = SIGN_UP_DECISION,
   budgetAllowed = true,
+  emailUnconfigured = false,
 }: {
   holder?: UserProfile | null;
   decision?: RoutingDecision;
   budgetAllowed?: boolean;
+  emailUnconfigured?: boolean;
 } = {}) {
   const memory = MemoryAuthDatabase.create();
   const mail = MemorySignUpVerificationMailChannel.create();
@@ -60,6 +62,7 @@ function makeService({
   let clock = NOW;
   let minted = 0;
   let current = holder;
+  let unconfigured = emailUnconfigured;
 
   const service = SignUpVerificationService.create({
     tokens: MemorySignUpVerificationTokenRepository.create({ memory }),
@@ -71,6 +74,7 @@ function makeService({
       return budgetAllowed ? { allowed: true } : { allowed: false, retryAfterSeconds: 60 };
     },
     buildVerificationUrl: ({ token }) => `https://app.test/auth/signup?verify=${token}`,
+    isEmailUnconfigured: async () => unconfigured,
     now: () => clock,
     mintToken: () => `token-${++minted}`,
   });
@@ -85,6 +89,9 @@ function makeService({
     },
     hold: (profile: UserProfile) => {
       current = profile;
+    },
+    configureEmail: () => {
+      unconfigured = false;
     },
   };
 }
@@ -299,6 +306,129 @@ describe("given a signed-out sign-up asking for a new account's link", () => {
       ).rejects.toMatchObject({ code: "auth_rate_limited", meta: { retryAfterSeconds: 60 } });
       expect(harness.budgets).toEqual(["auth.requestSignUpVerification:address:sam@acme.com"]);
       expect(harness.mail.sent).toEqual([]);
+    });
+  });
+});
+
+describe("given an installation that cannot send email", () => {
+  describe("when a signed-out sign-up asks for a new account's link", () => {
+    /** @scenario "An installation that cannot send email signs up with a password and leaves the address unconfirmed" */
+    it("mails nothing and answers an unconfirmed proof for the normalized address", async () => {
+      const harness = makeService({ emailUnconfigured: true });
+
+      const answer = await harness.service.requestNewAccountVerification({
+        email: " Sam@Acme.com ",
+      });
+
+      expect(answer).toEqual({ sent: false, addressProof: "token-1" });
+      expect(harness.mail.sent).toEqual([]);
+      expect(harness.memory.verificationTokens.get("token-1")?.expires).toEqual(
+        NOW.add({ milliseconds: CONFIRMED_ADDRESS_TTL_MS }),
+      );
+      await expect(
+        harness.service.claimUnconfirmedAddressProof({ token: "token-1", email: "sam@acme.com" }),
+      ).resolves.toBe(true);
+    });
+
+    it("refuses an address that already holds an unconfirmed account, since nothing can confirm it", async () => {
+      const harness = makeService({
+        emailUnconfigured: true,
+        holder: account({ emailVerified: false }),
+      });
+
+      await expect(
+        harness.service.requestNewAccountVerification({ email: "sam@acme.com" }),
+      ).rejects.toMatchObject({ code: "email_already_registered" });
+    });
+  });
+
+  describe("when an unconfirmed proof is issued", () => {
+    it("is single-use and bound to the address", async () => {
+      const harness = makeService({ emailUnconfigured: true });
+      const proof = await harness.service.issueUnconfirmedAddressProof({ email: "sam@acme.com" });
+
+      await expect(
+        harness.service.validateUnconfirmedAddressProof({ token: proof, email: "sam@acme.com" }),
+      ).resolves.toBe(true);
+      await expect(
+        harness.service.claimUnconfirmedAddressProof({ token: proof, email: "other@acme.com" }),
+      ).resolves.toBe(false);
+      await expect(
+        harness.service.claimUnconfirmedAddressProof({ token: proof, email: "sam@acme.com" }),
+      ).resolves.toBe(true);
+      await expect(
+        harness.service.claimUnconfirmedAddressProof({ token: proof, email: "sam@acme.com" }),
+      ).resolves.toBe(false);
+    });
+
+    it("stops working once its lifetime has passed", async () => {
+      const harness = makeService({ emailUnconfigured: true });
+      const proof = await harness.service.issueUnconfirmedAddressProof({ email: "sam@acme.com" });
+
+      harness.advance(CONFIRMED_ADDRESS_TTL_MS + 1);
+
+      await expect(
+        harness.service.claimUnconfirmedAddressProof({ token: proof, email: "sam@acme.com" }),
+      ).resolves.toBe(false);
+    });
+  });
+
+  describe("when an unconfirmed proof is offered as a confirmed one", () => {
+    /** @scenario "A confirmed address proof and an unconfirmed one never stand in for each other" */
+    it("is refused by both confirmed-proof checks and stays unspent", async () => {
+      const harness = makeService({ emailUnconfigured: true });
+      const proof = await harness.service.issueUnconfirmedAddressProof({ email: "sam@acme.com" });
+
+      await expect(
+        harness.service.validateAddressProof({ token: proof, email: "sam@acme.com" }),
+      ).resolves.toBe(false);
+      await expect(
+        harness.service.claimAddressProof({ token: proof, email: "sam@acme.com" }),
+      ).resolves.toBe(false);
+      await expect(
+        harness.service.validateUnconfirmedAddressProof({ token: proof, email: "sam@acme.com" }),
+      ).resolves.toBe(true);
+    });
+  });
+
+  describe("when a confirmed proof is offered as an unconfirmed one", () => {
+    /** @scenario "A confirmed address proof and an unconfirmed one never stand in for each other" */
+    it("is refused by both unconfirmed-proof checks", async () => {
+      const harness = makeService({ emailUnconfigured: true });
+      await harness.service.requestVerification({ email: "sam@acme.com" });
+      const { addressProof } = await harness.service.completeVerification({ token: "token-1" });
+      if (!addressProof) throw new Error("the link minted no proof");
+
+      await expect(
+        harness.service.validateUnconfirmedAddressProof({
+          token: addressProof,
+          email: "sam@acme.com",
+        }),
+      ).resolves.toBe(false);
+      await expect(
+        harness.service.claimUnconfirmedAddressProof({
+          token: addressProof,
+          email: "sam@acme.com",
+        }),
+      ).resolves.toBe(false);
+    });
+  });
+
+  describe("when the installation can send email again", () => {
+    /** @scenario "An unconfirmed address proof is refused once the installation can send email" */
+    it("refuses an unconfirmed proof without spending it", async () => {
+      const harness = makeService({ emailUnconfigured: true });
+      const proof = await harness.service.issueUnconfirmedAddressProof({ email: "sam@acme.com" });
+
+      harness.configureEmail();
+
+      await expect(
+        harness.service.validateUnconfirmedAddressProof({ token: proof, email: "sam@acme.com" }),
+      ).resolves.toBe(false);
+      await expect(
+        harness.service.claimUnconfirmedAddressProof({ token: proof, email: "sam@acme.com" }),
+      ).resolves.toBe(false);
+      expect(harness.memory.verificationTokens.has(proof)).toBe(true);
     });
   });
 });

@@ -256,7 +256,6 @@ export interface InstanceIdentityView {
   readonly lastReportError?: string;
   readonly optionalMetricsOptOut: boolean;
   readonly hostnameOptOut: boolean;
-  readonly startupNoticeAcknowledgedSchemaVersion: number;
 }
 
 /** What the deployment decided about Connect, and whether any license here names a hosted service. */

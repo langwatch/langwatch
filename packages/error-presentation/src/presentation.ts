@@ -3061,6 +3061,11 @@ const presentations = {
     title: "That run is already over",
     describe: () => "There is nothing left to cancel.",
   },
+  instant_eval_classifier_not_configured: {
+    title: "Instant Evals need a judge on this installation",
+    describe: () =>
+      "Instant Evals are on for this project, but this installation has nothing to judge with yet. Ask whoever runs it to add a judge key or connect it to LangWatch.",
+  },
   instant_eval_classifier_unavailable: {
     title: "The judgements couldn't be made right now",
     describe: () => "The query ran, but nothing could be judged. Try again in a moment.",

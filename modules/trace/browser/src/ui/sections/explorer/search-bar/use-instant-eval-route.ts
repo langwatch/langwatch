@@ -27,6 +27,35 @@ import type { InstantEvalConfirmation } from "../instant-eval-confirm-dialog.tsx
  */
 export const INSTANT_EVAL_AUTO_RUN_USD = 0.5;
 
+/** Where a project without Instant Evals asks for them to be switched on. */
+export const CONTACT_US_HREF =
+  "mailto:support@langwatch.ai?subject=Please%20enable%20Instant%20Evals";
+
+/** What a project the flag is off for is told, in place of starting a run. */
+export const INSTANT_EVALS_UNRELEASED_COPY = {
+  title: "Instant Evals aren't enabled for this project yet",
+  description:
+    "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
+};
+
+/**
+ * The refusal for a project the flag is off for: said straight away, before
+ * any estimate goes out over a run it could never start. Nothing is searched,
+ * so the typed chip stays in the bar.
+ */
+function refuseUnreleased(): void {
+  toaster.create({
+    ...INSTANT_EVALS_UNRELEASED_COPY,
+    type: "info",
+    action: {
+      label: "Contact us",
+      onClick: () => {
+        window.open(CONTACT_US_HREF, "_blank", "noopener,noreferrer");
+      },
+    },
+  });
+}
+
 export interface InstantEvalRouteState {
   onInstantEvalRoute: (payload: InstantEvalRoutePayload) => void;
   /**
@@ -216,7 +245,11 @@ function useInstantEvalStarter({
   return { isStarting: start.isPending, applyChip, startRun };
 }
 
-export function useInstantEvalRoute(): InstantEvalRouteState {
+export function useInstantEvalRoute({
+  isInstantEvalAvailable,
+}: {
+  isInstantEvalAvailable: boolean;
+}): InstantEvalRouteState {
   const estimate = api.traces.instantEval.estimate.useMutation();
   const outcome = useInstantEvalOutcome();
   const { pendingRef, setConfirmation, refuse } = outcome;
@@ -269,6 +302,12 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
   const onInstantEvalRoute = useCallback(
     (payload: InstantEvalRoutePayload) => {
       const seq = ++seqRef.current;
+      if (!isInstantEvalAvailable) {
+        pendingRef.current = null;
+        setConfirmation(null);
+        refuseUnreleased();
+        return;
+      }
       const { timeRange, evalRuns } = useFilterStore.getState();
       const key = routeRunKey({ payload, presetId: timeRange.presetId });
       pendingRef.current = { payload, key };
@@ -283,7 +322,7 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
       }
       askForEstimate({ payload, key, seq });
     },
-    [applyChip, askForEstimate, pendingRef, setConfirmation],
+    [applyChip, askForEstimate, isInstantEvalAvailable, pendingRef, setConfirmation],
   );
 
   return {

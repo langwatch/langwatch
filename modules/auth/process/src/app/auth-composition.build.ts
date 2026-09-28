@@ -484,6 +484,7 @@ export async function buildBetterAuth(
 
   const { socialProviders, genericOAuthConfigs } = await options.sso.getSignInProviderMounts({
     baseUrl: identity.baseUrl,
+    onMicrosoftProfile: (profile) => options.identityApi.moveLegacyMicrosoftAccountKey({ profile }),
   });
 
   return createBetterAuthTransport({

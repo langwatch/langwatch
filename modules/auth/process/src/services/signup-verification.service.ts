@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import {
   DirectRegistrationUnavailableError,
   FrontDoorRateLimitedError,
+  type SignUpVerificationRequest,
 } from "@langwatch/auth-contract";
 import {
   IdentityVerificationExpiredError,
@@ -35,6 +36,8 @@ export interface SignUpVerificationDeps {
   ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number | undefined }>>;
   /** Builds the link the email carries, from a minted token. */
   buildVerificationUrl(input: { token: string }): string;
+  /** No email configured at all; a named but unusable provider is a misconfiguration, not this. */
+  isEmailUnconfigured(): Promise<boolean>;
   now?: () => Instant;
   mintToken?: () => string;
 }
@@ -50,6 +53,12 @@ const CONFIRMED_ADDRESS_NAMESPACE = "identity-signup-confirmed:";
 
 /** Long enough to choose a password on the next screen; worthless in a closed tab. */
 export const CONFIRMED_ADDRESS_TTL_MS = 30 * 60 * 1000;
+
+/**
+ * An address typed where no email could prove it (ADR-117, revision 2026-09-25). Its own
+ * namespace keeps it from ever passing a confirmed-proof check.
+ */
+const UNCONFIRMED_ADDRESS_NAMESPACE = "identity-signup-unconfirmed:";
 
 /** How long a spent link, opened again, still answers as it did the first time. */
 export const SPENT_LINK_GRACE_MS = 24 * 60 * 60 * 1000;
@@ -102,13 +111,20 @@ export class SignUpVerificationService {
   /**
    * A signed-out sign-up's link, as main's router answers it: an organization's connection
    * refuses, a confirmed address is told so, and each address gets its own hourly budget.
+   * Without email an unconfirmed account is an account, and the answer is an unconfirmed proof.
    */
-  async requestNewAccountVerification({ email }: { email: string }): Promise<void> {
+  async requestNewAccountVerification({
+    email,
+  }: {
+    email: string;
+  }): Promise<SignUpVerificationRequest> {
     const decision = await this.deps.route({ identifier: email, breakGlass: false });
     if (isOrganizationManagedDecision(decision)) {
       throw new DirectRegistrationUnavailableError();
     }
-    if ((await this.addressState({ email })) === "confirmed") {
+    const withoutEmail = await this.deps.isEmailUnconfigured();
+    const state = await this.addressState({ email });
+    if (state === "confirmed" || (withoutEmail && state !== "unknown")) {
       throw new EmailAlreadyRegisteredError();
     }
 
@@ -123,7 +139,54 @@ export class SignUpVerificationService {
       });
     }
 
+    if (withoutEmail) {
+      return { sent: false, addressProof: await this.issueUnconfirmedAddressProof({ email }) };
+    }
     await this.requestVerification({ email });
+    return { sent: true };
+  }
+
+  /** Mints a single-use proof for an address that could not be mailed; it confirms nothing. */
+  async issueUnconfirmedAddressProof({ email }: { email: string }): Promise<string> {
+    const token = this.mintToken();
+    await this.deps.tokens.issue({
+      identifier: `${UNCONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
+      token,
+      expires: this.now().add({ milliseconds: CONFIRMED_ADDRESS_TTL_MS }),
+    });
+    return token;
+  }
+
+  /** Spends an unconfirmed proof; it counts only while the installation still has no email. */
+  async claimUnconfirmedAddressProof({
+    token,
+    email,
+  }: {
+    token: string;
+    email: string;
+  }): Promise<boolean> {
+    if (!(await this.deps.isEmailUnconfigured())) return false;
+    return this.deps.tokens.claimExpected({
+      token,
+      identifier: `${UNCONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
+      now: this.now(),
+    });
+  }
+
+  /** Whether an unconfirmed proof is live and still counts, spending nothing. */
+  async validateUnconfirmedAddressProof({
+    token,
+    email,
+  }: {
+    token: string;
+    email: string;
+  }): Promise<boolean> {
+    if (!(await this.deps.isEmailUnconfigured())) return false;
+    return this.deps.tokens.hasExpected({
+      token,
+      identifier: `${UNCONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
+      now: this.now(),
+    });
   }
 
   /**

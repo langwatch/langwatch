@@ -5,10 +5,16 @@ import type {
   VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
+import { getActiveTraceId } from "@langwatch/observability/tracing";
+import { z } from "zod";
 
 import { isAllowedAuthOrigin } from "../rules/auth-origin.rules.ts";
 import { sessionPollOf, type AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { presentedSessionCookie } from "../rules/session-cookie.rules.ts";
+import {
+  isSignInCallbackPath,
+  signInFailureLocation,
+} from "../rules/sign-in-callback-failure.rules.ts";
 
 const logger = createLogger("langwatch:auth");
 
@@ -97,9 +103,59 @@ export class AuthDoorService {
     // Better Auth counts the caller the platform resolved, never one a header claims.
     const stated = requestStatingCaller({ request, caller: ClientAddress.resolvedFor(request) });
 
-    return bornFinalized
+    const answered = await (bornFinalized
       ? this.deps.runWithIdentityBirth(() => betterAuth.handler(stated))
-      : betterAuth.handler(stated);
+      : betterAuth.handler(stated));
+    return landFailedSignInCallback({
+      response: answered,
+      pathname: new URL(request.url).pathname,
+      errorPageUrl: `${baseUrl}/auth/error`,
+    });
+  }
+}
+
+/**
+ * A server error on a sign-in callback, sent to the sign-in error screen rather than a blank
+ * page: the callback is a browser navigation. Every other auth route keeps its status, because
+ * its callers read it (specs/identity/sso-signin-error-boundary.feature).
+ */
+async function landFailedSignInCallback({
+  response,
+  pathname,
+  errorPageUrl,
+}: {
+  response: Response;
+  pathname: string;
+  errorPageUrl: string;
+}): Promise<Response> {
+  if (response.status < 500 || !isSignInCallbackPath({ pathname })) return response;
+
+  const traceId = getActiveTraceId();
+  logger.error(
+    {
+      status: response.status,
+      path: pathname,
+      traceId: traceId ?? null,
+      cause: await readCauseCode(response),
+    },
+    "a sign-in callback failed on the server; the person was sent a generic refusal",
+  );
+  return new Response(null, {
+    status: 302,
+    headers: { location: signInFailureLocation({ errorPageUrl, traceId }) },
+  });
+}
+
+const errorBodySchema = z.object({ code: z.string() });
+
+/** Better Auth's error `code`, for the log only: its message can hold an address. */
+async function readCauseCode(response: Response): Promise<string> {
+  const unreadable = "unreadable";
+  try {
+    const parsed = errorBodySchema.safeParse(JSON.parse(await response.text()));
+    return parsed.success ? parsed.data.code.slice(0, 100) : unreadable;
+  } catch {
+    return unreadable;
   }
 }
 

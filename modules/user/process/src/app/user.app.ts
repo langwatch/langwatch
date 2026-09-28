@@ -414,26 +414,35 @@ export class UserApp implements UserApi {
 
     // The mailbox proof is the authority to enrol a credential, spent before
     // anything is hashed or written and bound to this exact address.
-    const proofClaimed = await this.#peers.auth.claimSignUpAddressProof({
-      token: input.addressProof,
-      email,
-    });
-    if (!proofClaimed) throw new IdentityVerificationExpiredError();
+    const addressConfirmed = await this.#claimSignUpProof({ token: input.addressProof, email });
 
     // Case-insensitive on purpose: rows written before the lowercasing above
     // may carry capitals, and minting a case-twin beside one would leave two
     // accounts answering for one person.
     if (await this.#users.emailIsTaken({ email })) throw new EmailAlreadyRegisteredError();
 
-    const created = await this.#users.createConfirmedCredentialUser({
+    const account = {
       name: input.name,
       email,
       passwordHash: await this.#members.passwords.hash({ password: input.password }),
-    });
+    };
+    const created = addressConfirmed
+      ? await this.#users.createConfirmedCredentialUser(account)
+      : await this.#users.createCredentialUser(account);
 
     this.#members.analytics.trackServerEvent({ userId: created.id, event: "signed_up" });
 
     return created;
+  }
+
+  /**
+   * Spends the sign-up proof and answers whether it confirmed the address. An unconfirmed
+   * proof counts only while the installation cannot send email (ADR-117, revision 2026-09-25).
+   */
+  async #claimSignUpProof(proof: { token: string; email: string }): Promise<boolean> {
+    if (await this.#peers.auth.claimSignUpAddressProof(proof)) return true;
+    if (await this.#peers.auth.claimUnconfirmedSignUpAddressProof(proof)) return false;
+    throw new IdentityVerificationExpiredError();
   }
 
   /** Whether this account can sign in with a password at all. */

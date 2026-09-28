@@ -46,6 +46,7 @@ const door: AuthApi = {
   sendMyAddressConfirmation,
   completeSignUpVerification,
   claimSignUpAddressProof: () => unreached("claimSignUpAddressProof"),
+  claimUnconfirmedSignUpAddressProof: () => unreached("claimUnconfirmedSignUpAddressProof"),
   getSignUpEnrollment,
   getMyAddressConfirmation,
   getPriorSession,
@@ -217,12 +218,21 @@ describe("the signed-out front door", () => {
     });
 
     it("asks for a new account's link for the address the visitor typed", async () => {
-      requestNewAccountVerification.mockResolvedValue(undefined);
+      requestNewAccountVerification.mockResolvedValue({ sent: true });
 
       await expect(visitor.requestSignUpVerification({ email: "ana@acme.com" })).resolves.toEqual({
         sent: true,
       });
       expect(requestNewAccountVerification).toHaveBeenCalledWith({ email: "ana@acme.com" });
+    });
+
+    it("hands the screen the unconfirmed proof where no link could be sent", async () => {
+      requestNewAccountVerification.mockResolvedValue({ sent: false, addressProof: "proof-1" });
+
+      await expect(visitor.requestSignUpVerification({ email: "ana@acme.com" })).resolves.toEqual({
+        sent: false,
+        addressProof: "proof-1",
+      });
     });
   });
 

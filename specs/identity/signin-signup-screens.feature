@@ -275,7 +275,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # The link proves the address but does not choose or create a credential.
   # Its proof is bound to the address and may be consumed only once by the
   # account-creation boundary.
-  @integration @e2e
+  @integration
   Scenario: Opening the link unlocks credential choice
     Given I asked to sign up and have not opened the confirmation link
     When I open the link
@@ -313,7 +313,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # precedes the account and credential writes; those writes are not one
   # cross-resource transaction. If enrollment then fails, recovery starts
   # with a fresh email proof rather than replaying the claimed one.
-  @unit @e2e
+  @unit
   Scenario: Signing up with a passkey consumes the verified address proof
     Given I returned with a valid proof for an address that has no account
     When I create a passkey instead of choosing a password
@@ -356,6 +356,52 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When I reopen its confirmation link
     Then no password or passkey control is shown
     And I am offered a fresh confirmation link
+
+  # An installation with no email provider cannot prove an address (ADR-117,
+  # revision 2026-09-25). Sign-up there enrolls a password and leaves the
+  # address unconfirmed, so domain join requests and OAuth account linking,
+  # which require a confirmed address, stay closed for that account.
+  @unit @integration @e2e
+  Scenario: An installation that cannot send email signs up with a password and leaves the address unconfirmed
+    Given the installation has no email provider configured
+    When I start sign-up with my email
+    Then no confirmation link is sent
+    And the screen says the address is not confirmed and asks for a password
+    And no passkey sign-up is offered
+    When I choose a password
+    Then my account is created with its address unconfirmed
+    And I am signed in
+
+  # A provider that is named but unusable (a mistyped EMAIL_PROVIDER, a
+  # missing credential) is a misconfiguration: sign-up keeps asking for the
+  # mailed link and fails loudly rather than skipping address confirmation.
+  @unit
+  Scenario: A misconfigured email provider keeps sign-up on the mailed link
+    Given the installation names an email provider it cannot use
+    When I start sign-up with my email
+    Then no unconfirmed address proof is issued
+    And the confirmation link is attempted through the provider
+
+  @unit
+  Scenario: An unconfirmed address proof is refused once the installation can send email
+    Given I hold an unconfirmed address proof minted while no email provider was configured
+    And the installation now has an email provider
+    When I try to enroll or register with that proof
+    Then it is refused and no account is created
+
+  @unit
+  Scenario: A confirmed address proof and an unconfirmed one never stand in for each other
+    Given an unconfirmed address proof for my address
+    When it is checked or claimed as a confirmed proof
+    Then it is refused
+    And a confirmed proof is refused where an unconfirmed one is asked for
+
+  @unit @integration
+  Scenario: Without a way to send email, the address confirmation nudge stays silent
+    Given the installation has no email provider configured
+    And my account's address is unconfirmed
+    Then no resend confirmation action is offered for it
+    And asking to send the confirmation anyway is refused with a named error
 
   @integration
   Scenario: Post-link routing still governs credential enrollment

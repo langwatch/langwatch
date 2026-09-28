@@ -3,6 +3,7 @@ import type { JoinRequestFoldState } from "../../eventing/join-request-state.pro
 import type { MfaFoldState } from "../../eventing/mfa-enrollment-state.projection.ts";
 import type { SsoConnectionFoldState } from "../../eventing/sso-connection-state.projection.ts";
 import type { IdentityRepositories } from "../identity.repositories.ts";
+import { MemoryIdentityAccountRekeyRepository } from "./memory.identity-account-rekey.repository.ts";
 import { MemoryIdentityHistoryRepository } from "./memory.identity-history.repository.ts";
 import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
 import { MemoryIdentityLookupRepository } from "./memory.identity-lookup.repository.ts";
@@ -66,6 +67,7 @@ export function identityRepositoriesOverMemory(
     latch: MemoryIdentityLatchRepository.create(store),
     users: MemoryIdentityUsersRepository.create(store),
     signInAccounts: MemoryIdentitySignInAccountsRepository.create(store),
+    accountRekey: MemoryIdentityAccountRekeyRepository.create(store),
     newborn: MemoryIdentityNewbornRepository.create(store),
     reservations: MemoryIdentityReservationRepository.create(store),
     verification: MemoryIdentityVerificationRepository.create(store),

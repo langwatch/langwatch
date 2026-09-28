@@ -41,6 +41,8 @@ const VERIFIED: VerifiedBrowserSession = {
 
 const NO_MOUNTS: SignInProviderMounts = { socialProviders: {}, genericOAuthConfigs: [] };
 
+type MountsRequest = Parameters<SsoApi["getSignInProviderMounts"]>[0];
+
 function sessionSecretFor(named: boolean): string | undefined {
   return named ? BROWSER_SESSION.secret : void 0;
 }
@@ -52,7 +54,8 @@ async function appFor(
     config?: Partial<SignInProvidersConfig>;
     secrets?: Partial<Record<string, string>>;
     mounts?: SignInProviderMounts;
-    askedFor?: { baseUrl: string }[];
+    askedFor?: MountsRequest[];
+    identity?: IdentityApi;
   } = {},
 ): Promise<AuthApp> {
   return AuthApp.create({
@@ -71,7 +74,7 @@ async function appFor(
       users: new TestUserApi({}) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,
-      identity: createApiFixture<IdentityApi>(),
+      identity: providers.identity ?? createApiFixture<IdentityApi>(),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
@@ -250,13 +253,31 @@ describe("given enterprise SSO answers the deployment's sign-in providers", () =
 
   /** @scenario "Better Auth asks enterprise SSO for its providers on first use, not while composing" */
   it("asks SSO once, on first use, with Better Auth's own URL", async () => {
-    const askedFor: { baseUrl: string }[] = [];
+    const askedFor: MountsRequest[] = [];
     const app = await appFor(true, { askedFor });
 
     expect(askedFor).toEqual([]);
 
     await Promise.all([app.betterAuth(), app.betterAuth()]);
 
-    expect(askedFor).toEqual([{ baseUrl: BROWSER_SESSION.baseUrl }]);
+    expect(askedFor).toEqual([
+      { baseUrl: BROWSER_SESSION.baseUrl, onMicrosoftProfile: expect.any(Function) },
+    ]);
+  });
+
+  it("hands each Microsoft profile to identity to move a legacy account key", async () => {
+    const askedFor: MountsRequest[] = [];
+    const moved: unknown[] = [];
+    const identity = createApiFixture<IdentityApi>({
+      moveLegacyMicrosoftAccountKey: async ({ profile }) => {
+        moved.push(profile);
+      },
+    });
+    const app = await appFor(true, { askedFor, identity });
+    await app.betterAuth();
+
+    await askedFor[0]?.onMicrosoftProfile?.({ oid: "object-1", tid: "tenant-1" });
+
+    expect(moved).toEqual([{ oid: "object-1", tid: "tenant-1" }]);
   });
 });

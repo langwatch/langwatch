@@ -260,3 +260,25 @@ Feature: Instant Evals inside the Trace Explorer
       Given a run that finished more than fifteen seconds ago
       When the page reads it for the first time
       Then it is settled without a second read, and no bar is shown
+
+  # ---------------------------------------------------------------------------
+  # The flag gate (the refusal popover arrives with the Instant Eval module;
+  # until then the search bar says this in a toast)
+  # ---------------------------------------------------------------------------
+
+  Rule: A project the Instant Evals flag is off for is told so before any request
+
+    @integration
+    Scenario: Instant Evals switched off open the contact-us popover and nothing is searched
+      Given the Instant Evals flag is off for the project
+      When the reader submits an eval chip
+      Then the search bar says Instant Evals aren't enabled for this project and offers to contact us
+      And no estimate is requested and the typed query stays in the bar
+      And a chip typed alongside other words is refused the same way, before any request
+
+    @integration
+    Scenario: A flag read still in flight lets the submit reach the estimate
+      Given the flag read has not answered yet
+      When the user submits an eval chip
+      Then the estimate is requested
+      And nothing is said before the estimate responds

@@ -26,10 +26,11 @@ export class MailDeliveryService {
 
   async getView(): Promise<MailDeliveryView> {
     const settings = await this.settings();
-    const [provider] = findProviderNames(settings);
+    const { provider, misconfigured } = readProviderChoice(settings);
     return {
-      ...(provider === undefined ? {} : { provider }),
+      ...(provider === null ? {} : { provider }),
       smtpConfigured: Boolean(settings.smtp.url ?? settings.smtp.host),
+      misconfigured,
     };
   }
 
@@ -43,13 +44,20 @@ export class MailDeliveryService {
   }
 }
 
-/** The gateway these settings select; empty where none is, or the one named is half-configured. */
-function findProviderNames(settings: MailGatewaySettings): EmailProviderName[] {
+/** The gateway these settings select, and whether the one named is half-configured. */
+function readProviderChoice(settings: MailGatewaySettings): {
+  provider: EmailProviderName | null;
+  misconfigured: boolean;
+} {
   try {
-    const name = EmailProviderService.create(settings).pickProviderName();
-    return name === null ? [] : [name];
+    return {
+      provider: EmailProviderService.create(settings).pickProviderName(),
+      misconfigured: false,
+    };
   } catch (error) {
-    if (error instanceof EmailProviderConfigurationError) return [];
+    if (error instanceof EmailProviderConfigurationError) {
+      return { provider: null, misconfigured: true };
+    }
     throw error;
   }
 }

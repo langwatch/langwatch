@@ -255,8 +255,6 @@ export const ShellPageBody = ({
           </Alert.Root>
         )}
 
-        {host.startupNotice()}
-
         {host.joinOffer({
           currentOrganizationId: isOrganizationLoading ? void 0 : (organization?.id ?? null),
         })}

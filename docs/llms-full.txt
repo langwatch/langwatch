@@ -1095,7 +1095,7 @@ Manage them at **Settings > Model Providers**. The table lists each configuratio
 | Bedrock | AWS access key id, secret access key and region |
 | Vertex AI | Service account JSON, project and location |
 | DeepSeek, xAI, Cerebras, Groq, Voyage AI | API key |
-| ElevenLabs | API key, optional webhook secret. See [Voice Agents in the App](/agent-testing/voice-agents-in-app) for the key permissions it needs |
+| ElevenLabs | API key, optional webhook secret. See [Voice Agents](/agent-testing/voice-agents#before-you-start) for the key permissions it needs |
 | Azure Safety | Content Safety endpoint and key, for the Azure safety evaluators |
 | Custom (OpenAI-compatible) | Base URL and optional API key, for a LiteLLM proxy, vLLM or any endpoint that serves `/chat/completions` |
 
@@ -20895,6 +20895,10 @@ keywords: litellm, instrumentation, autotrack, langwatch, python, tracing
 
 LangWatch integrates with LiteLLM to capture detailed information about your LLM calls across multiple providers through a unified interface.
 
+<Info>
+This page covers the LiteLLM Python SDK inside your own code. To trace everything that goes through a LiteLLM Proxy (gateway) instead, see [LiteLLM Proxy](/integration/litellm-proxy).
+</Info>
+
 ## Installation
 
 <CodeGroup>
@@ -37163,325 +37167,109 @@ Also check: [Write scenarios in code](/agent-testing/scenarios-in-code), [Scenar
 
 ---
 
-# FILE: ./agent-testing/voice-agents-in-app.mdx
-
----
-title: Voice Agents in the App
-sidebarTitle: Voice Agents (App)
-keywords: langwatch, agent testing, voice agents, voice testing, elevenlabs, conversational ai, feature flag
-description: "Test an ElevenLabs Conversational AI agent from the LangWatch app: talk to it, call it from a run, or run scenarios with a simulated caller."
----
-
-<Note>
-  Testing another transport (Pipecat, OpenAI Realtime, Gemini Live, Twilio) from code? See [Voice Agent Testing](/agent-testing/voice-agents).
-</Note>
-
-## What it is
-
-A **Voice** agent type in **Agents** points at an ElevenLabs Conversational AI agent by its agent id. Three ways to test it:
-
-| Way | Where | Caller |
-|---|---|---|
-| **Talk to it** | The agent drawer | You, from the browser |
-| **Call it myself** | The Run dialog, on a scenario against a voice target | You, from the browser |
-| **Run a scenario** | Normal scenario run | A simulated caller, speaking the scenario with a caller voice |
-
-<Note>
-  **Talk to it** works before the agent is saved, as soon as the agent id and the ElevenLabs key exist. The agent is saved on hang-up. The panel then shows the transcript and, when the recording is ready, a Play control. The call is not stored as a run; instead each exchange is recorded as a trace, so the conversation stays queryable in the Trace Explorer without a run.
-
-  To score a call against a scenario, use **Call it myself**. That writes a run under the scenario, scored the same way a simulated run is.
-</Note>
-
-**Call it myself** opens the same panel from the Run dialog of a scenario, in scenario mode. The run is named after the scenario.
-
-A normal scenario run needs no manual call: the simulated caller speaks the scenario using the caller voice configured on it.
-
-**Phone number targets** dial the agent over the phone. A scenario run places an outbound call to the target number through your Twilio account, and the simulated caller speaks to whoever answers.
-
-The Phone number option appears in the agent drawer once your project has a Twilio provider in **Settings > Model Providers** (account SID, auth token and from-number); until then the drawer points you there. A phone target supports **Run a scenario** only. **Talk to it** and **Call it myself** are not available for it, because a phone call has no browser leg. See [issue #8014](https://github.com/langwatch/langwatch/issues/8014).
-
-On a self-hosted deployment, set `VOICE_PUBLIC_BASE_URL` only when the voice worker has its own hostname; when it is unset the app's own public base host is used. Set `VOICE_WS_PORT` to pin the port the phone transport listens on, so your public origin can route to it; it defaults to an ephemeral port.
-
-## Turn it on
-
-In-app voice agents are in private beta. The feature sits behind the product flag `release_voice_agents_enabled`, off by default. To request access, reach out to support at support@langwatch.ai.
-
-
-  ### Self-hosted
-
-    Set `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled` on the app.
-
-  ### Cloud
-
-    Ask LangWatch to enable it for your organization.
-
-
-
-<Warning>
-  With the flag off, the Voice agent type, **Talk to it**, **Call it myself** and the Caller voice controls are hidden, and the server refuses voice agents and voice runs.
-</Warning>
-
-## Credentials
-
-Add both under **Settings > Model Providers**. Never from environment variables.
-
-<Steps>
-  <Step title="ElevenLabs key">
-    The key needs `convai_read` to read the agent, `convai_write` to mint the browser conversation token and signed URL, and conversation read to fetch the transcript and recording after the call.
-
-    <Warning>
-      Without `convai_write`, every call fails at start with "ElevenLabs rejected the connection: The API key you used is missing the permission convai_write to execute this operation."
-    </Warning>
-
-    The agent must live in the same ElevenLabs workspace as the key. A wrong workspace shows as agent not found.
-  </Step>
-  <Step title="OpenAI key">
-    Required only for a simulated scenario run. The simulated caller's speech is synthesized with OpenAI text-to-speech (`gpt-4o-mini-tts`), and the agent's audio is transcribed with OpenAI for the judge. **Talk to it** and **Call it myself** use ElevenLabs only and need no OpenAI key.
-
-    Without it a simulated run fails with "The caller voice needs an OpenAI key. Add one in Settings > Model Providers."
-  </Step>
-</Steps>
-
-See [Model Providers](/platform/model-providers) for how to add and scope a provider.
-
-## Caller voice
-
-Set the caller voice on the scenario, under **Customize scenario**, or in the **Caller voice** block of the Agent Testing case editor. It is stored on the scenario, so every run of it uses the same caller.
-
-| Field | Values |
-|---|---|
-| **Voice** | An OpenAI text-to-speech voice: `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`, `verse`. Default `nova`. |
-| **Interrupts** | Probability from 0 to 1 that the caller talks over the agent. |
-| **Effects** | None, phone line, or background noise. |
-
-## Limits
-
-Set these as app environment variables.
-
-| Variable | Default | Effect |
-|---|---|---|
-| `VOICE_CALL_MAX_SECONDS` | 300 | A call is cut at the limit. The run is marked "Cut at the call limit" and the judge still scores what was said. |
-| `VOICE_RUNS_MAX_CONCURRENT` | 2 | Per execution process, per project. More voice runs queue instead of failing. Text runs are unaffected. Enforcement is local to each process and not shared across processes or pods, so the effective ceiling on a multi-process deployment is higher than this number. |
-
-`VOICE_CALL_MAX_SECONDS` is enforced by the server and governs a scenario run: the simulated caller, the judge and the recorded transcript all stop at that limit. A **Talk to it** or **Call it myself** call in the browser is bounded by the browser tab instead, up to ElevenLabs' own maximum call length: closing or reloading the tab, or losing the connection, ends the call at whatever point that happens, not at `VOICE_CALL_MAX_SECONDS`.
-
-<Note>
-  **Security**: projects in one organization that share a single ElevenLabs key share that workspace's agents and conversations, since ElevenLabs checks the key, not the project. A project-scoped key is the way to isolate a project's voice agents from the rest of the organization.
-</Note>
-
-## Traps
-
-- The ElevenLabs key needs `convai_read`, `convai_write` and conversation read. A key missing any of these fails at a different step, so check all three when a call breaks.
-- The agent must be in the same ElevenLabs workspace as the key.
-- An agent marked public in ElevenLabs still needs a token here; public access does not skip the credential check.
-- LangWatch never sends prompt overrides. Enabling overrides on the agent has no effect on these calls: the agent's own ElevenLabs prompt is what gets tested.
-- The recording can be unavailable for a short while after hang-up while ElevenLabs processes it. The run shows "Recording unavailable"; reload later.
-- The browser needs HTTPS or localhost and microphone permission. Autoplay policy can keep the agent silent until the page has been clicked.
-- Every call, whether **Talk to it**, **Call it myself** or simulated, consumes ElevenLabs conversation minutes on your account. A simulated run also consumes OpenAI audio tokens.
-- Only one browser call per tab.
-- Self-hosted: voice turns carry audio, and audio is written to stored objects. If the stored-objects path is not writable (or no S3 bucket is configured), every voice message fails to ingest and the run shows "No response" even though the call happened. Check the api log for `EACCES` on the stored-objects directory.
-
-## Troubleshooting
-
-| Message | Cause | Fix |
-|---|---|---|
-| "...missing the permission convai_write..." | The ElevenLabs key lacks `convai_write` | Regenerate the key with `convai_write` |
-| "ElevenLabs rejected the connection: Status code: 401" | Wrong or revoked key | Check the key in Settings > Model Providers |
-| Agent not found | Wrong agent id, or the agent is in a different ElevenLabs workspace than the key | Confirm the agent id and workspace |
-| "The caller voice needs an OpenAI key..." | No OpenAI provider configured | Add an OpenAI provider in Settings > Model Providers |
-| "Recording unavailable" | ElevenLabs is still processing the recording | Reload the run after a short wait |
-| Run marked "Cut at the call limit" | The call reached `VOICE_CALL_MAX_SECONDS` | Raise the limit, or shorten the scenario |
-| Runs sit in queue | `VOICE_RUNS_MAX_CONCURRENT` is reached | Wait for a slot, or raise the limit |
-| "No response" after a call that clearly happened (self-hosted) | Audio could not be written to stored objects, so the voice messages were dropped | Make the stored-objects directory writable by the app user, or configure the S3 bucket |
-
----
-
 # FILE: ./agent-testing/voice-agents.mdx
 
 ---
-title: Voice Agent Testing
+title: Voice Agents
 sidebarTitle: Voice Agents
-keywords: langwatch, agent testing, voice agents, voice testing, elevenlabs, openai realtime, twilio, pipecat, audio testing
-description: Scenario tests voice agents end to end over real audio, with the same scenario.run() and the same judge you use for text.
+keywords: langwatch, agent testing, voice agents, voice testing, elevenlabs, twilio, phone, openai realtime, pipecat, gemini live, audio testing, caller voice
+description: Test a voice agent over real audio. A simulated caller talks to your agent, and a judge scores the call against your criteria.
 ---
 
-<Tip>
-  **Fastest path:** run `/scenarios add voice testing to my agent` in your coding assistant after
-  installing the [`/scenarios` skill](https://langwatch.ai/docs/skills/directory). It detects your
-  transport, picks the matching adapter, and wires it to your deployed agent. To do it by hand,
-  follow the steps below.
-</Tip>
+A voice test is a [scenario](/agent-testing/scenarios) played out over audio. A simulated caller speaks to your agent, listens to each reply and answers, turn by turn. A judge then scores the call against your criteria. You write the scenario the same way as for a text agent.
+
+<img src="/images/scenario-voice.webp" alt="A voice scenario: a simulated caller, the agent under test and the judge" width="100%" />
+
+This page gets one voice test running from the platform, against an ElevenLabs agent or a phone number. To test another transport, or to run voice tests in CI, see [Test from code](#test-from-code).
+
+## Before you start
 
 <Note>
-  Prefer no code? You can register an ElevenLabs agent and test it from the app, see [Voice Agents in the App](/agent-testing/voice-agents-in-app).
+  Voice agents are in private beta. On cloud, write to support@langwatch.ai to enable them for your organization. Self-hosted, set `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled` on the app.
 </Note>
 
-## How a voice test runs
+Add the providers under **Settings > Model Providers**. See [Model Providers](/platform/model-providers).
 
-The user simulator synthesizes a caller, speaks to your agent through its real transport, and reacts to the replies turn after turn. The judge scores the conversation against your criteria, and the run records the audio and a per-segment transcript.
+- **OpenAI**, for every voice test. The simulated caller speaks with OpenAI text-to-speech, and the judge reads an OpenAI transcript of the call.
+- **ElevenLabs**, to test an ElevenLabs agent. The key must be in the same ElevenLabs workspace as the agent, with `convai_read`, `convai_write` and conversation read.
+- **Twilio**, to test a phone number. The call is placed from your Twilio number.
 
-<img src="/images/scenario-voice.webp" alt="Voice Agent Testing" width="100%" />
+## Add your voice agent
 
-## What you can test
+1. Open **Agents** in the sidebar and press **New Agent**.
+2. Pick **Voice Agent** and give it a **Name**.
+3. Under **Reached via**, pick **ElevenLabs agent** and paste the **Agent id** from ElevenLabs. For a phone number, pick **Phone number** and enter it in international format, for example `+14155550123`.
+4. Press **Create Agent**.
+
+LangWatch tests the agent as ElevenLabs has it configured. It does not send prompt overrides.
+
+For an ElevenLabs agent, press **Talk to it** to hear the agent from your browser before you write a scenario. This call is not scored.
+
+## Run a scenario against it
+
+Open **Agent Testing**, create a scenario the way you would for a text agent, and press **Run**. In the run dialog, pick your voice agent as the **Agent to be tested**. See [Test from the platform](/agent-testing/test-from-the-platform) for writing scenarios and the run dialog.
+
+A voice run takes one to two minutes per scenario, because every turn is spoken, then transcribed.
+
+## Read the result
+
+The run shows the same verdict as a text run: each criterion passed or failed, with the judge's reasoning. The conversation drawer adds the recording of the call, with the transcript per turn. See [Results](/agent-testing/results).
+
+## Test from code
+
+The [Scenario](https://langwatch.ai/scenario/) SDK runs voice tests from your own test runner, in Python or TypeScript. It has adapters for ElevenLabs, OpenAI Realtime, Gemini Live, Pipecat and Twilio, and can add background noise and interruptions. With `LANGWATCH_API_KEY` set, each run appears in **Agent Testing** with its recording and transcript.
 
 <CardGroup cols={2}>
-  <Card title="Real-audio, multi-turn calls" icon="phone">
-    A synthesized user actually speaks to your agent and reacts to its replies, turn after turn.
+  <Card title="Voice quick start" icon="rocket" href="https://langwatch.ai/scenario/voice/getting-started/">
+    Install, set up keys and run your first voice scenario.
   </Card>
-  <Card title="Audio effects" icon="waveform-lines">
-    Inject background noise, phone-quality codec degradation, or custom WAV clips to test how the
-    agent handles degraded audio.
+  <Card title="Choose an adapter" icon="plug" href="https://langwatch.ai/scenario/voice/choosing-an-adapter/">
+    Pick the adapter for your transport.
   </Card>
-  <Card title="Interruptions" icon="hand">
-    Script the user barging in mid-reply, with native barge-in or a VAD-driven fallback per adapter.
+  <Card title="Voice recipes" icon="sliders" href="https://langwatch.ai/scenario/voice/recipes/">
+    Audio effects, interruptions, multi-turn calls and observability.
   </Card>
-  <Card title="Latency metrics" icon="gauge-high">
-    Time-to-first-byte and p50/p95 per turn, so you catch a slow agent before a release.
+  <Card title="Troubleshooting" icon="wrench" href="https://langwatch.ai/scenario/voice/troubleshooting/">
+    The failures that come up most often in voice scenarios.
   </Card>
 </CardGroup>
 
-## Adapters per transport
+## Reference
 
-Pick the adapter that matches the transport you deployed:
+<AccordionGroup>
+  <Accordion title="Caller voice">
+    The caller voice is part of the scenario, so every run of it uses the same caller. In the scenario editor, open **Customize scenario**, then **Caller voice**.
 
-| Transport                          | Adapter                      |
-| ---------------------------------- | ---------------------------- |
-| Pipecat / Twilio Media Streams     | `PipecatAgentAdapter`        |
-| ElevenLabs hosted ConvAI           | `ElevenLabsAgentAdapter`     |
-| OpenAI Realtime                    | `OpenAIRealtimeAgentAdapter` |
-| Gemini Live                        | `GeminiLiveAgentAdapter`     |
-| Twilio phone number (PSTN)         | `TwilioAgentAdapter`         |
-| Text-only agent (no transport yet) | `ComposableVoiceAgent`       |
+    | Field | Values |
+    |---|---|
+    | **Voice** | An OpenAI text-to-speech voice. Default `nova`. |
+    | **Interrupts** | How often the caller talks over the agent, from 0% to 100%. |
+    | **Effects** | None, phone line, or background noise. |
+  </Accordion>
+  <Accordion title="Score a call you make yourself">
+    Run a single scenario and, in the run dialog, pick **Call it myself** to talk to an ElevenLabs agent from your browser. The call is saved as a run of the scenario, and the judge scores it like a simulated call.
 
-<Note>
-  Full constructors, the per-adapter [capability
-  matrix](https://langwatch.ai/scenario/voice/capability-matrix), and guidance on [choosing an
-  adapter](https://langwatch.ai/scenario/voice/choosing-an-adapter) are in the Scenario docs.
-</Note>
+    The browser needs HTTPS or localhost and microphone permission.
+  </Accordion>
+  <Accordion title="Limits and cost">
+    A call is cut after 5 minutes. The run is marked "Cut at the call limit", and the judge scores what was said. Each project runs 2 voice calls at a time per worker process, and more voice runs wait in the queue. Self-hosted, change these limits with the voice variables in [Environment Variables](/self-hosting/configuration/environment-variables#voice-agents).
 
-## Get it running
+    Every call uses ElevenLabs conversation minutes, or Twilio minutes for a phone number. A simulated call also uses OpenAI audio tokens.
 
-If you have not used Scenario, start with [Getting Started](/agent-testing/scenarios-in-code) for the basics (API key, your agent's `call()` adapter), then come back for the voice specifics.
-
-<Steps>
-  <Step title="Install Scenario">
-
-      ### Python
-
-        ```bash
-        pip install langwatch-scenario
-        ```
-
-      ### TypeScript
-
-        ```bash
-        npm install @langwatch/scenario
-        ```
-
-
-  </Step>
-  <Step title="Point at your agent, add a voice user and a judge">
-    Swap `BOT_WS_URL` for your running bot (or use the adapter for your transport from the table above). The user simulator speaks with a real voice; the judge scores the call against your criteria.
-
-
-      ### Python
-
-        ```python
-        import scenario
-
-        scenario.configure(default_model="openai/gpt-5-mini")
-
-        BOT_WS_URL = "ws://localhost:8765/stream"  # your deployed bot
-
-        result = await scenario.run(
-            name="billing inquiry",
-            description="An upset customer calls about a duplicate charge.",
-            agents=[
-                scenario.PipecatAgentAdapter(url=BOT_WS_URL),
-                scenario.UserSimulatorAgent(
-                    voice="elevenlabs/EXAVITQu4vr4xnSDxMaL",
-                    audio_effects=[scenario.effects.phone_quality()],
-                ),
-                scenario.JudgeAgent(criteria=[
-                    "Acknowledged the frustration before logistics",
-                    "Verified identity before any account action",
-                ]),
-            ],
-            script=[scenario.agent(), scenario.user(), scenario.proceed(turns=5), scenario.judge()],
-        )
-        assert result.success
-        ```
-
-      ### TypeScript
-
-        ```typescript
-        import scenario, { voice } from "@langwatch/scenario";
-
-        const BOT_WS_URL = "ws://localhost:8765/stream"; // your deployed bot
-
-        const result = await scenario.run({
-          name: "billing inquiry",
-          description: "An upset customer calls about a duplicate charge.",
-          agents: [
-            scenario.pipecatAgent({ url: BOT_WS_URL }),
-            scenario.userSimulatorAgent({
-              voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
-              audioEffects: [voice.effects.phoneQuality()],
-            }),
-            scenario.judgeAgent({
-              criteria: [
-                "Acknowledged the frustration before logistics",
-                "Verified identity before any account action",
-              ],
-            }),
-          ],
-          script: [scenario.agent(), scenario.user(), scenario.proceed(5), scenario.judge()],
-        });
-        ```
-
-
-
-  </Step>
-  <Step title="Run it">
-    Run your usual test command (`pytest` or `vitest`). With `LANGWATCH_API_KEY` set, the run appears under **Agent Testing > Results** with full audio playback and per-segment transcripts, and writes a `recordings/<scenario>/full.wav` to listen back.
-
-    <Tip>Voice scenarios are slower than text: TTS + transport + multi-turn means 30 to 120 seconds per run, so give your test runner a generous timeout.</Tip>
-
-  </Step>
-</Steps>
-
-## Full documentation
-
-<CardGroup cols={2}>
-  <Card
-    title="Voice quick start"
-    icon="rocket"
-    href="https://langwatch.ai/scenario/voice/getting-started"
-  >
-    The complete five-minute walkthrough with a worked example per adapter.
-  </Card>
-  <Card
-    title="Audio effects & interruptions"
-    icon="sliders"
-    href="https://langwatch.ai/scenario/voice/recipes"
-  >
-    Background noise, codec degradation, custom WAVs, and barge-in recipes.
-  </Card>
-  <Card
-    title="Capability matrix"
-    icon="table-list"
-    href="https://langwatch.ai/scenario/voice/capability-matrix"
-  >
-    Exactly which features each adapter supports.
-  </Card>
-  <Card
-    title="Runnable examples"
-    icon="github"
-    href="https://github.com/langwatch/scenario/tree/main/python/examples/voice"
-  >
-    Demos per adapter and use case on GitHub.
-  </Card>
-</CardGroup>
+    Projects that share one ElevenLabs key share that workspace's agents and calls, because ElevenLabs checks the key, not the project. Give each project its own key to keep them apart.
+  </Accordion>
+  <Accordion title="Troubleshooting">
+    | Message | Fix |
+    |---|---|
+    | "...missing the permission convai_write..." | Create an ElevenLabs key with `convai_read`, `convai_write` and conversation read. |
+    | "ElevenLabs rejected the connection" with status 401 | The key is wrong or revoked. Check it in **Settings > Model Providers**. |
+    | Agent not found | Check the agent id, and that the agent is in the same ElevenLabs workspace as the key. |
+    | "The caller voice needs an OpenAI key..." | Add an OpenAI provider in **Settings > Model Providers**. |
+    | "Recording not ready yet" | ElevenLabs is still processing the call. Reload the run after a short wait. |
+    | The agent is silent in the browser | Click the page once, allow the microphone, and use HTTPS or localhost. |
+    | "Cut at the call limit" | Shorten the scenario, or raise the call limit if you self-host. |
+  </Accordion>
+</AccordionGroup>
 
 ---
 
@@ -61939,6 +61727,18 @@ The `smtp` gateway ignores these variables on purpose, because an SMTP relay is 
 | `GOOGLE_EVALUATOR_ENABLED`        | Enable Google AI for evaluations (PII detection) | `false` |
 | `GOOGLE_CREDENTIALS_JSON`         | Google service account credentials JSON          | -       |
 
+## Voice Agents
+
+`VOICE_CALL_MAX_SECONDS` and `VOICE_RUNS_MAX_CONCURRENT` shape [voice agent](/agent-testing/voice-agents) runs, which need `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled`. The other three act on every worker boot, with the flag on or off: each worker listens on `VOICE_WS_PORT` and, unless `VOICE_PUBLIC_BASE_URL` is set or `VOICE_TUNNEL=false`, opens a cloudflared quick tunnel.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `VOICE_CALL_MAX_SECONDS` | Longest a voice call can last, in seconds. A scenario call is cut at this limit and marked "Cut at the call limit". Browser calls (**Talk to it**, **Call it myself**) are cut at the same limit. | `300` |
+| `VOICE_RUNS_MAX_CONCURRENT` | Voice runs at a time, per project, per worker process. More voice runs wait in the queue. Text runs are not affected. | `2` |
+| `VOICE_PUBLIC_BASE_URL` | Public https origin of the voice worker, for Twilio phone calls to reach it. When set, it always wins over the tunnel. | - |
+| `VOICE_TUNNEL` | With `VOICE_PUBLIC_BASE_URL` unset, the worker opens a cloudflared quick tunnel at boot and uses its URL. Set to `false` to turn the tunnel off. With both off, phone runs fail. | on |
+| `VOICE_WS_PORT` | Port the voice worker listens on for phone audio. Route your public origin to it. | `3300` |
+
 ## Feature Flags
 
 | Variable              | Description                                     | Default |
@@ -62786,7 +62586,7 @@ For on-premises deployments with SSO, map email domains to organizations:
 -- Connect to PostgreSQL and run:
 UPDATE "Organization"
 SET "ssoProvider" = 'okta',
-    "ssoEmailDomain" = 'yourcompany.com'
+    "ssoDomain" = 'yourcompany.com'
 WHERE "id" = 'your-org-id';
 ```
 
@@ -62794,16 +62594,13 @@ This ensures users with `@yourcompany.com` emails are automatically associated w
 
 ## Migrating from Email/Password to SSO
 
-1. Enable SSO by setting the provider configuration above
-2. Flag existing email/password users for SSO migration:
+An SSO sign-in joins an existing email/password account only when that account's address is confirmed. Otherwise the sign-in is refused with "Account already exists", because an unconfirmed account may have been registered by somebody else.
 
-```sql
-UPDATE "User"
-SET "pendingSsoSetup" = true
-WHERE "email" LIKE '%@yourcompany.com';
-```
+1. Before you switch the provider, have each email/password user confirm their address: **Settings > Security**, **Send the link again** next to their address, then open the link in the same browser. This needs [outbound email](/self-hosting/configuration/email).
+2. Enable SSO by setting the provider configuration above.
+3. Each confirmed user signs in through SSO and lands on their existing account, with the same data, projects and permissions.
 
-3. When flagged users next sign in via SSO, their accounts are automatically linked
+Setting `"pendingSsoSetup"` on a user only shows them a banner asking them to sign in through SSO. It does not link the account.
 
 <Note>
   Users keep their existing data, projects, and permissions after the SSO migration. The migration
@@ -63165,7 +62962,7 @@ The switches on the Checkup page are stored in the install's own database, so th
 
 ## When the report starts
 
-The first report goes out at the next 12:00 UTC after boot, and one a day after that. An install shows its administrators a notice once, in the app, when it starts reporting and again whenever the report changes shape. The notice links this page and the Checkup page, and dismissing it records the dismissal in the database so it stays dismissed for everyone.
+The first report goes out at the next 12:00 UTC after boot, and one a day after that.
 
 ## What is never collected
 
@@ -63177,7 +62974,7 @@ The report lands in a database at LangWatch, one row per install and one per rep
 
 ## Existing installs
 
-An install on an offline license, upgraded to a release with this page, behaves as before: the same seat cap, the same screens, the same license check with no network on the path, and the usage report going where it always went. The report gains fields with the release, which is what the startup notice tells you, and the switches above are how to trim it.
+An install on an offline license, upgraded to a release with this page, behaves as before: the same seat cap, the same screens, the same license check with no network on the path, and the usage report going where it always went. The report gains fields with the release, and the switches above are how to trim it.
 
 ---
 
@@ -63243,7 +63040,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.17.0
+    targetRevision: 3.18.0
     helm:
       releaseName: langwatch
       values: |
@@ -63292,7 +63089,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.17.0
+      targetRevision: 3.18.0
       helm:
         releaseName: langwatch
         valueFiles:
@@ -63661,7 +63458,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.17.0
+VERSION=3.18.0
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -63677,13 +63474,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.17.0"
+    tag: "3.18.0"
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.17.0"
+    tag: "3.18.0"
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.17.0"
+    tag: "3.18.0"
 
 imagePullSecrets:
   - name: registry-credentials
@@ -64100,20 +63897,20 @@ clickhouse:
 
 You only need to set these two values, the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
 
-### AI Gateway sub-chart (optional)
+### AI Gateway sub-chart
 
-The umbrella chart bundles the AI Gateway as an opt-in sub-chart that runs alongside the core LangWatch app. Enabling it gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching, all governed by the same control plane.
+The umbrella chart bundles the AI Gateway as a sub-chart that runs alongside the core LangWatch app, and installs it by default. It gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching, all governed by the same control plane.
 
-Minimum viable opt-in:
+To run without it:
 
 ```yaml
 gateway:
-  enabled: true
+  chartManaged: false
 ```
 
-That ships sane defaults (2 replicas, ClusterIP service, no ingress). For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+The defaults are 2 replicas, a ClusterIP service and an ingress for the placeholder host `gateway.langwatch.ai`. Set `gateway.ingress.host` to your own hostname, or `gateway.ingress.enabled: false` to reach the gateway only from inside the cluster. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
-Three things to know before flipping it on:
+Three things to know when running it:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
@@ -64164,6 +63961,18 @@ cronjobs:
     annotations:
       sidecar.istio.io/inject: "false"
 ```
+
+### Two installs in one cluster
+
+The bundled Prometheus creates a cluster-scoped ClusterRole named `<release>-prometheus-server`. A second install with the same release name in another namespace, for example a staging `langwatch` beside a production `langwatch`, fails with `ClusterRole "langwatch-prometheus-server" ... exists and cannot be imported into the current release`. Give the second install its own ClusterRole name, or use a different release name:
+
+```yaml
+prometheus:
+  server:
+    clusterRoleNameOverride: langwatch-staging-prometheus-server
+```
+
+Both installs render ingress rules for the same default hosts and paths, and overlapping host and path rules conflict in the ingress controller. Give each install its own `ingress.hosts` and `gateway.ingress.host`, or disable an ingress that install does not need.
 
 ### Custom StorageClass
 
@@ -66607,7 +66416,7 @@ Choose the deployment method that fits your environment.
 - **Auto-tuned ClickHouse** via the `clickhouse-serverless` subchart adapts resource allocation to your workload.
 - **Composable Helm chart overlays** let you customize deployments without forking the chart.
 - **Deep OpenTelemetry integration**: ingest traces via OTLP, export platform metrics and logs via OTel for infrastructure monitoring.
-- **AI Gateway sub-chart** (optional), terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, opt in via `gateway.enabled=true`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
+- **AI Gateway sub-chart**, terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, on by default; turn it off with `gateway.chartManaged=false`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
 
 ## Enterprise
 
@@ -67596,7 +67405,7 @@ helm repo update
 
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.17.0 \
+  --version 3.18.0 \
   -f values-production.yaml \
   --wait --timeout 10m
 ```
@@ -68048,7 +67857,7 @@ helm search repo langwatch/langwatch --versions
 # Install a specific chart version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.17.0 \
+  --version 3.18.0 \
   -f values-production.yaml
 ```
 
@@ -68100,6 +67909,24 @@ docker compose up -d
 ```
 
 ## Breaking Changes
+
+### 3.16 or 3.17 to 3.18: Sign-in and SSO
+
+The upgrade keeps existing accounts working with no manual step, apart from the cases below. A Helm upgrade from 3.16.0 with email and password users, an Okta-configured deployment and domain SSO was tested end to end; the Azure AD account move is covered by tests only:
+
+- Password users sign in with their existing password on the new email-first sign-in page.
+- SSO users land on their existing user and organization. The callback URL stays `/api/auth/callback/<provider>`, so the identity provider registration does not change.
+- Azure AD accounts move to the key the new sign-in looks them up by on each user's first sign-in after the upgrade. There is no SQL to run.
+- Browser sessions and API keys keep working.
+- The identity migrations run on first start. Check **Ops > Migrations** afterwards; see [Check the migration results](#check-the-migration-results).
+
+The first start runs a migration preflight before the app reports ready. `--timeout 45m` on `helm upgrade` gives it room to start. A migration that cannot finish during the preflight stays gated and does not block startup, so check **Ops > Migrations** once the rollout completes. The app can restart once or twice while the bundled ClickHouse restarts on its new image; that is expected.
+
+**Provider setting.** The chart now passes `app.nextAuth.provider` to the app as `AUTH_PROVIDER`. `NEXTAUTH_PROVIDER` is still read and logs a deprecation warning. If you select the provider with `NEXTAUTH_PROVIDER` in `app.extraEnvs`, the chart leaves the setting to you, as before. Outside the chart, set `AUTH_PROVIDER`; when both are set it wins.
+
+**Moving password users to SSO.** An SSO sign-in joins an existing password account only once its address is confirmed. See [Migrating from Email/Password to SSO](/self-hosting/configuration/sso) on the SSO page.
+
+**Okta and Auth0.** The id token is now verified: its `iss` must equal the `issuer` in the provider's discovery document. A provider behind a proxy that rewrites one but not the other stops signing people in until the two agree.
 
 ### Dataset Object Storage (Helm)
 
@@ -68198,7 +68025,7 @@ Sent with every report. `DISABLE_USAGE_STATS=true` stops the report as a whole.
 | `teams` | at the time of the report | How the install is divided up, which is what team-level features have to work against. | Team |
 | `projects` | at the time of the report | How many projects the install carries, which is the unit limits and screens are scoped to. | Project |
 | `users` | at the time of the report | How many people use the install, which is what support and seat questions start from. | OrganizationUser |
-| `auth_method` | at the time of the report | Which sign-in method is configured, so an authentication problem can be reproduced rather than guessed at. | AUTH_PROVIDER |
+| `auth_method` | at the time of the report | Which sign-in method is configured, so an authentication problem can be reproduced rather than guessed at. | AUTH_PROVIDER, else the deprecated NEXTAUTH_PROVIDER |
 | `sso_provider` | at the time of the report | The name of the identity provider in use, never its configuration or its secrets, so an SSO problem names the product it is about. | Organization.ssoProvider |
 | `connected` | at the time of the report | Whether this install's license names a hosted service, which decides what it may call and which host answers it. | the signed license |
 

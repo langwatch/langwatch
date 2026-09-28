@@ -250,6 +250,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
           compileFilter: (input) => traces.compileLangWatchQLTraceFilter(input),
           selectTraceIds: (input) => traces.findTraceIdsForFilter(input),
           isEnabled: (input) => access.isEnabled(input),
+          isReleased: (input) => access.isReleased(input),
           isQueryIdentityAvailable: () => analytics.isLangWatchQLAvailable(),
           resolveCaller: (input) => InstantEvalApp.callerOf({ analytics, ...input }),
           getPlan: async ({ projectId }) => {

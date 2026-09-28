@@ -194,4 +194,30 @@ describe.skipIf(!DB_URL)("PrismaIdentityProjectionRepository", () => {
       await prisma!.account.deleteMany({ where: { userId: orphanUser } });
     });
   });
+
+  describe("when the fold holds the account's own address as proven", () => {
+    /** @scenario "An existing unconfirmed account confirms its own address from Settings" */
+    it("marks the User row's address confirmed", async () => {
+      await withUserRow();
+      await prisma.user.update({ where: { id: USER }, data: { emailVerified: false } });
+      const id = `${namespace}-own-email`;
+      const own: IdentifierFact = {
+        ...fact(id, "VERIFIED"),
+        provider: "email",
+        value: `${USER}@acme.com`.toUpperCase(),
+        accountId: null,
+        providerId: null,
+        issuer: null,
+        providerAccountId: null,
+      };
+
+      await repository.store(projection({ [id]: own }, { acceptedAt: 15, eventId: "evt_6" }), {
+        aggregateId: USER,
+        tenantId: createTenantId(USER),
+      });
+
+      const row = await prisma.user.findUnique({ where: { id: USER } });
+      expect(row).toMatchObject({ emailVerified: true, signupConfirmationPending: false });
+    });
+  });
 });

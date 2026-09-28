@@ -175,11 +175,18 @@ export type LangyTurnSettlementWaitInput = Readonly<{
   turnId: string;
   userId: string;
   signal: AbortSignal;
+  /** Also settle once the turn waits on the user (a question or permission card). */
+  shouldSettleOnUserWait?: boolean;
 }>;
 
-/** `stopped`: the caller's signal ended the wait before the turn settled. */
+/**
+ * `stopped`: the caller's signal ended the wait before the turn settled.
+ * `awaiting_user`: only for a caller that opted in; `question` is the question
+ * prose, empty for a permission card.
+ */
 export type LangyTurnSettlementWait =
   | { kind: "settled"; settlement: LangyTurnSettlement }
+  | { kind: "awaiting_user"; question: string }
   | { kind: "stopped" };
 
 export type LangyGetPageInput = {

@@ -1,3 +1,4 @@
+/** @see specs/clickhouse/concurrent-boot-migrations.feature */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { holdMigrationLock, migrationLockKey } from "../migration-lock.ts";
@@ -23,6 +24,8 @@ beforeEach(() => {
 
 describe("given the deployment migration lock", () => {
   describe("when another runner holds it", () => {
+    /** @scenario "Two migration runs started together never overlap" */
+    /** @scenario "The migration lock is released when the run ends" */
     it("waits on the same session and unlocks after the sequence", async () => {
       database.query.mockResolvedValueOnce({ rows: [{ locked: false }] });
       const run = vi.fn(async () => {
@@ -42,6 +45,7 @@ describe("given the deployment migration lock", () => {
   });
 
   describe("when a task fails", () => {
+    /** @scenario "A failed migration run releases the lock" */
     it("unlocks and closes the session before propagating the failure", async () => {
       const failure = new Error("task failed");
       await expect(

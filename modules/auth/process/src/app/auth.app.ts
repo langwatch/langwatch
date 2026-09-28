@@ -33,6 +33,7 @@ import {
   type AuthUsageCount,
   type AddressConfirmation,
   type SignUpEnrollment,
+  type SignUpVerificationRequest,
   type PriorSession,
 } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
@@ -423,6 +424,10 @@ export class AuthApp implements AuthApiContract {
         users: dependencies.users,
         route: (input) => dependencies.identity.routeSignIn(input),
         isWithinBudget: (input) => app.isWithinBudget(input),
+        isEmailUnconfigured: async () => {
+          const view = await dependencies.notifications.getMailDelivery();
+          return view.provider === undefined && !view.misconfigured;
+        },
       }),
       members,
       dependencies: {
@@ -450,6 +455,8 @@ export class AuthApp implements AuthApiContract {
       },
       signUpEnrollment: SignUpEnrollmentService.create({
         validateAddressProof: (input) => app.requireSignUp().validateAddressProof(input),
+        validateUnconfirmedAddressProof: (input) =>
+          app.requireSignUp().validateUnconfirmedAddressProof(input),
         route: (input) => app.route(input),
         addressIsTaken: async ({ email }) =>
           (await dependencies.users.findByEmail({ email })) !== null,
@@ -846,7 +853,9 @@ export class AuthApp implements AuthApiContract {
     return this.requireSignUp().requestVerification(input);
   }
 
-  async requestNewAccountVerification(input: Readonly<{ email: string }>): Promise<void> {
+  async requestNewAccountVerification(
+    input: Readonly<{ email: string }>,
+  ): Promise<SignUpVerificationRequest> {
     return this.requireSignUp().requestNewAccountVerification(input);
   }
 
@@ -922,6 +931,12 @@ export class AuthApp implements AuthApiContract {
     return this.requireSignUp().claimAddressProof(input);
   }
 
+  async claimUnconfirmedSignUpAddressProof(
+    input: Readonly<{ token: string; email: string }>,
+  ): Promise<boolean> {
+    return this.requireSignUp().claimUnconfirmedAddressProof(input);
+  }
+
   linkProviderAccount(
     input: Readonly<{
       userId: string;
@@ -992,6 +1007,7 @@ function buildSignUpVerification({
   users,
   route,
   isWithinBudget,
+  isEmailUnconfigured,
 }: {
   members: AuthInfrastructure;
   repositories: AuthRepositories;
@@ -999,6 +1015,7 @@ function buildSignUpVerification({
   users: UserApi;
   route: SignUpVerificationDeps["route"];
   isWithinBudget: SignUpVerificationDeps["isWithinBudget"];
+  isEmailUnconfigured: SignUpVerificationDeps["isEmailUnconfigured"];
 }): SignUpVerificationService | null {
   const baseUrl = members.publicBaseUrl;
   if (!baseUrl) return null;
@@ -1011,6 +1028,7 @@ function buildSignUpVerification({
     isWithinBudget,
     buildVerificationUrl: ({ token }) =>
       `${baseUrl}/auth/signup?verify=${encodeURIComponent(token)}`,
+    isEmailUnconfigured,
     now,
   });
 }

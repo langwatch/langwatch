@@ -2628,8 +2628,7 @@ export const prismaModelFieldCatalogue = {
     "lastReportAt",
     "lastReportError",
     "optionalMetricsOptOut",
-    "hostnameOptOut",
-    "startupNoticeAcknowledgedSchemaVersion"
+    "hostnameOptOut"
   ],
   "SelfHostedInstance": [
     "id",

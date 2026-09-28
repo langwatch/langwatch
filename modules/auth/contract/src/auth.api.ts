@@ -16,6 +16,7 @@ import type {
   InviteLanding,
   PriorSession,
   SignUpEnrollment,
+  SignUpVerificationRequest,
   SignUpVerificationResult,
 } from "./front-door.responses.ts";
 import type {
@@ -165,8 +166,13 @@ export interface AuthApi {
   addressIsRegistered(input: Readonly<{ email: string }>): Promise<boolean>;
   /** Mails a fresh confirmation link. Asking twice sends twice. */
   requestSignUpVerification(input: Readonly<{ email: string }>): Promise<void>;
-  /** Mails a sign-up confirmation link, refusing an address that already has an account. */
-  requestNewAccountVerification(input: Readonly<{ email: string }>): Promise<void>;
+  /**
+   * Mails a sign-up confirmation link, refusing an address that already has an account. Where
+   * the installation has no email at all, it mails nothing and answers an unconfirmed proof.
+   */
+  requestNewAccountVerification(
+    input: Readonly<{ email: string }>,
+  ): Promise<SignUpVerificationRequest>;
   /**
    * Starts identity's PKCE ceremony for the signed-in caller's own address, metered per caller;
    * refuses an account with no address, and an installation that cannot send email.
@@ -208,6 +214,13 @@ export interface AuthApi {
    * account. False for a proof that is missing, expired, spent or another address's.
    */
   claimSignUpAddressProof(input: Readonly<{ token: string; email: string }>): Promise<boolean>;
+  /**
+   * Spends an unconfirmed proof, minted where the installation could not send email. False
+   * for a proof that is missing, expired, spent, another address's, or once email works.
+   */
+  claimUnconfirmedSignUpAddressProof(
+    input: Readonly<{ token: string; email: string }>,
+  ): Promise<boolean>;
   /**
    * Creates the provider account a confirmed link proposal earned, through Better Auth, so
    * the ordinary account ceremony runs; the issuer is the connection's own, else the provider's.

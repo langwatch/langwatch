@@ -141,6 +141,7 @@ function harness(
 
   const peers: InstantEvalRunPeers = {
     isEnabled: async () => true,
+    isReleased: async () => false,
     isQueryIdentityAvailable: () => true,
     resolveCaller: async ({ projectId }) => ({
       project: { id: projectId, lwqlKey: "key-1" },
@@ -196,6 +197,18 @@ describe("creating a run", () => {
     await expect(
       service.createRun({ projectId: "project-1", actor: ACTOR, input: { sql: "SELECT 1" } }),
     ).rejects.toMatchObject({ code: "instant_eval_not_enabled" });
+    expect(statements.accepted).toEqual([]);
+  });
+
+  /** @scenario "A released project on a deployment with no judge is told what to configure" */
+  it("tells a released project on a deployment with no judge what to configure", async () => {
+    const { service, statements } = harness({
+      peers: { isEnabled: async () => false, isReleased: async () => true },
+    });
+
+    await expect(
+      service.createRun({ projectId: "project-1", actor: ACTOR, input: { sql: "SELECT 1" } }),
+    ).rejects.toMatchObject({ code: "instant_eval_classifier_not_configured", httpStatus: 403 });
     expect(statements.accepted).toEqual([]);
   });
 

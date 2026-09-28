@@ -28,7 +28,7 @@ describe("MailDeliveryService", () => {
         settingsWith({ provider: "smtp", smtp: { host: "mail.acme.test" } }),
       ).getView();
 
-      expect(view).toEqual({ provider: "smtp", smtpConfigured: true });
+      expect(view).toEqual({ provider: "smtp", smtpConfigured: true, misconfigured: false });
     });
   });
 
@@ -36,14 +36,17 @@ describe("MailDeliveryService", () => {
     it("names no gateway", async () => {
       await expect(serviceOver(settingsWith()).getView()).resolves.toEqual({
         smtpConfigured: false,
+        misconfigured: false,
       });
     });
   });
 
   describe("when EMAIL_PROVIDER names a gateway whose settings are missing", () => {
-    it("reads as no gateway rather than failing the checkup", async () => {
+    /** @scenario "A misconfigured email provider keeps sign-up on the mailed link" */
+    it("reads as no gateway rather than failing the checkup, and says it is misconfigured", async () => {
       await expect(serviceOver(settingsWith({ provider: "resend" })).getView()).resolves.toEqual({
         smtpConfigured: false,
+        misconfigured: true,
       });
     });
   });

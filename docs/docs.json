@@ -148,7 +148,6 @@
                 ]
               },
               "agent-testing/voice-agents",
-              "agent-testing/voice-agents-in-app",
               "agent-testing/red-teaming"
             ]
           },
@@ -493,7 +492,6 @@
                 ]
               },
               "integration/typescript/integrations/vercel-ai-sdk",
-              "integration/python/integrations/lite-llm",
               "integration/python/integrations/open-ai-agents",
               "integration/python/integrations/pydantic-ai",
               "integration/typescript/integrations/mastra",
@@ -567,7 +565,14 @@
               "integration/go/integrations/groq",
               "integration/go/integrations/grok",
               "integration/go/integrations/ollama",
-              "integration/go/integrations/openrouter"
+              "integration/go/integrations/openrouter",
+              {
+                "group": "LiteLLM",
+                "pages": [
+                  "integration/litellm-proxy",
+                  "integration/python/integrations/lite-llm"
+                ]
+              }
             ]
           },
           {
@@ -2035,6 +2040,10 @@
     },
     {
       "source": "/agent-simulations/voice-agents",
+      "destination": "/agent-testing/voice-agents"
+    },
+    {
+      "source": "/agent-testing/voice-agents-in-app",
       "destination": "/agent-testing/voice-agents"
     },
     {

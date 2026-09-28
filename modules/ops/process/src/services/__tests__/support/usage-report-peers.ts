@@ -145,6 +145,7 @@ export class UsageReportWorld {
         getMailDelivery: async () => ({
           ...(this.mailProvider === undefined ? {} : { provider: this.mailProvider }),
           smtpConfigured: this.mailProvider === "smtp",
+          misconfigured: false,
         }),
       },
       storage: { getStorageDestination: async () => this.storageDestination },

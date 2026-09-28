@@ -16,6 +16,12 @@ const langyMock = {
   enabled: false,
   panelOpen: false,
 };
+// The Instant Evals gate reads this flag; stub it enabled so nothing here
+// depends on the tRPC provider this suite doesn't mount.
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
+  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+}));
+
 vi.mock("../../../langy/hooks/use-show-langy.ts", () => ({
   useShowLangy: () => langyMock.enabled,
 }));

@@ -319,8 +319,20 @@ spec:
             # every app-image consumer needs it, see _helpers.tpl).
             # AUTH_PROVIDER is the app's supported name for this setting;
             # the values key keeps its NextAuth-era path for compatibility.
+            # An operator who selects the provider in app.extraEnvs, under
+            # either name, owns the setting: rendering AUTH_PROVIDER from the
+            # values key would outrank a NEXTAUTH_PROVIDER there and silently
+            # put an SSO install into email mode.
+            {{- $providerFromExtraEnvs := false }}
+            {{- range .Values.app.extraEnvs }}
+            {{- if has (toString .name) (list "AUTH_PROVIDER" "NEXTAUTH_PROVIDER") }}
+            {{- $providerFromExtraEnvs = true }}
+            {{- end }}
+            {{- end }}
+            {{- if not $providerFromExtraEnvs }}
             - name: AUTH_PROVIDER
               value: {{ .Values.app.nextAuth.provider | quote }}
+            {{- end }}
 
             # NextAuth - SSO OAuth providers (auth0, azureAd, cognito, github,
             # gitlab, google, okta, onelogin, oidc).

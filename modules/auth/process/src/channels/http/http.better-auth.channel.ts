@@ -25,7 +25,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import { compare, hash } from "bcrypt";
 import { type Auth, type BetterAuthOptions, betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import type { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
@@ -57,6 +57,7 @@ import {
   passkeySignUpRegistration,
   type SignUpVerification,
 } from "./http.passkey-sign-up.channel.ts";
+import { resilientGenericOAuth } from "./http.resilient-generic-oauth.channel.ts";
 import {
   runSignInRouterShadow,
   type SignInRouterShadow,
@@ -689,14 +690,14 @@ export function twoFactorPlugin(): ReturnType<typeof twoFactor> {
 }
 
 /**
- * The generic-OIDC plugin, mounted only when this deployment configured a connection for
- * it.
+ * The generic-OIDC plugin, mounted only when this deployment configured a connection for it. A
+ * provider unreachable at startup is left out and retried, rather than failing the process.
  */
 function genericOAuthPlugins(
   deployment: BetterAuthDeploymentConfiguration,
 ): NonNullable<BetterAuthOptions["plugins"]> {
   if (deployment.genericOAuthConfigs.length === 0) return [];
-  return [genericOAuth({ config: [...deployment.genericOAuthConfigs] })];
+  return [resilientGenericOAuth({ config: [...deployment.genericOAuthConfigs] })];
 }
 
 /**

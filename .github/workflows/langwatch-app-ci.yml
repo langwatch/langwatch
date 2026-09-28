@@ -1333,6 +1333,9 @@ jobs:
       - name: Test extract-failures.sh
         run: bash .github/scripts/__tests__/extract-failures.test.sh
 
+      - name: Test vitest-changed-files.sh
+        run: bash .github/scripts/__tests__/vitest-changed-files.test.sh
+
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
 

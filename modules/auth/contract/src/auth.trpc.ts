@@ -11,10 +11,10 @@ import {
   addressConfirmationSchema,
   frontDoorAskedSchema,
   frontDoorOwnAddressSentSchema,
-  frontDoorSentSchema,
   inviteLandingSchema,
   priorSessionSchema,
   signUpEnrollmentSchema,
+  signUpVerificationRequestSchema,
   signUpVerificationResultSchema,
 } from "./front-door.responses.ts";
 import {
@@ -43,7 +43,7 @@ export const authTrpc = defineTrpcContract("auth")
 
   .mutation("requestSignUpVerification")
   .withInput(frontDoorEmailInputSchema)
-  .withOutput(frontDoorSentSchema)
+  .withOutput(signUpVerificationRequestSchema)
 
   .mutation("completeSignUpVerification")
   .withInput(frontDoorTokenInputSchema)

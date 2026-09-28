@@ -9,6 +9,7 @@ import type {
   IdentityPipelineRepositories,
   IdentityRepositories,
 } from "../identity.repositories.ts";
+import { PrismaIdentityAccountRekeyRepository } from "./prisma.identity-account-rekey.repository.ts";
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
 import { PrismaIdentityHeadsRepository } from "./prisma.identity-heads.repository.ts";
 import { PrismaIdentityLatchRepository } from "./prisma.identity-latch.repository.ts";
@@ -69,6 +70,7 @@ export class PostgresIdentityRepositories {
       latch: PrismaIdentityLatchRepository.create(database),
       users: PrismaIdentityUsersRepository.create(database),
       signInAccounts: PrismaIdentitySignInAccountsRepository.create(database),
+      accountRekey: PrismaIdentityAccountRekeyRepository.create(database),
       ssoBreakGlass: PrismaSsoBreakGlassRepository.create(database),
       newborn: PrismaIdentityNewbornRepository.create(database),
       reservations,

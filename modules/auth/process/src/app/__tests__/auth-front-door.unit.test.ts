@@ -46,7 +46,7 @@ const CHALLENGE = "c".repeat(43);
 async function appFor(
   limiter: ReturnType<typeof countingLimiter>["rateLimiter"],
   identity: IdentityApi = createApiFixture<IdentityApi>(),
-  mailDelivery: { provider?: string } = { provider: "smtp" },
+  mailDelivery: { provider?: string; misconfigured?: boolean } = { provider: "smtp" },
 ): Promise<AuthApp> {
   return AuthApp.create({
     config: {
@@ -71,7 +71,11 @@ async function appFor(
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
       notifications: createApiFixture<NotificationService>({
-        getMailDelivery: async () => ({ ...mailDelivery, smtpConfigured: false }),
+        getMailDelivery: async () => ({
+          misconfigured: false,
+          ...mailDelivery,
+          smtpConfigured: false,
+        }),
       }),
       sso: createApiFixture<SsoApi>(),
       authz: createApiFixture<AuthzApi>({}),

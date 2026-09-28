@@ -196,6 +196,16 @@ describe("given the sign-up screen", () => {
       });
     });
 
+    /** @scenario "Opening the link unlocks credential choice" */
+    it("offers a credential for the confirmed address and signs nobody in yet", async () => {
+      const { container } = renderScreen();
+
+      expect((await screen.findByTestId("verified-address")).textContent).toContain("sam@acme.com");
+      expect(container.querySelector('input[type="password"]')).not.toBeNull();
+      expect(registerMock).not.toHaveBeenCalled();
+      expect(signInMock).not.toHaveBeenCalled();
+    });
+
     /** @scenario No credential is collected until the confirmation link is opened */
     it("registers with the proof, signs in, and asks for no name", async () => {
       registerMock.mockResolvedValue({ id: "user_1" });
@@ -244,6 +254,42 @@ describe("given the sign-up screen", () => {
 
       expect(await screen.findByText(/the two passwords are not the same/i)).toBeTruthy();
       expect(registerMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the installation cannot send email", () => {
+    /** @scenario "An installation that cannot send email signs up with a password and leaves the address unconfirmed" */
+    it("asks for a password straight away and never says the address is confirmed", async () => {
+      requestVerificationMock.mockResolvedValue({ sent: false, addressProof: "unconfirmed_proof" });
+      registerMock.mockResolvedValue({ id: "user_1" });
+      signInMock.mockResolvedValue({});
+
+      const { container } = renderScreen();
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+      expect(await screen.findByTestId("unconfirmed-address")).toHaveTextContent(
+        "This installation does not send email, so sam@acme.com is not confirmed. Choose a password to finish.",
+      );
+      expect(enrollmentMock).toHaveBeenCalledWith({
+        email: "sam@acme.com",
+        addressProof: "unconfirmed_proof",
+      });
+      expect(screen.queryByTestId("verification-sent")).toBeNull();
+      expect(screen.queryByTestId("verified-address")).toBeNull();
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
+
+      await fillPasswordPair(container, "a-good-password");
+      await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+      await waitFor(() => {
+        expect(registerMock).toHaveBeenCalledWith({
+          email: "sam@acme.com",
+          password: "a-good-password",
+          addressProof: "unconfirmed_proof",
+        });
+      });
+      await waitFor(() => expect(signInMock).toHaveBeenCalled());
     });
   });
 

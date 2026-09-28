@@ -1,5 +1,5 @@
 /** The Langy canary's verdict and answer, from main's `health-probes/langy-canary.service.ts`. */
-import type { LangyTurnSettlement } from "@langwatch/langy-contract";
+import type { LangyTurnSettlementWait } from "@langwatch/langy-contract";
 
 /** Wall-time budget for one check: under the 60s a plain HTTP monitor allows. */
 export const LANGY_CANARY_BUDGET_MS = 55_000;
@@ -20,13 +20,16 @@ export type LangyCanaryOutcome = LangyCanaryVerdict & {
 export type LangyCanaryResult = LangyCanaryOutcome | { busy: true };
 
 /**
- * `null` is a wait the budget ended: `timeout`. A failed or stopped turn is `turn_failed` (nobody
- * stops a canary turn, so a stop is the worker giving up); a blank reply is `empty_reply`.
+ * A wait the budget ended is `timeout`. A failed or stopped turn is `turn_failed` (nobody stops a
+ * canary turn, so a stop is the worker giving up); a blank reply is `empty_reply`. A turn that
+ * answered with a question card and waits on the user is healthy.
  */
 export function classifyLangyCanaryOutcome(
-  settlement: LangyTurnSettlement | null,
+  wait: LangyTurnSettlementWait | null,
 ): LangyCanaryVerdict {
-  if (!settlement) return { healthy: false, reason: "timeout" };
+  if (!wait || wait.kind === "stopped") return { healthy: false, reason: "timeout" };
+  if (wait.kind === "awaiting_user") return { healthy: true };
+  const { settlement } = wait;
   if (!settlement.succeeded || settlement.outcome !== "completed") {
     return { healthy: false, reason: "turn_failed" };
   }

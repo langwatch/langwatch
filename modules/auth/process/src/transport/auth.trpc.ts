@@ -123,9 +123,7 @@ export const authTrpcTransport = defineTrpcRouter(AuthApi, authTrpc)
       refusal: "Too many signup attempts. Please try again later.",
     });
 
-    await app.requestNewAccountVerification({ email: input.email });
-
-    return { sent: true as const };
+    return app.requestNewAccountVerification({ email: input.email });
   })
 
   /**

@@ -660,10 +660,6 @@ export class LicensingApp implements LicensingApiContract {
     return this.#identity.setReportSwitches(input);
   }
 
-  acknowledgeStartupNotice({ schemaVersion }: { schemaVersion: number }): Promise<void> {
-    return this.#identity.acknowledgeStartupNotice(schemaVersion);
-  }
-
   isConnectServiceEnabled(input: {
     organizationId: string;
     service: ConnectService;
@@ -957,7 +953,6 @@ function unavailableConnectInstall({ version }: { version: string }): ConnectIns
     identity: {
       findRow: () => Promise.resolve(null),
       mint: () => Promise.reject(unavailable()),
-      acknowledgeStartupNotice: () => Promise.reject(unavailable()),
       setReportSwitches: () => Promise.reject(unavailable()),
       recordReport: () => Promise.reject(unavailable()),
     },

@@ -184,6 +184,13 @@ jobs:
         if: "!cancelled()"
         run: ./tests/sso-providers.sh
 
+      # The app, the workers and the NLP service must carry one checked
+      # code-block ceiling, and the chart must refuse ceilings the engine's
+      # stream idle timeout cannot cover. Only the render shows both.
+      - name: "assert every nlpgo caller gets the same code-block ceiling"
+        if: "!cancelled()"
+        run: ./tests/nlpgo-timeout-guard.sh
+
       # Workers drain in-flight queue jobs and their ClickHouse writes on
       # SIGTERM. Too short a grace period turns that drain into a SIGKILL,
       # which severs in-flight statements — invisible in the template source,
@@ -214,6 +221,10 @@ jobs:
       - name: "assert LWQL env is exactly the two query passwords, on every posture"
         if: "!cancelled()"
         run: ./tests/lwql-connection-env.sh
+
+      - name: "assert app and workers get the in-cluster gateway address"
+        if: "!cancelled()"
+        run: ./tests/gateway-internal-url.sh
 
       # Connect's upgrade guarantee is a claim about absence: an install that
       # changes no value must carry no LANGWATCH_CONNECT_ variable, so nothing

@@ -229,11 +229,6 @@ export interface LicensingApi {
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
   }): Promise<void>;
-  /**
-   * An administrator read the startup notice for this version of the report.
-   * Mints the identity where there is none: the dismissal needs a row.
-   */
-  acknowledgeStartupNotice(input: { schemaVersion: number }): Promise<void>;
 
   /**
    * The hosted end of Connect (ADR-156 §5), which only LangWatch Cloud

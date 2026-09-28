@@ -68,20 +68,7 @@ export class InstanceIdentityService {
       ...(row.lastReportError ? { lastReportError: row.lastReportError } : {}),
       optionalMetricsOptOut: row.optionalMetricsOptOut,
       hostnameOptOut: row.hostnameOptOut,
-      startupNoticeAcknowledgedSchemaVersion: row.startupNoticeAcknowledgedSchemaVersion,
     }));
-  }
-
-  /**
-   * Records that an administrator read the startup notice for this schema
-   * version. Mints where there is none: an install whose administrator is
-   * dismissing the notice about reporting is an install about to report.
-   */
-  async acknowledgeStartupNotice(schemaVersion: number): Promise<void> {
-    await this.deps.repository.acknowledgeStartupNotice({
-      instanceId: await this.getInstanceId(),
-      schemaVersion,
-    });
   }
 
   async setReportSwitches(switches: InstanceReportSwitches): Promise<void> {

@@ -14,7 +14,6 @@ export interface InstanceIdentityRecord {
   readonly lastReportError: string | null;
   readonly optionalMetricsOptOut: boolean;
   readonly hostnameOptOut: boolean;
-  readonly startupNoticeAcknowledgedSchemaVersion: number;
 }
 
 /** What a customer switched off. Absent means the switch is left alone. */
@@ -32,9 +31,6 @@ export interface InstanceIdentityRepository {
    * Never returns a second identity for one install.
    */
   mint(instanceId: string): Promise<InstanceIdentityRecord>;
-
-  /** Records that an administrator read the startup notice for this version. */
-  acknowledgeStartupNotice(params: { instanceId: string; schemaVersion: number }): Promise<void>;
 
   /**
    * Records what a customer switched off. An install with no identity has

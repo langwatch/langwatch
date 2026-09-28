@@ -107,6 +107,7 @@ import { JoinRequestsService } from "../services/join-requests.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { LinkProposalService } from "../services/link-proposal.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
+import { MicrosoftAccountRekeyService } from "../services/microsoft-account-rekey.service.ts";
 import { OrganizationMfaNotifierService } from "../services/organization-mfa-notifier.service.ts";
 import { OrganizationMfaService } from "../services/organization-mfa.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
@@ -193,6 +194,7 @@ type IdentityAppParts = {
   identity: IdentityService;
   verification: VerificationCeremonyService;
   accountIdentifiers: AccountIdentifiersService;
+  microsoftAccountRekey: MicrosoftAccountRekeyService;
   newbornSweep: IdentityNewbornReconciliationService;
   backfill: IdentityBackfillService;
   secrets: IdentitySecretCarryService;
@@ -695,6 +697,9 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         rateLimiter: setup.members.rateLimiter,
         sessions: setup.dependencies.auth,
       }),
+      microsoftAccountRekey: MicrosoftAccountRekeyService.create({
+        accounts: setup.repositories.accountRekey,
+      }),
       newbornSweep,
       backfill,
       secrets,
@@ -856,6 +861,12 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
 
   removeIdentifier(input: { userId: string; identifierId: string }): Promise<void> {
     return this.#parts.accountIdentifiers.removeIdentifier(input);
+  }
+
+  moveLegacyMicrosoftAccountKey(input: {
+    profile: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    return this.#parts.microsoftAccountRekey.moveOnSignIn(input);
   }
 
   routeSignIn(

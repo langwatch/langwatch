@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
+import { useEffect, useMemo, useState } from "react";
 
 import type { DashboardWidgetQuery } from "../model/dashboard-widget-definition.ts";
 import { STARTER_WIDGET_CODE, STARTER_WIDGET_QUERIES } from "../model/dashboard-widget/presets.ts";
@@ -33,11 +34,24 @@ export function useCreateDashboardWidgetDrawer({
   const [draftCode, setDraftCode] = useState(STARTER_WIDGET_CODE);
   const [draftQueries, setDraftQueries] = useState<DashboardWidgetQuery[]>(STARTER_WIDGET_QUERIES);
 
+  // The draft previews against the dashboard's own period, the window the
+  // widget runs in once placed (as DashboardWidgetFrame reads it), so the
+  // preview and the saved card agree on what the query returns.
+  const { period } = usePeriodSelector();
+  const timeWindow = useMemo(
+    () => ({
+      start: period.startDate.epochMilliseconds,
+      end: period.endDate.epochMilliseconds,
+    }),
+    [period.startDate, period.endDate],
+  );
+
   const preview = useWidgetPreview({
     code: draftCode,
     queries: draftQueries,
     projectId,
     projectSlug,
+    timeWindow,
   });
 
   // A fresh starter draft every time the drawer opens — otherwise a second

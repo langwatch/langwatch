@@ -1,7 +1,6 @@
 /**
- * What the checkup page shows of the usage report and the startup notice
- * (specs/self-hosting/checkup/checkup.feature, "What we send";
- * specs/self-hosting/checkup/startup-notice.feature).
+ * What the checkup page shows of the usage report
+ * (specs/self-hosting/checkup/checkup.feature, "What we send").
  */
 
 import { z } from "zod";
@@ -37,10 +36,3 @@ export const usageReportPreviewSchema = z.object({
   nextReportAt: z.string().nullable().optional(),
 });
 export type UsageReportPreview = z.infer<typeof usageReportPreviewSchema>;
-
-/** Whether the one-time notice is due, and for which version of the report. */
-export const startupNoticeStateSchema = z.object({
-  show: z.boolean(),
-  schemaVersion: z.number().int(),
-});
-export type StartupNoticeState = z.infer<typeof startupNoticeStateSchema>;

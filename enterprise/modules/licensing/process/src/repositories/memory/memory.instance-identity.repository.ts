@@ -37,17 +37,6 @@ export class MemoryInstanceIdentityRepository implements InstanceIdentityReposit
     return this.#row;
   }
 
-  async acknowledgeStartupNotice({
-    instanceId,
-    schemaVersion,
-  }: {
-    instanceId: string;
-    schemaVersion: number;
-  }): Promise<void> {
-    const row = this.#row ?? blankRow(instanceId, this.now());
-    this.#row = { ...row, startupNoticeAcknowledgedSchemaVersion: schemaVersion };
-  }
-
   async setReportSwitches({
     optionalMetricsOptOut,
     hostnameOptOut,
@@ -76,6 +65,5 @@ function blankRow(instanceId: string, createdAt: Instant): InstanceIdentityRecor
     lastReportError: null,
     optionalMetricsOptOut: false,
     hostnameOptOut: false,
-    startupNoticeAcknowledgedSchemaVersion: 0,
   };
 }

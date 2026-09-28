@@ -174,4 +174,41 @@ describe("AuthDoorService", () => {
       expect(world.verifyBrowserSession).not.toHaveBeenCalled();
     });
   });
+
+  describe("when a sign-in callback fails on the server", () => {
+    /** @scenario "A sign-in callback that fails on the server lands on the error screen" */
+    it("redirects the browser to the error screen with the generic code", async () => {
+      const world = door({
+        betterAuth: async () => ({
+          handler: async () =>
+            Response.json(
+              { code: "INTERNAL_SERVER_ERROR", message: "rekey failed" },
+              { status: 500 },
+            ),
+        }),
+      });
+
+      const answered = await world.service.betterAuthHandshake(
+        new Request(`${BASE_URL}/api/auth/callback/microsoft?code=c&state=s`),
+      );
+
+      expect(answered.status).toBe(302);
+      const location = new URL(answered.headers.get("location") ?? "");
+      expect(`${location.origin}${location.pathname}`).toBe(`${BASE_URL}/auth/error`);
+      expect(location.searchParams.get("error")).toBe("sign_in_failed");
+    });
+  });
+
+  describe("when an auth route that is not a callback fails on the server", () => {
+    /** @scenario "A server error on an auth route that is not a callback keeps its status" */
+    it("answers with the server error itself", async () => {
+      const world = door({
+        betterAuth: async () => ({ handler: async () => new Response(null, { status: 500 }) }),
+      });
+
+      const answered = await world.service.betterAuthHandshake(signIn());
+
+      expect(answered.status).toBe(500);
+    });
+  });
 });

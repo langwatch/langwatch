@@ -45,12 +45,13 @@ JWT pre-rotation has expired (default ~15 min).
 ## Install
 
 The gateway sub-chart is shipped as a dependency of the umbrella
-`langwatch` chart, not as a standalone published OCI artifact. Install
-the umbrella chart and opt into the gateway via values:
+`langwatch` chart, not as a standalone published OCI artifact. Installing
+the umbrella chart installs the gateway too (`gateway.chartManaged`
+defaults to `true`):
 
 ```bash
 helm install langwatch oci://ghcr.io/langwatch/charts/langwatch \
-  -n langwatch -f values.prod.yaml --set gateway.enabled=true
+  -n langwatch -f values.prod.yaml
 ```
 
 Or, for development against the chart in this repo, render this
