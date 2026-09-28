@@ -132,10 +132,11 @@ func TestBuildRowsPairsBothSidesAndAttachesTheDiff(t *testing.T) {
 
 // @scenario A run diffs the captures and writes a report
 func TestWriteReportWritesAllThreeArtefacts(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "report")
+	runDir := t.TempDir()
+	dir := filepath.Join(runDir, "report")
 	rows := BuildRows([]Capture{
-		{Kind: "route", Key: "/governance/catalog", Side: "base", NotFound: true, Screenshot: "/tmp/a.png"},
-		{Kind: "route", Key: "/governance/catalog", Side: "candidate", Screenshot: "/tmp/b.png",
+		{Kind: "route", Key: "/governance/catalog", Side: "base", NotFound: true, Screenshot: filepath.Join(runDir, "shots", "a b.png")},
+		{Kind: "route", Key: "/governance/catalog", Side: "candidate", Screenshot: filepath.Join(runDir, "shots", "b.png"),
 			FailedRequests: []string{"500 GET /api/governance/catalog"}, ConsoleErrors: []string{"boom"}},
 	}, nil)
 	meta := ReportMeta{BaseRef: "origin/main", CandidateRef: "HEAD", Viewport: "1440x900"}
@@ -146,8 +147,8 @@ func TestWriteReportWritesAllThreeArtefacts(t *testing.T) {
 
 	page := readFile(t, filepath.Join(dir, "report.html"))
 	mustContain(t, page, "/governance/catalog")
-	mustContain(t, page, "file:///tmp/a.png")
-	mustContain(t, page, "file:///tmp/b.png")
+	mustContain(t, page, `src="../shots/a%20b.png"`)
+	mustContain(t, page, `src="../shots/b.png"`)
 	mustContain(t, page, "500 GET /api/governance/catalog")
 	mustContain(t, page, "boom")
 	mustContain(t, readFile(t, filepath.Join(dir, "findings.md")), "origin/main")
@@ -167,10 +168,19 @@ func TestWriteReportWritesAllThreeArtefacts(t *testing.T) {
 func TestReportEscapesWhatItRenders(t *testing.T) {
 	rows := []Row{{Kind: "route", Key: "/x", Base: &Capture{}, Candidate: &Capture{ConsoleErrors: []string{"<img onerror=alert(1)>"}}}}
 
-	page := renderHTML(rows, ReportMeta{})
+	page := renderHTML(t.TempDir(), rows, ReportMeta{})
 
 	if strings.Contains(page, "<img onerror") {
 		t.Fatal("console text was rendered as markup")
+	}
+}
+
+func TestImageSourceKeepsAPathItCannotMakeRelative(t *testing.T) {
+	if got := ImageSource("report", "/tmp/a.png"); got != "file:///tmp/a.png" {
+		t.Fatalf("a relative report directory keeps the file address: %q", got)
+	}
+	if got := ImageSource("/run/report", "shots/a.png"); got != "file://shots/a.png" {
+		t.Fatalf("a relative screenshot keeps the file address: %q", got)
 	}
 }
 

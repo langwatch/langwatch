@@ -305,6 +305,18 @@ func SaveBaseline(baseline Baseline, captures []Capture) error {
 	return os.Rename(staging, baseline.Dir)
 }
 
+// UnloadedBaseCaptures counts the base captures whose own modules did not
+// load: a baseline holding one would replay the tool's failure on every run.
+func UnloadedBaseCaptures(captures []Capture) int {
+	count := 0
+	for index := range captures {
+		if captures[index].Side == "base" && len(captures[index].ModuleFailures) > 0 {
+			count++
+		}
+	}
+	return count
+}
+
 // stageBaseCaptures copies each base capture's screenshot into staging and
 // returns the captures as JSON lines pointing at where they will live in dir.
 func stageBaseCaptures(dir, staging string, captures []Capture) ([]byte, error) {

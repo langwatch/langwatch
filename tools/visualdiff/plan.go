@@ -204,7 +204,8 @@ func (stack Stack) Env(inherit []string) []string {
 			"SKIP_PRISMA_MIGRATE=true",
 			"SKIP_CLICKHOUSE_MIGRATE=true",
 			"SKIP_LWQL_PROVISION=true",
-			"LANGWATCH_API_PORT="+strconv.Itoa(stack.Ports.UI),
+			// Vite binds PORT and proxies /api to PORT+1000, where the API must listen.
+			"LANGWATCH_API_PORT="+strconv.Itoa(stack.Ports.API),
 		)
 	}
 	return env

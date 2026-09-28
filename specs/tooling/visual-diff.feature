@@ -34,6 +34,7 @@ Feature: Visual diff between two refs
     When the run composes that stack's environment
     Then the Prisma, ClickHouse and provisioning steps are skipped for it
     And the shared database is left exactly as the run found it
+    And its API listens on the stack's API port, where its Vite proxies /api
 
   @unit
   Scenario: A run seeds its fixtures through the candidate API

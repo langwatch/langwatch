@@ -23,6 +23,7 @@ const usage = `visualdiff — render every route and every flow on two refs and 
   visualdiff recapture -run RUNID [-routes a,b] [-flows x,y] [-edition E] [-root DIR]
   visualdiff coverage [-base REF] [-candidate REF] [-config FILE] [-root DIR]
   visualdiff gc [-kept] [-no-haven] [-root DIR]
+  visualdiff publish -run-dir DIR [-pr N] [-link URL] [-base REF] [-candidate REF] [-root DIR]
 
 Each ref boots as a haven stack under its own run-scoped slug wherever haven
 is installed, so a run never reaches the datastores your own stack uses.
@@ -34,7 +35,8 @@ stdout) says what to look at first: counts per class and edition, coverage,
 and the worst findings one line each with their text evidence. stderr is
 kept in <run-dir>/run.log.
 
-Findings fail the run: a missing capture on either side, a regression, a
+Findings fail the run: a missing capture on either side, a screen whose own
+modules did not load even when taken again alone (capture-failed), a regression, a
 screen broken on both refs, a blank or not-found page, a different final
 path, a new failed /api/ or tRPC request, a control (button, link, heading,
 tab, form field) one side lacks, and every route either ref declares that
@@ -61,6 +63,11 @@ never tears anything down: pass -keep to run, recapture as many times as a
 triage loop needs, then tear the stacks down yourself (haven destroy, or a
 fresh run without -keep).
 
+publish shows a finished run's screens on a pull request after the fact:
+-pr names it (default: the checked-out branch's open PR) and -link is the
+full report's address. It exits 0 when it published, 1 when it skipped and
+said why, 2 when it failed.
+
 coverage prints the same coverage verdict without booting anything. gc,
 which every run also does first, removes what dead runs left behind: their
 worktrees, haven stacks and databases, and every orphan visualdiff-* stack.
@@ -84,6 +91,8 @@ func Run(ctx context.Context, args []string, streams Streams) int {
 		return coverageCommand(ctx, args[1:], streams)
 	case "gc":
 		return gcCommand(ctx, args[1:], streams)
+	case "publish":
+		return publishCommand(ctx, args[1:], streams)
 	case "-h", "--help", "help":
 		fmt.Fprint(streams.Out, usage)
 		return ExitClean

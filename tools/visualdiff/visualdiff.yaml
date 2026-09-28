@@ -21,9 +21,10 @@ concurrency:
   routes: 4
   flows: 3
 
-# After a run, the screens its branch's pull request shows, in one comment
-# edited in place: the largest changes, then new failures, then these key
-# pages; each scaled to `width` and cut at `maxHeight`. -no-publish skips it.
+# After a run, the screens its pull request shows, in one comment edited in
+# place: these key pages, then findings and changes, largest first, one per
+# area before any repeats; never a blank or failed capture. Each is scaled to
+# `width` and cut at `maxHeight`. -no-publish skips it.
 publish:
   screens: 12
   width: 1000
@@ -31,8 +32,9 @@ publish:
   keyPages:
     - /{slug}
     - /{slug}/traces
-    - /settings
-    - /governance
+    - /{slug}/traces/{trace}
+    - /settings/members
+    - /me
 
 # Ids the run seeds deterministically (seed.go), filling a route's {name}.
 # team and actor are the seeded identity's, the same on main and the branch.
