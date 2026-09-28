@@ -1,7 +1,7 @@
 /**
- * Authz's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability, so the module mounts it, not the
- * application. ARCHITECTURE.md §10.1.
+ * Authz's answer to the port its screens declare: each method projects a
+ * `@langwatch/browser-host` capability or the plan it reads itself, so the
+ * module mounts it, not the application. ARCHITECTURE.md §10.1.
  */
 
 import {
@@ -20,9 +20,7 @@ import {
   type AuthzPlanReading,
   type AuthzSuccessNotice,
 } from "../model/authz-host.ts";
-
-/** No capability carries the plan tier yet, so the enterprise gate reads closed. */
-const NO_PLAN: AuthzPlanReading = { isEnterprise: false, isLoading: false };
+import { authzApi } from "./authz-api.ts";
 
 class CapabilityAuthzHost extends AuthzHostApi {
   constructor(
@@ -30,6 +28,7 @@ class CapabilityAuthzHost extends AuthzHostApi {
       organizationId: string | undefined;
       session: UiSession;
       feedback: UiFeedback;
+      plan: AuthzPlanReading;
     },
   ) {
     super();
@@ -44,7 +43,7 @@ class CapabilityAuthzHost extends AuthzHostApi {
   }
 
   plan(): AuthzPlanReading {
-    return NO_PLAN;
+    return this.deps.plan;
   }
 
   succeeded(notice: AuthzSuccessNotice): void {
@@ -64,9 +63,25 @@ class CapabilityAuthzHost extends AuthzHostApi {
 export default function AuthzHostMount({ children }: { children?: ReactNode }) {
   const { session, feedback } = useUiCapabilities();
   const { organizationId } = useUiScope().activeScope();
+  // The same question, gate and cache entry as the navigation's plan reading.
+  const usage = authzApi.limits.getUsage.useQuery(
+    { organizationId: organizationId ?? "" },
+    { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
+  );
+  const planType = usage.data?.activePlan.type;
+  const plan = useMemo(
+    () => ({ isEnterprise: planType === "ENTERPRISE", isLoading: usage.isLoading }),
+    [planType, usage.isLoading],
+  );
   const host = useMemo(
-    () => new CapabilityAuthzHost({ organizationId: organizationId ?? void 0, session, feedback }),
-    [organizationId, session, feedback],
+    () =>
+      new CapabilityAuthzHost({
+        organizationId: organizationId ?? void 0,
+        session,
+        feedback,
+        plan,
+      }),
+    [organizationId, session, feedback, plan],
   );
   return <AuthzHostProvider value={host}>{children}</AuthzHostProvider>;
 }

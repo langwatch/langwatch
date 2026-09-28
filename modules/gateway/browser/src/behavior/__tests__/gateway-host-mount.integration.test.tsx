@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 /**
- * The port promised an organization graph and answered an empty array.
+ * The port answered an empty organization graph and a hard-coded plan.
  * Spec: specs/ui/module-host-mounting.feature
  */
 import {
   UiCapabilityContextProvider,
   UiScope,
+  UiSession,
   type UiActiveScope,
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
@@ -29,9 +30,18 @@ const ORGANIZATION_GRAPH = {
   ],
 };
 
+type UsageAnswer = {
+  data?: { activePlan: { type: string; webhookEndpointsEnabled?: boolean } };
+  isLoading: boolean;
+};
+
 const answer = vi.fn(() => ({ data: [ORGANIZATION_GRAPH] }));
+const usage = vi.fn((): UsageAnswer => ({ isLoading: false }));
 vi.mock("../gateway-api.ts", () => ({
-  gatewayApi: { organization: { getAll: { useQuery: () => answer() } } },
+  gatewayApi: {
+    organization: { getAll: { useQuery: () => answer() } },
+    limits: { getUsage: { useQuery: () => usage() } },
+  },
   api: { organization: { getAll: { useQuery: () => answer() } } },
 }));
 
@@ -48,12 +58,30 @@ class TestScope extends UiScope {
   }
 }
 
+class AdminSession extends UiSession {
+  currentUser() {
+    return null;
+  }
+
+  hasPermission(): boolean {
+    return true;
+  }
+
+  isSettled(): boolean {
+    return true;
+  }
+
+  featureFlag(): boolean | undefined {
+    return false;
+  }
+}
+
 function harness(scope: UiActiveScope) {
   const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
-      route: () => ({ params: {}, query: {} }),
-      navigate: () => void 0,
-    }),
+    ...createUiCapabilitiesFromHost(
+      { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
+      new AdminSession(),
+    ),
     scope: new TestScope(scope),
     deployment: {
       isDevelopment: false,
@@ -101,6 +129,63 @@ describe("given a gateway host above a surface that names an organization", () =
       expect(screen.getByTestId("name")).toHaveTextContent("Local Dev Organization");
       // The graph states a project's team by nesting; the port states it by field.
       expect(screen.getByTestId("project-team")).toHaveTextContent("team-1");
+    });
+  });
+});
+
+/** Stands in for the webhooks page, which branches on exactly this reading. */
+function PlanReader() {
+  const plan = useGatewayHost().plan();
+
+  return (
+    <div>
+      <span data-testid="enterprise">{String(plan.isEnterprise)}</span>
+      <span data-testid="webhooks">{String(plan.webhookEndpointsEnabled)}</span>
+      <span data-testid="loading">{String(plan.isLoading)}</span>
+    </div>
+  );
+}
+
+describe("given a gateway host above a surface gated on the plan", () => {
+  describe("when the organization's plan is Enterprise with webhook endpoints", () => {
+    /** @scenario "A mounted host answers the reading its screen renders from" */
+    it("reports the plan rather than a hard-coded refusal", () => {
+      usage.mockReturnValue({
+        data: { activePlan: { type: "ENTERPRISE", webhookEndpointsEnabled: true } },
+        isLoading: false,
+      });
+
+      render(<PlanReader />, {
+        wrapper: harness({ organizationId: ORGANIZATION_ID, projectId: null }),
+      });
+
+      expect(screen.getByTestId("enterprise")).toHaveTextContent("true");
+      expect(screen.getByTestId("webhooks")).toHaveTextContent("true");
+      expect(screen.getByTestId("loading")).toHaveTextContent("false");
+    });
+  });
+
+  describe("when a legacy plan row carries no webhook flag", () => {
+    it("reads webhook endpoints as off", () => {
+      usage.mockReturnValue({ data: { activePlan: { type: "ENTERPRISE" } }, isLoading: false });
+
+      render(<PlanReader />, {
+        wrapper: harness({ organizationId: ORGANIZATION_ID, projectId: null }),
+      });
+
+      expect(screen.getByTestId("webhooks")).toHaveTextContent("false");
+    });
+  });
+
+  describe("when the plan has not answered yet", () => {
+    it("reports still-arriving rather than not entitled", () => {
+      usage.mockReturnValue({ isLoading: true });
+
+      render(<PlanReader />, {
+        wrapper: harness({ organizationId: ORGANIZATION_ID, projectId: null }),
+      });
+
+      expect(screen.getByTestId("loading")).toHaveTextContent("true");
     });
   });
 });

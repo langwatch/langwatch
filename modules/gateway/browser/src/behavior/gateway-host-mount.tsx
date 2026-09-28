@@ -1,7 +1,7 @@
 /**
  * Gateway's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability. Missing capabilities (org graph,
- * plan, deployment addresses) read honestly empty. ARCHITECTURE.md §10.1.
+ * `@langwatch/browser-host` capability or its own read. Missing capabilities
+ * (deployment addresses) read honestly empty. ARCHITECTURE.md §10.1.
  */
 
 import {
@@ -74,6 +74,21 @@ function organizationsOf(
   }));
 }
 
+/** The plan as the port states it; a legacy row without the webhook flag reads as off. */
+function planOf({
+  activePlan,
+  isLoading,
+}: {
+  activePlan: { type: string; webhookEndpointsEnabled?: boolean } | undefined;
+  isLoading: boolean;
+}): GatewayPlan {
+  return {
+    isEnterprise: activePlan?.type === "ENTERPRISE",
+    webhookEndpointsEnabled: activePlan?.webhookEndpointsEnabled === true,
+    isLoading,
+  };
+}
+
 class CapabilityGatewayHost extends GatewayHostApi {
   private readonly activeScope: GatewayScope;
   private readonly scopeHost: UiScopeHost | undefined;
@@ -83,6 +98,7 @@ class CapabilityGatewayHost extends GatewayHostApi {
   private readonly uiRoute: UiRoute;
   private readonly feedback: UiFeedback;
   private readonly organizations_: readonly GatewayOrganization[];
+  private readonly plan_: GatewayPlan;
 
   constructor({
     activeScope,
@@ -93,6 +109,7 @@ class CapabilityGatewayHost extends GatewayHostApi {
     uiRoute,
     feedback,
     organizations,
+    plan,
   }: {
     activeScope: GatewayScope;
     scopeHost: UiScopeHost | undefined;
@@ -102,6 +119,7 @@ class CapabilityGatewayHost extends GatewayHostApi {
     uiRoute: UiRoute;
     feedback: UiFeedback;
     organizations: readonly GatewayOrganization[];
+    plan: GatewayPlan;
   }) {
     super();
     this.activeScope = activeScope;
@@ -112,6 +130,7 @@ class CapabilityGatewayHost extends GatewayHostApi {
     this.uiRoute = uiRoute;
     this.feedback = feedback;
     this.organizations_ = organizations;
+    this.plan_ = plan;
   }
 
   scope(): GatewayScope {
@@ -152,9 +171,8 @@ class CapabilityGatewayHost extends GatewayHostApi {
     return this.session.isFeatureEnabled(flag);
   }
 
-  /** No entitlement capability exists yet; recorded gap, see the handoff. */
   plan(): GatewayPlan {
-    return { isEnterprise: false, webhookEndpointsEnabled: false, isLoading: false };
+    return this.plan_;
   }
 
   /** No deployment-address capability exists yet; recorded gap, see the handoff. */
@@ -213,6 +231,16 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
     [graph.data],
   );
 
+  // The same question, gate and cache entry as the navigation's plan reading.
+  const usage = gatewayApi.limits.getUsage.useQuery(
+    { organizationId: organizationId ?? "" },
+    { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
+  );
+  const plan = useMemo(
+    () => planOf({ activePlan: usage.data?.activePlan, isLoading: usage.isLoading }),
+    [usage.data, usage.isLoading],
+  );
+
   const host = useMemo(
     () =>
       new CapabilityGatewayHost({
@@ -224,6 +252,7 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
         uiRoute: route,
         feedback,
         organizations,
+        plan,
       }),
     [
       organizationId,
@@ -235,6 +264,7 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
       route,
       feedback,
       organizations,
+      plan,
     ],
   );
 
