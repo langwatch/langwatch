@@ -342,13 +342,30 @@ const RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set([
  * `anthropic/claude-sonnet-4`, `gpt-5:latest`, `lookup_profile`).
  *
  * No whitespace, so prose written under one of these names is still analysed;
- * no `@`, so an email address is still analysed. What this knowingly lets
- * through is a lone single-token name written under a model or tool attribute
- * ("jane.doe"). That is the residual, and it is accepted: those attributes are
- * set by code, and the native pass still runs on them, so card numbers, phone
+ * no `@`, so an email address is still analysed; and a URL is sent on too (see
+ * {@link reservesModelOrToolName}), since it can carry a person in its path.
+ *
+ * What this knowingly lets through is a lone single-token name written under a
+ * model or tool attribute ("jane.doe", "jane_doe"). It cannot be told apart by
+ * shape: providers write their own ids as dotted words (`anthropic.messages`,
+ * `openai.chat`), which is the exact value this rule exists for. The trace
+ * rule can refuse "jane.doe" because an address is hex or decimal; a model name
+ * is words. That is the residual, and it is accepted: those attributes are set
+ * by code, and the native pass still runs on them, so card numbers, phone
  * numbers and secrets in them are redacted either way.
  */
-const MODEL_OR_TOOL_NAME_VALUE = /^[A-Za-z0-9._:/+-]{1,128}$/;
+const MODEL_OR_TOOL_NAME_VALUE = /^[A-Za-z0-9._:/+-]+$/;
+
+/**
+ * How long a model, provider or tool name may be. Real ones fit, including a
+ * full Bedrock inference-profile ARN (about 100 characters); this sits below
+ * {@link MAX_IDENTIFIER_LENGTH} because the rule is exempting readable words,
+ * not opaque runs, so the longer the value the less it looks like a name
+ * picked from a list.
+ */
+export const MAX_MODEL_OR_TOOL_NAME_LENGTH = 128;
+
+const URL_SCHEME = /:\/\//;
 
 /**
  * Whether this attribute is a model, provider or tool name carrying a value
@@ -363,7 +380,9 @@ export function reservesModelOrToolName({
 }): boolean {
   return (
     RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS.has(key.toLowerCase()) &&
-    MODEL_OR_TOOL_NAME_VALUE.test(value)
+    value.length <= MAX_MODEL_OR_TOOL_NAME_LENGTH &&
+    MODEL_OR_TOOL_NAME_VALUE.test(value) &&
+    !URL_SCHEME.test(value)
   );
 }
 
