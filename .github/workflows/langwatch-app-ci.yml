@@ -1005,9 +1005,11 @@ jobs:
             !/docs/images/
           sparse-checkout-cone-mode: false
 
+      # Oxlint's type-aware pass resolves every governed file's imports, so it
+      # needs every workspace project installed, not only the applications'.
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/platform-api... @langwatch/ui... @langwatch/architecture-enforcer..."
+          install: "all"
 
       # The ADR-076 workspace invariants: one lockfile, one workspace
       # definition, no member carrying overrides pnpm would ignore, the app and
@@ -1077,6 +1079,10 @@ jobs:
       #
       # `lint:oxlint` is the same binary, config and path set that `pnpm lint`
       # gives a contributor.
+      # The Prisma client, the generated SDK types and the built SDK dist are
+      # imports the type-aware rules resolve; without them they read as `any`.
+      - uses: ./.github/actions/prepare-generated-files
+
       - name: Oxlint (blocking -- config errors included)
         run: pnpm lint:oxlint
 
