@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type * as NodeTimers from "node:timers";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -37,6 +38,14 @@ vi.mock("node:child_process", () => ({
     spawnedChildren.push(child);
     return child;
   }),
+}));
+
+// The supervisor imports its timers from node:timers, which vi.useFakeTimers
+// leaves real; route them through the globals the fake clock replaces.
+vi.mock("node:timers", async (importOriginal) => ({
+  ...(await importOriginal<typeof NodeTimers>()),
+  setTimeout: (callback: () => void, ms?: number) => globalThis.setTimeout(callback, ms),
+  clearTimeout: (timer: ReturnType<typeof globalThis.setTimeout>) => globalThis.clearTimeout(timer),
 }));
 
 function makePaths(root: string) {
