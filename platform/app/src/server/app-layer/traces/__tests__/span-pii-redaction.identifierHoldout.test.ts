@@ -249,7 +249,9 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
       ["ai.toolCall.name", "getWeatherForecast"],
       ["gen_ai.tool.name", "search_documents"],
     ])("never submits %s = %s for name detection, and stores it unchanged", async (key, value) => {
-      const { service, submitted, submittedForNames } = makeService();
+      const { service, batchSpy, submittedForNames, namesEverything } =
+        makeService();
+      namesEverything();
       const span = spanWith({
         [key]: value,
         "app.support_note": PROSE_THAT_MUST_BE_ANALYSED,
@@ -259,8 +261,10 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
 
       expect(submittedForNames()).toContain(PROSE_THAT_MUST_BE_ANALYSED);
       expect(submittedForNames()).not.toContain(value);
-      expect(submitted()).toContain(value);
+      const call = batchSpy.mock.calls.find(([texts]) => texts.includes(value));
+      expect(call?.[1].entities).toEqual(["EMAIL_ADDRESS", "PHONE_NUMBER"]);
       expect(attr(span, key)).toBe(value);
+      expect(attr(span, "app.support_note")).toBe("[PERSON]");
     });
 
     // The control: the same value under a name nobody reserved still goes to
@@ -296,6 +300,16 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
 
       expect(attr(span, "ai.model.id")).toBe("[EMAIL_ADDRESS]");
       expect(submitted()).not.toContain("jane@example.com");
+
+      // The native pass caught it above. Without that pass, the value is still
+      // not spared: it goes to the full detector, names included.
+      const fallback = makeService();
+      await fallback.service.redactSpan(
+        spanWith({ "ai.model.id": "jane@example.com" }),
+        null,
+        "STRICT",
+      );
+      expect(fallback.submittedForNames()).toContain("jane@example.com");
     });
 
     /** @scenario "A phone number written under a model name attribute is still redacted" */
@@ -305,18 +319,25 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
 
       await service.redactSpan(span, null, "STRICT", TENANT);
 
-      expect(attr(span, "ai.model.id")).not.toContain("234-567-8901");
+      expect(attr(span, "ai.model.id")).toBe("[PHONE_NUMBER]");
     });
 
     // With no tenant (or the kill switch, or a failed policy lookup) the native
     // pass never runs and the analysis batch is the only redaction. A model
     // name is still scanned there for everything but names and places.
     /** @scenario "Without a resolved policy a model name attribute is still scanned for other identifiers" */
-    it("still scans a model name attribute for a phone number when the native pass did not run", async () => {
-      const { service, batchSpy } = makeService();
+    it.each([
+      ["no tenant", undefined],
+      ["a failed policy lookup", TENANT],
+    ] as const)("still scans a model name attribute for a phone number when the native pass did not run (%s)", async (_why, tenant) => {
+      const { service, batchSpy } = makeService(STRICT_POLICY, {
+        getResolvedForProject: async () => {
+          throw new Error("policy store unavailable");
+        },
+      });
       const span = spanWith({ "ai.model.id": "+1-234-567-8901" });
 
-      await service.redactSpan(span, null, "STRICT");
+      await service.redactSpan(span, null, "STRICT", tenant);
 
       const call = batchSpy.mock.calls.find(([texts]) =>
         texts.includes("+1-234-567-8901"),
@@ -371,11 +392,12 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
     // model name is not submitted at all and stays as the native pass left it.
     /** @scenario "A model name attribute is not submitted when only names are selected" */
     it("does not submit a model name attribute when a custom level selects only names", async () => {
-      const { service, submitted } = makeService({
+      const { service, submitted, namesEverything } = makeService({
         ...STRICT_POLICY,
         pii: { level: "custom", entities: ["PERSON"], exceptPatterns: [] },
         secrets: { enabled: false, customPatterns: [] },
       });
+      namesEverything();
       const span = spanWith({ "ai.model.id": "claude-sonnet-4-6" });
 
       await service.redactSpan(span, null, "STRICT", TENANT);

@@ -51,7 +51,10 @@ export function resolverFor(policy: ResolvedDataPrivacy): DataPrivacyResolver {
  * every string that left the process, flattened across batches, which is the
  * observable contract these suites assert against.
  */
-export function makeService(policy: ResolvedDataPrivacy = STRICT_POLICY) {
+export function makeService(
+  policy: ResolvedDataPrivacy = STRICT_POLICY,
+  dataPrivacyResolver: DataPrivacyResolver = resolverFor(policy),
+) {
   // Return null for every input: the analysis service reporting "nothing to
   // change" keeps the stored values readable, so an assertion about what was
   // STORED and one about what was SUBMITTED cannot be confused for each other.
@@ -62,7 +65,7 @@ export function makeService(policy: ResolvedDataPrivacy = STRICT_POLICY) {
     batchClearPII: batchSpy,
     isLangevalsConfigured: true,
     isProduction: false,
-    dataPrivacyResolver: resolverFor(policy),
+    dataPrivacyResolver,
   });
   const submitted = (): string[] =>
     batchSpy.mock.calls.flatMap((call) => call[0] as string[]);
@@ -72,7 +75,15 @@ export function makeService(policy: ResolvedDataPrivacy = STRICT_POLICY) {
     batchSpy.mock.calls.flatMap(([texts, options]) =>
       (options.entities ?? ["PERSON"]).includes("PERSON") ? texts : [],
     );
-  return { service, batchSpy, submitted, submittedForNames };
+  // Make the name detector read every string as a person, the way it reads a
+  // bare model id. A stored value that survives this was never offered to it.
+  const namesEverything = () =>
+    batchSpy.mockImplementation(async (texts, options) =>
+      texts.map(() =>
+        (options.entities ?? ["PERSON"]).includes("PERSON") ? "[PERSON]" : null,
+      ),
+    );
+  return { service, batchSpy, submitted, submittedForNames, namesEverything };
 }
 
 export function spanWith(attributes: Record<string, string>): OtlpSpan {
