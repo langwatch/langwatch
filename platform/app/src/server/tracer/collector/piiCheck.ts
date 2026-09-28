@@ -396,10 +396,13 @@ type PresidioFinding = z.infer<typeof presidioFindingsSchema>[number];
  * @returns the redacted text, null when nothing is left to redact, or
  *   undefined when the findings cannot be applied to this text.
  */
-export const redactSparingNamesAndPlaces = (
-  text: string,
-  findings: unknown,
-): string | null | undefined => {
+export const redactSparingNamesAndPlaces = ({
+  text,
+  findings,
+}: {
+  text: string;
+  findings: unknown;
+}): string | null | undefined => {
   const parsed = presidioFindingsSchema.safeParse(findings);
   if (!parsed.success) return undefined;
   if (text !== text.trim() || /[\\\uD800-\uDFFF]/.test(text)) {
@@ -554,7 +557,10 @@ const redactedInput = ({
   spareNamesAndPlaces: boolean;
 }): string | null => {
   if (spareNamesAndPlaces) {
-    const spared = redactSparingNamesAndPlaces(input, rawResponse?.results);
+    const spared = redactSparingNamesAndPlaces({
+      text: input,
+      findings: rawResponse?.results,
+    });
     if (spared !== undefined) return spared;
   }
   return rawResponse?.anonymized

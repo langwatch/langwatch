@@ -130,10 +130,13 @@ describe("redactSparingNamesAndPlaces", () => {
   describe("given only name and place findings", () => {
     it("returns null, leaving the text unchanged", () => {
       expect(
-        redactSparingNamesAndPlaces("claude-sonnet-4-6", [
-          PERSON,
-          { entity_type: "LOCATION", start: 7, end: 13, score: 0.6 },
-        ]),
+        redactSparingNamesAndPlaces({
+          text: "claude-sonnet-4-6",
+          findings: [
+            PERSON,
+            { entity_type: "LOCATION", start: 7, end: 13, score: 0.6 },
+          ],
+        }),
       ).toBeNull();
     });
   });
@@ -142,19 +145,25 @@ describe("redactSparingNamesAndPlaces", () => {
     /** @scenario "Overlapping findings in a model name are redacted as one span" */
     it("replaces the whole overlapping span with one marker", () => {
       const text = "id-4111111111111111-x";
-      const result = redactSparingNamesAndPlaces(text, [
-        { entity_type: "US_BANK_NUMBER", start: 3, end: 15, score: 0.4 },
-        { entity_type: "CREDIT_CARD", start: 3, end: 19, score: 1 },
-      ]);
+      const result = redactSparingNamesAndPlaces({
+        text,
+        findings: [
+          { entity_type: "US_BANK_NUMBER", start: 3, end: 15, score: 0.4 },
+          { entity_type: "CREDIT_CARD", start: 3, end: 19, score: 1 },
+        ],
+      });
 
       expect(result).toBe("id-[CREDIT_CARD]-x");
     });
 
     it("never leaves the tail of a partial overlap readable", () => {
-      const result = redactSparingNamesAndPlaces("a-1234567890-b", [
-        { entity_type: "PHONE_NUMBER", start: 2, end: 8, score: 0.9 },
-        { entity_type: "US_BANK_NUMBER", start: 5, end: 12, score: 0.5 },
-      ]);
+      const result = redactSparingNamesAndPlaces({
+        text: "a-1234567890-b",
+        findings: [
+          { entity_type: "PHONE_NUMBER", start: 2, end: 8, score: 0.9 },
+          { entity_type: "US_BANK_NUMBER", start: 5, end: 12, score: 0.5 },
+        ],
+      });
 
       expect(result).toBe("a-[PHONE_NUMBER]-b");
     });
@@ -166,7 +175,9 @@ describe("redactSparingNamesAndPlaces", () => {
       ["an escape the JSON unfolding would change", "model\\n4"],
       ["a character outside the BMP", "model-\u{1F600}"],
     ])("cannot place the findings when it has %s", (_why, text) => {
-      expect(redactSparingNamesAndPlaces(text, [PHONE])).toBeUndefined();
+      expect(
+        redactSparingNamesAndPlaces({ text, findings: [PHONE] }),
+      ).toBeUndefined();
     });
   });
 
@@ -177,7 +188,7 @@ describe("redactSparingNamesAndPlaces", () => {
       ["missing a position", [{ entity_type: "PHONE_NUMBER", score: 1 }]],
     ])("cannot place them when they are %s", (_why, findings) => {
       expect(
-        redactSparingNamesAndPlaces("claude-sonnet-4-6", findings),
+        redactSparingNamesAndPlaces({ text: "claude-sonnet-4-6", findings }),
       ).toBeUndefined();
     });
   });
