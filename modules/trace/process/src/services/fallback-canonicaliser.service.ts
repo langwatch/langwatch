@@ -2,8 +2,11 @@
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
+import type {
+  AttributeCanonicaliser,
+  ExtractorContext,
+} from "../rules/canonical-attributes.rules.ts";
 import { extractErrorInfo, inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules.ts";
-import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 /** OTel GenAI `gen_ai.operation.name` values that are not a model call. */
 const OPERATION_TO_SPAN_TYPE: Record<string, "agent" | "tool"> = {

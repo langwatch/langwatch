@@ -632,6 +632,47 @@ export class OrganizationMembershipService {
     await this.roles.setMemberDisabled(params);
   }
 
+  /**
+   * Changes exactly one of a member's role or disabled status, then reads the member back with
+   * the teams a role change left without an administrator.
+   */
+  async updateMember(params: {
+    organizationId: string;
+    userId: string;
+    role?: OrganizationUserRole;
+    disabled?: boolean;
+    /** The user the credential acts as; null for a service key. */
+    actingUser: OrganizationPlanUser | null;
+  }): Promise<
+    OrganizationMemberSummary & {
+      teams: MemberTeamBinding[];
+      teamsLeftWithoutAdmin: { id: string; name: string }[];
+    }
+  > {
+    const { organizationId, userId, role, actingUser } = params;
+    let teamsLeftWithoutAdmin: { id: string; name: string }[] = [];
+
+    if (role !== undefined) {
+      const result = await this.roles.changeMemberRole({
+        organizationId,
+        userId,
+        role,
+        currentUserId: actingUser?.id ?? null,
+        ...(actingUser ? { planUser: actingUser } : {}),
+      });
+      teamsLeftWithoutAdmin = [...result.teamsLeftWithoutAdmin];
+    } else {
+      await this.roles.setMemberDisabled({
+        organizationId,
+        userId,
+        disabled: params.disabled === true,
+        actingUser,
+      });
+    }
+
+    return { ...(await this.getMember({ organizationId, userId })), teamsLeftWithoutAdmin };
+  }
+
   async changeMemberRole(
     params: Parameters<OrganizationMemberRoleService["changeMemberRole"]>[0],
   ): ReturnType<OrganizationMemberRoleService["changeMemberRole"]> {

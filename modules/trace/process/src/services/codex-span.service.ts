@@ -1,5 +1,6 @@
 import { ATTR_KEYS, CODEX_TURN_SPAN_NAME } from "@langwatch/trace-contract";
 
+import { type ExtractorContext, takeAttribute } from "../rules/canonical-attributes.rules.ts";
 import {
   applyCanonicalLifts,
   asNumber,
@@ -14,7 +15,6 @@ import {
   toPositiveOrNull,
   type CanonicalLift,
 } from "../rules/codex-canonical-value.rules.ts";
-import type { ExtractorContext } from "./canonical-attributes.service.ts";
 
 export class CodexSpanCanonicaliserService {
   private constructor() {}
@@ -44,9 +44,11 @@ export class CodexSpanCanonicaliserService {
     ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "agent");
 
     const { attrs } = ctx.bag;
-    const model = asString(attrs.take("model"));
-    const cacheRead = asNumber(attrs.take("codex.turn.token_usage.cached_input_tokens"));
-    const cacheCreation = asNumber(attrs.take("codex.turn.token_usage.cache_write_input_tokens"));
+    const model = asString(takeAttribute(attrs, "model"));
+    const cacheRead = asNumber(takeAttribute(attrs, "codex.turn.token_usage.cached_input_tokens"));
+    const cacheCreation = asNumber(
+      takeAttribute(attrs, "codex.turn.token_usage.cache_write_input_tokens"),
+    );
     const lifts: CanonicalLift[] = [
       [ATTR_KEYS.GEN_AI_REQUEST_MODEL, model],
       [ATTR_KEYS.GEN_AI_RESPONSE_MODEL, model],
@@ -56,17 +58,17 @@ export class CodexSpanCanonicaliserService {
       ],
       [
         ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
-        asNumber(attrs.take("codex.turn.token_usage.output_tokens")),
+        asNumber(takeAttribute(attrs, "codex.turn.token_usage.output_tokens")),
       ],
       [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cacheRead],
       [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cacheCreation],
       [
         ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
-        asNumber(attrs.take("codex.turn.token_usage.reasoning_output_tokens")),
+        asNumber(takeAttribute(attrs, "codex.turn.token_usage.reasoning_output_tokens")),
       ],
       [
         ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
-        asString(attrs.take("codex.turn.reasoning_effort")),
+        asString(takeAttribute(attrs, "codex.turn.reasoning_effort")),
       ],
       [ATTR_KEYS.GEN_AI_CONVERSATION_ID, extractConversationId(attrs)],
     ];
@@ -86,11 +88,11 @@ export class CodexSpanCanonicaliserService {
     const lifts: CanonicalLift[] = [
       [
         ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
-        asString(attrs.take("codex.request.reasoning_effort")),
+        asString(takeAttribute(attrs, "codex.request.reasoning_effort")),
       ],
       [
         ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
-        toPositiveOrNull(asNumber(attrs.take("codex.usage.reasoning_output_tokens"))),
+        toPositiveOrNull(asNumber(takeAttribute(attrs, "codex.usage.reasoning_output_tokens"))),
       ],
       [
         ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,

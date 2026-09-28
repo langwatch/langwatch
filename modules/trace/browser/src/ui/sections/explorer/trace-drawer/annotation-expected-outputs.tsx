@@ -29,9 +29,10 @@ export function AnnotationExpectedOutputs({
     { enabled: !!project?.id },
   );
 
-  const suggestions = (annotations.data ?? []).filter((annotation) =>
-    annotationSuggestedOutput({ annotation, traceId }),
-  );
+  const suggestions = (annotations.data ?? []).filter((annotation) => {
+    const suggestion = annotationSuggestedOutput({ annotation, traceId });
+    return suggestion.suggested && suggestion.output !== "";
+  });
 
   if (suggestions.length === 0) return null;
 

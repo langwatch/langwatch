@@ -3,6 +3,10 @@
 import type { CanonicalEvent } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
+import type {
+  AttributeCanonicaliser,
+  ExtractorContext,
+} from "../rules/canonical-attributes.rules.ts";
 import {
   extractInputMessages,
   extractOutputMessages,
@@ -10,7 +14,6 @@ import {
   recordValueType,
 } from "../rules/canonical-extraction.rules.ts";
 import { parseJsonSafely } from "../rules/canonical-guard.rules.ts";
-import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 export class LogfireCanonicaliserService implements AttributeCanonicaliser {
   static create(): LogfireCanonicaliserService {

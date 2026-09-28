@@ -1,6 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
-import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
+import { type ExtractorContext, takeAttribute } from "./canonical-attributes.rules.ts";
 import {
   extractModelToBoth,
   extractUsageTokens,
@@ -58,7 +58,7 @@ function canonicaliseSpanIdentity(ctx: ExtractorContext): void {
     transform: (raw) => normaliseModelFromAiModelObject(raw),
   });
   if (!extractedModel) {
-    attrs.take(ATTR_KEYS.AI_MODEL);
+    takeAttribute(attrs, ATTR_KEYS.AI_MODEL);
   }
 }
 
@@ -75,10 +75,10 @@ function canonicaliseUsage(ctx: ExtractorContext): void {
     asNumber(attrs.get(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS));
   if (canonicalInput !== null) {
     const cacheRead =
-      asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS)) ??
-      asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS));
-    const cacheWrite = asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHE_WRITE_TOKENS));
-    const noCacheTokens = asNumber(attrs.take(ATTR_KEYS.AI_USAGE_NO_CACHE_TOKENS));
+      asNumber(takeAttribute(attrs, ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS)) ??
+      asNumber(takeAttribute(attrs, ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS));
+    const cacheWrite = asNumber(takeAttribute(attrs, ATTR_KEYS.AI_USAGE_CACHE_WRITE_TOKENS));
+    const noCacheTokens = asNumber(takeAttribute(attrs, ATTR_KEYS.AI_USAGE_NO_CACHE_TOKENS));
     if (cacheRead !== null && cacheRead > 0) {
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cacheRead);
       ctx.recordRule(`${VERCEL_RULE_PREFIX}:ai.usage.cacheRead->gen_ai.usage.cache_read`);
@@ -90,7 +90,7 @@ function canonicaliseUsage(ctx: ExtractorContext): void {
 
     recordFreshInputTokens({ cacheRead, cacheWrite, canonicalInput, ctx, noCacheTokens });
 
-    const reasoningTokens = asNumber(attrs.take(ATTR_KEYS.AI_USAGE_REASONING_TOKENS));
+    const reasoningTokens = asNumber(takeAttribute(attrs, ATTR_KEYS.AI_USAGE_REASONING_TOKENS));
     if (reasoningTokens !== null && reasoningTokens > 0) {
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, reasoningTokens);
       ctx.recordRule(

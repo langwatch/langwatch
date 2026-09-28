@@ -3,12 +3,16 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 import {
+  type AttributeCanonicaliser,
+  type ExtractorContext,
+  takeAttribute,
+} from "../rules/canonical-attributes.rules.ts";
+import {
   ALLOWED_SPAN_TYPES,
   extractInputMessages,
   extractOutputMessages,
   recordValueType,
 } from "../rules/canonical-extraction.rules.ts";
-import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 export class TraceloopCanonicaliserService implements AttributeCanonicaliser {
   static create(): TraceloopCanonicaliserService {
@@ -23,7 +27,7 @@ export class TraceloopCanonicaliserService implements AttributeCanonicaliser {
     const { attrs } = ctx.bag;
 
     if (!attrs.has(ATTR_KEYS.SPAN_TYPE)) {
-      const rawKind = attrs.take(ATTR_KEYS.TRACELOOP_SPAN_KIND);
+      const rawKind = takeAttribute(attrs, ATTR_KEYS.TRACELOOP_SPAN_KIND);
       const kind = typeof rawKind === "string" ? rawKind.toLowerCase() : null;
 
       if (kind && ALLOWED_SPAN_TYPES[kind] === true) {
@@ -31,7 +35,7 @@ export class TraceloopCanonicaliserService implements AttributeCanonicaliser {
         ctx.recordRule(`${this.id}:span.kind`);
       }
     } else {
-      attrs.take(ATTR_KEYS.TRACELOOP_SPAN_KIND);
+      takeAttribute(attrs, ATTR_KEYS.TRACELOOP_SPAN_KIND);
     }
 
     if (

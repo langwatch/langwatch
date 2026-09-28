@@ -1,4 +1,4 @@
-import type { ResolvePlanInput } from "@langwatch/entitlement-contract";
+import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type {
@@ -76,7 +76,7 @@ export type LicenseLimitCheck = Readonly<{
 
 /** The portable signed-license capability supplied to process peers. */
 export interface LicensingApi {
-  resolve(input: ResolvePlanInput): Promise<PlanInfo>;
+  resolve(input: ResolvePlanInput): Promise<EntitlementGrant>;
   /** Every license on this deployment, the instance key first, until one permits the platform. */
   inspectPlatformAccess(): Promise<PlatformLicenseAccess>;
   getActivePlan(organizationId: string): Promise<PlanInfo>;

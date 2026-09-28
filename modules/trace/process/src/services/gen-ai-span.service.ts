@@ -1,5 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
+import { type ExtractorContext, takeAttribute } from "../rules/canonical-attributes.rules.ts";
 import {
   coerceStringNumberAttrs,
   extractInputMessages,
@@ -19,7 +20,6 @@ import {
   extractSystemInstructionFromMessages,
   stripLiftedSystemMessage,
 } from "../rules/canonical-message.rules.ts";
-import type { ExtractorContext } from "./canonical-attributes.service.ts";
 
 const GEN_AI_RULE_PREFIX = "genai";
 
@@ -47,16 +47,16 @@ export class GenAiSpanService {
       }
     }
 
-    const system = attrs.take(ATTR_KEYS.GEN_AI_SYSTEM);
+    const system = takeAttribute(attrs, ATTR_KEYS.GEN_AI_SYSTEM);
     if (system !== void 0 && typeof system === "string" && system.length > 0) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_PROVIDER_NAME, system);
       ctx.recordRule(`${GEN_AI_RULE_PREFIX}:provider.name`);
     }
 
     const agentName =
-      attrs.take(ATTR_KEYS.GEN_AI_AGENT_NAME) ??
-      attrs.take(ATTR_KEYS.GEN_AI_AGENT) ??
-      attrs.take(ATTR_KEYS.AGENT_NAME);
+      takeAttribute(attrs, ATTR_KEYS.GEN_AI_AGENT_NAME) ??
+      takeAttribute(attrs, ATTR_KEYS.GEN_AI_AGENT) ??
+      takeAttribute(attrs, ATTR_KEYS.AGENT_NAME);
     if (agentName !== void 0 && typeof agentName === "string" && agentName.length > 0) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_AGENT_NAME, agentName);
       ctx.recordRule(`${GEN_AI_RULE_PREFIX}:agent.name`);
@@ -99,7 +99,7 @@ export class GenAiSpanService {
 
   /** System instructions as the emitter sent them: one string, or blocks joined into one. */
   private canonicaliseSystemInstructions(ctx: ExtractorContext): void {
-    const raw = ctx.bag.attrs.take(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS);
+    const raw = takeAttribute(ctx.bag.attrs, ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS);
     if (typeof raw === "string") {
       ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, raw);
       ctx.recordRule(`${GEN_AI_RULE_PREFIX}:system_instructions(string)`);
@@ -145,7 +145,7 @@ export class GenAiSpanService {
     if (sysInstruction !== null) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
       const stripped = stripLiftedSystemMessage(existing);
-      attrs.take(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
+      takeAttribute(attrs, ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
       if (stripped.length > 0) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, stripped);
       }

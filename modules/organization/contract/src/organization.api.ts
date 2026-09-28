@@ -121,6 +121,12 @@ export type OrganizationRestMemberTeamBinding = Readonly<{
   customRoleId: string | null;
   customRoleName: string | null;
 }>;
+/** One member after a role or disabled-status change, and the teams it left without an admin. */
+export type OrganizationUpdatedMember = OrganizationRestMemberSummary &
+  Readonly<{
+    teams: OrganizationRestMemberTeamBinding[];
+    teamsLeftWithoutAdmin: { id: string; name: string }[];
+  }>;
 export type OrganizationProvisioningSummary = Readonly<{
   id: string;
   name: string;
@@ -273,6 +279,16 @@ export interface OrganizationApi {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationRestMemberSummary & { teams: OrganizationRestMemberTeamBinding[] }>;
+  /** Changes exactly one of a member's role or disabled status, and reads the member back. */
+  updateMember(
+    input: Readonly<{
+      organizationId: string;
+      userId: string;
+      role?: OrganizationUserRole;
+      disabled?: boolean;
+    }>,
+    by: OrganizationCaller | null,
+  ): Promise<OrganizationUpdatedMember>;
   createForProvisioning(input: { name: string; slug?: string }): Promise<{
     organization: { id: string; name: string };
     team: { id: string; slug: string; name: string };

@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
+import type { Cluster, Redis } from "ioredis";
 
 import {
   AGENT_SANDBOX_KEY_REUSE_MS,
@@ -15,11 +16,8 @@ const ALGORITHM = "aes-256-gcm";
 const KEY_BYTES = 32;
 const IV_BYTES = 12;
 
-/** The two commands the share needs, so no Redis client type crosses this seam. */
-export interface AgentSandboxKeyShareRedis {
-  get(key: string): Promise<string | null>;
-  setex(key: string, seconds: number, value: string): Promise<unknown>;
-}
+/** Only what the share calls. */
+export type AgentSandboxKeyShareRedis = Pick<Redis | Cluster, "get" | "setex">;
 
 type HeldToken = { sealed: string; expiresAt: number };
 

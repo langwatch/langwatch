@@ -4,7 +4,7 @@ import type {
   AttributeCanonicaliser,
   ExtractorContext,
   LogExtractorContext,
-} from "./canonical-attributes.service.ts";
+} from "../rules/canonical-attributes.rules.ts";
 
 export const SPRING_AI_SCOPE_NAMES: ReadonlySet<string> = new Set([
   "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",

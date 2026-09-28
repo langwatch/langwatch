@@ -121,7 +121,10 @@ describe("given the licence leg a deployment composes", () => {
         isSaas: true,
       });
 
-      await expect(source.resolve({ organizationId: "org-1" })).resolves.toBe(UNLIMITED_PLAN);
+      await expect(source.resolve({ organizationId: "org-1" })).resolves.toEqual({
+        granted: true,
+        plan: UNLIMITED_PLAN,
+      });
     });
   });
 
@@ -142,11 +145,14 @@ describe("given the licence leg a deployment composes", () => {
       });
 
       await expect(source.resolve({ organizationId: "org-1" })).resolves.toMatchObject({
-        type: "ENTERPRISE",
-        // The seats the customer bought bind; the licence's message ceiling
-        // does not, because self-hosted volume is never metered.
-        maxMembers: 100,
-        maxMessagesPerMonth: UNLIMITED_PLAN.maxMessagesPerMonth,
+        granted: true,
+        plan: {
+          type: "ENTERPRISE",
+          // The seats the customer bought bind; the licence's message ceiling
+          // does not, because self-hosted volume is never metered.
+          maxMembers: 100,
+          maxMessagesPerMonth: UNLIMITED_PLAN.maxMessagesPerMonth,
+        },
       });
     });
 
@@ -159,7 +165,8 @@ describe("given the licence leg a deployment composes", () => {
       });
 
       await expect(source.resolve({ organizationId: "org-1" })).resolves.toMatchObject({
-        type: "ENTERPRISE",
+        granted: true,
+        plan: { type: "ENTERPRISE" },
       });
     });
 
@@ -170,7 +177,10 @@ describe("given the licence leg a deployment composes", () => {
         isSaas: false,
       });
 
-      await expect(source.resolve({ organizationId: "org-1" })).resolves.toBe(UNLIMITED_PLAN);
+      await expect(source.resolve({ organizationId: "org-1" })).resolves.toEqual({
+        granted: true,
+        plan: UNLIMITED_PLAN,
+      });
     });
   });
 });

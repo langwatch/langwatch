@@ -56,7 +56,7 @@ import {
   type GenerateLicenseInput,
   type GenerateLicenseOutput,
 } from "@langwatch/enterprise-licensing-contract";
-import type { ResolvePlanInput } from "@langwatch/entitlement-contract";
+import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -354,7 +354,7 @@ export class LicensingApp implements LicensingApiContract {
     return app;
   }
 
-  resolve(input: ResolvePlanInput): Promise<PlanInfo> {
+  resolve(input: ResolvePlanInput): Promise<EntitlementGrant> {
     return this.#entitlements.resolve(input);
   }
 

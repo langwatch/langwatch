@@ -1,11 +1,11 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
+import { type LogExtractorContext, takeAttribute } from "../rules/canonical-attributes.rules.ts";
 import {
   asNumber,
   asString,
   CODEX_EVENT_NAME_PREFIX,
 } from "../rules/codex-canonical-value.rules.ts";
-import type { LogExtractorContext } from "./canonical-attributes.service.ts";
 
 export class CodexLogCanonicaliserService {
   private constructor() {}
@@ -59,12 +59,12 @@ export class CodexLogCanonicaliserService {
   }
 
   private liftSseEvent(ctx: LogExtractorContext): void {
-    const model = asString(ctx.bag.attrs.take("model"));
-    const inputTokens = asNumber(ctx.bag.attrs.take("input_token_count"));
-    const outputTokens = asNumber(ctx.bag.attrs.take("output_token_count"));
-    const cacheReadTokens = asNumber(ctx.bag.attrs.take("cached_token_count"));
-    const principalEmail = asString(ctx.bag.attrs.take("user.email"));
-    const reasoningEffort = asString(ctx.bag.attrs.take("model_reasoning_effort"));
+    const model = asString(takeAttribute(ctx.bag.attrs, "model"));
+    const inputTokens = asNumber(takeAttribute(ctx.bag.attrs, "input_token_count"));
+    const outputTokens = asNumber(takeAttribute(ctx.bag.attrs, "output_token_count"));
+    const cacheReadTokens = asNumber(takeAttribute(ctx.bag.attrs, "cached_token_count"));
+    const principalEmail = asString(takeAttribute(ctx.bag.attrs, "user.email"));
+    const reasoningEffort = asString(takeAttribute(ctx.bag.attrs, "model_reasoning_effort"));
 
     let fired = false;
     if (reasoningEffort !== null) {
@@ -103,9 +103,9 @@ export class CodexLogCanonicaliserService {
   }
 
   private liftConversationStarts(ctx: LogExtractorContext): void {
-    const model = asString(ctx.bag.attrs.take("model"));
-    const principalEmail = asString(ctx.bag.attrs.take("user.email"));
-    const reasoningEffort = asString(ctx.bag.attrs.take("reasoning_effort"));
+    const model = asString(takeAttribute(ctx.bag.attrs, "model"));
+    const principalEmail = asString(takeAttribute(ctx.bag.attrs, "user.email"));
+    const reasoningEffort = asString(takeAttribute(ctx.bag.attrs, "reasoning_effort"));
 
     let fired = false;
     if (reasoningEffort !== null) {
@@ -129,7 +129,7 @@ export class CodexLogCanonicaliserService {
   }
 
   private liftUserPrompt(ctx: LogExtractorContext): void {
-    const prompt = asString(ctx.bag.attrs.take("prompt"));
+    const prompt = asString(takeAttribute(ctx.bag.attrs, "prompt"));
     if (prompt === null) {
       return;
     }

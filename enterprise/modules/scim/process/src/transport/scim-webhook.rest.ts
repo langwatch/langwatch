@@ -14,10 +14,12 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestAnswer,
-  type RestProtocolProducer,
 } from "@langwatch/api/rest";
-import { ScimApi, scimWebhookDeliveryHeadersSchema } from "@langwatch/enterprise-scim-contract";
+import {
+  ScimApi,
+  scimWebhookDeliveryHeadersSchema,
+  type ScimDeliveryReceipt,
+} from "@langwatch/enterprise-scim-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
 
@@ -35,13 +37,9 @@ const payloadTooLarge = (): Error =>
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
-/** One of the four sentences a refused delivery reads in Auth0's log. */
-function refusal(
-  response: RestProtocolProducer<typeof JSON_MEDIA_TYPE>,
-  status: 400 | 401 | 403 | 404,
-  error: string,
-): RestAnswer<"protocol"> {
-  return response.write({ status, mediaType: JSON_MEDIA_TYPE, body: JSON.stringify({ error }) });
+/** The body Auth0's log reads: the acknowledgement, or the refusal's one sentence. */
+function receiptBody(receipt: ScimDeliveryReceipt): { received: true } | { error: string } {
+  return "error" in receipt ? { error: receipt.error } : { received: true };
 }
 
 /**
@@ -79,28 +77,16 @@ export const scimWebhookRest = defineRestRouter(ScimApi)
       "Auth0's SCIM log stream, signed with the deployment's shared secret and tenanted by the SCIM token the delivery presents. A deployment that configured no secret answers 404, so a probe cannot learn whether the path is served here.",
   })
   .handle(async ({ app, raw, response }, delivery) => {
-    const admission = await app.admitDirectoryDelivery({
+    const receipt = await app.receiveDirectoryDelivery({
       body: raw,
       signature: delivery.signature,
       authorization: delivery.authorization,
     });
 
-    if (admission.status === "not-configured") {
-      return refusal(response, 404, "Webhook not configured");
-    }
-    if (admission.status === "unauthorized") return refusal(response, 401, "Unauthorized");
-    if (admission.status === "forbidden") return refusal(response, 403, "Forbidden");
-    if (admission.status === "invalid-json") return refusal(response, 400, "Invalid JSON");
-
-    await app.relayDirectoryEvents({
-      organizationId: admission.organizationId,
-      events: admission.events,
-    });
-
     return response.write({
-      status: 200,
+      status: receipt.status,
       mediaType: JSON_MEDIA_TYPE,
-      body: JSON.stringify({ received: true }),
+      body: JSON.stringify(receiptBody(receipt)),
     });
   })
   .build();

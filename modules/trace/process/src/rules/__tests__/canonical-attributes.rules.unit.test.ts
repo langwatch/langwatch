@@ -1,12 +1,12 @@
 import type { CanonicalAttributes } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { CanonicalAttributeStore } from "../canonical-attributes.service.ts";
+import { canonicalAttributeStore, takeAttributesByPrefix } from "../canonical-attributes.rules.ts";
 
-describe("CanonicalAttributeStore", () => {
-  describe("when takeByPrefix is called", () => {
+describe("canonical attribute store", () => {
+  describe("when its attributes are taken by prefix", () => {
     it("returns all entries matching the prefix and removes them", () => {
-      const bag = CanonicalAttributeStore.create({
+      const bag = canonicalAttributeStore({
         "mastra.metadata.threadId": "thread-1",
         "mastra.metadata.runId": "run-42",
         "mastra.metadata.resourceId": "res-7",
@@ -14,7 +14,7 @@ describe("CanonicalAttributeStore", () => {
         "other.key": "value",
       } as CanonicalAttributes);
 
-      const result = bag.takeByPrefix("mastra.metadata.");
+      const result = takeAttributesByPrefix(bag, "mastra.metadata.");
 
       expect(result).toEqual([
         { key: "mastra.metadata.threadId", value: "thread-1" },
@@ -33,19 +33,19 @@ describe("CanonicalAttributeStore", () => {
     });
 
     it("returns empty array when no keys match the prefix", () => {
-      const bag = CanonicalAttributeStore.create({
+      const bag = canonicalAttributeStore({
         "gen_ai.usage.input_tokens": 100,
       } as CanonicalAttributes);
 
-      const result = bag.takeByPrefix("mastra.metadata.");
+      const result = takeAttributesByPrefix(bag, "mastra.metadata.");
 
       expect(result).toEqual([]);
     });
 
     it("returns empty array for empty bag", () => {
-      const bag = CanonicalAttributeStore.create({} as CanonicalAttributes);
+      const bag = canonicalAttributeStore({} as CanonicalAttributes);
 
-      const result = bag.takeByPrefix("any.prefix.");
+      const result = takeAttributesByPrefix(bag, "any.prefix.");
 
       expect(result).toEqual([]);
     });

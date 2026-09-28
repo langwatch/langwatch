@@ -43,6 +43,7 @@ import {
   type OrganizationProvisioningSummary,
   type OrganizationRestMemberSummary,
   type OrganizationRestMemberTeamBinding,
+  type OrganizationUpdatedMember,
   type OrganizationSettings,
   type AddOrganizationGroupBindingInput,
   type AddOrganizationTeamMemberInput,
@@ -655,6 +656,22 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     userId: string;
   }): Promise<OrganizationRestMemberSummary & { teams: OrganizationRestMemberTeamBinding[] }> {
     return this.#dependencies.membership.getMember(input);
+  }
+
+  /** One member's role or disabled status, changed; the acting user travels whole, as above. */
+  updateMember(
+    input: Readonly<{
+      organizationId: string;
+      userId: string;
+      role?: OrganizationUserRole;
+      disabled?: boolean;
+    }>,
+    by: (OrganizationCaller & { name?: string | null; email?: string | null }) | null,
+  ): Promise<OrganizationUpdatedMember> {
+    return this.#dependencies.membership.updateMember({
+      ...input,
+      actingUser: by ? { id: by.id, name: by.name ?? null, email: by.email ?? null } : null,
+    });
   }
 
   createForProvisioning(input: { name: string; slug?: string }): Promise<{

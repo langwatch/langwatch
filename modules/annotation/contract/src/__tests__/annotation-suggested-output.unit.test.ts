@@ -11,11 +11,14 @@ const suggestionOf = (annotation: AnnotationSuggestionSource = {}) =>
 describe("the expected output an annotation suggests", () => {
   describe("given a comment about the whole trace", () => {
     it("reads the suggestion as the trace's expected output", () => {
-      expect(suggestionOf({ expectedOutput: "the right answer" })).toBe("the right answer");
+      expect(suggestionOf({ expectedOutput: "the right answer" })).toEqual({
+        suggested: true,
+        output: "the right answer",
+      });
     });
 
     it("reads nothing when the reviewer suggested nothing", () => {
-      expect(suggestionOf({ expectedOutput: null })).toBeNull();
+      expect(suggestionOf({ expectedOutput: null })).toEqual({ suggested: false });
     });
   });
 
@@ -28,7 +31,7 @@ describe("the expected output an annotation suggests", () => {
           anchorId: traceId,
           anchorPath: "output",
         }),
-      ).toBe("the right answer");
+      ).toEqual({ suggested: true, output: "the right answer" });
     });
   });
 
@@ -41,7 +44,7 @@ describe("the expected output an annotation suggests", () => {
           anchorId: traceId,
           anchorPath: "input",
         }),
-      ).toBeNull();
+      ).toEqual({ suggested: false });
     });
   });
 
@@ -54,7 +57,7 @@ describe("the expected output an annotation suggests", () => {
           anchorId: "span-search",
           anchorPath: "output",
         }),
-      ).toBeNull();
+      ).toEqual({ suggested: false });
     });
 
     it("reads no expected output for a span's input", () => {
@@ -65,7 +68,7 @@ describe("the expected output an annotation suggests", () => {
           anchorId: "span-search",
           anchorPath: "input",
         }),
-      ).toBeNull();
+      ).toEqual({ suggested: false });
     });
   });
 
@@ -77,7 +80,7 @@ describe("the expected output an annotation suggests", () => {
           anchorKind: "span",
           anchorId: "span-search",
         }),
-      ).toBeNull();
+      ).toEqual({ suggested: false });
     });
 
     it("reads no expected output for a message", () => {
@@ -88,7 +91,7 @@ describe("the expected output an annotation suggests", () => {
           anchorId: traceId,
           anchorPath: "assistant-2-9f1c",
         }),
-      ).toBeNull();
+      ).toEqual({ suggested: false });
     });
   });
 
@@ -101,7 +104,7 @@ describe("the expected output an annotation suggests", () => {
           anchorId: "gizmo-1",
           anchorPath: "somewhere",
         }),
-      ).toBe("the right answer");
+      ).toEqual({ suggested: true, output: "the right answer" });
     });
 
     it("reads the same way when the kind names nothing at all", () => {
@@ -112,7 +115,7 @@ describe("the expected output an annotation suggests", () => {
           anchorId: null,
           anchorPath: "output",
         }),
-      ).toBe("the right answer");
+      ).toEqual({ suggested: true, output: "the right answer" });
     });
   });
 });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { Plan } from "./plan.ts";
+import { planSchema, type Plan } from "./plan.ts";
 
 export const planProviderUserSchema = z.object({
   id: z.string().optional(),
@@ -39,9 +39,16 @@ export interface PlanProvider {
   getActivePlan(input: ResolvePlanInput): Promise<Plan>;
 }
 
-/** A provider-specific source. `null` means that source has no active grant. */
+/** What one provider-specific source answers: the plan it grants, or no grant at all. */
+export const entitlementGrantSchema = z.discriminatedUnion("granted", [
+  z.object({ granted: z.literal(true), plan: planSchema }),
+  z.object({ granted: z.literal(false) }),
+]);
+export type EntitlementGrant = z.infer<typeof entitlementGrantSchema>;
+
+/** A provider-specific source of an organization's plan. */
 export interface EntitlementSource {
-  resolve(input: ResolvePlanInput): Promise<Plan | null>;
+  resolve(input: ResolvePlanInput): Promise<EntitlementGrant>;
 }
 
 export interface BaselinePlanSource {

@@ -1,6 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
-import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
+import type { ExtractorContext } from "./canonical-attributes.rules.ts";
 import { inferSpanTypeIfAbsent } from "./canonical-extraction.rules.ts";
 import { isNonEmptyString } from "./canonical-guard.rules.ts";
 

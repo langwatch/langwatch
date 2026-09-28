@@ -1,5 +1,6 @@
 import {
   floorAtOssBaseline,
+  type EntitlementGrant,
   type EntitlementSource,
   type LicensingService,
   type PlanInfo,
@@ -51,7 +52,12 @@ export class LicensingEntitlementSourceService implements EntitlementSource {
     private readonly mode: LicensingEntitlementSourceMode,
   ) {}
 
-  async resolve(input: ResolvePlanInput): Promise<PlanInfo> {
+  /** A licence always answers a plan, the free one included, so it always grants one. */
+  async resolve(input: ResolvePlanInput): Promise<EntitlementGrant> {
+    return { granted: true, plan: await this.planFor(input) };
+  }
+
+  private async planFor(input: ResolvePlanInput): Promise<PlanInfo> {
     if (this.mode === "cloud") {
       return this.licensing.getActivePlan(input.organizationId);
     }

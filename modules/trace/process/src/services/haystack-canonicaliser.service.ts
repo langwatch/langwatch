@@ -2,9 +2,12 @@
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
+import type {
+  AttributeCanonicaliser,
+  ExtractorContext,
+} from "../rules/canonical-attributes.rules.ts";
 import { inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules.ts";
 import { isRecord } from "../rules/canonical-guard.rules.ts";
-import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 export class HaystackCanonicaliserService implements AttributeCanonicaliser {
   static create(): HaystackCanonicaliserService {
