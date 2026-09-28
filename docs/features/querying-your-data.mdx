@@ -64,6 +64,7 @@ options, so every condition you send has to hold.
 langwatch trace search --filter "status:error AND model:gpt-*" --limit 20
 langwatch trace search --filter "trace.attribute.langwatch.user_id:alice"
 langwatch trace search --filter "evaluatorVerdict:fail" -q "refund"
+langwatch trace search --filter "event:thumbs_up_down"
 ```
 
 Three namespaces reach arbitrary OpenTelemetry attributes:

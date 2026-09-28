@@ -2,3 +2,15 @@
 title: 'Search traces'
 openapi: 'POST /api/traces/search'
 ---
+
+The `filter` field takes the LangWatch filter language. See
+[Filtering traces](/features/querying-your-data#filtering-traces) for the syntax.
+
+```text
+status:error
+-status:error
+event:thumbs_up_down
+```
+
+`event:<name>` matches traces carrying an event with that name, such as the
+`thumbs_up_down` feedback recorded through `POST /api/events/track`.

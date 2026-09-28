@@ -2,3 +2,8 @@
 title: "Update a dataset by its slug or id"
 openapi: "PATCH /api/dataset/{slugOrId}"
 ---
+
+<Warning>
+Renaming a dataset changes its slug, and the old slug stops resolving. Store the
+dataset id when you need a reference that survives a rename.
+</Warning>
