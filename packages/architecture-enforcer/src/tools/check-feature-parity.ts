@@ -341,7 +341,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/cli-virtualkeys.feature",
   "specs/ai-gateway/epic.feature",
   "specs/ai-gateway/governance/activity-monitor.feature",
-  "specs/ai-gateway/governance/admin-oversight.feature",
   "specs/ai-gateway/governance/anomaly-detection.feature",
   "specs/ai-gateway/governance/anomaly-rules.feature",
   "specs/ai-gateway/governance/architecture-invariants.feature",
