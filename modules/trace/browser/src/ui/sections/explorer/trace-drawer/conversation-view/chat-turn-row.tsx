@@ -5,7 +5,6 @@ import {
   formatDuration,
   formatRelativeTimeAgo,
   isSessionMarked,
-  type MediaPartData,
   useAnnotationQueueSessionStore,
   useConversationExpand,
 } from "@langwatch/trace-browser-kit";
