@@ -13,30 +13,30 @@ import {
 import type { Protections, TraceApi } from "@langwatch/trace-contract";
 
 import type { CancellationPublisher } from "../app/scenario.app.ts";
-import { ComputeRunMetricsCommand } from "../eventing/compute-run-metrics.commands.ts";
-import { FinishRunCommand } from "../eventing/finish-run.commands.ts";
-import { QueueRunCommand } from "../eventing/queue-run.commands.ts";
-import { RecordEvaluationsCommand } from "../eventing/record-evaluations.commands.ts";
+import type { SimulationRunProcessingRepository } from "../repositories/simulation-run-processing.repository.ts";
+import { isSimulationProcessingEvent } from "../rules/simulation-run-event.rules.ts";
+import { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service.ts";
+import type { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
+import { ScenarioRunDispatchService } from "../services/scenario-run-dispatch.service.ts";
+import type { SimulationCommandDispatcherService } from "../services/simulation-command-dispatcher.service.ts";
+import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
+import { FinishRunCommand } from "./finish-run.commands.ts";
+import { QueueRunCommand } from "./queue-run.commands.ts";
+import { RecordEvaluationsCommand } from "./record-evaluations.commands.ts";
 import {
   SCENARIO_EVALUATIONS_PROCESS_NAME,
   scenarioEvaluationsPM,
-} from "../eventing/scenario-evaluations.process.ts";
+} from "./scenario-evaluations.process.ts";
 import {
   SimulationProcessingPipelineAdapter,
   type SimulationProcessingPipelineDefinition,
-} from "../eventing/simulation-processing.pipeline.ts";
+} from "./simulation-processing.pipeline.ts";
 import {
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,
   simulationRunExecutionPM,
-} from "../eventing/simulation-run-execution.process.ts";
-import type { SnapshotUpdateBroadcastSubscriberDeps } from "../eventing/snapshot-update-broadcast.subscriber.ts";
-import type { SuiteRunSyncSubscriberDeps } from "../eventing/suite-run-sync.subscriber.ts";
-import type { SimulationRunProcessingRepository } from "../repositories/simulation-run-processing.repository.ts";
-import { isSimulationProcessingEvent } from "../rules/simulation-run-event.rules.ts";
-import { ScenarioExecutionPoolService } from "./scenario-execution-pool.service.ts";
-import type { ScenarioExecutorService } from "./scenario-executor.service.ts";
-import { ScenarioRunDispatchService } from "./scenario-run-dispatch.service.ts";
-import type { SimulationCommandDispatcherService } from "./simulation-command-dispatcher.service.ts";
+} from "./simulation-run-execution.process.ts";
+import type { SnapshotUpdateBroadcastSubscriberDeps } from "./snapshot-update-broadcast.subscriber.ts";
+import type { SuiteRunSyncSubscriberDeps } from "./suite-run-sync.subscriber.ts";
 
 export type SimulationTraceReads = Pick<
   TraceApi,
@@ -70,7 +70,7 @@ export interface SimulationPipelineSetup {
  * metrics over scenario's repositories, ECST commands reading the run's own
  * earlier events, and the execution pool built only on consume (WP-5 ruling 3).
  */
-export class SimulationProcessingService {
+export class SimulationProcessingRuntimeAdapter {
   private constructor(
     private readonly input: {
       runs: SimulationRunProcessingRepository;
@@ -100,8 +100,8 @@ export class SimulationProcessingService {
     snapshotUpdates: SnapshotUpdateBroadcastSubscriberDeps;
     executor: ScenarioExecutorService;
     grading: SimulationGradingPeers;
-  }): SimulationProcessingService {
-    return new SimulationProcessingService(input);
+  }): SimulationProcessingRuntimeAdapter {
+    return new SimulationProcessingRuntimeAdapter(input);
   }
 
   buildPipeline(setup: SimulationPipelineSetup): SimulationProcessingPipelineDefinition {
