@@ -29,7 +29,7 @@ vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => ({
     }) => unknown,
   ) => selector({ attachContext: langyMock.attach, openPanel: langyMock.open }),
 }));
-vi.mock("../../../../../behavior/use-drawer.ts", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({

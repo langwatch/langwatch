@@ -3,8 +3,15 @@
  * in the order the router resolves them, with the permission each asks for.
  */
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { promptRest } from "../prompt.rest.ts";
+
+const requiredFields = z.array(z.string()).optional();
+const publishedRequiredSchema = z.object({
+  required: requiredFields,
+  items: z.object({ required: requiredFields }).optional(),
+});
 
 describe("the prompts REST declaration", () => {
   it("publishes every route at its literal address, in resolution order", () => {
@@ -60,7 +67,8 @@ describe("the prompts REST declaration", () => {
           return [route.operation, undefined];
         }
         const { schema: body } = await schema.toOpenAPISchema();
-        return [route.operation, body.items?.required ?? body.required];
+        const published = publishedRequiredSchema.parse(body);
+        return [route.operation, published.items?.required ?? published.required];
       }),
     );
     const required = Object.fromEntries(published);

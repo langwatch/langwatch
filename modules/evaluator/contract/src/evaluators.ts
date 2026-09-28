@@ -43,9 +43,10 @@ export const AVAILABLE_EVALUATORS: Readonly<Record<string, EvaluatorDefinition>>
   ...nativeEvaluatorDefinitions,
 };
 
-/** Returns the installed catalogue definition when the check type is known. */
-export const getEvaluatorDefinitions = (evaluatorType: string): EvaluatorDefinition | undefined => {
+/** The installed catalogue definition for a check type: one, or none when the type is unknown. */
+export const findEvaluatorDefinitions = (evaluatorType: string): EvaluatorDefinition[] => {
   const definitions: Readonly<Record<string, EvaluatorDefinition>> = AVAILABLE_EVALUATORS;
+  const definition = definitions[evaluatorType];
 
-  return definitions[evaluatorType];
+  return definition ? [definition] : [];
 };

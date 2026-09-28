@@ -1,23 +1,9 @@
-import {
-  workflowAgentConfigSchema,
-  type AgentInputBinding,
-  type Field,
-  type WorkflowAgentConfig,
-} from "@langwatch/agent-contract";
+import { workflowAgentConfigSchema, type AgentInputBinding } from "@langwatch/agent-contract";
+import type { UiWorkflowAgentEditorOptions } from "@langwatch/browser-host/drawer";
 import { isScenarioMappingValid } from "@langwatch/scenario-contract";
 import { useEffect, useReducer, useRef } from "react";
 
-export interface WorkflowAgentEditorOptions {
-  open: boolean;
-  agent?: { id: string; name: string; config: unknown };
-  isLoading: boolean;
-  isSaving: boolean;
-  workflowInputs: Field[];
-  workflowOutputs: Field[];
-  defaultMappings: Record<string, AgentInputBinding>;
-  onUpdate: (input: { id: string; name: string; config: WorkflowAgentConfig }) => void;
-  onClose: () => void;
-}
+export type WorkflowAgentEditorOptions = UiWorkflowAgentEditorOptions;
 
 interface WorkflowDraft {
   name: string;

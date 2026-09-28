@@ -846,6 +846,14 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     return this.#parts.accountIdentifiers.resendConfirmation(input);
   }
 
+  sendOwnAddressConfirmation(input: {
+    userId: string;
+    email: string;
+    codeChallenge: string;
+  }): Promise<EmailIdentifierAdded> {
+    return this.#parts.accountIdentifiers.sendOwnAddressConfirmation(input);
+  }
+
   removeIdentifier(input: { userId: string; identifierId: string }): Promise<void> {
     return this.#parts.accountIdentifiers.removeIdentifier(input);
   }

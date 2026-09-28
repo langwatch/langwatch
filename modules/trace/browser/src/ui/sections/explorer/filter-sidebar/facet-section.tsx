@@ -75,6 +75,251 @@ interface InactiveRowExtras {
   below?: React.ReactNode;
 }
 
+/**
+ * Whether a row's drilldown is open: open while its value is filtered on,
+ * unless the chevron overrode it, and an override lapses once the filter state
+ * it was made against changes.
+ */
+function useRowExpansion(getValueState: (value: string) => FacetValueState) {
+  const [overrides, setOverrides] = useState<
+    Map<string, { open: boolean; against: FacetValueState }>
+  >(() => new Map());
+  const isRowExpanded = useCallback(
+    (value: string) => {
+      const state = getValueState(value);
+      const override = overrides.get(value);
+      if (override && override.against === state) return override.open;
+      return state !== "neutral";
+    },
+    [overrides, getValueState],
+  );
+  const toggleExpand = useCallback(
+    (value: string) => {
+      const against = getValueState(value);
+      const open = !isRowExpanded(value);
+      setOverrides((prev) => new Map(prev).set(value, { open, against }));
+    },
+    [getValueState, isRowExpanded],
+  );
+  return { isRowExpanded, toggleExpand };
+}
+
+/**
+ * The typed-value filter, hidden until the header's funnel reveals and focuses
+ * it. Closing it clears the query, so reopening never shows a stale filter.
+ */
+function useFacetSearchInput() {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+    else setSearchQuery("");
+  }, [searchOpen]);
+  return { searchOpen, setSearchOpen, searchQuery, setSearchQuery, searchInputRef };
+}
+
+/**
+ * The preloaded values, supplemented while a search is typed by the server's
+ * prefix matches across all of the facet's values. Preloaded rows win on a
+ * shared value, keeping their colour and aggregates.
+ */
+function useSearchedItems({
+  items,
+  field,
+  enabled,
+  searchQuery,
+}: {
+  items: FacetItem[];
+  field: string;
+  enabled: boolean;
+  searchQuery: string;
+}) {
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
+  const serverSearchActive =
+    enabled && searchQuery.trim().length > 0 && debouncedSearchQuery.trim().length > 0;
+  const serverSearch = useFacetSearch({
+    facetKey: field,
+    prefix: debouncedSearchQuery,
+    enabled: serverSearchActive,
+  });
+  const baseItems = useMemo(() => {
+    if (!serverSearchActive) return items;
+    const serverItems = serverSearch.values.map((v) => ({
+      value: v.value,
+      label: v.label ?? v.value,
+      count: v.count,
+    }));
+    return dedupeByValue([...items, ...serverItems]);
+  }, [serverSearchActive, items, serverSearch.values]);
+  return { baseItems, isSearching: serverSearchActive && serverSearch.isFetching };
+}
+
+type FacetLayout = { activeItems: FacetItem[]; facetWindow: FacetWindow; maxCount: number };
+
+/**
+ * The row layout, frozen while the pointer is inside the section so a click
+ * never yanks a row to the pinned area or reshuffles the list under the cursor.
+ * A typed search bypasses the freeze so the list narrows live.
+ */
+function useFrozenLayout({ live, searching }: { live: FacetLayout; searching: boolean }) {
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  const [frozen, setFrozen] = useState<FacetLayout | null>(null);
+  const freeze = useCallback(() => setFrozen((prev) => prev ?? { ...liveRef.current }), []);
+  const thaw = useCallback(() => setFrozen(null), []);
+  return { layout: searching ? live : (frozen ?? live), freeze, thaw };
+}
+
+/**
+ * Active rows (the filtered-on values) pinned above the rest, and the window of
+ * the rest the list shows, with the largest count for the bars.
+ */
+function useFacetLayout({
+  baseItems,
+  searchQuery,
+  showMore,
+  getValueState,
+}: {
+  baseItems: FacetItem[];
+  searchQuery: string;
+  showMore: boolean;
+  getValueState: (value: string) => FacetValueState;
+}) {
+  return useMemo(() => {
+    const filtered = filterAndSortItems({ items: baseItems, searchQuery });
+    const activeItems = filtered.filter((item) => getValueState(item.value) !== "neutral");
+    const activeValues = new Set(activeItems.map((i) => i.value));
+    const restItems = filtered.filter((item) => !activeValues.has(item.value));
+    const isHighCardinality = restItems.length >= MAX_VISIBLE_FACETS;
+    const facetWindow = computeWindow({
+      filtered: restItems,
+      isHighCardinality,
+      showMore,
+      searchActive: searchQuery.length > 0,
+    });
+    const maxCount = facetWindow.visible.reduce((m, i) => (i.count > m ? i.count : m), 0);
+    return { live: { activeItems, facetWindow, maxCount }, isHighCardinality };
+  }, [baseItems, searchQuery, showMore, getValueState]);
+}
+
+/** The value a typed entry names: an exact value or label match, else the text itself. */
+function valueForTyped({ items, typed }: { items: FacetItem[]; typed: string }): string {
+  const lowered = typed.toLowerCase();
+  const matched = items.find(
+    (i) => i.value.toLowerCase() === lowered || i.label.toLowerCase() === lowered,
+  );
+  return matched?.value ?? typed;
+}
+
+/**
+ * Shown when two or more values are included: a field holds one value at a
+ * time, so they combine with OR, and the header says so.
+ */
+function AnyOfHint() {
+  return (
+    <Text
+      textStyle="2xs"
+      color="blue.fg"
+      fontWeight="500"
+      textTransform="none"
+      letterSpacing="normal"
+      flexShrink={0}
+      title="These values are combined with OR: traces matching any of them are shown"
+      data-testid="facet-any-of-hint"
+    >
+      any of
+    </Text>
+  );
+}
+
+/** A row with its trailing accessory (the expand chevron) beside it and its panel below. */
+function RowWithExtras({
+  row,
+  extras,
+}: {
+  row: React.ReactNode;
+  extras: InactiveRowExtras | null | undefined;
+}) {
+  return (
+    <Box>
+      {extras?.trailing ? (
+        <HStack gap={0.5} align="center">
+          <Box flex={1} minWidth={0}>
+            {row}
+          </Box>
+          {extras.trailing}
+        </HStack>
+      ) : (
+        row
+      )}
+      {extras?.below}
+    </Box>
+  );
+}
+
+/**
+ * The typed-value filter. Enter applies the typed value; the focus ring is
+ * inset so the sidebar's overflow cannot clip it.
+ */
+function FacetSearchInput({
+  inputRef,
+  searchQuery,
+  onQueryChange,
+  onSubmit,
+  isSearching,
+  hasNoMatch,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  searchQuery: string;
+  onQueryChange: (query: string) => void;
+  onSubmit: (typed: string) => void;
+  isSearching: boolean;
+  hasNoMatch: boolean;
+}) {
+  return (
+    <VStack gap={0.5} align="stretch" marginTop={1} paddingX={0.5} paddingY={0.5}>
+      <Input
+        ref={inputRef}
+        size="xs"
+        placeholder="Search or press Enter to apply…"
+        value={searchQuery}
+        _focusVisible={{
+          outlineWidth: "2px",
+          outlineStyle: "solid",
+          outlineColor: "blue.focusRing",
+          outlineOffset: "-2px",
+        }}
+        onChange={(e) => onQueryChange(e.target.value)}
+        onKeyDown={(e) => {
+          const typed = searchQuery.trim();
+          if (e.key !== "Enter" || !typed) return;
+          e.preventDefault();
+          onSubmit(typed);
+        }}
+        textStyle="xs"
+      />
+      {isSearching && (
+        <HStack data-testid="facet-search-spinner" gap={2} paddingX={1} paddingY={1}>
+          <Spinner size="xs" />
+          <Text textStyle="2xs" color="fg.subtle">
+            Searching all values…
+          </Text>
+        </HStack>
+      )}
+      {searchQuery.trim() && !isSearching && hasNoMatch && (
+        <Text textStyle="2xs" color="fg.muted" paddingX={1}>
+          No match. Press <Kbd>Enter</Kbd> to filter by "
+          <Box as="span" fontWeight="600" color="fg">
+            {searchQuery.trim()}
+          </Box>
+          " anyway.
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
 const FacetSectionInner: React.FC<FacetSectionProps> = ({
   title,
   icon,
@@ -93,176 +338,53 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   modeToggleProps,
   serverValueSearch,
 }) => {
-  // Derives open state from filter (prevents drift); chevron override expires
-  // when filter state changes.
-  const [expandOverrides, setExpandOverrides] = useState<
-    Map<string, { open: boolean; against: FacetValueState }>
-  >(() => new Map());
-  const isRowExpanded = useCallback(
-    (value: string) => {
-      const state = getValueState(value);
-      const override = expandOverrides.get(value);
-      if (override && override.against === state) return override.open;
-      return state !== "neutral";
-    },
-    [expandOverrides, getValueState],
-  );
-  const toggleInactiveExpand = useCallback(
-    (value: string) => {
-      const state = getValueState(value);
-      const open = isRowExpanded(value);
-      setExpandOverrides((prev) => {
-        const next = new Map(prev);
-        next.set(value, { open: !open, against: state });
-        return next;
-      });
-    },
-    [getValueState, isRowExpanded],
-  );
+  const { isRowExpanded, toggleExpand } = useRowExpansion(getValueState);
   const lensOverride = useFacetLensStore((s) => s.lens.sectionOpen[field]);
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
   const [showMore, setShowMore] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  // The typed-value filter is hidden by default; the SidebarSection header shows a
-  // list-filter funnel icon that reveals (and auto- focuses) the input.
-  const [searchOpen, setSearchOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
-  useEffect(() => {
-    if (searchOpen) searchInputRef.current?.focus();
-  }, [searchOpen]);
-  // When the user types something then closes the search, reset the
-  // query so reopening the search doesn't surprise them with a stale
-  // filter from a previous session.
-  useEffect(() => {
-    if (!searchOpen) setSearchQuery("");
-  }, [searchOpen]);
+  const search = useFacetSearchInput();
+  const { searchQuery } = search;
 
-  // Row click opens drilldown (not just chevron) so sub-options are
-  // discoverable; layout freeze keeps drilldown in place.
   const handleToggle = useCallback((value: string) => onToggle(field, value), [onToggle, field]);
   const handleExclude = useCallback((value: string) => onExclude(field, value), [onExclude, field]);
 
-  const activeCount = useMemo(
-    () =>
-      items.filter((i) => getValueState(i.value) !== "neutral").length + (noneRow?.active ? 1 : 0),
-    [items, getValueState, noneRow?.active],
-  );
-
-  // "Any of" hint: 2+ INCLUDED values of the same field combine with OR
-  // (a trace's field can equal only one value at a time). Surfacing this on
-  // the header tells the user the selection is a set of alternatives, not a
-  // narrowing AND — without making them read the query bar. Excluded values
-  // don't count: `NOT a AND NOT b` is a genuine AND, not an "any of".
-  const includedCount = useMemo(
-    () => items.filter((i) => getValueState(i.value) === "include").length,
-    [items, getValueState],
-  );
-  const showAnyOfHint = includedCount >= 2;
-
-  // Header value-count badge counts only values that actually have matching
-  // traces — see countPresentValues. The zero-count default rows stay visible
-  // in the list for one-click filtering; the badge just stops tallying them.
+  const activeCount =
+    items.filter((i) => getValueState(i.value) !== "neutral").length + (noneRow?.active ? 1 : 0);
+  const includedCount = items.filter((i) => getValueState(i.value) === "include").length;
+  // The badge counts only values with matching traces; zero-count rows stay listed.
   const presentValueCount = useMemo(() => countPresentValues(items), [items]);
 
-  // Server-side value search. When the per-facet search is open with a non-empty query,
-  // ALSO query `facetValues` with that text as a `prefix` so the match reaches ALL of
-  // this facet's distinct values — not just the preloaded top-N `items`.
-  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
-  const serverSearchActive =
-    !!serverValueSearch &&
-    searchOpen &&
-    searchQuery.trim().length > 0 &&
-    debouncedSearchQuery.trim().length > 0;
-  const serverSearch = useFacetSearch({
-    facetKey: field,
-    prefix: debouncedSearchQuery,
-    enabled: serverSearchActive,
+  const { baseItems, isSearching } = useSearchedItems({
+    items,
+    field,
+    enabled: !!serverValueSearch && search.searchOpen,
+    searchQuery,
   });
-  const serverItems = useMemo<FacetItem[]>(
-    () =>
-      serverSearch.values.map((v) => ({
-        value: v.value,
-        label: v.label ?? v.value,
-        count: v.count,
-      })),
-    [serverSearch.values],
+  const { live, isHighCardinality } = useFacetLayout({
+    baseItems,
+    searchQuery,
+    showMore,
+    getValueState,
+  });
+  const { layout, freeze, thaw } = useFrozenLayout({ live, searching: !!searchQuery });
+
+  const row = (item: FacetItem) => (
+    <FacetRow
+      item={item}
+      state={getValueState(item.value)}
+      maxCount={layout.maxCount}
+      onToggle={handleToggle}
+      onExclude={handleExclude}
+      field={field}
+    />
   );
 
-  // SUPPLEMENT, don't replace: while server search is active, feed the UNION of the
-  // preloaded items and the server prefix results (preloaded first so it wins on a
-  // shared value, keeping its dotColor / aggregates).
-  const baseItems = useMemo(
-    () => (serverSearchActive ? dedupeByValue([...items, ...serverItems]) : items),
-    [serverSearchActive, items, serverItems],
-  );
-  const filtered = useMemo(
-    () => filterAndSortItems({ items: baseItems, searchQuery }),
-    [baseItems, searchQuery],
-  );
-
-  // Active rows = currently-filtered values (same-field OR values are
-  // already active here via getValueState). We pin them above the
-  // collapsible content so they stay visible even when the section is
-  // collapsed — the user can see / remove what's filtered without
-  // expanding the whole list.
-  const activeItems = useMemo(
-    () => filtered.filter((item) => getValueState(item.value) !== "neutral"),
-    [filtered, getValueState],
-  );
-  const activeValueSet = useMemo(() => new Set(activeItems.map((i) => i.value)), [activeItems]);
-  const restItems = useMemo(
-    () => filtered.filter((item) => !activeValueSet.has(item.value)),
-    [filtered, activeValueSet],
-  );
-
-  const isHighCardinality = restItems.length >= MAX_VISIBLE_FACETS;
-  const facetWindow = useMemo(
-    () =>
-      computeWindow({
-        filtered: restItems,
-        isHighCardinality,
-        showMore,
-        searchActive: searchQuery.length > 0,
-      }),
-    [restItems, isHighCardinality, showMore, searchQuery],
-  );
-
-  const maxCount = useMemo(
-    () => facetWindow.visible.reduce((m, i) => (i.count > m ? i.count : m), 0),
-    [facetWindow.visible],
-  );
-
-  // Freeze the row layout while the pointer is inside the section. A click toggles a
-  // value's state but must not yank it up to the pinned area or reshuffle the
-  // count-sorted list under the cursor (jarring).
-  const liveLayoutRef = useRef({ activeItems, facetWindow, maxCount });
-  liveLayoutRef.current = { activeItems, facetWindow, maxCount };
-  const [frozenLayout, setFrozenLayout] = useState<{
-    activeItems: FacetItem[];
-    facetWindow: FacetWindow;
-    maxCount: number;
-  } | null>(null);
-  const freezeLayout = useCallback(
-    () => setFrozenLayout((prev) => prev ?? { ...liveLayoutRef.current }),
-    [],
-  );
-  const thawLayout = useCallback(() => setFrozenLayout(null), []);
-  // Bypass freeze during a typed search: freezing would keep showing the pre-search facet
-  // window instead of narrowing it live as `searchQuery` filters.
-  const layout = searchQuery
-    ? { activeItems, facetWindow, maxCount }
-    : (frozenLayout ?? { activeItems, facetWindow, maxCount });
-
-  // Collapsed by default so the sidebar reads as a clean, scannable list of
-  // facet titles rather than a wall of values. The only exception is a facet
-  // that already has an active selection — that one opens so the applied
-  // filter is visible at a glance. A user's explicit open/close (lensOverride)
-  // always wins. See specs/traces-v2/filter-bar-interactions.feature.
-  const smartDefaultOpen = activeCount > 0;
-  const effectiveOpen = lensOverride ?? smartDefaultOpen;
+  // Collapsed by default, open when a value is filtered on; the reader's own
+  // open or close always wins. See specs/traces-v2/filter-bar-interactions.feature.
+  const effectiveOpen = lensOverride ?? activeCount > 0;
 
   return (
-    <Box onMouseEnter={freezeLayout} onMouseLeave={thawLayout}>
+    <Box onMouseEnter={freeze} onMouseLeave={thaw}>
       <SidebarSection
         title={title}
         icon={icon}
@@ -274,10 +396,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
         hideLabel={`Hide ${title}`}
         searchToggleProps={
           items.length > 0
-            ? {
-                open: searchOpen,
-                onToggle: () => setSearchOpen((prev) => !prev),
-              }
+            ? { open: search.searchOpen, onToggle: () => search.setSearchOpen((prev) => !prev) }
             : undefined
         }
         modeToggleProps={modeToggleProps}
@@ -286,89 +405,35 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
         pinnedContent={
           layout.activeItems.length > 0 ? (
             <VStack gap={0.5} align="stretch">
-              {layout.activeItems.map((item) => {
-                const extras = renderActiveRowExtras?.(item);
-                return (
-                  <Box key={item.value}>
-                    <FacetRow
-                      item={item}
-                      state={getValueState(item.value)}
-                      maxCount={layout.maxCount}
-                      onToggle={handleToggle}
-                      onExclude={handleExclude}
-                      field={field}
-                    />
-                    {extras}
-                  </Box>
-                );
-              })}
+              {layout.activeItems.map((item) => (
+                <Box key={item.value}>
+                  {row(item)}
+                  {renderActiveRowExtras?.(item)}
+                </Box>
+              ))}
             </VStack>
           ) : undefined
         }
-        activeIndicator={
-          // "Any of" hint — the only header indicator left.
-          showAnyOfHint ? (
-            <Text
-              textStyle="2xs"
-              color="blue.fg"
-              fontWeight="500"
-              textTransform="none"
-              letterSpacing="normal"
-              flexShrink={0}
-              title="These values are combined with OR: traces matching any of them are shown"
-              data-testid="facet-any-of-hint"
-            >
-              any of
-            </Text>
-          ) : undefined
-        }
+        activeIndicator={includedCount >= 2 ? <AnyOfHint /> : undefined}
       >
         <VStack gap={0.5} align="stretch">
-          {/* Placeholder row for sections that exist but have no values yet
-            (synthetic state — project has no traces, or discover is loading). */}
           {items.length === 0 && synthetic && (
             <Text textStyle="2xs" color="fg.subtle" paddingX={1} paddingY={1}>
               No values yet
             </Text>
           )}
-          {layout.facetWindow.visible.map((item) => {
-            const inactiveExtras = renderInactiveRowExtras?.(item, isRowExpanded(item.value), () =>
-              toggleInactiveExpand(item.value),
-            );
-            const row = (
-              <FacetRow
-                item={item}
-                state={getValueState(item.value)}
-                maxCount={layout.maxCount}
-                onToggle={handleToggle}
-                onExclude={handleExclude}
-                field={field}
-              />
-            );
-            return (
-              <Box key={item.value}>
-                {inactiveExtras?.trailing ? (
-                  // Pair the row with its inline trailing accessory (the
-                  // expand chevron) so the toggle sits at the row's end
-                  // instead of as a full-width strip beneath it.
-                  <HStack gap={0.5} align="center">
-                    <Box flex={1} minWidth={0}>
-                      {row}
-                    </Box>
-                    {inactiveExtras.trailing}
-                  </HStack>
-                ) : (
-                  row
-                )}
-                {inactiveExtras?.below}
-              </Box>
-            );
-          })}
-
+          {layout.facetWindow.visible.map((item) => (
+            <RowWithExtras
+              key={item.value}
+              row={row(item)}
+              extras={renderInactiveRowExtras?.(item, isRowExpanded(item.value), () =>
+                toggleExpand(item.value),
+              )}
+            />
+          ))}
           {noneRow && !searchQuery && (
             <NoneFacetRow active={noneRow.active} onToggle={noneRow.onToggle} />
           )}
-
           {isHighCardinality && !searchQuery && (
             <ExpandToggle
               showMore={showMore}
@@ -378,74 +443,19 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
               onShowLess={() => setShowMore(false)}
             />
           )}
-
-          {/* Typed-value filter — revealed only when the user clicks the
-            list-filter funnel icon in the section header (searchToggleProps).
-            Audit feedback was that the always-on input took ~32px off
-            every section's vertical real estate for an affordance most
-            operators only reach for on long-tail values. The toggle
-            keeps it one click away; reopening auto-focuses the Input
-            so the user can start typing immediately. */}
-          {items.length > 0 &&
-            searchOpen && (
-              // The Input carries an inset focus ring (outlineOffset -2px) so the
-              // keyboard outline renders fully inside the element instead of being
-              // clipped at the edge by the sidebar scroll container's overflow (#18b).
-              <VStack gap={0.5} align="stretch" marginTop={1} paddingX={0.5} paddingY={0.5}>
-                <Input
-                  ref={searchInputRef}
-                  size="xs"
-                  placeholder="Search or press Enter to apply…"
-                  value={searchQuery}
-                  // Inset focus ring so the keyboard outline renders fully —
-                  // the sidebar scroll container's overflow clips an outset
-                  // ring's edges (#18b). The paddingX/paddingY gutter on the
-                  // wrapper above is kept as belt-and-braces.
-                  _focusVisible={{
-                    outlineWidth: "2px",
-                    outlineStyle: "solid",
-                    outlineColor: "blue.focusRing",
-                    outlineOffset: "-2px",
-                  }}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key !== "Enter") return;
-                    const typed = searchQuery.trim();
-                    if (!typed) return;
-                    // Prefer an exact match against a known FacetItem so facets where
-                    // label !== value (friendly topic names, etc.) submit `value`
-                    // rather than the typed `label`.
-                    const lowered = typed.toLowerCase();
-                    const matched = items.find(
-                      (i) => i.value.toLowerCase() === lowered || i.label.toLowerCase() === lowered,
-                    );
-                    e.preventDefault();
-                    handleToggle(matched?.value ?? typed);
-                    setSearchQuery("");
-                  }}
-                  textStyle="xs"
-                />
-                {serverSearchActive && serverSearch.isFetching && (
-                  <HStack data-testid="facet-search-spinner" gap={2} paddingX={1} paddingY={1}>
-                    <Spinner size="xs" />
-                    <Text textStyle="2xs" color="fg.subtle">
-                      Searching all values…
-                    </Text>
-                  </HStack>
-                )}
-                {searchQuery.trim() &&
-                  !(serverSearchActive && serverSearch.isFetching) &&
-                  layout.facetWindow.visible.length === 0 && (
-                    <Text textStyle="2xs" color="fg.muted" paddingX={1}>
-                      No match. Press <Kbd>Enter</Kbd> to filter by "
-                      <Box as="span" fontWeight="600" color="fg">
-                        {searchQuery.trim()}
-                      </Box>
-                      " anyway.
-                    </Text>
-                  )}
-              </VStack>
-            )}
+          {items.length > 0 && search.searchOpen && (
+            <FacetSearchInput
+              inputRef={search.searchInputRef}
+              searchQuery={searchQuery}
+              onQueryChange={search.setSearchQuery}
+              onSubmit={(typed) => {
+                handleToggle(valueForTyped({ items, typed }));
+                search.setSearchQuery("");
+              }}
+              isSearching={isSearching}
+              hasNoMatch={layout.facetWindow.visible.length === 0}
+            />
+          )}
         </VStack>
       </SidebarSection>
     </Box>

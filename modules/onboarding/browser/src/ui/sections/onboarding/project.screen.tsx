@@ -138,7 +138,11 @@ export default function ProjectOnboarding() {
               )}
             </>
           )}
-          <TechStackSelector form={form} />
+          <TechStackSelector
+            form={form}
+            language={form.watch("language")}
+            framework={form.watch("framework")}
+          />
           {createProject.error && <p>Something went wrong!</p>}
           <HStack width="full">
             <Button

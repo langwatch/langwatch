@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
 import {
@@ -10,7 +11,6 @@ import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
 import { useState } from "react";
 
 import { api, type RouterOutputs } from "../../../../../behavior/trace-api.ts";
-import { useDrawer } from "../../../../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import {
   HoverActionButton,

@@ -114,7 +114,7 @@ describe("given the workflows library", () => {
       state.workflows = [workflowRow()];
 
       const { host } = renderWithWorkflowHost(<WorkflowsScreen />);
-      await user.click(screen.getByText("Summarise support tickets"));
+      await user.click(screen.getByRole("button", { name: "Summarise support tickets" }));
 
       expect(host.navigations).toEqual(["/my-project/studio/wf_1"]);
     });

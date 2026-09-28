@@ -9,9 +9,10 @@ import {
   type FieldMapping as UIFieldMapping,
   VariablesSection,
 } from "@langwatch/prompt-browser-kit";
-import { useProjectSpanNames } from "@langwatch/trace-browser/surfaces/project-span-names";
 import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useProjectSpanNames } from "../../../behavior/use-project-span-names.ts";
 
 const logger = createLogger("EvaluatorMappingsSection");
 

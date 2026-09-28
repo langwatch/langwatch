@@ -1,14 +1,13 @@
 import "@langwatch/time/polyfill";
 import { buildChartFrameDocument } from "@langwatch/analytics-contract/chart-frame-document";
 import { CHART_FRAME_PATH } from "@langwatch/analytics-contract/chart-frame-protocol";
-import { langWatchQlSupply } from "@langwatch/analytics-process";
-import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-process";
 import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process-server";
 import { scenarioChildBundle } from "@langwatch/scenario-child";
 
 import { apiHealthRoute } from "./api-health-route.ts";
+import { processEnvironment } from "./config.ts";
 
 /**
  * The local launcher hosts both halves in one Node process: only the owner may
@@ -22,6 +21,7 @@ export type ApiStartOptions = Readonly<{
 /** Boots the API and starts serving. The server it answers with drains it. */
 export async function startApi(options: ApiStartOptions = {}): Promise<ProcessServer> {
   const preamble = Server.create("langwatch-api")
+    .withEnvironment(processEnvironment)
     .withConfig(processConfig(processModules))
     .withSecrets((config, secrets) =>
       secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
@@ -39,16 +39,6 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
   const app = await server
     .composeProcess("api")
     .withModules(processModules)
-    .withMember("dataPrivacy", (members) => ({
-      directory: createDataPrivacyDirectoryReader(members.read("prisma")),
-    }))
-    .withMember("langwatchQl", (members) =>
-      langWatchQlSupply({
-        admin: members.read("clickhouseAdmin"),
-        postgres: members.read("databaseTarget"),
-        database: () => members.read("prisma"),
-      }),
-    )
     // Dataset's two optional seams. This process composes neither, so the
     // module's own absent-behaviour applies: normalize runs in-process.
     .withMember("queue", () => void 0)

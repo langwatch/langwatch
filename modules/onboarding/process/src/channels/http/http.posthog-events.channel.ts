@@ -24,10 +24,15 @@ export class HttpPostHogEventsChannel implements PostHogEventsChannel {
     return new HttpPostHogEventsChannel(options.targets);
   }
 
-  track({ userId, event, properties }: PostHogEventInput): void {
+  track({ userId, event, properties, uuid }: PostHogEventInput): void {
     try {
       for (const client of this.clients()) {
-        client.capture({ distinctId: userId, event, properties });
+        client.capture({
+          distinctId: userId,
+          event,
+          ...(properties === undefined ? {} : { properties: { ...properties } }),
+          ...(uuid === undefined ? {} : { uuid }),
+        });
       }
     } catch (error) {
       logger.warn({ error, event }, "guided onboarding event did not reach PostHog");

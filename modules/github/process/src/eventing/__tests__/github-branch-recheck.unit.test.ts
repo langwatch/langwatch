@@ -8,7 +8,6 @@ import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestGithubService } from "../../app/__tests__/github.fixture.ts";
-import { EventingGithubMaintenanceAdapter } from "../../services/github-maintenance.service.ts";
 import {
   runGithubBranchRecheck,
   runGithubRetentionPrune,
@@ -20,6 +19,7 @@ import {
   type GithubBranchRecheckIntents,
   githubBranchRecheckWake,
 } from "../github-branch-recheck.process.ts";
+import { buildGithubMaintenancePipeline } from "../github-maintenance.pipeline.ts";
 
 const wakeContext = (at: number): ProcessHandlerContext<GithubBranchRecheckIntents> => ({
   at,
@@ -171,9 +171,7 @@ describe("githubBranchRecheck process", () => {
     describe("when its shape is inspected", () => {
       /** @scenario "The recheck sweep runs once per fleet, not once per replica" */
       it("registers the sweep as a scheduled process and appends no events", () => {
-        const pipeline = EventingGithubMaintenanceAdapter.create({
-          ...createDeps(),
-        }).build();
+        const pipeline = buildGithubMaintenancePipeline({ ...createDeps() });
 
         const pm = pipeline.processManagers.get(GITHUB_BRANCH_RECHECK_PROCESS_NAME);
         expect(pm).toBeDefined();

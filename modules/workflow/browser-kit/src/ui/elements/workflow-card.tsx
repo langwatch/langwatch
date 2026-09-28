@@ -1,24 +1,55 @@
-import { HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowUp, Copy, MoreVertical, RefreshCw, Trash2 } from "react-feather";
 
 import { WorkflowIcon } from "./workflow-icons.tsx";
 
-type WorkflowCardBaseProps = React.ComponentProps<typeof VStack>;
+type WorkflowCardBaseProps = Omit<React.ComponentProps<typeof VStack>, "onClick"> & {
+  /** Opens the card, from a full-card button stacked beneath the card's own controls. */
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+  /** What the opener is called; the card's name by default. */
+  label?: string;
+  /** Opens the card some other way, e.g. a `WorkflowCardLink`, instead of the button. */
+  opener?: React.ReactNode;
+};
 
-export function WorkflowCardBase(props: WorkflowCardBaseProps) {
+/** The whole-card target: stretched over the card, beneath its controls, reachable by keyboard. */
+const OPENER_STYLE = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 1,
+  borderRadius: "xl",
+  cursor: "pointer",
+  _focusVisible: { outline: "2px solid", outlineColor: "blue.focusRing" },
+} as const;
+
+/** A card opener that navigates rather than acts. */
+export function WorkflowCardLink({
+  label,
+  ...props
+}: { label: string } & Omit<React.ComponentProps<typeof Link>, "children">) {
+  return <Link aria-label={label} {...OPENER_STYLE} {...props} />;
+}
+
+export function WorkflowCardBase({
+  onClick,
+  label,
+  opener,
+  children,
+  ...props
+}: WorkflowCardBaseProps) {
   return (
     <VStack
       align="start"
+      position="relative"
       padding={4}
       gap={2}
       borderRadius="xl"
       background="bg.panel"
       boxShadow="md"
       height="142px"
-      cursor="pointer"
-      role="button"
       transition="all 0.2s ease-in-out"
       border="1px solid"
       borderColor="border.muted"
@@ -28,7 +59,11 @@ export function WorkflowCardBase(props: WorkflowCardBaseProps) {
       }}
       {...props}
     >
-      {props.children}
+      {opener ??
+        (onClick && (
+          <chakra.button type="button" aria-label={label} onClick={onClick} {...OPENER_STYLE} />
+        ))}
+      {children}
     </VStack>
   );
 }
@@ -50,7 +85,7 @@ export function WorkflowCardDisplay({
   children?: React.ReactNode;
 } & WorkflowCardBaseProps) {
   return (
-    <WorkflowCardBase paddingX={0} {...props}>
+    <WorkflowCardBase paddingX={0} label={name} {...props}>
       <HStack gap={4} paddingX={4} paddingBottom={2} width="full">
         <WorkflowIcon icon={icon} size="lg" />
         {description && (
@@ -59,7 +94,9 @@ export function WorkflowCardDisplay({
           </Text>
         )}
         <Spacer />
-        {action}
+        <Box position="relative" zIndex={2}>
+          {action}
+        </Box>
       </HStack>
       {children}
       {!description && <Spacer />}

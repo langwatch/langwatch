@@ -38,4 +38,14 @@ export const experimentWeb = defineWebModule("experiment")
           .TargetTypeSelectorDrawer,
       }),
     },
+  })
+  /** The comparison evaluator form, lent to the evaluator editor (§3.4 rule 7). */
+  .withCapabilities({
+    comparisonConfigForm: {
+      load: async () => ({
+        default: (
+          await import("./ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx")
+        ).ComparisonConfigForm,
+      }),
+    },
   });

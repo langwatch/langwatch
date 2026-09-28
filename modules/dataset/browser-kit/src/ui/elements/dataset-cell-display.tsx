@@ -50,17 +50,15 @@ export function DatasetCellDisplay({
     setCellValue,
     setEditingCell,
   } = useDatasetTable();
-  const contentRef = useRef<HTMLDivElement>(null);
-  const currentHeightRef = useRef<number | null>(null);
-  const draggingRef = useRef(false);
-  const dragStartYRef = useRef(0);
-  const dragStartHeightRef = useRef(0);
-  const startedCompactRef = useRef(false);
-  const expandedDuringDragRef = useRef(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [customHeight, setCustomHeight] = useState<number | null>(null);
   const cellKey = `${row}-${columnId}`;
   const isExpanded = expandedCells.has(cellKey);
+  const { contentRef, customHeight, startResize, toggleExpanded } = useCellResize({
+    row,
+    columnId,
+    isExpanded,
+    toggleCellExpanded,
+  });
 
   const displayValue = useMemo(() => {
     const isJsonType = dataType !== void 0 && JSON_LIKE_TYPES.includes(dataType);
@@ -96,6 +94,72 @@ export function DatasetCellDisplay({
         })
       : null;
   const image = attachment ?? (dataType === "image" && value ? renderImage(value) : null);
+
+  return (
+    <Box
+      ref={cellRef}
+      data-testid={`cell-${row}-${columnId}`}
+      height="100%"
+      minHeight="20px"
+      fontSize={displayValue.isJson ? "12px" : "13px"}
+      whiteSpace="pre-wrap"
+      wordBreak="break-word"
+      opacity={isEditing ? 0 : 1}
+      fontFamily={displayValue.isJson ? "mono" : void 0}
+      position="relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <Box ref={contentRef} height="100%" maxHeight={cellMaxHeight} overflow={cellOverflow}>
+        {image ?? (
+          <>
+            {displayValue.text}
+            {displayValue.truncated && (
+              <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
+                (truncated)
+              </Box>
+            )}
+          </>
+        )}
+      </Box>
+
+      {showClamped && <CellFadeOverlay onClick={toggleExpanded} />}
+
+      {rowHeightMode === "compact" && (isExpanded || (isHovered && isOverflowing)) && (
+        <CellResizeHandle onMouseDown={startResize} onClick={toggleExpanded} />
+      )}
+    </Box>
+  );
+}
+
+/**
+ * Drag-to-resize for an expanded cell: dragging a compact cell open expands it, and dragging it
+ * back to the minimum collapses it. A click right after a drag is not a toggle.
+ */
+function useCellResize({
+  row,
+  columnId,
+  isExpanded,
+  toggleCellExpanded,
+}: {
+  row: number;
+  columnId: string;
+  isExpanded: boolean;
+  toggleCellExpanded: (row: number, columnId: string) => void;
+}): {
+  contentRef: RefObject<HTMLDivElement | null>;
+  customHeight: number | null;
+  startResize: (event: ReactMouseEvent) => void;
+  toggleExpanded: (event: ReactMouseEvent) => void;
+} {
+  const [customHeight, setCustomHeight] = useState<number | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const currentHeightRef = useRef<number | null>(null);
+  const draggingRef = useRef(false);
+  const dragStartYRef = useRef(0);
+  const dragStartHeightRef = useRef(0);
+  const startedCompactRef = useRef(false);
+  const expandedDuringDragRef = useRef(false);
 
   useEffect(() => {
     if (!isExpanded) {
@@ -175,85 +239,66 @@ export function DatasetCellDisplay({
     [columnId, customHeight, isExpanded, row, toggleCellExpanded],
   );
 
+  return { contentRef, customHeight, startResize, toggleExpanded };
+}
+
+function CellFadeOverlay({ onClick }: { onClick: (event: ReactMouseEvent) => void }) {
   return (
     <Box
-      ref={cellRef}
-      data-testid={`cell-${row}-${columnId}`}
-      height="100%"
-      minHeight="20px"
-      fontSize={displayValue.isJson ? "12px" : "13px"}
-      whiteSpace="pre-wrap"
-      wordBreak="break-word"
-      opacity={isEditing ? 0 : 1}
-      fontFamily={displayValue.isJson ? "mono" : void 0}
-      position="relative"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      position="absolute"
+      bottom="-8px"
+      left="-12px"
+      right="-12px"
+      height="40px"
+      cursor="pointer"
+      onClick={onClick}
+      className="cell-fade-overlay"
+      css={{
+        background: "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
+        "tr:hover &": {
+          background: "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-subtle))",
+        },
+        "tr[data-selected='true'] &": {
+          background: "linear-gradient(to bottom, transparent, var(--chakra-colors-blue-subtle))",
+        },
+      }}
+    />
+  );
+}
+
+function CellResizeHandle({
+  onMouseDown,
+  onClick,
+}: {
+  onMouseDown: (event: ReactMouseEvent) => void;
+  onClick: (event: ReactMouseEvent) => void;
+}) {
+  return (
+    <Box
+      position="absolute"
+      bottom="-8px"
+      left="-10px"
+      right="-10px"
+      height="20px"
+      cursor="ns-resize"
+      onMouseDown={onMouseDown}
+      onClick={onClick}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      opacity={0.5}
+      transition="opacity 0.15s"
+      _hover={{ opacity: 1 }}
+      css={{ background: "var(--cell-bg, var(--chakra-colors-bg-panel))" }}
     >
-      <Box ref={contentRef} height="100%" maxHeight={cellMaxHeight} overflow={cellOverflow}>
-        {image ?? (
-          <>
-            {displayValue.text}
-            {displayValue.truncated && (
-              <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
-                (truncated)
-              </Box>
-            )}
-          </>
-        )}
-      </Box>
-
-      {showClamped && (
-        <Box
-          position="absolute"
-          bottom="-8px"
-          left="-12px"
-          right="-12px"
-          height="40px"
-          cursor="pointer"
-          onClick={toggleExpanded}
-          className="cell-fade-overlay"
-          css={{
-            background: "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
-            "tr:hover &": {
-              background: "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-subtle))",
-            },
-            "tr[data-selected='true'] &": {
-              background:
-                "linear-gradient(to bottom, transparent, var(--chakra-colors-blue-subtle))",
-            },
-          }}
-        />
-      )}
-
-      {rowHeightMode === "compact" && (isExpanded || (isHovered && isOverflowing)) && (
-        <Box
-          position="absolute"
-          bottom="-8px"
-          left="-10px"
-          right="-10px"
-          height="20px"
-          cursor="ns-resize"
-          onMouseDown={startResize}
-          onClick={toggleExpanded}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          opacity={0.5}
-          transition="opacity 0.15s"
-          _hover={{ opacity: 1 }}
-          css={{ background: "var(--cell-bg, var(--chakra-colors-bg-panel))" }}
-        >
-          <Box
-            width="40px"
-            height="4px"
-            borderRadius="full"
-            bg="gray.emphasized"
-            _hover={{ bg: "gray.emphasized" }}
-            transition="background 0.15s"
-          />
-        </Box>
-      )}
+      <Box
+        width="40px"
+        height="4px"
+        borderRadius="full"
+        bg="gray.emphasized"
+        _hover={{ bg: "gray.emphasized" }}
+        transition="background 0.15s"
+      />
     </Box>
   );
 }

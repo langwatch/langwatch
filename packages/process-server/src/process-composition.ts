@@ -21,15 +21,18 @@ export type BootedApplication = ServedApplication &
   Readonly<{
     tasks<Task>(isTask: (contribution: unknown) => contribution is Task): readonly Task[];
   }>;
+/** What one role boots: its modules, its pipelines' participation, and what it supplies. */
+export type ProcessBootInput = Readonly<{
+  role: "api" | "worker" | "tasks";
+  modules: readonly ProcessModule[];
+  pipelines: PipelineParticipation;
+  members: Readonly<Record<string, ProcessMemberFactory>>;
+  transports?: TransportSelection;
+}>;
+
 export interface ProcessBoot {
   readonly surfaceDefaults: SurfaceDefaultsOptions;
-  boot(
-    role: "api" | "worker" | "tasks",
-    modules: readonly ProcessModule[],
-    pipelines: PipelineParticipation,
-    members: Readonly<Record<string, ProcessMemberFactory>>,
-    transports?: TransportSelection,
-  ): Promise<BootedApplication>;
+  boot(input: ProcessBootInput): Promise<BootedApplication>;
 }
 
 /**
@@ -94,13 +97,13 @@ export class ApiProcessComposition extends Composition {
           throw new Error(`${module.name} needs surface.${transport.protocol}.`);
       }
     }
-    return this.runtime.boot(
-      "api",
-      this.modules,
-      this.participation(),
-      this.members,
-      this.#transports,
-    );
+    return this.runtime.boot({
+      role: "api",
+      modules: this.modules,
+      pipelines: this.participation(),
+      members: this.members,
+      transports: this.#transports,
+    });
   }
 }
 
@@ -116,7 +119,12 @@ export class WorkerProcessComposition extends Composition {
   }
 
   boot(): Promise<ServedApplication> {
-    return this.runtime.boot("worker", this.modules, this.participation(), this.members);
+    return this.runtime.boot({
+      role: "worker",
+      modules: this.modules,
+      pipelines: this.participation(),
+      members: this.members,
+    });
   }
 }
 
@@ -133,7 +141,12 @@ export class TasksProcessComposition extends Composition {
   }
 
   boot(): Promise<BootedApplication> {
-    return this.runtime.boot("tasks", this.modules, this.participation(), this.members);
+    return this.runtime.boot({
+      role: "tasks",
+      modules: this.modules,
+      pipelines: this.participation(),
+      members: this.members,
+    });
   }
 }
 

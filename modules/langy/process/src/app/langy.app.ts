@@ -9,6 +9,7 @@ import {
   type SessionKeyPresented,
 } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
@@ -19,7 +20,7 @@ import { ExperimentApi } from "@langwatch/experiment-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { GithubApi } from "@langwatch/github-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import {
   type LangyConversationDetail,
   type LangyConversationEventPage,
@@ -95,6 +96,7 @@ import {
 } from "@langwatch/langy-contract";
 import type * as langyContractModule from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { OnboardingApi } from "@langwatch/onboarding-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -105,7 +107,9 @@ import type { z } from "zod";
 
 import { HttpLangyWorkerChannel } from "../channels/http/http.langy-worker.channel.ts";
 import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-worker.channel.ts";
-import { buildLangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
+import { RedisLangyConversationProducerRepository } from "../eventing/langy-conversation-producer.pipeline.ts";
+import { EventingLangyConversationAdapter } from "../eventing/langy-conversation-runtime.pipeline.ts";
+import { LangyConversationCommandSenders } from "../eventing/langy-conversation.commands.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { createLangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
@@ -115,6 +119,10 @@ import type {
 } from "../repositories/langy-token-buffer.repository.ts";
 import { PrismaLangySessionKeyReapRepository } from "../repositories/prisma/prisma.langy-session-key-reap.repository.ts";
 import { readSessionKeyCredential } from "../rules/langy-local-control-connect.rules.ts";
+import { LangyAnalyticsEventStorageService } from "../services/langy-analytics-event-storage.service.ts";
+import type { LangyConversationDefinition } from "../services/langy-conversation-pipeline.service.ts";
+import { LangyConversationUpdateService } from "../services/langy-conversation-update.service.ts";
+import { LangyGuidedOnboardingService } from "../services/langy-guided-onboarding.service.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
 import { LocalControlConnectionService } from "../services/langy-local-control-connection.service.ts";
 import { LocalControlLongPollService } from "../services/langy-local-control-long-poll.service.ts";
@@ -134,6 +142,7 @@ import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts
 import { LangyRestMetricsPrometheusService } from "../services/langy-rest-metrics-prometheus.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
+import { LangyTitleGeneratorService } from "../services/langy-title-generator.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
 import { LangyUiActionBackendService } from "../services/langy-ui-action-backend.service.ts";
@@ -193,6 +202,10 @@ type LangyAppDependencies = {
   panelConversations: LangyPanelConversationService;
   panelLocal: LangyPanelLocalService;
   panelEgress: LangyPanelEgressService;
+  /** The pipeline's senders, bound once the process registers it (§9). */
+  conversationCommands: LangyConversationCommandSenders;
+  /** The consume half of the pipeline: its folds, process manager and reactions. */
+  conversationProcessing: EventingLangyConversationAdapter;
 };
 
 /** The local-control runtime, its durable commands, its peer reads and this origin. */
@@ -203,7 +216,7 @@ export interface LangyLocalControl {
   baseHost: string | undefined;
 }
 
-const langyStores = reads("prisma", "redis", "eventing", "rateLimiter");
+const langyStores = reads("prisma", "redis", "rateLimiter");
 
 /** `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`. */
 type LangySetup = FeatureSetup<
@@ -237,14 +250,14 @@ export class LangyApp implements LangyApiContract {
     secrets: SecretApi,
     /** The saved workbench an away page's UI action is applied to. */
     experiments: ExperimentApi,
+    /** Whether a failed turn belonged to guided onboarding, and where that failure is tracked. */
+    onboarding: OnboardingApi,
+    /** The platform default retention the analytics grain is written on. */
+    retention: DataRetentionApi,
   };
   static readonly config = langyConfig;
   static readonly secrets = langySecrets;
-  /**
-   * `eventing` is the agent-pipeline dispatcher's own producer registration
-   * (`eventing/langy-conversation.commands.ts`). `rateLimiter` is the per-project counter
-   * every turn is checked against.
-   */
+  /** `rateLimiter` is the per-project counter every turn is checked against. */
   static readonly reads = [...langyStores, "publicBaseUrl"] as const;
 
   static async create(setup: LangySetup): Promise<LangyApp> {
@@ -284,10 +297,7 @@ export class LangyApp implements LangyApiContract {
       }),
       uiActionSurface: LangyUiActionSurfaceService.create(setup.dependencies.featureFlags),
     });
-    const commands = buildLangyConversationCommands({
-      eventing: setup.members.eventing,
-      processName: "langy",
-    });
+    const commands = LangyConversationCommandSenders.create();
     const langy = adapter.build({
       ...built,
       commands,
@@ -330,6 +340,37 @@ export class LangyApp implements LangyApiContract {
       events: commands,
       buffer,
       skipGate: (gate) => workspace.canSkipPermissions(gate),
+    });
+    const persistence = adapter.eventing();
+    const guidedOnboarding = LangyGuidedOnboardingService.create({
+      onboarding: setup.dependencies.onboarding,
+    });
+    const conversationProcessing = EventingLangyConversationAdapter.create({
+      langyConversationProjectionStore: persistence.langyConversationState,
+      langyConversationTurnProjectionStore: persistence.langyConversationTurnState,
+      langyMessageProjectionStore: persistence.langyMessageStorage,
+      langyAnalyticsEventProjectionStore: LangyAnalyticsEventStorageService.create({
+        sink: setup.repositories.analyticsEvents,
+        defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
+      }),
+      broadcast: LangyConversationUpdateService.create({ presence: setup.dependencies.presence }),
+      admissions: persistence.langyTurnAdmission,
+      buffer,
+      handoffStore: setup.repositories.turnHandoff,
+      worker: channel,
+      titleGenerator: LangyTitleGeneratorService.create({
+        messages: persistence.trustedMessages,
+        models: setup.dependencies.modelProviders,
+      }).generator(),
+      sessionKeys,
+      localConnectTurn: {
+        presence: () => runtime.presence,
+        turns: LocalControlSessionCoreService.turnStarter({
+          actors: setup.members.prisma,
+          turns: langy,
+        }),
+      },
+      guidedOnboarding: { reader: guidedOnboarding, analytics: guidedOnboarding },
     });
     const longPoll = LocalControlLongPollService.create({ core });
     const sockets = LocalControlConnectionService.create({ core });
@@ -435,6 +476,30 @@ export class LangyApp implements LangyApiContract {
         baseHost: setup.members.publicBaseUrl,
       }),
       panelEgress: LangyPanelEgressService.create({ access, langy }),
+      conversationCommands: commands,
+      conversationProcessing,
+    });
+  }
+
+  /** langy_conversation_processing as this role registers it: the worker folds, the api sends. */
+  conversationPipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): LangyConversationDefinition {
+    if (participation === "produce") {
+      return RedisLangyConversationProducerRepository.create({ processName: "langy" }).build();
+    }
+    return this.dependencies.conversationProcessing.buildProcessing();
+  }
+
+  /** The registration's senders, handed to every write and to the pipeline's own effects. */
+  connectConversationCommands(commands: Readonly<Record<string, unknown>>): void {
+    const senders = this.dependencies.conversationCommands;
+    senders.connect(commands);
+    this.dependencies.conversationProcessing.connectCommands({
+      failAgentResponse: (data) => senders.failAgentResponse(data),
+      generateConversationTitle: (data) => senders.generateConversationTitle(data),
     });
   }
 

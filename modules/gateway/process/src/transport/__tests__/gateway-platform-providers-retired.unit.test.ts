@@ -1,5 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import {
+  bindRestMiddleware,
   createRestRuntime,
   type IdempotentRunner,
   type RestErrorHandler,
@@ -9,11 +10,11 @@ import {
  * Mounted rather than called directly, because the fact under test is what a
  * caller still on the old address receives, not what the handler throws.
  */
-import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { GatewayApi, GatewayRequestCredential } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
-import { gatewayPlatformRest } from "../gateway-platform.rest.ts";
+import { gatewayPlatformRest, gatewayRestCredential } from "../gateway-platform.rest.ts";
 
 const PROJECT_ID = "project-1";
 
@@ -52,7 +53,15 @@ function mountedPlatform() {
     },
   });
 
-  return runtime.mount(gatewayPlatformRest.router(), { app: () => app, onError: renderError });
+  return runtime.mount(gatewayPlatformRest.router(), {
+    app: () => app,
+    onError: renderError,
+    facts: [
+      bindRestMiddleware(gatewayRestCredential, (): GatewayRequestCredential => ({
+        kind: "legacyProjectKey",
+      })),
+    ],
+  });
 }
 
 const RETIRED = [

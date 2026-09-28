@@ -168,6 +168,7 @@
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@opentelemetry/otlp-transformer": "catalog:",

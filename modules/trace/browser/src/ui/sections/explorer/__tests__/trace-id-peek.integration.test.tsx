@@ -24,7 +24,7 @@ const { openDrawerMock, capturedHeaderInputs } = vi.hoisted(() => ({
   capturedHeaderInputs: [] as HeaderInput[],
 }));
 
-vi.mock("../../../../behavior/use-drawer.ts", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: openDrawerMock }),
 }));
 

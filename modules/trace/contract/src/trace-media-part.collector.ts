@@ -1,13 +1,14 @@
+/**
+ * The one media collector (main's shared/traces/mediaParts.ts): the display
+ * surfaces render what it collects and the fold derives media refs from the same
+ * walk, which must match the ingestion walker. See `trace-media-ref.ts`.
+ */
 import { visitContentPart } from "./trace-content-part.dispatcher.ts";
 import { parseBase64DataUri } from "./trace-content-part.file-decoder.ts";
 import type { ContentSource } from "./trace-content-part.types.ts";
-/**
- * FROZEN TWIN: platform/app/src/shared/traces/mediaParts.ts (collector half).
- * Walk that extracts media parts from span input/output. Must match ingestion walker
- * for consistent reference collection. See `trace-media-ref.ts` for references.
- */
 import { containsMediaMarkers } from "./trace-media-markers.ts";
 import { isMediaPartRole, type MediaPartRole } from "./trace-media-role.ts";
+import { convertRawPcmBase64ToWavBase64, detectRawPcmFormat } from "./trace-pcm-to-wav.ts";
 
 /**
  * A single renderable media content part, as produced after content
@@ -77,20 +78,37 @@ function isStoredObjectUrl(url: string): boolean {
 }
 
 /**
- * Whether an `input_audio` part names a raw, header-less realtime format —
- * such a part carries no playable inline source here (see `inputAudio`
- * below).
+ * Scheme allowlist for any URL that reaches an `href`/`src` from span content:
+ * `/api/files/` references, `data:` URIs and absolute http(s). Control
+ * characters and spaces are stripped first, as a browser does when parsing.
  */
-function isRawPcmFormat(format?: string, mimeType?: string): boolean {
-  const f = format?.toLowerCase();
-  if (f === "pcm16" || f === "g711_ulaw" || f === "g711_alaw") return true;
+export function isSafeMediaUrl(url: string): boolean {
+  const cleaned = Array.from(url)
+    .filter((character) => character.charCodeAt(0) > 0x20)
+    .join("");
+  // ".." would let a same-origin link escape the files route after normalisation.
+  if (cleaned.startsWith("/api/files/")) return !cleaned.includes("..");
+  const lower = cleaned.toLowerCase();
+  if (lower.startsWith("data:")) return true;
+  return lower.startsWith("https://") || lower.startsWith("http://");
+}
 
-  const m = mimeType?.toLowerCase();
-  if (!m) return false;
-  if (m.includes("pcm16")) return true;
-  const isUlaw = m.includes("ulaw") || m.includes("pcmu") || m === "audio/basic";
-  if (isUlaw) return true;
-  return m.includes("alaw") || m.includes("pcma");
+/**
+ * `[image/png, 12345 bytes]` is what an engine writes in place of an attachment it
+ * did not carry into the trace, so the renderer can say what happened rather than
+ * report bytes that were never stored.
+ */
+export interface NotCapturedMedia {
+  mediaType: string;
+  sizeBytes: number;
+}
+
+const NOT_CAPTURED_SUMMARY = /^\[([^,\]]+),\s*(\d+)\s*bytes\]$/;
+
+export function parseNotCapturedMedia(value: string): NotCapturedMedia | null {
+  const match = NOT_CAPTURED_SUMMARY.exec(value.trim());
+  if (!match?.[1] || !match[2]) return null;
+  return { mediaType: match[1], sizeBytes: Number(match[2]) };
 }
 
 /** A document renders as an attachment chip — the binary member. */
@@ -130,13 +148,20 @@ function providerMediaToMediaData(
 }
 
 /**
- * DELIBERATE DIFFERENCE: application wraps raw PCM audio into playable WAV
- * (byte work). This package omits it; reference collection ignores data: anyway.
+ * Raw, header-less realtime formats are not playable as a data: URI, so inline
+ * data is wrapped into a WAV (G.711 decoded to linear PCM first). A url needs no
+ * wrap: the extractor stored it as playable audio/wav.
  */
 function convertInputAudioToMediaData(
   p: Readonly<{ data?: string; url?: string; format?: string; mimeType?: string }>,
 ): MediaPartData | null {
-  if (p.data && isRawPcmFormat(p.format, p.mimeType)) return null;
+  const rawFormat = detectRawPcmFormat(p.format, p.mimeType);
+  if (p.data && rawFormat) {
+    const wav = convertRawPcmBase64ToWavBase64(p.data, rawFormat);
+    return wav
+      ? { type: "audio", source: { type: "data", value: wav, mimeType: "audio/wav" } }
+      : null;
+  }
 
   const mimeType = p.mimeType ?? audioFormatToMimeType(p.format);
   if (p.url) return { type: "audio", source: { type: "url", value: p.url, mimeType } };

@@ -3,7 +3,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
-import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   SimulationRunStatus as ScenarioRunStatus,
@@ -179,7 +179,7 @@ export function ScenarioTargetRow({
       _hover={{ borderColor: "transparent" }}
     >
       <HStack
-        as="button"
+        position="relative"
         width="full"
         paddingX={4}
         paddingY={2}
@@ -187,13 +187,21 @@ export function ScenarioTargetRow({
         _hover={{ bg: "bg.muted/80" }}
         borderRadius="lg"
         cursor="pointer"
-        onClick={onClick}
-        onMouseEnter={handlePrefetch}
-        onFocus={handlePrefetch}
-        tabIndex={0}
-        aria-label={`View details for ${displayName}`}
       >
-        <HStack>
+        {/* The row's overlay makes the whole row open the run; stop and metrics sit above it. */}
+        <chakra.button
+          display="flex"
+          alignItems="center"
+          type="button"
+          gap={4}
+          minWidth={0}
+          cursor="pointer"
+          onClick={onClick}
+          onMouseEnter={handlePrefetch}
+          onFocus={handlePrefetch}
+          aria-label={`View details for ${displayName}`}
+          _before={{ content: '""', position: "absolute", inset: 0, borderRadius: "lg" }}
+        >
           <StatusCircle status={scenarioRun.status} />
           <Text
             fontSize="xs"
@@ -208,15 +216,18 @@ export function ScenarioTargetRow({
               results: scenarioRun.results ?? undefined,
             })}
           </Text>
-        </HStack>
-        <Text fontSize="sm" textAlign="left" truncate>
-          {displayName}
-        </Text>
+          <Text fontSize="sm" textAlign="left" truncate>
+            {displayName}
+          </Text>
+        </chakra.button>
         {hasCancelButton && (
-          <HStack
-            as="span"
-            role="button"
-            tabIndex={isCancelling ? -1 : 0}
+          <chakra.button
+            display="flex"
+            alignItems="center"
+            type="button"
+            position="relative"
+            zIndex={1}
+            disabled={isCancelling}
             gap={1}
             paddingX={2}
             paddingY={0.5}
@@ -229,24 +240,13 @@ export function ScenarioTargetRow({
             opacity={isCancelling ? 0.6 : 1}
             flexShrink={0}
             _hover={isCancelling ? undefined : { bg: "gray.100", borderColor: "gray.400" }}
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              if (!isCancelling) onCancel?.();
-            }}
-            onKeyDown={(e: React.KeyboardEvent) => {
-              if (!isCancelling && (e.key === "Enter" || e.key === " ")) {
-                e.stopPropagation();
-                e.preventDefault();
-                onCancel?.();
-              }
-            }}
+            onClick={() => onCancel?.()}
             aria-label="Stop run"
-            aria-disabled={isCancelling}
             data-testid="cancel-run-button"
           >
             {isCancelling ? <Spinner size="xs" /> : <Square size={10} />}
             <Text fontSize="xs">Stop</Text>
-          </HStack>
+          </chakra.button>
         )}
         <Box flex={1} />
         {hasMetrics && (
@@ -256,7 +256,7 @@ export function ScenarioTargetRow({
             positioning={{ placement: "bottom" }}
             interactive
           >
-            <HStack gap={2} flexShrink={0} color="fg.subtle">
+            <HStack position="relative" zIndex={1} gap={2} flexShrink={0} color="fg.subtle">
               {scenarioRun.durationInMs > 0 && (
                 <Text fontSize="11px">{formatLatency(scenarioRun.durationInMs)}</Text>
               )}

@@ -340,13 +340,12 @@ Feature: Langy drives the open page through typed UI actions
     the parts are spread across a CLI, an HTTP route, Redis, an SSE stream, a
     browser store and an execution pipeline.
 
-    A headless stand-in for the page closes that gap
-    (the fake workbench tab, deleted with the platform application). It listens to the same turn
-    stream the panel listens to, claims through the same mutation, applies the
-    same transforms to the same store, saves the same document, and starts runs
-    through the same route. What it stands in for is the rendering, not the
-    behavior, so a suite with one attached exercises the leg the no-page suites
-    can never reach.
+    The real workbench page closes that gap, opened in a headless browser
+    (apps/ui/e2e/langy/workbench-page.ts). Its Langy panel follows the
+    suite's conversation, claims through the same mutation, applies the same
+    transforms to the same store, saves the same document, and starts runs
+    through its own run buttons, so a suite with it attached exercises the leg
+    the no-page suites can never reach.
 
     @e2e
     Scenario: A live conversation's actions are claimed and carried out by the open page

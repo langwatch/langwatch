@@ -737,6 +737,15 @@ export interface IdentityApi {
     identifierId: string;
     codeChallenge: string;
   }): Promise<void>;
+  /**
+   * Mails the session's own address its PKCE confirmation ceremony, the identifier resolved from
+   * the address, never the caller; refuses a confirmed address and one the account is not known by.
+   */
+  sendOwnAddressConfirmation(input: {
+    userId: string;
+    email: string;
+    codeChallenge: string;
+  }): Promise<EmailIdentifierAdded>;
   /** Gives up a way in, demoting a primary first; the detach guard decides. */
   removeIdentifier(input: { userId: string; identifierId: string }): Promise<void>;
   /** When each sign-in method last minted a session, read from the user's sessions. */

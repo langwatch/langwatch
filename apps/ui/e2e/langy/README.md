@@ -446,45 +446,54 @@ browser-live half is covered by the channel's integration tests and by
 browser QA. Run one file per vitest invocation, same as every other suite
 here.
 
-## The fake workbench tab
+## The workbench page
 
-`fake-workbench-tab.ts` is a workbench page without a browser. It exists because
-the scenario adapter attaches no page, so every `langwatch ui call workbench.*`
-the agent runs falls back to the backend after the claim window, and the browser
-half of the UI-action channel was never covered end to end.
+`workbench-page.ts` opens the real workbench page in a headless Playwright
+browser, signed in with the same session cookie `trpc.ts` holds. Other suites
+attach no page, so every `langwatch ui call workbench.*` falls back to the
+backend after the claim window. The page covers the browser half of the
+UI-action channel end to end with the product's own code, and imports none of
+it.
 
-A tab hears the `ui` entry on the turn stream the adapter is already reading,
-claims the action, applies the same shared transform to the same store, saves the
-document with `expectedVersion`, and completes the action. For `workbench.run` it
-posts the same `POST /api/experiments/execute` request the page posts and drains
-the same stream. Nothing the page shares is reimplemented: the action manifest,
-the store, `executeUiAction`, `buildExecutionRequest`, `resultsFold`,
-`readLiveWorkbench` and `scopeFromRunPayload` are the app's own modules, imported
-through the `~/` alias `vitest.config.ts` declares for this suite.
+With an adapter, the page follows the adapter's conversation. When the first
+turn opens the conversation, the page reloads with `?langyConversation=<id>`
+and the Langy panel selects it. The panel then adopts each turn the adapter
+starts and claims, runs and completes the turn's `ui` entries itself.
 
 ```ts
 const langy = makeLangyAdapter({
   pageContext: [{ kind: "experiment", ref: slug, label: "my experiment" }],
 });
-const tab = await openFakeWorkbenchTab({ adapter: langy, experimentSlug: slug });
+const tab = await openWorkbenchPage({ adapter: langy, experimentSlug: slug });
 // ... run the scenario ...
 await tab.close();
 ```
 
-Omit `adapter` for a tab that only drives the workbench directly
-(`tab.runToCompletion(scope)`), which is how `workbench-fake-tab.harness.test.ts`
-exercises the run path without spending a Langy turn.
+Omit `adapter` for a page that only runs columns
+(`tab.runColumn(targetId)`, which presses that column's own run button). That
+is how `workbench-page.harness.test.ts` exercises the run path without
+spending a Langy turn.
 
-**One tab per process.** The workbench store is a module singleton, so a second
-concurrent tab would drive the same board. `openFakeWorkbenchTab` refuses one.
-`fileParallelism: false` plus one file per vitest run already serialize the
-suites.
+**What the suite reads, and where from.**
+
+| Record                                          | Source                                                                                                                              |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `seenActions`                                   | the turn stream the adapter reads (`adapter.onUiAction`)                                                                            |
+| `claimedActions` / `droppedActions` and outcome | the page's own `langy.claimUiAction` / `langy.completeUiAction` calls, read off the network. tRPC batches are split per call        |
+| a run's events, `runId` and status              | the page's own `POST /api/experiments/execute` stream, teed by an init script, because the page stops reading at its terminal frame |
+| filled cells                                    | the DOM: a cell renders `copy-output-<targetId>` only when it holds an output                                                       |
+
+**Prerequisites beyond the other suites.**
+
+- Chromium for `playwright`.
+- The `release_langy_ui_actions` flag must be on for the project: with the flag
+  off, the page ignores `ui` entries.
 
 **The three second claim window is a hard constant.**
-`UI_ACTION_CLAIM_WINDOW_MS` has no env override. A tab's cost inside it is one
-SSE frame plus one claim mutation, which is milliseconds locally. Assert "at
-least one action was claimed", never "every action was": a lost claim degrades to
-a backend execution that still writes the right document. Every drop is logged
+`UI_ACTION_CLAIM_WINDOW_MS` has no env override, and the page adopts each turn
+through its durable record before it can claim anything. Assert "at least one
+action was claimed", never "every action was": a lost claim degrades to a
+backend execution that still writes the right document. Every drop is logged
 with how long it waited (`tab.droppedActions`), so a flake reads as a timing
 report rather than a mystery.
 
@@ -499,8 +508,8 @@ the API.
 
 Three handles, in increasing order of what they prove:
 
-1. `tab.claimedActions`: the harness's own record, with the outcome
-   `executeUiAction` returned. Cheapest, always available.
+1. `tab.claimedActions`: the page's own claim and completion calls. Cheapest,
+   always available.
 2. `langy.state.toolOutputs`: the CLI prints the platform's own bytes back, and
    the tool card carries them to the test process, so
    `"executedVia":"browser"` and `"executedVia":"backend"` are readable there.
@@ -520,27 +529,24 @@ Three handles, in increasing order of what they prove:
 resolve permissions on the id, and a slug there is refused as `no-binding` on
 every project-scoped call.
 
-### How it differs from the real page
+### What the page cannot show
 
-| Divergence                                                                                                                                                                                                                                      | Which test owns the gap                                                         |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| No React render, so the handler table is built once instead of in a `useMemo`                                                                                                                                                                   | `StalePageRefusesAgentActions.integration.test.tsx`                             |
-| No autosave debounce: every claimed action saves before it answers                                                                                                                                                                              | `RunFlushesPendingSave.integration.test.tsx`                                    |
-| No `experiment_updated` broadcast, so a tab learns it is behind only from a refused save. It then reloads before the next action, which is the clean-page half of what `useWorkbenchUpdateListener` does; `tab.reload()` asks for it explicitly | the `@integration` scenarios in `specs/langy/langy-ui-actions-fallback.feature` |
-| `workbench.getState` answers without `targetNames`: resolving a prompt handle is a React hook and this tab calls none. The projection falls back to what state alone can answer                                                                 | the projection's own unit tests                                                 |
-| No `revealTargetColumn`, no status line, no toasts                                                                                                                                                                                              | both DOM helpers already no-op without a document                               |
-| One store singleton, so one tab per process and no two-tab claim race                                                                                                                                                                           | the `@unit` scenarios on `executeUiAction`                                      |
-| Its own SSE reader, because `fetchSSE` needs a browser origin                                                                                                                                                                                   | the run pipeline's own integration tests                                        |
+- **The page's own "saw".** An entry the page never tried to claim reads as
+  `no-handler`. That covers both "the page never heard it" and "it heard it
+  and had no handler".
+- **A `duplicate`.** The page's local dedup makes no call.
+- **A two-column run.** The page has no control for one, so the harness runs
+  each prompt column with its own button.
 
 ### The suites that use it
 
-| File                                    | What it covers                                                                                                                                            | Model turns             |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| `workbench-fake-tab.harness.test.ts`    | the tab's run path: a comparison column run alone, and one variant of a comparison chip re-run alone, both of which have to seed the columns they compare | none (judge calls only) |
-| `langy-workbench-live.scenario.test.ts` | one judged conversation with the page open, the tab closed mid-script, and the zero-model refusal pin                                                     | three agent turns       |
+| File                                    | What it covers                                                                                                                                             | Model turns             |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `workbench-page.harness.test.ts`        | the page's run path: a comparison column run alone, and one variant of a comparison chip re-run alone, both of which have to seed the columns they compare | none (judge calls only) |
+| `langy-workbench-live.scenario.test.ts` | one judged conversation with the page open, the page closed mid-script, and the zero-model refusal pin                                                     | three agent turns       |
 
-Run the harness file first: it validates the shared request builder and the
-results fold without spending a Langy turn.
+Run the harness file first: it validates the page's run path without spending
+a Langy turn.
 
 ## langy-rules.ts
 
@@ -1159,9 +1165,7 @@ was confirmed directly against a live haven stack.
   for a result; the stream can — a call whose `start` precedes every `end`
   of its turn was issued blind, before any tool had answered.
 - `LangySessionState.currentTurnId`: the turn this session is streaming,
-  or the last one it streamed. The fake workbench tab dedups the actions
-  it sees on `turnId:actionId`, the same identity the panel uses, so it
-  needs the id the send returned.
+  or the last one it streamed: the id the send returned.
 - `.navigateHrefs`: every navigate instruction, in order — navigation
   scenarios assert the href is the hard fact that an agent-driven navigate
   actually landed on the stream.
@@ -1212,8 +1216,8 @@ was confirmed directly against a live haven stack.
   reported here — it is the reply, and comes back as `text`.
 - `onUiAction`: the whole browser leg's entry point — the entry arrives
   with no extra network hop, which is what buys a listener the 3 second
-  claim window (`UI_ACTION_CLAIM_WINDOW_MS`, see "The fake workbench
-  tab"). Fired synchronously from the frame reader; a listener must start
+  claim window (`UI_ACTION_CLAIM_WINDOW_MS`, see "The workbench
+  page"). The workbench page records what the stream carried through it. Fired synchronously from the frame reader; a listener must start
   its work and return rather than block the read loop.
 - The `entry.type === "tool" && entry.name === "say"` branch: a line said
   with the `say` tool is Langy's own words, drawn as prose where the call
@@ -1281,7 +1285,7 @@ was confirmed directly against a live haven stack.
   mutation as every other, and the override is spent once.
 - `makeLangyAdapter`'s `pageContext`: a turn with an `experiment` chip is
   what tells the agent the page it is looking at accepts live UI actions,
-  so a suite that opens a fake tab sends one and a suite that does not
+  so a suite that opens the workbench page sends one and a suite that does not
   leaves this out.
 
 ## trpc.ts

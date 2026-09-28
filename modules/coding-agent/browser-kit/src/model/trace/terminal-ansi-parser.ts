@@ -240,105 +240,122 @@ function styleKey(style: AnsiStyle): string {
 }
 
 /**
+ * One escape sequence at `at`: an SGR sets the style, OSC and any other escape
+ * (charset select `ESC(`, `ESC=`, a lone ESC at the end) are dropped whole.
+ */
+function readEscape({ input, at, style }: { input: string; at: number; style: AnsiStyle }): {
+  next: number;
+  style: AnsiStyle;
+} {
+  const nextCh = input[at + 1];
+  if (nextCh === "[") {
+    const csi = scanCsi(input, at);
+    return {
+      next: csi.next,
+      style: csi.sgrParams === null ? style : applySgr(style, csi.sgrParams),
+    };
+  }
+  if (nextCh === "]") return { next: scanOsc(input, at), style };
+
+  return { next: at + (nextCh === void 0 ? 1 : 2), style };
+}
+
+/** The lines being built: the open line's segments, its unflushed text and the current style. */
+class AnsiLineBuilder {
+  readonly lines: AnsiLine[] = [];
+  #segments: AnsiSegment[] = [];
+  #buffer = "";
+  #style: AnsiStyle = {};
+
+  get style(): AnsiStyle {
+    return this.#style;
+  }
+
+  append(ch: string): void {
+    this.#buffer += ch;
+  }
+
+  setStyle(nextStyle: AnsiStyle): void {
+    if (styleKey(nextStyle) === styleKey(this.#style)) return;
+    this.#flushSegment();
+    this.#style = nextStyle;
+  }
+
+  pushLine(): void {
+    this.#flushSegment();
+    this.lines.push({ segments: this.#segments });
+    this.#segments = [];
+  }
+
+  /** Clears the open line's visible content, keeping the style. */
+  clearLine(): void {
+    this.#buffer = "";
+    this.#segments = [];
+  }
+
+  hasOpenContent(): boolean {
+    return this.#buffer.length > 0 || this.#segments.length > 0;
+  }
+
+  #flushSegment(): void {
+    if (this.#buffer.length === 0) return;
+    this.#segments.push({ text: this.#buffer, style: { ...this.#style } });
+    this.#buffer = "";
+  }
+}
+
+/** Consumes the character or sequence at `at` into `out`; answers where the next one starts. */
+function consumeAnsi({
+  input,
+  at,
+  out,
+}: {
+  input: string;
+  at: number;
+  out: AnsiLineBuilder;
+}): number {
+  const ch = input[at]!;
+  if (ch === ESC) {
+    const escape = readEscape({ input, at, style: out.style });
+    out.setStyle(escape.style);
+    return escape.next;
+  }
+  if (ch === "\n") {
+    out.pushLine();
+    return at + 1;
+  }
+  if (ch === "\r") {
+    // \r\n is one newline. A bare \r moves the cursor to column 0 and later text
+    // overwrites, so the line collapses to its final frame.
+    if (input[at + 1] === "\n") {
+      out.pushLine();
+      return at + 2;
+    }
+    out.clearLine();
+    return at + 1;
+  }
+  // Other C0 controls (bell, backspace, NUL, stray binary) would render as replacement glyphs.
+  if (input.charCodeAt(at) < 0x20 && ch !== "\t") return at + 1;
+
+  out.append(ch);
+  return at + 1;
+}
+
+/**
  * Parse raw string with ANSI codes into styled lines; handles carriage returns
  * (terminal overwrite), non-SGR control sequences (dropped), never throws.
  */
 export function parseAnsi(input: string): AnsiLine[] {
-  const lines: AnsiLine[] = [];
-  let segments: AnsiSegment[] = [];
-  let buffer = "";
-  let style: AnsiStyle = {};
-
-  const flushSegment = () => {
-    if (buffer.length === 0) return;
-    segments.push({ text: buffer, style: { ...style } });
-    buffer = "";
-  };
-
-  const pushLine = () => {
-    flushSegment();
-    lines.push({ segments });
-    segments = [];
-  };
-
-  const setStyle = (nextStyle: AnsiStyle) => {
-    if (styleKey(nextStyle) === styleKey(style)) return;
-    flushSegment();
-    style = nextStyle;
-  };
-
-  const len = input.length;
+  const out = new AnsiLineBuilder();
   let i = 0;
-  while (i < len) {
-    const ch = input[i]!;
+  while (i < input.length) i = consumeAnsi({ input, at: i, out });
 
-    if (ch === ESC) {
-      const nextCh = input[i + 1];
-      if (nextCh === "[") {
-        const csi = scanCsi(input, i);
-        if (csi.sgrParams !== null) {
-          setStyle(applySgr(style, csi.sgrParams));
-        }
-        i = csi.next;
-        continue;
-      }
-      if (nextCh === "]") {
-        i = scanOsc(input, i);
-        continue;
-      }
-      // Some other escape (charset select `ESC(`, `ESC=`, a lone ESC at end
-      // of string, …). Drop ESC and the byte after it.
-      i += nextCh === void 0 ? 1 : 2;
-      continue;
-    }
+  // The trailing line is emitted when it holds anything; an entirely empty
+  // input still answers one empty line, so callers always get at least one.
+  if (out.hasOpenContent()) out.pushLine();
+  else if (out.lines.length === 0) out.lines.push({ segments: [] });
 
-    if (ch === "\n") {
-      pushLine();
-      i++;
-      continue;
-    }
-
-    if (ch === "\r") {
-      // Carriage return without a newline: the terminal would move the cursor
-      // to column 0 and subsequent text overwrites. Collapse to the final
-      // frame by clearing the current line's visible content (keeping style).
-      if (input[i + 1] === "\n") {
-        // \r\n — treat as a single newline.
-        pushLine();
-        i += 2;
-        continue;
-      }
-      buffer = "";
-      segments = [];
-      i++;
-      continue;
-    }
-
-    const code = input.charCodeAt(i);
-    if (code < 0x20 && ch !== "\t") {
-      // Drop other C0 control characters (bell, backspace, form feed, NUL,
-      // and any stray bytes from binary content) so they don't render as
-      // replacement glyphs.
-      i++;
-      continue;
-    }
-
-    buffer += ch;
-    i++;
-  }
-
-  // Flush the trailing line (even if empty, when there was prior content, to
-  // preserve a final newline's worth of structure). Only emit a trailing
-  // empty line if the input ended on a newline handled above; otherwise emit
-  // whatever is buffered.
-  if (buffer.length > 0 || segments.length > 0) {
-    pushLine();
-  } else if (lines.length === 0) {
-    // Entirely empty input → one empty line, so callers always get ≥1 line.
-    lines.push({ segments: [] });
-  }
-
-  return lines;
+  return out.lines;
 }
 
 /**

@@ -17,13 +17,13 @@ import {
   getDrawerStack,
   navigateToDrawer,
   setFlowCallbacks,
+  type UiOnlineEvaluationDrawerProps,
   useDrawer,
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
-import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-browser/evaluator-editor-callbacks";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-contract/mapping-validation";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
@@ -76,13 +76,7 @@ import { serializeMappingsToMappingState } from "../../../model/evaluations/seri
 
 export type EvaluationLevel = "trace" | "thread" | null;
 
-export type OnlineEvaluationDrawerProps = {
-  open?: boolean;
-  onClose?: () => void;
-  onSave?: () => void;
-  /** If provided, loads an existing monitor for editing */
-  monitorId?: string;
-};
+export type OnlineEvaluationDrawerProps = UiOnlineEvaluationDrawerProps;
 
 /** Auto-inferred mappings for standard evaluator fields */
 const AUTO_INFER_MAPPINGS: Record<string, keyof typeof TRACE_MAPPINGS> = {
@@ -737,7 +731,7 @@ function openEvaluatorEditor({
   onMappingChange: (identifier: string, mapping: UIFieldMapping | undefined) => void;
   selecting?: boolean;
 }) {
-  setFlowCallbacks("evaluatorEditor", createEvaluatorEditorCallbacks({ onMappingChange }));
+  setFlowCallbacks("evaluatorEditor", { onMappingChange });
   const mappingsConfig: EvaluatorMappingsConfig = { level: level ?? undefined, initialMappings };
   if (!selecting) {
     openDrawer("evaluatorEditor", { evaluatorId, mappingsConfig });
@@ -761,23 +755,20 @@ function registerNewEvaluatorFlow(draft: {
   preconditions: CheckPrecondition[];
   threadIdleTimeout: number | null;
 }) {
-  setFlowCallbacks(
-    "evaluatorEditor",
-    createEvaluatorEditorCallbacks({
-      onSave: (savedEvaluator) => {
-        onlineEvaluationDrawerState = {
-          ...draft,
-          name: draft.name || savedEvaluator.name,
-          selectedEvaluator: null,
-          mappings: {},
-          pendingEvaluatorId: savedEvaluator.id,
-        };
-        navigateToDrawer("onlineEvaluation", { resetStack: true });
-        // Handled navigation, so the editor does not also go back.
-        return true;
-      },
-    }),
-  );
+  setFlowCallbacks("evaluatorEditor", {
+    onSave: (savedEvaluator: { id: string; name: string }) => {
+      onlineEvaluationDrawerState = {
+        ...draft,
+        name: draft.name || savedEvaluator.name,
+        selectedEvaluator: null,
+        mappings: {},
+        pendingEvaluatorId: savedEvaluator.id,
+      };
+      navigateToDrawer("onlineEvaluation", { resetStack: true });
+      // Handled navigation, so the editor does not also go back.
+      return true;
+    },
+  });
 }
 
 /**

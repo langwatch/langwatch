@@ -5,12 +5,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
-  "files": [
-    "./src/activity.ts",
-    "./src/coding-agent.web.ts",
-    "./src/pull-requests.ts",
-    "./src/session-table.ts"
-  ],
+  "files": ["./src/coding-agent.web.ts", "./src/pull-requests.ts", "./src/session-table.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

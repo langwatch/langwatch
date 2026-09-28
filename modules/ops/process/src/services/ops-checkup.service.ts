@@ -377,7 +377,12 @@ async function findOldestProjects({
   projects: Pick<ProjectApi, "listByOrganization">;
   organizationId: string;
 }): Promise<{ id: string; apiKey: string }[]> {
-  const page = await projects.listByOrganization({ organizationId, page: 1, limit: 100 });
+  const page = await projects.listByOrganization({
+    organizationId,
+    page: 1,
+    limit: 100,
+    includeGovernance: true,
+  });
   return page.data
     .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
     .slice(0, 1)

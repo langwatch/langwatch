@@ -818,7 +818,7 @@ async function lintFile(file, rules, opts, key) {
       error: r.error,
       findings: r.findings
         .filter((f) => f.probability >= opts.min)
-        .sort((a, b) => b.probability - a.probability)
+        .toSorted((a, b) => b.probability - a.probability)
         .map((f) => ({
           rule: f.rule.key,
           name: f.rule.name,

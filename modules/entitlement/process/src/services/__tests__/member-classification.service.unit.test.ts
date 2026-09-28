@@ -287,67 +287,67 @@ describe("getRoleChangeType", () => {
   describe("given the classification does not change", () => {
     it("returns no-change when both roles are Full Member (ADMIN to MEMBER)", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.ADMIN,
-          undefined,
-          OrganizationUserRole.MEMBER,
-          undefined,
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.ADMIN,
+          oldPermissions: undefined,
+          newRole: OrganizationUserRole.MEMBER,
+          newPermissions: undefined,
+        }),
       ).toBe("no-change");
     });
 
     it("returns no-change when both roles are Full Member (MEMBER to ADMIN)", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.MEMBER,
-          undefined,
-          OrganizationUserRole.ADMIN,
-          undefined,
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.MEMBER,
+          oldPermissions: undefined,
+          newRole: OrganizationUserRole.ADMIN,
+          newPermissions: undefined,
+        }),
       ).toBe("no-change");
     });
 
     it("returns no-change when both roles are Lite Member (EXTERNAL to EXTERNAL)", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
-          undefined,
-          OrganizationUserRole.EXTERNAL,
-          ["project:view"],
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.EXTERNAL,
+          oldPermissions: undefined,
+          newRole: OrganizationUserRole.EXTERNAL,
+          newPermissions: ["project:view"],
+        }),
       ).toBe("no-change");
     });
 
     it("returns no-change when EXTERNAL with non-view to MEMBER (both Full Member)", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
-          ["project:manage"],
-          OrganizationUserRole.MEMBER,
-          undefined,
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.EXTERNAL,
+          oldPermissions: ["project:manage"],
+          newRole: OrganizationUserRole.MEMBER,
+          newPermissions: undefined,
+        }),
       ).toBe("no-change");
     });
 
     it("returns no-change when custom role changes but stays view-only", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
-          ["project:view"],
-          OrganizationUserRole.EXTERNAL,
-          ["project:view", "analytics:view"],
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.EXTERNAL,
+          oldPermissions: ["project:view"],
+          newRole: OrganizationUserRole.EXTERNAL,
+          newPermissions: ["project:view", "analytics:view"],
+        }),
       ).toBe("no-change");
     });
 
     it("returns no-change when custom role changes but stays non-view", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
-          ["project:manage"],
-          OrganizationUserRole.EXTERNAL,
-          ["project:update"],
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.EXTERNAL,
+          oldPermissions: ["project:manage"],
+          newRole: OrganizationUserRole.EXTERNAL,
+          newPermissions: ["project:update"],
+        }),
       ).toBe("no-change");
     });
   });
@@ -355,56 +355,56 @@ describe("getRoleChangeType", () => {
   describe("given the member upgrades from lite to full", () => {
     it("returns lite-to-full when EXTERNAL upgraded to MEMBER", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
-          undefined,
-          OrganizationUserRole.MEMBER,
-          undefined,
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.EXTERNAL,
+          oldPermissions: undefined,
+          newRole: OrganizationUserRole.MEMBER,
+          newPermissions: undefined,
+        }),
       ).toBe("lite-to-full");
     });
 
     it("returns lite-to-full when EXTERNAL upgraded to ADMIN", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
-          undefined,
-          OrganizationUserRole.ADMIN,
-          undefined,
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.EXTERNAL,
+          oldPermissions: undefined,
+          newRole: OrganizationUserRole.ADMIN,
+          newPermissions: undefined,
+        }),
       ).toBe("lite-to-full");
     });
 
     it("returns lite-to-full when view-only custom role gets manage permission", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
-          ["project:view"],
-          OrganizationUserRole.EXTERNAL,
-          ["project:view", "project:manage"],
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.EXTERNAL,
+          oldPermissions: ["project:view"],
+          newRole: OrganizationUserRole.EXTERNAL,
+          newPermissions: ["project:view", "project:manage"],
+        }),
       ).toBe("lite-to-full");
     });
 
     it("returns lite-to-full when no permissions to non-view custom role", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
-          undefined,
-          OrganizationUserRole.EXTERNAL,
-          ["project:create"],
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.EXTERNAL,
+          oldPermissions: undefined,
+          newRole: OrganizationUserRole.EXTERNAL,
+          newPermissions: ["project:create"],
+        }),
       ).toBe("lite-to-full");
     });
 
     it("returns lite-to-full when empty permissions to non-view custom role", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
-          [],
-          OrganizationUserRole.EXTERNAL,
-          ["project:update"],
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.EXTERNAL,
+          oldPermissions: [],
+          newRole: OrganizationUserRole.EXTERNAL,
+          newPermissions: ["project:update"],
+        }),
       ).toBe("lite-to-full");
     });
   });
@@ -412,56 +412,56 @@ describe("getRoleChangeType", () => {
   describe("given the member downgrades from full to lite", () => {
     it("returns full-to-lite when MEMBER downgraded to EXTERNAL", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.MEMBER,
-          undefined,
-          OrganizationUserRole.EXTERNAL,
-          undefined,
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.MEMBER,
+          oldPermissions: undefined,
+          newRole: OrganizationUserRole.EXTERNAL,
+          newPermissions: undefined,
+        }),
       ).toBe("full-to-lite");
     });
 
     it("returns full-to-lite when ADMIN downgraded to EXTERNAL", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.ADMIN,
-          undefined,
-          OrganizationUserRole.EXTERNAL,
-          undefined,
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.ADMIN,
+          oldPermissions: undefined,
+          newRole: OrganizationUserRole.EXTERNAL,
+          newPermissions: undefined,
+        }),
       ).toBe("full-to-lite");
     });
 
     it("returns full-to-lite when MEMBER downgraded to EXTERNAL with view-only role", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.MEMBER,
-          undefined,
-          OrganizationUserRole.EXTERNAL,
-          ["project:view"],
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.MEMBER,
+          oldPermissions: undefined,
+          newRole: OrganizationUserRole.EXTERNAL,
+          newPermissions: ["project:view"],
+        }),
       ).toBe("full-to-lite");
     });
 
     it("returns full-to-lite when non-view custom role changed to view-only", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
-          ["project:manage"],
-          OrganizationUserRole.EXTERNAL,
-          ["project:view"],
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.EXTERNAL,
+          oldPermissions: ["project:manage"],
+          newRole: OrganizationUserRole.EXTERNAL,
+          newPermissions: ["project:view"],
+        }),
       ).toBe("full-to-lite");
     });
 
     it("returns full-to-lite when non-view custom role removed", () => {
       expect(
-        MemberClassificationService.getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
-          ["project:update"],
-          OrganizationUserRole.EXTERNAL,
-          undefined,
-        ),
+        MemberClassificationService.getRoleChangeType({
+          oldRole: OrganizationUserRole.EXTERNAL,
+          oldPermissions: ["project:update"],
+          newRole: OrganizationUserRole.EXTERNAL,
+          newPermissions: undefined,
+        }),
       ).toBe("full-to-lite");
     });
   });

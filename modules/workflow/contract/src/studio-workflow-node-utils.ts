@@ -156,7 +156,16 @@ export const getMappingSurfaceInputs = (
   });
 };
 
-export const getInputsOutputs = (edges: StudioEdge[], nodes: StudioNode[]) => {
+/** The workflow's entry fields, as the entry edges name them, and the end node's inputs. */
+export type StudioWorkflowInputsOutputs = {
+  inputs: { identifier: string | undefined; type: string; optional?: boolean }[];
+  outputs: StudioNode["data"]["inputs"] | undefined;
+};
+
+export const getInputsOutputs = (
+  edges: StudioEdge[],
+  nodes: StudioNode[],
+): StudioWorkflowInputsOutputs => {
   const entryInputs = getEntryInputs(edges, nodes);
 
   const inputs = entryInputs.map((edge) => ({

@@ -49,6 +49,15 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
       removeIdentifier: mutation(() => ({ removed: true })),
       completeVerification: mutation(() => ({ verified: true })),
     },
+    auth: {
+      myAddressConfirmation: {
+        useQuery: () => ({
+          data: { email: "carol@acme.example", confirmed: true, canSendConfirmation: true },
+          isPending: false,
+        }),
+      },
+      sendMyAddressConfirmation: mutation(() => ({ sent: true, identifierId: "id-own" })),
+    },
     user: {
       getLinkedAccounts: {
         useQuery: () => ({ data: state.linkedAccounts, isLoading: state.accountsLoading }),

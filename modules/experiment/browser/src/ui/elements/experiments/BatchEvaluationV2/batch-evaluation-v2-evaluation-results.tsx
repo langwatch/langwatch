@@ -1,7 +1,8 @@
 import { Alert, HStack, Skeleton, Spacer, Table, Tabs, Text, VStack } from "@chakra-ui/react";
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Menu } from "@langwatch/design-system/menu";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import type { Experiment, Project } from "@langwatch/workflow-contract";
+import type { Experiment } from "@langwatch/workflow-contract";
 import React, { useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";
 
@@ -26,7 +27,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
     downloadCSV,
     isDownloadCSVEnabled,
   }: {
-    project: Project;
+    project: UiHostProject;
     experiment: Experiment;
     runId: string | undefined;
     isFinished: boolean;

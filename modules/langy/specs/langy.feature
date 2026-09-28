@@ -66,3 +66,16 @@ Feature: Langy service capability
     When feedback is checked or marked shown
     Then the read returns false
     And the write does not throw
+
+  @integration
+  Scenario: The worker folds a created langy conversation into its projection
+    Given the worker boots with live eventing and langy's rows in a test database
+    When langy's conversation pipeline is sent a created conversation
+    Then the conversation is readable through its projection
+
+  @unit
+  Scenario: A new conversation takes its placeholder title in sentence case
+    Given a new conversation whose first user message reads "apidiff question"
+    When its first turn is accepted
+    Then the conversation starts with the title "Apidiff question"
+    And the recorded message carries the same title

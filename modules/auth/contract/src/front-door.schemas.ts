@@ -3,6 +3,7 @@
  * crosses the network before anybody has an account, so the bounds are part
  * of the contract rather than a defensive afterthought.
  */
+import { identifierCodeChallengeSchema } from "@langwatch/identity-contract";
 import { z } from "zod";
 
 /**
@@ -22,10 +23,12 @@ export const frontDoorEmailInputSchema = z.object({ email: z.string().email() })
 export type FrontDoorEmailInput = z.infer<typeof frontDoorEmailInputSchema>;
 
 /**
- * The caller's own address, taken from the session rather than the request, so
- * the body carries nothing at all.
+ * The caller's own address comes from the session, never the request; the body
+ * carries only the S256 challenge whose verifier the asking window keeps.
  */
-export const frontDoorOwnAddressInputSchema = z.object({});
+export const frontDoorOwnAddressInputSchema = z.object({
+  codeChallenge: identifierCodeChallengeSchema,
+});
 export type FrontDoorOwnAddressInput = z.infer<typeof frontDoorOwnAddressInputSchema>;
 
 /** The emailed confirmation token a visitor is spending. */

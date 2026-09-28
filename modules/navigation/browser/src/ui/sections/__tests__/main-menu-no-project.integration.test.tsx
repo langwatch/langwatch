@@ -35,7 +35,7 @@ const anchorHrefs = () =>
 
 async function expandSimulations(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "Expand Simulations" }));
-  await screen.findByRole("link", { name: "Scenarios" });
+  await screen.findByRole("button", { name: "Scenarios" });
 }
 
 afterEach(() => {
@@ -55,7 +55,7 @@ describe("<MainMenuSections showExpanded />", () => {
     it("marks a project destination unavailable instead of linking it", () => {
       renderMenu({ project: undefined });
 
-      const home = screen.getByRole("link", { name: "Home" });
+      const home = screen.getByRole("button", { name: "Home" });
 
       expect(home).toHaveAttribute("aria-disabled", "true");
       expect(home).not.toHaveAttribute("href");
@@ -66,7 +66,7 @@ describe("<MainMenuSections showExpanded />", () => {
       const user = userEvent.setup();
       renderMenu({ project: undefined });
 
-      await user.hover(screen.getByRole("link", { name: "Analytics" }));
+      await user.hover(screen.getByRole("button", { name: "Analytics" }));
 
       expect(await screen.findByText("Create a project first to open Analytics.")).toBeTruthy();
     });
@@ -78,7 +78,7 @@ describe("<MainMenuSections showExpanded />", () => {
       await expandSimulations(user);
 
       for (const label of ["Scenarios", "Runs"]) {
-        const item = screen.getByRole("link", { name: label });
+        const item = screen.getByRole("button", { name: label });
         expect(item).toHaveAttribute("aria-disabled", "true");
         expect(item).not.toHaveAttribute("href");
       }

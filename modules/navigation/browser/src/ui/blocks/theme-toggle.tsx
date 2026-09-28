@@ -1,4 +1,4 @@
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack, VisuallyHidden } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
@@ -90,10 +90,7 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
         {themeOptions.map((option) => (
           <Box
             key={option.value}
-            as="button"
-            role="radio"
-            aria-checked={theme === option.value}
-            aria-label={`Set theme to ${option.value}`}
+            as="label"
             flex={1}
             display="flex"
             alignItems="center"
@@ -104,8 +101,17 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
             transition="color 0.2s ease"
             position="relative"
             _hover={{ color: theme === option.value ? "fg" : "fg.muted" }}
-            onClick={() => setTheme(option.value)}
           >
+            <VisuallyHidden asChild>
+              <input
+                type="radio"
+                name="theme"
+                value={option.value}
+                checked={theme === option.value}
+                aria-label={`Set theme to ${option.value}`}
+                onChange={() => setTheme(option.value)}
+              />
+            </VisuallyHidden>
             <Box
               transition="transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)"
               transform={theme === option.value ? "scale(1.15)" : "scale(1)"}

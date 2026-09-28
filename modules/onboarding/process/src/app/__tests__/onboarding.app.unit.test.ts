@@ -15,6 +15,7 @@ import {
 } from "@langwatch/onboarding-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -22,6 +23,7 @@ import { OnboardingApp } from "../onboarding.app.ts";
 
 const ORGANIZATION_ID = "organization_1";
 const USER_ID = "user_1";
+const PROJECT_ID = "project_1";
 const INITIALIZED: OrganizationInitialized = {
   success: true,
   teamSlug: "acme-team",
@@ -67,6 +69,12 @@ function buildApp(
           publicUrl: options.publicGatewayUrl,
           expectedControlPlaneUrl: void 0,
         }),
+      }),
+      projects: createApiFixture<ProjectApi>({
+        getOrganizationId: async (projectId) => {
+          if (projectId !== PROJECT_ID) throw new ProjectNotFoundError();
+          return ORGANIZATION_ID;
+        },
       }),
     },
     config: void 0,
@@ -193,6 +201,35 @@ describe("OnboardingApp", () => {
     expect(recordIntegrationMethod).toHaveBeenCalledWith({
       userId: USER_ID,
       selection: "via-claude-code",
+    });
+  });
+
+  describe("given a reaction that reads guided onboarding by project", () => {
+    /** @scenario "A failed guided turn reads the organization's guided onboarding by project" */
+    it("answers the organization, its variant and its state with no caller to authorize", async () => {
+      const { app, hasPermission } = buildApp({
+        record: {
+          state: { ...EMPTY_GUIDED_ONBOARDING_STATE, conversationId: "langyconv_1" },
+          variant: "guided",
+        },
+      });
+
+      const guided = await app.getGuidedStateByProject({ projectId: PROJECT_ID });
+
+      expect(guided).toMatchObject({
+        organizationId: ORGANIZATION_ID,
+        variant: "guided",
+        state: { conversationId: "langyconv_1" },
+      });
+      expect(hasPermission).not.toHaveBeenCalled();
+    });
+
+    it("refuses a project that is gone with project_not_found", async () => {
+      const { app } = buildApp();
+
+      await expect(
+        app.getGuidedStateByProject({ projectId: "project_gone" }),
+      ).rejects.toMatchObject({ code: "project_not_found" });
     });
   });
 });

@@ -7,7 +7,7 @@ import {
   MetricDataPointAppendStore,
   MetricSeriesCatalogAppendStore,
   MetricTimeRollupAppendStore,
-} from "../../stores/metric-projection/metric-projection.store.ts";
+} from "../../eventing/metric-projection.store.ts";
 import type { MetricDataPointRepository } from "../metric-data-point.repository.ts";
 
 function makeRepository() {

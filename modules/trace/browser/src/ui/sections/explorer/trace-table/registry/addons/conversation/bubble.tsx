@@ -82,6 +82,74 @@ function bubbleDisplayText({
   return truncated.replace(/\n+…\s*$/, "");
 }
 
+/** The amber edge on the bubble's inner side that marks an annotated message. */
+function annotatedEdge(side: "left" | "right"): string {
+  return `inset ${side === "right" ? "-3px" : "3px"} 0 0 var(--chakra-colors-amber-solid)`;
+}
+
+function AnnotationBadge({ annotation }: { annotation: NonNullable<BubbleProps["annotation"]> }) {
+  const { count, hasCorrection } = annotation;
+  return (
+    <HStack
+      gap={0.5}
+      paddingX={1.5}
+      paddingY={0.5}
+      borderRadius="sm"
+      bg="amber.subtle"
+      color="amber.fg"
+      aria-label={`${count} annotation${count === 1 ? "" : "s"}${
+        hasCorrection ? ", includes correction" : ""
+      }`}
+    >
+      <Icon as={MessageSquare} boxSize="10px" />
+      <Text textStyle="2xs" fontWeight="600" lineHeight="1">
+        {count}
+      </Text>
+      {hasCorrection && <Icon as={Lightbulb} boxSize="10px" color="yellow.fg" />}
+    </HStack>
+  );
+}
+
+function ReasoningPanel({ reasoning, hasText }: { reasoning: string; hasText: boolean }) {
+  return (
+    <Box
+      mb={hasText ? "3" : "0"}
+      borderBottomWidth={hasText ? "1px" : "0"}
+      borderBottomColor="border.subtle"
+      bg="bg.muted/60"
+      px="3"
+      py="2"
+      borderRadius="md"
+      mx="-1"
+    >
+      <ReasoningBlock text={reasoning} />
+    </Box>
+  );
+}
+
+/**
+ * The message as markdown, with Prose's headings tamed so chat reads as
+ * conversation, and its outer block margins dropped so they do not stack on
+ * the bubble's own padding.
+ */
+function BubbleMarkdown({ compact, text }: { compact: boolean; text: string }) {
+  return (
+    <Box
+      css={{
+        "& > div": { fontSize: compact ? "13.5px" : "14px", lineHeight: "1.55" },
+        "& > div > *:first-child": { marginTop: "0 !important" },
+        "& > div > *:last-child": { marginBottom: "0 !important" },
+        "& h1": { fontSize: "1.15em !important" },
+        "& h2": { fontSize: "1.1em !important" },
+        "& h3": { fontSize: "1.05em !important" },
+        "& h4, & h5, & h6": { fontSize: "1em !important" },
+      }}
+    >
+      <Markdown>{text}</Markdown>
+    </Box>
+  );
+}
+
 export const Bubble: React.FC<BubbleProps> = ({
   side,
   tone,
@@ -151,11 +219,7 @@ export const Bubble: React.FC<BubbleProps> = ({
         cursor={onClick ? "pointer" : "default"}
         transition="background 0.15s ease, transform 0.15s ease"
         position="relative"
-        boxShadow={
-          hasAnnotation
-            ? `inset ${side === "right" ? "-3px" : "3px"} 0 0 var(--chakra-colors-amber-solid)`
-            : undefined
-        }
+        boxShadow={hasAnnotation ? annotatedEdge(side) : undefined}
         _hover={onClick ? { bg: palette.selectedBg, transform: "translateY(-1px)" } : undefined}
         onClick={(e: React.MouseEvent) => {
           if (!onClick) return;
@@ -167,27 +231,7 @@ export const Bubble: React.FC<BubbleProps> = ({
           <Text textStyle="2xs" fontWeight="600" color={palette.accent} letterSpacing="0.02em">
             {label}
           </Text>
-          {hasAnnotation && (
-            <HStack
-              gap={0.5}
-              paddingX={1.5}
-              paddingY={0.5}
-              borderRadius="sm"
-              bg="amber.subtle"
-              color="amber.fg"
-              aria-label={`${annotation!.count} annotation${
-                annotation!.count === 1 ? "" : "s"
-              }${annotation!.hasCorrection ? ", includes correction" : ""}`}
-            >
-              <Icon as={MessageSquare} boxSize="10px" />
-              <Text textStyle="2xs" fontWeight="600" lineHeight="1">
-                {annotation!.count}
-              </Text>
-              {annotation!.hasCorrection && (
-                <Icon as={Lightbulb} boxSize="10px" color="yellow.fg" />
-              )}
-            </HStack>
-          )}
+          {annotation && hasAnnotation && <AnnotationBadge annotation={annotation} />}
           {annotate && (
             <>
               <Spacer />
@@ -195,42 +239,8 @@ export const Bubble: React.FC<BubbleProps> = ({
             </>
           )}
         </HStack>
-        {reasoning && (
-          <Box
-            mb={text ? "3" : "0"}
-            borderBottomWidth={text ? "1px" : "0"}
-            borderBottomColor="border.subtle"
-            bg="bg.muted/60"
-            px="3"
-            py="2"
-            borderRadius="md"
-            mx="-1"
-          >
-            <ReasoningBlock text={reasoning} />
-          </Box>
-        )}
-        <Box
-          css={{
-            // Markdown renders inside <Prose>, which scales h1..h3 (2em/1.5em/
-            // 1.2em). In a chat bubble those headings dominate; tame them so
-            // chat content reads as conversation.
-            "& > div": {
-              fontSize: compact ? "13.5px" : "14px",
-              lineHeight: "1.55",
-            },
-            // Prose gives every block a margin on both sides. Inside a bubble
-            // the outermost ones stack on top of the bubble's own padding, so
-            // the message reads as sitting high in a box too tall for it.
-            "& > div > *:first-child": { marginTop: "0 !important" },
-            "& > div > *:last-child": { marginBottom: "0 !important" },
-            "& h1": { fontSize: "1.15em !important" },
-            "& h2": { fontSize: "1.1em !important" },
-            "& h3": { fontSize: "1.05em !important" },
-            "& h4, & h5, & h6": { fontSize: "1em !important" },
-          }}
-        >
-          <Markdown>{display}</Markdown>
-        </Box>
+        {reasoning && <ReasoningPanel reasoning={reasoning} hasText={!!text} />}
+        <BubbleMarkdown compact={compact} text={display} />
         {canExpand && (
           <MessageExpandToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
         )}

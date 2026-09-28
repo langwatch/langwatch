@@ -14,11 +14,6 @@
       "langwatch-declaration-source": "./src/scenario.web.ts",
       "types": "./dist/scenario.web.d.ts",
       "default": "./src/scenario.web.ts"
-    },
-    "./surfaces/media-part": {
-      "langwatch-declaration-source": "./src/ui/sections/media-part.tsx",
-      "types": "./dist/ui/sections/media-part.d.ts",
-      "default": "./src/ui/sections/media-part.tsx"
     }
   },
   "scripts": {

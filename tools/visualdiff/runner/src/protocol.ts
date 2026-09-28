@@ -29,6 +29,8 @@ export interface PlanFlow {
 export interface PlanSide {
   name: string;
   baseUrl: string;
+  /** replay names a cached captures.jsonl this side is read from instead of rendered. */
+  replay?: string;
 }
 
 export interface Credential {
@@ -36,6 +38,8 @@ export interface Credential {
   email: string;
   password: string;
   slug: string;
+  /** fallbackEmails are tried in order when email does not sign in on a side. */
+  fallbackEmails?: string[];
 }
 
 export interface Plan {
@@ -47,6 +51,12 @@ export interface Plan {
   routes: string[];
   flows: PlanFlow[];
   credential: Credential;
+  /** failFast aborts once the candidate's first routes show its shell does not render. */
+  failFast?: boolean;
+  /** frozenTime is the Date.now() every page sees, so relative times render alike on both sides. */
+  frozenTime?: number;
+  /** fixtures fill a route's {name} placeholders with seeded ids. */
+  fixtures?: Record<string, string>;
 }
 
 export interface CaptureMessage {
@@ -61,6 +71,9 @@ export interface CaptureMessage {
   consoleErrors: string[];
   failedRequests: string[];
   notFound: boolean;
+  blank: boolean;
+  /** ariaSnapshot is the page's accessibility tree as YAML, the screen's text evidence. */
+  ariaSnapshot: string;
   error: string;
   durationMs: number;
 }

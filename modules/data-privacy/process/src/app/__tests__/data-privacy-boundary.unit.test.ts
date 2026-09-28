@@ -8,17 +8,14 @@ import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contrac
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApp } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
-import { dataPrivacyServer } from "../../data-privacy.server.ts";
+import { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
 import {
   createDataPrivacyTestProjects,
-  installableDataPrivacy,
-  dataPrivacyTestInfrastructure,
+  createDataPrivacyTestApp,
   dataPrivacyTestGraph,
-  MemoryDataPrivacyDirectory,
 } from "./data-privacy.fixture.ts";
 
 const { projectId, teamId, organizationId } = dataPrivacyTestGraph;
@@ -35,7 +32,7 @@ const permittedAuthz = createApiFixture<AuthzApi>({
 });
 
 async function bootWith(scopeOrganizationId: string | null): Promise<DataPrivacyApi> {
-  const directory = MemoryDataPrivacyDirectory.create({
+  const directory = MemoryDataPrivacyDirectoryRepository.create({
     lineage: {
       projectId,
       name: "Acme production",
@@ -46,21 +43,16 @@ async function bootWith(scopeOrganizationId: string | null): Promise<DataPrivacy
     scopeOrganizationId,
   });
 
-  const runtime = await createApp({ role: "api" })
-    .withModules([installableDataPrivacy()])
-    .withMember("dataPrivacy", dataPrivacyTestInfrastructure(directory))
-    .withMember("nodeEnvironment", undefined)
-    .withConfig({ "data-privacy": { googleDlpDisabled: undefined, enforcement: undefined } })
-    .provide({
-      project: createDataPrivacyTestProjects(),
-      organization: createApiFixture<OrganizationApi>(),
-      authz: permittedAuthz,
-      "feature-flag": createApiFixture<FeatureFlagApi>(),
+  return createDataPrivacyTestApp({
+    directory,
+    dependencies: {
+      projects: createDataPrivacyTestProjects(),
+      organizations: createApiFixture<OrganizationApi>(),
+      permissions: permittedAuthz,
+      featureFlags: createApiFixture<FeatureFlagApi>(),
       evaluation: createApiFixture<EvaluationApi>(),
-    })
-    .boot();
-
-  return runtime.module(dataPrivacyServer).provided;
+    },
+  });
 }
 
 describe("given a rule write through the data-privacy app", () => {

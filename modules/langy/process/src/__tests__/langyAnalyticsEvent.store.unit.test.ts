@@ -33,7 +33,7 @@ describe("LangyAnalyticsEventAppendStore", () => {
     const sink = new FakeLangyAnalyticsEventSink();
     const store = LangyAnalyticsEventStorageService.create({
       sink,
-      defaultRetentionDays: 49,
+      defaultRetentionDays: () => 49,
     });
 
     await store.append(record, {
@@ -53,7 +53,7 @@ describe("LangyAnalyticsEventAppendStore", () => {
     const sink = new FakeLangyAnalyticsEventSink();
     const store = LangyAnalyticsEventStorageService.create({
       sink,
-      defaultRetentionDays: 49,
+      defaultRetentionDays: () => 49,
     });
     const second = {
       ...record,
@@ -83,7 +83,7 @@ describe("LangyAnalyticsEventAppendStore", () => {
     const sink = new FakeLangyAnalyticsEventSink();
     const store = LangyAnalyticsEventStorageService.create({
       sink,
-      defaultRetentionDays: 49,
+      defaultRetentionDays: () => 49,
     });
 
     await store.bulkAppend([], {

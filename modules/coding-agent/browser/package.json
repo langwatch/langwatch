@@ -13,11 +13,6 @@
       "types": "./dist/coding-agent.web.d.ts",
       "default": "./src/coding-agent.web.ts"
     },
-    "./surfaces/activity": {
-      "langwatch-declaration-source": "./src/activity.ts",
-      "types": "./dist/activity.d.ts",
-      "default": "./src/activity.ts"
-    },
     "./surfaces/session-table": {
       "langwatch-declaration-source": "./src/session-table.ts",
       "types": "./dist/session-table.d.ts",

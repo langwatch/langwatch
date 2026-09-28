@@ -161,7 +161,7 @@ func BuildScopedLedger(union []Operation, report Report, options LedgerOptions) 
 	}
 	build.seedRows(union)
 	build.applyTranscripts(report.Transcripts)
-	build.applyFindings(report.Findings)
+	build.applyFindings(unruledFindings(report.Findings))
 	build.applySpecChanges(report.SpecChanges)
 	return build.finish()
 }

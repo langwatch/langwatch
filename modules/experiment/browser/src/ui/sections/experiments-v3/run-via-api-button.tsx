@@ -1,7 +1,4 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { buildRunSnippet, DataSourcePicker } from "@langwatch/workflow-browser-kit";
-import { GenerateApiSnippetDialog } from "@langwatch/workflow-browser/generate-api-snippet-dialog";
-import { useRunViaApiTabs } from "@langwatch/workflow-browser/run-via-api-tabs";
 import type { WorkflowField } from "@langwatch/workflow-contract";
 /**
  * "Run via API" dialog for the evaluations-v3 workbench.
@@ -9,54 +6,7 @@ import type { WorkflowField } from "@langwatch/workflow-contract";
 import { useShallow } from "zustand/react/shallow";
 
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
-
-export function RunViaApiDialog({
-  open,
-  onOpenChange,
-  experimentSlug,
-  entryFields,
-  datasetColumns,
-  datasetName,
-  projectSlug,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  experimentSlug: string;
-  entryFields: WorkflowField[];
-  datasetColumns: string[];
-  datasetName?: string;
-  projectSlug?: string;
-}) {
-  const baseUrl =
-    typeof window !== "undefined" ? window.location.origin : "https://app.langwatch.ai";
-
-  const { dataSource, setDataSource, tabs } = useRunViaApiTabs(({ lang, dataSource: source }) =>
-    buildRunSnippet({
-      kind: "experiment",
-      identifier: experimentSlug,
-      baseUrl,
-      entryFields,
-      datasetColumns,
-      datasetName,
-      dataSource: source,
-      projectSlug,
-      lang,
-    }),
-  );
-
-  return (
-    <GenerateApiSnippetDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      snippets={[]}
-      targets={[]}
-      tabs={tabs}
-      controls={<DataSourcePicker value={dataSource} onChange={setDataSource} />}
-      title="Run via API"
-      description="Trigger this evaluation through the LangWatch API and read the per-row results back."
-    />
-  );
-}
+import { RunExperimentViaApiDialog } from "../../../behavior/lent-workflow.tsx";
 
 /**
  * Page-level wrapper: reads the experiment slug and the active dataset (name + columns)
@@ -90,7 +40,7 @@ export function RunViaApiDialogContainer({
   }));
 
   return (
-    <RunViaApiDialog
+    <RunExperimentViaApiDialog
       open={open}
       onOpenChange={onOpenChange}
       experimentSlug={experimentSlug}

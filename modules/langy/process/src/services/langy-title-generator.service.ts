@@ -1,18 +1,14 @@
 /**
- * The title a conversation gets when nobody named it. Moved here from the retired application,
- * which is where it had to live while `getVercelAIModel` was reachable only through the app's own
- * module graph.
+ * The title a conversation gets when nobody named it, written by the project's cheap model
+ * through model-provider, which keeps the vendor handle to itself.
+ * @see specs/langy/langy-conversation-title.feature
  */
+import { HandledError } from "@langwatch/handled-error";
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
-import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import { generateText } from "ai";
 
-import type {
-  LangyGeneratedTitle,
-  LangyTitleGenerator,
-  LangyTitleModelResolver,
-} from "../app/langy.members.ts";
+import type { LangyGeneratedTitle, LangyTitleGenerator } from "../app/langy.members.ts";
 import { normalizeLangyConversationTitle } from "../rules/langy-conversation-title.rules.ts";
 import type { LangyTrustedMessageReader } from "./langy-message.service.ts";
 
@@ -36,9 +32,14 @@ const TITLE_SYSTEM_PROMPT = [
 export type LangyTitleGeneratorDeps = Readonly<{
   /** The transcript, off the conversation's own message projection. */
   messages: LangyTrustedMessageReader;
-  /** Where the model handle comes from; see {@link LangyTitleModelResolver}. */
-  models: LangyTitleModelResolver;
+  /** The project's model for the title key, and the completion run on it. */
+  models: Pick<ModelProviderApi, "resolveModelForFeature" | "generateText">;
 }>;
+
+/** Nothing to retry: this project has no model to ask. */
+function isModelNotConfigured(error: unknown): boolean {
+  return HandledError.isHandled(error) && error.code === "model_not_configured";
+}
 
 /**
  * The generator, bound to one message reader and one model gateway.
@@ -55,6 +56,7 @@ export class LangyTitleGeneratorService {
     return (input) => this.generate(input);
   }
 
+  /** Every failure but an unconfigured model throws, so the process outbox retries it. */
   async generate(input: {
     projectId: string;
     conversationId: string;
@@ -69,45 +71,45 @@ export class LangyTitleGeneratorService {
       return UNCHANGED;
     }
 
-    let model: Awaited<ReturnType<LangyTitleModelResolver["resolveTitleModel"]>>;
     try {
-      model = await this.deps.models.resolveTitleModel({
+      const model = await this.titleModel(projectId);
+      const { text } = await this.deps.models.generateText({
         projectId,
         featureKey: LANGY_TITLE_FEATURE_KEY,
-        fallbackModel: LANGY_TITLE_GENERATION.MODEL,
+        ...(model.fallback ? { model: model.name } : {}),
+        system: TITLE_SYSTEM_PROMPT,
+        messages: [{ role: "user", content: `Conversation so far:\n\n${transcript}\n\nTitle:` }],
+        temperature: 0.2,
+        maxRetries: 1,
       });
+      const title = normalizeLangyConversationTitle(text);
+
+      return title ? { outcome: "generated", title, model: model.name } : UNCHANGED;
     } catch (error) {
-      // Nothing to retry: this project has no model to ask. Every other failure
-      // is this attempt's alone, and it throws so the process outbox retries it
-      // — a swallowed blip left the conversation on its raw first message for
-      // ever.
-      if (error instanceof ModelNotConfiguredError) {
-        logger.warn(
-          { projectId, conversationId },
-          "no cheap model configured for Langy titles — leaving title unchanged",
-        );
+      if (!isModelNotConfigured(error)) throw error;
+      logger.warn(
+        { projectId, conversationId },
+        "no cheap model configured for Langy titles — leaving title unchanged",
+      );
 
-        return UNCHANGED;
-      }
-
-      throw error;
+      return UNCHANGED;
     }
+  }
 
-    const { text } = await generateText({
-      model,
-      system: TITLE_SYSTEM_PROMPT,
-      prompt: `Conversation so far:\n\n${transcript}\n\nTitle:`,
-      temperature: 0.2,
-      maxRetries: 1,
-    });
+  /** The project's model for titles, else the cheap default so titles work out of the box. */
+  private async titleModel(projectId: string): Promise<{ name: string; fallback: boolean }> {
+    try {
+      const resolved = await this.deps.models.resolveModelForFeature({
+        projectId,
+        featureKey: LANGY_TITLE_FEATURE_KEY,
+      });
 
-    const title = normalizeLangyConversationTitle(text);
-    // The AI SDK's handle is either a model object or the bare id string a
-    // provider registry resolves later, and the fact recorded on the
-    // conversation is which model wrote the title.
-    const modelId = typeof model === "string" ? model : model.modelId;
+      return { name: resolved.model, fallback: false };
+    } catch (error) {
+      if (!isModelNotConfigured(error)) throw error;
 
-    return title ? { outcome: "generated", title, model: modelId } : UNCHANGED;
+      return { name: LANGY_TITLE_GENERATION.MODEL, fallback: true };
+    }
   }
 }
 

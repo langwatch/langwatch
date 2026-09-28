@@ -118,9 +118,9 @@ function disabled(env) {
   return null;
 }
 
-async function main(argv, env) {
+async function main(argv, env, { buildBundle } = {}) {
   if (argv[0] === SENTINEL_FLAG) return await runSentinel(argv.slice(1), env);
-  if (argv[0] === WATCH_FLAG) return await runWatchSupervisor(argv.slice(1), env);
+  if (argv[0] === WATCH_FLAG) return await runWatchSupervisor(argv.slice(1), env, buildBundle);
   if (argv.length === 0) {
     stderr(`${PREFIX} usage: dev-supervisor.mjs <command> [args...]\n`);
     return 64;
@@ -498,13 +498,13 @@ function watchDirs(dirs, debouncer) {
  * detached) so an external group-wide SIGTERM reaches it directly, and
  * restarts it, debounced, by pid — never the shared group — on tree changes.
  */
-async function runWatchSupervisor(rawArgv, env) {
+async function runWatchSupervisor(rawArgv, env, buildBundle) {
   const argv = rawArgv[0] === "--" ? rawArgv.slice(1) : rawArgv;
   if (argv.length === 0) {
     stderr(`${PREFIX} usage: dev-supervisor.mjs --watch -- <command> [args...]\n`);
     return 64;
   }
-  return new WatchSupervisor(argv, env).run();
+  return new WatchSupervisor(argv, env, buildBundle).run();
 }
 
 /** One watched command: its current child, its restarts and its exit. */
@@ -515,9 +515,10 @@ class WatchSupervisor {
   finished = false;
   watchers = [];
 
-  constructor(argv, env) {
+  constructor(argv, env, buildBundle) {
     this.argv = argv;
     this.env = env;
+    this.buildBundle = buildBundle;
     const { dirs, debounceMs } = resolveWatchConfig(env);
     this.dirs = dirs;
     this.graceMs = positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS);
@@ -544,14 +545,18 @@ class WatchSupervisor {
   }
 
   /**
-   * The import is deliberately dynamic: dev-supervisor.test.ts copies this
-   * file to a scratch dir and runs it expecting nothing but node builtins
-   * imported at load time. A static import here would break that copy.
+   * The bundle builder is handed in by whoever starts the supervisor, so this
+   * file loads with node builtins only (dev-supervisor.test.ts runs a copy).
    */
   async rebuild() {
     if (this.bundle === null) return { ok: true };
-    const { buildDevBundle } = await import("./lib/dev-bundle.mjs");
-    const result = await buildDevBundle({ appDir: process.cwd(), ...this.bundle });
+    if (!this.buildBundle) {
+      return {
+        ok: false,
+        errors: ["LANGWATCH_DEV_BUNDLE_ENTRY is set, but no bundle builder was handed in"],
+      };
+    }
+    const result = await this.buildBundle({ appDir: process.cwd(), ...this.bundle });
     if (!result.ok) {
       stderr(`${PREFIX} bundle failed, keeping the previous run:\n`);
       for (const line of result.errors) stderr(`${PREFIX}   ${line}\n`);
@@ -613,6 +618,11 @@ class WatchSupervisor {
       .takeDown()
       .then(() => this.finish());
   }
+}
+
+/** A detached child's whole process group, or nothing to signal when it never got a pid. */
+function processGroupOf(pid) {
+  return pid === undefined ? undefined : -pid;
 }
 
 /**
@@ -759,7 +769,7 @@ async function runSentinel(args, env) {
   });
 
   const stack = stackControls({
-    target: -child.pid,
+    target: processGroupOf(child.pid),
     graceMs: positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS),
   });
   const everyMs = positiveInt(env.LANGWATCH_DEV_WATCH_MS, WATCH_INTERVAL_MS);
@@ -904,7 +914,7 @@ function startDirect(argv, env, detached) {
   const child = startChild(argv, env, detached);
   if (child === null) return null;
   return {
-    target: async () => (detached ? -child.pid : child.pid),
+    target: async () => (detached ? processGroupOf(child.pid) : child.pid),
     onFailed: (cb) =>
       child.on("error", (err) => {
         stderr(`${PREFIX} could not start ${argv[0]} (${err.message})\n`);

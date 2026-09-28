@@ -8,6 +8,61 @@ import {
   useDrawerStore,
 } from "../../../../../behavior/drawer.store.ts";
 
+const MAGNET_PX = 32;
+
+/** The widest the drawer may be: the viewport, less the edge it keeps. */
+function maxDrawerWidth(): number {
+  if (typeof window === "undefined") return Number.POSITIVE_INFINITY;
+  return window.innerWidth - DRAWER_MAXIMIZE_EDGE_PX;
+}
+
+/**
+ * The width a drag proposes. Dragging left widens the drawer, since its right
+ * edge is anchored; within MAGNET_PX of the maximum it snaps there, so a full
+ * width is easy to commit.
+ */
+function draggedWidth({ startWidth, dx }: { startWidth: number; dx: number }): number {
+  const proposed = startWidth - dx;
+  const max = maxDrawerWidth();
+  if (proposed >= max - MAGNET_PX) return max;
+  return Math.max(DRAWER_MIN_WIDTH_PX, Math.min(max, proposed));
+}
+
+/** Where a drag starts: the set width, or the default capped at the viewport. */
+function startingWidth(widthPx: number | null): number {
+  if (widthPx !== null) return widthPx;
+  if (typeof window === "undefined") return DRAWER_DEFAULT_WIDTH_PX;
+  return Math.min(DRAWER_DEFAULT_WIDTH_PX, window.innerWidth);
+}
+
+/** Whether the drawer sits at the maximum snap; the default width never does. */
+function isAtMaxSnap(widthPx: number | null): boolean {
+  if (typeof window === "undefined" || widthPx === null) return false;
+  return Math.abs(widthPx - maxDrawerWidth()) < 2;
+}
+
+/**
+ * Re-clamps the width when the viewport shrinks, so a drawer dragged wide on a
+ * big monitor does not hang off the edge of a smaller window.
+ */
+function useClampOnViewportResize({
+  widthPx,
+  setWidthPx,
+}: {
+  widthPx: number | null;
+  setWidthPx: (width: number) => void;
+}) {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => {
+      const max = maxDrawerWidth();
+      if (widthPx !== null && widthPx > max) setWidthPx(max);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [widthPx, setWidthPx]);
+}
+
 /**
  * Left-edge resize rail for the trace drawer.
  */
@@ -16,43 +71,21 @@ export function ResizeRail() {
   const setWidthPx = useDrawerStore((s) => s.setWidthPx);
   const toggleSnapMaximize = useDrawerStore((s) => s.toggleSnapMaximize);
 
-  const dragState = useRef<{
-    startX: number;
-    startWidth: number;
-    pointerId: number;
-    didMove: boolean;
-  } | null>(null);
-
-  const resolveCurrentWidth = useCallback(() => {
-    if (widthPx !== null) return widthPx;
-    if (typeof window === "undefined") return DRAWER_DEFAULT_WIDTH_PX;
-    // Cap at the viewport so a default wider than the window doesn't
-    // start the drag from off-screen.
-    return Math.min(DRAWER_DEFAULT_WIDTH_PX, window.innerWidth);
-  }, [widthPx]);
+  const dragState = useRef<{ startX: number; startWidth: number; didMove: boolean } | null>(null);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      // Ignore non-primary buttons so a right-click context menu doesn't
-      // start a drag we can't cancel.
+      // Primary button only, so a context menu never starts a drag it cannot end.
+      // No preventDefault: a double-click without a drag must still reach dblclick.
       if (e.button !== 0) return;
-      // Don't preventDefault — we want the browser to still emit the
-      // synthetic dblclick when the user double-clicks without dragging.
-      const startWidth = resolveCurrentWidth();
-      dragState.current = {
-        startX: e.clientX,
-        startWidth,
-        pointerId: e.pointerId,
-        didMove: false,
-      };
+      dragState.current = { startX: e.clientX, startWidth: startingWidth(widthPx), didMove: false };
       try {
-        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+        e.currentTarget.setPointerCapture?.(e.pointerId);
       } catch {
-        // setPointerCapture can throw on detached nodes — best-effort.
-        return;
+        // setPointerCapture can throw on a detached node; capture is best-effort.
       }
     },
-    [resolveCurrentWidth],
+    [widthPx],
   );
 
   const handlePointerMove = useCallback(
@@ -60,75 +93,32 @@ export function ResizeRail() {
       const drag = dragState.current;
       if (!drag) return;
       const dx = e.clientX - drag.startX;
-      // Dragging *left* widens the drawer (its right edge is anchored to
-      // the viewport), so subtract dx.
-      const proposed = drag.startWidth - dx;
-      const maxWidth =
-        typeof window !== "undefined"
-          ? window.innerWidth - DRAWER_MAXIMIZE_EDGE_PX
-          : Number.POSITIVE_INFINITY;
-      let clamped = Math.max(DRAWER_MIN_WIDTH_PX, Math.min(maxWidth, proposed));
-      // Magnet snap: when the user drags the rail within ~32px of the
-      // viewport edge (i.e., proposed width is within 32px of max), snap
-      // to the max-edge value so it's easy to commit a full-screen
-      // expansion without having to be pixel-perfect.
-      const MAGNET_PX = 32;
-      if (proposed >= maxWidth - MAGNET_PX) {
-        clamped = maxWidth;
-      }
       if (Math.abs(dx) > 2) drag.didMove = true;
-      setWidthPx(clamped);
+      setWidthPx(draggedWidth({ startWidth: drag.startWidth, dx }));
     },
     [setWidthPx],
   );
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragState.current;
-    if (!drag) return;
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
-    } catch {
-      // Best-effort release.
-      dragState.current = null;
-      return;
-    }
+    if (!dragState.current) return;
     dragState.current = null;
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch {
+      // Release is best-effort too.
+    }
   }, []);
 
+  // A drag that lands within the double-click threshold does not also snap.
   const handleDoubleClick = useCallback(() => {
-    // Only toggle the snap if the user wasn't dragging — a drag that
-    // happens to land within the dblclick threshold should not also
-    // snap the width.
-    if (dragState.current?.didMove) return;
-    if (typeof window === "undefined") return;
+    if (dragState.current?.didMove || typeof window === "undefined") return;
     toggleSnapMaximize(window.innerWidth);
   }, [toggleSnapMaximize]);
 
-  // Re-clamp the width if the viewport itself shrinks (window resize). A
-  // user who dragged to 1200px on a wide monitor and then docks a smaller
-  // window would otherwise see the drawer hang off the right edge until
-  // they touched the rail again.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onResize = () => {
-      if (widthPx === null) return;
-      const max = window.innerWidth - DRAWER_MAXIMIZE_EDGE_PX;
-      if (widthPx > max) setWidthPx(max);
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [widthPx, setWidthPx]);
+  useClampOnViewportResize({ widthPx, setWidthPx });
 
-  // Determine whether the drawer is at the max-snap width. When it is,
-  // we hide the pill — the rail is invisible chrome that only re-appears
-  // on hover for the operator to grab the edge back. The default flat
-  // `DRAWER_DEFAULT_WIDTH_PX` fallback (`widthPx === null`) is never
-  // "at max" so the pill is always visible there.
-  const atMaxSnap = (() => {
-    if (typeof window === "undefined" || widthPx === null) return false;
-    const max = window.innerWidth - DRAWER_MAXIMIZE_EDGE_PX;
-    return Math.abs(widthPx - max) < 2;
-  })();
+  // At the maximum snap the pill hides; the rail reappears on hover to grab.
+  const atMaxSnap = isAtMaxSnap(widthPx);
 
   return (
     <Box

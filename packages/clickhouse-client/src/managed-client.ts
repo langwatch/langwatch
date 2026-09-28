@@ -301,7 +301,7 @@ function shedStatementError<Client extends ClickHouseVendorClient>({
 export function withClickHouseStatementLimit<Client extends ClickHouseVendorClient>(
   options: ClickHouseStatementLimitOptions<Client>,
 ): Client {
-  const { client, input, telemetry, overloadErrorFactory, logger } = options;
+  const { client, input, telemetry, logger } = options;
   const timeoutMs = options.statementWaitTimeoutMs ?? DEFAULT_STATEMENT_WAIT_TIMEOUT_MS;
   const maxQueued = statementQueueDepth(options);
   const limiter = new ConcurrencyLimiter({

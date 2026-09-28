@@ -4,7 +4,7 @@
  * ScenarioTargetRow (list) or ScenarioGridCard (grid) for each scenario run.
  */
 
-import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { Dialog } from "@langwatch/design-system/dialog";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
@@ -155,17 +155,14 @@ function RunRowData({
       {/* Run header - clickable to expand/collapse, sticky within scroll container */}
       <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
         <HStack
-          as="button"
+          position="relative"
           width="full"
           paddingX={4}
           paddingY={3}
           gap={3}
           flexWrap="nowrap"
           cursor="pointer"
-          onClick={onToggle}
           className="group"
-          aria-expanded={isExpanded}
-          aria-label={`Run from ${timeAgo ?? "unknown time"}`}
           bg="color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 70%), transparent)"
           backdropFilter="var(--lw-backdrop-blur, blur(12px) saturate(140%))"
           borderWidth="1px"
@@ -176,34 +173,51 @@ function RunRowData({
           borderRadius="lg"
           boxShadow="xs"
         >
-          {isExpanded ? (
-            <ChevronDown size={14} style={{ flexShrink: 0 }} />
-          ) : (
-            <ChevronRight size={14} style={{ flexShrink: 0 }} />
-          )}
-          {suiteName && (
-            <>
-              <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
-                {suiteName}
-              </Text>
-              <Text fontSize="sm" color="fg.muted" flexShrink={0}>
-                &middot;
-              </Text>
-            </>
-          )}
-          <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
-            {timeAgo}
-          </Text>
-          {expectedJobCount != null && summary.totalCount < expectedJobCount && (
-            <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-              {summary.totalCount} of {expectedJobCount}
+          {/* The toggle's overlay spans the whole header; the stop button sits above it. */}
+          <chakra.button
+            display="flex"
+            alignItems="center"
+            type="button"
+            gap={3}
+            flexShrink={0}
+            cursor="pointer"
+            onClick={onToggle}
+            aria-expanded={isExpanded}
+            aria-label={`Run from ${timeAgo ?? "unknown time"}`}
+            _before={{ content: '""', position: "absolute", inset: 0, borderRadius: "lg" }}
+          >
+            {isExpanded ? (
+              <ChevronDown size={14} style={{ flexShrink: 0 }} />
+            ) : (
+              <ChevronRight size={14} style={{ flexShrink: 0 }} />
+            )}
+            {suiteName && (
+              <>
+                <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
+                  {suiteName}
+                </Text>
+                <Text fontSize="sm" color="fg.muted" flexShrink={0}>
+                  &middot;
+                </Text>
+              </>
+            )}
+            <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
+              {timeAgo}
             </Text>
-          )}
+            {expectedJobCount != null && summary.totalCount < expectedJobCount && (
+              <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+                {summary.totalCount} of {expectedJobCount}
+              </Text>
+            )}
+          </chakra.button>
           {onCancelAll && hasCancellableRuns && (
-            <HStack
-              as="span"
-              role="button"
-              tabIndex={isCancellingBatch ? -1 : 0}
+            <chakra.button
+              display="flex"
+              alignItems="center"
+              type="button"
+              position="relative"
+              zIndex={1}
+              disabled={isCancellingBatch}
               gap={1}
               paddingX={2}
               paddingY={0.5}
@@ -218,24 +232,13 @@ function RunRowData({
               _hover={
                 isCancellingBatch ? undefined : { bg: "bg.muted", borderColor: "border.emphasized" }
               }
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                if (!isCancellingBatch) setIsCancelAllDialogOpen(true);
-              }}
-              onKeyDown={(e: React.KeyboardEvent) => {
-                if (!isCancellingBatch && (e.key === "Enter" || e.key === " ")) {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  setIsCancelAllDialogOpen(true);
-                }
-              }}
+              onClick={() => setIsCancelAllDialogOpen(true)}
               aria-label="Stop all remaining runs"
-              aria-disabled={isCancellingBatch}
               data-testid="cancel-all-button"
             >
               {isCancellingBatch ? <Spinner size="xs" /> : <Square size={10} />}
               <Text fontSize="xs">Stop</Text>
-            </HStack>
+            </chakra.button>
           )}
           <Box flex={1} />
           <RunMetricsSummary summary={summary} />

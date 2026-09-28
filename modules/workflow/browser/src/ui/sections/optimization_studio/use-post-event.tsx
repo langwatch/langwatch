@@ -3,6 +3,7 @@ import {
   showErrorToast,
   isHandledByGlobalHandler,
 } from "@langwatch/browser-host/errors";
+import { fetchSSE } from "@langwatch/browser-host/fetch-sse";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { createLogger } from "@langwatch/observability/browser";
 import { nowInstant } from "@langwatch/time";
@@ -17,7 +18,6 @@ import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { type WorkflowStore } from "../../../behavior/workflow-store.ts";
-import { fetchSSE } from "../../../model/sse/fetch-sse.ts";
 import {
   type CodedExecutionFailure,
   explainExecutionStateError,

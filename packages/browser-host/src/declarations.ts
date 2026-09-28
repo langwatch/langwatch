@@ -4,15 +4,24 @@
  * to its screens. ARCHITECTURE.md §10.1, "A capability travels by declaration".
  */
 
+import type { SystemStyleObject } from "@chakra-ui/react";
+import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
+import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import type { AnnotationFormState } from "@langwatch/annotation-contract";
-import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+import type { CustomGraphInput } from "@langwatch/dashboard-contract";
+import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
+import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
+import type { MediaPartProps, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import type { TimeInput } from "@langwatch/time";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import type {
   AvailableSource,
+  Field,
   FieldMapping,
+  LLMConfig,
   LocalPromptConfig,
   Signature,
+  WorkflowField,
 } from "@langwatch/workflow-contract";
 import type { ComponentType, ReactNode } from "react";
 
@@ -31,6 +40,23 @@ export type UiAuthenticationOverviewCardProps = {
 /** What a landing hero hands project's lent inline command palette. */
 export type UiHeroAskFieldProps = { placeholder: string };
 
+/** What a screen hands analytics' lent graph: the graph to draw, and what to show when empty. */
+export type UiCustomGraphProps = {
+  input: CustomGraphInput;
+  titleProps?: SystemStyleObject;
+  emptyState?: ReactNode;
+};
+
+/** What a surface hands navigation's lent command palette, drawn inline rather than as the bar. */
+export type UiInlineCommandPaletteProps = { placeholder: string };
+
+/** What project's settings form hands organization's lent department row. */
+export type UiProjectDepartmentFieldProps = {
+  organizationId: string;
+  projectId: string;
+  governanceEnabled: boolean;
+};
+
 /** What agent's test panel hands scenario's lent parameter line: the agent's own parameters. */
 export type UiParameterLineFieldProps = {
   definitions: readonly ScenarioParameterDefinition[];
@@ -41,7 +67,7 @@ export type UiParameterLineFieldProps = {
 };
 
 /** A dataset column as a dataset surface names it: its name and its type's name. */
-export type UiDatasetColumn = { name: string; type: string };
+export type UiDatasetColumn = DatasetColumn;
 
 /** What a screen hands dataset's lent create-or-edit drawer. */
 export type UiAddOrEditDatasetDrawerProps = {
@@ -101,6 +127,35 @@ export type UiDatasetRecordSyncProps = {
   ) => ({ id: string } & Record<string, unknown>) | undefined;
   clearPendingChange: (dbDatasetId: string, recordId: string) => void;
   onStatus: (state: "idle" | "saving" | "saved" | "error", error?: string) => void;
+};
+
+/** The surface coding-agent's lent activity tables read: where they are, who asks, and toasts. */
+export type UiCodingAgentActivityHost = {
+  hasPermission(permission: string): boolean;
+  route(): {
+    params: Readonly<Record<string, string | undefined>>;
+    query: Readonly<Record<string, string | undefined>>;
+  };
+  setQuery(
+    next: Readonly<Record<string, string | undefined>>,
+    options?: { replace?: boolean },
+  ): void;
+  navigate(to: string): void;
+  succeeded(notice: { title: string; description?: string; id?: string }): void;
+  failed(failure: { error: unknown; fallbackTitle: string; id?: string }): void;
+};
+
+/** What a screen hands coding-agent's lent pull requests table. */
+export type UiCodingAgentPullRequestsTableProps = {
+  projectId: string;
+  host: UiCodingAgentActivityHost;
+};
+
+/** What a screen hands coding-agent's lent sessions table. */
+export type UiCodingAgentSessionsTableProps = {
+  projectId: string;
+  projectSlug: string | null;
+  host: UiCodingAgentActivityHost;
 };
 
 /** What a screen hands scenario's lent Talk-to-it panel. */
@@ -168,7 +223,7 @@ export type UiEditModelProviderFormProps = {
   organizationId?: string | undefined;
   projectId?: string | undefined;
   /** What "the credential is saved" means to a surface that is not the settings drawer. */
-  onSaved?: () => void;
+  onSaved?: (saved: { chatModel?: string }) => void;
   /** Onboarding's presentation: Connect wording, model pills, no settings chrome. */
   guided?: boolean;
 };
@@ -261,6 +316,24 @@ export type UiHoverableBigTextProps = {
   expandable?: boolean;
 };
 
+/** What a screen hands workflow's version badge; no version draws an empty badge. */
+export type UiVersionBoxProps = {
+  version?: { autoSaved?: boolean; version: string };
+  minWidth?: string;
+  backgroundColor?: string;
+};
+
+/** What the experiment workbench hands workflow's "Run via API" dialog. */
+export type UiRunExperimentViaApiDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  experimentSlug: string;
+  entryFields: WorkflowField[];
+  datasetColumns: string[];
+  datasetName?: string;
+  projectSlug?: string;
+};
+
 /** What a screen hands workflow's marker for a trace field the reader may not see. */
 export type UiRedactedFieldProps = {
   field: "input" | "output";
@@ -328,6 +401,73 @@ export type UiStudioPromptEditorProps = {
   availableSources: AvailableSource[];
   inputMappings: Record<string, FieldMapping>;
   onInputMappingsChange: (identifier: string, mapping: FieldMapping | undefined) => void;
+};
+
+/** What a screen hands analytics' filter sidebar; it reads the filters from the URL itself. */
+export type UiFilterSidebarProps = { defaultShowFilters?: boolean; hideTopics?: boolean };
+
+/** What a check form hands trace's mapping editor, which reads its own sample traces. */
+export type UiEvaluatorTracesMappingProps = {
+  targetFields: string[];
+  traceMapping?: MappingState;
+  setTraceMapping?: (mapping: MappingState) => void;
+};
+
+/** What an evaluator editor hands experiment's comparison evaluator form. */
+export type UiComparisonConfigFormProps = {
+  value: ComparisonEvaluatorConfig;
+  onChange: (next: ComparisonEvaluatorConfig) => void;
+  targets: TargetConfig[];
+  datasetColumns: { id: string; name: string }[];
+  datasetName?: string;
+};
+
+/** What an HTTP agent's properties panel hands agent's configuration editor. */
+export type UiHttpConfigEditorProps = {
+  url: string;
+  onUrlChange: (url: string) => void;
+  method: HttpMethod;
+  onMethodChange: (method: HttpMethod) => void;
+  bodyTemplate: string;
+  onBodyTemplateChange: (body: string) => void;
+  outputPath: string;
+  onOutputPathChange: (path: string) => void;
+  auth: HttpAuth | undefined;
+  onAuthChange: (auth: HttpAuth | undefined) => void;
+  headers: HttpHeader[];
+  onHeadersChange: (headers: HttpHeader[]) => void;
+  onTest: (templateVariables: Record<string, unknown>) => Promise<HttpTestResult>;
+  paddingX?: number | string;
+};
+
+/** One declared output of a prompt, code or agent node. */
+export type UiNodeOutput = { identifier: string; type: Field["type"]; json_schema?: object };
+
+/** What a node panel hands prompt's outputs editor. */
+export type UiOutputsSectionProps = {
+  outputs: UiNodeOutput[];
+  onChange: (outputs: UiNodeOutput[]) => void;
+  canAddRemove?: boolean;
+  readOnly?: boolean;
+  title?: string;
+  availableTypes?: Field["type"][];
+};
+
+/** What a studio node hands prompt's LLM config row; prompt resolves the model option itself. */
+export type UiLlmConfigFieldProps = {
+  llmConfig: LLMConfig;
+  onChange: (llmConfig: LLMConfig) => void;
+  requiresCustomKey: boolean;
+  showProviderKeyMessage?: boolean;
+  outputs?: UiNodeOutput[];
+  onOutputsChange?: (outputs: UiNodeOutput[]) => void;
+  showStructuredOutputs?: boolean;
+};
+
+/** What an evaluator's settings hand prompt's LLM parameter popover. */
+export type UiLlmConfigPopoverProps = {
+  values: LLMConfig;
+  onChange: (llmConfig: LLMConfig) => void;
 };
 
 /** What an empty state hands trace's "Setup via Agent" menu. */
@@ -408,21 +548,35 @@ export type UiDeclaredCapabilities = {
     readonly section?: "sign-in" | "provisioning";
   };
   conversationThread: UiDeclaredComponent<UiConversationThreadProps>;
+  customGraph: UiDeclaredComponent<UiCustomGraphProps>;
   datasetEditorTable: UiDeclaredComponent<UiDatasetEditorTableProps>;
   datasetRecordSync: UiDeclaredComponent<UiDatasetRecordSyncProps>;
   editModelProviderForm: UiDeclaredComponent<UiEditModelProviderFormProps>;
   heroAskField: UiDeclaredComponent<UiHeroAskFieldProps>;
   hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
+  inlineCommandPalette: UiDeclaredComponent<UiInlineCommandPaletteProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
+  comparisonConfigForm: UiDeclaredComponent<UiComparisonConfigFormProps>;
+  codingAgentPullRequestsTable: UiDeclaredComponent<UiCodingAgentPullRequestsTableProps>;
+  codingAgentSessionsTable: UiDeclaredComponent<UiCodingAgentSessionsTableProps>;
+  evaluatorTracesMapping: UiDeclaredComponent<UiEvaluatorTracesMappingProps>;
   evaluatorSettingsForm: UiDeclaredComponent<UiEvaluatorSettingsFormProps>;
+  filterSidebar: UiDeclaredComponent<UiFilterSidebarProps>;
+  httpConfigEditor: UiDeclaredComponent<UiHttpConfigEditorProps>;
+  llmConfigField: UiDeclaredComponent<UiLlmConfigFieldProps>;
+  llmConfigPopover: UiDeclaredComponent<UiLlmConfigPopoverProps>;
+  mediaPart: UiDeclaredComponent<MediaPartProps>;
   modelDisplay: UiDeclaredComponent<UiModelDisplayProps>;
   modelSelector: UiDeclaredComponent<UiModelSelectorProps>;
+  outputsSection: UiDeclaredComponent<UiOutputsSectionProps>;
   parameterLineField: UiDeclaredComponent<UiParameterLineFieldProps>;
+  projectDepartmentField: UiDeclaredComponent<UiProjectDepartmentFieldProps>;
   passkeys: UiDeclaredOperations<UiPasskeyCeremonies>;
   redactedField: UiDeclaredComponent<UiRedactedFieldProps>;
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
+  runExperimentViaApiDialog: UiDeclaredComponent<UiRunExperimentViaApiDialogProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;
   suggestBody: UiDeclaredComponent<UiSuggestBodyProps>;
@@ -433,6 +587,7 @@ export type UiDeclaredCapabilities = {
   traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;
   tracePreviewHoverCard: UiDeclaredComponent<UiTracePreviewHoverCardProps>;
   twoStepVerification: UiDeclaredOperations<UiTwoStepCeremonies>;
+  versionBox: UiDeclaredComponent<UiVersionBoxProps>;
 };
 
 export type UiDeclaredName = keyof UiDeclaredCapabilities;

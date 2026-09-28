@@ -35,6 +35,23 @@ export const traceWeb = defineWebModule("trace")
           .AnnotationQueueConversation,
       }),
     },
+    conversationThread: {
+      load: async () => ({
+        default: (await import("./ui/sections/conversation/conversation-thread.tsx"))
+          .ConversationThread,
+      }),
+    },
+    evaluatorTracesMapping: {
+      load: async () => ({
+        default: (await import("./ui/sections/evaluations/evaluator-traces-mapping.tsx"))
+          .EvaluatorTracesMapping,
+      }),
+    },
+    presenceMenuItem: {
+      load: async () => ({
+        default: (await import("./ui/sections/presence/presence-menu-item.tsx")).PresenceMenuItem,
+      }),
+    },
     renderInputOutput: {
       load: async () => ({
         default: (await import("./ui/sections/traces/render-input-output.tsx")).RenderInputOutput,

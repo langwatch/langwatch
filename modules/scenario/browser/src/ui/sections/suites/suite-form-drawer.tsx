@@ -30,10 +30,11 @@ import {
 } from "@langwatch/suite-browser-kit";
 import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { FormServerError } from "../../../behavior/errors.tsx";
 import { api, type SimulationSuite } from "../../../behavior/scenario-api.ts";
+import { useSuiteFormDraft } from "../../../behavior/suites/suite-form-draft.ts";
 import { useArchivedItemsResolution } from "../../../behavior/suites/use-archived-items-resolution.ts";
 import { useSuiteRunMutation } from "../../../behavior/suites/use-suite-run-mutation.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
@@ -45,7 +46,6 @@ import { SimulationModelSelect } from "../scenarios/simulation-model-select.tsx"
 export type SuiteFormDrawerProps = {
   onSaved?: (suite: SimulationSuite) => void;
   onRunRequested?: (suite: SimulationSuite) => void;
-  renderHttpEditor(props: { open: boolean; onClose(): void }): ReactNode;
 };
 
 /** Build the mutation payload from validated form data. */
@@ -70,7 +70,6 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, drawerOpen, openDrawer } = useDrawer();
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
-  const [agentHttpEditorOpen, setAgentHttpEditorOpen] = useState(false);
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const params = useDrawerParams();
 
@@ -79,8 +78,8 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
 
   // Get flow callbacks for onSaved / onRunRequested
   const callbacks = getFlowCallbacks("suiteEditor");
-  const onSaved = callbacks?.onSaved;
-  const onRunRequested = callbacks?.onRunRequested;
+  const onSaved = props.onSaved ?? callbacks?.onSaved;
+  const onRunRequested = props.onRunRequested ?? callbacks?.onRunRequested;
 
   // Fetch suite data when editing
   const { data: suite, isLoading: isSuiteLoading } = api.suites.getById.useQuery(
@@ -131,6 +130,12 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
 
   const { form } = suiteForm;
   const errors = form.formState.errors;
+
+  const { holdDraft } = useSuiteFormDraft({ form, isOpen, suiteId, suiteLoaded: !!suite });
+  const openHttpAgentEditor = () => {
+    holdDraft();
+    openDrawer("agentHttpEditor");
+  };
 
   const { handleSave, handleRunNow, isSaving } = useSuiteSave({
     projectId: project?.id,
@@ -254,7 +259,7 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
                     onClear={suiteForm.clearTargets}
                     searchQuery={suiteForm.targetSearch}
                     onSearchChange={suiteForm.setTargetSearch}
-                    onAddTarget={() => setAgentHttpEditorOpen(true)}
+                    onAddTarget={openHttpAgentEditor}
                     hasError={!!errors.selectedTargets}
                     archivedTargets={archivedTargetsWithNames}
                     onRemoveArchived={suiteForm.removeArchivedTarget}
@@ -377,11 +382,6 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
 
       {/* Child drawer: Scenario Editor -- managed via local state */}
       <ScenarioFormDrawer open={scenarioEditorOpen} onClose={() => setScenarioEditorOpen(false)} />
-
-      {props.renderHttpEditor({
-        open: agentHttpEditorOpen,
-        onClose: () => setAgentHttpEditorOpen(false),
-      })}
     </>
   );
 }

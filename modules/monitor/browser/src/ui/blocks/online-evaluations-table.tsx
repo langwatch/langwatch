@@ -7,7 +7,7 @@ import { Badge, Box, HStack, IconButton, Table, Text, VStack } from "@chakra-ui/
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
-import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import {
   LuChartNoAxesCombined,
   LuCopy,
@@ -67,7 +67,7 @@ export const OnlineEvaluationsTable = ({
     </Table.Header>
     <Table.Body>
       {rows.map((row) => {
-        const definition = getEvaluatorDefinitions(row.checkType);
+        const [definition] = findEvaluatorDefinitions(row.checkType);
         const href = analyticsHref(projectSlug, row.id);
 
         return (

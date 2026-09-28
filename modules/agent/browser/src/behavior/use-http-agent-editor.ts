@@ -8,7 +8,7 @@ import {
   type HttpMethod,
 } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
-import { hasScenarioInputMapping } from "@langwatch/scenario-contract";
+import { computeBestMatchMappings, hasScenarioInputMapping } from "@langwatch/scenario-contract";
 import { useEffect, useRef, useState } from "react";
 
 import type { AgentBrowser } from "../model/agent-client.ts";
@@ -22,6 +22,8 @@ export const HTTP_FIXED_VARIABLE_IDS = new Set(
   HTTP_FIXED_VARIABLES.map(({ identifier }) => identifier),
 );
 const EMPTY_MAPPINGS: Record<string, AgentInputBinding> = {};
+/** A new agent starts with its fixed variables matched to the scenario's fields, as main's did. */
+const BEST_MATCH_MAPPINGS = computeBestMatchMappings({ inputs: HTTP_FIXED_VARIABLES });
 
 interface HttpAgentDraft {
   name: string;
@@ -146,7 +148,7 @@ async function saveHttpAgent(
 
 export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
   const isUnavailable = Boolean(options.agentId) && !readHttpConfig(options.agent);
-  const defaults = options.defaultScenarioMappings ?? EMPTY_MAPPINGS;
+  const defaults = options.defaultScenarioMappings ?? BEST_MATCH_MAPPINGS;
   const inputMappings = options.inputMappings ?? EMPTY_MAPPINGS;
   const [draft, setDraft] = useState(() => initialDraft(void 0, defaults));
   const [dirty, setDirty] = useState(false);

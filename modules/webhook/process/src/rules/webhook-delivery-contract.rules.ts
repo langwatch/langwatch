@@ -12,7 +12,6 @@ import type { WebhookEndpointView } from "@langwatch/webhook-contract";
 import { z } from "zod";
 
 import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
-import type { PendingEnvelope } from "../services/webhook-batch-planner.service.ts";
 
 export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as const;
 export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE = "lw.gateway.spend.confirmed" as const;
@@ -191,20 +190,6 @@ export const INITIAL_WEBHOOK_DELIVERY_STATE: WebhookDeliveryState = {
   pendingOutcome: null,
 };
 
-/** A buffered envelope with its arrival instant, for the coalescing
- *  deadline and the lag (oldest-undelivered) metric. `salt` is set only
- *  on REPLAYED entries: the batch id hashes it in so a replay of
- *  already-delivered envelopes cannot collide with the historical
- *  batch's message key and silently no-op. */
-/**
- * The per-endpoint stream instance (processKey `endpoint:<id>`), committed
- * directly through the ProcessStore by the deliver and flush executors.
- * Holds the coalescing buffer; everything shipped lives in outbox messages.
- */
-export interface EndpointStreamState {
-  pending: PendingEnvelope[];
-}
-
 /** Every quantity added after the first deploy carries a default: this rides
  *  a durable outbox row, so a payload the previous build wrote is read back
  *  by this one, and a field without a default turns that row into a
@@ -272,22 +257,49 @@ export const webhookDeliveryStateSchema = z.object({
 export type WebhookDeliveryState = z.infer<typeof webhookDeliveryStateSchema>;
 export type DeliverPayload = z.infer<typeof deliverSchema>;
 
+const bufferedEnvelopeSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  created: z.string(),
+  schema_version: z.literal("1"),
+  data: z.record(z.string(), z.unknown()),
+});
+
 export const sendBatchSchema = z.object({
   organizationId: z.string(),
   endpointId: z.string(),
   /** Stable batch identity: the X-LangWatch-Delivery-Id across every retry. */
   batchId: z.string(),
-  envelopes: z.array(
+  envelopes: z.array(bufferedEnvelopeSchema),
+});
+export type SendBatchPayload = z.infer<typeof sendBatchSchema>;
+
+/**
+ * The per-endpoint stream instance (processKey `endpoint:<id>`): the coalescing buffer the
+ * deliver and flush executors commit directly. `salt` marks a replayed entry.
+ */
+export const endpointStreamStateSchema = z.object({
+  pending: z.array(
     z.object({
-      id: z.string(),
-      type: z.string(),
-      created: z.string(),
-      schema_version: z.literal("1"),
-      data: z.record(z.string(), z.unknown()),
+      envelope: bufferedEnvelopeSchema,
+      appendedAtMs: z.number(),
+      salt: z.string().optional(),
     }),
   ),
 });
-export type SendBatchPayload = z.infer<typeof sendBatchSchema>;
+export type EndpointStreamState = z.infer<typeof endpointStreamStateSchema>;
+
+/** The hourly retention claim (processKey `maintenance`): a compare-and-set row no handler folds. */
+const maintenanceClaimStateSchema = z.object({ lastRunMs: z.number() });
+export type MaintenanceClaimState = z.infer<typeof maintenanceClaimStateSchema>;
+
+/** One process name keeps three instance kinds: a request's delivery, an endpoint's stream, the claim. */
+export const webhookProcessStateSchema = z.union([
+  webhookDeliveryStateSchema,
+  endpointStreamStateSchema,
+  maintenanceClaimStateSchema,
+]);
+export type WebhookProcessState = z.infer<typeof webhookProcessStateSchema>;
 
 export const flushEndpointSchema = z.object({
   organizationId: z.string(),

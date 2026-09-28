@@ -204,10 +204,14 @@ export const authTrpcTransport = defineTrpcRouter(AuthApi, authTrpc)
   .procedure("sendMyAddressConfirmation")
   .withFacts(callerEmailFact)
   .noPermission({ reason: OWN_ADDRESS })
-  .handle(async ({ app, actor }, email) => {
-    await app.sendMyAddressConfirmation({ actorId: actor.id, email });
+  .handle(async ({ app, actor, input }, email) => {
+    const { identifierId } = await app.sendMyAddressConfirmation({
+      actorId: actor.id,
+      email,
+      codeChallenge: input.codeChallenge,
+    });
 
-    return { sent: true as const };
+    return { sent: true as const, identifierId };
   })
 
   /** Why a signed-out visitor is here: only an expired session of theirs names its address. */

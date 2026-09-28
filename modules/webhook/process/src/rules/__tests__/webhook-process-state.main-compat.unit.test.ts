@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { webhookDeliveryStateSchema } from "../webhook-delivery-contract.rules.ts";
+import {
+  webhookDeliveryStateSchema,
+  webhookProcessStateSchema,
+} from "../webhook-delivery-contract.rules.ts";
 
 describe("process state stored by the main release", () => {
   it("parses a webhook delivery state as main stored it", () => {
@@ -37,5 +40,24 @@ describe("process state stored by the main release", () => {
       },
       pendingOutcome: null,
     });
+  });
+
+  it("parses an endpoint stream state as main stored it", () => {
+    const stream = {
+      pending: [
+        {
+          envelope: {
+            id: "request-1:completed",
+            type: "gateway.request.completed",
+            created: "2026-09-27T12:00:00.000Z",
+            schema_version: "1",
+            data: { organization_id: "o" },
+          },
+          appendedAtMs: 1,
+        },
+      ],
+    };
+
+    expect(webhookProcessStateSchema.parse(stream)).toEqual(stream);
   });
 });

@@ -93,7 +93,7 @@ describe("platform health REST family", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(healthyReport);
-    expect(checkAll).toHaveBeenCalledWith({});
+    expect(checkAll).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) });
   });
 
   it.each(["/api/health/langy", "/api/health/scenarios"])(

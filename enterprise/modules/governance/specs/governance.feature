@@ -178,3 +178,10 @@ Feature: Enterprise governance package boundary
     When a CLI presents a bearer the access-token store does not know on /api/auth/cli/budget/status
     Then the family carries main's fourteen /api/auth/cli routes
     And the route answers 401 with main's unauthorized body
+
+  @unit
+  Scenario: A personal ingestion key minted by a CLI without device metadata is named for an unknown device
+    Given a CLI session that sent neither a device label nor a hostname
+    When it mints a personal ingestion key for copilot_app
+    Then the key is minted with the device label "unknown-device", as its login key carries
+    And its name reads "Ingestion key (copilot_app, unknown-device)"

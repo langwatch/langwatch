@@ -1,6 +1,10 @@
 import type { PlatformHealthCheckName } from "@langwatch/platform-health-contract";
 
-import { type SubsystemProbe, type SubsystemProbeResult } from "../app/platform-health.members.ts";
+import {
+  type SubsystemProbe,
+  type SubsystemProbeQuery,
+  type SubsystemProbeResult,
+} from "../app/platform-health.members.ts";
 import type {
   SubsystemProbeOutcome,
   SubsystemProbeReason,
@@ -44,7 +48,7 @@ export interface SubsystemProbeCredential {
  * workflow probe named no target reports `not_configured`: the platform is not
  * broken because nobody told the probe what to look at.
  */
-export class SubsystemProbeAdapter implements SubsystemProbe {
+export class SubsystemProbeRunService implements SubsystemProbe {
   readonly name: PlatformHealthCheckName;
   readonly #probes: SubsystemProbeRunner;
   readonly #credential: SubsystemProbeCredential;
@@ -63,20 +67,18 @@ export class SubsystemProbeAdapter implements SubsystemProbe {
     name: PlatformHealthCheckName;
     probes: SubsystemProbeRunner;
     credential: SubsystemProbeCredential;
-  }): SubsystemProbeAdapter {
-    return new SubsystemProbeAdapter(options);
+  }): SubsystemProbeRunService {
+    return new SubsystemProbeRunService(options);
   }
 
-  async run(
-    query: Readonly<{ triggerId?: string; workflowId?: string }>,
-  ): Promise<SubsystemProbeResult> {
+  async run(query: SubsystemProbeQuery): Promise<SubsystemProbeResult> {
     const authToken = this.#credential.authToken;
 
     // Resolved once and forwarded on every canary: a key that self-scopes to
     // one project cannot be re-resolved behind the public boundary.
     if (this.name === "collector" || this.name === "evaluations" || this.name === "processor") {
       const [projectId] = await this.#credential.findProjectIds();
-      const credential = { authToken, projectId: projectId ?? null };
+      const credential = { authToken, projectId: projectId ?? null, signal: query.signal };
       if (this.name === "collector") return read(await this.#probes.runCollector(credential));
       if (this.name === "evaluations") return read(await this.#probes.runEvaluations(credential));
       return read(await this.#probes.runProcessor(credential));
@@ -101,7 +103,12 @@ export class SubsystemProbeAdapter implements SubsystemProbe {
     return read(
       this.name === "triggers"
         ? await this.#probes.runTriggers({ projectId, triggerId: target })
-        : await this.#probes.runWorkflows({ projectId, workflowId: target, authToken }),
+        : await this.#probes.runWorkflows({
+            projectId,
+            workflowId: target,
+            authToken,
+            signal: query.signal,
+          }),
     );
   }
 }

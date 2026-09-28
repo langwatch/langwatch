@@ -9,6 +9,7 @@ import { ProjectMissingCredentialsError } from "@langwatch/api";
 import { createApiFixture } from "@langwatch/api-fixture";
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import {
+  bindRestMiddleware,
   canonicalErrorResponse,
   createRestRuntime,
   type IdempotentRunner,
@@ -16,6 +17,7 @@ import {
 import {
   type GatewayApi,
   GatewayCacheRuleNotFoundError,
+  type GatewayRequestCredential,
   GatewaySpendSourceUnavailableError,
   type GatewayVirtualKeySnakeDto,
   virtualKeyBudgetInputSchema,
@@ -24,7 +26,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { virtualKeyRow } from "../../app/__tests__/gateway-virtual-key.fixture.ts";
-import { gatewayPlatformRest } from "../gateway-platform.rest.ts";
+import { gatewayPlatformRest, gatewayRestCredential } from "../gateway-platform.rest.ts";
 
 const PROJECT_ID = "project_caller";
 const ORGANIZATION_ID = "organization_1";
@@ -73,6 +75,10 @@ const passthroughIdempotency: IdempotentRunner = async ({ handler }) => {
 function mount(overrides: Partial<GatewayApi> = {}, refuse?: () => never) {
   const app = createApiFixture<GatewayApi>({
     organizationIdForProject: async () => ORGANIZATION_ID,
+    actorForCredential: ({ projectId }) => ({
+      actor: { kind: "legacyProjectKey" },
+      actorUserId: `svc_${projectId}`,
+    }),
     ...overrides,
   });
   const runtime = createRestRuntime({
@@ -91,6 +97,11 @@ function mount(overrides: Partial<GatewayApi> = {}, refuse?: () => never) {
   const hono = runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
+    facts: [
+      bindRestMiddleware(gatewayRestCredential, (): GatewayRequestCredential => ({
+        kind: "legacyProjectKey",
+      })),
+    ],
   });
   return async (
     method: string,

@@ -17,7 +17,7 @@ export const workflowWeb = defineWebModule("workflow")
       load: () => import("./ui/sections/workflows/workflow-chat-screen.tsx"),
     },
   })
-  /** The expandable text and the redaction marker, lent to evaluator (§3.4 rule 7). */
+  /** Lent under §3.4 rule 7: to evaluator, and run-via-api plus the version badge to experiment. */
   .withCapabilities({
     hoverableBigText: {
       load: async () => ({
@@ -27,6 +27,17 @@ export const workflowWeb = defineWebModule("workflow")
     redactedField: {
       load: async () => ({
         default: (await import("./ui/sections/redacted-field.tsx")).RedactedField,
+      }),
+    },
+    runExperimentViaApiDialog: {
+      load: async () => ({
+        default: (await import("./ui/sections/run-via-api/run-experiment-via-api-dialog.tsx"))
+          .RunExperimentViaApiDialog,
+      }),
+    },
+    versionBox: {
+      load: async () => ({
+        default: (await import("./ui/sections/optimization_studio/history.tsx")).VersionBox,
       }),
     },
   });

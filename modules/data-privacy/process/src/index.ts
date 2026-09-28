@@ -1,6 +1,5 @@
 export {
   dataPrivacyServer,
-  createDataPrivacyDirectoryReader,
   createOtlpSpanContentDropService,
   createOtlpSpanPiiRedactionService,
 } from "./data-privacy.server.ts";
@@ -12,7 +11,6 @@ export { dataPrivacyTrpcTransport } from "./transport/data-privacy.trpc.ts";
  */
 export type {
   DataPrivacyDirectoryReader,
-  DataPrivacyInfrastructure,
   DataPrivacyOrganizationDirectory,
   DataPrivacyProjectLineage,
 } from "./app/data-privacy.app.ts";

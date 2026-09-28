@@ -10,6 +10,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { EmailDelivery } from "@langwatch/mail";
+import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -53,6 +54,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
+      notifications: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>(),
       authz: createApiFixture<AuthzApi>({}),
       auditLog: createApiFixture<AuditLogApi>({

@@ -1,5 +1,4 @@
 import { RawHttpHost, RawSocketHost, WebSocketHost } from "@langwatch/api";
-import type { TransportSelection } from "@langwatch/api/hosting";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
 import {
   bootInstalledProcess,
@@ -15,7 +14,6 @@ import {
   type ProcessMemberSource,
 } from "@langwatch/process-stores";
 import { storesOwner, type StoresConfig } from "@langwatch/process-stores/config";
-import type { PipelineParticipation } from "@langwatch/process-stores/pipelines";
 import type { SecretsResolver } from "@langwatch/secrets";
 import { z } from "zod";
 
@@ -25,8 +23,7 @@ import {
   TasksProcessComposition,
   WorkerProcessComposition,
   type ProcessBoot,
-  type ProcessMemberFactory,
-  type ProcessModule,
+  type ProcessBootInput,
   type BootedApplication,
 } from "./process-composition.ts";
 import {
@@ -110,13 +107,13 @@ export class ProcessServer implements ProcessBoot {
     return new WorkerProcessComposition(this);
   }
 
-  async boot(
-    role: "api" | "worker" | "tasks",
-    modules: readonly ProcessModule[],
-    pipelines: PipelineParticipation,
-    suppliedMembers: Readonly<Record<string, ProcessMemberFactory>> = {},
-    transports?: TransportSelection,
-  ): Promise<BootedApplication> {
+  async boot({
+    role,
+    modules,
+    pipelines,
+    members: suppliedMembers,
+    transports,
+  }: ProcessBootInput): Promise<BootedApplication> {
     if (!this.config.stores)
       throw new Error("The stores config owner must be installed before boot.");
     const config = this.config.stores as StoresConfig;
@@ -197,6 +194,8 @@ export class ProcessServer implements ProcessBoot {
               nlpServiceUrl: this.settings.nlpServiceUrl,
               nlpCodeBlockTimeoutSeconds: this.settings.nlpCodeBlockTimeoutSeconds,
               adminEmails: this.settings.adminEmails ?? [],
+              // The raw-socket door's port, which a module tunnelling to that door reads.
+              rawSocketPort: this.settings.rawSocketPort,
               // Role facts: the composition's word, never a deployment's.
               processName: this.server.name,
               ...Object.fromEntries(

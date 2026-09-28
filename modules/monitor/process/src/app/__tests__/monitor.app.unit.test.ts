@@ -66,6 +66,17 @@ async function patchWith(changes: MonitorPatchInput["changes"]) {
 }
 
 describe("MonitorApp", () => {
+  describe("when the monitors running one evaluator are asked for", () => {
+    it("answers them by id and name, and none that run another evaluator", async () => {
+      const { app, repository } = harness();
+      repository.seed({ ...existing, id: "monitor-2", name: "Tone", evaluatorId: "evaluator-2" });
+
+      await expect(
+        app.findByEvaluator({ projectId: "project-1", evaluatorId: "evaluator-1" }),
+      ).resolves.toEqual([{ id: "monitor-1", name: "Toxicity Monitor" }]);
+    });
+  });
+
   describe("when a partial update mentions one field", () => {
     it("keeps every field the caller did not mention", async () => {
       const updated = await patchWith({ name: "Renamed" });

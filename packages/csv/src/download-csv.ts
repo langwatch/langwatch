@@ -29,8 +29,3 @@ export function downloadCsv({
   link.remove();
   window.URL.revokeObjectURL(url);
 }
-
-/** `<name> - YYYY-MM-DD.csv`, the file name every export here uses. */
-export function csvFileName(name: string, today = new Date()): string {
-  return `${name} - ${today.toISOString().split("T")[0]}.csv`;
-}

@@ -103,7 +103,7 @@ export class ApiKeyGrantPolicyService {
     for (const permission of input.permissions ?? []) {
       if (!apiKeyPermissionFormatSchema.validate(permission)) {
         throw new ApiKeyScopeViolationError(
-          `Invalid permission format "${permission}" — must match resource:action`,
+          `Invalid permission format "${String(permission)}" — must match resource:action`,
         );
       }
     }

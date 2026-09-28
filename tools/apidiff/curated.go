@@ -43,6 +43,11 @@ var langyWorkspace = map[string]any{"root": "/tmp/apidiff-workspace", "name": "a
 // needs it (evaluator before monitor, scenario and agent before suite, suite
 // before run plan).
 var curatedCreates = []curatedCreate{
+	// The CLI's governance lists read what these create: a template, a
+	// personal ingestion key, then (seedGovernance) a source and a budget.
+	{key: "POST /api/governance/ingestion-templates"},
+	{key: "POST /api/auth/cli/governance/ingestion-key", after: (*probeEngine).seedGovernance,
+		body: map[string]any{"source_type": "copilot_app", "device_label": "apidiff"}},
 	{key: "POST /api/evaluators", body: map[string]any{
 		"name":   "apidiff evaluator",
 		"config": map[string]any{"evaluatorType": "langevals/exact_match", "settings": map[string]any{}},
@@ -116,7 +121,7 @@ var curatedCreates = []curatedCreate{
 		"name": "apidiff instant eval", "sql": "SELECT TraceId, eval(TraceName, 'The trace is named apidiff') AS named FROM traces",
 		"start": "{{window:from}}", "end": "{{window:to}}", "limit": 1,
 		"questions": []any{map[string]any{"id": "q1", "kind": "boolean", "instructions": "Is the answer polite?"}},
-	}},
+	}, after: (*probeEngine).awaitInstantEval},
 	// Langy, in the order a connected local session lives: a turn, the
 	// request to share a folder, its approval (a session key), the folder's
 	// registration (an instance token), a local call and a question the
@@ -124,7 +129,7 @@ var curatedCreates = []curatedCreate{
 	{key: "POST /api/langy/conversations", body: map[string]any{
 		"messages":       []any{map[string]any{"role": "user", "content": "apidiff question"}},
 		"idempotencyKey": "apidiff-turn-1",
-	}},
+	}, after: (*probeEngine).awaitLangyConversation},
 	{key: "POST /api/langy/local/requests", captureUnder: "/api/langy/control/requests", bucket: "requestid", idField: "request.id",
 		body: map[string]any{"conversationId": "{{conversationid}}"}},
 	{key: "GET /api/langy/control/requests"},

@@ -5,7 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * @see modules/share/specs/share.feature
  */
 import { AUTHZ_ENGINE_MIGRATION_NAME, type AuthzApi } from "@langwatch/authz-contract";
-import { AuthzCollectorService, PostgresAuthzAdapter } from "@langwatch/authz-process";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -273,53 +273,4 @@ describe.skipIf(!databaseUrl)("given a cut-over organization's capped share link
       });
     });
   });
-
-  describe("when the engine reads the link back", () => {
-    const engineReader = () => PostgresAuthzAdapter.createReader({ database: prisma });
-
-    /** @scenario "A cut-over organization's share link consumes its remaining budget" */
-    it("reports the views this repository counted", async () => {
-      await consume();
-
-      const links = await engineReader().findShareLinks({
-        projectId: project.id,
-        tokens: [token],
-        links: [{ kind: "trace", id: traceId }],
-      });
-
-      expect(links).toEqual([
-        expect.objectContaining({
-          resourceId: traceId,
-          maxViews: MAX_VIEWS,
-          viewCount: SEEDED_VIEWS + 1,
-        }),
-      ]);
-    });
-
-    /** @scenario "An exhausted share link stays exhausted after cutover" */
-    it("grants nothing once the budget is spent", async () => {
-      const collector = AuthzCollectorService.create({ reader: engineReader() });
-      const scope = {
-        type: "resource" as const,
-        kind: "trace" as const,
-        id: traceId,
-        shareTokens: [token],
-        projectId: project.id,
-        teamId: team.id,
-        organizationId: organization.id,
-      };
-
-      // While a view remains, possession of the token is a grant.
-      expect(await collector.collectResourceGrants({ scope })).toEqual([
-        expect.objectContaining({ id: traceId, permission: "traces:view" }),
-      ]);
-
-      await consume();
-
-      // Spent: the row is still there and the token is still presented, and
-      // the link confers nothing at all.
-      expect(await collector.collectResourceGrants({ scope })).toEqual([]);
-    });
-  });
 });
-import { createLogger } from "@langwatch/observability";

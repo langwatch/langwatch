@@ -128,7 +128,10 @@ export type ModelProviderTextGenerationInput = Readonly<{
   featureKey: string;
   system: string;
   messages: readonly ModelProviderTextMessage[];
+  /** Runs this model instead of the feature's cascade, as a caller's fallback. */
+  model?: string;
   maxOutputTokens?: number;
+  maxRetries?: number;
   temperature?: number;
   reasoningEffort?: "low" | "medium" | "high";
 }>;

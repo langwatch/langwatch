@@ -4,9 +4,11 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import {
   OnboardingApi,
   type OnboardingApi as OnboardingApiContract,
+  type GuidedOnboardingForProject,
   type GuidedOnboardingState,
   type GuidedOnboardingStateWithInstance,
   type GuidedOnboardingStateWithVariant,
+  type GuidedOnboardingTrackedEvent,
   type OnboardingCallerInput,
   type OnboardingInitializeOrganizationInput,
   type OnboardingSignUpCaller,
@@ -14,6 +16,7 @@ import {
 } from "@langwatch/onboarding-contract";
 import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 
 import { HttpPostHogEventsChannel } from "../channels/http/http.posthog-events.channel.ts";
 import { withInstanceFacts } from "../rules/guided-onboarding-instance.rules.ts";
@@ -29,6 +32,8 @@ export class OnboardingApp implements OnboardingApiContract {
     ops: OpsApi,
     /** Where an app on this instance points; the gateway owns the address. */
     gateway: GatewayApi,
+    /** The project-to-organization hop a project-scoped read resolves through. */
+    projects: ProjectApi,
   };
 
   readonly #guided: GuidedOnboardingService;
@@ -38,17 +43,20 @@ export class OnboardingApp implements OnboardingApiContract {
     OrganizationApi,
     "initializeOrganization" | "recordIntegrationMethod"
   >;
+  readonly #projects: Pick<ProjectApi, "getOrganizationId">;
 
   private constructor(parts: {
     guided: GuidedOnboardingService;
     permissions: AuthzApi;
     gateway: Pick<GatewayApi, "getDeploymentAddresses">;
     organizations: Pick<OrganizationApi, "initializeOrganization" | "recordIntegrationMethod">;
+    projects: Pick<ProjectApi, "getOrganizationId">;
   }) {
     this.#guided = parts.guided;
     this.#permissions = parts.permissions;
     this.#gateway = parts.gateway;
     this.#organizations = parts.organizations;
+    this.#projects = parts.projects;
   }
 
   static create(setup: OnboardingSetup): OnboardingApp {
@@ -67,6 +75,7 @@ export class OnboardingApp implements OnboardingApiContract {
       permissions: setup.dependencies.permissions,
       gateway: setup.dependencies.gateway,
       organizations: setup.dependencies.organizations,
+      projects: setup.dependencies.projects,
     });
   }
 
@@ -168,6 +177,23 @@ export class OnboardingApp implements OnboardingApiContract {
 
   recordIntegrationMethod(input: { userId: string; selection: string }): void {
     this.#organizations.recordIntegrationMethod(input);
+  }
+
+  async getGuidedStateByProject(input: { projectId: string }): Promise<GuidedOnboardingForProject> {
+    const organizationId = await this.#projects.getOrganizationId(input.projectId);
+    const { variant, ...state } = await this.#guided.getStateWithVariant({ organizationId });
+
+    return { organizationId, variant, state };
+  }
+
+  trackGuidedOnboardingEvent(input: GuidedOnboardingTrackedEvent): void {
+    this.#guided.trackEvent({
+      userId: input.userId,
+      event: input.event,
+      projectId: input.projectId,
+      properties: input.properties,
+      uuid: input.uuid,
+    });
   }
 
   private actorOf(input: OnboardingCallerInput): { organizationId: string; userId: string } {

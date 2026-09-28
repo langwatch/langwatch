@@ -24,12 +24,14 @@ describe("given a browser that installs coding-agent", () => {
     });
   });
 
-  describe("when a surface the declaration publishes is asked for", () => {
-    it.each([["surfaces/activity"]] as const)("resolves %s", async (surface) => {
-      const publication = codingAgentWeb.installation.publications[surface];
-      const loaded = await publication?.load();
+  describe("when user's workspace reads a lent activity table", () => {
+    it.each([["codingAgentPullRequestsTable"], ["codingAgentSessionsTable"]] as const)(
+      "loads %s",
+      async (capability) => {
+        const loaded = await codingAgentWeb.installation.capabilities[capability].load();
 
-      expect(loaded).toBeDefined();
-    });
+        expect(loaded.default).toBeTypeOf("function");
+      },
+    );
   });
 });

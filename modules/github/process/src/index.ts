@@ -6,7 +6,6 @@ export type {
   GithubBranchMaintenanceComposition,
   GithubBranchDemandComposition,
 } from "./app/github.app.ts";
-export { EventingGithubMaintenanceAdapter } from "./services/github-maintenance.service.ts";
 export type { GithubBranchMaintenance } from "./app/github.members.ts";
 export type { GithubBranchDemand } from "./app/github.members.ts";
 export type { GithubProjectActivity } from "./app/github.members.ts";

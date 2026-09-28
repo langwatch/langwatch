@@ -189,7 +189,7 @@ describe("LedgerShareRepository", () => {
         });
         // The id is minted before the write - it IS the grant id - and the
         // row read back afterwards is the one that id names.
-        expect(emission?.grantId).toEqual(expect.any(String));
+        expect(emission?.grantId).toMatch(/^share_[a-zA-Z0-9]+$/);
         expect(head.findById).toHaveBeenCalledWith({
           id: emission?.grantId,
           projectId: PROJECT_ID,

@@ -1,10 +1,10 @@
 import "@langwatch/time/polyfill";
-import { langWatchQlSupply } from "@langwatch/analytics-process";
-import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-process";
 import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process-server";
 import { scenarioChildBundle } from "@langwatch/scenario-child";
+
+import { processEnvironment } from "./config.ts";
 
 /**
  * The local launcher hosts both halves in one Node process: only the owner may
@@ -18,6 +18,7 @@ export type WorkerStartOptions = Readonly<{
 /** Boots the worker and starts consuming. The server it answers with drains it. */
 export async function startWorker(options: WorkerStartOptions = {}): Promise<ProcessServer> {
   const preamble = Server.create("langwatch-worker")
+    .withEnvironment(processEnvironment)
     .withConfig(processConfig(processModules, "worker"))
     .withSecrets((config, secrets) =>
       secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
@@ -34,16 +35,6 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
   const app = await server
     .composeProcess("worker")
     .withModules(processModules)
-    .withMember("dataPrivacy", (members) => ({
-      directory: createDataPrivacyDirectoryReader(members.read("prisma")),
-    }))
-    .withMember("langwatchQl", (members) =>
-      langWatchQlSupply({
-        admin: members.read("clickhouseAdmin"),
-        postgres: members.read("databaseTarget"),
-        database: () => members.read("prisma"),
-      }),
-    )
     // Dataset's two optional seams. This process composes neither, so the
     // module's own absent-behaviour applies: normalize runs in-process.
     .withMember("queue", () => void 0)

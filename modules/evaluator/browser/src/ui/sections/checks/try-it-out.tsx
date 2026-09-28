@@ -18,7 +18,6 @@ import {
   useFilterParams,
   FilterToggle,
 } from "@langwatch/analytics-browser-kit";
-import { FilterSidebar } from "@langwatch/analytics-browser/surfaces/filter-sidebar";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
@@ -31,8 +30,9 @@ import type { Money } from "@langwatch/design-system/type-utils";
 import { evaluationStatusColor } from "@langwatch/evaluator-browser-kit";
 import {
   evaluatorSettingsSchemaFor,
+  type EvaluatorDefinition,
   type SingleEvaluationResult,
-  getEvaluatorDefinitions,
+  findEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
 import type { ElasticSearchTrace } from "@langwatch/trace-contract";
 import numeral from "numeral";
@@ -41,6 +41,7 @@ import { Pause, Play, RefreshCw, Search } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 
+import { FilterSidebar } from "../../../behavior/lent-peers.tsx";
 import { HoverableBigText, RedactedField } from "../../../behavior/lent-workflow.tsx";
 import { readableDate } from "../../../model/display-formatters.ts";
 import {
@@ -100,7 +101,7 @@ export function TryItOut({
   const settings = watch("settings");
   const mappings = watch("mappings");
 
-  const evaluatorDefinition = evaluatorType ? getEvaluatorDefinitions(evaluatorType) : undefined;
+  const [evaluatorDefinition] = evaluatorType ? findEvaluatorDefinitions(evaluatorType) : [];
 
   const [query, setQuery] = useDebounceValue("", 300);
   const {
@@ -403,7 +404,7 @@ function resultCellsFor({
   runningResult: RunningResult | undefined;
   color: string | undefined;
   evaluatorType: string | undefined;
-  evaluatorDefinition: ReturnType<typeof getEvaluatorDefinitions>;
+  evaluatorDefinition: EvaluatorDefinition | undefined;
   hasAnyLabels: boolean;
 }) {
   if (!runningResult) return { scoreCells: null, details: null, cost: null };
@@ -458,7 +459,7 @@ function scoreCellFor({
   runningResult: RunningResult;
   color: string | undefined;
   isCustom: boolean;
-  evaluatorDefinition: ReturnType<typeof getEvaluatorDefinitions>;
+  evaluatorDefinition: EvaluatorDefinition | undefined;
 }): React.ReactNode {
   if (runningResult.status === "loading") {
     return (
@@ -483,7 +484,7 @@ function scoreTextFor({
 }: {
   runningResult: SingleEvaluationResult;
   isCustom: boolean;
-  evaluatorDefinition: ReturnType<typeof getEvaluatorDefinitions>;
+  evaluatorDefinition: EvaluatorDefinition | undefined;
 }): string | undefined {
   if (runningResult.status === "skipped") return "Skipped";
   if (runningResult.status === "error") return "Error";
@@ -519,7 +520,7 @@ function parseRunSettings({
 }: {
   evaluatorType: string;
   settings: Record<string, unknown>;
-  evaluatorDefinition: ReturnType<typeof getEvaluatorDefinitions>;
+  evaluatorDefinition: EvaluatorDefinition | undefined;
 }): { ok: true; settings: Record<string, unknown> } | { ok: false } {
   const settingsLookup = evaluatorSettingsSchemaFor(evaluatorType);
   try {
@@ -678,7 +679,7 @@ function SampleTableHeader({
   hasAnyLabels,
 }: {
   evaluatorType: string | undefined;
-  evaluatorDefinition: ReturnType<typeof getEvaluatorDefinitions>;
+  evaluatorDefinition: EvaluatorDefinition | undefined;
   hasAnyLabels: boolean;
 }) {
   const isCustom = !!evaluatorType?.startsWith("custom/");

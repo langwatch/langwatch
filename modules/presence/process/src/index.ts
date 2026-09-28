@@ -14,7 +14,7 @@ export {
  * The tenant broadcast fabric the presence emitter and the export relay both subscribe on.
  */
 export {
-  RedisBroadcastRepository as BroadcastAdapter,
+  RedisBroadcastRepository,
   type BroadcastEventType,
 } from "./repositories/redis/redis.broadcast.repository.ts";
 export {

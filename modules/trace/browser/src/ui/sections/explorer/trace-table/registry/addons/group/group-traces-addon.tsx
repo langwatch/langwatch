@@ -1,4 +1,5 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
+import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
 import {
   formatCost,
   formatDuration,
@@ -8,7 +9,6 @@ import {
 import type React from "react";
 
 import { formatPreview } from "../../../../../../../behavior/preview-formatter.ts";
-import { useDrawer, useDrawerParams } from "../../../../../../../behavior/use-drawer.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
 import type { DensityTokens } from "../../../../hooks/use-density-tokens.ts";

@@ -1783,7 +1783,7 @@ describe("checkEvaluatorRequiredFields()", () => {
       // "custom/expected_output_check" is not a real evaluator, so it won't have
       // requiredFields including "expected_output". Use a known one if available,
       // or test the logic directly. For robustness, test with a mock approach:
-      // Since getEvaluatorDefinitions returns undefined for unknown types,
+      // Since findEvaluatorDefinitions finds nothing for unknown types,
       // the function returns true (no requirements to fail).
       expect(result).toBe(true);
     });

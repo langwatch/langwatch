@@ -78,7 +78,7 @@ export class ProjectKeyedProbeService {
     if (request.check === "scenarios")
       return this.#runScenarioCanary({ projectId, requested: request.runPlanId });
 
-    return answerOf(await this.#run(request, { authToken, projectId }));
+    return answerOf(await this.#run(request, { authToken, projectId, signal: request.signal }));
   }
 
   async #runScenarioCanary({
@@ -100,9 +100,9 @@ export class ProjectKeyedProbeService {
 
   #run(
     request: Exclude<ProjectKeyedProbeRequest, { check: "scenarios" }>,
-    credential: Readonly<{ authToken: string; projectId: string }>,
+    credential: Readonly<{ authToken: string; projectId: string; signal: AbortSignal | undefined }>,
   ): Promise<SubsystemProbeOutcome> {
-    const { authToken, projectId } = credential;
+    const { authToken, projectId, signal } = credential;
     switch (request.check) {
       case "collector":
         return this.#probes.runCollector(credential);
@@ -117,6 +117,7 @@ export class ProjectKeyedProbeService {
           projectId,
           workflowId: request.workflowId ?? "",
           authToken,
+          signal,
         });
     }
   }

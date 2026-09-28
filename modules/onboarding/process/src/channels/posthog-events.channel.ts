@@ -7,7 +7,9 @@
 export interface PostHogEventInput {
   readonly userId: string;
   readonly event: string;
-  readonly properties?: Record<string, unknown>;
+  readonly properties?: Readonly<Record<string, unknown>>;
+  /** PostHog keeps one event per uuid, so a redelivered source event is counted once. */
+  readonly uuid?: string;
 }
 
 export interface PostHogEventsChannel {

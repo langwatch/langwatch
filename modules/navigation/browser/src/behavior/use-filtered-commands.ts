@@ -26,6 +26,43 @@ export interface FilteredCommands {
   page: Command[];
 }
 
+const NAVIGATION_KEYWORDS = ["navigation", "navigate", "go to", "jump to", "pages"];
+const ACTION_KEYWORDS = ["new", "create", "add new", "actions"];
+const SUPPORT_KEYWORDS = ["support", "help", "docs", "documentation", "chat"];
+const THEME_KEYWORDS = ["theme", "dark", "light", "mode", "appearance"];
+
+/**
+ * One category's commands for a query: all of them when the query names the
+ * category itself (a close match), otherwise the keyword-filtered ones.
+ */
+function filterCategory({
+  commands,
+  query,
+  keywords,
+  minMatchLength,
+}: {
+  commands: Command[];
+  query: string;
+  keywords: string[];
+  minMatchLength: number;
+}): Command[] {
+  if (!query.trim()) return [];
+  const lowerQuery = query.toLowerCase().trim();
+  const isSearchingCategory = keywords.some(
+    (kw) => kw.startsWith(lowerQuery) && lowerQuery.length >= minMatchLength,
+  );
+  return isSearchingCategory ? commands : filterCommands(commands, query);
+}
+
+/** "Open Chat" only on SaaS; the plans command links where plans are managed. */
+function availableSupportCommands(isSaas: boolean | undefined): Command[] {
+  return supportCommands
+    .filter((cmd) => isSaas || cmd.id !== "action-open-chat")
+    .map((cmd) =>
+      cmd.id === "support-plans" ? { ...cmd, path: planManagementHref(isSaas ?? false) } : cmd,
+    );
+}
+
 /**
  * Hook for filtering commands based on search query.
  * Handles category-based and keyword-based filtering.
@@ -53,23 +90,16 @@ export function useFilteredCommands({
     });
   }, [hasOpsAccess, commandFeatureFlags]);
 
-  const filteredNavigation = useMemo(() => {
-    if (!query.trim()) return [];
-
-    const lowerQuery = query.toLowerCase().trim();
-
-    // Check if searching for navigation category (must be a close match)
-    const navKeywords = ["navigation", "navigate", "go to", "jump to", "pages"];
-    const isSearchingCategory = navKeywords.some(
-      (kw) => kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_CATEGORY_MATCH_LENGTH,
-    );
-
-    if (isSearchingCategory) {
-      return availableNavCommands;
-    }
-
-    return filterCommands(availableNavCommands, query);
-  }, [query, availableNavCommands]);
+  const filteredNavigation = useMemo(
+    () =>
+      filterCategory({
+        commands: availableNavCommands,
+        query,
+        keywords: NAVIGATION_KEYWORDS,
+        minMatchLength: MIN_CATEGORY_MATCH_LENGTH,
+      }),
+    [query, availableNavCommands],
+  );
 
   const availableActionCommands = useMemo(() => {
     return hasOpsAccess
@@ -77,72 +107,38 @@ export function useFilteredCommands({
       : actionCommands.filter((cmd) => cmd.id !== "action-send-trace");
   }, [hasOpsAccess]);
 
-  const filteredActions = useMemo(() => {
-    if (!query.trim()) return [];
+  const filteredActions = useMemo(
+    () =>
+      filterCategory({
+        commands: availableActionCommands,
+        query,
+        keywords: ACTION_KEYWORDS,
+        minMatchLength: MIN_SEARCH_QUERY_LENGTH,
+      }),
+    [query, availableActionCommands],
+  );
 
-    const lowerQuery = query.toLowerCase().trim();
+  const filteredSupport = useMemo(
+    () =>
+      filterCategory({
+        commands: availableSupportCommands(isSaas),
+        query,
+        keywords: SUPPORT_KEYWORDS,
+        minMatchLength: MIN_SEARCH_QUERY_LENGTH,
+      }),
+    [query, isSaas],
+  );
 
-    // Check if searching for actions category (must be a close match)
-    const actionKeywords = ["new", "create", "add new", "actions"];
-    const isSearchingCategory = actionKeywords.some(
-      (kw) => kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
-    );
-
-    if (isSearchingCategory) {
-      return availableActionCommands;
-    }
-
-    return filterCommands(availableActionCommands, query);
-  }, [query, availableActionCommands]);
-
-  // Filter support commands based on query (filter out "Open Chat" if not SAAS)
-  const filteredSupport = useMemo(() => {
-    if (!query.trim()) return [];
-
-    const lowerQuery = query.toLowerCase().trim();
-
-    // Check if searching for support/help category
-    const supportKeywords = ["support", "help", "docs", "documentation", "chat"];
-    const isSearchingCategory = supportKeywords.some(
-      (kw) => kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
-    );
-
-    // Filter out "Open Chat" if not SAAS and set dynamic paths
-    const availableCommands = supportCommands
-      .filter((cmd) => isSaas || cmd.id !== "action-open-chat")
-      .map((cmd) => {
-        // Set dynamic path for plans command
-        if (cmd.id === "support-plans") {
-          return { ...cmd, path: planManagementHref(isSaas ?? false) };
-        }
-        return cmd;
-      });
-
-    if (isSearchingCategory) {
-      return availableCommands;
-    }
-
-    return filterCommands(availableCommands, query);
-  }, [query, isSaas]);
-
-  // Filter theme commands based on query
-  const filteredTheme = useMemo(() => {
-    if (!query.trim()) return [];
-
-    const lowerQuery = query.toLowerCase().trim();
-
-    // Check if searching for theme category
-    const themeKeywords = ["theme", "dark", "light", "mode", "appearance"];
-    const isSearchingCategory = themeKeywords.some(
-      (kw) => kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
-    );
-
-    if (isSearchingCategory) {
-      return themeCommands;
-    }
-
-    return filterCommands(themeCommands, query);
-  }, [query]);
+  const filteredTheme = useMemo(
+    () =>
+      filterCategory({
+        commands: themeCommands,
+        query,
+        keywords: THEME_KEYWORDS,
+        minMatchLength: MIN_SEARCH_QUERY_LENGTH,
+      }),
+    [query],
+  );
 
   // Filter page-specific commands based on current route. The host answers
   // with the ADDRESS on screen; `getPageCommands` normalises the first segment

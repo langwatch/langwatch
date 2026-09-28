@@ -10,6 +10,7 @@ import { z } from "zod";
 import {
   addressConfirmationSchema,
   frontDoorAskedSchema,
+  frontDoorOwnAddressSentSchema,
   frontDoorSentSchema,
   inviteLandingSchema,
   priorSessionSchema,
@@ -62,7 +63,7 @@ export const authTrpc = defineTrpcContract("auth")
 
   .mutation("sendMyAddressConfirmation")
   .withInput(frontDoorOwnAddressInputSchema)
-  .withOutput(frontDoorSentSchema)
+  .withOutput(frontDoorOwnAddressSentSchema)
 
   /** Reads only the cookie the caller presented, so it can describe no one else's session. */
   .query("priorSession")

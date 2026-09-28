@@ -17,15 +17,39 @@ const usage = `visualdiff — render every route and every flow on two refs and 
                  [-viewport 1440x900] [-config visualdiff.yaml] [-root DIR]
                  [-base-port N] [-run-dir DIR] [-boot-timeout DUR]
                  [-dry-run] [-keep] [-agent] [-no-haven]
+                 [-editions enterprise,free] [-no-baseline] [-refresh-baseline]
+                 [-no-fail-fast] [-resume RUNID]
 
-  visualdiff recapture -run RUNID -routes a,b,c [-root DIR]
+  visualdiff recapture -run RUNID [-routes a,b] [-flows x,y] [-edition E] [-root DIR]
+  visualdiff coverage [-base REF] [-candidate REF] [-config FILE] [-root DIR]
+  visualdiff gc [-kept] [-no-haven] [-root DIR]
 
 Each ref boots as a haven stack under its own run-scoped slug wherever haven
 is installed, so a run never reaches the datastores your own stack uses.
 -no-haven boots the old way instead, on -base-port and its ten-above stride,
 sharing your own Postgres, ClickHouse and Redis. Every run streams one line
 per screen to <run-dir>/findings.jsonl as it decides each one, and a final
-run-complete summary line.
+run-complete summary line per edition, and <run-dir>/summary.txt (printed on
+stdout) says what to look at first: counts per class and edition, coverage,
+and the worst findings one line each with their text evidence. stderr is
+kept in <run-dir>/run.log.
+
+Findings fail the run: a missing capture on either side, a regression, a
+screen broken on both refs, a blank or not-found page, a different final
+path, a new failed /api/ or tRPC request, a control (button, link, heading,
+tab, form field) one side lacks, and every route either ref declares that
+visualdiff.yaml neither renders nor excludes. copy, changed,
+intended-restore and noise are reported and never fail it.
+
+Every screen is captured once per edition - enterprise (the seeded license)
+by default, and free (no license) with -editions enterprise,free - on the
+same stacks. The base's captures are cached
+under .visualdiff/baselines per base commit, edition, configuration and day:
+a later run against the same base replays them and never boots the base.
+The candidate is captured first, and a candidate whose shell does not render
+stops the run within its first three routes (-no-fail-fast to carry on).
+-resume RUNID continues a -keep run after a fix: its prepared worktrees and
+running stacks are reused, so nothing is checked out or installed again.
 
 recapture re-renders only the named routes against a run's own stacks - which
 stay up when that run was started with -keep - and appends to the same
@@ -33,6 +57,11 @@ findings.jsonl. It never checks out a worktree, never runs haven up, and
 never tears anything down: pass -keep to run, recapture as many times as a
 triage loop needs, then tear the stacks down yourself (haven destroy, or a
 fresh run without -keep).
+
+coverage prints the same coverage verdict without booting anything. gc,
+which every run also does first, removes what dead runs left behind: their
+worktrees, haven stacks and databases, and every orphan visualdiff-* stack.
+A -keep run is left alone unless -kept is given.
 
 Exit status: 0 no findings, 1 findings, 2 the run could not be completed.
 `
@@ -48,6 +77,10 @@ func Run(ctx context.Context, args []string, streams Streams) int {
 		return runCommand(ctx, args[1:], streams)
 	case "recapture":
 		return recaptureCommand(ctx, args[1:], streams)
+	case "coverage":
+		return coverageCommand(ctx, args[1:], streams)
+	case "gc":
+		return gcCommand(ctx, args[1:], streams)
 	case "-h", "--help", "help":
 		fmt.Fprint(streams.Out, usage)
 		return ExitClean
@@ -104,6 +137,11 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	slug := flags.String("slug", "", "project slug the routes are rendered for")
 	email := flags.String("email", "", "email the runner signs in with")
 	password := flags.String("password", "", "password the runner signs in with")
+	editionList := flags.String("editions", "", "comma-separated editions to capture: enterprise, free (default both; enterprise with -no-haven)")
+	noBaseline := flags.Bool("no-baseline", false, "render the base every time and cache nothing")
+	refreshBaseline := flags.Bool("refresh-baseline", false, "render the base and replace its cached baseline")
+	noFailFast := flags.Bool("no-fail-fast", false, "keep capturing even when the candidate's shell does not render")
+	resume := flags.String("resume", "", "continue a -keep run by id: reuse its worktrees and running stacks")
 	if err := flags.Parse(args); err != nil {
 		return nil, errFlagsReported
 	}
@@ -117,6 +155,10 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 		return nil, err
 	}
 
+	editions, err := runEditions(*editionList, *noHaven)
+	if err != nil {
+		return nil, err
+	}
 	options := Options{
 		Root: absoluteRoot, BaseRef: *baseRef, CandidateRef: *candidateRef, RunDir: *runDir,
 		BasePort: *basePort, Viewport: parsedViewport, RoutesOnly: *routesOnly,
@@ -126,8 +168,22 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 		Identity: SeedIdentity{
 			ProjectKey: *projectKey, Slug: *slug, Email: *email, Password: *password,
 		},
+		Editions: editions, Baseline: !*noBaseline, RefreshBaseline: *refreshBaseline,
+		FailFast: !*noFailFast,
+	}
+	if *resume != "" {
+		options.Resume, options.RunDir = true, filepath.Join(absoluteRoot, ".visualdiff", *resume)
 	}
 	return &runFlags{options: options, config: config}, nil
+}
+
+// runEditions defaults to both editions, except on -no-haven, whose stacks
+// share the developer's own database and so must never have a license cleared.
+func runEditions(value string, noHaven bool) ([]Edition, error) {
+	if value == "" && noHaven {
+		return []Edition{EditionEnterprise}, nil
+	}
+	return ParseEditions(value)
 }
 
 // runConfigInputs carries loadRunConfig's raw flag values, grouped so the
@@ -207,9 +263,11 @@ func splitList(value string) []string {
 
 // recaptureFlags is one parsed `visualdiff recapture` command line.
 type recaptureFlags struct {
-	root   string
-	runID  string
-	routes []string
+	root    string
+	runID   string
+	routes  []string
+	flows   []string
+	edition Edition
 }
 
 func recaptureCommand(ctx context.Context, args []string, streams Streams) int {
@@ -220,7 +278,9 @@ func recaptureCommand(ctx context.Context, args []string, streams Streams) int {
 		}
 		return ExitOperational
 	}
-	result, err := Recapture(ctx, RecaptureRequest{Root: parsed.root, RunID: parsed.runID, Routes: parsed.routes}, streams)
+	result, err := Recapture(ctx, RecaptureRequest{
+		Root: parsed.root, RunID: parsed.runID, Routes: parsed.routes, Flows: parsed.flows, Edition: parsed.edition,
+	}, streams)
 	if err != nil {
 		fmt.Fprintln(streams.Err, "visualdiff:", err)
 		return ExitOperational
@@ -237,19 +297,25 @@ func parseRecaptureFlags(args []string, stderr io.Writer) (*recaptureFlags, erro
 	root := flags.String("root", ".", "repository root")
 	runID := flags.String("run", "", "run id to recapture against (an earlier -keep run's .visualdiff/<runID> directory)")
 	routes := flags.String("routes", "", "comma-separated routes to recapture")
+	flowList := flags.String("flows", "", "comma-separated flow ids to recapture")
+	edition := flags.String("edition", string(EditionEnterprise), "edition pass to recapture: enterprise or free")
 	if err := flags.Parse(args); err != nil {
 		return nil, errFlagsReported
 	}
 	if *runID == "" {
 		return nil, errors.New("recapture: -run is required")
 	}
-	routeList := splitList(*routes)
-	if len(routeList) == 0 {
-		return nil, errors.New("recapture: -routes is required")
+	routeList, flowIDs := splitList(*routes), splitList(*flowList)
+	if len(routeList) == 0 && len(flowIDs) == 0 {
+		return nil, errors.New("recapture: -routes or -flows is required")
+	}
+	editions, err := ParseEditions(*edition)
+	if err != nil || len(editions) != 1 {
+		return nil, fmt.Errorf("recapture: -edition wants exactly one of enterprise or free")
 	}
 	absoluteRoot, err := filepath.Abs(*root)
 	if err != nil {
 		return nil, err
 	}
-	return &recaptureFlags{root: absoluteRoot, runID: *runID, routes: routeList}, nil
+	return &recaptureFlags{root: absoluteRoot, runID: *runID, routes: routeList, flows: flowIDs, edition: editions[0]}, nil
 }

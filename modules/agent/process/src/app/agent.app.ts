@@ -66,7 +66,6 @@ import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import type { Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -98,14 +97,13 @@ const THREAD_KSUID_RESOURCE = "thread";
  * absent where the deployment named no `BASE_HOST`.
  */
 type AgentMembers = Readonly<{
-  redis: RedisConnection;
   publicBaseUrl: string | undefined;
 }>;
 
 /**
- * The relay behind connected agents runs on the process's own `redis` member.
- * A deployment that named no Redis refuses at boot naming this module, rather
- * than starting with the relay quietly switched off.
+ * The relay behind connected agents runs on the live tier's Redis session
+ * state, so a deployment that named no Redis refuses at boot naming this
+ * module rather than starting with the relay quietly switched off.
  */
 type AgentSetup = FeatureSetup<
   typeof AgentApp.dependencies,
@@ -128,7 +126,7 @@ export class AgentApp implements AgentApi {
     workflows: WorkflowApi,
   };
   /** Both names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["redis", "publicBaseUrl"] as const;
+  static readonly reads = ["publicBaseUrl"] as const;
 
   readonly #agents: AgentService;
   readonly #presence = ConnectedAgentPresenceService.create();
@@ -164,7 +162,7 @@ export class AgentApp implements AgentApi {
       apiKeys: dependencies.apiKeys,
       authz: dependencies.permissions,
       projects: dependencies.projects,
-      redis: members.redis,
+      sessionState: repositories.sessionState,
       config,
       publicBaseUrl: this.#publicBaseUrl,
     });

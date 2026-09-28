@@ -35,11 +35,12 @@ import {
   type SendBatchPayload,
   type SettleSpendCommandData,
   type WebhookDeliveryEndpointService,
-  webhookDeliveryStateSchema,
+  webhookProcessStateSchema,
   type WebhookDispatchResult,
 } from "../rules/webhook-delivery-contract.rules.ts";
 import {
   deriveEndpointFlushTarget,
+  isDeliveryState,
   onAdmission,
   onSpendOutcome,
   payloadToRow,
@@ -153,11 +154,12 @@ export class WebhookDeliveryService {
   processManager(): ProcessManagerApplier<WebhookSpendDeliveryRequestedEvent> {
     return (process) =>
       process
-        .state(webhookDeliveryStateSchema, INITIAL_WEBHOOK_DELIVERY_STATE)
+        .state(webhookProcessStateSchema, INITIAL_WEBHOOK_DELIVERY_STATE)
         .intent("deliver", deliverSchema, this.runDeliver())
         .intent("flushEndpoint", flushEndpointSchema, this.runFlushEndpoint())
         .intent("sendBatch", sendBatchSchema, this.runWebhookSendBatch())
         .on(webhookSpendDeliveryRequestedEventSchema, (state, { spend }, context) => {
+          if (!isDeliveryState(state)) return { state };
           switch (spend.type) {
             case GATEWAY_SPEND_ADMITTED_EVENT_TYPE:
               return onAdmission({ state, ctx: context, admit: spend.data });

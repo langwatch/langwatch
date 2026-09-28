@@ -1,7 +1,7 @@
+import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
 import type React from "react";
 import { useCallback, useState } from "react";
 
-import { useDrawer, useDrawerParams } from "../../../../behavior/use-drawer.ts";
 import { useOpenTraceDrawer } from "../hooks/use-open-trace-drawer.ts";
 import type { TraceListItem } from "../types/trace.ts";
 

@@ -33,9 +33,6 @@
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../dev/tsconfig.web-declarations.json"
-    },
-    {
       "path": "../../model-provider/browser-kit/tsconfig.build.json"
     },
     {

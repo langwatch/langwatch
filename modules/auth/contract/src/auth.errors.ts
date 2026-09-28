@@ -42,6 +42,20 @@ export class NoAddressToConfirmError extends HandledError {
   }
 }
 
+/** No email provider is configured, so no confirmation link can be sent (ADR-117). */
+export class EmailSendingUnavailableError extends HandledError {
+  declare readonly code: "auth_email_sending_unavailable";
+
+  constructor() {
+    super(
+      "auth_email_sending_unavailable",
+      "This installation cannot send email, so the address cannot be confirmed.",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "EmailSendingUnavailableError";
+  }
+}
+
 export class FrontDoorRateLimitedError extends HandledError {
   declare readonly code: "auth_rate_limited";
 

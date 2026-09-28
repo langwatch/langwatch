@@ -6,11 +6,6 @@ import {
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import type { TimeInput } from "@langwatch/time";
 
-/** A suite id, when the caller did not supply one. */
-export function defaultSuiteId(): string {
-  return `suite_${crypto.randomUUID()}`;
-}
-
 /** The url-safe name a suite is addressed by. */
 export function suiteSlugOf(value: string): string {
   return (

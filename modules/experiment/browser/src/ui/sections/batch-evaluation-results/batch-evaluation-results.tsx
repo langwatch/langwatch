@@ -1,23 +1,11 @@
 /** Main entry point combining the sidebar and table (V3-style, replaces BatchEvaluationV2). */
 
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  Heading,
-  HStack,
-  Skeleton,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
-import { Link } from "@langwatch/browser-host/link";
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { ExternalImage } from "@langwatch/design-system/external-image";
-import { PageLayout } from "@langwatch/design-system/page-layout";
 import { EvaluatorResultChip } from "@langwatch/evaluator-browser-kit";
 import {
   describeCellFailure,
@@ -34,18 +22,20 @@ import {
   GroupRowsButton,
   RowHeightButton,
   type BatchRunSummary,
+  type RenderBatchEvaluatorResult,
+  type RenderDatasetImage,
+  type RenderTracePeek,
   BatchRunsSidebar,
   useResultsGrouping,
 } from "@langwatch/experiment-browser-kit";
 import type { Experiment } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
-import type { Project } from "@langwatch/workflow-contract";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BarChart2, Download, ExternalLink } from "react-feather";
 
 import {
   RUN_COLORS,
+  type RunWithColor,
   useMultiRunData,
 } from "../../../behavior/batch-evaluation-results/use-multi-run-data.ts";
 import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
@@ -53,9 +43,10 @@ import { TraceIdPeek } from "../../../behavior/lent-trace.tsx";
 import { useComparisonMode } from "../../../behavior/use-comparison-mode.ts";
 import { downloadCsv } from "../batch-evaluation-results.csv.ts";
 import { ComparisonCharts } from "../batch-results/comparison-charts.tsx";
+import { BatchEvaluationResultsHeader } from "./batch-evaluation-results-header.tsx";
 
 type BatchEvaluationResultsProps = {
-  project?: Project;
+  project?: UiHostProject;
   experiment?: Experiment;
   /** Size variant */
   size?: "sm" | "md";
@@ -84,6 +75,297 @@ const queryWithGroupBy = (query: RouterQuery, groupBy: string | null): RouterQue
   return rest;
 };
 
+/** Which result columns are hidden, starting from the defaults. */
+const useColumnVisibility = () => {
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(
+    () => new Set(DEFAULT_HIDDEN_COLUMNS),
+  );
+  const toggleColumn = useCallback((columnName: string) => {
+    setHiddenColumns((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(columnName)) next.add(columnName);
+      return next;
+    });
+  }, []);
+  return { hiddenColumns, toggleColumn };
+};
+
+/**
+ * How often the selected run's data refetches: every second while it runs and for a
+ * grace period after it finishes (to catch its final results), then never.
+ */
+const useRunDataRefetch = ({
+  selectedRun,
+  selectedRunId,
+}: {
+  selectedRun: BatchRunSummary | undefined;
+  selectedRunId: string | undefined;
+}): { isFinished: boolean; refetchInterval: number | false } => {
+  // null: not finished yet; -1: the grace period ran out; otherwise when it finished.
+  const [finishedAt, setFinishedAt] = useState<number | null>(null);
+  const isFinished = !!selectedRun && isRunFinished(selectedRun.timestamps);
+
+  useEffect(() => {
+    if (!isFinished) setFinishedAt(null);
+    else if (finishedAt === null) setFinishedAt(nowInstant().epochMilliseconds);
+  }, [isFinished, finishedAt]);
+  useEffect(() => {
+    setFinishedAt(null);
+  }, [selectedRunId]);
+  useEffect(() => {
+    if (finishedAt === null) return;
+    const remaining = REFETCH_GRACE_PERIOD_MS - (nowInstant().epochMilliseconds - finishedAt);
+    if (remaining <= 0) return;
+    const timer = setTimeout(() => setFinishedAt(-1), remaining);
+    return () => clearTimeout(timer);
+  }, [finishedAt]);
+
+  const isInGracePeriod =
+    isFinished &&
+    finishedAt !== null &&
+    finishedAt > 0 &&
+    nowInstant().epochMilliseconds - finishedAt < REFETCH_GRACE_PERIOD_MS;
+  return { isFinished, refetchInterval: !isFinished || isInGracePeriod ? 1000 : false };
+};
+
+/** Keeps `setIsSomeRunning` in step with whether any run is still going. */
+const useTrackSomeRunning = (
+  runs: BatchRunSummary[] | undefined,
+  setIsSomeRunning: (running: boolean) => void,
+) => {
+  useEffect(() => {
+    setIsSomeRunning(!!runs?.some((r) => !isRunFinished(r.timestamps)));
+  }, [runs, setIsSomeRunning]);
+};
+
+/** The runs as the sidebar lists them. */
+const sidebarRunsOf = (runs: BatchRunSummary[] | undefined): BatchRunSummary[] =>
+  (runs ?? []).map((run) => ({
+    runId: run.runId,
+    workflowVersion: run.workflowVersion,
+    timestamps: run.timestamps,
+    progress: run.progress,
+    total: run.total,
+    summary: {
+      datasetCost: run.summary.datasetCost,
+      evaluationsCost: run.summary.evaluationsCost,
+      evaluations: Object.fromEntries(
+        Object.entries(run.summary.evaluations).map(([id, ev]) => [
+          id,
+          { name: ev.name, averageScore: ev.averageScore, averagePassed: ev.averagePassed },
+        ]),
+      ),
+    },
+  }));
+
+/** Each run's name: its commit message, else "Run #N" numbered in creation order. */
+const runNameMapOf = (runs: BatchRunSummary[]): Record<string, string | React.ReactNode> =>
+  Object.fromEntries(
+    runs
+      .toSorted((a, b) => a.timestamps.createdAt - b.timestamps.createdAt)
+      .map((run, index) => [
+        run.runId,
+        getRunDisplayName({
+          commitMessage: run.workflowVersion?.commitMessage,
+          runId: run.runId,
+          index,
+        }),
+      ]),
+  );
+
+/** The `compare` query param's run ids, whichever shape the router gave it in. */
+const compareRunIdsFromQuery = (param: unknown): string[] | undefined => {
+  if (typeof param === "string") return param.split(",").filter(Boolean);
+  if (Array.isArray(param)) return param.filter((id): id is string => typeof id === "string");
+  return undefined;
+};
+
+/** The `groupBy` query param, or null when there is no grouping. */
+const groupByFromQuery = (value: unknown): string | null =>
+  typeof value === "string" && value.length > 0 ? value : null;
+
+/**
+ * The query after a comparison change: comparing two or more runs sets `compare` and
+ * drops `runId`; leaving compare mode with none drops `compare`.
+ */
+const queryWithComparison = ({
+  query,
+  isComparing,
+  comparedRunIds,
+}: {
+  query: Record<string, unknown>;
+  isComparing: boolean;
+  comparedRunIds: string[];
+}): Record<string, unknown> => {
+  if (isComparing && comparedRunIds.length >= 2) {
+    const { runId: _runId, ...rest } = query;
+    return { ...rest, compare: comparedRunIds.join(",") };
+  }
+  if (!isComparing && comparedRunIds.length === 0) {
+    const { compare: _compare, ...rest } = query;
+    return rest;
+  }
+  return query;
+};
+
+/** One color per run, by its position in the full list, so a comparison keeps them. */
+const runColorMapOf = (runIds: string[]): Record<string, string> =>
+  Object.fromEntries(runIds.map((runId, idx) => [runId, RUN_COLORS[idx % RUN_COLORS.length]!]));
+
+/** Charts open visible when they become available; a later hide by the user sticks. */
+const useChartsVisibility = (canShowCharts: boolean): [boolean, (visible: boolean) => void] => {
+  const [chartsVisible, setChartsVisible] = useState(canShowCharts);
+  const [chartsWereAvailable, setChartsWereAvailable] = useState(canShowCharts);
+  if (canShowCharts !== chartsWereAvailable) {
+    setChartsWereAvailable(canShowCharts);
+    if (canShowCharts) setChartsVisible(true);
+  }
+  return [chartsVisible, setChartsVisible];
+};
+
+/** The compared runs as the table and charts read them. */
+const comparisonDataOf = (
+  runs: RunWithColor[],
+  runNameMap: Record<string, string | React.ReactNode>,
+) =>
+  runs.map((run) => ({
+    runId: run.runId,
+    runName: runNameMap[run.runId] ?? run.runId,
+    color: run.color,
+    data: run.data ? transformBatchEvaluationData(run.data) : null,
+    isLoading: run.isLoading,
+  }));
+
+/** The selected run's results, refetched while it runs. */
+const useSelectedRunData = ({
+  projectId,
+  experimentId,
+  runs,
+  selectedRunId,
+}: {
+  projectId?: string;
+  experimentId?: string;
+  runs: BatchRunSummary[] | undefined;
+  selectedRunId: string | undefined;
+}) => {
+  const selectedRun = useMemo(
+    () => runs?.find((r) => r.runId === selectedRunId),
+    [runs, selectedRunId],
+  );
+  const { refetchInterval } = useRunDataRefetch({ selectedRun, selectedRunId });
+  const runDataQuery = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+    { projectId: projectId ?? "", experimentId: experimentId ?? "", runId: selectedRunId ?? "" },
+    { enabled: !!projectId && !!experimentId && !!selectedRunId, refetchInterval },
+  );
+  const transformedData: BatchEvaluationData | null = useMemo(
+    () => (runDataQuery.data ? transformBatchEvaluationData(runDataQuery.data) : null),
+    [runDataQuery.data],
+  );
+  return { runDataQuery, transformedData };
+};
+
+/** The compared runs, synced to the URL's `compare` param unless a parent controls the page. */
+const useComparisonUrlSync = ({ controlled }: { controlled: boolean }) => {
+  const router = useRouter();
+  const queryCompareRunIds = useMemo(
+    () => compareRunIdsFromQuery(router.query.compare),
+    [router.query.compare],
+  );
+  const handleComparisonChange = useCallback(
+    (isComparing: boolean, comparedRunIds: string[]) => {
+      if (controlled) return;
+      const newQuery = queryWithComparison({ query: router.query, isComparing, comparedRunIds });
+      if (router.query.compare === newQuery.compare) return;
+      void router.replace({ pathname: router.pathname, query: newQuery }, undefined, {
+        shallow: true,
+      });
+    },
+    [controlled, router],
+  );
+  return { queryCompareRunIds, handleComparisonChange };
+};
+
+/** The run shown: the parent's choice, else the URL's, else the newest. */
+const useRunSelection = ({
+  externalSelectedRunId,
+  firstRunId,
+  onSelectRunId,
+}: {
+  externalSelectedRunId?: string;
+  firstRunId?: string;
+  onSelectRunId?: (runId: string) => void;
+}) => {
+  const router = useRouter();
+  const queryRunId = typeof router.query.runId === "string" ? router.query.runId : undefined;
+  const selectedRunId = externalSelectedRunId ?? queryRunId ?? firstRunId;
+  const handleSelectRun = useCallback(
+    (runId: string) => {
+      if (onSelectRunId) return onSelectRunId(runId);
+      void router.replace(
+        { pathname: router.pathname, query: { ...router.query, runId } },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [onSelectRunId, router],
+  );
+  return { selectedRunId, handleSelectRun };
+};
+
+/**
+ * Group-by-metadata, synced to the URL unless a parent controls the page. Applied
+ * locally first, always: reading it back out of the URL put ~4s between the click
+ * and the regroup. The URL stays the source of truth on load and in shared links.
+ */
+const useGroupBy = ({ controlled }: { controlled: boolean }) => {
+  const router = useRouter();
+  const queryGroupBy = useMemo(
+    () => groupByFromQuery(router.query.groupBy),
+    [router.query.groupBy],
+  );
+  const [localGroupBy, setLocalGroupBy] = useState<string | null>(null);
+  const handleGroupByChange = useCallback(
+    (next: string | null) => {
+      setLocalGroupBy(next);
+      if (controlled) return;
+      const newQuery = queryWithGroupBy(router.query, next);
+      if (!newQuery) return;
+      void router.replace({ pathname: router.pathname, query: newQuery }, undefined, {
+        shallow: true,
+      });
+    },
+    [controlled, router],
+  );
+  return { groupBy: localGroupBy ?? queryGroupBy, handleGroupByChange };
+};
+
+const renderEvaluatorResult: RenderBatchEvaluatorResult = ({ result }) => (
+  <EvaluatorResultChip
+    name={result.evaluatorName}
+    result={{
+      status: result.status,
+      score: result.score,
+      passed: result.passed,
+      label: result.label,
+      details: result.details,
+    }}
+    inputs={result.inputs}
+  />
+);
+
+const renderTracePeek: RenderTracePeek = ({ traceId }) => <TraceIdPeek traceId={traceId} />;
+
+const renderDatasetImage: RenderDatasetImage = ({ src }) => (
+  <ExternalImage
+    src={src}
+    minWidth="24px"
+    minHeight="24px"
+    maxHeight="80px"
+    maxWidth="100%"
+    expandable
+  />
+);
+
 export function BatchEvaluationResults({
   project,
   experiment,
@@ -91,41 +373,14 @@ export function BatchEvaluationResults({
   selectedRunId: externalSelectedRunId,
   onSelectRunId,
 }: BatchEvaluationResultsProps) {
-  // The lite-member CSV-export guard did not travel: the host port carries
-  // permissions, not organization role, so the button is offered to everyone
-  // who can open the page and the server still refuses the download.
-  const isLiteMember = false;
   const { openDrawer } = useDrawer();
   const showComparisonLeaderboard = useShowComparisonLeaderboard();
 
   // Track if any run is still in progress
   const [isSomeRunning, setIsSomeRunning] = useState(false);
 
-  // Track when the selected run finished (for grace period)
-  const [finishedAt, setFinishedAt] = useState<number | null>(null);
-
-  // Column visibility state - initialize with defaults
-  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(
-    () => new Set(DEFAULT_HIDDEN_COLUMNS),
-  );
-
-  // Which target fields render, and how much of each cell's content shows —
-  // see useResultDisplayPreferences for why fields reset per session while
-  // row height persists.
+  const { hiddenColumns, toggleColumn } = useColumnVisibility();
   const { fields, toggleField, rowHeight, setRowHeight } = useResultDisplayPreferences();
-
-  // Toggle column visibility
-  const toggleColumn = useCallback((columnName: string) => {
-    setHiddenColumns((prev) => {
-      const next = new Set(prev);
-      if (next.has(columnName)) {
-        next.delete(columnName);
-      } else {
-        next.add(columnName);
-      }
-      return next;
-    });
-  }, []);
 
   /** The experiment's runs, read as `BatchRunSummary` (what this file hands the sidebar). */
   const runsQuery = api.experiments.getExperimentBatchEvaluationRuns.useQuery(
@@ -139,246 +394,39 @@ export function BatchEvaluationResults({
     },
   ) as { data?: { runs: BatchRunSummary[] }; error?: unknown; isLoading: boolean };
 
-  // Router for URL query params
-  const router = useRouter();
+  const { selectedRunId, handleSelectRun } = useRunSelection({
+    externalSelectedRunId,
+    firstRunId: runsQuery.data?.runs[0]?.runId,
+    onSelectRunId,
+  });
 
-  // Get runId from URL query params
-  const queryRunId = typeof router.query.runId === "string" ? router.query.runId : undefined;
-
-  // Determine which run ID to use (priority: external prop > URL query > first run)
-  const selectedRunId = externalSelectedRunId ?? queryRunId ?? runsQuery.data?.runs[0]?.runId;
-
-  // Handle run selection - updates URL query param
-  const handleSelectRun = useCallback(
-    (runId: string) => {
-      if (onSelectRunId) {
-        onSelectRunId(runId);
-      } else {
-        // Update URL query param without full navigation
-        void router.replace(
-          {
-            pathname: router.pathname,
-            query: { ...router.query, runId },
-          },
-          undefined,
-          { shallow: true },
-        );
-      }
-    },
-    [onSelectRunId, router],
-  );
-
-  // Find selected run
-  const selectedRun = useMemo(
-    () => runsQuery.data?.runs.find((r) => r.runId === selectedRunId),
-    [runsQuery.data?.runs, selectedRunId],
-  );
-
-  // Determine if selected run is finished
-  const isFinished = useMemo(() => {
-    if (!selectedRun) return false;
-    return isRunFinished(selectedRun.timestamps);
-  }, [selectedRun]);
-
-  // Track when the run finished and reset when run changes or becomes not finished
-  useEffect(() => {
-    if (isFinished && finishedAt === null) {
-      // Run just finished, record the time
-      setFinishedAt(nowInstant().epochMilliseconds);
-    } else if (!isFinished) {
-      // Run is not finished (new run or restarted), reset
-      setFinishedAt(null);
-    }
-  }, [isFinished, finishedAt]);
-
-  // Reset finishedAt when selected run changes
-  useEffect(() => {
-    setFinishedAt(null);
-  }, [selectedRunId]);
-
-  // Force re-render after grace period expires to stop refetching
-  useEffect(() => {
-    if (finishedAt === null) return;
-
-    const timeUntilGraceExpires =
-      REFETCH_GRACE_PERIOD_MS - (nowInstant().epochMilliseconds - finishedAt);
-    if (timeUntilGraceExpires <= 0) return;
-
-    const timer = setTimeout(() => {
-      // Set finishedAt to -1 to indicate the grace period has expired.
-      setFinishedAt(-1);
-    }, timeUntilGraceExpires);
-
-    return () => clearTimeout(timer);
-  }, [finishedAt]);
-
-  // Determine if we're still in the grace period after finish
-  // finishedAt > 0 means we have a valid timestamp, and we check if it's within grace period
-  const isInGracePeriod =
-    isFinished &&
-    finishedAt !== null &&
-    finishedAt > 0 &&
-    nowInstant().epochMilliseconds - finishedAt < REFETCH_GRACE_PERIOD_MS;
-
-  // Update isSomeRunning state
-  useEffect(() => {
-    const hasRunning = runsQuery.data?.runs.some((r) => !isRunFinished(r.timestamps));
-    setIsSomeRunning(!!hasRunning);
-  }, [runsQuery.data?.runs]);
-
-  // Determine refetch interval for run data
-  // - 1000ms while running
-  // - 1000ms during grace period after finish (to catch final results)
-  // - false (disabled) after grace period
-  const runDataRefetchInterval = !isFinished || isInGracePeriod ? 1000 : false;
-
-  // Fetch selected run data
-  const runDataQuery = api.experiments.getExperimentBatchEvaluationRun.useQuery(
-    {
-      projectId: project?.id ?? "",
-      experimentId: experiment?.id ?? "",
-      runId: selectedRunId ?? "",
-    },
-    {
-      enabled: !!project && !!experiment && !!selectedRunId,
-      refetchInterval: runDataRefetchInterval,
-    },
-  );
-
-  // Transform run data
-  const transformedData: BatchEvaluationData | null = useMemo(() => {
-    if (!runDataQuery.data) return null;
-    return transformBatchEvaluationData(runDataQuery.data);
-  }, [runDataQuery.data]);
+  const { runDataQuery, transformedData } = useSelectedRunData({
+    projectId: project?.id,
+    experimentId: experiment?.id,
+    runs: runsQuery.data?.runs,
+    selectedRunId,
+  });
+  useTrackSomeRunning(runsQuery.data?.runs, setIsSomeRunning);
 
   // Transform runs list for sidebar
-  const sidebarRuns: BatchRunSummary[] = useMemo(() => {
-    if (!runsQuery.data?.runs) return [];
-    return runsQuery.data.runs.map((run) => ({
-      runId: run.runId,
-      workflowVersion: run.workflowVersion,
-      timestamps: run.timestamps,
-      progress: run.progress,
-      total: run.total,
-      summary: {
-        datasetCost: run.summary.datasetCost,
-        evaluationsCost: run.summary.evaluationsCost,
-        evaluations: Object.fromEntries(
-          Object.entries(run.summary.evaluations).map(([id, ev]) => [
-            id,
-            {
-              name: ev.name,
-              averageScore: ev.averageScore,
-              averagePassed: ev.averagePassed,
-            },
-          ]),
-        ),
-      },
-    }));
-  }, [runsQuery.data?.runs]);
+  const sidebarRuns = useMemo(() => sidebarRunsOf(runsQuery.data?.runs), [runsQuery.data?.runs]);
 
   // Comparison mode
   const runIds = useMemo(() => sidebarRuns.map((r) => r.runId), [sidebarRuns]);
 
   // Map runId to human-readable name (commit message or "Run #N")
   // Sort chronologically so fallback "Run #N" numbering is stable
-  const runNameMap = useMemo(() => {
-    const map: Record<string, string | React.ReactNode> = {};
-    const sorted = [...sidebarRuns].toSorted(
-      (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
-    );
-    sorted.forEach((run, index) => {
-      map[run.runId] = getRunDisplayName({
-        commitMessage: run.workflowVersion?.commitMessage,
-        runId: run.runId,
-        index,
-      });
-    });
-    return map;
-  }, [sidebarRuns]);
+  const runNameMap = useMemo(() => runNameMapOf(sidebarRuns), [sidebarRuns]);
 
-  // Get compare run IDs from URL query params
-  const queryCompareRunIds = useMemo(() => {
-    const compareParam = router.query.compare;
-    if (typeof compareParam === "string") {
-      return compareParam.split(",").filter(Boolean);
-    }
-    if (Array.isArray(compareParam)) {
-      return (compareParam as unknown[]).filter((id): id is string => typeof id === "string");
-    }
-    return undefined;
-  }, [router.query.compare]);
+  const { groupBy, handleGroupByChange } = useGroupBy({ controlled: !!onSelectRunId });
 
-  // Group-by-metadata URL sync. The dropdown lives inside ComparisonTable
-  // but the URL contract is shared state, so we own it here. `null`
-  // means "no grouping" (URL param absent).
-  const queryGroupBy = useMemo(() => {
-    const value = router.query.groupBy;
-    if (typeof value === "string" && value.length > 0) return value;
-    return null;
-  }, [router.query.groupBy]);
-
-  // In controlled mode a parent owns the URL, so grouping is held here
-  // instead. Returning early without this would leave the dropdown rendered
-  // but inert — ComparisonTable shows it whenever the data has groupable
-  // keys, and it has no way to know the parent swallowed the change.
-  const [localGroupBy, setLocalGroupBy] = useState<string | null>(null);
-
-  const handleGroupByChange = useCallback(
-    (next: string | null) => {
-      // Apply locally first, always. Routing to read the answer back out of
-      // the URL put ~4s between the click and the table regrouping, which
-      // reads as the grouping itself being slow rather than as a round-trip.
-      // The URL is still the source of truth on load and still what a shared
-      // link carries — it just no longer gates the render.
-      setLocalGroupBy(next);
-      if (onSelectRunId) return;
-      const newQuery = queryWithGroupBy(router.query, next);
-      if (!newQuery) return;
-      void router.replace({ pathname: router.pathname, query: newQuery }, undefined, {
-        shallow: true,
-      });
-    },
-    [onSelectRunId, router],
-  );
-
-  // Handle comparison mode URL sync
-  const handleComparisonChange = useCallback(
-    (isComparing: boolean, comparedRunIds: string[]) => {
-      if (onSelectRunId) return; // Don't sync URL in controlled mode
-
-      const newQuery = { ...router.query };
-
-      if (isComparing && comparedRunIds.length >= 2) {
-        // In compare mode: set compare param, remove runId
-        newQuery.compare = comparedRunIds.join(",");
-        delete newQuery.runId;
-      } else if (!isComparing && comparedRunIds.length === 0) {
-        // Not in compare mode: remove compare param
-        delete newQuery.compare;
-      }
-
-      // Only update if query actually changed
-      const currentCompare = router.query.compare;
-      const newCompare = newQuery.compare;
-      if (currentCompare !== newCompare) {
-        void router.replace({ pathname: router.pathname, query: newQuery }, undefined, {
-          shallow: true,
-        });
-      }
-    },
-    [onSelectRunId, router],
-  );
+  const { queryCompareRunIds, handleComparisonChange } = useComparisonUrlSync({
+    controlled: !!onSelectRunId,
+  });
 
   // Stable color map for ALL runs - colors are assigned based on position in the full list
   // This ensures colors stay the same regardless of which runs are selected for comparison
-  const stableRunColorMap = useMemo(() => {
-    const colorMap: Record<string, string> = {};
-    runIds.forEach((runId, idx) => {
-      colorMap[runId] = RUN_COLORS[idx % RUN_COLORS.length]!;
-    });
-    return colorMap;
-  }, [runIds]);
+  const stableRunColorMap = useMemo(() => runColorMapOf(runIds), [runIds]);
 
   const {
     compareMode,
@@ -403,16 +451,10 @@ export function BatchEvaluationResults({
   });
 
   // Transform comparison data for table
-  const comparisonData = useMemo(() => {
-    if (!compareMode) return null;
-    return multiRunData.runs.map((run) => ({
-      runId: run.runId,
-      runName: runNameMap[run.runId] ?? run.runId,
-      color: run.color,
-      data: run.data ? transformBatchEvaluationData(run.data) : null,
-      isLoading: run.isLoading,
-    }));
-  }, [compareMode, multiRunData.runs, runNameMap]);
+  const comparisonData = useMemo(
+    () => (compareMode ? comparisonDataOf(multiRunData.runs, runNameMap) : null),
+    [compareMode, multiRunData.runs, runNameMap],
+  );
 
   // Determine if charts are available:
   // 1. In compare mode with 2+ runs selected
@@ -424,14 +466,7 @@ export function BatchEvaluationResults({
   // Charts visibility state - default to visible when available
   const defaultChartsVisible = canShowCharts;
 
-  const [chartsVisible, setChartsVisible] = useState(defaultChartsVisible);
-
-  // Charts that just became available open visible; a later hide by the user sticks.
-  const [chartsWereAvailable, setChartsWereAvailable] = useState(canShowCharts);
-  if (canShowCharts !== chartsWereAvailable) {
-    setChartsWereAvailable(canShowCharts);
-    if (canShowCharts) setChartsVisible(true);
-  }
+  const [chartsVisible, setChartsVisible] = useChartsVisibility(defaultChartsVisible);
 
   // Build chart data for single run (when not in compare mode but has 2+ targets)
   const singleRunChartData = useMemo(() => {
@@ -473,7 +508,6 @@ export function BatchEvaluationResults({
     downloadCsv(transformedData, experiment.name ?? experiment.slug);
   }, [transformedData, experiment]);
 
-  const isDownloadCSVEnabled = !!transformedData && transformedData.rows.length > 0;
   const showRunsLoading = runsQuery.isLoading;
   const showWaitingForRuns = !showRunsLoading && sidebarRuns.length === 0;
   const showResultsTable = !showRunsLoading && sidebarRuns.length > 0;
@@ -510,90 +544,32 @@ export function BatchEvaluationResults({
       {/* Main content - flex column that fills available space */}
       <VStack flex={1} minWidth={0} height="full" gap={0} align="stretch" overflow="auto">
         {/* Header - fixed height */}
-        <PageLayout.Header paddingX={2} withBorder={false} flexShrink={0}>
-          <HStack gap={1} minWidth={0} overflow="hidden" flexShrink={1}>
-            <Heading whiteSpace="nowrap" flexShrink={0}>
-              {experiment ? (
-                (experiment.name ?? experiment.slug)
-              ) : (
-                <Skeleton width="200px" height="28px" />
-              )}
-            </Heading>
-            {experiment && sidebarSelectedRun && (
-              <Text
-                textStyle={"xs"}
-                color={"fg.muted"}
-                whiteSpace="nowrap"
-                overflow="hidden"
-                textOverflow="ellipsis"
-                flexShrink={1}
-                minWidth={0}
-              >
-                {"// "}
-                {sidebarSelectedRun.runId}
-              </Text>
-            )}
-          </HStack>
-          <Spacer />
-          {/* Charts toggle - show when charts are available */}
-          {canShowCharts && (
-            <Button
-              size="sm"
-              variant={chartsVisible ? "solid" : "outline"}
-              onClick={() => setChartsVisible(!chartsVisible)}
-              data-testid="toggle-charts-button"
-            >
-              <BarChart2 size={16} />
-              Charts
-            </Button>
-          )}
-          {transformedData && transformedData.targetColumns.length > 0 && (
+        <BatchEvaluationResultsHeader
+          project={project}
+          experiment={experiment}
+          shownRunId={sidebarSelectedRun?.runId}
+          data={transformedData}
+          charts={{ available: canShowCharts, visible: chartsVisible, onChange: setChartsVisible }}
+          displayControls={
             <>
               <RowHeightButton value={rowHeight} onChange={setRowHeight} />
               <FieldsButton fields={fields} onToggle={toggleField} />
               <GroupRowsButton
                 availableKeys={groupableKeys}
-                value={localGroupBy ?? queryGroupBy}
+                value={groupBy}
                 onChange={handleGroupByChange}
               />
             </>
-          )}
-          {transformedData && transformedData.datasetColumns.length > 0 && (
+          }
+          columnControls={
             <ColumnVisibilityButton
-              datasetColumns={transformedData.datasetColumns}
+              datasetColumns={transformedData?.datasetColumns ?? []}
               hiddenColumns={hiddenColumns}
               onToggle={toggleColumn}
             />
-          )}
-          {!isLiteMember && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleDownloadCSV}
-              disabled={!isDownloadCSVEnabled}
-            >
-              <Download size={16} /> Export to CSV
-            </Button>
-          )}
-          {experiment?.workflowId && (
-            <Link
-              target="_blank"
-              href={`/${project?.slug}/studio/${experiment?.workflowId}`}
-              asChild
-            >
-              <Button size="sm" variant="outline" textDecoration="none">
-                <ExternalLink size={16} /> Open Workflow
-              </Button>
-            </Link>
-          )}
-          {experiment?.type === "EVALUATIONS_V3" && (
-            <Link href={`/${project?.slug}/experiments/workbench/${experiment?.slug}`} asChild>
-              <Button size="sm" variant="outline" textDecoration="none">
-                <ExternalLink size={16} /> Open Experiment
-              </Button>
-            </Link>
-          )}
-        </PageLayout.Header>
+          }
+          onDownloadCsv={handleDownloadCSV}
+        />
 
         {/* Charts (comparison or single-run with multiple targets) - auto height.
             The win-rate chart lives INSIDE this component alongside
@@ -634,33 +610,12 @@ export function BatchEvaluationResults({
                   showEvaluations={fields.scores}
                   showCostAndLatency={fields.costAndLatency}
                   rowHeight={rowHeight}
-                  groupBy={localGroupBy ?? queryGroupBy}
+                  groupBy={groupBy}
                   describeFailure={describeCellFailure}
-                  renderEvaluatorResult={({ result }) => (
-                    <EvaluatorResultChip
-                      name={result.evaluatorName}
-                      result={{
-                        status: result.status,
-                        score: result.score,
-                        passed: result.passed,
-                        label: result.label,
-                        details: result.details,
-                      }}
-                      inputs={result.inputs}
-                    />
-                  )}
-                  renderTracePeek={({ traceId }) => <TraceIdPeek traceId={traceId} />}
+                  renderEvaluatorResult={renderEvaluatorResult}
+                  renderTracePeek={renderTracePeek}
                   onOpenTrace={(traceId) => openDrawer("traceV2Details", { traceId })}
-                  renderDatasetImage={({ src }) => (
-                    <ExternalImage
-                      src={src}
-                      minWidth="24px"
-                      minHeight="24px"
-                      maxHeight="80px"
-                      maxWidth="100%"
-                      expandable
-                    />
-                  )}
+                  renderDatasetImage={renderDatasetImage}
                 />
               </Card.Body>
             </Card.Root>

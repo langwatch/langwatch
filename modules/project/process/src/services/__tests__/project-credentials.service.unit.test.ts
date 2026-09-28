@@ -10,10 +10,10 @@ import { ProjectCredentialsService } from "../project-credentials.service.ts";
 describe("ProjectCredentialsAdapter", () => {
   describe("when a project is created", () => {
     /** @scenario "A project is born with packaged credentials" */
-    it("mints a bare nanoid project identifier", () => {
+    it("mints a project KSUID identifier", () => {
       const adapter = ProjectCredentialsService.create();
 
-      expect(adapter.generateProjectId()).toMatch(/^[A-Za-z0-9_-]{21}$/);
+      expect(adapter.generateProjectId()).toMatch(/^project_[a-zA-Z0-9]+$/);
       expect(adapter.generateProjectId()).not.toBe(adapter.generateProjectId());
     });
 

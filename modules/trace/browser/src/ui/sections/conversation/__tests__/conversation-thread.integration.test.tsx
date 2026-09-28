@@ -27,7 +27,7 @@ function renderConversation({
   messages: Record<string, unknown>[];
   shouldRenderStructuredOutput?: boolean;
   labels?: { user?: string; assistant?: string };
-  roleMode?: "chat" | "scenario";
+  roleMode?: "chat" | "scenario" | "scenario-human-caller";
 }): ReturnType<typeof render> {
   const ui: ReactElement = (
     <ConversationThread
@@ -402,6 +402,140 @@ describe("<ConversationThread />", () => {
 
       expect(screen.getByText("User Simulator")).toBeInTheDocument();
       expect(screen.getByText("Agent")).toBeInTheDocument();
+    });
+  });
+
+  // Moved from scenario's renderer suite when trace began lending the thread:
+  // how a scenario run's voice turns are laid out is this renderer's to decide.
+  describe("given a scenario run's voice turns", () => {
+    const audioPart = (url: string) => ({
+      type: "input_audio",
+      input_audio: { url, mimeType: "audio/mpeg" },
+    });
+
+    describe.each([
+      {
+        label: "text-first [text, input_audio] (production SDK ordering)",
+        content: [{ type: "text", text: "hello from the agent" }, audioPart("/api/files/voice-id")],
+      },
+      {
+        label: "audio-first [input_audio, text]",
+        content: [audioPart("/api/files/voice-id"), { type: "text", text: "hello from the agent" }],
+      },
+    ])("when an assistant voice turn carries audio and a transcript, $label", ({ content }) => {
+      /** @scenario "Both part orderings collapse a voice turn into one assistant bubble" */
+      it("renders exactly one assistant-left bubble with the text as transcript", () => {
+        renderConversation({
+          roleMode: "scenario",
+          messages: [
+            { id: "msg_voice_collapse", role: "assistant", trace_id: "trace_voice", content },
+          ],
+        });
+
+        expect(screen.getAllByTestId("media-part-audio")).toHaveLength(1);
+        expect(screen.getAllByTestId("turn-separator")).toHaveLength(1);
+        const mediaWrapper = screen.getByTestId("media-part-audio").closest("[data-align]");
+        expect(mediaWrapper).toContainElement(screen.getByText("hello from the agent"));
+        expect(mediaWrapper).toHaveAttribute("data-align", "flex-start");
+      });
+    });
+
+    describe("when a simulated-user voice turn arrives", () => {
+      /** @scenario "User-role voice turns align right" */
+      it("aligns the user media bubble to the right (flex-end)", () => {
+        renderConversation({
+          roleMode: "scenario",
+          messages: [
+            { id: "msg_voice_user", role: "user", content: [audioPart("/api/files/user-voice")] },
+          ],
+        });
+
+        const mediaWrapper = screen.getByTestId("media-part-audio").closest("[data-align]");
+        expect(mediaWrapper).toHaveAttribute("data-align", "flex-end");
+      });
+    });
+
+    describe("when an assistant voice turn is audio-only", () => {
+      /** @scenario "Audio-only voice turn renders one bubble with no empty transcript artifact" */
+      it("renders one assistant-left audio bubble and no italic transcript node", () => {
+        renderConversation({
+          roleMode: "scenario",
+          messages: [
+            {
+              id: "msg_voice_audio_only",
+              role: "assistant",
+              content: [audioPart("/api/files/solo-voice")],
+            },
+          ],
+        });
+
+        expect(screen.getAllByTestId("media-part-audio")).toHaveLength(1);
+        const mediaWrapper = screen.getByTestId("media-part-audio").closest("[data-align]");
+        expect(mediaWrapper).toHaveAttribute("data-align", "flex-start");
+        expect(mediaWrapper!.querySelector("p")).toBeNull();
+      });
+    });
+
+    describe("when a phone run shows callee and simulator voice turns", () => {
+      /** @scenario "Callee turns show their transcript in the run conversation" */
+      it("shows each callee turn's audio player with its transcript beside it, like the simulator's", () => {
+        renderConversation({
+          roleMode: "scenario",
+          messages: [
+            {
+              id: "msg_callee_turn",
+              role: "assistant",
+              content: [
+                { type: "text", text: "Hello, thanks for calling" },
+                audioPart("/api/files/callee-voice"),
+              ],
+            },
+            {
+              id: "msg_simulator_turn",
+              role: "user",
+              content: [
+                { type: "text", text: "Hi, I have a question about my order" },
+                audioPart("/api/files/simulator-voice"),
+              ],
+            },
+          ],
+        });
+
+        const [calleePlayer, simulatorPlayer] = screen.getAllByTestId("media-part-audio");
+        expect(calleePlayer!.closest("[data-align]")).toContainElement(
+          screen.getByText("Hello, thanks for calling"),
+        );
+        expect(simulatorPlayer!.closest("[data-align]")).toContainElement(
+          screen.getByText("Hi, I have a question about my order"),
+        );
+      });
+    });
+
+    describe("when the simulated user sends a stored document", () => {
+      it("hugs the attachment chip to the user's side", () => {
+        renderConversation({
+          roleMode: "scenario",
+          messages: [
+            {
+              id: "msg_pdf_attachment",
+              role: "user",
+              content: [
+                {
+                  type: "binary",
+                  mimeType: "application/pdf",
+                  id: "so_123",
+                  url: "/api/files/proj_test/so_123",
+                  filename: "document.pdf",
+                },
+              ],
+            },
+          ],
+        });
+
+        const chip = screen.getByTestId("media-part-binary");
+        expect(chip.closest("[data-media-align]")).toHaveAttribute("data-media-align", "flex-end");
+        expect(chip.closest("[data-align]")).toHaveAttribute("data-align", "flex-end");
+      });
     });
   });
 });

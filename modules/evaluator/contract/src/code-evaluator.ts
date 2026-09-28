@@ -51,5 +51,10 @@ export const defaultCodeEvaluatorConfig: CodeEvaluatorConfig = {
 export const CODE_EVALUATOR_CHECK_PREFIX = "code/";
 export const isCodeEvaluatorCheckType = (value: string): boolean =>
   value.startsWith(CODE_EVALUATOR_CHECK_PREFIX);
-export const codeEvaluatorIdFromCheckType = (value: string): string | undefined =>
-  isCodeEvaluatorCheckType(value) ? value.slice(CODE_EVALUATOR_CHECK_PREFIX.length) : undefined;
+/** The evaluator id a `code/…` check type names; any other check type is refused. */
+export const getCodeEvaluatorId = (value: string): string => {
+  if (!isCodeEvaluatorCheckType(value)) {
+    throw new Error(`"${value}" is not a code evaluator check type`);
+  }
+  return value.slice(CODE_EVALUATOR_CHECK_PREFIX.length);
+};

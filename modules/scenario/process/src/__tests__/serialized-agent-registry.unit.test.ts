@@ -5,6 +5,7 @@
 import type { LiteLLMParams, TargetAdapterData } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
+import { createVoiceTransportRegistry } from "../channels/voice-transport.channels.ts";
 import {
   SerializedAgentChannelRegistry,
   HttpSerializedCodeAgentChannel,
@@ -29,7 +30,9 @@ describe("SerializedAgentRegistryAdapter", () => {
         inputs: [],
       };
 
-      const adapter = SerializedAgentChannelRegistry.create().build({
+      const adapter = SerializedAgentChannelRegistry.create({
+        voiceTransports: createVoiceTransportRegistry({}),
+      }).build({
         adapterData,
         modelParams: defaultModelParams,
         projectApiKey: "lw-project-key",
@@ -51,7 +54,9 @@ describe("SerializedAgentRegistryAdapter", () => {
         secrets: {},
       };
 
-      const adapter = SerializedAgentChannelRegistry.create().build({
+      const adapter = SerializedAgentChannelRegistry.create({
+        voiceTransports: createVoiceTransportRegistry({}),
+      }).build({
         adapterData,
         modelParams: defaultModelParams,
         projectApiKey: "lw-project-key",
@@ -73,7 +78,9 @@ describe("SerializedAgentRegistryAdapter", () => {
         secrets: {},
       };
 
-      const adapter = SerializedAgentChannelRegistry.create().build({
+      const adapter = SerializedAgentChannelRegistry.create({
+        voiceTransports: createVoiceTransportRegistry({}),
+      }).build({
         adapterData,
         modelParams: defaultModelParams,
         projectApiKey: "lw-project-key",

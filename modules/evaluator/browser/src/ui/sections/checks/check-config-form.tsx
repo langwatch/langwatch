@@ -30,7 +30,7 @@ import {
   evaluatorTypesSchema,
   getEvaluatorDefaultSettings,
   type EvaluatorDefinition,
-  getEvaluatorDefinitions,
+  findEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-browser-kit";
@@ -54,13 +54,13 @@ import {
 } from "react-hook-form";
 import { z } from "zod";
 
+import { EvaluatorTracesMapping } from "../../../behavior/lent-peers.tsx";
 import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators.ts";
 import {
   type CheckPreconditions,
   checkPreconditionsSchema,
 } from "../../../model/evaluations/types.ts";
 import { PreconditionsField } from "../../elements/checks/preconditions-field.tsx";
-import { EvaluatorTracesMapping } from "../../elements/evaluations/evaluator-traces-mapping.tsx";
 import DynamicZodForm from "./dynamic-zod-form.tsx";
 import { EvaluationManualIntegration } from "./evaluation-manual-integration.tsx";
 import { EvaluatorSelection } from "./evaluator-selection.tsx";
@@ -625,7 +625,7 @@ function applyEvaluatorDefaults({
   evaluatorDefinition: EvaluatorDefinition | undefined;
   resolvedModels: { defaultModel: string | null; embeddingsModel: string | null };
 }) {
-  const defaultName = getEvaluatorDefinitions(checkType)?.name;
+  const defaultName = findEvaluatorDefinitions(checkType)[0]?.name;
   const allDefaultNames = Object.values(availableEvaluators).map((evaluator) =>
     evaluatorDisplayName(evaluator.name),
   );

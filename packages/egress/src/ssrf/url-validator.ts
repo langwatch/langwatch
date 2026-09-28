@@ -296,21 +296,27 @@ function findAllowlistedResult(
   return buildAllowlistedResult(ctx, allowlistedVersion !== 0 ? ctx.hostname : undefined);
 }
 
+/** The URL, refused unless it parses and speaks http or https. */
+function parseHttpUrl(url: string): URL {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    throw new Error("Invalid URL format");
+  }
+
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new Error(
+      `Unsupported protocol: ${parsedUrl.protocol} — only http and https are allowed`,
+    );
+  }
+  return parsedUrl;
+}
+
 /** Builds a validator for one address policy. */
 export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
   return async function validateUrlForSsrf(url: string): Promise<SsrfValidationResult> {
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(url);
-    } catch {
-      throw new Error("Invalid URL format");
-    }
-
-    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-      throw new Error(
-        `Unsupported protocol: ${parsedUrl.protocol} — only http and https are allowed`,
-      );
-    }
+    const parsedUrl = parseHttpUrl(url);
 
     const hostname = bareHostname(parsedUrl);
     const requestHost = parsedUrl.hostname.toLowerCase();

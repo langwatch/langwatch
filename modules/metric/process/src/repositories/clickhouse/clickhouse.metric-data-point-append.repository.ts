@@ -18,7 +18,13 @@ import {
   type MetricDataPointWrite,
 } from "../metric-data-point-append.repository.ts";
 import {
-  MetricDataPointMapper,
+  metricPointFromSeekRow,
+  metricRawRow,
+  metricRollupRow,
+  metricRollupSourceFromRow,
+  metricSeriesRow,
+  metricUsageEstimateRow,
+  validateMetricPoint,
   ROLLUP_SELECT,
   type RollupSourceRow,
   SEEK_SELECT,
@@ -53,7 +59,7 @@ export type MetricClickHouseClientResolver = (tenantId: string) => Promise<Metri
  * Adapts the process's routed `clickhouse` member to Metric's tenant-resolved
  * client, so the append/read repositories below keep their own shape.
  */
-export function createMetricClickHouseResolver(
+function metricClickHouseResolver(
   clickhouse: ClickHouseQueryClient,
 ): MetricClickHouseClientResolver {
   return (tenantId) =>
@@ -160,6 +166,11 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     this.defaultRetentionDays = defaultRetentionDays;
   }
 
+  /** The routed `clickhouse` member, as the tenant-resolved client this repository reads. */
+  static resolverOver(clickhouse: ClickHouseQueryClient): MetricClickHouseClientResolver {
+    return metricClickHouseResolver(clickhouse);
+  }
+
   static create(options: {
     resolveClient: MetricClickHouseClientResolver;
     defaultRetentionDays: number;
@@ -181,7 +192,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }: MetricDataPointBulkWrite): Promise<void> {
     if (points.length === 0) return;
     for (const point of points) {
-      MetricDataPointMapper.validatePoint({
+      validateMetricPoint({
         point,
         operation: "ClickHouseMetricDataPointAppendRepository.ensureDataPoints",
       });
@@ -191,13 +202,13 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
       // Raw must be authoritative before any derived or shadow write.
       await client.insert({
         table: "metric_data_points",
-        values: points.map((point) => MetricDataPointMapper.rawRow({ point, retentionDays })),
+        values: points.map((point) => metricRawRow({ point, retentionDays })),
         format: "JSONEachRow",
         clickhouse_settings: INSERT_SETTINGS,
       });
       await client.insert({
         table: "metric_usage_estimates",
-        values: points.map((point) => MetricDataPointMapper.usageEstimateRow(point)),
+        values: points.map((point) => metricUsageEstimateRow(point)),
         format: "JSONEachRow",
         clickhouse_settings: INSERT_SETTINGS,
       });
@@ -232,7 +243,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }: MetricDataPointBulkWrite): Promise<void> {
     if (points.length === 0) return;
     for (const point of points) {
-      MetricDataPointMapper.validatePoint({
+      validateMetricPoint({
         point,
         operation: "ClickHouseMetricDataPointAppendRepository.upsertSeriesMany",
       });
@@ -250,9 +261,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     const client = await this.resolveClient(points[0]!.tenantId);
     await client.insert({
       table: "metric_series",
-      values: [...latest.values()].map((point) =>
-        MetricDataPointMapper.seriesRow({ point, retentionDays }),
-      ),
+      values: [...latest.values()].map((point) => metricSeriesRow({ point, retentionDays })),
       format: "JSONEachRow",
       clickhouse_settings: INSERT_SETTINGS,
     });
@@ -305,7 +314,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     const client = await this.resolveClient(points[0]!.tenantId);
     await client.insert({
       table: "metric_time_rollups",
-      values: rows.map((row) => MetricDataPointMapper.rollupRow({ row, retentionDays })),
+      values: rows.map((row) => metricRollupRow({ row, retentionDays })),
       format: "JSONEachRow",
       clickhouse_settings: INSERT_SETTINGS,
     });
@@ -332,7 +341,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
         format: "JSONEachRow",
       });
       for (const row of await result.json<SeekMetricRow>()) {
-        found.push(MetricDataPointMapper.fromSeekRow(row));
+        found.push(metricPointFromSeekRow(row));
       }
     }
     return found;
@@ -473,7 +482,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
         format: "JSONEachRow",
       });
       for (const row of await result.json<RollupSourceRow>()) {
-        unique.set(`${row.SeriesId}\u0000${row.PointId}`, MetricDataPointMapper.fromRollupRow(row));
+        unique.set(`${row.SeriesId}\u0000${row.PointId}`, metricRollupSourceFromRow(row));
       }
     }
   }

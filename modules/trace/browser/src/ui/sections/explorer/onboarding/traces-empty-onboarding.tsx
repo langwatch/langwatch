@@ -1,4 +1,5 @@
 import { Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { nowInstant } from "@langwatch/time";
 import { useUIStore } from "@langwatch/trace-browser-kit";
@@ -15,7 +16,6 @@ import {
   markJourneyCompleted,
   useOnboardingStore,
 } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
-import { useDrawer } from "../../../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   findStageDef,

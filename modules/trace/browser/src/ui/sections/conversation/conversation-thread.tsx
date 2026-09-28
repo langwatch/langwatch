@@ -1,12 +1,12 @@
 import { Box, VStack } from "@chakra-ui/react";
+import type {
+  UiConversationAudioPlayback,
+  UiConversationThreadProps,
+} from "@langwatch/browser-host/declarations";
 import { groupIntoTurns } from "@langwatch/trace-browser-kit";
+import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 
-import type {
-  ConversationAudioPlayback,
-  ConversationRoleMode,
-  DisplayPart,
-} from "./conversation.types.ts";
 import {
   ErrorPart,
   ImagePart,
@@ -24,58 +24,7 @@ import { PendingReply } from "./pending-reply.tsx";
  * `compact` is the simulations grid cell — smaller type, tighter truncation,
  * no turn separators, since a card is a preview rather than a transcript.
  */
-export type ConversationVariant = "compact" | "regular";
-
-interface ConversationThreadProps {
-  parts: DisplayPart[];
-  variant?: ConversationVariant;
-  /**
-   * Scenario runs invert the roles a reader expects: the `user` messages come
-   * from a simulated user and the `assistant` messages from the agent under
-   * test. `scenario` swaps the sides so the agent reads as the subject.
-   */
-  roleMode?: ConversationRoleMode;
-  // Custom labels for sides; playground needs reader's name and model under
-  // test instead of generic "User" and "Assistant".
-  labels?: { user?: string; assistant?: string };
-  /** Owns the stored objects behind any media parts. */
-  projectId: string;
-  /** Rendered after each part, keyed by part id — hover actions, delete. */
-  renderPartActions?: (part: DisplayPart) => ReactNode;
-  /** Scrolls the newest part into view as content arrives. */
-  shouldAutoScroll?: boolean;
-  /**
-   * Renders an assistant reply that parses as JSON as a value tree, not
-   * markdown. On for surfaces with structured-output prompts; off
-   * elsewhere, where a JSON-shaped reply is still prose the user wrote.
-   */
-  shouldRenderStructuredOutput?: boolean;
-  // Standalone chat panel framing: scrollbar at panel edge, messages centred;
-  // drawer supplies its own frame and keeps section behavior.
-  panel?: { contentMaxWidth: string };
-  /**
-   * A reply has been asked for and hasn't begun arriving. Draws the
-   * waiting state where the reply will appear — otherwise the gap between
-   * sending and the first token reads as nothing having happened.
-   */
-  hasPendingReply?: boolean;
-  // Live mode numbers turns from start and shows affordances as trace lands,
-  // vs recorded transcript where untraced messages have no trace to offer.
-  live?: boolean;
-  /** Draws one media part. The host owns stored-object probing and playback. */
-  renderMediaPart: RenderMediaPart;
-  /**
-   * Draws the rule that opens a turn. The host owns it because the affordance
-   * on it reaches a trace: it queries for one and opens the trace drawer, both
-   * of which belong to the surface rather than to the renderer.
-   */
-  renderTurnSeparator?: (input: { index: number; traceId?: string; live: boolean }) => ReactNode;
-  /**
-   * Playback props for one part, from the host's sequential player. Absent
-   * where a surface plays no audio, and for any part that is not audio.
-   */
-  audioPlaybackFor?: (part: DisplayPart) => ConversationAudioPlayback | undefined;
-}
+export type ConversationVariant = NonNullable<UiConversationThreadProps["variant"]>;
 
 /** Dispatches one part to the component that knows how to draw it. */
 function ConversationPart({
@@ -96,7 +45,7 @@ function ConversationPart({
   projectId: string;
   shouldRenderStructuredOutput: boolean;
   actions?: ReactNode;
-  audioPlayback?: ConversationAudioPlayback;
+  audioPlayback?: UiConversationAudioPlayback;
   renderMediaPart: RenderMediaPart;
 }) {
   switch (part.kind) {
@@ -142,7 +91,7 @@ function threadBodyLayout({
   panel,
 }: {
   compact: boolean;
-  panel: ConversationThreadProps["panel"];
+  panel: UiConversationThreadProps["panel"];
 }) {
   return {
     align: "stretch",
@@ -174,7 +123,7 @@ export function ConversationThread({
   renderMediaPart,
   renderTurnSeparator,
   audioPlaybackFor,
-}: ConversationThreadProps) {
+}: UiConversationThreadProps) {
   const compact = variant === "compact";
   const scrollRef = useRef<HTMLDivElement>(null);
 

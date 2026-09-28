@@ -1,4 +1,4 @@
-import { MailRender } from "../ports/mail-render.port.ts";
+import { MailRender } from "../mail-render.ts";
 import {
   renderJoinRequestExpiredEmail,
   renderJoinRequestReminderEmail,

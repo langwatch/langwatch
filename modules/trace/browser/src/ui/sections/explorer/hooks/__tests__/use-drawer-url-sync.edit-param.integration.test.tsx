@@ -11,7 +11,7 @@ const harness = vi.hoisted(() => ({
   updateDrawerParams: vi.fn(),
 }));
 
-vi.mock("../../../../../behavior/use-drawer.ts", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawerParams: () => {
     const params: Record<string, string | undefined> = {};
     for (const [key, value] of Object.entries(harness.query)) {

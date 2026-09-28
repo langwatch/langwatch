@@ -375,6 +375,11 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
         [...scopes],
         permission,
       ),
+    assertCanOperateAtOrganization: ({ actor, organizationId, permission }) =>
+      virtualKeyAuthorization.assertActorCanOperateAtOrganization(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        { organizationId, permission },
+      ),
     assertScopesBelongToOrganization: ({ organizationId, scopes }) =>
       virtualKeyAuthorization.assertScopesBelongToOrg({ organizationId, scopes: [...scopes] }),
     assertTraceProjectBelongsToOrganization: ({ organizationId, traceProjectId }) =>

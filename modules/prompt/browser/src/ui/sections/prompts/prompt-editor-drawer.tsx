@@ -1,4 +1,5 @@
 import { Box, Button, Circle, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
+import type { UiPromptEditorDrawerProps } from "@langwatch/browser-host/drawer";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -9,7 +10,6 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { LocalPromptConfig } from "@langwatch/experiment-contract";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -40,71 +40,7 @@ import { ChangeHandleDialog } from "./forms/change-handle-dialog.tsx";
 import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
 import { PromptEditorHeader } from "./prompt-editor-header.tsx";
 
-export type PromptEditorDrawerProps = {
-  open?: boolean;
-  onClose?: () => void;
-  onSave?: (prompt: {
-    id: string;
-    name: string;
-    version?: number;
-    versionId?: string;
-    inputs?: { identifier: string; type: string }[];
-    // json_schema flows to the target so structured outputs stay field-selectable
-    // in the comparison config — see promptEditorCallbacks.onSave.
-    outputs?: {
-      identifier: string;
-      type: string;
-      json_schema?: object | null;
-    }[];
-  }) => void;
-  /** If provided, loads an existing prompt for editing */
-  promptId?: string;
-  /**
-   * If provided, fetches this specific version instead of the latest.
-   * Used when editing a prompt that has local changes based on an older version.
-   */
-  promptVersionId?: string;
-  /**
-   * For evaluations context: callback to persist local changes when closing without save.
-   * If provided, closing with unsaved changes will call this instead of showing a warning.
-   * Pass undefined to clear local changes (when form matches saved state).
-   */
-  onLocalConfigChange?: (config: LocalPromptConfig | undefined) => void;
-  /**
-   * Initial local config to load (for resuming unpublished changes).
-   */
-  initialLocalConfig?: LocalPromptConfig;
-  /**
-   * Fallback config used ONLY when `promptId` is set but the prompt is not found in the
-   * project (e.g. a workflow imported from another project).
-   */
-  inlineConfigFallback?: LocalPromptConfig;
-  /**
-   * Available sources for variable mapping (e.g., dataset columns).
-   * When provided, shows mapping UI instead of simple value inputs.
-   */
-  availableSources?: AvailableSource[];
-  /**
-   * Current input mappings (managed by parent, e.g., evaluations store).
-   */
-  inputMappings?: Record<string, FieldMapping>;
-  /**
-   * Callback when input mappings change.
-   */
-  onInputMappingsChange?: (identifier: string, mapping: FieldMapping | undefined) => void;
-  /**
-   * Callback when a version is loaded from history (for evaluations context).
-   * Called before the form is reset with the new version data.
-   */
-  onVersionChange?: (prompt: {
-    version: number;
-    versionId: string;
-    inputs?: { identifier: string; type: string }[];
-    outputs?: { identifier: string; type: string }[];
-  }) => void;
-  /** When true, renders form content without Drawer shell (for embedding in external drawer) */
-  headless?: boolean;
-};
+export type PromptEditorDrawerProps = UiPromptEditorDrawerProps;
 
 type EditorSave = ReturnType<typeof usePromptEditorSave>;
 type EditorMethods = ReturnType<typeof usePromptEditorForm>["methods"];

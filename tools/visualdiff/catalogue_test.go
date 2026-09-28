@@ -7,13 +7,13 @@ import (
 )
 
 // testCatalogue is a small fixture standing in for modules/catalogue.json:
-// enough features to exercise an exact route-segment match, the
+// enough modules to exercise an exact route-segment match, the
 // singular/plural fallback, and an unmatched route.
 const testCatalogue = `{
   "version": 0,
   "features": [
-    {"id": "analytics", "root": "modules/analytics", "classification": "core", "subjects": ["analytics"]},
-    {"id": "annotation", "root": "modules/annotation", "classification": "core", "subjects": ["annotation"]}
+    {"id": "analytics", "root": "modules/analytics", "subjects": ["analytics"]},
+    {"id": "annotation", "root": "modules/annotation", "subjects": ["annotation"]}
   ]
 }`
 

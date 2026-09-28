@@ -52,8 +52,14 @@ export function listBarrels() {
   return out.split("\n").filter(Boolean);
 }
 
+/** The default sort's own order, spelled out. */
+function byCodeUnit(left, right) {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
 export function listTargets() {
-  return [...listBarrels(), ...PROCESS_ENTRYPOINTS].toSorted();
+  return [...listBarrels(), ...PROCESS_ENTRYPOINTS].toSorted(byCodeUnit);
 }
 
 const IMPORT_PROBE = `

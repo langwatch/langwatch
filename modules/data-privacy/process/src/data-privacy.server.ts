@@ -1,12 +1,7 @@
 import { defineServerModule } from "@langwatch/kernel";
 
-import type { DataPrivacyDirectoryReader } from "./app/data-privacy.app.ts";
 import { DataPrivacyApp } from "./app/data-privacy.app.ts";
 import { dataPrivacyRepositories } from "./repositories/data-privacy-repositories.registry.ts";
-import {
-  PrismaDataPrivacyDirectoryRepository,
-  type DataPrivacyDirectoryDatabase,
-} from "./repositories/prisma/prisma.data-privacy-directory.repository.ts";
 import {
   OtlpSpanContentDropService,
   type OtlpSpanContentDropServiceOptions,
@@ -25,12 +20,6 @@ export const dataPrivacyServer = defineServerModule("data-privacy")
  * composition root never names one directly (private-runtime-export drive,
  * dev/docs/plans/private-runtime-export-drive.md §3d).
  */
-
-export function createDataPrivacyDirectoryReader(
-  database: DataPrivacyDirectoryDatabase,
-): DataPrivacyDirectoryReader {
-  return PrismaDataPrivacyDirectoryRepository.create(database);
-}
 
 export function createOtlpSpanContentDropService(
   options: OtlpSpanContentDropServiceOptions,

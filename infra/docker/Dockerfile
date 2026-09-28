@@ -178,6 +178,9 @@ RUN apk --no-cache add curl openssl bash
 RUN npm install -g pnpm@10.24.0
 
 COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
+# The scenario SDK opens a voice worker's quick tunnel with a bare `cloudflared` spawn, so the
+# binary is on the image's PATH; the worker never writes its own environment (Alex, 2026-09-28).
+COPY --from=cloudflare/cloudflared:latest /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 
 WORKDIR /app
 

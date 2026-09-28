@@ -22,6 +22,8 @@ const (
 	FindingUnverifiedShape    = "unverified_shape"
 	FindingProbeFailed        = "probe_failed"
 	FindingSkipped            = "skipped"
+	// FindingRuled is a body difference a probe ruling triaged; see probe-rulings.go.
+	FindingRuled = "ruled"
 )
 
 // Finding is one behavioral difference, in the spirit of
@@ -152,17 +154,18 @@ func (cmp Comparison) compareBodies(before, after SideResult) ([]Finding, bool) 
 func (cmp Comparison) compareJSONBodies(beforeBody, afterBody any, bothErrored bool) []Finding {
 	beforeShape, afterShape := ShapeOf(beforeBody), ShapeOf(afterBody)
 	if beforeShape.Signature() != afterShape.Signature() {
-		kind := FindingBodyShapeDiff
 		if bothErrored {
-			kind = FindingErrorShapeDiff
+			return []Finding{cmp.finding(FindingErrorShapeDiff, map[string][2]any{
+				"shape": {beforeShape.Signature(), afterShape.Signature()},
+			})}
 		}
-		return []Finding{cmp.finding(kind, map[string][2]any{
+		return cmp.ruleShape(cmp.finding(FindingBodyShapeDiff, map[string][2]any{
 			"shape": {beforeShape.Signature(), afterShape.Signature()},
-		})}
+		}), beforeBody, afterBody)
 	}
 
 	if fields := valueDiffFields(MaskValue(beforeBody), MaskValue(afterBody)); len(fields) > 0 {
-		return []Finding{cmp.finding(FindingBodyValueDiff, fields)}
+		return cmp.ruleValues(cmp.finding(FindingBodyValueDiff, fields))
 	}
 	return nil
 }
@@ -178,9 +181,9 @@ func (cmp Comparison) compareRawBodies(before, after SideResult, sameKind bool) 
 			"content": {"non-JSON", "JSON"},
 		})}
 	}
-	return []Finding{cmp.finding(FindingBodyValueDiff, map[string][2]any{
+	return cmp.ruleRaw(cmp.finding(FindingBodyValueDiff, map[string][2]any{
 		"body": {truncateForFinding(before.Body), truncateForFinding(after.Body)},
-	})}
+	}), before.Body, after.Body)
 }
 
 // valueDiffFields walks both masked trees in lockstep and collects one

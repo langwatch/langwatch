@@ -209,6 +209,72 @@ describe("AccountIdentifiersService", () => {
     });
   });
 
+  describe("given the account's own address is attached but never confirmed", () => {
+    describe("when the owner asks for its confirmation", () => {
+      /** @scenario "The own address confirmation only ever goes to the session's own address" */
+      it("starts the ceremony for that identifier and names it back", async () => {
+        const { service, mail, mintEmailVerification } = harness({
+          heads: holding(fact({ identifierId: "idf_own", state: "ATTACHED", verifiedAtMs: null })),
+        });
+
+        await expect(
+          service.sendOwnAddressConfirmation({
+            userId: USER,
+            email: "Sam@Acme.com",
+            codeChallenge: CHALLENGE,
+          }),
+        ).resolves.toEqual({ identifierId: "idf_own" });
+        expect(mintEmailVerification).toHaveBeenCalledWith({
+          userId: USER,
+          identifierId: "idf_own",
+          codeChallenge: CHALLENGE,
+        });
+        expect(mail.sent).toEqual([
+          {
+            email: "sam@acme.com",
+            identifierId: "idf_own",
+            verificationId: "verif_1",
+            token: "tok_1",
+          },
+        ]);
+      });
+    });
+  });
+
+  describe("given the account's own address is already confirmed", () => {
+    /** @scenario "An own address that is already confirmed is not confirmed again" */
+    it("sends nothing and says it is not awaiting confirmation", async () => {
+      const { service, mail } = harness({ heads: holding(fact({ identifierId: "idf_own" })) });
+
+      await expect(
+        service.sendOwnAddressConfirmation({
+          userId: USER,
+          email: "sam@acme.com",
+          codeChallenge: CHALLENGE,
+        }),
+      ).rejects.toMatchObject({ code: "identity_identifier_not_verifiable" });
+      expect(mail.sent).toEqual([]);
+    });
+  });
+
+  describe("given the account is not known by its own address", () => {
+    /** @scenario "An own address the account is not known by sends nothing" */
+    it("sends nothing and says the address was not found", async () => {
+      const { service, mail } = harness({
+        heads: holding(fact({ identifierId: "idf_other", value: "sam@other.test" })),
+      });
+
+      await expect(
+        service.sendOwnAddressConfirmation({
+          userId: USER,
+          email: "sam@acme.com",
+          codeChallenge: CHALLENGE,
+        }),
+      ).rejects.toMatchObject({ code: "identity_identifier_not_found" });
+      expect(mail.sent).toEqual([]);
+    });
+  });
+
   describe("given a primary address, an unconfirmed one and a passkey", () => {
     describe("when the list is read", () => {
       it("says of each what it is, and what the guard would say about losing it", async () => {

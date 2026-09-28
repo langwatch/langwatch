@@ -1,7 +1,9 @@
 import { chakra, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import type { MediaPartData } from "@langwatch/trace-browser-kit";
-import { collectMediaParts } from "@langwatch/trace-browser-kit";
-import type { TraceMediaRef } from "@langwatch/trace-contract";
+import {
+  collectMediaParts,
+  type MediaPartData,
+  type TraceMediaRef,
+} from "@langwatch/trace-contract";
 import { ArrowDown, ArrowUp, AudioLines, Bot, Film, Paperclip, User, Wrench } from "lucide-react";
 import type React from "react";
 import { Fragment, memo, type ReactNode, useLayoutEffect, useMemo, useRef } from "react";

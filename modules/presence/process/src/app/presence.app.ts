@@ -24,6 +24,7 @@ import type { Cluster, Redis } from "ioredis";
 
 import type { PresenceRepositories } from "../repositories/presence.repositories.ts";
 import { RedisBroadcastRepository } from "../repositories/redis/redis.broadcast.repository.ts";
+import { BroadcastTenantRateLimiterService } from "../services/broadcast-tenant-rate-limiter.service.ts";
 import { PresenceStreamService } from "../services/presence-stream.service.ts";
 import { PresenceService } from "../services/presence.service.ts";
 
@@ -31,7 +32,7 @@ export interface PresenceBroadcast {
   publish(input: {
     projectId: string;
     event: string;
-    channel: "presence_updated" | "presence_cursor" | "export_progress";
+    channel: "presence_updated" | "presence_cursor" | PresenceProjectEvent["channel"];
     rateLimited: boolean;
   }): Promise<void>;
 }
@@ -99,7 +100,12 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
 
   static create({ repositories, members, dependencies, resources }: PresenceSetup): PresenceApp {
     const needsDerivedFabric = !members.broadcast || !members.emitters;
-    const derived = needsDerivedFabric ? RedisBroadcastRepository.create(members.redis) : undefined;
+    const derived = needsDerivedFabric
+      ? RedisBroadcastRepository.create(members.redis, {
+          sender: BroadcastTenantRateLimiterService.create(),
+          subscriber: BroadcastTenantRateLimiterService.create(),
+        })
+      : undefined;
     if (derived) {
       resources.ownService({
         name: "presence-broadcast",

@@ -55,6 +55,21 @@ var servedIgnores = []struct {
 	{ignoreBetterAuth, func(path string) bool { return path == "/api/auth/*" }},
 	{ignoreTrpcLanes, func(path string) bool { return path == "/api/trpc/*" || path == "/api/sse/*" }},
 	{ignoreVersionMount, versionMountRoute},
+	{ignoreServedLiterally, func(path string) bool { return servedLiterally[path] }},
+}
+
+// ignoreServedLiterally names main routes whose wildcard or parameter the
+// branch answers route by route instead.
+const ignoreServedLiterally = "main's wildcard or parameter route is served one route per operation on the branch"
+
+// servedLiterally: main's /api/evaluations/v3/* only forwarded to its v3 app,
+// which experiment-v3-legacy.rest.ts serves route for route; main's gateway
+// connect dispatch table has exactly instant-evals-classify, usage and budget,
+// which licensing's connect-hosted.rest.ts serves as literal routes.
+var servedLiterally = map[string]bool{
+	"/api/evaluations/v3/*":                     true,
+	"/api/internal/gateway/connect/:operation":  true,
+	"/api/internal/gateway/connect/{operation}": true,
 }
 
 func ignoreReason(path string) string {
@@ -130,6 +145,7 @@ func (diff *servedDiff) file(route ServedRoute) {
 // by the prefix they answer under.
 type servedIndex struct {
 	exact     map[string]bool
+	paths     map[string]bool
 	wildcards []servedWildcard
 	count     int
 }
@@ -140,13 +156,14 @@ type servedWildcard struct {
 }
 
 func indexServed(routes []ServedRoute) servedIndex {
-	index := servedIndex{exact: map[string]bool{}}
+	index := servedIndex{exact: map[string]bool{}, paths: map[string]bool{}}
 	for _, route := range routes {
 		key := routeKey(route.Path)
 		if index.exact[route.Method+" "+key] {
 			continue
 		}
 		index.exact[route.Method+" "+key] = true
+		index.paths[key] = true
 		index.count++
 		if prefix, found := strings.CutSuffix(key, "*"); found {
 			index.wildcards = append(index.wildcards, servedWildcard{method: route.Method, prefix: prefix})
@@ -156,8 +173,13 @@ func indexServed(routes []ServedRoute) servedIndex {
 }
 
 // covers says whether the branch answers a main METHOD key: the same route,
-// an any-method route, GET for a HEAD, or a wildcard the key falls under.
+// an any-method route, GET for a HEAD, or a wildcard the key falls under. A
+// main ALL is covered by any declared method there: the framework's method
+// guard answers the rest with 405, as main's catch-all did.
 func (index servedIndex) covers(method, key string) bool {
+	if method == "ALL" && index.paths[key] {
+		return true
+	}
 	methods := coveringMethods(method)
 	for _, candidate := range methods {
 		if index.exact[candidate+" "+key] {

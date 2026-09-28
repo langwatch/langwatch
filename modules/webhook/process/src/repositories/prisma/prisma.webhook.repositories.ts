@@ -1,7 +1,6 @@
 /**
  * Live tier combining Postgres and ClickHouse; hand-written to span two stores coexisting.
  */
-import { PrismaProcessStore } from "@langwatch/eventing/server";
 import { generate } from "@langwatch/ksuid";
 
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
@@ -75,7 +74,6 @@ export class PostgresWebhookRepositories {
       events: WebhookEventsClickHouseRepository.forRoutedClickHouse(members.clickhouse),
       retention: PrismaWebhookRetentionRepository.create({ prisma: members.prisma }),
       tenants: PrismaWebhookTenantsRepository.create(members.prisma),
-      processStore: PrismaProcessStore.create({ database: members.prisma }),
     };
   }
 }

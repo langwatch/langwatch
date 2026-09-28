@@ -12,6 +12,16 @@ const trimmedOptional = z
   .optional()
   .transform((value) => value?.trim() || void 0);
 const passthrough = z.string().optional();
+/** On unless the value is the literal "false" (case-insensitive). */
+const onUnlessFalse = z
+  .string()
+  .optional()
+  .transform((value) => (value ?? "").trim().toLowerCase() !== "false");
+/** Off unless the value is the literal "true" (case-insensitive). */
+const offUnlessTrue = z
+  .string()
+  .optional()
+  .transform((value) => (value ?? "").trim().toLowerCase() === "true");
 const optionalNumber = z
   .string()
   .optional()
@@ -26,6 +36,10 @@ export const scenarioConfig = Config.define((c) => ({
   langwatchEndpoint: c.env("LANGWATCH_ENDPOINT", trimmedOptional),
   /** The worker media listener's public origin, forwarded only to voice children. */
   voicePublicBaseUrl: c.env("VOICE_PUBLIC_BASE_URL", trimmedOptional),
+  /** The worker's quick-tunnel fallback when no public origin is set. */
+  voiceTunnel: c.env("VOICE_TUNNEL", onUnlessFalse),
+  /** A voice-only worker refuses to boot without a public https origin. */
+  voiceWorkerOnly: c.env("VOICE_WORKER_ONLY", offUnlessTrue),
   /** The browser call's length cap in seconds; unusable values fall back to the default. */
   voiceCallMaxSeconds: c.env("VOICE_CALL_MAX_SECONDS", passthrough),
   blockLocalHttpCalls,

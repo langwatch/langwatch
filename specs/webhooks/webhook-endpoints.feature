@@ -409,6 +409,37 @@ Feature: Webhook endpoints, signed outbound event delivery
       When the coalescing deadline passes
       Then the wake flushes them as one batch
 
+    @unit
+    Scenario: The delivery process manager flushes an endpoint stream on its wake
+      Given an active endpoint with a coalescing delay
+      And a confirmed spend step buffered in the endpoint's stream
+      When the stream's wake fires
+      Then the buffered envelope is delivered to the endpoint once
+
+    @unit
+    Scenario: A memory-tier worker delivers a completed gateway request to its endpoint
+      Given a worker installed over memory stores with one active HTTP endpoint
+      When gateway hands over a request's admitted and confirmed spend steps
+      Then the endpoint's delivery log records one attempt
+
+    @unit
+    Scenario: A memory-tier replay is delivered through the worker's endpoint stream
+      Given a memory-tier worker with one active HTTP endpoint and an emitted envelope
+      When the envelope is replayed to the endpoint
+      Then the endpoint's delivery log records one attempt
+
+    @unit
+    Scenario: Endpoint health reads the worker's pending endpoint stream
+      Given a memory-tier worker with an endpoint that holds envelopes for a minute
+      When a completed gateway request is still coalescing in its endpoint stream
+      Then the endpoint's health reports an undelivered envelope
+
+    @unit
+    Scenario: An operator wake on the delivery maintenance claim leaves it as it was
+      Given the hourly maintenance claim stored under the delivery process
+      When an operator wakes it from the ops console
+      Then the claim is read and committed unchanged
+
     @integration
     Scenario: Under backpressure batches grow toward the size cap
       Given an endpoint capped at one in-flight send with a slow receiver

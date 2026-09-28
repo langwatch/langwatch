@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -69,14 +72,13 @@ func havenEnv(inherit []string, slug string) []string {
 // as the stack is backgrounded, and the expensive part (install, codegen,
 // migrate, seed, then the lanes) then runs on both sides at once.
 func (run *session) bringUpHaven(ctx context.Context) error {
-	stacks := []*Stack{&run.plan.Base, &run.plan.Candidate}
-	for _, stack := range stacks {
-		if err := run.checkoutForHaven(ctx, stack); err != nil {
-			return err
-		}
+	stacks := run.liveStacks()
+	running, err := run.prepareHaven(ctx, stacks)
+	if err != nil {
+		return err
 	}
 	for _, stack := range stacks {
-		if err := run.havenUp(ctx, *stack); err != nil {
+		if err := run.startHaven(ctx, *stack, running[stack.Name]); err != nil {
 			return err
 		}
 	}
@@ -84,8 +86,80 @@ func (run *session) bringUpHaven(ctx context.Context) error {
 		if err := run.havenWaitReady(ctx, stack); err != nil {
 			return err
 		}
+		if err := run.waitForAPI(ctx, *stack); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// waitForAPI waits for the API through the routed origin. A monolith's one
+// lane listens as soon as its page server does, while its API is still
+// booting behind it, and a seed sent then answers 502.
+func (run *session) waitForAPI(ctx context.Context, stack Stack) error {
+	wait := run.request.Deps.Wait
+	if wait == nil {
+		return nil
+	}
+	if err := wait(ctx, []string{stack.APIURL() + HealthPath}, run.request.Options.BootTimeout); err != nil {
+		return fmt.Errorf("%s: the API behind %s never answered: %w", stack.Name, stack.APIURL(), err)
+	}
+	return nil
+}
+
+// prepareHaven adopts each stack a -resume run already prepared and checks
+// out the rest, reporting which stacks haven already runs.
+func (run *session) prepareHaven(ctx context.Context, stacks []*Stack) (map[string]bool, error) {
+	running := map[string]bool{}
+	for _, stack := range stacks {
+		adopted, live, err := run.adoptHaven(ctx, stack)
+		if err != nil {
+			return nil, err
+		}
+		running[stack.Name] = live
+		if !adopted {
+			if err := run.checkoutForHaven(ctx, stack); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return running, nil
+}
+
+// startHaven boots a stack unless haven already runs it, recording it for
+// teardown either way.
+func (run *session) startHaven(ctx context.Context, stack Stack, running bool) error {
+	if running {
+		run.havenSlugs = append(run.havenSlugs, stack.HavenSlug)
+		return nil
+	}
+	return run.havenUp(ctx, stack)
+}
+
+// adoptHaven takes over a -resume run's own prepared worktree instead of
+// checking it out again, and reports whether haven already runs its stack,
+// so a resumed run only boots what is not up.
+func (run *session) adoptHaven(ctx context.Context, stack *Stack) (bool, bool, error) {
+	if !run.request.Options.Resume {
+		return false, false, nil
+	}
+	if !dirExists(stack.Dir) {
+		return false, false, nil
+	}
+	run.created = append(run.created, stack.Dir)
+	layout, err := run.request.Deps.Layout(stack.Dir)
+	if err != nil {
+		return false, false, err
+	}
+	stack.Layout = layout
+	live := false
+	if status, err := run.havenStatus(ctx, *stack); err == nil {
+		for _, reported := range status.Stacks {
+			live = live || (reported.Slug == stack.HavenSlug && reported.Live)
+		}
+	}
+	fmt.Fprintf(run.streams.Err, "%s: resumed %s (haven stack %s, running=%t)\n", stack.Name, stack.Dir, stack.HavenSlug, live)
+	return true, live, nil
 }
 
 // checkoutForHaven adds one ref's worktree and prepares it. haven's own
@@ -182,6 +256,10 @@ func CopyEnvFiles(ctx context.Context, root, dir string) (int, error) {
 // teardown has to be able to take them.
 func (run *session) havenUp(ctx context.Context, stack Stack) error {
 	run.havenSlugs = append(run.havenSlugs, stack.HavenSlug)
+	if run.logOffsets == nil {
+		run.logOffsets = map[string]int64{}
+	}
+	run.logOffsets[stack.HavenSlug] = logSize(stack.HavenSlug)
 	fmt.Fprintf(run.streams.Err, "%s: haven up --agent --detach (stack %s)\n", stack.Name, stack.HavenSlug)
 	spec := commandSpec{name: havenrun.Command, args: havenrun.UpArgs(), dir: stack.Dir, env: havenEnv(run.request.Deps.Environ(), stack.HavenSlug)}
 	if err := run.request.Deps.Run(ctx, spec, run.streams.Err); err != nil {
@@ -199,13 +277,8 @@ func (run *session) havenWaitReady(ctx context.Context, stack *Stack) error {
 	deadline := time.Now().Add(timeout)
 	fmt.Fprintf(run.streams.Err, "%s: waiting for the ui and backend lanes of %q (up to %s)\n", stack.Name, stack.HavenSlug, timeout)
 	for {
-		status, err := run.havenStatus(ctx, *stack)
-		if err == nil {
-			if url, ready := havenStackURL(status, stack.HavenSlug); ready {
-				stack.HavenURL = url
-				fmt.Fprintf(run.streams.Err, "%s: %s ready at %s\n", stack.Name, stack.HavenSlug, url)
-				return nil
-			}
+		if ready, err := run.havenPoll(ctx, stack); ready || err != nil {
+			return err
 		}
 		if time.Now().After(deadline) {
 			return fmt.Errorf("%s: haven stack %q had no healthy ui/backend lanes within %s\n%s",
@@ -217,6 +290,78 @@ func (run *session) havenWaitReady(ctx context.Context, stack *Stack) error {
 		case <-time.After(havenrun.PollDelay(deadline, havenrun.DefaultReadyPoll)):
 		}
 	}
+}
+
+// havenPoll asks haven once: ready adopts the stack's URL, and a stack haven
+// has already given up on is an error now rather than at the timeout.
+func (run *session) havenPoll(ctx context.Context, stack *Stack) (bool, error) {
+	status, statusErr := run.havenStatus(ctx, *stack)
+	if statusErr != nil {
+		// A status call that fails mid-boot is retried; the boot timeout bounds it.
+		return false, nil //nolint:nilerr // retried by the caller's poll loop.
+	}
+	if url, ready := havenStackURL(status, stack.HavenSlug); ready {
+		stack.HavenURL = url
+		fmt.Fprintf(run.streams.Err, "%s: %s ready at %s\n", stack.Name, stack.HavenSlug, url)
+		return true, nil
+	}
+	if fatal, tail := havenGaveUp(status, stack.HavenSlug, run.logOffsets[stack.HavenSlug]); fatal != "" {
+		return false, fmt.Errorf("%s: haven gave up on stack %q: %s\n%s", stack.Name, stack.HavenSlug, fatal, tail)
+	}
+	return false, nil
+}
+
+// havenGaveUp reports haven's own fatal line for a stack that is not live
+// and whose log, since from, carries one - so a stack that died in its first
+// minute fails the run then rather than at the boot timeout. from skips what
+// an earlier `haven up` of the same slug wrote.
+func havenGaveUp(status havenrun.Status, slug string, from int64) (string, string) {
+	for _, stack := range status.Stacks {
+		if stack.Slug == slug && stack.Live {
+			return "", ""
+		}
+	}
+	content, err := readFrom(havenrun.StackLogFile(slug), from)
+	if err != nil {
+		return "", ""
+	}
+	plain := ansiEscape.ReplaceAllString(content, "")
+	for _, line := range strings.Split(plain, "\n") {
+		if at := strings.Index(line, "haven: "); at >= 0 {
+			return strings.TrimSpace(line[at:]), havenrun.LastLines(plain, havenrun.DefaultFailureLogLines)
+		}
+	}
+	return "", ""
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
+// ansiEscape matches the terminal control sequences haven's log viewer writes.
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
+
+// logSize is how much of a stack's log exists now, so a later read can skip it.
+func logSize(slug string) int64 {
+	info, err := os.Stat(havenrun.StackLogFile(slug))
+	if err != nil {
+		return 0
+	}
+	return info.Size()
+}
+
+func readFrom(path string, from int64) (string, error) {
+	file, err := os.Open(path) // #nosec G304 -- a stack log under haven's own home, named by this run's slug.
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	if _, err := file.Seek(from, io.SeekStart); err != nil {
+		return "", err
+	}
+	content, err := io.ReadAll(file)
+	return string(content), err
 }
 
 // havenStackURL reports the app hostname to drive once the named stack's
@@ -254,6 +399,9 @@ func (run *session) havenBackendLog(ctx context.Context, stack Stack) string {
 	var out bytes.Buffer
 	spec := commandSpec{name: havenrun.Command, args: havenrun.LogArgs(lane, stack.HavenSlug), dir: stack.Dir, env: havenEnv(run.request.Deps.Environ(), stack.HavenSlug)}
 	if err := run.request.Deps.Run(ctx, spec, &out); err != nil {
+		if tail, fileErr := havenrun.StackLogTailOrError(stack.HavenSlug, havenrun.DefaultFailureLogLines); fileErr == nil {
+			return tail
+		}
 		return fmt.Sprintf("(%s log for %s unavailable: %v)", lane, stack.HavenSlug, err)
 	}
 	return havenrun.LastLines(out.String(), havenrun.DefaultFailureLogLines)

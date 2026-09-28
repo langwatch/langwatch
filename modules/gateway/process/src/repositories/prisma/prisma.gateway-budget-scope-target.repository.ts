@@ -51,16 +51,22 @@ export class PrismaGatewayBudgetScopeTargetRepository {
     prisma,
     kind,
     idSet,
+    organizationId,
   }: AddTargetArgs & {
     kind: "ORGANIZATION" | "TEAM";
   }): Promise<void> {
-    if (idSet.size === 0) return;
-    const where = { where: { id: { in: [...idSet] } } };
+    if (idSet.size === 0 || !organizationId) return;
     const select = { select: { id: true, name: true, slug: true } };
     const rows =
       kind === "ORGANIZATION"
-        ? await prisma.organization.findMany({ ...where, ...select })
-        : await prisma.team.findMany({ ...where, ...select });
+        ? await prisma.organization.findMany({
+            where: { id: { in: [...idSet].filter((id) => id === organizationId) } },
+            ...select,
+          })
+        : await prisma.team.findMany({
+            where: { id: { in: [...idSet] }, organizationId },
+            ...select,
+          });
     for (const r of rows) {
       out.set(scopeTargetKey(kind, r.id), {
         kind,
@@ -225,7 +231,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
 
   /**
    * Resolve display targets for budget scopes, grouped by scopeType so each
-   * kind costs at most one findMany. VK, GROUP and PRINCIPAL lookups pin
+   * kind costs at most one findMany. Every prisma lookup pins
    * organizationId so a stray scopeId can't surface another tenant's data.
    */
   async resolveScopeTargetsBatch({
@@ -270,12 +276,14 @@ export class PrismaGatewayBudgetScopeTargetRepository {
         prisma,
         kind: "ORGANIZATION",
         idSet: ids.ORGANIZATION!,
+        organizationId,
       }),
       this.addNamedTargets({
         out,
         prisma,
         kind: "TEAM",
         idSet: ids.TEAM!,
+        organizationId,
       }),
       this.addVirtualKeyTargets({
         out,

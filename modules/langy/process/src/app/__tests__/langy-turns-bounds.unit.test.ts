@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   EventSourcing,
@@ -21,6 +22,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { OnboardingApi } from "@langwatch/onboarding-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
@@ -113,6 +115,8 @@ async function harness() {
         requestBound: ({ key, organizationId }) =>
           Promise.resolve(resolveRequestBound(key, TIER_PLAN_TYPE[organizationId] ?? "FREE")),
       }),
+      onboarding: createApiFixture<OnboardingApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
     },
     members: {
       publicBaseUrl: undefined,
@@ -120,7 +124,6 @@ async function harness() {
       // A throwing double rather than a Redis-less build: the turn paths this
       // suite exercises never reach the member, and a reach is a loud failure.
       redis: createApiFixture<RedisConnection>(),
-      eventing: recordingEventing(),
       rateLimiter: windowLimiter(),
     },
     config: {
@@ -136,6 +139,9 @@ async function harness() {
     secrets: noSecrets,
     repositories: MemoryLangyRepositories.create(),
   });
+  app.connectConversationCommands(
+    recordingEventing().register(app.conversationPipeline({ participation: "produce" })).commands,
+  );
 
   const dispatched = vi
     .spyOn(app.langyService, "startConversationTurn")

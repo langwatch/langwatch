@@ -22,6 +22,7 @@ import {
   type ReportTemplateContext,
   type TemplateContext,
 } from "@langwatch/automation-contract";
+import type { UiAutomationDrawerProps } from "@langwatch/browser-host/drawer";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -164,36 +165,7 @@ export function AutomationDrawer({
   initialFilters,
   initialFilterQuery,
   onClose,
-}: {
-  automationId?: string;
-  /** Marker query param set by the email "Edit automation" footer link so the
-   *  drawer can surface a one-line landing banner. Any other value (or
-   *  undefined) renders the drawer normally. */
-  source?: string;
-  /** When set, the drawer opens in graph-alert mode with the graph
-   *  pre-filled and locked. Used by the dashboard "Add alert" entry
-   *  point (Phase 5.2). */
-  prefilledGraphId?: string;
-  prefilledSeriesName?: string;
-  /** Fresh-create prefills from the "New alert" button and use-case cards:
-   *  `initialSource: "customGraph"` opens a new alert with the graph left
-   *  unlocked (unlike `prefilledGraphId`). `initialFilters` is the
-   *  persisted-shape JSON filter, sanitized like the edit-hydration path. */
-  initialSource?: string;
-  initialName?: string;
-  initialAction?: string;
-  initialFilters?: string;
-  /** ADR-043 Subject facet: a Traces-V2 liqe query to seed a fresh trace
-   *  automation with — set by the traces view's "Automate" button so the
-   *  current filter becomes the automation's subject. */
-  initialFilterQuery?: string;
-  /**
-   * Closes the editor. Taken as a prop rather than calling `closeDrawer`
-   * directly (drawers doc rule): that would clear the whole navigation
-   * stack. Supplied once by the composing application's registry adapter.
-   */
-  onClose: () => void;
-}) {
+}: UiAutomationDrawerProps) {
   const { project, organization, team } = useOrganizationTeamProject();
   const appBaseUrl = useAppBaseUrl();
   const projectId = project?.id ?? "";

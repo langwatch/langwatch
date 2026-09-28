@@ -12,14 +12,18 @@ import { useFilteredProjects } from "../../behavior/use-filtered-projects.ts";
 import { useRecentItems } from "../../behavior/use-recent-items.ts";
 import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import { useScrollIntoView } from "../../behavior/use-scroll-into-view.ts";
-import { findEasterEgg } from "../../model/command-easter-eggs.ts";
+import type { Command } from "../../model/command-bar-types.ts";
+import { findEasterEgg, type EasterEgg } from "../../model/command-easter-eggs.ts";
 import type { ListItem } from "../../model/command-icon-info.ts";
 import { beginLangyHandoff } from "../../model/command-langy-handoff.ts";
 import {
+  type AddRecentItem,
   handleCommandSelect,
   handleProjectSelect,
   handleRecentItemSelect,
   handleSearchResultSelect,
+  type NavigationContext,
+  type OpenDrawer,
 } from "../../model/command-select-handlers.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { CommandBarLangyMode } from "../blocks/command-bar-langy-mode.tsx";
@@ -32,6 +36,254 @@ import { CommandBarResults } from "./command-bar-results.tsx";
 const RESULTS_PANEL_MIN_HEIGHT = 180;
 /** Breathing room between the panel's bottom edge and the viewport's. */
 const RESULTS_PANEL_VIEWPORT_MARGIN = 24;
+
+const THEME_BY_COMMAND: Partial<Record<string, "light" | "dark" | "system">> = {
+  "action-theme-light": "light",
+  "action-theme-dark": "dark",
+  "action-theme-system": "system",
+};
+
+/**
+ * The inline panel hangs off the ask field, so its room depends on where
+ * that field sits. Measured rather than guessed: a fixed `vh` cap that
+ * looks right on a laptop runs off a short window.
+ */
+function useInlinePanelMaxHeight({ inline, active }: { inline: boolean; active: boolean }): {
+  panelRef: React.RefObject<HTMLDivElement | null>;
+  panelMaxHeight: number | null;
+} {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
+  useEffect(() => {
+    if (!inline || !active) return;
+    const measure = () => {
+      const node = panelRef.current;
+      if (!node) return;
+      const top = node.getBoundingClientRect().top;
+      setPanelMaxHeight(
+        Math.max(
+          RESULTS_PANEL_MIN_HEIGHT,
+          window.innerHeight - top - RESULTS_PANEL_VIEWPORT_MARGIN,
+        ),
+      );
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    // Capture: the page scrolls under the field, and the panel travels with it.
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [inline, active]);
+  return { panelRef, panelMaxHeight };
+}
+
+function runEasterEgg({
+  query,
+  triggerEffect,
+  onDone,
+}: {
+  query: string;
+  triggerEffect: (egg: EasterEgg) => void;
+  onDone: () => void;
+}): void {
+  const egg = findEasterEgg(query);
+  if (!egg) return;
+  triggerEffect(egg);
+  if (!egg.keepOpen) onDone();
+}
+
+/** What choosing one command does; everything that navigates goes through the shared handler. */
+function selectPaletteCommand({
+  cmd,
+  query,
+  projectSlug,
+  ctx,
+  addRecentItem,
+  openDrawer,
+  openSupportChat,
+  setTheme,
+  triggerEffect,
+  handOffToLangy,
+  enterLangyMode,
+}: {
+  cmd: Command;
+  query: string;
+  projectSlug: string;
+  ctx: NavigationContext;
+  addRecentItem: AddRecentItem;
+  openDrawer: OpenDrawer;
+  openSupportChat: () => void;
+  setTheme: (theme: string) => void;
+  triggerEffect: (egg: EasterEgg) => void;
+  handOffToLangy: () => void;
+  enterLangyMode: () => void;
+}): void {
+  // Ask Langy doesn't navigate. A typed question is already the message, so
+  // selecting the row hands it straight to the panel — one Enter, no compose
+  // stop in between. Only an empty bar turns the field into Langy's own input
+  // first, because there is nothing to send yet.
+  if (cmd.id === "action-ask-langy") {
+    if (query.trim()) handOffToLangy();
+    else enterLangyMode();
+    return;
+  }
+  if (cmd.externalUrl) {
+    window.open(cmd.externalUrl, "_blank", "noopener,noreferrer");
+    ctx.close();
+    return;
+  }
+  // The bubble is the deployment's, and the host is what knows whether there
+  // is one: a deployment with none never lists this command.
+  if (cmd.id === "action-open-chat") {
+    openSupportChat();
+    ctx.close();
+    return;
+  }
+  const theme = THEME_BY_COMMAND[cmd.id];
+  if (theme) {
+    setTheme(theme);
+    ctx.close();
+    return;
+  }
+  if (cmd.id.startsWith("easter-")) {
+    runEasterEgg({ query, triggerEffect, onDone: ctx.close });
+    return;
+  }
+  handleCommandSelect({ cmd, projectSlug, ctx, addRecentItem, openDrawer });
+}
+
+function selectPaletteItem({
+  item,
+  projectSlug,
+  ctx,
+  addRecentItem,
+  openDrawer,
+  selectCommand,
+}: {
+  item: ListItem;
+  projectSlug: string;
+  ctx: NavigationContext;
+  addRecentItem: AddRecentItem;
+  openDrawer: OpenDrawer;
+  selectCommand: (cmd: Command) => void;
+}): void {
+  switch (item.type) {
+    case "command":
+      selectCommand(item.data);
+      return;
+    case "search":
+      handleSearchResultSelect({ result: item.data, projectSlug, ctx, addRecentItem, openDrawer });
+      return;
+    case "recent":
+      handleRecentItemSelect({ item: item.data, ctx, addRecentItem, openDrawer });
+      return;
+    case "project":
+      handleProjectSelect(item.data, ctx, addRecentItem);
+      return;
+  }
+}
+
+/** The address a row stands for, for "copy link"; empty when it has none. */
+function copyLinkPathOf({ item, projectSlug }: { item: ListItem; projectSlug: string }): string {
+  if (item.type === "command") return item.data.path?.replace("[project]", projectSlug) ?? "";
+  if (item.type === "project") return `/${item.data.slug}`;
+  return item.data.path;
+}
+
+/**
+ * Langy mode and the hand-off into Langy: the panel opens FIRST and
+ * auto-sends, then this surface dissolves over its entrance. Reduced motion
+ * keeps the same state ordering but closes synchronously.
+ */
+function useLangyHandoff({
+  active,
+  langyEnabled,
+  askLangy,
+  query,
+  onDone,
+  inputRef,
+  onHandoffStateChange,
+}: {
+  active: boolean;
+  langyEnabled: boolean;
+  askLangy: ((prompt: string) => void) | undefined;
+  query: string;
+  onDone: () => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onHandoffStateChange: ((exiting: boolean) => void) | undefined;
+}) {
+  const reduceMotion = useReducedMotion();
+  const [langyMode, setLangyMode] = useState(false);
+  const [langyExiting, setLangyExiting] = useState(false);
+  const handoffTimerRef = useRef<number | null>(null);
+  const handoffInFlightRef = useRef(false);
+
+  useEffect(() => {
+    onHandoffStateChange?.(langyExiting);
+  }, [langyExiting, onHandoffStateChange]);
+
+  const enterLangyMode = useCallback(() => {
+    if (!langyEnabled) return;
+    handoffInFlightRef.current = false;
+    setLangyExiting(false);
+    setLangyMode(true);
+  }, [langyEnabled]);
+
+  // Shared by Enter in Langy mode and by selecting a non-empty "Ask Langy"
+  // result — the same single gesture from two doors.
+  const handOffToLangy = useCallback(() => {
+    if (handoffInFlightRef.current || !askLangy) return;
+    handoffInFlightRef.current = true;
+    handoffTimerRef.current = beginLangyHandoff({
+      prompt: query,
+      askLangy,
+      closeCommandBar: onDone,
+      reducedMotion: reduceMotion,
+      setExiting: setLangyExiting,
+    });
+  }, [query, askLangy, onDone, reduceMotion]);
+
+  // Reset Langy mode and handoff timer on stand-down; onDone is idempotent across surfaces.
+  useEffect(() => {
+    if (active) return;
+    if (handoffTimerRef.current !== null) {
+      window.clearTimeout(handoffTimerRef.current);
+      handoffTimerRef.current = null;
+      if (handoffInFlightRef.current) onDone();
+    }
+    handoffInFlightRef.current = false;
+    setLangyMode(false);
+    setLangyExiting(false);
+  }, [active, onDone]);
+
+  useEffect(
+    () => () => {
+      if (handoffTimerRef.current !== null) {
+        window.clearTimeout(handoffTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  // Escape / Backspace-on-empty in Langy mode — back to normal command mode.
+  const exitLangyMode = useCallback(() => {
+    handoffInFlightRef.current = false;
+    setLangyMode(false);
+    setLangyExiting(false);
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  }, [inputRef]);
+
+  return {
+    langyMode,
+    langyExiting,
+    handoffInFlightRef,
+    enterLangyMode,
+    handOffToLangy,
+    exitLangyMode,
+  };
+}
 
 /**
  * Where this palette is mounted: `dialog` is the one Cmd+K raises over the
@@ -80,35 +332,7 @@ export function CommandPalette({
   const inline = surface === "inline";
   const host = useNavigationHost();
 
-  /**
-   * The inline panel hangs off the ask field, so its room depends on where
-   * that field sits. Measured rather than guessed: a fixed `vh` cap that
-   * looks right on a laptop runs off a short window.
-   */
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
-  useEffect(() => {
-    if (!inline || !active) return;
-    const measure = () => {
-      const node = panelRef.current;
-      if (!node) return;
-      const top = node.getBoundingClientRect().top;
-      setPanelMaxHeight(
-        Math.max(
-          RESULTS_PANEL_MIN_HEIGHT,
-          window.innerHeight - top - RESULTS_PANEL_VIEWPORT_MARGIN,
-        ),
-      );
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    // Capture: the page scrolls under the field, and the panel travels with it.
-    window.addEventListener("scroll", measure, true);
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
-    };
-  }, [inline, active]);
+  const { panelRef, panelMaxHeight } = useInlinePanelMaxHeight({ inline, active });
 
   /**
    * The ask field and Langy's own panel say the same thing, so offering
@@ -145,16 +369,22 @@ export function CommandPalette({
   // it to someone holding only `langy:view` would be inviting them into a 403.
   // The host answers `null` for a reader who may not, which is that gate.
   const langyEnabled = !!langy;
-  const askLangy = langy?.ask;
-  const reduceMotion = useReducedMotion();
-  const [langyMode, setLangyMode] = useState(false);
-  const [langyExiting, setLangyExiting] = useState(false);
-  const handoffTimerRef = useRef<number | null>(null);
-  const handoffInFlightRef = useRef(false);
-
-  useEffect(() => {
-    onHandoffStateChange?.(langyExiting);
-  }, [langyExiting, onHandoffStateChange]);
+  const {
+    langyMode,
+    langyExiting,
+    handoffInFlightRef,
+    enterLangyMode,
+    handOffToLangy,
+    exitLangyMode,
+  } = useLangyHandoff({
+    active,
+    langyEnabled,
+    askLangy: langy?.ask,
+    query,
+    onDone,
+    inputRef,
+    onHandoffStateChange,
+  });
 
   // Detect platform for keyboard hints
   const isMac =
@@ -205,30 +435,6 @@ export function CommandPalette({
   // taken the keyboard from someone who was about to scroll.
   useAutoFocusInput(!inline && active, inputRef);
 
-  const enterLangyMode = useCallback(() => {
-    if (!langyEnabled) return;
-    handoffInFlightRef.current = false;
-    setLangyExiting(false);
-    setLangyMode(true);
-  }, [langyEnabled]);
-
-  // Hand the typed question to Langy: the panel opens FIRST and auto-sends,
-  // then this surface dissolves over its entrance. Reduced motion keeps the
-  // same state ordering but closes synchronously, with no decorative overlap.
-  // Shared by Enter in Langy mode and by selecting a non-empty "Ask Langy"
-  // result — the same single gesture from two doors.
-  const handOffToLangy = useCallback(() => {
-    if (handoffInFlightRef.current || !askLangy) return;
-    handoffInFlightRef.current = true;
-    handoffTimerRef.current = beginLangyHandoff({
-      prompt: query,
-      askLangy,
-      closeCommandBar: onDone,
-      reducedMotion: reduceMotion,
-      setExiting: setLangyExiting,
-    });
-  }, [query, askLangy, onDone, reduceMotion]);
-
   const handleSelect = useCallback(
     (item: ListItem, newTab = false) => {
       // The surface is already dissolving into Langy; nothing else may fire.
@@ -236,80 +442,27 @@ export function CommandPalette({
 
       const projectSlug = project?.slug ?? "";
       const ctx = { go: (to: string) => host.navigate(to), newTab, close: onDone };
-
-      if (item.type === "command") {
-        const cmd = item.data;
-
-        // Ask Langy doesn't navigate. A typed question is already the
-        // message, so selecting the row hands it straight to the panel — one
-        // Enter, no compose stop in between. Only an empty bar turns the
-        // field into Langy's own input first, because there is nothing to
-        // send yet.
-        if (cmd.id === "action-ask-langy") {
-          if (query.trim()) {
-            handOffToLangy();
-          } else {
-            enterLangyMode();
-          }
-          return;
-        }
-
-        if (cmd.externalUrl) {
-          window.open(cmd.externalUrl, "_blank", "noopener,noreferrer");
-          onDone();
-          return;
-        }
-
-        if (cmd.id === "action-open-chat") {
-          // The bubble is the deployment's, and the host is what knows whether
-          // there is one: a deployment with none never lists this command, so
-          // reaching it at all means the host has a bubble to open.
-          host.supportChat()?.open();
-          onDone();
-          return;
-        }
-
-        if (cmd.id === "action-theme-light") {
-          setTheme("light");
-          onDone();
-          return;
-        }
-        if (cmd.id === "action-theme-dark") {
-          setTheme("dark");
-          onDone();
-          return;
-        }
-        if (cmd.id === "action-theme-system") {
-          setTheme("system");
-          onDone();
-          return;
-        }
-
-        if (cmd.id.startsWith("easter-")) {
-          const egg = findEasterEgg(query);
-          if (egg) {
-            triggerEffect(egg);
-            if (!egg.keepOpen) {
-              onDone();
-            }
-          }
-          return;
-        }
-
-        handleCommandSelect({ cmd, projectSlug, ctx, addRecentItem, openDrawer });
-      } else if (item.type === "search") {
-        handleSearchResultSelect({
-          result: item.data,
-          projectSlug,
-          ctx,
-          addRecentItem,
-          openDrawer,
-        });
-      } else if (item.type === "recent") {
-        handleRecentItemSelect({ item: item.data, ctx, addRecentItem, openDrawer });
-      } else if (item.type === "project") {
-        handleProjectSelect(item.data, ctx, addRecentItem);
-      }
+      selectPaletteItem({
+        item,
+        projectSlug,
+        ctx,
+        addRecentItem,
+        openDrawer,
+        selectCommand: (cmd) =>
+          selectPaletteCommand({
+            cmd,
+            query,
+            projectSlug,
+            ctx,
+            addRecentItem,
+            openDrawer,
+            openSupportChat: () => host.supportChat()?.open(),
+            setTheme,
+            triggerEffect,
+            handOffToLangy,
+            enterLangyMode,
+          }),
+      });
     },
     [
       project?.slug,
@@ -322,56 +475,15 @@ export function CommandPalette({
       triggerEffect,
       enterLangyMode,
       handOffToLangy,
+      handoffInFlightRef,
     ],
   );
-
-  // Reset Langy mode and handoff timer on stand-down; onDone is idempotent across surfaces.
-  useEffect(() => {
-    if (!active) {
-      if (handoffTimerRef.current !== null) {
-        window.clearTimeout(handoffTimerRef.current);
-        handoffTimerRef.current = null;
-        if (handoffInFlightRef.current) onDone();
-      }
-      handoffInFlightRef.current = false;
-      setLangyMode(false);
-      setLangyExiting(false);
-    }
-  }, [active, onDone]);
-
-  useEffect(
-    () => () => {
-      if (handoffTimerRef.current !== null) {
-        window.clearTimeout(handoffTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  // Escape / Backspace-on-empty in Langy mode — back to normal command mode.
-  const exitLangyMode = useCallback(() => {
-    handoffInFlightRef.current = false;
-    setLangyMode(false);
-    setLangyExiting(false);
-    window.requestAnimationFrame(() => inputRef.current?.focus());
-  }, [inputRef]);
 
   const handleCopyLink = useCallback(() => {
     const item = allItems[selectedIndex];
     if (!item) return;
 
-    let path = "";
-    const projectSlug = project?.slug ?? "";
-
-    if (item.type === "command" && item.data.path) {
-      path = item.data.path.replace("[project]", projectSlug);
-    } else if (item.type === "search") {
-      path = item.data.path;
-    } else if (item.type === "recent") {
-      path = item.data.path;
-    } else if (item.type === "project") {
-      path = `/${item.data.slug}`;
-    }
+    const path = copyLinkPathOf({ item, projectSlug: project?.slug ?? "" });
 
     if (path) {
       const url = `${window.location.origin}${path}`;

@@ -21,7 +21,7 @@ type ClickHouseDateTime = ReturnType<typeof toDate>;
 export interface LangyAnalyticsClickHouseWriteClient {
   insert(input: {
     table: string;
-    values: readonly unknown[];
+    values: readonly Readonly<Record<string, unknown>>[];
     format: "JSONEachRow";
     clickhouse_settings?: Record<string, number>;
   }): Promise<unknown>;
@@ -30,6 +30,16 @@ export interface LangyAnalyticsClickHouseWriteClient {
 export type LangyAnalyticsClickHouseClientResolver = (
   tenantId: string,
 ) => Promise<LangyAnalyticsClickHouseWriteClient>;
+
+/** The process's routing ClickHouse member, as far as this sink writes through it. */
+export interface LangyAnalyticsClickHouseMember {
+  insert(request: {
+    tenantId: string;
+    table: string;
+    rows: readonly Readonly<Record<string, unknown>>[];
+    settings?: Record<string, string | number>;
+  }): Promise<void>;
+}
 
 type ClickHouseLangyAnalyticsEventRecord = {
   TenantId: string;
@@ -103,6 +113,23 @@ export class LangyAnalyticsEventClickHouseRepository extends LangyAnalyticsEvent
     resolveClient: LangyAnalyticsClickHouseClientResolver,
   ): LangyAnalyticsEventClickHouseRepository {
     return new LangyAnalyticsEventClickHouseRepository(resolveClient);
+  }
+
+  /** The sink over the process's own ClickHouse member, every write naming its tenant. */
+  static overMember(
+    clickhouse: LangyAnalyticsClickHouseMember,
+  ): LangyAnalyticsEventClickHouseRepository {
+    return new LangyAnalyticsEventClickHouseRepository((tenantId) =>
+      Promise.resolve({
+        insert: ({ table, values, clickhouse_settings }) =>
+          clickhouse.insert({
+            tenantId,
+            table,
+            rows: values,
+            ...(clickhouse_settings === undefined ? {} : { settings: clickhouse_settings }),
+          }),
+      }),
+    );
   }
 
   constructor(private readonly resolveClient: LangyAnalyticsClickHouseClientResolver) {

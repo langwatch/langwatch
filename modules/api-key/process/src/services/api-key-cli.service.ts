@@ -432,6 +432,7 @@ export class ApiKeyCliService {
         organizationId: input.organizationId,
         page: 1,
         limit: 1000,
+        includeGovernance: true,
       })
     ).data.filter((project) => projectIds.includes(project.id) || teamIds.includes(project.teamId));
 

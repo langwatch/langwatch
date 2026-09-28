@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { LuCheck, LuX } from "react-icons/lu";
 
 import { useTraceHost } from "../../behavior/trace-host.ts";
-import { useRenameTrace } from "./internal/use-rename-trace.ts";
+import { type RenameTraceOutcome, useRenameTrace } from "./internal/use-rename-trace.ts";
 
 export type EditableTraceNameProps = {
   projectId: string;
@@ -15,6 +15,120 @@ export type EditableTraceNameProps = {
   /** When true the title text was a fallback (trace ID prefix), so we render it muted. */
   titleIsFallback: boolean;
 };
+
+function nameValidationMessage(trimmed: string): string | undefined {
+  if (trimmed.length === 0) return "Name can't be empty";
+  if (trimmed.length > TRACE_NAME_MAX_LENGTH) {
+    return `Name is too long (max ${TRACE_NAME_MAX_LENGTH} chars)`;
+  }
+  return undefined;
+}
+
+/** What the screen offers where the registry has nothing for the code. */
+function renameFailureDescription(outcome: Extract<RenameTraceOutcome, { ok: false }>): string {
+  if (outcome.reason !== "too-long") return "That name couldn't be saved. Try again.";
+  return `Trace names are limited to ${outcome.maxLength} characters (you used ${outcome.receivedLength}).`;
+}
+
+/**
+ * Focuses and selects the input once editing starts, a frame later so the
+ * input has mounted; without it the cursor often landed at position 0.
+ */
+function useFocusWhenEditing({
+  isEditing,
+  inputRef,
+}: {
+  isEditing: boolean;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+}) {
+  useEffect(() => {
+    if (!isEditing) return;
+    const raf = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isEditing, inputRef]);
+}
+
+function TraceNameButton({
+  titleText,
+  titleIsFallback,
+  onEdit,
+}: {
+  titleText: string;
+  titleIsFallback: boolean;
+  onEdit: () => void;
+}) {
+  return (
+    <Tooltip
+      content={
+        <VStack align="start" gap={0.5}>
+          <Text textStyle="xs">Trace name, derived from the root span.</Text>
+          <Text textStyle="xs" color="fg.muted">
+            Click to rename.
+          </Text>
+        </VStack>
+      }
+      positioning={{ placement: "bottom-start" }}
+      openDelay={400}
+    >
+      <chakra.button
+        fontWeight="semibold"
+        textStyle="md"
+        truncate
+        letterSpacing="-0.005em"
+        minWidth={0}
+        color={titleIsFallback ? "fg.muted" : undefined}
+        cursor="help"
+        onClick={onEdit}
+        onDoubleClick={onEdit}
+        type="button"
+        textAlign="start"
+      >
+        {titleText}
+      </chakra.button>
+    </Tooltip>
+  );
+}
+
+/**
+ * The validation message, or the length counter, floated under the input so
+ * it adds no height; otherwise the header re-centres and the status orb drops.
+ * See specs/traces-v2/editable-trace-name-alignment.feature
+ */
+function NameFootnote({
+  errorId,
+  message,
+  length,
+}: {
+  errorId: string;
+  message: string | undefined;
+  length: number;
+}) {
+  if (message) {
+    return (
+      <Text
+        id={errorId}
+        textStyle="2xs"
+        color="red.fg"
+        position="absolute"
+        top="100%"
+        left={0}
+        marginTop={0.5}
+        role="alert"
+      >
+        {message}
+      </Text>
+    );
+  }
+  if (length === 0) return null;
+  return (
+    <Text textStyle="2xs" color="fg.subtle" position="absolute" top="100%" left={0} marginTop={0.5}>
+      {length}/{TRACE_NAME_MAX_LENGTH}
+    </Text>
+  );
+}
 
 /**
  * Read-only trace name with a pencil affordance and double-click to edit.
@@ -33,27 +147,9 @@ export function EditableTraceName({
   const errorId = useId();
 
   const trimmed = draft.trim();
-  const localValidationMessage = (() => {
-    if (trimmed.length === 0) return "Name can't be empty";
-    if (trimmed.length > TRACE_NAME_MAX_LENGTH) {
-      return `Name is too long (max ${TRACE_NAME_MAX_LENGTH} chars)`;
-    }
-    return null;
-  })();
+  const localValidationMessage = nameValidationMessage(trimmed);
 
-  useEffect(() => {
-    if (isEditing) {
-      // Defer the focus so the input has actually mounted before we try to grab
-      // it; without the rAF the cursor ended up at position 0 half the time
-      // after the React 18 batched render.
-      const raf = requestAnimationFrame(() => {
-        inputRef.current?.focus();
-        inputRef.current?.select();
-      });
-      return () => cancelAnimationFrame(raf);
-    }
-    return undefined;
-  }, [isEditing]);
+  useFocusWhenEditing({ isEditing, inputRef });
 
   function startEditing() {
     setDraft(titleIsFallback ? "" : titleText);
@@ -79,51 +175,21 @@ export function EditableTraceName({
       return;
     }
 
-    // The failure goes to the host whole, so the composition's code-keyed
-    // registry writes the words and the toast carries the trace id (ADR-045).
-    // The line below is what the screen offers where the registry has nothing
-    // for the code; the too-long case spells out the limit the server reported.
-    // The editor stays open either way so the user can correct the value.
+    // The host's code-keyed registry writes the words (ADR-045); the editor stays open.
     host.failed({
       error: outcome.error,
       fallbackTitle: "Couldn't rename trace",
-      description:
-        outcome.reason === "too-long"
-          ? `Trace names are limited to ${outcome.maxLength} characters (you used ${outcome.receivedLength}).`
-          : "That name couldn't be saved. Try again.",
+      description: renameFailureDescription(outcome),
     });
   }
 
   if (!isEditing) {
     return (
-      <Tooltip
-        content={
-          <VStack align="start" gap={0.5}>
-            <Text textStyle="xs">Trace name, derived from the root span.</Text>
-            <Text textStyle="xs" color="fg.muted">
-              Click to rename.
-            </Text>
-          </VStack>
-        }
-        positioning={{ placement: "bottom-start" }}
-        openDelay={400}
-      >
-        <chakra.button
-          fontWeight="semibold"
-          textStyle="md"
-          truncate
-          letterSpacing="-0.005em"
-          minWidth={0}
-          color={titleIsFallback ? "fg.muted" : undefined}
-          cursor="help"
-          onClick={startEditing}
-          onDoubleClick={startEditing}
-          type="button"
-          textAlign="start"
-        >
-          {titleText}
-        </chakra.button>
-      </Tooltip>
+      <TraceNameButton
+        titleText={titleText}
+        titleIsFallback={titleIsFallback}
+        onEdit={startEditing}
+      />
     );
   }
 
@@ -146,7 +212,7 @@ export function EditableTraceName({
               cancelEditing();
             }
           }}
-          aria-invalid={localValidationMessage !== null}
+          aria-invalid={localValidationMessage !== undefined}
           aria-describedby={localValidationMessage ? errorId : undefined}
           maxLength={TRACE_NAME_MAX_LENGTH + 50}
           placeholder="Trace name"
@@ -163,7 +229,7 @@ export function EditableTraceName({
             size="2xs"
             variant="ghost"
             color="green.fg"
-            disabled={localValidationMessage !== null || isPending}
+            disabled={localValidationMessage !== undefined || isPending}
             onClick={() => void commitEditing()}
           >
             <LuCheck size={14} />
@@ -186,32 +252,7 @@ export function EditableTraceName({
           row's `align="center"` re-centres the sibling status orb against the
           taller box and the orb visibly drops while editing. See
           specs/traces-v2/editable-trace-name-alignment.feature */}
-      {localValidationMessage && (
-        <Text
-          id={errorId}
-          textStyle="2xs"
-          color="red.fg"
-          position="absolute"
-          top="100%"
-          left={0}
-          marginTop={0.5}
-          role="alert"
-        >
-          {localValidationMessage}
-        </Text>
-      )}
-      {!localValidationMessage && trimmed.length > 0 && (
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          position="absolute"
-          top="100%"
-          left={0}
-          marginTop={0.5}
-        >
-          {trimmed.length}/{TRACE_NAME_MAX_LENGTH}
-        </Text>
-      )}
+      <NameFootnote errorId={errorId} message={localValidationMessage} length={trimmed.length} />
     </Box>
   );
 }

@@ -93,6 +93,72 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 201
     And the key is reachable org-wide
 
+  # Budgets and cache rules are organization-owned, so every write to one is
+  # authorized at the organization, whichever project the credential names.
+
+  @integration @rest @rbac
+  Scenario: A scoped API key with the budget grant at the organization creates a budget
+    Given a scoped API key whose bindings grant `gatewayBudgets:create` at the organization
+    When it creates a budget
+    Then the response status is 201
+    And the budget is attributed to the key's owning user
+
+  @integration @rest @rbac
+  Scenario: A key without the budget grant at the organization is refused by code
+    Given a scoped API key that may create budgets only in its own project
+    When it creates a budget
+    Then the response status is 403 with the code `permission_denied`
+    And no budget is created
+
+  @unit @rbac
+  Scenario: The organization-wide gate asks the key and its owner at the organization
+    Given a scoped API key
+    When it asks to write an organization-wide gateway row
+    Then the grant is checked for that key and its owner at the organization
+    And a key without it is refused with the code `permission_denied`
+
+  @unit @rbac
+  Scenario: A legacy project key writes organization-wide budgets and cache rules
+    # As on main: the legacy key carries full access by its class alone for
+    # these seven writes. Nothing else widens; its keys stay project-bound.
+    When a legacy project key asks to write an organization-wide gateway row
+    Then it is admitted without any grant being asked
+    And the write is attributed to the synthetic actor `svc_<projectId>`
+
+  @unit @rbac
+  Scenario: A refused virtual-key create is a 403 naming the missing grant
+    When a legacy project key requests an organization-scoped key
+    Then it is refused with the code `permission_denied`
+    And the refusal names the missing `virtualKeys:manage` grant
+
+  @integration @rest @audit
+  Scenario: A legacy project key's own-project key is attributed to the machine principal
+    When a legacy project key creates a key for its own project
+    Then the response status is 201
+    And the write is attributed to the synthetic actor `svc_<projectId>`
+
+  @integration @rest @rbac
+  Scenario: A legacy project key cannot aim a budget at another organization
+    Given a legacy project key for a project in organization A
+    When it creates a budget whose scope, anchor or model provider names a resource of organization B
+    Then it is refused with the code `gateway_scope_org_mismatch`, or `virtual_key_not_found` for a key
+    And no budget is created
+
+  @integration @rest @rbac
+  Scenario: A legacy project key cannot change another organization's budget or cache rule
+    Given a legacy project key for a project in organization A
+    When it updates, archives or resets a budget or cache rule of organization B by id
+    Then the response status is 404
+    And nothing is written
+
+  @integration @rest @rbac
+  Scenario: A legacy project key's writes land in its own project's organization
+    # As on main: inside its own organization the key may budget any team or
+    # project, and change any budget or cache rule.
+    Given a legacy project key for a project in organization A
+    When it creates a budget or a cache rule, whatever organization the body names
+    Then the row is filed under organization A
+
   @integration @rest @rbac
   Scenario: A key that can create but not manage mints a key for its own project
     # MEMBER holds virtualKeys:create but not virtualKeys:manage. Issuing a

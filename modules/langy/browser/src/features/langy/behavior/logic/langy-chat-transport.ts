@@ -108,10 +108,17 @@ interface StartTurnResponse {
  * A custom AI-SDK `ChatTransport` for Langy.
  */
 export function createLangyChatTransport(deps: LangyChatTransportDeps): ChatTransport<UIMessage> {
+  const regenerations = new Map<string, number>();
   return {
     async sendMessages(options) {
       const ctx = deps.getContext();
-      const { conversationId, turnId } = await startTurn({ client: deps.client, ctx, options });
+      const idempotencyKey = turnIdempotencyKey({ options, regenerations });
+      const { conversationId, turnId } = await startTurn({
+        client: deps.client,
+        ctx,
+        options,
+        idempotencyKey,
+      });
       deps.onIds({ conversationId, turnId });
 
       return subscribeTurnStream({
@@ -135,25 +142,44 @@ export function createLangyChatTransport(deps: LangyChatTransportDeps): ChatTran
   };
 }
 
+type SendOptions = Parameters<ChatTransport<UIMessage>["sendMessages"]>[0];
+
+/**
+ * One key per user intent: the sent message's id and the trigger, plus a count of regenerates of
+ * that message. A retry of the same send repeats its key and dedupes; a re-send (a new message) or
+ * another regenerate is a new turn.
+ */
+function turnIdempotencyKey({
+  options,
+  regenerations,
+}: {
+  options: SendOptions;
+  regenerations: Map<string, number>;
+}): string {
+  const lastUserMessage = options.messages.findLast((message) => message.role === "user");
+  const sentId = lastUserMessage?.id ?? options.chatId;
+  if (options.trigger !== "regenerate-message") return `${sentId}:${options.trigger}`;
+  const count = (regenerations.get(sentId) ?? 0) + 1;
+  regenerations.set(sentId, count);
+  return `${sentId}:${options.trigger}:${count}`;
+}
+
 /** Admits the turn: continues the open conversation, or creates one carrying only this send. */
 async function startTurn({
   client,
   ctx,
   options,
+  idempotencyKey,
 }: {
   client: LangyTurnClient;
   ctx: LangyTurnRequestContext;
-  options: Parameters<ChatTransport<UIMessage>["sendMessages"]>[0];
+  options: SendOptions;
+  idempotencyKey: string;
 }): Promise<StartTurnResponse> {
   // A create carries THIS send and nothing else.
   const lastUserMessage = options.messages.findLast((message) => message.role === "user");
   const turnInput = {
-    // One logical send, one identity: minted fresh on every sendMessages
-    // call (each composer submit / regenerate re-arms with a new key), so
-    // a genuine re-send of the same text is a NEW turn. Transport/proxy
-    // retries replay the same mutation body — same key, same content —
-    // and collapse onto the same admitted turn.
-    idempotencyKey: crypto.randomUUID(),
+    idempotencyKey,
     messages: options.messages,
     ...(options.trigger ? { trigger: options.trigger } : {}),
     projectId: ctx.projectId,

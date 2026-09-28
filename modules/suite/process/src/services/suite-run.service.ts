@@ -42,7 +42,6 @@ import {
 
 import type { SuiteExecution } from "../app/suite.app.ts";
 import {
-  defaultSuiteId,
   suiteSlugOf,
   TARGET_SECRET_REFUSAL,
   targetsOverrideASecret,
@@ -62,6 +61,8 @@ type SuiteRunServiceOptions = {
     attachments: EvaluatorAttachment[];
   }) => Promise<EvaluatorAttachment[]>;
   testSuiteToSuite: (testSuite: ScenarioTestSuite) => Suite;
+  /** The owning service's id for a suite it creates. */
+  newSuiteId: () => string;
 };
 
 export class SuiteRunService {
@@ -224,7 +225,7 @@ export class SuiteRunService {
     });
 
     const { suite, created } = await repository.findOrCreatePlanByName({
-      id: (this.options.generateId ?? defaultSuiteId)(),
+      id: this.deps.newSuiteId(),
       projectId: parsed.projectId,
       name,
       scope,
@@ -492,7 +493,7 @@ export class SuiteRunService {
       (scenario) => scenario.id,
     );
     const suite = await this.options.repository.saveManagedRunAll({
-      id: (this.options.generateId ?? defaultSuiteId)(),
+      id: this.deps.newSuiteId(),
       projectId: parsed.projectId,
       name: RUN_ALL_SUITE_NAME,
       baseSlug: suiteSlugOf(RUN_ALL_SUITE_NAME),

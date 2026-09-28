@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -410,5 +411,62 @@ func TestAnErrorEchoingTheIDIsNotVisible(t *testing.T) {
 	}
 	if !visibleIn(SideResult{Status: 200, Body: `[{"id":"w-a"}]`}, "w-a") {
 		t.Fatal("a listed entity was not visible")
+	}
+}
+
+// doomedWidgetsSpec adds the delete that removes what the create made.
+const doomedWidgetsSpec = `{
+  "openapi": "3.0.3",
+  "paths": {
+    "/api/widgets": {
+      "get": {"operationId": "listWidgets", "responses": {"200": {"description": "ok"}}},
+      "post": {"operationId": "createWidget", "responses": {"200": {"description": "ok"}}}
+    },
+    "/api/widgets/{id}": {
+      "delete": {"operationId": "deleteWidget", "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "ok"}}}
+    }
+  },
+  "components": {"securitySchemes": {"project_api_key": {"type": "apiKey", "in": "header", "name": "X-Auth-Token"}}},
+  "security": [{"project_api_key": []}]
+}`
+
+// doomedWidgetsServer lists the widget its create made until the delete removes it.
+func doomedWidgetsServer(t *testing.T, createID string) *httptest.Server {
+	t.Helper()
+	var mutex sync.Mutex
+	live := false
+	return newTestServer(t, doomedWidgetsSpec, map[string]http.HandlerFunc{
+		"GET /api/widgets": func(writer http.ResponseWriter, _ *http.Request) {
+			mutex.Lock()
+			defer mutex.Unlock()
+			if live {
+				writeJSON(writer, 200, `[{"id": "`+createID+`"}]`)
+				return
+			}
+			writeJSON(writer, 200, `[]`)
+		},
+		"POST /api/widgets": func(writer http.ResponseWriter, _ *http.Request) {
+			mutex.Lock()
+			defer mutex.Unlock()
+			live = true
+			writeJSON(writer, 200, `{"id": "`+createID+`"}`)
+		},
+		"DELETE /api/widgets/{id}": func(writer http.ResponseWriter, _ *http.Request) {
+			mutex.Lock()
+			defer mutex.Unlock()
+			live = false
+			writeJSON(writer, 200, `{}`)
+		},
+	})
+}
+
+func TestCollectionVerificationReadsTheListBeforeTheDeleteRemovesTheEntity(t *testing.T) {
+	sideA := doomedWidgetsServer(t, "w-a")
+	sideB := doomedWidgetsServer(t, "w-b")
+	_, stdout, stderr := runProbeCLI(t, "probe", "-a", sideA.URL, "-b", sideB.URL, "-settle-timeout", "200ms")
+
+	if strings.Contains(stderr, "created entity not visible") || strings.Contains(stdout, "mutation_not_visible") {
+		t.Fatalf("the created widget must be read before the delete removes it:\nstdout:\n%s\nstderr:\n%s", stdout, stderr)
 	}
 }

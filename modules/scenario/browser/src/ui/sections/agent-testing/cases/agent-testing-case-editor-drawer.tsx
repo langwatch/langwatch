@@ -4,7 +4,12 @@
  * @see dev/docs/best_practices/drawers.md
  */
 
-import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
+import {
+  getFlowCallbacks,
+  type UiAgentTestingCaseEditorDrawerProps,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/browser-host/drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import {
   parseEvaluatorAttachments,
@@ -23,22 +28,6 @@ import { CASE_EDITOR_DRAWER } from "./drawer-keys.ts";
 import { useCaseEditor } from "./use-case-editor.ts";
 
 export { CASE_EDITOR_DRAWER };
-
-/**
- * The props the drawer accepts at open time. The three URL-serializable fields
- * survive a reload; the flow callback is registered separately via
- * `setFlowCallbacks`.
- */
-export type AgentTestingCaseEditorDrawerProps = {
-  /** The scenario being edited, or absent for a new one. */
-  scenarioId?: string;
-  /** The suite a new scenario starts in. */
-  testSuiteId?: string;
-  /** "true" opens the scenario with its version history strip open. */
-  showHistory?: string;
-  /** Called when a scenario is saved. `shouldRunAfterSave` is true for Save & Run. */
-  onSaved?: (saved: Scenario, options: { shouldRunAfterSave: boolean }) => void;
-};
 
 function useEditorSuites(projectId: string): TestSuiteEntry[] {
   const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
@@ -60,7 +49,7 @@ function useEditorSuites(projectId: string): TestSuiteEntry[] {
   );
 }
 
-export function AgentTestingCaseEditorDrawer(_props: AgentTestingCaseEditorDrawerProps) {
+export function AgentTestingCaseEditorDrawer(_props: UiAgentTestingCaseEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const { closeDrawer, drawerOpen } = useDrawer();

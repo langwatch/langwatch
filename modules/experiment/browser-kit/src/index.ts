@@ -22,3 +22,4 @@ export * from "./ui/sections/batch-results/comparison-winner-cell.tsx";
 export * from "./model/batch-evaluation-results.run-display-name.ts";
 export * from "./model/batch-evaluation-results.run-state.ts";
 export * from "./ui/elements/batch-results/run-display-name.tsx";
+export * from "./behavior/use-batch-run-selection.ts";

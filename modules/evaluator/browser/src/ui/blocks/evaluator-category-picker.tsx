@@ -1,4 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import type { UiEvaluatorCategoryId } from "@langwatch/browser-host/drawer";
 import {
   Brain,
   CheckSquare,
@@ -10,7 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type EvaluatorCategoryId = "expected_answer" | "llm_judge" | "rag" | "quality" | "safety";
+export type EvaluatorCategoryId = UiEvaluatorCategoryId;
 
 export const evaluatorCategoryNames: Record<EvaluatorCategoryId, string> = {
   expected_answer: "Expected Answer",

@@ -14,6 +14,7 @@ import type { SignInProviderMounts, SsoApi } from "@langwatch/enterprise-sso-con
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { EmailDelivery } from "@langwatch/mail";
+import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -74,6 +75,7 @@ async function appFor(
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
+      notifications: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>({
         getSignInProviderMounts: async (input) => {
           providers.askedFor?.push(input);
@@ -129,9 +131,9 @@ describe("given a deployment that named no browser-session identity", () => {
     await expect(app.verifyBrowserSession({ headers: new Headers() })).resolves.toEqual({
       kind: "anonymous",
     });
-    await expect(
-      app.resolveSession(new Request("https://app.langwatch.test/api/auth/session")),
-    ).resolves.toEqual({ kind: "anonymous" });
+    await expect(app.getSessionByCookie({ cookie: undefined })).resolves.toEqual({
+      document: null,
+    });
   });
 });
 

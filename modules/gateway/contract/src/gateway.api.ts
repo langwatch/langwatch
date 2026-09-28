@@ -5,6 +5,7 @@
  */
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Instant } from "@langwatch/time";
+import type { z } from "zod";
 
 import type {
   ArchiveGatewayCacheRuleInput,
@@ -20,6 +21,7 @@ import type {
   UpdateGatewayGuardrailInput,
 } from "./gateway-guardrail.ts";
 import type { GatewayInternalSpendCommandRecord } from "./gateway-internal.schemas.ts";
+import type { gatewayRequestCredentialSchema } from "./gateway-platform.schemas.ts";
 import type {
   GatewayPrincipalDailySpend,
   GatewayPrincipalModelSpend,
@@ -72,19 +74,8 @@ import type {
   VirtualKeyBudgetInput,
 } from "./virtual-key.schemas.ts";
 
-/**
- * The REST credential a project door presented, as this module is told about
- * it: a scoped API key acts as its owning user, a legacy project key carries
- * none and acts as a stable synthetic machine principal.
- */
-export type GatewayRequestCredential =
-  | Readonly<{
-      kind: "apiKey";
-      apiKeyId: string;
-      userId: string | null;
-      organizationId: string;
-    }>
-  | Readonly<{ kind: "legacyProjectKey" }>;
+/** The REST credential a project door presented, as this module is told about it. */
+export type GatewayRequestCredential = z.infer<typeof gatewayRequestCredentialSchema>;
 
 /** A minted or read virtual key, published in the public REST surface's snake_case shape. */
 export type GatewayVirtualKeySnakeDto = {

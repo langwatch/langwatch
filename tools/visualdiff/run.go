@@ -34,6 +34,19 @@ type Options struct {
 	// own Postgres, ClickHouse and Redis. Default wherever haven is
 	// installed; see haven.go for why.
 	UseHaven bool
+	// Editions are the license states every screen is captured under, one
+	// pass each on the same stacks (edition.go).
+	Editions []Edition
+	// Baseline replays a cached base when one exists and caches a live one
+	// otherwise; RefreshBaseline renders it and replaces the cached one
+	// (baseline.go).
+	Baseline        bool
+	RefreshBaseline bool
+	// FailFast aborts the capture once the candidate's shell does not render.
+	FailFast bool
+	// Resume continues a -keep run in RunDir: its prepared worktrees and
+	// running stacks are reused, and its fixtures are not seeded twice.
+	Resume bool
 }
 
 // Streams are where a run writes: the summary on Out, everything a person
@@ -83,6 +96,8 @@ type Result struct {
 	Findings  int
 	ReportDir string
 	Plan      Plan
+	Coverage  *Coverage
+	Summary   string
 }
 
 // Exit codes, matching apidiff: 0 clean, 1 differences worth a person's
@@ -162,6 +177,10 @@ func (options *Options) fill(now func() time.Time) {
 	if options.RunDir == "" {
 		options.RunDir = filepath.Join(options.Root, ".visualdiff", now().Format("20060102-150405"))
 	}
+	if len(options.Editions) == 0 {
+		options.Editions = []Edition{EditionEnterprise}
+	}
+	options.Identity = options.Identity.withSeededDefaults()
 }
 
 // Execute is the whole run. Teardown is deferred before the first worktree
@@ -173,11 +192,23 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 	request.Options.fill(request.Deps.Now)
 	options, config, deps := request.Options, request.Config, request.Deps
 
+	finish, err := startRun(ctx, request, &streams)
+	defer finish()
+	if err != nil {
+		return Result{}, err
+	}
 	plan := buildPlan(options, config)
-	result := Result{Plan: plan}
+	result := Result{Plan: plan, Coverage: runCoverage(ctx, request, streams.Err)}
+	baselines, err := planBaselines(ctx, baselineInputs{options: options, config: config, deps: deps}, streams.Err)
+	if err != nil {
+		return result, err
+	}
+	plan.ReplayBase = !needsLiveBase(options.Editions, baselines)
+	result.Plan = plan
 
 	if options.DryRun {
 		writePlan(streams.Out, plan, options.RoutesOnly)
+		writeBaselinePlan(streams.Out, options.Editions, baselines)
 		return result, nil
 	}
 	if !options.UseHaven {
@@ -199,18 +230,46 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 	}()
 	defer run.stopAll()
 
-	bringUp := run.bringUp
-	if options.UseHaven {
-		bringUp = run.bringUpHaven
-	}
-	if err := bringUp(ctx); err != nil {
+	if err := run.boot(ctx); err != nil {
 		return result, err
 	}
-	stream, err := run.capture(ctx)
+	captured, err := run.captureEditions(ctx, baselines)
+	captured.Coverage = result.Coverage
 	if err != nil {
-		return result, err
+		return captured, err
 	}
-	return run.report(stream)
+	return run.finish(captured)
+}
+
+// boot brings both stacks up through haven, or by hand with -no-haven.
+func (run *session) boot(ctx context.Context) error {
+	if run.request.Options.UseHaven {
+		return run.bringUpHaven(ctx)
+	}
+	return run.bringUp(ctx)
+}
+
+// planBaselines refuses an edition the run could not safely set, then finds
+// the baselines. A base that cannot be resolved only turns caching off.
+func planBaselines(ctx context.Context, inputs baselineInputs, stderr io.Writer) (map[Edition]Baseline, error) {
+	if !inputs.options.UseHaven && hasEdition(inputs.options.Editions, EditionFree) {
+		return nil, fmt.Errorf("the free edition clears the organization's license, and -no-haven shares your own database: pass -editions enterprise")
+	}
+	baselines, err := resolveBaselines(ctx, inputs)
+	if err != nil {
+		fmt.Fprintf(stderr, "baseline: off for this run, the base renders live: %v\n", err)
+		return map[Edition]Baseline{}, nil
+	}
+	return baselines, nil
+}
+
+func hasEdition(editions []Edition, wanted Edition) bool {
+	for _, edition := range editions {
+		if edition == wanted {
+			return true
+		}
+	}
+	return false
 }
 
 // buildPlan decides both stacks' identities: ports and a Redis placeholder on
@@ -289,6 +348,9 @@ type session struct {
 	// havenSlugs are the stacks this run started, in order. Teardown destroys
 	// these and nothing else.
 	havenSlugs []string
+	// logOffsets are each started stack's log size at its `haven up`, so a
+	// fatal line an earlier up of the same slug wrote is never read as this one's.
+	logOffsets map[string]int64
 }
 
 func (run *session) stopAll() {
@@ -306,7 +368,7 @@ func (run *session) bringUp(ctx context.Context) error {
 	if err := os.MkdirAll(logDir, 0o750); err != nil {
 		return err
 	}
-	stacks := []*Stack{&run.plan.Base, &run.plan.Candidate}
+	stacks := run.liveStacks()
 	for _, stack := range stacks {
 		if err := run.checkout(ctx, stack); err != nil {
 			return err
@@ -355,25 +417,146 @@ func (run *session) checkout(ctx context.Context, stack *Stack) error {
 	return steps.prepare(ctx, *stack)
 }
 
-// capture seeds the run's fixtures and drives the runner over both stacks.
-func (run *session) capture(ctx context.Context) (RunnerStream, error) {
+// liveStacks are the stacks this run boots: the candidate always, the base
+// only when some edition has no cached baseline to replay.
+func (run *session) liveStacks() []*Stack {
+	if run.plan.ReplayBase {
+		return []*Stack{&run.plan.Candidate}
+	}
+	return []*Stack{&run.plan.Base, &run.plan.Candidate}
+}
+
+// editionStacks are the live haven stacks an edition switch reaches.
+func (run *session) editionStacks() []EditionStack {
+	if !run.request.Options.UseHaven {
+		return nil
+	}
+	stacks := make([]EditionStack, 0, 2)
+	for _, stack := range run.liveStacks() {
+		stacks = append(stacks, EditionStack{Name: stack.Name, Slug: stack.HavenSlug, Dir: stack.Dir})
+	}
+	return stacks
+}
+
+// seed posts the fixtures. Haven stacks each own their database, so every
+// live one is seeded; the port-based stacks share one, seeded once through
+// the candidate so the rows are in the shape the newer code writes.
+func (run *session) seed(ctx context.Context) error {
+	options, deps := run.request.Options, run.request.Deps
+	marker := filepath.Join(options.RunDir, "seeded")
+	if _, err := os.Stat(marker); err == nil {
+		fmt.Fprintln(run.streams.Err, "seed: this run's stacks are already seeded")
+		return nil
+	}
+	if err := run.seedStacks(ctx, options, deps); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(options.RunDir, 0o750); err != nil {
+		return err
+	}
+	return os.WriteFile(marker, nil, 0o600)
+}
+
+// seedStacks posts the fixtures to each stack that owns a database.
+func (run *session) seedStacks(ctx context.Context, options Options, deps Deps) error {
+	stacks := []*Stack{&run.plan.Candidate}
+	if options.UseHaven {
+		stacks = run.liveStacks()
+	}
+	for _, stack := range stacks {
+		seed := SeedRequest{APIURL: stack.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount}
+		if _, err := deps.Seed(ctx, seed); err != nil {
+			return fmt.Errorf("seed %s: %w", stack.Name, err)
+		}
+	}
+	return nil
+}
+
+// captureEditions seeds once, then runs one capture pass per edition on the
+// same stacks, flipping the license between passes.
+func (run *session) captureEditions(ctx context.Context, baselines map[Edition]Baseline) (Result, error) {
+	options, deps := run.request.Options, run.request.Deps
+	total := Result{Plan: run.plan, ReportDir: filepath.Join(options.RunDir, "report")}
+	if err := run.seed(ctx); err != nil {
+		return total, err
+	}
+	seeded := EditionEnterprise
+	if options.Resume {
+		seeded = ""
+	}
+	switcher := newEditionSwitch(deps.Run, deps.Environ, seeded)
+	for _, edition := range options.Editions {
+		rows, err := run.captureEdition(ctx, editionPass{switcher: switcher, edition: edition, baseline: baselines[edition]})
+		if err != nil {
+			return total, err
+		}
+		total.Rows = append(total.Rows, rows...)
+		total.Findings += CountFindings(rows)
+	}
+	return total, nil
+}
+
+// editionPass is one edition's capture: the license to set, and the
+// baseline to replay or fill.
+type editionPass struct {
+	switcher *editionSwitch
+	edition  Edition
+	baseline Baseline
+}
+
+// captureEdition sets the license, captures, caches a live base pass as that
+// edition's baseline, and writes the edition's report.
+func (run *session) captureEdition(ctx context.Context, pass editionPass) ([]Row, error) {
+	if run.request.Options.UseHaven {
+		fmt.Fprintf(run.streams.Err, "edition: %s\n", pass.edition)
+		if err := pass.switcher.Set(ctx, pass.edition, run.editionStacks()); err != nil {
+			return nil, err
+		}
+	}
+	stream, err := run.capture(ctx, pass.edition, pass.baseline)
+	if err != nil {
+		return nil, err
+	}
+	run.cacheBaseline(pass.baseline, stream)
+	return run.report(stream, pass.edition)
+}
+
+// cacheBaseline keeps a live base pass for the next run. A failure to cache
+// costs the next run a boot, never this run its result.
+func (run *session) cacheBaseline(baseline Baseline, stream RunnerStream) {
+	if baseline.Cached || baseline.Dir == "" {
+		return
+	}
+	if err := SaveBaseline(baseline, stream.Captures); err != nil {
+		fmt.Fprintf(run.streams.Err, "baseline: could not cache %s: %v\n", baseline.Dir, err)
+		return
+	}
+	fmt.Fprintf(run.streams.Err, "baseline: cached %s for the next run\n", baseline.Dir)
+}
+
+// capture drives the runner over both sides for one edition: the base from
+// its baseline when one is cached, live otherwise.
+func (run *session) capture(ctx context.Context, edition Edition, baseline Baseline) (RunnerStream, error) {
 	options, config, deps := run.request.Options, run.request.Config, run.request.Deps
 	plan := run.plan
-	seed := SeedRequest{APIURL: plan.Candidate.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount}
-	if _, err := deps.Seed(ctx, seed); err != nil {
-		return RunnerStream{}, fmt.Errorf("seed: %w", err)
+	base := RunnerSide{Name: "base", BaseURL: plan.Base.URL()}
+	if baseline.Cached {
+		base = RunnerSide{Name: "base", Replay: baseline.CapturesPath()}
+		fmt.Fprintf(run.streams.Err, "%s: base replayed from %s\n", edition, baseline.Dir)
 	}
 	runnerPlan := RunnerPlan{
-		Viewport: options.Viewport,
-		Settle:   config.Settle,
-		Sides: []RunnerSide{
-			{Name: "base", BaseURL: plan.Base.URL()},
-			{Name: "candidate", BaseURL: plan.Candidate.URL()},
-		},
-		OutDir:     filepath.Join(options.RunDir, "shots"),
+		Viewport:   options.Viewport,
+		Settle:     config.Settle,
+		Sides:      []RunnerSide{base, {Name: "candidate", BaseURL: plan.Candidate.URL()}},
+		OutDir:     filepath.Join(options.RunDir, "shots", string(edition)),
 		Slug:       options.Identity.Slug,
 		Routes:     config.Routes,
 		Credential: options.Identity,
+		FailFast:   options.FailFast,
+		FrozenTime: deps.Now().UnixMilli(),
+		Fixtures:   config.Fixtures,
+		Edition:    edition,
+		Stacks:     run.editionStacks(),
 	}
 	if !options.RoutesOnly {
 		runnerPlan.Flows = config.Flows
@@ -381,44 +564,67 @@ func (run *session) capture(ctx context.Context) (RunnerStream, error) {
 	findingsPath := filepath.Join(options.RunDir, FindingsFile)
 	stream, err := runWithFindings(ctx, findingsRunInputs{
 		Deps: deps, Plan: runnerPlan, Options: CaptureOptions{Root: options.Root, Stderr: run.streams.Err},
-		FindingsPath: findingsPath, CatalogueRoot: options.Root,
+		FindingsPath: findingsPath, CatalogueRoot: options.Root, Edition: edition,
 	})
 	if err != nil {
-		return stream, fmt.Errorf("capture: %w", err)
+		return stream, fmt.Errorf("capture %s: %w", edition, err)
 	}
 	return stream, nil
 }
 
-// report classifies the captures and writes the three artifacts.
-func (run *session) report(stream RunnerStream) (Result, error) {
+// report classifies one edition's captures and writes its three artifacts.
+func (run *session) report(stream RunnerStream, edition Edition) ([]Row, error) {
 	options, plan := run.request.Options, run.plan
-	result := Result{Plan: plan}
-	result.Rows = BuildRows(stream.Captures, stream.Diffs)
-	result.Findings = CountFindings(result.Rows)
-	result.ReportDir = filepath.Join(options.RunDir, "report")
+	rows := BuildRows(stream.Captures, stream.Diffs)
+	for index := range rows {
+		rows[index].Edition = edition
+	}
+	dir := filepath.Join(options.RunDir, "report", string(edition))
 	meta := ReportMeta{
-		BaseRef: options.BaseRef, CandidateRef: options.CandidateRef,
+		BaseRef: options.BaseRef, CandidateRef: options.CandidateRef + " (" + string(edition) + ")",
 		BaseURL: plan.Base.URL(), CandidateURL: plan.Candidate.URL(),
 		Viewport: options.Viewport.String(), StartedAt: run.request.Deps.Now().Format(time.RFC3339),
 	}
-	if err := WriteReport(result.ReportDir, result.Rows, meta); err != nil {
-		return result, fmt.Errorf("write report: %w", err)
+	if err := WriteReport(dir, rows, meta); err != nil {
+		return rows, fmt.Errorf("write %s report: %w", edition, err)
 	}
+	fmt.Fprintf(run.streams.Err, "%s: %d rows, %d findings — %s\n", edition, len(rows), CountFindings(rows), filepath.Join(dir, "report.html"))
+	return rows, nil
+}
+
+// finish records every uncovered route as a finding, then writes
+// summary.txt and prints it.
+func (run *session) finish(result Result) (Result, error) {
+	options := run.request.Options
+	if result.Coverage != nil {
+		uncovered := result.Coverage.Uncovered()
+		if err := appendUncovered(filepath.Join(options.RunDir, FindingsFile), uncovered, run.request.Deps.Now()); err != nil {
+			fmt.Fprintf(run.streams.Err, "findings: could not record uncovered routes: %v\n", err)
+		}
+		result.Findings += len(uncovered)
+	}
+	summary := RenderSummary(SummaryInputs{
+		BaseRef: options.BaseRef, CandidateRef: options.CandidateRef, Editions: options.Editions,
+		Rows: result.Rows, Coverage: result.Coverage,
+	})
+	if err := WriteSummaryFile(options.RunDir, summary); err != nil {
+		return result, fmt.Errorf("write summary: %w", err)
+	}
+	result.Summary = summary
 	writeSummary(run.streams.Out, result, options.Agent)
 	return result, nil
 }
 
-// writeSummary is the one line stdout carries. In agent mode it is key=value
-// pairs, so a caller parses the result instead of a sentence.
+// writeSummary prints summary.txt. In agent mode a key=value line leads it,
+// so a caller parses the verdict before reading the text.
 func writeSummary(stdout io.Writer, result Result, agent bool) {
 	if agent {
-		fmt.Fprintf(stdout, "rows=%d findings=%d report=%s findings_json=%s\n",
-			len(result.Rows), result.Findings,
-			filepath.Join(result.ReportDir, "report.html"), filepath.Join(result.ReportDir, "findings.json"))
-		return
+		fmt.Fprintf(stdout, "rows=%d findings=%d reports=%s\n", len(result.Rows), result.Findings, result.ReportDir)
 	}
-	fmt.Fprintf(stdout, "%d rows, %d findings — %s\n", len(result.Rows), result.Findings,
-		filepath.Join(result.ReportDir, "report.html"))
+	fmt.Fprint(stdout, result.Summary)
+	if !agent {
+		fmt.Fprintf(stdout, "reports: %s/<edition>/report.html\n", result.ReportDir)
+	}
 }
 
 // heldPorts reports which of the planned ports something already holds.
@@ -602,7 +808,7 @@ func RunRunner(ctx context.Context, plan RunnerPlan, options CaptureOptions) (Ru
 	}
 	// #nosec G204 -- constant executable and constant args but for the plan
 	// path, which this function just wrote inside the run directory.
-	command := exec.CommandContext(ctx, "pnpm", "--filter", RunnerPackage, "capture", "--plan", planPath)
+	command := exec.CommandContext(ctx, "pnpm", "--silent", "--filter", RunnerPackage, "capture", "--plan", planPath)
 	command.Dir = options.Root
 	command.Stderr = options.Stderr
 	stdout, err := command.StdoutPipe()

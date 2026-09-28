@@ -56,6 +56,217 @@ function countParticipants(spans: SequenceViewProps["spans"], types: ReadonlySet
   return set.size;
 }
 
+/**
+ * One render shape for either diagram, so the renderer need not know which
+ * syntax it draws: both fill the same id-to-span maps for click-to-select.
+ */
+function diagramResult({
+  spans,
+  selectedTypes,
+  subMode,
+  colorMode,
+}: {
+  spans: SequenceViewProps["spans"];
+  selectedTypes: SequenceSpanType[];
+  subMode: SequenceViewProps["subMode"];
+  colorMode: "light" | "dark";
+}) {
+  if (subMode === "topology") {
+    const r = generateTopologySyntax(spans, selectedTypes, colorMode);
+    return {
+      syntax: r.syntax,
+      idToSpanId: r.nodeToSpanId,
+      idDisplay: r.nodeDisplay,
+      idKind: new Map<string, string>(r.nodes.map((node) => [node.id, node.kind])),
+      primaryCount: r.nodes.length,
+      secondaryCount: r.edgeCount,
+      countLabel: `${r.nodes.length}n · ${r.edgeCount}e`,
+    };
+  }
+  const r = generateMermaidSyntax(spans, selectedTypes);
+  return {
+    syntax: r.syntax,
+    idToSpanId: r.participantToSpanId,
+    idDisplay: r.participantDisplay,
+    idKind: new Map<string, string>(r.participantKind),
+    primaryCount: r.participants.length,
+    secondaryCount: r.messageCount,
+    countLabel: `${r.participants.length}p · ${r.messageCount}m`,
+  };
+}
+
+/** The span types the trace has, with any type outside the list read as unknown. */
+function presentTypesOf(spans: SequenceViewProps["spans"]): Set<SequenceSpanType> {
+  return new Set(
+    spans.map((span) => {
+      const type = span.type ?? "span";
+      return SEQUENCE_SPAN_TYPES.find((t) => t === type) ?? "unknown";
+    }),
+  );
+}
+
+function TypeFilterMenu({
+  selectedTypes,
+  presentTypes,
+  onToggle,
+}: {
+  selectedTypes: SequenceSpanType[];
+  presentTypes: Set<SequenceSpanType>;
+  onToggle: (type: SequenceSpanType) => void;
+}) {
+  const selectedCount = selectedTypes.filter((t) => presentTypes.has(t)).length;
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Flex
+          as="button"
+          align="center"
+          gap={1}
+          paddingX={1.5}
+          paddingY={0.5}
+          borderRadius="sm"
+          color="fg.muted"
+          cursor="pointer"
+          _hover={{ bg: "bg.muted", color: "fg" }}
+          transition="all 0.15s ease"
+          title="Filter span types"
+        >
+          <Icon as={LuFilter} boxSize={3} />
+          <Text textStyle="2xs" lineHeight={1} fontWeight={500}>
+            {selectedCount === presentTypes.size
+              ? "All types"
+              : `${selectedCount}/${presentTypes.size}`}
+          </Text>
+        </Flex>
+      </Menu.Trigger>
+      <Menu.Content minWidth="200px">
+        {SEQUENCE_SPAN_TYPES.map((type) => {
+          const present = presentTypes.has(type);
+          return (
+            <Menu.CheckboxItem
+              key={type}
+              value={type}
+              checked={selectedTypes.includes(type)}
+              onCheckedChange={() => onToggle(type)}
+              disabled={!present}
+            >
+              <Flex
+                align="center"
+                justify="space-between"
+                width="full"
+                gap={2}
+                opacity={present ? 1 : 0.45}
+              >
+                <Text textStyle="xs">{TYPE_LABELS[type]}</Text>
+                {!present ? (
+                  <Text textStyle="2xs" color="fg.subtle">
+                    none
+                  </Text>
+                ) : null}
+              </Flex>
+            </Menu.CheckboxItem>
+          );
+        })}
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
+function ZoomControls({
+  zoom,
+  zoomStep,
+  onZoom,
+  onFit,
+  syntax,
+}: {
+  zoom: number;
+  zoomStep: number;
+  onZoom: (factor: number) => void;
+  onFit: () => void;
+  syntax: string;
+}) {
+  return (
+    <HStack gap={0.5} flexShrink={0}>
+      <ZoomButton label="Zoom out" icon={LuMinus} onClick={() => onZoom(1 / zoomStep)} />
+      <Tooltip content="Fit to screen" positioning={{ placement: "top" }}>
+        <Box
+          as="button"
+          onClick={onFit}
+          paddingX={1.5}
+          paddingY={0.5}
+          borderRadius="sm"
+          color="fg.muted"
+          cursor="pointer"
+          _hover={{ bg: "bg.muted", color: "fg" }}
+          transition="all 0.15s ease"
+          minWidth="38px"
+        >
+          <Text textStyle="2xs" lineHeight={1} fontVariantNumeric="tabular-nums" fontWeight={500}>
+            {Math.round(zoom * 100)}%
+          </Text>
+        </Box>
+      </Tooltip>
+      <ZoomButton label="Zoom in" icon={LuPlus} onClick={() => onZoom(zoomStep)} />
+      <ZoomButton label="Fit to screen" icon={LuMaximize} onClick={onFit} />
+      <CopySourceButton syntax={syntax} />
+    </HStack>
+  );
+}
+
+/** The whole diagram in miniature, with the visible area outlined; a click recentres. */
+function SequenceMinimap({
+  width,
+  height,
+  rect,
+  stageRef,
+  onClick,
+}: {
+  width: number;
+  height: number;
+  rect: { x: number; y: number; w: number; h: number };
+  stageRef: RefObject<HTMLDivElement | null>;
+  onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
+}) {
+  return (
+    <Box
+      position="absolute"
+      bottom={2}
+      right={2}
+      width={`${width}px`}
+      height={`${height}px`}
+      borderRadius="md"
+      borderWidth="1px"
+      borderColor="border.subtle"
+      bg="bg.panel/85"
+      backdropFilter="blur(6px)"
+      boxShadow="sm"
+      overflow="hidden"
+      cursor="pointer"
+      onClick={onClick}
+      onPointerDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
+      <Box ref={stageRef} position="absolute" inset={0} />
+      <Box
+        position="absolute"
+        top="0"
+        left="0"
+        borderWidth="1.5px"
+        borderColor="purple.fg"
+        bg="purple.subtle"
+        opacity={0.4}
+        pointerEvents="none"
+        borderRadius="xs"
+        style={{
+          transform: `translate3d(${rect.x}px, ${rect.y}px, 0)`,
+          width: `${rect.w}px`,
+          height: `${rect.h}px`,
+        }}
+      />
+    </Box>
+  );
+}
+
 export function SequenceView({ spans, selectedSpanId, onSelectSpan, subMode }: SequenceViewProps) {
   const { colorMode } = useColorMode();
 
@@ -91,49 +302,11 @@ export function SequenceView({ spans, selectedSpanId, onSelectSpan, subMode }: S
     });
   }, [spans]);
 
-  // Unified render result shape so the renderer doesn't have to know which
-  // syntax it's drawing. Both generators populate the same id → span maps for
-  // click-to-select.
-  const result = useMemo(() => {
-    if (subMode === "topology") {
-      const r = generateTopologySyntax(spans, selectedTypes, colorMode);
-      const kindMap = new Map<string, string>();
-      for (const node of r.nodes) kindMap.set(node.id, node.kind);
-      return {
-        syntax: r.syntax,
-        idToSpanId: r.nodeToSpanId,
-        idDisplay: r.nodeDisplay,
-        idKind: kindMap,
-        primaryCount: r.nodes.length,
-        secondaryCount: r.edgeCount,
-        countLabel: `${r.nodes.length}n · ${r.edgeCount}e`,
-      };
-    }
-    const r = generateMermaidSyntax(spans, selectedTypes);
-    const kindMap = new Map<string, string>();
-    for (const [id, kind] of r.participantKind) kindMap.set(id, kind);
-    return {
-      syntax: r.syntax,
-      idToSpanId: r.participantToSpanId,
-      idDisplay: r.participantDisplay,
-      idKind: kindMap,
-      primaryCount: r.participants.length,
-      secondaryCount: r.messageCount,
-      countLabel: `${r.participants.length}p · ${r.messageCount}m`,
-    };
-  }, [spans, selectedTypes, subMode, colorMode]);
-
-  const presentTypeSet = useMemo(() => {
-    const set = new Set<SequenceSpanType>();
-    for (const span of spans) {
-      const t = (span.type ?? "span") as SequenceSpanType;
-      if (SEQUENCE_SPAN_TYPES.includes(t)) set.add(t);
-      else set.add("unknown");
-    }
-    return set;
-  }, [spans]);
-
-  const availableSelectedCount = selectedTypes.filter((t) => presentTypeSet.has(t)).length;
+  const result = useMemo(
+    () => diagramResult({ spans, selectedTypes, subMode, colorMode }),
+    [spans, selectedTypes, subMode, colorMode],
+  );
+  const presentTypeSet = useMemo(() => presentTypesOf(spans), [spans]);
 
   const { error } = useMermaidRenderer({
     result,
@@ -167,96 +340,21 @@ export function SequenceView({ spans, selectedSpanId, onSelectSpan, subMode }: S
         bg="bg.subtle/60"
         flexShrink={0}
       >
-        <Menu.Root>
-          <Menu.Trigger asChild>
-            <Flex
-              as="button"
-              align="center"
-              gap={1}
-              paddingX={1.5}
-              paddingY={0.5}
-              borderRadius="sm"
-              color="fg.muted"
-              cursor="pointer"
-              _hover={{ bg: "bg.muted", color: "fg" }}
-              transition="all 0.15s ease"
-              title="Filter span types"
-            >
-              <Icon as={LuFilter} boxSize={3} />
-              <Text textStyle="2xs" lineHeight={1} fontWeight={500}>
-                {availableSelectedCount === presentTypeSet.size
-                  ? "All types"
-                  : `${availableSelectedCount}/${presentTypeSet.size}`}
-              </Text>
-            </Flex>
-          </Menu.Trigger>
-          <Menu.Content minWidth="200px">
-            {SEQUENCE_SPAN_TYPES.map((type) => {
-              const active = selectedTypes.includes(type);
-              const present = presentTypeSet.has(type);
-              return (
-                <Menu.CheckboxItem
-                  key={type}
-                  value={type}
-                  checked={active}
-                  onCheckedChange={() => toggleType(type)}
-                  disabled={!present}
-                >
-                  <Flex
-                    align="center"
-                    justify="space-between"
-                    width="full"
-                    gap={2}
-                    opacity={present ? 1 : 0.45}
-                  >
-                    <Text textStyle="xs">{TYPE_LABELS[type]}</Text>
-                    {!present ? (
-                      <Text textStyle="2xs" color="fg.subtle">
-                        none
-                      </Text>
-                    ) : null}
-                  </Flex>
-                </Menu.CheckboxItem>
-              );
-            })}
-          </Menu.Content>
-        </Menu.Root>
+        <TypeFilterMenu
+          selectedTypes={selectedTypes}
+          presentTypes={presentTypeSet}
+          onToggle={toggleType}
+        />
 
         <Box flex="1" />
 
-        <HStack gap={0.5} flexShrink={0}>
-          <ZoomButton
-            label="Zoom out"
-            icon={LuMinus}
-            onClick={() => handleZoomBtn(1 / ZOOM_STEP)}
-          />
-          <Tooltip content="Fit to screen" positioning={{ placement: "top" }}>
-            <Box
-              as="button"
-              onClick={handleResetFit}
-              paddingX={1.5}
-              paddingY={0.5}
-              borderRadius="sm"
-              color="fg.muted"
-              cursor="pointer"
-              _hover={{ bg: "bg.muted", color: "fg" }}
-              transition="all 0.15s ease"
-              minWidth="38px"
-            >
-              <Text
-                textStyle="2xs"
-                lineHeight={1}
-                fontVariantNumeric="tabular-nums"
-                fontWeight={500}
-              >
-                {Math.round(view.z * 100)}%
-              </Text>
-            </Box>
-          </Tooltip>
-          <ZoomButton label="Zoom in" icon={LuPlus} onClick={() => handleZoomBtn(ZOOM_STEP)} />
-          <ZoomButton label="Fit to screen" icon={LuMaximize} onClick={handleResetFit} />
-          <CopySourceButton syntax={result.syntax} />
-        </HStack>
+        <ZoomControls
+          zoom={view.z}
+          zoomStep={ZOOM_STEP}
+          onZoom={handleZoomBtn}
+          onFit={handleResetFit}
+          syntax={result.syntax}
+        />
 
         <Text textStyle="2xs" color="fg.subtle" flexShrink={0} marginLeft={1.5} fontWeight={500}>
           {result.countLabel}
@@ -294,42 +392,13 @@ export function SequenceView({ spans, selectedSpanId, onSelectSpan, subMode }: S
         )}
 
         {hasParticipants && minimapRect ? (
-          <Box
-            position="absolute"
-            bottom={2}
-            right={2}
-            width={`${MINIMAP_W}px`}
-            height={`${MINIMAP_H}px`}
-            borderRadius="md"
-            borderWidth="1px"
-            borderColor="border.subtle"
-            bg="bg.panel/85"
-            backdropFilter="blur(6px)"
-            boxShadow="sm"
-            overflow="hidden"
-            cursor="pointer"
+          <SequenceMinimap
+            width={MINIMAP_W}
+            height={MINIMAP_H}
+            rect={minimapRect}
+            stageRef={minimapStageRef}
             onClick={handleMinimapClick}
-            onPointerDown={(e) => e.stopPropagation()}
-            onDoubleClick={(e) => e.stopPropagation()}
-          >
-            <Box ref={minimapStageRef} position="absolute" inset={0} />
-            <Box
-              position="absolute"
-              top="0"
-              left="0"
-              borderWidth="1.5px"
-              borderColor="purple.fg"
-              bg="purple.subtle"
-              opacity={0.4}
-              pointerEvents="none"
-              borderRadius="xs"
-              style={{
-                transform: `translate3d(${minimapRect.x}px, ${minimapRect.y}px, 0)`,
-                width: `${minimapRect.w}px`,
-                height: `${minimapRect.h}px`,
-              }}
-            />
-          </Box>
+          />
         ) : null}
       </Box>
     </VStack>

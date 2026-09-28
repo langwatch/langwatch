@@ -70,13 +70,8 @@ export function FloatingCellEditor({
 }: FloatingCellEditorProps) {
   const { setCellValue, setEditingCell, editorPortalRef } = useDatasetTable();
   const [editValue, setEditValue] = useState(value);
-  const [style, setStyle] = useState<CSSProperties>({});
-  const [textareaHeight, setTextareaHeight] = useState<number | undefined>(void 0);
   const [validationError, setValidationError] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cancelingRef = useRef(false);
-  const intendedPositionRef = useRef<{ top: number; left: number } | null>(null);
-  const offsetCorrectedRef = useRef(false);
 
   useEffect(() => {
     if (!isEditing) {
@@ -89,6 +84,127 @@ export function FloatingCellEditor({
     const isJson = dataType !== void 0 && JSON_LIKE_TYPES.includes(dataType);
     setEditValue(isJson ? formatJsonCellValue(value).formatted : value);
   }, [dataType, isEditing, value]);
+
+  const { style, textareaHeight, textareaRef } = useEditorPosition({ anchorRef, isEditing });
+
+  const save = useCallback(() => {
+    const result = validateCellValue(dataType, editValue);
+    if (!result.valid) {
+      setValidationError(true);
+      return;
+    }
+
+    setCellValue({ datasetId, row, columnId, value: result.normalized });
+    setValidationError(false);
+    setEditingCell(void 0);
+  }, [columnId, dataType, datasetId, editValue, row, setCellValue, setEditingCell]);
+
+  const cancel = useCallback(() => {
+    cancelingRef.current = true;
+    setEditValue(value);
+    setValidationError(false);
+    setEditingCell(void 0);
+  }, [setEditingCell, value]);
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      const saves = event.key === "Tab" || (event.key === "Enter" && !event.shiftKey);
+      if (!saves) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      save();
+    },
+    [save],
+  );
+
+  const handleBlur = useCallback(() => {
+    if (cancelingRef.current) {
+      cancelingRef.current = false;
+      return;
+    }
+
+    save();
+  }, [save]);
+
+  useEscapeToCancel({ isEditing, cancel });
+
+  if (!isEditing) {
+    return null;
+  }
+
+  const errorMessage =
+    dataType === "boolean" ? "Invalid value. Use: true, false, 1, or 0" : "Invalid number";
+
+  return (
+    <Portal container={editorPortalRef ?? void 0}>
+      <Box
+        data-floating-cell-editor
+        style={style}
+        bg="bg.panel"
+        borderRadius="md"
+        boxShadow={
+          validationError
+            ? "0 0 0 2px var(--chakra-colors-red-solid), 0 4px 12px rgba(0,0,0,0.15)"
+            : "0 0 0 2px var(--chakra-colors-blue-solid), 0 4px 12px rgba(0,0,0,0.15)"
+        }
+        overflow="hidden"
+        position="relative"
+      >
+        <Textarea
+          ref={textareaRef}
+          value={editValue}
+          onChange={(event) => {
+            setEditValue(event.target.value);
+            setValidationError(false);
+          }}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
+          minHeight={textareaHeight ? `${textareaHeight}px` : "80px"}
+          resize="vertical"
+          border="none"
+          borderRadius="0"
+          fontSize="13px"
+          padding={2}
+          _focus={{ outline: "none", boxShadow: "none" }}
+        />
+        {dataType === "boolean" && (
+          <BooleanChoices
+            editValue={editValue}
+            onChoose={(choice) => {
+              setCellValue({ datasetId, row, columnId, value: choice });
+              setEditingCell(void 0);
+            }}
+          />
+        )}
+        <EditorFooter validationError={validationError} errorMessage={errorMessage} />
+      </Box>
+    </Portal>
+  );
+}
+
+/**
+ * Where the editor sits over its cell. Portalled content can land offset from where it was
+ * placed, so the second pass measures the miss once and corrects it.
+ */
+function useEditorPosition({
+  anchorRef,
+  isEditing,
+}: {
+  anchorRef: FloatingCellEditorProps["anchorRef"];
+  isEditing: boolean;
+}): {
+  style: CSSProperties;
+  textareaHeight: number | undefined;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
+} {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [style, setStyle] = useState<CSSProperties>({});
+  const [textareaHeight, setTextareaHeight] = useState<number | undefined>(void 0);
+  const intendedPositionRef = useRef<{ top: number; left: number } | null>(null);
+  const offsetCorrectedRef = useRef(false);
 
   useLayoutEffect(() => {
     if (!isEditing || !anchorRef.current) {
@@ -139,48 +255,17 @@ export function FloatingCellEditor({
     }));
   }, [isEditing, style]);
 
-  const save = useCallback(() => {
-    const result = validateCellValue(dataType, editValue);
-    if (!result.valid) {
-      setValidationError(true);
-      return;
-    }
+  return { style, textareaHeight, textareaRef };
+}
 
-    setCellValue({ datasetId, row, columnId, value: result.normalized });
-    setValidationError(false);
-    setEditingCell(void 0);
-  }, [columnId, dataType, datasetId, editValue, row, setCellValue, setEditingCell]);
-
-  const cancel = useCallback(() => {
-    cancelingRef.current = true;
-    setEditValue(value);
-    setValidationError(false);
-    setEditingCell(void 0);
-  }, [setEditingCell, value]);
-
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLTextAreaElement>) => {
-      const saves = event.key === "Tab" || (event.key === "Enter" && !event.shiftKey);
-      if (!saves) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      save();
-    },
-    [save],
-  );
-
-  const handleBlur = useCallback(() => {
-    if (cancelingRef.current) {
-      cancelingRef.current = false;
-      return;
-    }
-
-    save();
-  }, [save]);
-
+/** Escape cancels the edit before anything else on the page sees the key. */
+function useEscapeToCancel({
+  isEditing,
+  cancel,
+}: {
+  isEditing: boolean;
+  cancel: () => void;
+}): void {
   useEffect(() => {
     if (!isEditing) {
       return;
@@ -200,88 +285,59 @@ export function FloatingCellEditor({
     window.addEventListener("keydown", cancelOnEscape, { capture: true });
     return () => window.removeEventListener("keydown", cancelOnEscape, { capture: true });
   }, [cancel, isEditing]);
+}
 
-  if (!isEditing) {
-    return null;
-  }
-
-  const errorMessage =
-    dataType === "boolean" ? "Invalid value. Use: true, false, 1, or 0" : "Invalid number";
-
+function BooleanChoices({
+  editValue,
+  onChoose,
+}: {
+  editValue: string;
+  onChoose: (choice: "true" | "false") => void;
+}) {
   return (
-    <Portal container={editorPortalRef ?? void 0}>
-      <Box
-        data-floating-cell-editor
-        style={style}
-        bg="bg.panel"
-        borderRadius="md"
-        boxShadow={
-          validationError
-            ? "0 0 0 2px var(--chakra-colors-red-solid), 0 4px 12px rgba(0,0,0,0.15)"
-            : "0 0 0 2px var(--chakra-colors-blue-solid), 0 4px 12px rgba(0,0,0,0.15)"
-        }
-        overflow="hidden"
-        position="relative"
+    <HStack position="absolute" bottom="32px" left={2} gap={1}>
+      <Button
+        size="xs"
+        variant={editValue.toLowerCase() === "true" ? "solid" : "outline"}
+        colorPalette="green"
+        onClick={() => onChoose("true")}
+        onMouseDown={(event) => event.preventDefault()}
       >
-        <Textarea
-          ref={textareaRef}
-          value={editValue}
-          onChange={(event) => {
-            setEditValue(event.target.value);
-            setValidationError(false);
-          }}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          minHeight={textareaHeight ? `${textareaHeight}px` : "80px"}
-          resize="vertical"
-          border="none"
-          borderRadius="0"
-          fontSize="13px"
-          padding={2}
-          _focus={{ outline: "none", boxShadow: "none" }}
-        />
-        {dataType === "boolean" && (
-          <HStack position="absolute" bottom="32px" left={2} gap={1}>
-            <Button
-              size="xs"
-              variant={editValue.toLowerCase() === "true" ? "solid" : "outline"}
-              colorPalette="green"
-              onClick={() => {
-                setCellValue({ datasetId, row, columnId, value: "true" });
-                setEditingCell(void 0);
-              }}
-              onMouseDown={(event) => event.preventDefault()}
-            >
-              true
-            </Button>
-            <Button
-              size="xs"
-              variant={editValue.toLowerCase() === "false" ? "solid" : "outline"}
-              colorPalette="red"
-              onClick={() => {
-                setCellValue({ datasetId, row, columnId, value: "false" });
-                setEditingCell(void 0);
-              }}
-              onMouseDown={(event) => event.preventDefault()}
-            >
-              false
-            </Button>
-          </HStack>
-        )}
-        <Box
-          paddingX={2}
-          paddingY={1}
-          fontSize="10px"
-          color={validationError ? "red.fg" : "fg.muted"}
-          borderTop="1px solid"
-          borderColor={validationError ? "red.muted" : "border.muted"}
-          bg={validationError ? "red.subtle" : "bg.subtle"}
-        >
-          {validationError
-            ? errorMessage
-            : "Enter to save • Escape to cancel • Shift+Enter for newline"}
-        </Box>
-      </Box>
-    </Portal>
+        true
+      </Button>
+      <Button
+        size="xs"
+        variant={editValue.toLowerCase() === "false" ? "solid" : "outline"}
+        colorPalette="red"
+        onClick={() => onChoose("false")}
+        onMouseDown={(event) => event.preventDefault()}
+      >
+        false
+      </Button>
+    </HStack>
+  );
+}
+
+function EditorFooter({
+  validationError,
+  errorMessage,
+}: {
+  validationError: boolean;
+  errorMessage: string;
+}) {
+  return (
+    <Box
+      paddingX={2}
+      paddingY={1}
+      fontSize="10px"
+      color={validationError ? "red.fg" : "fg.muted"}
+      borderTop="1px solid"
+      borderColor={validationError ? "red.muted" : "border.muted"}
+      bg={validationError ? "red.subtle" : "bg.subtle"}
+    >
+      {validationError
+        ? errorMessage
+        : "Enter to save • Escape to cancel • Shift+Enter for newline"}
+    </Box>
   );
 }

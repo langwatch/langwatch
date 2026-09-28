@@ -49,7 +49,7 @@ vi.mock("../../../../me/personal-feature-gate-dialog.tsx", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
-vi.mock("../../../../../../behavior/use-drawer.ts", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 

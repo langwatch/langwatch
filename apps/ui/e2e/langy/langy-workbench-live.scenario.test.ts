@@ -1,7 +1,7 @@
 /**
- * The improvement loop with the workbench OPEN, via a fake workbench tab
- * (unlike other suites, which attach no page) that closes halfway through
- * so the run covers both the page and backend legs.
+ * The improvement loop with the workbench OPEN in a real browser (unlike other
+ * suites, which attach no page) that closes halfway through, so the run covers
+ * both the page and backend legs.
  */
 
 import { openai } from "@ai-sdk/openai";
@@ -12,7 +12,6 @@ import {
 import * as scenario from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
 
-import { type FakeWorkbenchTab, openFakeWorkbenchTab } from "./fake-workbench-tab";
 import { makeLangyAdapter } from "./langy-agent";
 import { LANGY_LIVE_PAGE_CRITERIA, LANGY_OPTIMIZE_LOOP_CRITERIA } from "./langy-rules";
 import { runScenarioAndLog } from "./scenario-logger";
@@ -23,6 +22,7 @@ import {
   newestRunId,
   readBaselineTarget,
 } from "./workbench-assertions";
+import { openWorkbenchPage, type WorkbenchPage } from "./workbench-page";
 import { request } from "./workbench-rest";
 
 const model = openai("gpt-5-mini");
@@ -75,7 +75,7 @@ describe("Langy on a workbench the user is watching", () => {
           ],
         });
 
-        let tab: FakeWorkbenchTab = await openFakeWorkbenchTab({
+        let tab: WorkbenchPage = await openWorkbenchPage({
           adapter: langy,
           experimentSlug: seeded.experimentSlug,
         });
@@ -126,7 +126,7 @@ describe("Langy on a workbench the user is watching", () => {
             // that never had one, so the tab is rebuilt before it starts.
             beforeRetry: async () => {
               await tab.close();
-              tab = await openFakeWorkbenchTab({
+              tab = await openWorkbenchPage({
                 adapter: langy,
                 experimentSlug: seeded.experimentSlug,
               });
@@ -140,7 +140,7 @@ describe("Langy on a workbench the user is watching", () => {
           // the handover and the run pipeline actually worked. The reasoning is
           // already printed above either way.
 
-          // Layer 2, the harness's own record: the page really carried actions
+          // Layer 2, the page's own claim and completion calls: it really carried actions
           // while it was open. "At least one" rather than "every one": the claim
           // window is a hard 3 second constant server-side, and a lost claim
           // degrades to a backend execution that still writes the right

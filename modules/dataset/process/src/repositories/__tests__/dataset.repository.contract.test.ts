@@ -213,6 +213,28 @@ function contractCases(backend: Backend): void {
       expect(remaining.records.map((record) => record.id)).toEqual(["delete-2"]);
     });
   });
+
+  describe("when a record is created under its own identifier", () => {
+    /** @scenario "A record identifier is not treated as a column" */
+    it("keeps the identifier beside the entry, never inside it", async () => {
+      const dataset = await create("identified");
+
+      const [created] = await backend.records().createMany({
+        datasetId: dataset.id,
+        projectId: backend.mine(),
+        entries: [{ id: "record-own-id", input: "one" }],
+      });
+      const [read] = await backend.records().findByIds({
+        datasetId: dataset.id,
+        projectId: backend.mine(),
+        ids: ["record-own-id"],
+      });
+
+      expect(created?.id).toBe("record-own-id");
+      expect(created?.entry).toEqual({ input: "one" });
+      expect(read?.entry).toEqual({ input: "one" });
+    });
+  });
 }
 
 describe("given the memory dataset repositories", () => {

@@ -62,6 +62,9 @@
       "path": "../../../packages/mail/tsconfig.declarations.json"
     },
     {
+      "path": "../../notification/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {

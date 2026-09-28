@@ -27,7 +27,6 @@ import {
   LANGY_TITLE_SOURCE,
 } from "@langwatch/langy-contract";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import type { LanguageModel } from "ai";
 import { z } from "zod";
 
 import type {
@@ -171,25 +170,6 @@ export interface LangyNavigateResourceLocator {
  * minted-minus-revoked without joining (a port because App and worker export differently). */
 export interface LangySessionKeyMetrics {
   record(input: { operation: "minted" | "revoked" | "reaped"; count?: number }): void;
-}
-
-/** A port because WHICH model runs on is the deployment's cascade (providers, feature keys,
- * disabled-provider alternates), not Langy's. The adapter resolves the feature key and falls
- * back to the named model only when the cascade says nothing—keeping the distinction where
- * the type lives. */
-export interface LangyTitleModelResolver {
-  /**
-   * The handle a title call runs on. Rejects rather than answering `null`:
-   * the generator turns any failure into "keeps the title it has", and a
-   * `null` would make unconfigured and broken deployments look identical.
-   */
-  resolveTitleModel(input: {
-    projectId: string;
-    /** The cascade key a project may have pointed somewhere specific. */
-    featureKey: string;
-    /** The model to use where the key resolves to nothing at any scope. */
-    fallbackModel: string;
-  }): Promise<LanguageModel>;
 }
 
 /** Who a backend edit is recorded as. */

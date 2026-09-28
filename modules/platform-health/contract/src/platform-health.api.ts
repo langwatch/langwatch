@@ -7,11 +7,15 @@ import type {
 } from "./platform-health.ts";
 
 /** The callable platform-health capability a process transport reaches. */
+/** A report's query, and the caller's request so the probes stop when it goes away. */
+export type PlatformHealthCheckInput = PlatformHealthQuery &
+  Readonly<{ signal: AbortSignal | undefined }>;
+
 export interface PlatformHealthApi {
-  checkAll(query: PlatformHealthQuery): Promise<PlatformHealthReport>;
+  checkAll(query: PlatformHealthCheckInput): Promise<PlatformHealthReport>;
   checkOne(
     name: PlatformHealthCheckName,
-    query: PlatformHealthQuery,
+    query: PlatformHealthCheckInput,
   ): Promise<PlatformHealthReport>;
   /**
    * Whether the presented key is this deployment's monitoring key. The answer

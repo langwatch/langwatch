@@ -183,7 +183,7 @@ func TestExecuteWritesTheReportAndCountsTheFindings(t *testing.T) {
 		t.Fatalf("result: %+v", result)
 	}
 	for _, name := range []string{"report.html", "findings.md", "findings.json"} {
-		if _, err := os.Stat(filepath.Join(result.ReportDir, name)); err != nil {
+		if _, err := os.Stat(filepath.Join(result.ReportDir, string(EditionEnterprise), name)); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 	}
@@ -212,8 +212,8 @@ func TestDryRunPrintsThePlanAndStartsNothing(t *testing.T) {
 	mustContain(t, printed, "ui :5680")
 	mustContain(t, printed, "routes    2")
 	mustContain(t, printed, "prompt-create, annotate")
-	if len(fake.commands) != 0 {
-		t.Fatalf("a dry run creates no worktree: %v", fake.rendered())
+	if changing := mutatingCommands(fake.rendered()); len(changing) != 0 {
+		t.Fatalf("a dry run creates no worktree: %v", changing)
 	}
 	if _, err := os.Stat(options.RunDir); err == nil {
 		t.Fatal("a dry run created the run directory")
@@ -285,7 +285,23 @@ func TestExecuteRefusesToBootOntoAPortSomethingElseHolds(t *testing.T) {
 	}
 	mustContain(t, err.Error(), "6680")
 	mustContain(t, err.Error(), "-base-port")
-	if len(fake.commands) != 0 {
-		t.Fatalf("nothing should be checked out: %v", fake.rendered())
+	if changing := mutatingCommands(fake.rendered()); len(changing) != 0 {
+		t.Fatalf("nothing should be checked out: %v", changing)
 	}
+}
+
+// mutatingCommands drops the read-only git queries a run makes before it
+// boots (the dirty-tree check, coverage, the baseline's commit).
+func mutatingCommands(commands []string) []string {
+	var out []string
+	for _, command := range commands {
+		readOnly := false
+		for _, prefix := range []string{"git status", "git ls-tree", "git grep", "git rev-parse"} {
+			readOnly = readOnly || strings.HasPrefix(command, prefix)
+		}
+		if !readOnly {
+			out = append(out, command)
+		}
+	}
+	return out
 }

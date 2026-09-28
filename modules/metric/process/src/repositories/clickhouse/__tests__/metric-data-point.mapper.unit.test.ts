@@ -8,18 +8,21 @@ import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { describe, expect, it } from "vitest";
 
 import { point } from "../../../app/__tests__/metric.fixture.ts";
-import { MetricDataPointMapper } from "../clickhouse.metric-data-point.mapper.ts";
+import {
+  firstAcceptanceWinsVersion,
+  metricRawRow,
+  metricUsageEstimateRow,
+} from "../clickhouse.metric-data-point.mapper.ts";
 
 const EARLIER = 1_787_000_000_000;
 const LATER = EARLIER + 60_000;
 
-const versionAt = (acceptedAt: number) =>
-  BigInt(MetricDataPointMapper.firstAcceptanceWinsVersion(acceptedAt));
+const versionAt = (acceptedAt: number) => BigInt(firstAcceptanceWinsVersion(acceptedAt));
 
 const accepted = (acceptedAt: number): CanonicalMetricDataPoint =>
   ({ ...point({ timeUnixMs: EARLIER }), acceptedAt }) as CanonicalMetricDataPoint;
 
-describe("MetricDataPointMapper.firstAcceptanceWinsVersion", () => {
+describe("firstAcceptanceWinsVersion", () => {
   describe("given the same point accepted twice", () => {
     /** @scenario "Canonical metric identity and retries are stable" */
     it("gives the earlier acceptance the LARGER version, so the merge keeps it", () => {
@@ -33,7 +36,7 @@ describe("MetricDataPointMapper.firstAcceptanceWinsVersion", () => {
 
   describe("given the value it writes", () => {
     it("stays a non-negative integer string, which is what UInt64 accepts", () => {
-      const version = MetricDataPointMapper.firstAcceptanceWinsVersion(EARLIER);
+      const version = firstAcceptanceWinsVersion(EARLIER);
 
       expect(version).toMatch(/^\d+$/);
       expect(BigInt(version)).toBeGreaterThan(0n);
@@ -42,12 +45,12 @@ describe("MetricDataPointMapper.firstAcceptanceWinsVersion", () => {
 
   describe("given the rows that carry it", () => {
     it("stamps the raw row", () => {
-      const row = MetricDataPointMapper.rawRow({
+      const row = metricRawRow({
         point: accepted(EARLIER),
         retentionDays: 30,
       }) as { DedupVersion: string };
 
-      expect(row.DedupVersion).toBe(MetricDataPointMapper.firstAcceptanceWinsVersion(EARLIER));
+      expect(row.DedupVersion).toBe(firstAcceptanceWinsVersion(EARLIER));
     });
 
     it("stamps the usage-estimate row with the same rule, so the two cannot disagree", () => {
@@ -55,11 +58,11 @@ describe("MetricDataPointMapper.firstAcceptanceWinsVersion", () => {
       // agree: the estimate is derived from the same acceptance as the point,
       // so a retry that replaced one and not the other would leave a usage
       // figure describing a measurement that is no longer stored.
-      const raw = MetricDataPointMapper.rawRow({
+      const raw = metricRawRow({
         point: accepted(EARLIER),
         retentionDays: 30,
       }) as { DedupVersion: string };
-      const estimate = MetricDataPointMapper.usageEstimateRow(accepted(EARLIER)) as {
+      const estimate = metricUsageEstimateRow(accepted(EARLIER)) as {
         DedupVersion: string;
       };
 

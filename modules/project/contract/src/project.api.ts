@@ -69,8 +69,15 @@ export interface ProjectApi {
     page: number;
     limit: number;
     projectIds?: string[];
+    /** The organization's hidden governance project is left out unless this is true. */
+    includeGovernance?: boolean;
   }): Promise<PaginatedProjects>;
-  listByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]>;
+  listByTeam(input: {
+    organizationId: string;
+    teamId: string;
+    /** The organization's hidden governance project is left out unless this is true. */
+    includeGovernance?: boolean;
+  }): Promise<Project[]>;
   listNamesByIds(input: ProjectNamesByIdsInput): Promise<ProjectIdentity[]>;
   listIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]>;
   /** Unarchived, non-governance project ids, unpaged: main's `findAllByOrganization` filter. */

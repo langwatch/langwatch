@@ -1,0 +1,288 @@
+package visualdiff
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+)
+
+// A baseline is one base commit's captures for one edition, kept under
+// .visualdiff/baselines so a later run against the same base replays them
+// instead of booting and rendering the base again. Its key covers everything
+// that decides what a capture looks like: the commit, the edition, the
+// configuration, the viewport, the runner's own source and the UTC day, since
+// seeded dates render as text.
+const (
+	BaselinesDir     = "baselines"
+	BaselineCaptures = "captures.jsonl"
+	BaselineMetaFile = "meta.json"
+	baselineFormat   = "2"
+	runnerSourceDir  = "tools/visualdiff/runner/src"
+)
+
+// BaselineMeta is what a baseline records beside its captures.
+type BaselineMeta struct {
+	BaseRef    string    `json:"baseRef"`
+	BaseCommit string    `json:"baseCommit"`
+	Edition    Edition   `json:"edition"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
+
+// Baseline is one resolved cache slot. Cached means this run replays it;
+// an uncached slot with a Dir is filled by this run's live base pass.
+type Baseline struct {
+	Dir    string
+	Meta   BaselineMeta
+	Cached bool
+}
+
+// Present reports whether the slot holds a complete baseline.
+func (baseline Baseline) Present() bool {
+	_, captures := os.Stat(filepath.Join(baseline.Dir, BaselineCaptures))
+	_, meta := os.Stat(filepath.Join(baseline.Dir, BaselineMetaFile))
+	return captures == nil && meta == nil
+}
+
+// CapturesPath is the replay file the runner reads the base side from.
+func (baseline Baseline) CapturesPath() string {
+	return filepath.Join(baseline.Dir, BaselineCaptures)
+}
+
+// baselineKeyInputs are what a baseline's key is derived from.
+type baselineKeyInputs struct {
+	commit   string
+	edition  Edition
+	config   *Config
+	viewport Viewport
+	root     string
+	day      time.Time
+}
+
+// BaselineKey derives the cache slot name. Any input changing means a new
+// slot, never a stale replay.
+func BaselineKey(inputs baselineKeyInputs) (string, error) {
+	digest := sha256.New()
+	fmt.Fprintf(digest, "format=%s\nviewport=%s\nday=%s\n", baselineFormat, inputs.viewport, inputs.day.UTC().Format(time.DateOnly))
+	encoded, err := json.Marshal(inputs.config)
+	if err != nil {
+		return "", err
+	}
+	digest.Write(encoded)
+	if err := hashTree(digest, filepath.Join(inputs.root, runnerSourceDir)); err != nil {
+		return "", err
+	}
+	commit := inputs.commit
+	if len(commit) > 12 {
+		commit = commit[:12]
+	}
+	return fmt.Sprintf("%s-%s-%s", commit, inputs.edition, hex.EncodeToString(digest.Sum(nil))[:12]), nil
+}
+
+// hashTree folds every non-test source file under dir into digest, in a
+// stable order.
+func hashTree(digest io.Writer, dir string) error {
+	files, err := runnerSources(dir)
+	if err != nil {
+		return fmt.Errorf("hash runner source: %w", err)
+	}
+	for _, file := range files {
+		content, err := os.ReadFile(file) // #nosec G304 -- walked from the tool's own source directory.
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(dir, file)
+		if _, err := fmt.Fprintf(digest, "%s\n%s", rel, content); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// runnerSources lists the runner's non-test TypeScript sources, sorted.
+func runnerSources(dir string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		switch {
+		case err != nil:
+			return err
+		case entry.IsDir() && entry.Name() == "__tests__":
+			return filepath.SkipDir
+		case !entry.IsDir() && strings.HasSuffix(path, ".ts"):
+			files = append(files, path)
+		}
+		return nil
+	})
+	sort.Strings(files)
+	return files, err
+}
+
+// gitRef is one ref of the repository at root, resolved through run.
+type gitRef struct {
+	run  runner
+	root string
+	ref  string
+}
+
+// resolveCommit turns a ref into the commit it names right now, so the cache
+// follows main as it moves.
+func resolveCommit(ctx context.Context, target gitRef) (string, error) {
+	var out bytes.Buffer
+	spec := commandSpec{name: "git", args: []string{"rev-parse", "--verify", target.ref + "^{commit}"}, dir: target.root}
+	if err := target.run(ctx, spec, &out); err != nil {
+		return "", fmt.Errorf("resolve %s: %w", target.ref, err)
+	}
+	commit := strings.TrimSpace(out.String())
+	if len(commit) < 40 {
+		return "", fmt.Errorf("resolve %s: git answered %q", target.ref, commit)
+	}
+	return commit, nil
+}
+
+// baselineInputs carries resolveBaselines' inputs, grouped so the function
+// itself stays within this repository's argument-count limit.
+type baselineInputs struct {
+	options Options
+	config  *Config
+	deps    Deps
+}
+
+// resolveBaselines finds each edition's slot for the base as it is now.
+// Without Options.Baseline it returns none, so nothing is replayed or saved.
+func resolveBaselines(ctx context.Context, inputs baselineInputs) (map[Edition]Baseline, error) {
+	baselines := map[Edition]Baseline{}
+	options := inputs.options
+	if !options.Baseline {
+		return baselines, nil
+	}
+	commit, err := resolveCommit(ctx, gitRef{run: inputs.deps.Run, root: options.Root, ref: options.BaseRef})
+	if err != nil {
+		return nil, err
+	}
+	now := inputs.deps.Now()
+	for _, edition := range options.Editions {
+		key, err := BaselineKey(baselineKeyInputs{
+			commit: commit, edition: edition, config: inputs.config,
+			viewport: options.Viewport, root: options.Root, day: now,
+		})
+		if err != nil {
+			return nil, err
+		}
+		baseline := Baseline{
+			Dir:  filepath.Join(options.Root, ".visualdiff", BaselinesDir, key),
+			Meta: BaselineMeta{BaseRef: options.BaseRef, BaseCommit: commit, Edition: edition, CreatedAt: now.UTC()},
+		}
+		baseline.Cached = !options.RefreshBaseline && baseline.Present()
+		baselines[edition] = baseline
+	}
+	return baselines, nil
+}
+
+// needsLiveBase reports whether any edition has no baseline to replay.
+func needsLiveBase(editions []Edition, baselines map[Edition]Baseline) bool {
+	for _, edition := range editions {
+		if !baselines[edition].Cached {
+			return true
+		}
+	}
+	return false
+}
+
+// writeBaselinePlan tells a dry run, per edition, whether the base will be
+// replayed or rendered.
+func writeBaselinePlan(stdout io.Writer, editions []Edition, baselines map[Edition]Baseline) {
+	for _, edition := range editions {
+		baseline, ok := baselines[edition]
+		switch {
+		case !ok:
+			fmt.Fprintf(stdout, "  %-10s base rendered live, not cached (-no-baseline)\n", edition)
+		case baseline.Cached:
+			fmt.Fprintf(stdout, "  %-10s base replayed from %s\n", edition, baseline.Dir)
+		default:
+			fmt.Fprintf(stdout, "  %-10s base rendered live, then cached at %s\n", edition, baseline.Dir)
+		}
+	}
+}
+
+// SaveBaseline copies a live base pass into its slot: every base capture's
+// screenshot moves under the slot and its path is rewritten to match. It is
+// written beside the slot and renamed into place, so a crash mid-copy never
+// leaves a slot that reads as present.
+func SaveBaseline(baseline Baseline, captures []Capture) error {
+	staging := baseline.Dir + ".partial"
+	_ = os.RemoveAll(staging)
+	if err := os.MkdirAll(filepath.Join(staging, "shots"), 0o750); err != nil {
+		return err
+	}
+	lines, err := stageBaseCaptures(baseline.Dir, staging, captures)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(staging, BaselineCaptures), lines, 0o600); err != nil {
+		return err
+	}
+	meta, err := json.MarshalIndent(baseline.Meta, "", " ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(staging, BaselineMetaFile), meta, 0o600); err != nil {
+		return err
+	}
+	_ = os.RemoveAll(baseline.Dir)
+	return os.Rename(staging, baseline.Dir)
+}
+
+// stageBaseCaptures copies each base capture's screenshot into staging and
+// returns the captures as JSON lines pointing at where they will live in dir.
+func stageBaseCaptures(dir, staging string, captures []Capture) ([]byte, error) {
+	var lines bytes.Buffer
+	for index := range captures {
+		stored := captures[index]
+		if stored.Side != "base" {
+			continue
+		}
+		if stored.Screenshot != "" {
+			name := fmt.Sprintf("%05d.png", index)
+			if err := copyIfPresent(stored.Screenshot, filepath.Join(staging, "shots", name)); err != nil {
+				return nil, err
+			}
+			stored.Screenshot = filepath.Join(dir, "shots", name)
+		}
+		encoded, err := json.Marshal(stored)
+		if err != nil {
+			return nil, err
+		}
+		lines.Write(append(encoded, '\n'))
+	}
+	return lines.Bytes(), nil
+}
+
+func copyIfPresent(source, target string) error {
+	in, err := os.Open(source) // #nosec G304 -- a screenshot this run's own runner wrote.
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(target) // #nosec G304 -- inside the baseline's own staging directory.
+	if err != nil {
+		return err
+	}
+	if _, err := bufio.NewReader(in).WriteTo(out); err != nil {
+		_ = out.Close()
+		return err
+	}
+	return out.Close()
+}

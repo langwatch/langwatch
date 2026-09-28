@@ -9,9 +9,14 @@ import {
   type AuthzApi,
   authzShareAudience,
 } from "@langwatch/authz-contract";
+import { generate } from "@langwatch/ksuid";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { ShareLink, ShareResourceType, ShareWithProject } from "@langwatch/share-contract";
-import { nanoid } from "nanoid";
+import {
+  SHARE_KSUID_RESOURCE,
+  type ShareLink,
+  type ShareResourceType,
+  type ShareWithProject,
+} from "@langwatch/share-contract";
 
 import type { ShareGrantRepository } from "../share-grant.repository.ts";
 import type {
@@ -89,7 +94,7 @@ export class LedgerShareRepository implements ShareRepository {
     const organizationId = await this.#ledgerOrganizationFor(params.projectId);
     if (!organizationId) return this.#head.create(params);
 
-    const id = nanoid();
+    const id = generate(SHARE_KSUID_RESOURCE).toString();
     const visibility = params.visibility ?? "PUBLIC";
     await this.#authz.attachResourceGrant({
       organizationId,

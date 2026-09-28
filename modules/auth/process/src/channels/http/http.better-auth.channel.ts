@@ -23,7 +23,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { fromDate } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import { compare, hash } from "bcrypt";
-import { type BetterAuthOptions, betterAuth } from "better-auth";
+import { type Auth, type BetterAuthOptions, betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
@@ -394,12 +394,14 @@ export const createAuthOptions = ({
   database: storage.adapter() as NonNullable<BetterAuthOptions["database"]>,
 
   /**
-   * Tell BetterAuth's rate limiter (and session IP tracking) which headers carry the real
-   * client IP.
+   * The only header BetterAuth's rate limiter (and session IP tracking) reads, with no
+   * trusted proxies so it takes the value as stated: the auth route restates the
+   * platform's resolved caller there (transport/auth.rest.ts).
    */
   advanced: {
     ipAddress: {
-      ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"],
+      ipAddressHeaders: ["x-forwarded-for"],
+      trustedProxies: [],
     },
   },
 
@@ -812,10 +814,8 @@ export type BetterAuthTransportOptions = Readonly<{
   addressRoutesToConnection: AddressRoutesToConnection;
 }>;
 
-/**
- * Builds the deployment's ONE Better Auth instance.
- */
-export const createBetterAuthTransport = ({
+/** The options the deployment's ONE Better Auth instance is built from. */
+const transportOptions = ({
   announcements,
   arrivals,
   auth,
@@ -861,7 +861,7 @@ export const createBetterAuthTransport = ({
       ssoMigration,
     },
   });
-  return betterAuth({
+  return {
     ...authOptions,
     plugins: [
       ...genericOAuthPlugins(deployment),
@@ -894,7 +894,12 @@ export const createBetterAuthTransport = ({
         await auth.revokeAllBrowserSessions({ userId: user.id });
       },
     },
-  });
+  } satisfies BetterAuthOptions;
 };
 
-export type BetterAuthTransport = ReturnType<typeof createBetterAuthTransport>;
+export type BetterAuthTransport = Auth<ReturnType<typeof transportOptions>>;
+
+/** Builds the deployment's ONE Better Auth instance. */
+export const createBetterAuthTransport = (
+  options: BetterAuthTransportOptions,
+): BetterAuthTransport => betterAuth(transportOptions(options));

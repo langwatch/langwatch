@@ -13,6 +13,159 @@ import type { FilteredCommands } from "./use-filtered-commands.ts";
 import type { FilteredProject } from "./use-filtered-projects.ts";
 import type { GroupedRecentItems } from "./use-recent-items.ts";
 
+function askLangyItemFor({
+  langyEnabled,
+  projectSlug,
+  query,
+}: {
+  langyEnabled: boolean;
+  projectSlug: string | undefined;
+  query: string;
+}): ListItem | null {
+  if (!langyEnabled || !projectSlug) return null;
+  const trimmed = query.trim();
+  return {
+    type: "command",
+    data: {
+      id: "action-ask-langy",
+      label: trimmed ? `Ask Langy: "${trimmed}"` : "Ask Langy",
+      description: trimmed
+        ? "Hand this question to Langy"
+        : "Ask about the project in plain language",
+      icon: Sparkles,
+      category: "actions",
+      keywords: ["langy", "ask", "ai", "assistant", "chat", "help"],
+    } as Command,
+  };
+}
+
+function searchInTracesItemFor({
+  query,
+  projectSlug,
+}: {
+  query: string;
+  projectSlug: string | undefined;
+}): ListItem | null {
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery || trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
+    return null;
+  }
+  // Don't create invalid path when projectSlug is missing
+  if (!projectSlug) {
+    return null;
+  }
+  return {
+    type: "command",
+    data: {
+      id: "action-search-traces",
+      label: `Search "${query.trim()}" in traces`,
+      icon: Search,
+      category: "navigation",
+      path: `/${projectSlug}/traces#all-traces?q=${encodeURIComponent(query.trim())}`,
+    } as Command,
+  };
+}
+
+function searchInDocsItemFor(query: string): ListItem | null {
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery || trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
+    return null;
+  }
+  return {
+    type: "command",
+    data: {
+      id: "action-search-docs",
+      label: `Search "${query.trim()}" in docs`,
+      icon: BookOpen,
+      category: "navigation",
+      externalUrl: `https://langwatch.ai/docs/introduction?search=${encodeURIComponent(query.trim())}`,
+    } as Command,
+  };
+}
+
+function easterEggItemFor(query: string): ListItem | null {
+  const egg = findEasterEgg(query);
+  if (!egg) return null;
+  return {
+    type: "command",
+    data: {
+      id: egg.id,
+      label: egg.label,
+      icon: egg.icon,
+      category: "actions",
+    } as Command,
+  };
+}
+
+function present(item: ListItem | null): ListItem[] {
+  return item ? [item] : [];
+}
+
+function commandItems(commands: Command[]): ListItem[] {
+  return commands.map((cmd): ListItem => ({ type: "command", data: cmd }));
+}
+
+/**
+ * On an empty bar Ask Langy LEADS — nothing competes for index 0, so
+ * "Cmd+K, Enter" is the fast path into the assistant — then recent items and
+ * the top-level navigation commands.
+ */
+function emptyQueryItems({
+  askLangyItem,
+  recentItemsLimited,
+  availableTopLevelNav,
+}: {
+  askLangyItem: ListItem | null;
+  recentItemsLimited: RecentItem[];
+  availableTopLevelNav: Command[];
+}): ListItem[] {
+  return [
+    ...present(askLangyItem),
+    ...recentItemsLimited.map((item): ListItem => ({ type: "recent", data: item })),
+    ...commandItems(availableTopLevelNav),
+  ];
+}
+
+/**
+ * Ask Langy sits under the real MATCHES and above the FALLBACKS: "Search for X
+ * in traces" and "in docs" are offered for literally any string, so they are
+ * not matches at all — they are the two things we can always say.
+ */
+function queryItems({
+  easterEggItem,
+  idResult,
+  filteredCommands,
+  searchResults,
+  filteredProjects,
+  askLangyItem,
+  searchInTracesItem,
+  searchInDocsItem,
+}: {
+  easterEggItem: ListItem | null;
+  idResult: SearchResult | null;
+  filteredCommands: FilteredCommands;
+  searchResults: SearchResult[];
+  filteredProjects: FilteredProject[];
+  askLangyItem: ListItem | null;
+  searchInTracesItem: ListItem | null;
+  searchInDocsItem: ListItem | null;
+}): ListItem[] {
+  return [
+    ...present(easterEggItem),
+    ...(idResult ? [{ type: "search", data: idResult } satisfies ListItem] : []),
+    ...commandItems(filteredCommands.navigation),
+    ...commandItems(filteredCommands.actions),
+    ...commandItems(filteredCommands.support),
+    ...commandItems(filteredCommands.theme),
+    ...commandItems(filteredCommands.page),
+    ...searchResults.map((result): ListItem => ({ type: "search", data: result })),
+    ...filteredProjects.map((proj): ListItem => ({ type: "project", data: proj })),
+    ...present(askLangyItem),
+    ...present(searchInTracesItem),
+    ...present(searchInDocsItem),
+  ];
+}
+
 /**
  * Hook that builds the flat list of all items for keyboard navigation and display.
  */
@@ -47,23 +200,10 @@ export function useCommandBarItems({
   // The "Ask Langy" activation — the command bar's door into Langy. Synthesized (not a static
   // registry command) so it can carry the live query and only appears where Langy can actually
   // open: a real project, and the user in the rollout (langyEnabled mirrors useShowLangy).
-  const askLangyItem = useMemo<ListItem | null>(() => {
-    if (!langyEnabled || !projectSlug) return null;
-    const trimmed = query.trim();
-    return {
-      type: "command",
-      data: {
-        id: "action-ask-langy",
-        label: trimmed ? `Ask Langy: "${trimmed}"` : "Ask Langy",
-        description: trimmed
-          ? "Hand this question to Langy"
-          : "Ask about the project in plain language",
-        icon: Sparkles,
-        category: "actions",
-        keywords: ["langy", "ask", "ai", "assistant", "chat", "help"],
-      } as Command,
-    };
-  }, [langyEnabled, projectSlug, query]);
+  const askLangyItem = useMemo<ListItem | null>(
+    () => askLangyItemFor({ langyEnabled, projectSlug, query }),
+    [langyEnabled, projectSlug, query],
+  );
 
   // Get top recent items across all time groups
   const recentItemsLimited = useMemo(() => {
@@ -77,139 +217,46 @@ export function useCommandBarItems({
   }, [groupedItems]);
 
   // Create "Search in traces" item when query is long enough
-  const searchInTracesItem = useMemo<ListItem | null>(() => {
-    const trimmedQuery = query.trim();
-    if (!trimmedQuery || trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
-      return null;
-    }
-    // Don't create invalid path when projectSlug is missing
-    if (!projectSlug) {
-      return null;
-    }
-    return {
-      type: "command",
-      data: {
-        id: "action-search-traces",
-        label: `Search "${query.trim()}" in traces`,
-        icon: Search,
-        category: "navigation",
-        path: `/${projectSlug}/traces#all-traces?q=${encodeURIComponent(query.trim())}`,
-      } as Command,
-    };
-  }, [query, projectSlug]);
+  const searchInTracesItem = useMemo<ListItem | null>(
+    () => searchInTracesItemFor({ query, projectSlug }),
+    [query, projectSlug],
+  );
 
   // Create "Search in docs" item when query is long enough
-  const searchInDocsItem = useMemo<ListItem | null>(() => {
-    const trimmedQuery = query.trim();
-    if (!trimmedQuery || trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
-      return null;
-    }
-    return {
-      type: "command",
-      data: {
-        id: "action-search-docs",
-        label: `Search "${query.trim()}" in docs`,
-        icon: BookOpen,
-        category: "navigation",
-        externalUrl: `https://langwatch.ai/docs/introduction?search=${encodeURIComponent(query.trim())}`,
-      } as Command,
-    };
-  }, [query]);
+  const searchInDocsItem = useMemo<ListItem | null>(() => searchInDocsItemFor(query), [query]);
 
   // Easter egg item
-  const easterEggItem = useMemo<ListItem | null>(() => {
-    const egg = findEasterEgg(query);
-    if (!egg) return null;
-    return {
-      type: "command",
-      data: {
-        id: egg.id,
-        label: egg.label,
-        icon: egg.icon,
-        category: "actions",
-      } as Command,
-    };
-  }, [query]);
+  const easterEggItem = useMemo<ListItem | null>(() => easterEggItemFor(query), [query]);
 
   // Build flat list of all items for keyboard navigation
-  const allItems = useMemo<ListItem[]>(() => {
-    const items: ListItem[] = [];
-
-    if (query === "") {
-      // On an empty bar Ask Langy LEADS — nothing competes for index 0, so
-      // "Cmd+K, Enter" is the fast path into the assistant.
-      if (askLangyItem) {
-        items.push(askLangyItem);
-      }
-
-      // Add up to 5 recent items first
-      for (const item of recentItemsLimited) {
-        items.push({ type: "recent", data: item });
-      }
-
-      // Show only top-level navigation commands by default
-      for (const cmd of availableTopLevelNav) {
-        items.push({ type: "command", data: cmd });
-      }
-    } else {
-      // Add easter egg item first if found
-      if (easterEggItem) {
-        items.push(easterEggItem);
-      }
-      // Add ID result if detected
-      if (idResult) {
-        items.push({ type: "search", data: idResult });
-      }
-      for (const cmd of filteredCommands.navigation) {
-        items.push({ type: "command", data: cmd });
-      }
-      for (const cmd of filteredCommands.actions) {
-        items.push({ type: "command", data: cmd });
-      }
-      for (const cmd of filteredCommands.support) {
-        items.push({ type: "command", data: cmd });
-      }
-      for (const cmd of filteredCommands.theme) {
-        items.push({ type: "command", data: cmd });
-      }
-      for (const cmd of filteredCommands.page) {
-        items.push({ type: "command", data: cmd });
-      }
-      for (const result of searchResults) {
-        items.push({ type: "search", data: result });
-      }
-      for (const proj of filteredProjects) {
-        items.push({ type: "project", data: proj });
-      }
-      // Ask Langy sits under the real MATCHES and above the FALLBACKS. It used to trail
-      // everything, which sounds like the same rule but is not: "Search for X in traces" and
-      // "in docs" are offered for literally any string, so they are not matches at all — they
-      // are the two things we can always say.
-      if (askLangyItem) {
-        items.push(askLangyItem);
-      }
-      if (searchInTracesItem) {
-        items.push(searchInTracesItem);
-      }
-      if (searchInDocsItem) {
-        items.push(searchInDocsItem);
-      }
-    }
-
-    return items;
-  }, [
-    query,
-    recentItemsLimited,
-    availableTopLevelNav,
-    askLangyItem,
-    easterEggItem,
-    idResult,
-    filteredCommands,
-    searchResults,
-    filteredProjects,
-    searchInTracesItem,
-    searchInDocsItem,
-  ]);
+  const allItems = useMemo<ListItem[]>(
+    () =>
+      query === ""
+        ? emptyQueryItems({ askLangyItem, recentItemsLimited, availableTopLevelNav })
+        : queryItems({
+            easterEggItem,
+            idResult,
+            filteredCommands,
+            searchResults,
+            filteredProjects,
+            askLangyItem,
+            searchInTracesItem,
+            searchInDocsItem,
+          }),
+    [
+      query,
+      recentItemsLimited,
+      availableTopLevelNav,
+      askLangyItem,
+      easterEggItem,
+      idResult,
+      filteredCommands,
+      searchResults,
+      filteredProjects,
+      searchInTracesItem,
+      searchInDocsItem,
+    ],
+  );
 
   return {
     allItems,

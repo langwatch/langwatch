@@ -1,4 +1,5 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { traceContextChip, useLangyStore } from "@langwatch/langy-browser-kit";
@@ -8,7 +9,6 @@ import type React from "react";
 import { useState } from "react";
 
 import { useCanAskLangy } from "../../../../behavior/langy/use-can-ask-langy.ts";
-import { useDrawer } from "../../../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { PersonalFeatureGateDialog } from "../../me/personal-feature-gate-dialog.tsx";
 import { usePersonalFeatureGate } from "../../me/use-personal-feature-gate.ts";

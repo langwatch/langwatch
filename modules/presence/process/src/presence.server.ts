@@ -4,6 +4,7 @@ import type { Cluster, Redis } from "ioredis";
 import { PresenceApp, type PresenceBroadcast, type PresenceEmitter } from "./app/presence.app.ts";
 import { presenceRepositories } from "./repositories/presence-repositories.registry.ts";
 import { RedisBroadcastRepository } from "./repositories/redis/redis.broadcast.repository.ts";
+import { BroadcastTenantRateLimiterService } from "./services/broadcast-tenant-rate-limiter.service.ts";
 import { presenceTrpcTransport } from "./transport/presence.trpc.ts";
 
 export const presenceServer = defineServerModule("presence")
@@ -18,5 +19,8 @@ export type PresenceBroadcastCapability = PresenceBroadcast &
 
 /** Composes the tenant broadcast fabric from the process's own Redis. */
 export function createBroadcast(redis: Redis | Cluster | null): PresenceBroadcastCapability {
-  return RedisBroadcastRepository.create(redis);
+  return RedisBroadcastRepository.create(redis, {
+    sender: BroadcastTenantRateLimiterService.create(),
+    subscriber: BroadcastTenantRateLimiterService.create(),
+  });
 }

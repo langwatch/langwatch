@@ -18,7 +18,7 @@ import { ConversationLensBody } from "../conversation-lens-body.tsx";
 
 const { openDrawerMock } = vi.hoisted(() => ({ openDrawerMock: vi.fn() }));
 
-vi.mock("../../../../../behavior/use-drawer.ts", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: openDrawerMock }),
 }));
 

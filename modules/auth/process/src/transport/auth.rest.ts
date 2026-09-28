@@ -4,37 +4,17 @@
  * door's own. @see specs/auth/auth-rest-family-mounted.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestAnswer,
+  type RestProtocolProducer,
+} from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/kernel/module-api";
-import { createLogger } from "@langwatch/observability";
+import { z } from "zod";
 
-import type { AuthDirectory } from "../app/auth.members.ts";
-import { isBornFinalizedSignUp } from "../channels/http/http.born-finalized-opt-in.channel.ts";
-import { isAllowedAuthOrigin } from "../rules/auth-origin.rules.ts";
+import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { isBetterAuthPath } from "../rules/better-auth-path.rules.ts";
-
-const logger = createLogger("langwatch:auth");
-
-/** The session `GET /api/auth/session` publishes, field for field. */
-/** The browser's own session poll: signed in, or an anonymous caller. */
-export type AuthRestSessionAnswer =
-  | { kind: "signed_in"; session: AuthRestSession }
-  | { kind: "anonymous" };
-
-export type AuthRestSession = Readonly<{
-  expires: string;
-  user: Readonly<{
-    id: string;
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-    /** Whether this person still owes the SSO setup ceremony. */
-    pendingSsoSetup?: boolean | undefined;
-    /** The admin acting AS this person, where one is. */
-    impersonator?: unknown;
-  }>;
-}>;
 
 /**
  * Where a `GET /api/auth/logout` sends the browser next. `null` keeps the
@@ -43,42 +23,23 @@ export type AuthRestSession = Readonly<{
  */
 export type AuthRestFederatedLogout = (input: { returnTo: string }) => Promise<string | null>;
 
-/**
- * What the sign-in door calls. Declared here because `auth` has no installer
- * and no feature app yet: the process composes an object satisfying this and
- * provides it for this token.
- */
+/** What the sign-in door calls, one operation per route; the process's own app answers it. */
 export interface AuthDoorApi {
-  /** The deployment's ONE Better Auth instance. */
-  betterAuth: () => Promise<
-    Readonly<{
-      handler(request: Request): Promise<Response>;
-      api: Readonly<{
-        getSession(input: { headers: Headers }): Promise<{ session: { id: string } } | null>;
-      }>;
-    }>
-  >;
-  /** Ends one browser session. */
-  revokeBrowserSession: (input: { sessionId: string }) => Promise<void>;
-  /** The session as this process resolves it, for the browser's own poll. */
-  resolveSession: (request: Request) => Promise<AuthRestSessionAnswer>;
-  /**
-   * The project a legacy `X-Auth-Token` names, by slug. `callerKey` names the
-   * probing address so the answer stays a token check and not a token oracle.
-   */
-  findProjectSlugByToken: (input: { token: string; callerKey?: string }) => Promise<string | null>;
-  /** This deployment's flag store, for the born-finalized entrance. */
-  featureFlags: () => FeatureFlagApi;
-  /** The typed client the born-finalized entrance reads its allowlist through. */
-  directory: () => AuthDirectory;
-  /** The origin every state-changing auth request is checked against. An
-   * operation, not a property: the feature-API proxy serves operations only,
-   * and a plain property read through it throws at request time. */
+  /** The project a legacy `X-Auth-Token` names, counted against the caller's nearest hop. */
+  validateProjectAuthToken(input: {
+    token: string | undefined;
+    forwardedFor: string | undefined;
+  }): Promise<{ projectSlug: string }>;
+  /** The browser's own session poll, read off its cookies. */
+  getSessionByCookie(input: { cookie: string | undefined }): Promise<AuthSessionPoll>;
+  /** Ends the browser session its cookies name. */
+  revokeSessionFromCookies(input: { cookie: string | undefined }): Promise<void>;
+  /** Better Auth's own fetch handler, behind the origin gate and the resolved caller. */
+  betterAuthHandshake(request: Request): Promise<Response>;
+  /** The origin a GET logout returns to; an operation, as the API proxy serves no properties. */
   baseUrl: () => string;
   /** Where a GET logout lands, once the local cookies are cleared. */
   federatedLogout: AuthRestFederatedLogout;
-  /** Runs the born-finalized handler inside Identity's birth context. */
-  runWithIdentityBirth: <T>(run: () => Promise<T>) => Promise<T>;
 }
 
 export const AuthDoorApi = moduleApi<AuthDoorApi>()("auth");
@@ -94,6 +55,19 @@ const AUTH_ANSWER = [JSON_MEDIA_TYPE, "text/html", "*/*"];
 /** Better Auth's cookie and redirect protocol, answered as its own response. */
 const BETTER_AUTH_FORWARDS =
   "Better Auth writes the session cookies, redirects and handshake bodies itself; this door passes them on untouched";
+
+/** The browser's session poll keeps its own document and its no-store header. */
+const SESSION_POLL_WIRE =
+  "the browser's session poll answers the document it has always published, never cached, with null for an anonymous caller";
+
+const VALIDATE_HEADERS = z.object({
+  "x-auth-token": z.string().optional(),
+  "x-forwarded-for": z.string().optional(),
+});
+
+const COOKIE_HEADERS = z.object({ cookie: z.string().optional() });
+
+const NO_STORE = { "Cache-Control": "no-store, must-revalidate" };
 
 const AUTH_DOOR = publicRoute({
   reason:
@@ -119,48 +93,22 @@ export const authRest = defineRestRouter(AuthDoorApi)
 
   .post("/api/auth/validate", "validateProjectAuthToken")
   .withAccess(AUTH_DOOR)
-  .withRawResponse({ produces: JSON_MEDIA_TYPE })
-  .handle(async ({ app, request }) => {
-    const authToken = request.headers.get("x-auth-token");
-
-    if (!authToken) return answer({ message: "X-Auth-Token header is required." }, 401);
-
-    const projectSlug = await app.findProjectSlugByToken({
-      token: authToken,
-      callerKey: callerKeyOf(request),
-    });
-
-    if (!projectSlug) return answer({ message: "Invalid auth token." }, 401);
-
-    return answer({ projectSlug });
-  })
+  .withHeaders(VALIDATE_HEADERS)
+  .withOutput(z.object({ projectSlug: z.string() }))
+  .handle(({ app }, headers) =>
+    app.validateProjectAuthToken({
+      token: headers["x-auth-token"],
+      forwardedFor: headers["x-forwarded-for"],
+    }),
+  )
 
   .get("/api/auth/session", "readBrowserAuthSession")
   .withAccess(AUTH_DOOR)
-  .withRawResponse({ produces: JSON_MEDIA_TYPE })
-  .handle(async ({ app, request }) => {
-    const answered = await app.resolveSession(request);
-    const headers = { "Cache-Control": "no-store, must-revalidate" };
-
-    if (answered.kind === "anonymous") return answer(null, 200, headers);
-    const { session } = answered;
-
-    return answer(
-      {
-        session: { expiresAt: session.expires },
-        user: {
-          id: session.user.id,
-          name: session.user.name,
-          email: session.user.email,
-          image: session.user.image,
-          pendingSsoSetup: session.user.pendingSsoSetup,
-          impersonator: session.user.impersonator,
-        },
-      },
-      200,
-      headers,
-    );
-  })
+  .withHeaders(COOKIE_HEADERS)
+  .withResponse("protocol", { produces: JSON_MEDIA_TYPE, because: SESSION_POLL_WIRE })
+  .handle(async ({ app, response }, headers) =>
+    sessionPollAnswer(response, await app.getSessionByCookie({ cookie: headers.cookie })),
+  )
 
   .get("/api/auth/logout", "endBrowserSessionAndRedirect")
   .withAccess(AUTH_DOOR)
@@ -183,7 +131,7 @@ export const authRest = defineRestRouter(AuthDoorApi)
   .anyMethod()
   .handle(async ({ app, request, response }) =>
     isBetterAuthPath({ pathname: new URL(request.url).pathname })
-      ? response.pass(await betterAuthHandshake({ app, request }))
+      ? response.pass(await app.betterAuthHandshake(request))
       : response.decline(),
   )
   .build();
@@ -199,26 +147,7 @@ async function endSession({
   app: AuthDoorApi;
   request: Request;
 }): Promise<Response> {
-  const cookies = request.headers.get("cookie") ?? "";
-  const sessionToken =
-    extractCookie(cookies, "__Secure-better-auth.session_token") ??
-    extractCookie(cookies, "better-auth.session_token");
-
-  if (sessionToken) {
-    try {
-      const headers = new Headers();
-
-      headers.set("cookie", cookies);
-
-      const session = await (await app.betterAuth()).api.getSession({ headers });
-
-      if (session) await app.revokeBrowserSession({ sessionId: session.session.id });
-    } catch (error) {
-      // Session lookup failed — the cookies below are still cleared.
-      void error;
-    }
-  }
-
+  await app.revokeSessionFromCookies({ cookie: request.headers.get("cookie") ?? undefined });
   const headers = clearedCookies();
 
   if (request.method === "GET") {
@@ -234,60 +163,17 @@ async function endSession({
   return new Response(JSON.stringify({ success: true }), { status: 200, headers });
 }
 
-/**
- * Better Auth's own fetch handler, behind the deployment's origin gate and the
- * born-finalized entrance.
- */
-async function betterAuthHandshake({
-  app,
-  request,
-}: {
-  app: AuthDoorApi;
-  request: Request;
-}): Promise<Response> {
-  const origin = request.headers.get("origin");
-  const referer = request.headers.get("referer");
-
-  if (
-    !isAllowedAuthOrigin({
-      method: request.method,
-      origin: origin ?? undefined,
-      referer: referer ?? undefined,
-      baseUrl: app.baseUrl(),
-    })
-  ) {
-    // The 403 body carries no detail on purpose. Without this line the reason
-    // is nowhere: the access log records the status and nothing else, so a
-    // misconfigured base URL is indistinguishable from a real cross-site POST.
-    logger.warn(
-      {
-        path: new URL(request.url).pathname,
-        method: request.method,
-        expectedOrigin: app.baseUrl(),
-        receivedOrigin: origin,
-        receivedReferer: referer,
-      },
-      "rejected auth request: origin does not match the deployment's base URL",
-    );
-
-    return answer({ message: "Invalid origin", code: "INVALID_ORIGIN" }, 403);
-  }
-
-  // ADR-116 §3: the born-finalized marker is set HERE and only here, once the
-  // backend allowlist check has passed. Nothing below re-decides it.
-  const bornFinalized = await isBornFinalizedSignUp({
-    featureFlags: app.featureFlags(),
-    directory: app.directory(),
-    request,
+/** The session poll's document, never cached. */
+function sessionPollAnswer(
+  response: RestProtocolProducer<typeof JSON_MEDIA_TYPE>,
+  poll: AuthSessionPoll,
+): RestAnswer<"protocol"> {
+  return response.write({
+    status: 200,
+    mediaType: JSON_MEDIA_TYPE,
+    body: JSON.stringify(poll.document),
+    headers: NO_STORE,
   });
-
-  const betterAuth = await app.betterAuth();
-
-  if (bornFinalized) {
-    return app.runWithIdentityBirth(() => betterAuth.handler(request));
-  }
-
-  return betterAuth.handler(request);
 }
 
 /** One `Set-Cookie` per session cookie, in both spellings, all expired. */
@@ -303,36 +189,4 @@ function clearedCookies(): Headers {
   }
 
   return headers;
-}
-
-/** A JSON body this door writes itself, in the shape its callers already parse. */
-function answer(
-  body: unknown,
-  status = 200,
-  headers: Readonly<Record<string, string>> = {},
-): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": JSON_MEDIA_TYPE, ...headers },
-  });
-}
-
-function extractCookie(cookieHeader: string, name: string): string | null {
-  const match = cookieHeader
-    .split(";")
-    .map((cookie) => cookie.trim())
-    .find((cookie) => cookie.startsWith(`${name}=`));
-
-  return match ? match.slice(name.length + 1) : null;
-}
-
-/**
- * Rate-limit bucket for the caller: the LAST `x-forwarded-for` hop, the only
- * one not client-supplied.
- */
-function callerKeyOf(request: Request): string {
-  const hops = request.headers.get("x-forwarded-for")?.split(",") ?? [];
-  const nearest = hops[hops.length - 1]?.trim();
-
-  return `ip:${nearest ?? "unknown"}`;
 }

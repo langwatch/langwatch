@@ -116,7 +116,6 @@ async function bootTasks() {
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
         adminEmails: config.process.adminEmails,
         processName: "langwatch-tasks",
-        dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory") },
         storageResolver: void 0,
         storage: void 0,
         queue: void 0,
@@ -124,6 +123,7 @@ async function bootTasks() {
         gatewayInternalProtocol: {},
         connectJudge: null,
         scenarioChildBundle,
+        rawSocketPort: 0,
         monitor: void 0,
         langwatchQl: {
           admin: { configured: false },
@@ -148,6 +148,7 @@ describe("the tasks process installation", () => {
       const names = runtime.tasks(isTask).map((task) => task.name);
       expect(names).toEqual([
         "backfill-annotations-to-clickhouse",
+        "clear-stale-pending-sso-setup",
         "slack-alert",
         "report-schedule-backfill",
         "stripe-prices-sync",

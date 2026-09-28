@@ -80,5 +80,7 @@ export type ProjectKeyedProbeRequest =
       headers: HealthProbeHeaders;
       triggerId?: string | undefined;
       workflowId?: string | undefined;
+      /** The caller's request, so a probe it no longer waits for stops. */
+      signal: AbortSignal | undefined;
     }>
   | Readonly<{ check: "scenarios"; headers: HealthProbeHeaders; runPlanId: string | undefined }>;

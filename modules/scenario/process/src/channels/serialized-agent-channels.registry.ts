@@ -5,6 +5,8 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import type { AgentAdapter } from "@langwatch/scenario";
+import type { VoiceTransport } from "@langwatch/scenario-contract";
 
 import { type AgentAdapterFactory, type AgentAdapterBuildInput } from "../app/scenario.app.ts";
 import { HttpSerializedCodeAgentChannel } from "./http/http.serialized-code-agent.channel.ts";
@@ -13,7 +15,8 @@ import { HttpSerializedHttpAgentChannel } from "./http/http.serialized-http-agen
 import { HttpSerializedPromptConfigChannel } from "./http/http.serialized-prompt-config.channel.ts";
 import { HttpSerializedWorkflowAgentChannel } from "./http/http.serialized-workflow-agent.channel.ts";
 import type { NlpFetchTimeouts } from "./nlp-fetch.channel.ts";
-import type { SerializedAgentChannel } from "./serialized-agent.channel.ts";
+import type { VoiceTransportRunner } from "./voice-transport.channel.ts";
+import { createSerializedVoiceAgentAdapter } from "./voice-transport.channels.ts";
 
 /**
  * Creates an adapter from serialized data using the registry. @throws Error if adapter type is not
@@ -28,13 +31,21 @@ export class SerializedAgentChannelRegistry implements AgentAdapterFactory {
    */
   static create({
     nlpTimeouts,
-  }: { nlpTimeouts?: NlpFetchTimeouts } = {}): SerializedAgentChannelRegistry {
-    return new SerializedAgentChannelRegistry(nlpTimeouts ?? {});
+    voiceTransports,
+  }: {
+    nlpTimeouts?: NlpFetchTimeouts;
+    /** The voice transports by vendor, built with the process's environment drilled in. */
+    voiceTransports: Record<VoiceTransport, VoiceTransportRunner>;
+  }): SerializedAgentChannelRegistry {
+    return new SerializedAgentChannelRegistry(nlpTimeouts ?? {}, voiceTransports);
   }
 
-  private constructor(private readonly nlpTimeouts: NlpFetchTimeouts) {}
+  private constructor(
+    private readonly nlpTimeouts: NlpFetchTimeouts,
+    private readonly voiceTransports: Record<VoiceTransport, VoiceTransportRunner>,
+  ) {}
 
-  build(input: AgentAdapterBuildInput): SerializedAgentChannel {
+  build(input: AgentAdapterBuildInput): AgentAdapter {
     const { adapterData } = input;
     switch (adapterData.type) {
       case "prompt": {
@@ -92,8 +103,12 @@ export class SerializedAgentChannelRegistry implements AgentAdapterFactory {
         });
       }
       case "voice":
-        // No serialized voice adapter exists yet; see voice-agent.adapter.ts.
-        throw new Error("Voice adapter is not yet implemented");
+        // The runner reads the transport, agent and credential off the prefetched data and
+        // dials; a missing credential fails the run with the transport's own message.
+        return createSerializedVoiceAgentAdapter({
+          data: adapterData,
+          registry: this.voiceTransports,
+        });
     }
   }
 }

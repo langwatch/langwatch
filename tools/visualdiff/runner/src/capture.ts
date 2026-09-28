@@ -17,6 +17,12 @@ const LOADING_SELECTOR =
 
 const MAX_SCREENSHOT_HEIGHT = 6000;
 
+const MAX_ARIA_SNAPSHOT = 64_000;
+
+/** Relative times move between two renders of the same screen; they are masked in the pixels. */
+const RELATIVE_TIME =
+  /\b(?:\d+|an?|a few) (?:seconds?|minutes?|hours?|days?|weeks?|months?|years?) ago\b|\bjust now\b/i;
+
 export const contextOptions = ({
   viewport,
   storageState,
@@ -115,21 +121,38 @@ export class Side {
     return /page not found|404/i.test(text.slice(0, 400));
   }
 
+  /** ariaSnapshot is the page's accessibility tree, or "" when it cannot be read. */
+  async ariaSnapshot(): Promise<string> {
+    const snapshot = await this.page
+      .locator("body")
+      .ariaSnapshot({ timeout: 5_000 })
+      .catch(() => "");
+    return snapshot.slice(0, MAX_ARIA_SNAPSHOT);
+  }
+
+  /** blank reports a page with no text at all, the shape of a shell that never mounted. */
+  async blank(): Promise<boolean> {
+    const text = await this.page.innerText("body").catch(() => "");
+    return text.trim() === "";
+  }
+
   async screenshot(file: string): Promise<void> {
     mkdirSync(dirname(file), { recursive: true });
     const height = await this.page
       .evaluate(() => document.documentElement.scrollHeight)
       .catch(() => 0);
     const viewport = this.page.viewportSize();
+    const mask = [this.page.locator("time"), this.page.getByText(RELATIVE_TIME)];
     if (height > MAX_SCREENSHOT_HEIGHT && viewport) {
       await this.page.screenshot({
         path: file,
         animations: "disabled",
+        mask,
         clip: { x: 0, y: 0, width: viewport.width, height: MAX_SCREENSHOT_HEIGHT },
       });
       return;
     }
-    await this.page.screenshot({ path: file, fullPage: true, animations: "disabled" });
+    await this.page.screenshot({ path: file, fullPage: true, animations: "disabled", mask });
   }
 }
 
@@ -138,14 +161,17 @@ export const openSide = async ({
   viewport,
   settle,
   storageState,
+  frozenTime,
 }: {
   side: PlanSide;
   viewport: Viewport;
   settle: SettleConfig;
   storageState?: string;
+  frozenTime?: number;
 }): Promise<Side> => {
   const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
   const context = await browser.newContext(contextOptions({ viewport, storageState }));
+  if (frozenTime !== undefined) await context.clock.setFixedTime(frozenTime);
   await context.addInitScript(() => {
     try {
       localStorage.setItem("chakra-ui-color-mode", "light");
@@ -169,6 +195,8 @@ export const captureMessage = ({
   error,
   durationMs,
   notFound,
+  blank,
+  ariaSnapshot,
 }: {
   kind: "route" | "flow";
   key: string;
@@ -179,6 +207,8 @@ export const captureMessage = ({
   error: string;
   durationMs: number;
   notFound: boolean;
+  blank: boolean;
+  ariaSnapshot: string;
 }): CaptureMessage => {
   const drained = side.drain();
   return {
@@ -193,6 +223,8 @@ export const captureMessage = ({
     consoleErrors: drained.consoleErrors,
     failedRequests: drained.failedRequests,
     notFound,
+    blank,
+    ariaSnapshot,
     error,
     durationMs,
   };

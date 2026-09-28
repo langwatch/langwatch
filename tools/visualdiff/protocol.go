@@ -125,10 +125,23 @@ type RunnerPlan struct {
 	Routes     []string     `json:"routes"`
 	Flows      []Flow       `json:"flows"`
 	Credential SeedIdentity `json:"credential"`
+	// FailFast stops the runner once the candidate's first routes show its
+	// shell does not render (runner/src/shell.ts).
+	FailFast bool `json:"failFast,omitempty"`
+	// FrozenTime is the Date.now() both sides' pages see, so relative times
+	// and "today" render alike; Fixtures fill a route's {name} placeholders.
+	FrozenTime int64             `json:"frozenTime,omitempty"`
+	Fixtures   map[string]string `json:"fixtures,omitempty"`
+	// Edition and Stacks are read back by recapture, which sets the same
+	// edition on the same stacks before it renders again.
+	Edition Edition        `json:"edition,omitempty"`
+	Stacks  []EditionStack `json:"stacks,omitempty"`
 }
 
-// RunnerSide is one stack the runner drives.
+// RunnerSide is one stack the runner drives. Replay names a cached
+// baseline's captures the runner reads instead of rendering this side.
 type RunnerSide struct {
 	Name    string `json:"name"`
 	BaseURL string `json:"baseUrl"`
+	Replay  string `json:"replay,omitempty"`
 }

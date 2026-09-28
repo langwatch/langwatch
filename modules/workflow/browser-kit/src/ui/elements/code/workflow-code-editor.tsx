@@ -1,6 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import type { Monaco } from "@monaco-editor/react";
+import type * as MonacoApi from "monaco-editor";
 import type { editor } from "monaco-editor";
 import { registerCompletion } from "monacopilot";
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
@@ -12,6 +12,9 @@ import type {
 } from "../../../model/code/python-provider.shared.ts";
 import { registerPythonProviders } from "../../../model/code/python-providers.ts";
 import { EditorStatusBar } from "./editor-status-bar.tsx";
+
+/** The monaco namespace; `@monaco-editor/react`'s own `Monaco` type reads as `any` here. */
+type Monaco = typeof MonacoApi;
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 

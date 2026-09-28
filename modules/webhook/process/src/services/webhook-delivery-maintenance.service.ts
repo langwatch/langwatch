@@ -15,6 +15,7 @@ import {
   MAINTENANCE_TENANT,
   OUTBOX_ROW_RETENTION_MS,
   WEBHOOK_DELIVERY_PROCESS_NAME,
+  type MaintenanceClaimState,
 } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDeliveryProcessDeps } from "./webhook-delivery.service.ts";
 
@@ -52,14 +53,14 @@ export class WebhookDeliveryMaintenanceService {
       processKey: MAINTENANCE_PROCESS_KEY,
     };
     try {
-      const existing = await this.deps.processStore.findByRef<{ lastRunMs: number }>({
+      const existing = await this.deps.processStore.findByRef<MaintenanceClaimState>({
         ref,
       });
       if (existing && now - existing.state.lastRunMs < MAINTENANCE_INTERVAL_MS) {
         return;
       }
 
-      const claimed = await this.deps.processStore.commit({
+      const claimed = await this.deps.processStore.commit<MaintenanceClaimState>({
         ref,
         tenantId: MAINTENANCE_TENANT,
         sourceEventId: null,

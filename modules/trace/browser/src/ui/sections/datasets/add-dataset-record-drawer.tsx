@@ -2,16 +2,15 @@
  * "Add to Dataset": pick a dataset, map the trace onto its columns, add the rows.
  */
 
-import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { toaster } from "@langwatch/design-system/toaster";
-import { createLogger } from "@langwatch/observability/browser";
 import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
-import { type ComponentType, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
 import { api } from "../../../behavior/trace-api.ts";
-import { useDrawer } from "../../../behavior/use-drawer.ts";
 import { useLocalStorageSelectedDataSetId } from "../../../behavior/use-local-storage-selected-dataset-id.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import NextLink from "../../elements/next-link.tsx";
@@ -20,33 +19,10 @@ import { showErrorToast } from "../errors/index.ts";
 import { DatasetMappingPreview } from "./dataset-mapping-preview.tsx";
 import { DatasetSelector } from "./dataset-selector.tsx";
 
-const logger = createLogger("AddDatasetRecordDrawer");
-
 /** Form values for dataset selection */
 type FormValues = {
   datasetId: string;
 };
-
-/**
- * The dataset editor this drawer leads to, as the application hands it over.
- */
-export type DatasetEditorComponent = ComponentType<{
-  datasetToSave?: {
-    datasetId?: string;
-    /** Optional to match the editor's own `InMemoryDataset` shape. */
-    name?: string;
-    columnTypes: DatasetColumns;
-    datasetRecords?: ({ id?: string } & Record<string, unknown>)[];
-  };
-  open?: boolean;
-  onClose?: () => void;
-  /**
-   * OPTIONAL, MATCHING THE EDITOR'S OWN PROP. The editor is a registered drawer as well
-   * as a component, and an address cannot carry a function, so it declares `onSuccess`
-   * optional and calls it only when one arrived.
-   */
-  onSuccess?: (dataset: { datasetId: string; name: string; columnTypes: DatasetColumns }) => void;
-}>;
 
 export interface AddDatasetRecordDrawerProps {
   /** Callback function called on successful record addition */
@@ -57,26 +33,99 @@ export interface AddDatasetRecordDrawerProps {
    * The traces a bulk selection is adding.
    */
   selectedTraceIds?: string[] | string;
-  /** The hosted dataset editor, when the application composed one. */
-  DatasetEditor?: DatasetEditorComponent;
+}
+
+/** The traces a bulk selection or a single trace is adding, blanks dropped. */
+function traceIdsOf({
+  selectedTraceIds,
+  traceId,
+}: {
+  selectedTraceIds: string[] | string | undefined;
+  traceId: string | undefined;
+}): string[] {
+  const selected = Array.isArray(selectedTraceIds) ? selectedTraceIds : [selectedTraceIds];
+  return [...selected, traceId].filter((id): id is string => !!id);
+}
+
+/**
+ * A cell as its column stores it. Anything but a `string` column holds JSON,
+ * read back out of the string the editor holds; text that is not JSON stays text.
+ */
+function cellValue({ value, columnType }: { value: unknown; columnType: string | undefined }) {
+  if (columnType === "string" || typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+/** The selected rows as dataset entries, without the selection flag. */
+function entriesToAdd({
+  rows,
+  columnTypes,
+}: {
+  rows: DatasetRecordEntry[];
+  columnTypes: DatasetColumns | undefined;
+}): DatasetRecordEntry[] {
+  return rows.map(
+    (row) =>
+      Object.fromEntries(
+        Object.entries(row)
+          .filter(([key]) => key !== "selected")
+          .map(([key, value]) => [
+            key,
+            cellValue({ value, columnType: columnTypes?.find((c) => c.name === key)?.type }),
+          ]),
+      ) as DatasetRecordEntry,
+  );
+}
+
+function isScrolledToBottom(el: HTMLElement): boolean {
+  return el.scrollTop >= el.scrollHeight - el.clientHeight;
+}
+
+function submitLabel({ rowCount, isReady }: { rowCount: number; isReady: boolean }): string {
+  if (!isReady) return "Add  to dataset";
+  return `Add ${rowCount} ${rowCount === 1 ? "row" : "rows"} to dataset`;
+}
+
+function toastAddedToDataset({
+  projectSlug,
+  datasetId,
+}: {
+  projectSlug: string | undefined;
+  datasetId: string;
+}) {
+  toaster.create({
+    title: "Successfully added to dataset",
+    description: (
+      <NextLink
+        href={`/${projectSlug}/datasets/${datasetId}`}
+        style={{ color: "white", textDecoration: "underline" }}
+      >
+        View the dataset
+      </NextLink>
+    ),
+    type: "success",
+  });
 }
 
 export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
   const trpc = api.useUtils();
   const { project } = useOrganizationTeamProject();
   const createDatasetRecord = api.datasetRecord.create.useMutation();
-  const editDataset = useDisclosure();
-  const DatasetEditor = props.DatasetEditor;
   // Leaving this drawer hands the reader back to whatever opened it, the
   // trace they were reading say, rather than clearing the page. Opened with
   // nothing underneath (a bulk selection, the end-of-queue hand-off), going
   // back closes the drawer outright.
-  const { goBack } = useDrawer();
+  const { goBack, openDrawer } = useDrawer();
 
   // Selected Dataset ID - Local Storage
   const {
     selectedDataSetId: localStorageDatasetId,
     setSelectedDataSetId: setLocalStorageDatasetId,
+    rememberCreatedDataset,
   } = useLocalStorageSelectedDataSetId();
 
   const {
@@ -99,15 +148,8 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
 
   const selectedDataset = datasets.data?.find((dataset) => dataset.id === datasetId);
 
-  // Combine trace IDs from props into a single array
   const traceIds = useMemo(
-    () =>
-      [
-        ...(Array.isArray(props.selectedTraceIds)
-          ? props.selectedTraceIds
-          : [props.selectedTraceIds]),
-        props?.traceId ?? "",
-      ].filter(Boolean) as string[],
+    () => traceIdsOf({ selectedTraceIds: props.selectedTraceIds, traceId: props.traceId }),
     [props.selectedTraceIds, props.traceId],
   );
 
@@ -125,18 +167,24 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
     },
   );
 
-  const onCreateDatasetSuccess = ({ datasetId }: { datasetId: string }) => {
-    void datasets
-      .refetch()
-      .then(() => {
-        setTimeout(() => {
-          setValue("datasetId", datasetId);
-        }, 100);
-      })
-      .catch((error) => {
-        logger.error({ error });
-      });
-  };
+  // Dataset's editor is its own routed drawer: go there, and come back to the dataset it saved.
+  const openDatasetEditor = () =>
+    openDrawer("addOrEditDataset", {
+      ...(selectedDataset
+        ? {
+            datasetToSave: {
+              datasetId,
+              name: selectedDataset.name ?? "",
+              columnTypes: selectedDataset.columnTypes ?? [],
+            },
+          }
+        : {}),
+      onSuccess: (saved) => {
+        rememberCreatedDataset(saved.datasetId);
+        void trpc.dataset.getAll.invalidate();
+      },
+      onClose: goBack,
+    });
 
   const handleOnClose = () => {
     goBack();
@@ -151,31 +199,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
   const onSubmit: SubmitHandler<FormValues> = async (_data) => {
     if (!selectedDataset || !project) return;
 
-    // Transform row data into dataset entries
-    const entries: DatasetRecordEntry[] = rowsToAdd.map(
-      (row) =>
-        Object.fromEntries(
-          Object.entries(row)
-            .filter(([key, _]) => key !== "selected")
-            .map(([key, value]) => {
-              const column = columnTypes?.find((column) => column.name === key);
-              // A cell holds one column's value, not a record: anything but a
-              // `string` column stores JSON, so it is read back out of the
-              // string the editor holds.
-              let entry: unknown = value;
-              if (column?.type !== "string" && typeof value === "string") {
-                try {
-                  entry = JSON.parse(value);
-                } catch {
-                  /* this is just a safe json parse fallback */
-                  entry = value;
-                }
-              }
-
-              return [key, entry];
-            }),
-        ) as DatasetRecordEntry,
-    );
+    const entries = entriesToAdd({ rows: rowsToAdd, columnTypes });
 
     await createDatasetRecord.mutateAsync(
       {
@@ -196,18 +220,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
           const session = useAnnotationQueueSessionStore.getState();
           if (session.active) session.noteHandoffAdded();
           goBack();
-          toaster.create({
-            title: "Successfully added to dataset",
-            description: (
-              <NextLink
-                href={`/${project?.slug}/datasets/${datasetId}`}
-                style={{ color: "white", textDecoration: "underline" }}
-              >
-                View the dataset
-              </NextLink>
-            ),
-            type: "success",
-          });
+          toastAddedToDataset({ projectSlug: project?.slug, datasetId });
         },
         onError: (error) => {
           showErrorToast({
@@ -240,12 +253,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
   const [atBottom, setAtBottom] = useState(false);
 
   useEffect(() => {
-    if (!scrollRef.current) return;
-
-    setAtBottom(
-      (scrollRef.current.scrollTop ?? 0) >=
-        (scrollRef.current.scrollHeight ?? 0) - (scrollRef.current.clientHeight ?? 0),
-    );
+    if (scrollRef.current) setAtBottom(isScrolledToBottom(scrollRef.current));
   }, [rowDataFromDataset]);
 
   return (
@@ -272,12 +280,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
         maxWidth="1400px"
         overflow="auto"
         ref={scrollRef}
-        onScroll={() =>
-          setAtBottom(
-            (scrollRef.current?.scrollTop ?? 0) >=
-              (scrollRef.current?.scrollHeight ?? 0) - (scrollRef.current?.clientHeight ?? 0),
-          )
-        }
+        onScroll={(e) => setAtBottom(isScrolledToBottom(e.currentTarget))}
       >
         <Drawer.Header>
           <HStack>
@@ -299,7 +302,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
                 localStorageDatasetId={datasetId}
                 errors={errors}
                 setValue={setValue}
-                {...(DatasetEditor ? { onCreateNew: editDataset.onOpen } : {})}
+                onCreateNew={openDatasetEditor}
               />
               {selectedDataset && (
                 <DatasetMappingPreview
@@ -307,7 +310,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
                   columnTypes={selectedDataset.columnTypes}
                   rowData={rowDataFromDataset}
                   selectedDataset={selectedDataset}
-                  onEditColumns={editDataset.onOpen}
+                  onEditColumns={openDatasetEditor}
                   onRowDataChange={setRowDataFromDataset}
                   editorPortalRef={editorPortalRef}
                 />
@@ -333,32 +336,15 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
                 loading={createDatasetRecord.isPending}
                 disabled={!selectedDataset || !tracesWithSpans.data || rowsToAdd.length === 0}
               >
-                Add{" "}
-                {selectedDataset && tracesWithSpans.data
-                  ? `${rowsToAdd.length} ${rowsToAdd.length === 1 ? "row" : "rows"}`
-                  : ""}{" "}
-                to dataset
+                {submitLabel({
+                  rowCount: rowsToAdd.length,
+                  isReady: !!selectedDataset && !!tracesWithSpans.data,
+                })}
               </Button>
             </HStack>
           </form>
         </Drawer.Body>
       </Drawer.Content>
-      {DatasetEditor && (
-        <DatasetEditor
-          {...(selectedDataset
-            ? {
-                datasetToSave: {
-                  datasetId,
-                  name: selectedDataset.name ?? "",
-                  columnTypes: selectedDataset.columnTypes ?? [],
-                },
-              }
-            : {})}
-          open={editDataset.open}
-          onClose={editDataset.onClose}
-          onSuccess={onCreateDatasetSuccess}
-        />
-      )}
     </Drawer.Root>
   );
 }

@@ -40,9 +40,10 @@ Interrupted vitest workers reparent to pid 1 and keep holding their memory.
 
 ## 3. Use the harness, not hand-rolled stubs
 
-`@langwatch/test-harness` is the toolkit:
+`@langwatch/test-harness` is the toolkit, beside `@langwatch/api-fixture`:
 
-- `createApiFixture<XApi>({ ...only the methods this test calls })` for an app or
+- `createApiFixture<XApi>({ ...only the methods this test calls })` (from
+  `@langwatch/api-fixture`) for an app or
   peer double. An uncalled method throws by name, so a test cannot pass on a
   silent no-op.
 - `cleanupTestRows` for datastore rows.
@@ -100,8 +101,8 @@ So a scenario needs both:
 1. a binding tag on the scenario, and
 2. a `/** @scenario "<title>" */` annotation on the test that covers it.
 
-Read the report's verdict banner, not a per-file tick. The `spec-bind` skill is
-the procedure.
+Read the report's verdict banner, not a per-file tick
+(`pnpm --filter @langwatch/architecture-enforcer check:feature-parity`).
 
 Error paths get scenarios too. A failure mode named in a spec with no bound test
 is a promise nobody keeps.

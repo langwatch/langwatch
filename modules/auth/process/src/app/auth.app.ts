@@ -12,7 +12,6 @@ import {
   authBrowserConfig,
   authServerConfig,
   AuthUnavailableError,
-  AuthValidateRateLimitedError,
   FrontDoorRateLimitedError,
   NoAddressToConfirmError,
   type AuthApi as AuthApiContract,
@@ -52,6 +51,7 @@ import {
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
+  type EmailIdentifierAdded,
   IdentityApi,
   type IdentityEmailService,
   type RoutingDecision,
@@ -60,22 +60,25 @@ import {
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { EmailDelivery } from "@langwatch/mail";
+import { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { resolveRequestBound } from "@langwatch/plans";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { sessionSecret, signInProviderSecrets } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
 import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
+import { isBornFinalizedSignUp } from "../channels/http/http.born-finalized-opt-in.channel.ts";
 import { signUpVerificationMailChannels } from "../channels/sign-up-verification-mail-channels.registry.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
+import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
 import { AddressConfirmationService } from "../services/address-confirmation.service.ts";
+import { AuthDoorService } from "../services/auth-door.service.ts";
 import { AuthProviderService } from "../services/auth-provider.service.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
 import {
@@ -93,6 +96,7 @@ import {
   type LegacySsoAccessMemberships,
 } from "../services/legacy-sso-access.service.ts";
 import { PriorSessionService } from "../services/prior-session.service.ts";
+import { ProjectAuthTokenService } from "../services/project-auth-token.service.ts";
 import {
   ProviderAccountLinkService,
   type ProviderAccountRow,
@@ -118,9 +122,8 @@ import {
   TwoStepVerificationService,
   type TwoStepProtocol,
 } from "../services/two-step-verification.service.ts";
-import type { AuthRestFederatedLogout, AuthRestSessionAnswer } from "../transport/auth.rest.ts";
+import type { AuthRestFederatedLogout } from "../transport/auth.rest.ts";
 import { buildBetterAuth, type BetterAuthDeploymentIdentity } from "./auth-composition.build.ts";
-import type { AuthDirectory } from "./auth.members.ts";
 
 /**
  * The invitation a landing page reads, and the reissue request behind it. Both
@@ -180,7 +183,7 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
 type AuthAppPeers = Readonly<{
   apiKeys: ApiKeyApi;
   featureFlags: FeatureFlagApi;
-  identity: Pick<IdentityApi, "routeSignIn">;
+  identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation">;
 }>;
 
 type AuthSetup = FeatureSetup<
@@ -209,6 +212,8 @@ export class AuthApp implements AuthApiContract {
     entitlements: EntitlementApi,
     /** Whether a signed license permits platform single sign-on (ADR-027). */
     licensing: LicensingApi,
+    /** Whether this installation names a way to send email, before a confirmation is offered. */
+    notifications: NotificationService,
     /** The sign-in providers, shaped for Better Auth by enterprise SSO. */
     sso: SsoApi,
     /** Whether a CLI approver may still hand out a shared project's key (`project:manage`). */
@@ -232,6 +237,10 @@ export class AuthApp implements AuthApiContract {
   } as const;
 
   readonly #sessions: BrowserSessionService;
+  /** The `/api/auth` door: Better Auth's handshake, the session poll and sign-out. */
+  readonly #door: AuthDoorService;
+  /** The legacy `X-Auth-Token` check. */
+  readonly #projectTokens: ProjectAuthTokenService;
   readonly #cliSessions: CliDeviceSessionService;
   readonly #cliDeviceFlow: CliDeviceFlowService;
   readonly #signUp: SignUpVerificationService | null;
@@ -348,6 +357,24 @@ export class AuthApp implements AuthApiContract {
       issuers: connectionIssuers,
       accounts: { createAccount: (row) => this.#createProviderAccount(row) },
     });
+    this.#projectTokens = ProjectAuthTokenService.create({
+      apiKeys: dependencies.apiKeys,
+      rateLimiter: members.rateLimiter,
+    });
+    this.#door = AuthDoorService.create({
+      betterAuth: () => this.betterAuth(),
+      isBornFinalizedSignUp: (request) =>
+        isBornFinalizedSignUp({
+          featureFlags: dependencies.featureFlags,
+          directory: PrismaAuthDirectoryRepository.create(members.prisma),
+          request,
+        }),
+      baseUrl: () => this.baseUrl(),
+      runWithIdentityBirth: (run) => this.runWithIdentityBirth(run),
+      verifyBrowserSession: (input) => this.verifyBrowserSession(input),
+      resolveBrowserSession: (input) => this.resolveBrowserSession(input),
+      revokeBrowserSession: (input) => this.revokeBrowserSession(input),
+    });
   }
 
   static async create(setup: AuthSetup): Promise<AuthApp> {
@@ -442,6 +469,8 @@ export class AuthApp implements AuthApiContract {
       addressConfirmation: AddressConfirmationService.create({
         isConfirmed: async ({ email }) =>
           (await dependencies.users.findByEmail({ email }))?.emailVerified === true,
+        hasMailDelivery: async () =>
+          (await dependencies.notifications.getMailDelivery()).provider !== undefined,
       }),
       priorSessions: PriorSessionService.create({
         sessions: repositories.sessions,
@@ -609,51 +638,23 @@ export class AuthApp implements AuthApiContract {
     return verified === null ? { kind: "anonymous" } : { kind: "verified", verified };
   }
 
-  /** The session the browser's own poll reads, verified and then resolved. */
-  async resolveSession(request: Request): Promise<AuthRestSessionAnswer> {
-    const verification = await this.verifyBrowserSession({ headers: request.headers });
-    if (verification.kind === "anonymous") return verification;
-
-    return this.resolveBrowserSession({ verified: verification.verified });
+  getSessionByCookie(input: { cookie: string | undefined }): Promise<AuthSessionPoll> {
+    return this.#door.getSessionByCookie(input);
   }
 
-  /**
-   * The project a legacy `X-Auth-Token` names, by slug. Every call probes a
-   * secret and gets a yes/no answer, so a caller that names itself is counted
-   * first: past the registry's per-minute ceiling the probe stops answering.
-   */
-  async findProjectSlugByToken(input: {
-    token: string;
-    callerKey?: string;
-  }): Promise<string | null> {
-    if (input.callerKey !== undefined) {
-      await this.countValidateCall(input.callerKey);
-    }
-
-    const resolved = await this.#dependencies.apiKeys.findResolvedToken({ token: input.token });
-
-    return resolved?.project.slug ?? null;
+  revokeSessionFromCookies(input: { cookie: string | undefined }): Promise<void> {
+    return this.#door.revokeSessionFromCookies(input);
   }
 
-  /** One probe of the token check, against the registry's per-IP ceiling. */
-  private async countValidateCall(callerKey: string): Promise<void> {
-    const requests = resolveRequestBound("authValidatePerIpPerMinute", "ENTERPRISE");
-    const decision = await this.#members.rateLimiter.check(`auth-validate:${callerKey}`, {
-      requests,
-      seconds: 60,
-    });
-
-    if (!decision.allowed) {
-      throw new AuthValidateRateLimitedError({ retryAfterSeconds: decision.retryAfterSeconds });
-    }
+  betterAuthHandshake(request: Request): Promise<Response> {
+    return this.#door.betterAuthHandshake(request);
   }
 
-  featureFlags(): FeatureFlagApi {
-    return this.#dependencies.featureFlags;
-  }
-
-  directory(): AuthDirectory {
-    return PrismaAuthDirectoryRepository.create(this.#members.prisma);
+  validateProjectAuthToken(input: {
+    token: string | undefined;
+    forwardedFor: string | undefined;
+  }): Promise<{ projectSlug: string }> {
+    return this.#projectTokens.validateProjectAuthToken(input);
   }
 
   /** The origin every state-changing auth request is checked against. An
@@ -851,9 +852,10 @@ export class AuthApp implements AuthApiContract {
 
   /** Metered on the caller rather than the address, like the token check's own probe. */
   async sendMyAddressConfirmation(
-    input: Readonly<{ actorId: string; email: string | null }>,
-  ): Promise<void> {
+    input: Readonly<{ actorId: string; email: string | null; codeChallenge: string }>,
+  ): Promise<EmailIdentifierAdded> {
     if (!input.email) throw new NoAddressToConfirmError();
+    await this.#addressConfirmation.assertCanSend();
 
     const budget = await this.isWithinBudget({
       key: `auth.sendMyAddressConfirmation:${input.actorId}`,
@@ -866,7 +868,11 @@ export class AuthApp implements AuthApiContract {
       });
     }
 
-    await this.requestSignUpVerification({ email: input.email });
+    return this.#dependencies.identity.sendOwnAddressConfirmation({
+      userId: input.actorId,
+      email: input.email,
+      codeChallenge: input.codeChallenge,
+    });
   }
 
   getMyAddressConfirmation(

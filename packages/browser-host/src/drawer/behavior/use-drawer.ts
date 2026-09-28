@@ -8,7 +8,7 @@ import { createLogger } from "@langwatch/observability/browser";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 
-import type { UiDrawerMap, UiDrawerPropsOf } from "../model/drawer-map.ts";
+import type { UiDrawerMap, UiDrawerPropsOf, UiFlowCallbacksStore } from "../model/drawer-map.ts";
 import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options.ts";
 import { type DrawerRouter, drawerRouterRef, useDrawerRouter } from "./drawer-router.ts";
 
@@ -67,7 +67,7 @@ export const setComplexProps = (props: Record<string, unknown>): void => {
  * Flow callbacks registry: persists across drawer navigation, and is cleared
  * on closeDrawer() except entries registered with `keepOnClose`.
  */
-let flowCallbacks: Record<string, Record<string, unknown>> = {};
+let flowCallbacks: UiFlowCallbacksStore = {};
 
 /**
  * Drawers whose callback belongs to a mounted component, not a drawer flow:
@@ -80,9 +80,9 @@ const keptOnClose = new Set<string>();
  * Sets flow callbacks for a drawer type; they persist across navigation until
  * closeDrawer() is called.
  */
-export const setFlowCallbacks = (
-  drawer: DrawerType,
-  callbacks: Record<string, any>,
+export const setFlowCallbacks = <Name extends string>(
+  drawer: Name,
+  callbacks: NonNullable<UiFlowCallbacksStore[Name]>,
   options?: {
     /**
      * True when a mounted component owns the registration, so that closing a
@@ -96,7 +96,7 @@ export const setFlowCallbacks = (
   // drawer, or right before a setComplexProps that does notify — so a notify
   // here is redundant, and expensive (~65 call sites; would cascade a
   // re-render through the open drawer's subtree on every registration).
-  flowCallbacks[drawer] = callbacks as Record<string, unknown>;
+  flowCallbacks[drawer] = callbacks;
   if (options?.keepOnClose) keptOnClose.add(drawer);
   else keptOnClose.delete(drawer);
 };
@@ -105,7 +105,7 @@ export const setFlowCallbacks = (
  * Get flow callbacks for a specific drawer type.
  * Returns undefined if no callbacks are registered for this drawer.
  */
-export const getFlowCallbacks = (drawer: DrawerType): Record<string, any> | undefined => {
+export const getFlowCallbacks = <Name extends string>(drawer: Name): UiFlowCallbacksStore[Name] => {
   return flowCallbacks[drawer];
 };
 
@@ -115,7 +115,7 @@ export const getFlowCallbacks = (drawer: DrawerType): Record<string, any> | unde
  * stays: it belongs to that component, still expecting to be called.
  */
 export const clearFlowCallbacks = () => {
-  const kept: Record<string, Record<string, unknown>> = {};
+  const kept: UiFlowCallbacksStore = {};
   for (const drawer of keptOnClose) {
     const callbacks = flowCallbacks[drawer];
     if (callbacks) kept[drawer] = callbacks;

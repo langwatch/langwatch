@@ -21,12 +21,23 @@ const harness = vi.hoisted(() => {
   };
 });
 
+// The drawer navigator reads the harness address and writes through its spies.
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useLocation: () => {
+    const [pathname = "", search = ""] = harness.router.asPath.split("?");
+    return { pathname, search: search ? `?${search}` : "", hash: "", state: null, key: "default" };
+  },
+  useNavigate: () => (url: string, options?: { replace?: boolean }) =>
+    options?.replace ? harness.replace(url) : harness.push(url),
+}));
+
 vi.mock("@langwatch/browser-host/use-router", () => ({
   default: harness.router,
   useRouter: () => harness.router,
 }));
 
-const { clearDrawerStack, getDrawerStack } = await import("../../../behavior/use-drawer.ts");
+const { clearDrawerStack, getDrawerStack } = await import("@langwatch/browser-host/use-drawer");
 const { LegacyTraceDrawerRedirect } = await import("../legacy-trace-drawer-redirect.tsx");
 
 /** The address the redirect last replaced to, or "" if it never navigated. */

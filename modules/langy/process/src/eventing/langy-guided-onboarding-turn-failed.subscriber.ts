@@ -8,6 +8,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
+import { analyticsUuidForEvent } from "../rules/langy-analytics-event-uuid.rules.ts";
 import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
 
 const logger = createLogger("langwatch:langy:guided-onboarding-turn-failed");
@@ -42,6 +43,8 @@ export interface GuidedOnboardingAnalytics {
     event: string;
     projectId: string;
     properties: Record<string, unknown>;
+    /** The same for every delivery of one event, so the sink keeps one. */
+    uuid: string;
   }): void;
 }
 
@@ -100,7 +103,13 @@ export function createGuidedOnboardingTurnFailedSubscriber(
       const conversationId = String(event.aggregateId);
 
       try {
-        await trackGuidedTurnFailure({ deps, failure, projectId, conversationId });
+        await trackGuidedTurnFailure({
+          deps,
+          failure,
+          projectId,
+          conversationId,
+          uuid: analyticsUuidForEvent(event.id),
+        });
       } catch (error) {
         logger.error(
           { projectId, conversationId, turnId: failure.turnId, error },
@@ -116,11 +125,13 @@ async function trackGuidedTurnFailure({
   failure,
   projectId,
   conversationId,
+  uuid,
 }: {
   deps: GuidedOnboardingTurnFailedSubscriberDeps;
   failure: { turnId: string; code: string };
   projectId: string;
   conversationId: string;
+  uuid: string;
 }): Promise<void> {
   const guided = await deps.guidedOnboarding.getByProject({ projectId }).catch((error: unknown) => {
     if (HandledError.isHandled(error) && error.code === "project_not_found") return null;
@@ -148,6 +159,7 @@ async function trackGuidedTurnFailure({
     userId,
     event: "guided_onboarding_turn_failed",
     projectId,
+    uuid,
     properties: {
       code: failure.code,
       path: guided.currentPath ?? null,

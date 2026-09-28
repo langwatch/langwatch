@@ -9,12 +9,6 @@ import { describe, expect, it, vi } from "vitest";
 const assignRole = vi.fn().mockResolvedValue({});
 const recordProvider = vi.fn().mockResolvedValue({});
 
-vi.mock("@langwatch/model-provider-browser/surfaces/model-provider-settings", () => ({
-  useModelProvidersSettings: () => ({
-    refetch: () => Promise.resolve({ data: { openai: { models: ["stored-first"] } } }),
-  }),
-}));
-
 vi.mock("../../../../behavior/onboarding-api.ts", () => {
   const mutation = (mutateAsync: (input: unknown) => unknown) => ({
     useMutation: () => ({ mutateAsync, isPending: false }),
@@ -25,7 +19,14 @@ vi.mock("../../../../behavior/onboarding-api.ts", () => {
         recordProvider: mutation((input) => recordProvider(input)),
         recordProviderSkipped: mutation(vi.fn()),
       },
-      modelProvider: { setRoleAssignmentForScope: mutation((input) => assignRole(input)) },
+      modelProvider: {
+        setRoleAssignmentForScope: mutation((input) => assignRole(input)),
+        getAllForProjectForFrontend: {
+          useQuery: () => ({
+            refetch: () => Promise.resolve({ data: { openai: { models: ["stored-first"] } } }),
+          }),
+        },
+      },
     },
   };
 });

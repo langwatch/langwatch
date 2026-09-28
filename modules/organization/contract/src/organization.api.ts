@@ -544,7 +544,13 @@ export interface OrganizationApi {
   ): Promise<PersonalFeatures>;
   findProject(id: string): Promise<Project | null>;
   listProjectsByOrganization(
-    input: Readonly<{ organizationId: string; page: number; limit: number; projectIds?: string[] }>,
+    input: Readonly<{
+      organizationId: string;
+      page: number;
+      limit: number;
+      projectIds?: string[];
+      includeGovernance?: boolean;
+    }>,
   ): Promise<PaginatedProjects>;
   listProjectsByTeam(
     input: Readonly<{ organizationId: string; teamId: string }>,

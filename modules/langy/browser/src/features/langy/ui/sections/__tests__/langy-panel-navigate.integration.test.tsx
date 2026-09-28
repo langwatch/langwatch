@@ -162,7 +162,7 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
         }),
       },
       listAllForProjectForFrontend: {
-        useQuery: () => ({ data: { providers: [] }, isLoading: false }),
+        useQuery: () => ({ data: [], isLoading: false }),
       },
       setRoleAssignmentForScope: { useMutation: () => ({ mutateAsync: () => Promise.resolve() }) },
       setFeatureOverrideForScope: { useMutation: () => ({ mutateAsync: () => Promise.resolve() }) },

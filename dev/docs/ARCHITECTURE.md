@@ -565,6 +565,9 @@ instead of `serve()`. The role decides what `boot()` hosts: jobs and
 subscriptions instead of HTTP doors. Liveness/metrics is a built-in Server
 component. Its pipeline declaration selects consumption, and shutdown drains that work
 before closing the services and stores it uses.
+A module's `static create(setup)` is told the role it boots in as `setup.role`, so work only
+one role owns (the worker's voice tunnel) is built there and released through
+`setup.resources` (Alex, 2026-09-28).
 
 **Tasks** takes the Server for telemetry and config, skips the listener;
 graceful degenerates to run-to-completion. Migrations are tasks (§7), run before any module boots,
@@ -780,12 +783,14 @@ untenanted statement client for DDL) and `databaseTarget` (the credential-free
 Postgres endpoint). Each answers `{ configured: false }` rather than refusing.
 A module never re-derives them from `process.env`.
 
-**An availability decision travels as a member the process answers** (ruled
-2026-09-24). LangWatchQL is one: analytics reads a `langwatchQl` member, and
-each process's `main.ts` answers it with one call to the module's exported
-supply function, over `clickhouseAdmin`, `databaseTarget` and `prisma`. Its
+**A module builds its own objects from the store members it already reads;
+`main.ts` wires none of them** (Alex, 2026-09-28; superseding the 2026-09-24
+supply-function form). LangWatchQL is one: analytics reads `clickhouseAdmin`,
+`databaseTarget` and `prisma` and builds its connection bundle itself. Its
 passwords stay the module's own `static readonly secrets`. No password means
-the member answers "unavailable" and every query is refused (ADR-159).
+LangWatchQL answers "unavailable" and every query is refused (ADR-159).
+Data-privacy's directory is another: its repository registry builds it over
+`prisma`.
 
 **`configSchema` is deleted, not migrated** (ruled 2026-09-18). The legacy
 static — an App-level Zod schema re-parsed per feature and fed by the deleted
@@ -1003,7 +1008,10 @@ the chain call is plumbing that carries config's answer, and the test seam
 before serve by the start script and the deploy pipeline. Prisma migrations
 live with the schema; ClickHouse migrations are goose SQL files. A serving
 process holding DDL locks is how deploys die. Because they run before any module boots, apps/tasks'
-migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27).
+migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27), and
+so may `lwql-provision.ts` and `lwql-render-access-config.ts`: LangWatchQL provisioning reads
+both schemas under the same migration lock, before serve, and the access-config render runs from
+env alone in its Helm job (Alex, 2026-09-28).
 
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path.
@@ -1084,8 +1092,9 @@ never thinks about resolution at all. The per-module resolver adapters
   them. Shared door helpers live in the protocol's framework package (`@langwatch/otlp`) (Alex, 2026-09-26).
 - A socket that must be handed on unopened (voice media to a scenario child) is a declared raw-socket
   door: a path pattern and a handler given the request, the raw socket and `head`, hosted on its own
-  port by the role that owns the children. A public address the role resolves at boot is a supplied
-  member (`{ url } | { unavailable }`), never a module writing `process.env` (Alex, 2026-09-27).
+  port by the role that owns the children. The module resolves the public address itself, in its own
+  app with an async create and a close, in the worker role only; other roles read it as
+  `{ unavailable }`. It is never a module writing `process.env` (Alex, 2026-09-28).
 - A protocol whose handler must write the raw Node response itself (hosted MCP's SDK transports) is a
   declared raw HTTP door, `RawHttpProtocol` (`@langwatch/api`): exact paths, prefixes claiming a path and
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
@@ -1175,7 +1184,8 @@ the runtime registers it onto its global registry when that pipeline registers, 
 refuses by name one that arrives after the registry started routing. The runtime's own maintenance
 pipelines (blob sweep, process-manager retention) are built by the eventing member where a Redis and a
 process store exist, answered by `maintenancePipelines()`, and installed once by the process after the
-modules', where the role drains (2026-09-25).
+modules', where the role drains (2026-09-25). The producer role holds the process store too, so
+every role reads and writes one process store (Alex, 2026-09-27).
 
 `withPipelines((pipelines) => pipelines.produce())` selects API production;
 `withPipelines((pipelines) => pipelines.consume())` selects worker consumption.

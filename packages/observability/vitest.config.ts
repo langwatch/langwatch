@@ -1,16 +1,16 @@
-import { defineModuleVitestConfig } from "@langwatch/vitest-config";
+import { defineConfig } from "vitest/config";
 
-export default defineModuleVitestConfig({
-  kind: "node",
-  // Nine files vi.mock the logger and SDK modules; a shared graph lets one
-  // file's mock decide another's result. See packages/system-migrations.
-  isolate: true,
+// Plain on purpose: @langwatch/vitest-config configures this package's logger, so
+// this package cannot test through it (Alex, 2026-09-27).
+export default defineConfig({
   test: {
+    environment: "node",
+    pool: "forks",
+    // Nine files vi.mock the logger and SDK modules; a shared graph lets one
+    // file's mock decide another's result. See packages/system-migrations.
+    isolate: true,
     watch: false,
-    testTimeout: 10000,
-    // This package's own suite asserts on createLogger's real behaviour
-    // (levels, transports), so it opts out of the vitest-wide test silencing
-    // that createLogger otherwise applies to every other package.
-    env: { LANGWATCH_TEST_LOGS: "1" },
+    testTimeout: 10_000,
+    exclude: ["**/node_modules/**", "**/dist/**", "**/*.browser.test.{ts,tsx}"],
   },
 });

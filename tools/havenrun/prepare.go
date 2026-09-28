@@ -80,18 +80,26 @@ func CopyEnvFiles(ctx context.Context, root, dir string) (int, error) {
 	copied := 0
 	for _, entry := range entries {
 		name := entry.Name()
-		if entry.IsDir() || !strings.HasPrefix(name, envDotfilePrefix) {
+		if entry.IsDir() || !strings.HasPrefix(name, envDotfilePrefix) || envFileTracked(ctx, dir, name) {
 			continue
 		}
-		if envFileTracked(ctx, dir, name) {
-			continue
+		count, err := copyEnvFileToTargets(filepath.Join(root, name), dir)
+		copied += count
+		if err != nil {
+			return copied, err
 		}
-		for _, target := range envCopyTargets(dir) {
-			if err := copyEnvFile(filepath.Join(root, name), filepath.Join(target, name)); err != nil {
-				return copied, err
-			}
-			copied++
+	}
+	return copied, nil
+}
+
+// copyEnvFileToTargets copies one dotenv file into every target the worktree has.
+func copyEnvFileToTargets(source, dir string) (int, error) {
+	copied := 0
+	for _, target := range envCopyTargets(dir) {
+		if err := copyEnvFile(source, filepath.Join(target, filepath.Base(source))); err != nil {
+			return copied, err
 		}
+		copied++
 	}
 	return copied, nil
 }
@@ -134,7 +142,36 @@ func copyEnvFile(src, dest string) error {
 	// #nosec G306 G703 -- dest is a path CopyEnvFiles built from the caller's
 	// own fresh worktree dir and a dotenv filename read off disk, not
 	// external input; 0o600 mirrors the source file's own mode.
-	return os.WriteFile(dest, data, 0o600)
+	return os.WriteFile(dest, []byte(NeutraliseStackOwnedKeys(string(data))), 0o600)
+}
+
+// StackOwnedDotenvKeys are what haven decides for every stack it runs. A
+// monolith checkout loads its .env with override: true after haven injects
+// these, so a copied DATABASE_URL would point a throwaway stack at the
+// developer's own database; in a copied file each is commented out instead.
+var StackOwnedDotenvKeys = []string{
+	"DATABASE_URL", "CLICKHOUSE_URL", "REDIS_URL", "REDIS_DB_INDEX", "LANGWATCH_SLUG",
+	"PORT", "APP_PORT", "API_PORT", "LANGWATCH_APP_PORT", "LANGWATCH_API_PORT",
+	"BASE_HOST", "NEXTAUTH_URL", "LANGWATCH_ENDPOINT", "LANGWATCH_API_URL",
+	"LANGWATCH_NLP_SERVICE", "LW_GATEWAY_BASE_URL", "LW_GATEWAY_PUBLIC_URL", "GATEWAY_CONTROL_PLANE_URL",
+	"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_RESOURCE_ATTRIBUTES",
+}
+
+// NeutraliseStackOwnedKeys comments out every StackOwnedDotenvKeys line of a
+// dotenv file, keeping the rest byte for byte.
+func NeutraliseStackOwnedKeys(content string) string {
+	owned := map[string]bool{}
+	for _, key := range StackOwnedDotenvKeys {
+		owned[key] = true
+	}
+	lines := strings.Split(content, "\n")
+	for index, line := range lines {
+		name, _, found := strings.Cut(strings.TrimPrefix(strings.TrimSpace(line), "export "), "=")
+		if found && owned[strings.TrimSpace(name)] {
+			lines[index] = "# owned by haven for this stack: " + line
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // portlessHomeEnv is the override root.go's havenHome() itself reads;

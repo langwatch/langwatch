@@ -4,9 +4,8 @@
  * whatever page the link was opened on, since that drawer is mounted everywhere.
  */
 
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useEffect } from "react";
-
-import { useDrawer } from "../../behavior/use-drawer.ts";
 
 export interface LegacyTraceDrawerRedirectProps {
   traceId?: string;

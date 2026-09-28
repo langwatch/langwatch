@@ -28,3 +28,17 @@ Feature: A drawer opened from a link, with nothing behind it
       When the reader names a dataset and creates it
       Then the dataset is written
       And the editor closes
+
+  Rule: A drawer a surface opens by name is one a module declares
+
+    @integration
+    Scenario: The dataset editor opens by its drawer name
+      Given dataset is installed
+      When a surface opens the "addOrEditDataset" drawer
+      Then dataset's create-or-edit editor mounts
+
+    @unit
+    Scenario: The run plan editor opens by its drawer name
+      Given scenario is installed
+      When a surface opens the "suiteEditor" drawer
+      Then scenario's run plan editor loads

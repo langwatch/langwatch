@@ -61,8 +61,8 @@ export const platformHealthRest = defineRestRouter(PlatformHealthApi)
     description: ANSWERS,
     responses: documentedResponses({ 503: platformHealthReportSchema }),
   })
-  .handle(async ({ app, input }, authorization) =>
-    answer(await accepted(app, authorization).checkAll(input)),
+  .handle(async ({ app, input, signal }, authorization) =>
+    answer(await accepted(app, authorization).checkAll({ ...input, signal })),
   )
 
   .get("/:check", "getPlatformHealthSubsystem")
@@ -76,11 +76,12 @@ export const platformHealthRest = defineRestRouter(PlatformHealthApi)
     description: ANSWERS,
     responses: documentedResponses({ 503: platformHealthReportSchema }),
   })
-  .handle(async ({ app, input }, authorization) =>
+  .handle(async ({ app, input, signal }, authorization) =>
     answer(
       await accepted(app, authorization).checkOne(subsystem(input.check), {
         triggerId: input.triggerId,
         workflowId: input.workflowId,
+        signal,
       }),
     ),
   )

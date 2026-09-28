@@ -93,6 +93,13 @@ export const organizationWeb = defineWebModule("organization")
     },
     /** Shown in place of the dashboard body to a member on none of its teams. */
     teamAccessWaiting: { load: () => import("./ui/sections/team-access-waiting.tsx") },
+    /** A project's department row, lent to project's settings form (§3.4 rule 7). */
+    projectDepartmentField: {
+      load: async () => ({
+        default: (await import("./ui/sections/project-department-field.tsx"))
+          .ProjectDepartmentField,
+      }),
+    },
   })
   .publishSurfaces({
     "surfaces/personal-workspace-features": {

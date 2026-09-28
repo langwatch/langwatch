@@ -6,8 +6,56 @@
 
 import type { ComponentType } from "react";
 
+import type { UiAddOrEditDatasetDrawerProps } from "../../declarations.ts";
+import type {
+  UiAgentEditorDrawerProps,
+  UiAgentListDrawerProps,
+  UiAgentTypeSelectorDrawerProps,
+  UiAgentWorkflowEditorDrawerProps,
+  UiWorkflowSelectorDrawerProps,
+} from "./agent-drawers.ts";
+import type { UiAutomationDrawerProps } from "./automation-drawers.ts";
+import type { UiSelectDatasetDrawerProps } from "./dataset-drawers.ts";
+import type {
+  UiCodeEvaluatorEditorDrawerProps,
+  UiEvaluatorCategorySelectorDrawerProps,
+  UiEvaluatorEditorDrawerProps,
+  UiEvaluatorListDrawerProps,
+  UiOnlineEvaluationDrawerProps,
+  UiWorkflowSelectorForEvaluatorDrawerProps,
+} from "./evaluator-drawers.ts";
+import type { UiFoundryDrawerProps } from "./ops-drawers.ts";
+import type { UiInviteMemberDrawerProps } from "./organization-drawers.ts";
+import type { UiPromptEditorDrawerProps, UiPromptListDrawerProps } from "./prompt-drawers.ts";
+import type {
+  UiAgentTestingCaseEditorDrawerProps,
+  UiScenarioRunDetailDrawerProps,
+} from "./scenario-drawers.ts";
+
 /** Entries land owner by owner; until a drawer has one, its props read as an open record. */
-export type UiDrawerMap = Record<never, never>;
+export type UiDrawerMap = {
+  addOrEditDataset: UiAddOrEditDatasetDrawerProps;
+  agentCodeEditor: UiAgentEditorDrawerProps;
+  agentHttpEditor: UiAgentEditorDrawerProps;
+  agentList: UiAgentListDrawerProps;
+  agentTestingCaseEditor: UiAgentTestingCaseEditorDrawerProps;
+  agentTypeSelector: UiAgentTypeSelectorDrawerProps;
+  agentWorkflowEditor: UiAgentWorkflowEditorDrawerProps;
+  automation: UiAutomationDrawerProps;
+  codeEvaluatorEditor: UiCodeEvaluatorEditorDrawerProps;
+  evaluatorCategorySelector: UiEvaluatorCategorySelectorDrawerProps;
+  evaluatorEditor: UiEvaluatorEditorDrawerProps;
+  evaluatorList: UiEvaluatorListDrawerProps;
+  foundry: UiFoundryDrawerProps;
+  inviteMember: UiInviteMemberDrawerProps;
+  onlineEvaluation: UiOnlineEvaluationDrawerProps;
+  promptEditor: UiPromptEditorDrawerProps;
+  promptList: UiPromptListDrawerProps;
+  scenarioRunDetail: UiScenarioRunDetailDrawerProps;
+  selectDataset: UiSelectDatasetDrawerProps;
+  workflowSelector: UiWorkflowSelectorDrawerProps;
+  workflowSelectorForEvaluator: UiWorkflowSelectorForEvaluatorDrawerProps;
+};
 
 /**
  * A callback of a drawer no map declares yet. A method type, so it compares bivariantly: a

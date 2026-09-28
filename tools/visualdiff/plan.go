@@ -102,6 +102,9 @@ type Plan struct {
 	// RunID is what both stacks' haven slugs are derived from (see haven.go).
 	UseHaven bool
 	RunID    string
+	// ReplayBase is set when every edition replays a cached baseline, and
+	// the base is then never checked out or booted at all.
+	ReplayBase bool
 }
 
 // DefaultBasePort is where the base stack starts. The candidate stack sits

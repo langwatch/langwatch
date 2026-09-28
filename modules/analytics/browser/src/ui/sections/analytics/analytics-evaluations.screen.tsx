@@ -1,5 +1,5 @@
 import { Alert, Box, Card, GridItem, Heading, HStack, SimpleGrid, Text } from "@chakra-ui/react";
-import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { BarChart2 } from "lucide-react";
 import { Fragment, useCallback } from "react";
 
@@ -67,7 +67,7 @@ const renderGridItems = (
     let checksAverage: CustomGraphInput | Record<string, never>;
     let checksSummary: CustomGraphInput | Record<string, never>;
     let passRateTrend: CustomGraphInput | null = null;
-    const traceCheck = getEvaluatorDefinitions(check.checkType);
+    const [traceCheck] = findEvaluatorDefinitions(check.checkType);
 
     const isCategoryEvaluator = check.checkType === "langevals/llm_category";
 

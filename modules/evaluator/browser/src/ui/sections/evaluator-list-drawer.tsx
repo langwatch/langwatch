@@ -5,6 +5,7 @@ import { Button, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
  * Evaluator"/"Edit" still open drawers in `platform/app`.
  */
 import type { WireOf } from "@langwatch/api/web";
+import type { UiEvaluatorListDrawerProps } from "@langwatch/browser-host/drawer";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
@@ -30,16 +31,7 @@ import { EvaluatorListEmptyState } from "../elements/evaluator-list-empty-state.
  */
 export type EvaluatorListRow = WireOf<Evaluator>;
 
-export type EvaluatorListDrawerProps = {
-  open?: boolean;
-  onClose?: () => void;
-  onSelect?: (evaluator: EvaluatorListRow) => void;
-  onCreateNew?: () => void;
-  filterEvaluatorType?: string;
-  title?: string;
-  createLabel?: string;
-  itemLabel?: string;
-};
+export type EvaluatorListDrawerProps = UiEvaluatorListDrawerProps;
 
 export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const host = useEvaluatorHost();

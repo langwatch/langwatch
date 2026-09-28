@@ -236,7 +236,7 @@ describe("given package-boundaries", () => {
       expect(found.map((entry) => entry.messageId)).toEqual(["compositionRoot"]);
       expect(found[0].message).toContain("`@langwatch/installed-server-modules`");
       expect(
-        ids("apps/tasks/src/lwql-provision.ts", 'import { Task } from "@langwatch/agent-process";'),
+        ids("apps/tasks/src/database.ts", 'import { Task } from "@langwatch/agent-process";'),
       ).toEqual(["compositionRoot"]);
     });
 
@@ -321,19 +321,20 @@ describe("given package-boundaries", () => {
 
   describe("when apps/tasks' migration runner names a process package", () => {
     /** @scenario "apps/tasks' migration runner may name a process package, nothing else in an app may" */
-    it.each(["apps/tasks/src/system-migrations-pass.ts", "apps/tasks/src/prisma-migrate.ts"])(
-      "reports nothing for %s",
-      (file) => {
-        expect(
-          report(file, 'import { ProjectMigrations } from "@langwatch/project-process";'),
-        ).toEqual([]);
-      },
-    );
+    it.each([
+      "apps/tasks/src/system-migrations-pass.ts",
+      "apps/tasks/src/prisma-migrate.ts",
+      "apps/tasks/src/lwql-provision.ts",
+      "apps/tasks/src/lwql-render-access-config.ts",
+    ])("reports nothing for %s", (file) => {
+      expect(
+        report(file, 'import { ProjectMigrations } from "@langwatch/project-process";'),
+      ).toEqual([]);
+    });
 
     /** @scenario "apps/tasks' migration runner may name a process package, nothing else in an app may" */
     it.each([
       "apps/tasks/src/main.ts",
-      "apps/tasks/src/lwql-provision.ts",
       "apps/api/src/prisma-migrate.ts",
       "apps/tasks/src/storage-seed/migrate.ts",
     ])("still reports compositionRoot for %s", (file) => {

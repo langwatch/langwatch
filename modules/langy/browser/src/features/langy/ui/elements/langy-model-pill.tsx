@@ -9,7 +9,6 @@ import {
 } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { modelProviderIcons, ProviderIconGlyph } from "@langwatch/model-provider-browser-kit";
-import { useModelSelectionOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
 import { LANGY_CHAT_FEATURE_KEY, findModelById } from "@langwatch/model-provider-contract";
 import {
   Brain,
@@ -30,6 +29,7 @@ import { type LangyModelGroup, profileLangyModel } from "../../../../model/langy
 import { splitLangyModels } from "../../../../model/langy-model-suggestions.ts";
 import { LangyComboboxSearch } from "../../../../ui/elements/langy-combobox-search.tsx";
 import { Link } from "../../../../ui/elements/link.tsx";
+import { useLangyModelOptions } from "../../behavior/panel/use-langy-model-options.ts";
 
 type ProviderKey = keyof typeof modelProviderIcons;
 
@@ -152,7 +152,9 @@ export const LangyModelPill = memo(function LangyModelPill({
 }) {
   // Langy is a licensed codex surface: declaring `langy.chat` re-admits
   // codex models the shared hook fail-closes everywhere else.
-  const { selectOptions, modelOption } = useModelSelectionOptions(options, model, "chat", {
+  const { selectOptions, modelOption } = useLangyModelOptions({
+    options,
+    model,
     featureKey: LANGY_CHAT_FEATURE_KEY,
   });
   const currentProvider = model.split("/")[0] ?? "";

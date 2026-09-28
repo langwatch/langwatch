@@ -1,9 +1,5 @@
 import { Box, Link as ChakraLink, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import {
-  featureIcons,
-  recentItemTypeToFeature,
-} from "@langwatch/navigation-browser/surfaces/command-bar";
 import { toEpochMs } from "@langwatch/time";
 import { keepPreviousData } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -12,32 +8,18 @@ import { LuCircleX } from "react-icons/lu";
 import type { RecentItem, RecentItemType } from "../../../../behavior/home-api.ts";
 import { homeApi } from "../../../../behavior/home-api.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
+import { fallbackRecentItemType, recentItemTypes } from "../../../../model/recent-item-types.ts";
 import NextLink from "../../../../ui/elements/app-link.tsx";
 import { HomeCard } from "./home-card.tsx";
 import { HOME_SECTION_GAP, HomeSectionHeader } from "./home-section-header.tsx";
 
-/**
- * Get icon for entity type using shared featureIcons config
- */
 const getIconForType = (type: RecentItemType): ReactNode => {
-  const featureKey = recentItemTypeToFeature[type];
-  const config = featureKey ? featureIcons[featureKey] : null;
-  if (config) {
-    return <Icon as={config.icon} width="14px" height="14px" display="block" />;
-  }
-  return <Icon as={featureIcons.home.icon} width="14px" height="14px" display="block" />;
+  const config = recentItemTypes[type] ?? fallbackRecentItemType;
+  return <Icon as={config.icon} width="14px" height="14px" display="block" />;
 };
 
-/**
- * Get label for entity type using shared featureIcons config
- */
-const getLabelForType = (type: RecentItemType): string => {
-  const featureKey = recentItemTypeToFeature[type];
-  const config = featureKey ? featureIcons[featureKey] : null;
-  // Remove trailing 's' for singular form (e.g., "Prompts" -> "Prompt")
-  const label = config?.label ?? "Item";
-  return label.endsWith("s") ? label.slice(0, -1) : label;
-};
+const getLabelForType = (type: RecentItemType): string =>
+  (recentItemTypes[type] ?? fallbackRecentItemType).label;
 
 /**
  * Group items by type — kept for consumers/tests even though the section now

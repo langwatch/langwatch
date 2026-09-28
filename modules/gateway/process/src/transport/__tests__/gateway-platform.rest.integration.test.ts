@@ -8,6 +8,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import {
   apiErrorBody,
+  bindRestMiddleware,
   createRestRuntime,
   type IdempotentRunner,
   type RestErrorHandler,
@@ -18,6 +19,7 @@ import {
   type GatewayBudgetResource,
   type GatewayBudgetWithSeats,
   type GatewayCacheRuleResource,
+  type GatewayRequestCredential,
   type GatewayVirtualKeySnakeDto,
 } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -27,10 +29,29 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { virtualKeyRow } from "../../app/__tests__/gateway-virtual-key.fixture.ts";
-import { gatewayPlatformRest } from "../gateway-platform.rest.ts";
+import { gatewayPlatformRest, gatewayRestCredential } from "../gateway-platform.rest.ts";
 
 const PROJECT_ID = "project_caller";
 const ORGANIZATION_ID = "organization_1";
+
+const scopedKey: GatewayRequestCredential = {
+  kind: "apiKey",
+  apiKeyId: "key_1",
+  userId: "user_1",
+  organizationId: ORGANIZATION_ID,
+};
+
+/** The fixture's caller: the credential stands as the actor, attributed as the composition does. */
+const callerOf: Pick<GatewayApi, "actorForCredential"> = {
+  actorForCredential: ({ projectId, credential }) => ({
+    actor: credential,
+    actorUserId: (credential.kind === "apiKey" ? credential.userId : null) ?? `svc_${projectId}`,
+  }),
+};
+
+function credentialFact(credential: GatewayRequestCredential = scopedKey) {
+  return bindRestMiddleware(gatewayRestCredential, () => credential);
+}
 
 const passthroughIdempotency: IdempotentRunner = async ({ handler }) => {
   const response = await handler();
@@ -82,6 +103,7 @@ function mountGatewayPlatform(options: { allowedAtOrganization: readonly string[
   });
 
   const app = createApiFixture<GatewayApi>({
+    ...callerOf,
     organizationIdForProject: async () => ORGANIZATION_ID,
     authorizeOrganizationWideOperation: async (input) => {
       probed.push(`${input.permission}@${input.organizationId}`);
@@ -107,7 +129,11 @@ function mountGatewayPlatform(options: { allowedAtOrganization: readonly string[
     idempotency: passthroughIdempotency,
   });
 
-  const hono = runtime.mount(gatewayPlatformRest.router(), { app: () => app, onError });
+  const hono = runtime.mount(gatewayPlatformRest.router(), {
+    app: () => app,
+    onError,
+    facts: [credentialFact()],
+  });
 
   return {
     probed,
@@ -253,7 +279,11 @@ function mountIdempotentGatewayPlatform(app: GatewayApi) {
     idempotency: statefulIdempotency(),
   });
 
-  const hono = runtime.mount(gatewayPlatformRest.router(), { app: () => app, onError });
+  const hono = runtime.mount(gatewayPlatformRest.router(), {
+    app: () => app,
+    onError,
+    facts: [credentialFact()],
+  });
 
   return {
     post: (path: string, body: unknown) =>
@@ -273,6 +303,7 @@ describe("the gateway platform family's idempotent creates", () => {
       secret: "secret_1",
     }));
     const app = createApiFixture<GatewayApi>({
+      ...callerOf,
       organizationIdForProject: async () => ORGANIZATION_ID,
       authorizeVirtualKeyCreate: async () => {},
       createVirtualKey,
@@ -296,6 +327,7 @@ describe("the gateway platform family's idempotent creates", () => {
       secret: "secret_2",
     }));
     const app = createApiFixture<GatewayApi>({
+      ...callerOf,
       organizationIdForProject: async () => ORGANIZATION_ID,
       authorizeVirtualKeyOperation: async () => virtualKeyRow(),
       rotateVirtualKey,
@@ -316,6 +348,7 @@ describe("the gateway platform family's idempotent creates", () => {
     const row = budgetRow();
     const createBudget = vi.fn(async () => row);
     const app = createApiFixture<GatewayApi>({
+      ...callerOf,
       organizationIdForProject: async () => ORGANIZATION_ID,
       authorizeOrganizationWideOperation: async () => {},
       createBudget,
@@ -348,6 +381,7 @@ describe("the gateway platform family's idempotent creates", () => {
     const row = cacheRuleRow();
     const createCacheRule = vi.fn(async () => row);
     const app = createApiFixture<GatewayApi>({
+      ...callerOf,
       organizationIdForProject: async () => ORGANIZATION_ID,
       authorizeOrganizationWideOperation: async () => {},
       createCacheRule,
@@ -362,5 +396,135 @@ describe("the gateway platform family's idempotent creates", () => {
     expect(second.status).toBe(201);
     expect(second.headers.get("X-Idempotent-Replay")).toBe("true");
     expect(createCacheRule).toHaveBeenCalledTimes(1);
+  });
+});
+
+const budgetBody = {
+  scope: { kind: "project", project_id: PROJECT_ID },
+  name: "cap",
+  window: "month",
+  limit_usd: "25.50",
+};
+
+/** Mounts the family as the project door hands a caller over: actor and credential fact. */
+function mountAs({
+  app,
+  actor,
+  credential,
+}: {
+  app: GatewayApi;
+  actor: { type: "user"; id: string } | null;
+  credential: GatewayRequestCredential;
+}) {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor, scope: { tier: "project", id: PROJECT_ID } }),
+    },
+    idempotency: passthroughIdempotency,
+  });
+  const hono = runtime.mount(gatewayPlatformRest.router(), {
+    app: () => app,
+    onError,
+    facts: [credentialFact(credential)],
+  });
+
+  return (path: string, body: unknown) =>
+    hono.request(`/api/gateway/v1${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+}
+
+describe("the gateway platform family's caller", () => {
+  describe("given a scoped API key with the budget grant at the organization", () => {
+    /** @scenario "A scoped API key with the budget grant at the organization creates a budget" */
+    it("creates the budget as the key's owning user, 201", async () => {
+      const authorizeOrganizationWideOperation = vi.fn(async () => {});
+      const createBudget = vi.fn(async () => budgetRow());
+      const post = mountAs({
+        actor: { type: "user", id: "user_1" },
+        credential: scopedKey,
+        app: createApiFixture<GatewayApi>({
+          ...callerOf,
+          organizationIdForProject: async () => ORGANIZATION_ID,
+          authorizeOrganizationWideOperation,
+          createBudget,
+          groupMemberCounts: async () => new Map<string, number>(),
+          budgetScopeReach: async () => ({
+            reachable: true,
+            reachableProjectIds: [PROJECT_ID],
+            activeKeyCount: 1,
+          }),
+        }),
+      });
+
+      const response = await post("/budgets", budgetBody);
+
+      expect(response.status).toBe(201);
+      expect(authorizeOrganizationWideOperation).toHaveBeenCalledWith({
+        actor: scopedKey,
+        organizationId: ORGANIZATION_ID,
+        permission: "gatewayBudgets:create",
+      });
+      expect(createBudget).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: "user_1" }));
+    });
+  });
+
+  describe("given a key without the budget grant at the organization", () => {
+    /** @scenario "A key without the budget grant at the organization is refused by code" */
+    it("answers 403 permission_denied and creates no budget", async () => {
+      const createBudget = vi.fn(async () => budgetRow());
+      const post = mountAs({
+        actor: { type: "user", id: "user_1" },
+        credential: scopedKey,
+        app: createApiFixture<GatewayApi>({
+          ...callerOf,
+          organizationIdForProject: async () => ORGANIZATION_ID,
+          authorizeOrganizationWideOperation: async ({ permission, organizationId }) => {
+            throw new PermissionDeniedError({
+              permission,
+              scope: { type: "organization", id: organizationId },
+              denialReason: "no-binding",
+            });
+          },
+          createBudget,
+        }),
+      });
+
+      const response = await post("/budgets", budgetBody);
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ code: "permission_denied" });
+      expect(createBudget).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a legacy project key", () => {
+    /** @scenario "A legacy project key's own-project key is attributed to the machine principal" */
+    it("mints its own project's key as svc_<projectId>, 201", async () => {
+      const createVirtualKey = vi.fn(async () => ({
+        virtualKey: virtualKeyRow(),
+        secret: "secret_1",
+      }));
+      const post = mountAs({
+        actor: null,
+        credential: { kind: "legacyProjectKey" },
+        app: createApiFixture<GatewayApi>({
+          ...callerOf,
+          organizationIdForProject: async () => ORGANIZATION_ID,
+          authorizeVirtualKeyCreate: async () => {},
+          createVirtualKey,
+          toVirtualKeySnakeDto: async () => virtualKeyDto,
+        }),
+      });
+
+      const response = await post("/virtual-keys", { name: "ci-key" });
+
+      expect(response.status).toBe(201);
+      expect(createVirtualKey).toHaveBeenCalledWith(
+        expect.objectContaining({ actorUserId: `svc_${PROJECT_ID}` }),
+      );
+    });
   });
 });

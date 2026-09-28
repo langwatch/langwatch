@@ -3,8 +3,6 @@
  * chain and preflight, telemetry, metrics. Order is load-bearing: config feeds secrets, both
  * precede telemetry.
  */
-import process from "node:process";
-
 import { ACTOR_SECRET_LOG_PATHS } from "@langwatch/actor";
 import { parseProcessConfig, type ConfigOwner, type ProcessConfigOf } from "@langwatch/config";
 import {
@@ -39,6 +37,9 @@ type FactoryContext<Owners extends readonly PreambleOwner[]> = Readonly<{
   redactPaths: readonly string[];
 }>;
 
+/** The environment the process was started with, as its main hands it in. */
+export type PreambleEnvironment = Readonly<Record<string, string | undefined>>;
+
 type ChainBuilder<Owners extends readonly PreambleOwner[]> = (
   config: ProcessConfigOf<Owners>,
   secrets: SecretsChain,
@@ -46,24 +47,25 @@ type ChainBuilder<Owners extends readonly PreambleOwner[]> = (
 
 export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly []> {
   static create(name: string): ServerPreamble {
-    return new ServerPreamble(name, {});
+    return new ServerPreamble(name, { owners: [] });
   }
 
   private constructor(
     private readonly name: string,
     private readonly state: Readonly<{
-      owners?: Owners;
+      owners: Owners;
       chain?: ChainBuilder<Owners>;
       telemetry?: (context: FactoryContext<Owners>) => Telemetry | Promise<Telemetry>;
       metrics?: (context: FactoryContext<Owners>) => Metrics | Promise<Metrics>;
       healthPort?: number;
       ownsProcess?: boolean;
+      environment?: PreambleEnvironment;
     }>,
   ) {}
 
   /** The installed owners, whose own schemas ARE the process config (§6). */
   withConfig<Next extends readonly PreambleOwner[]>(owners: Next): ServerPreamble<Next> {
-    return new ServerPreamble<Next>(this.name, { owners });
+    return new ServerPreamble<Next>(this.name, { owners, environment: this.state.environment });
   }
 
   /** The lookup order, built from a handed-in chain; config feeds it. */
@@ -91,13 +93,21 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
     return new ServerPreamble(this.name, { ...this.state, healthPort: port });
   }
 
+  /** What config and the secrets chain read; only an app's main hands the environment in. */
+  withEnvironment(environment: PreambleEnvironment): ServerPreamble<Owners> {
+    return new ServerPreamble(this.name, { ...this.state, environment });
+  }
+
   withProcessOwnership(ownsProcess: boolean): ServerPreamble<Owners> {
     return new ServerPreamble(this.name, { ...this.state, ownsProcess });
   }
 
   async start(): Promise<ProcessServer> {
-    const owners = this.state.owners ?? ([] as unknown as Owners);
-    const environment = process.env;
+    const owners = this.state.owners;
+    const environment = this.state.environment;
+    if (!environment) {
+      throw new Error(`${this.name}: the preamble starts only after withEnvironment(...)`);
+    }
     const config = parseProcessConfig({ owners, environment });
 
     const chain = (this.state.chain ?? ((_, secrets) => secrets.withEnv()))(

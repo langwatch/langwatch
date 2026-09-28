@@ -28,7 +28,7 @@ export {
 } from "./providers/smtp.ts";
 export { ResendEmailProvider } from "./providers/resend.ts";
 export { computeDefaultFrom, sendEmail } from "./email-sender.ts";
-export { MailRender } from "./ports/mail-render.port.ts";
+export { MailRender } from "./mail-render.ts";
 export { mailTemplates } from "./templates/index.ts";
 export { propsFormSchema, renderMailTemplate } from "./templates/registry.ts";
 export type { MailFixture, MailTemplate } from "./templates/registry.ts";

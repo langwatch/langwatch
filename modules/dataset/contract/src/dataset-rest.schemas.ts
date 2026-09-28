@@ -13,7 +13,6 @@ import {
   datasetColumnTypeSchema,
   datasetPaginationSchema,
   datasetRecordSchema,
-  datasetSummarySchema,
 } from "./dataset.ts";
 
 /**
@@ -132,7 +131,9 @@ export const datasetRestSummarySchema = z.object({
 
 /** `GET /api/dataset`: a page of the project's datasets, each with its URL. */
 export const datasetRestListResponseSchema = z.object({
-  data: z.array(datasetSummarySchema.safeExtend({ platformUrl: z.string() })),
+  data: z.array(
+    datasetRestSummarySchema.safeExtend({ recordCount: z.number().int().nonnegative() }),
+  ),
   pagination: datasetPaginationSchema,
 });
 

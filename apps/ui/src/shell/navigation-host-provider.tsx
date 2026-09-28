@@ -11,21 +11,12 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { LangyMark, LangyMarkGradientDefs, useLangyStore } from "@langwatch/langy-browser-kit";
-import {
-  NavigationHost,
-  NavigationHostProvider,
-  type NavigationAccountMenu,
-  type NavigationLangy,
-  type NavigationScopeWrite,
-  type NavigationUser,
+import type {
+  NavigationAccountMenu,
+  NavigationLangy,
+  NavigationScopeWrite,
+  NavigationUser,
 } from "@langwatch/navigation-browser/navigation";
-import {
-  CommandBarProvider,
-  CommandBarTrigger,
-  getCommandBarShortcut,
-  openCommandBar,
-} from "@langwatch/navigation-browser/surfaces/command-bar";
-import { PresenceMenuItem } from "@langwatch/trace-browser/surfaces/presence-menu-item";
 import { UiPageFailure, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, type ReactNode } from "react";
@@ -48,8 +39,19 @@ const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
 
 const ORGANIZATIONS_INPUT = { isDemo: false };
 
-/** Built over the port class this file already imports, until navigation declares it. */
-const BrowserNavigationHost = browserNavigationHosts(NavigationHost);
+/** The shell's host class over navigation's port class, built once per loaded port. */
+const browserHostClasses = new WeakMap<
+  UiRootCapabilities["navigationHost"]["NavigationHost"],
+  ReturnType<typeof browserNavigationHosts>
+>();
+
+function browserNavigationHostOf(port: UiRootCapabilities["navigationHost"]["NavigationHost"]) {
+  const known = browserHostClasses.get(port);
+  if (known) return known;
+  const built = browserNavigationHosts(port);
+  browserHostClasses.set(port, built);
+  return built;
+}
 
 /** The port's scope write, in the shell's own storage vocabulary. */
 function rememberScope({
@@ -102,6 +104,8 @@ export function UiNavigationHost({
     );
   }
 
+  const { NavigationHostProvider } = capabilities.navigationHost;
+  const { CommandBarProvider } = capabilities.commandBar;
   return (
     <NavigationHostProvider value={host}>
       {commandBar ? <CommandBarProvider>{children}</CommandBarProvider> : children}
@@ -111,7 +115,14 @@ export function UiNavigationHost({
 
 function useNavigationHostReading({
   commandBar,
-  capabilities: { session: auth, scope: scopeCapability, organizationFacts },
+  capabilities: {
+    session: auth,
+    scope: scopeCapability,
+    organizationFacts,
+    navigationHost,
+    commandBar: palette,
+    presenceMenuItem,
+  },
 }: {
   commandBar: boolean;
   capabilities: UiRootCapabilities;
@@ -215,12 +226,12 @@ function useNavigationHostReading({
     () =>
       commandBar
         ? {
-            shortcut: getCommandBarShortcut(),
-            open: openCommandBar,
-            trigger: <CommandBarTrigger />,
+            shortcut: palette.getCommandBarShortcut(),
+            open: palette.openCommandBar,
+            trigger: <palette.CommandBarTrigger />,
           }
         : null,
-    [commandBar],
+    [commandBar, palette],
   );
 
   /** The address, split the way the chrome reads it. */
@@ -243,8 +254,9 @@ function useNavigationHostReading({
       organizationId: activeScope.organizationId,
       projectId: activeScope.projectId,
     });
+    const PresenceMenuItem = presenceMenuItem.default;
     return { presence: <PresenceMenuItem {...flags} /> };
-  }, [routePattern, read, activeScope.organizationId, activeScope.projectId]);
+  }, [routePattern, read, activeScope.organizationId, activeScope.projectId, presenceMenuItem]);
 
   const setDocumentTitle = useCallback(
     (title: string) => documentTitle.set(title),
@@ -259,7 +271,7 @@ function useNavigationHostReading({
 
   const host = useMemo(
     () =>
-      BrowserNavigationHost.create(
+      browserNavigationHostOf(navigationHost.NavigationHost).create(
         {
           organizations: graph,
           organization,
@@ -328,6 +340,7 @@ function useNavigationHostReading({
       scopeCapability,
       setDocumentTitle,
       openDrawerByName,
+      navigationHost,
     ],
   );
 

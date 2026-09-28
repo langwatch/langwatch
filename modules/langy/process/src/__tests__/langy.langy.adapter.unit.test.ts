@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   EventSourcing,
@@ -25,6 +26,7 @@ import {
   createRecordingMeterProvider,
   type RecordingMeterProvider,
 } from "@langwatch/observability/metrics/testing";
+import type { OnboardingApi } from "@langwatch/onboarding-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -260,8 +262,8 @@ function compositionOptions() {
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
-function createApp(): Promise<LangyApp> {
-  return LangyApp.create({
+async function createApp(): Promise<LangyApp> {
+  const app = await LangyApp.create({
     dependencies: {
       presence: testPresence(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -275,12 +277,13 @@ function createApp(): Promise<LangyApp> {
       authz: createApiFixture<AuthzApi>(),
       projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "org_1" }),
       plans: createApiFixture<EntitlementApi>(),
+      onboarding: createApiFixture<OnboardingApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
     },
     members: {
       publicBaseUrl: undefined,
       prisma: undefined!,
       redis: createApiFixture<RedisConnection>(),
-      eventing: producerEventing(),
       rateLimiter: { check: async () => ({ allowed: true }) },
     },
     config: {
@@ -296,6 +299,16 @@ function createApp(): Promise<LangyApp> {
     secrets: noSecrets,
     repositories: MemoryLangyRepositories.create(),
   });
+  connectProducer(app);
+  return app;
+}
+
+/** Registers the pipeline's producer half and hands its senders to the app, as boot does. */
+function connectProducer(app: LangyApp): void {
+  const registered = producerEventing().register(
+    app.conversationPipeline({ participation: "produce" }),
+  );
+  app.connectConversationCommands(registered.commands);
 }
 
 /** The live-edge collaborators the application takes; these suites never use them. */

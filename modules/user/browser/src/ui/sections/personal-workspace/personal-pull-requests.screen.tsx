@@ -1,9 +1,8 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { PullRequestsTable } from "@langwatch/coding-agent-browser/surfaces/activity";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 
+import { CodingAgentPullRequestsTable } from "../../../behavior/lent-coding-agent-tables.tsx";
 import { usePersonalContext } from "../../../behavior/use-personal-context.ts";
-import { withCodingAgentHost } from "../coding-agent-host-provider.tsx";
 import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
 
 /**
@@ -27,7 +26,7 @@ export function PersonalPullRequestsScreen() {
         </VStack>
 
         {personalProjectId ? (
-          <PullRequestsTable projectId={personalProjectId} />
+          <CodingAgentPullRequestsTable projectId={personalProjectId} />
         ) : (
           <Text fontSize="sm" color="fg.muted">
             No pull requests yet
@@ -38,8 +37,4 @@ export function PersonalPullRequestsScreen() {
   );
 }
 
-/**
- * The activity tables answer a port of their own, mounted here since
- * `@langwatch/coding-agent-browser` is ungoverned and `apps/ui` may not import it.
- */
-export default withCodingAgentHost(PersonalPullRequestsScreen);
+export default PersonalPullRequestsScreen;

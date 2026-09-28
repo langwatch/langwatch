@@ -13,6 +13,7 @@ import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { EmailDelivery } from "@langwatch/mail";
+import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -70,6 +71,7 @@ async function appFor(
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
+      notifications: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>(),
       authz: createApiFixture<AuthzApi>({}),
       auditLog: createApiFixture<AuditLogApi>({
@@ -109,17 +111,16 @@ describe("given the token check behind the registry's per-IP ceiling", () => {
 
       for (let probe = 0; probe < CEILING; probe += 1) {
         await expect(
-          app.findProjectSlugByToken({ token: "tok", callerKey: "ip:1.2.3.4" }),
-        ).resolves.toBe("acme");
+          app.validateProjectAuthToken({ token: "tok", forwardedFor: "1.2.3.4" }),
+        ).resolves.toEqual({ projectSlug: "acme" });
       }
 
       const refusal = await app
-        .findProjectSlugByToken({ token: "tok", callerKey: "ip:1.2.3.4" })
+        .validateProjectAuthToken({ token: "tok", forwardedFor: "1.2.3.4" })
         .catch((error: unknown) => error);
 
       expect(refusal).toBeInstanceOf(AuthValidateRateLimitedError);
-      expect((refusal as AuthValidateRateLimitedError).code).toBe("auth_validate_rate_limited");
-      expect((refusal as AuthValidateRateLimitedError).httpStatus).toBe(429);
+      expect(refusal).toMatchObject({ code: "auth_validate_rate_limited", httpStatus: 429 });
       expect(windows).toEqual(
         Array.from({ length: CEILING + 1 }, () => ({ requests: CEILING, seconds: 60 })),
       );
@@ -131,24 +132,26 @@ describe("given the token check behind the registry's per-IP ceiling", () => {
 
       for (let probe = 0; probe <= CEILING; probe += 1) {
         await app
-          .findProjectSlugByToken({ token: "tok", callerKey: "ip:1.2.3.4" })
+          .validateProjectAuthToken({ token: "tok", forwardedFor: "1.2.3.4" })
           .catch(() => null);
       }
 
       await expect(
-        app.findProjectSlugByToken({ token: "tok", callerKey: "ip:5.6.7.8" }),
-      ).resolves.toBe("acme");
+        app.validateProjectAuthToken({ token: "tok", forwardedFor: "5.6.7.8" }),
+      ).resolves.toEqual({ projectSlug: "acme" });
     });
   });
 
-  describe("when a call names no caller", () => {
-    it("answers without counting, there being nobody to count", async () => {
+  describe("when a call names no forwarding hop", () => {
+    it("still counts it, under the one unknown caller", async () => {
       const { rateLimiter, windows } = countingLimiter();
       const app = await appFor(rateLimiter);
 
-      await expect(app.findProjectSlugByToken({ token: "tok" })).resolves.toBe("acme");
+      await expect(
+        app.validateProjectAuthToken({ token: "tok", forwardedFor: undefined }),
+      ).resolves.toEqual({ projectSlug: "acme" });
 
-      expect(windows).toEqual([]);
+      expect(windows).toHaveLength(1);
     });
   });
 });

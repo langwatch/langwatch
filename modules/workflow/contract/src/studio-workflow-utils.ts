@@ -1,6 +1,16 @@
 import type { StudioNode, StudioWorkflow } from "./studio-workflow.ts";
 
-export const clearDsl = (dsl: StudioWorkflow, includeExecutionStates = false) => {
+/** A workflow with what does not describe it cleared: version, id, selection, run state. */
+export type ClearedStudioWorkflow = Omit<StudioWorkflow, "version" | "state"> & {
+  version: undefined;
+  workflow_id: undefined;
+  state: StudioWorkflow["state"] | undefined;
+};
+
+export const clearDsl = (
+  dsl: StudioWorkflow,
+  includeExecutionStates = false,
+): ClearedStudioWorkflow => {
   return {
     ...dsl,
     version: undefined,

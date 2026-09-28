@@ -1,4 +1,6 @@
 import { createLogger } from "@langwatch/observability";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createTestLogger } from "@langwatch/test-harness";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nowInstant, Temporal } from "@langwatch/time";
 /**
@@ -101,8 +103,7 @@ describe("given a process started with mail off", () => {
   describe("when a module reads mail and sends", () => {
     /** @scenario "Mail off boots and skips each send with one log line" */
     it("builds the member and skips the send with one line naming it", async () => {
-      const logger = createLogger("process-members-test");
-      const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+      const { logger, lines } = createTestLogger();
       const members = createProcessMembers({ config: config(), members: { logger } });
 
       await members.read("mail").send({
@@ -111,11 +112,13 @@ describe("given a process started with mail off", () => {
         html: "<p>hi</p>",
       });
 
-      expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn).toHaveBeenCalledWith(
-        { subject: "Trigger - Errors above threshold" },
-        expect.stringContaining('"Trigger - Errors above threshold" was not sent'),
-      );
+      const warnings = lines.filter((line) => line.level === 40);
+      expect(warnings).toHaveLength(1);
+      expect(
+        lines.findLine("warn", '"Trigger - Errors above threshold" was not sent'),
+      ).toMatchObject({
+        subject: "Trigger - Errors above threshold",
+      });
     });
 
     /** @scenario "Mail off still names the sender main answered" */
@@ -164,8 +167,8 @@ describe("given a member source with several clients open", () => {
   describe("when it is disposed", () => {
     it("closes what it opened, in reverse construction order", async () => {
       const closed: string[] = [];
-      // A role that states no queue, so the only client this source opens is
-      // the runtime itself and the close it records is the one asserted below.
+      // No queue and a supplied Postgres client, so the only client this source
+      // opens is the runtime itself and the close it records is the one asserted.
       const members = createProcessMembers({
         config: config({
           eventing: {
@@ -174,6 +177,7 @@ describe("given a member source with several clients open", () => {
             executionTarget: "api",
           },
         }),
+        members: { prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }) },
       });
       // The two members with a close of their own, in construction order.
       const eventing = members.read("eventing");

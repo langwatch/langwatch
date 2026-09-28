@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { SubsystemProbe, SubsystemProbeResult } from "../../app/platform-health.members.ts";
 import { PlatformHealthService } from "../platform-health.service.ts";
 import {
-  SubsystemProbeAdapter,
+  SubsystemProbeRunService,
   type SubsystemProbeRunner,
 } from "../subsystem-probe-run.service.ts";
 import type { SubsystemProbeOutcome } from "../subsystem-probe.service.ts";
@@ -50,7 +50,7 @@ describe("given a probe that throws", () => {
         ],
       });
 
-      const report = await service.checkAll({});
+      const report = await service.checkAll({ signal: undefined });
 
       expect(report.status).toBe("unhealthy");
       expect(report.checks.map((check) => [check.name, check.status])).toEqual([
@@ -71,7 +71,7 @@ describe("given every subsystem answers", () => {
         probes: [healthy("collector"), healthy("evaluations")],
       });
 
-      const report = await service.checkAll({});
+      const report = await service.checkAll({ signal: undefined });
 
       expect(report.status).toBe("healthy");
       expect(report.checks).toHaveLength(2);
@@ -98,7 +98,7 @@ describe("given one named subsystem is asked for", () => {
         ],
       });
 
-      const report = await service.checkOne("processor", {});
+      const report = await service.checkOne("processor", { signal: undefined });
 
       expect(processorRuns).toBe(1);
       expect(report.checks.map((check) => check.name)).toEqual(["processor"]);
@@ -122,7 +122,7 @@ describe("given a subsystem refused the probe with a message of its own", () => 
 
       const service = PlatformHealthService.create({
         probes: [
-          SubsystemProbeAdapter.create({
+          SubsystemProbeRunService.create({
             name: "workflows",
             probes,
             credential: { authToken: "probe-key", findProjectIds: async () => ["project-1"] },
@@ -130,7 +130,7 @@ describe("given a subsystem refused the probe with a message of its own", () => 
         ],
       });
 
-      const report = await service.checkAll({ workflowId: "workflow-1" });
+      const report = await service.checkAll({ workflowId: "workflow-1", signal: undefined });
 
       expect(report.status).toBe("unhealthy");
       expect(report.checks[0]?.detail).toBe("the sample workflow did not run");
@@ -149,7 +149,7 @@ describe("given a subsystem the deployment named no target for", () => {
       const service = PlatformHealthService.create({
         probes: [
           healthy("collector"),
-          SubsystemProbeAdapter.create({
+          SubsystemProbeRunService.create({
             name: "triggers",
             probes,
             credential: { authToken: "probe-key", findProjectIds: async () => ["project-1"] },
@@ -157,7 +157,7 @@ describe("given a subsystem the deployment named no target for", () => {
         ],
       });
 
-      const report = await service.checkAll({});
+      const report = await service.checkAll({ signal: undefined });
 
       expect(report.checks[1]?.status).toBe("not_configured");
       expect(report.status).toBe("degraded");

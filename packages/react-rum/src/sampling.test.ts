@@ -4,7 +4,7 @@
  * See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
  */
 import { ROOT_CONTEXT, SpanKind, trace } from "@opentelemetry/api";
-import { SamplingDecision } from "@opentelemetry/sdk-trace-base";
+import { SamplingDecision, type Sampler } from "@opentelemetry/sdk-trace-base";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createBrowserSampler, SessionRatioSampler } from "./sampling.ts";
@@ -22,7 +22,7 @@ const visitWith = (sessionId: string) => {
 const LOW_SESSION = `00000000${"a".repeat(24)}`; // ~0.0 → inside any ratio
 const HIGH_SESSION = `ffffffff${"a".repeat(24)}`; // ~1.0 → outside any ratio
 
-const decide = (sampler: { shouldSample: SessionRatioSampler["shouldSample"] }) =>
+const decide = (sampler: Sampler) =>
   sampler.shouldSample(
     ROOT_CONTEXT,
     "0af7651916cd43dd8448eb211c80319c",

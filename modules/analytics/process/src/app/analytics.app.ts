@@ -200,12 +200,14 @@ type AnalyticsMembers = Readonly<{
   clickhouse: ClickHouseQueryClient;
   rateLimiter: RateLimiter;
   publicBaseUrl: string | undefined;
-  langwatchQl: LangWatchQlSupply;
+  clickhouseAdmin: LangWatchQlSupply["admin"];
+  databaseTarget: LangWatchQlSupply["postgres"];
+  prisma: LwqlProvisioningDatabase;
 }>;
 
 /**
- * Whether this deployment offers LangWatchQL, answered by the process (ADR-159): the
- * credential-free ClickHouse target and identity, plus what self-provisioning reads.
+ * Whether this deployment offers LangWatchQL (ADR-159): the credential-free ClickHouse target and
+ * identity, plus what self-provisioning reads, built from the store members (Alex, 2026-09-28).
  */
 export type LangWatchQlSupply = Readonly<{
   /** The stores' untenanted ClickHouse seam and credential-free target (ADR-159). */
@@ -390,7 +392,14 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
    * refuses by name.
    */
   static readonly config = analyticsServerConfig;
-  static readonly reads = ["clickhouse", "rateLimiter", "publicBaseUrl", "langwatchQl"] as const;
+  static readonly reads = [
+    "clickhouse",
+    "rateLimiter",
+    "publicBaseUrl",
+    "clickhouseAdmin",
+    "databaseTarget",
+    "prisma",
+  ] as const;
   /** The restricted identity's password and the PostgreSQL reader's (ADR-132). */
   static readonly secrets = {
     lwqlClickHousePassword: Secret.load("LWQL_CLICKHOUSE_PASSWORD", { optional: true }),
@@ -412,7 +421,8 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
       defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
     });
     const lwqlConfig = setup.config.langwatchQl;
-    const { admin, postgres, database } = setup.members.langwatchQl;
+    const { clickhouseAdmin: admin, databaseTarget: postgres, prisma } = setup.members;
+    const database = (): LwqlProvisioningDatabase => prisma;
     const target = admin.configured
       ? LangWatchQLConnectionService.create().applyTargetOverrides({
           target: admin.target,

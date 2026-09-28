@@ -15,6 +15,8 @@ const capture = (overrides: Partial<CaptureMessage>): CaptureMessage => ({
   consoleErrors: [],
   failedRequests: [],
   notFound: false,
+  blank: false,
+  ariaSnapshot: "",
   error: "",
   durationMs: 10,
   ...overrides,

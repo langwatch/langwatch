@@ -12,7 +12,6 @@ import {
 } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { LangyMark, useLangyStore, SERIF } from "@langwatch/langy-browser-kit";
-import { getIsMac } from "@langwatch/navigation-browser/surfaces/command-bar";
 import { MeshGradient } from "@paper-design/shaders-react";
 import {
   motion,
@@ -700,9 +699,13 @@ function CarouselOnly({ children, multi }: { children: ReactNode; multi: boolean
   return children;
 }
 
+function isMacKeyboard(): boolean {
+  return typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent);
+}
+
 function BriefingCtaIcon({ showKeyboard }: { showKeyboard: boolean }) {
   if (!showKeyboard) return <Icon as={LuArrowRight} boxSize={3.5} />;
-  return <Kbd fontSize="0.6875rem">{getIsMac() ? "⌘I" : "Ctrl+I"}</Kbd>;
+  return <Kbd fontSize="0.6875rem">{isMacKeyboard() ? "⌘I" : "Ctrl+I"}</Kbd>;
 }
 
 function AnimatedBannerOnly({ children, lowPerf }: { children: ReactNode; lowPerf: boolean }) {

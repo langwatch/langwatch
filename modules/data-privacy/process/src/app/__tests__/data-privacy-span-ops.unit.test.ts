@@ -11,7 +11,6 @@ import { describe, expect, it } from "vitest";
 import {
   createDataPrivacyTestProjects,
   dataPrivacyTestGraph,
-  dataPrivacyTestInfrastructure,
   installableDataPrivacy,
 } from "./data-privacy.fixture.ts";
 
@@ -38,7 +37,6 @@ function spanWith(value: string): OtlpSpan {
 async function boot({ enforcement }: { enforcement?: string }) {
   const runtime = await createApp({ role: "worker" })
     .withModules([installableDataPrivacy()])
-    .withMember("dataPrivacy", dataPrivacyTestInfrastructure())
     .withMember("nodeEnvironment", undefined)
     .withConfig({ "data-privacy": { googleDlpDisabled: undefined, enforcement } })
     .provide({

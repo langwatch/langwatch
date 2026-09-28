@@ -32,7 +32,11 @@ describe("subsystem probes", () => {
     it("names that project on every canary it posts", async () => {
       const canaries = MemorySubsystemProbeChannel.create();
 
-      await probes(canaries).runCollector({ authToken: "token", projectId: "project_1" });
+      await probes(canaries).runCollector({
+        authToken: "token",
+        projectId: "project_1",
+        signal: undefined,
+      });
 
       expect(headersOf(canaries)).toHaveLength(2);
       for (const headers of headersOf(canaries)) {
@@ -46,7 +50,11 @@ describe("subsystem probes", () => {
     it("posts the canary with the token alone", async () => {
       const canaries = MemorySubsystemProbeChannel.create();
 
-      await probes(canaries).runCollector({ authToken: "token", projectId: null });
+      await probes(canaries).runCollector({
+        authToken: "token",
+        projectId: null,
+        signal: undefined,
+      });
 
       for (const headers of headersOf(canaries)) {
         expect(headers).not.toHaveProperty("X-Project-Id");

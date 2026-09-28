@@ -3,25 +3,17 @@
  */
 
 import { Button, Spinner } from "@chakra-ui/react";
-import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { validateWorkbench } from "@langwatch/experiment-contract/mapping-validation";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
 import { LuPlay, LuSquare } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation.ts";
-import { useOpenComparisonEditor } from "../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
+import { useOpenEvaluatorMappings } from "../../../behavior/experiments-v3/use-open-evaluator-mappings.ts";
 import { useOpenTargetEditor } from "../../../behavior/experiments-v3/use-open-target-editor.ts";
 import { usePromptTemplateFields } from "../../../behavior/experiments-v3/use-prompt-template-fields.ts";
-import { useResolveTargetName } from "../../../behavior/experiments-v3/use-resolve-target-name.ts";
-import { createEvaluatorEditorCallbacks } from "../../../model/experiments-v3/evaluator-editor-callbacks.ts";
-import {
-  convertFromUIMapping,
-  convertToUIMapping,
-} from "../../../model/experiments-v3/field-mapping-converters.ts";
-import { isComparisonEvaluator } from "../../../model/experiments-v3/types.ts";
 
 type RunEvaluationButtonProps = {
   /** Whether the button is disabled (e.g., while loading) */
@@ -55,181 +47,67 @@ function RunButtonLabel({ isAborting, isRunning }: { isAborting: boolean; isRunn
   );
 }
 
+/** Why the button reads what it does: stopping, stopping soon, a gap to fill, or ready. */
+const runTooltipOf = ({
+  isAborting,
+  isRunning,
+  hasTargets,
+  validation,
+}: {
+  isAborting: boolean;
+  isRunning: boolean;
+  hasTargets: boolean;
+  validation: () => { firstInvalidTarget?: unknown; firstInvalidEvaluator?: unknown };
+}) => {
+  if (isAborting) return "Stopping evaluation...";
+  if (isRunning) return "Stop evaluation";
+  if (!hasTargets) return "Click to add a target";
+  const { firstInvalidTarget, firstInvalidEvaluator } = validation();
+  if (firstInvalidTarget) return "Configure missing mappings for target";
+  if (firstInvalidEvaluator) return "Configure missing mappings for evaluator";
+  return "Run evaluation on all targets";
+};
+
 export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonProps) => {
   const { openDrawer } = useDrawer();
   const { openTargetEditor } = useOpenTargetEditor();
-  const openComparisonEditor = useOpenComparisonEditor();
-  const resolveTargetName = useResolveTargetName();
+  const openEvaluatorMappings = useOpenEvaluatorMappings();
   const promptTemplateFields = usePromptTemplateFields();
-  const { status, progress, execute, abort, isAborting } = useExecuteEvaluation();
+  const { status, execute, abort, isAborting } = useExecuteEvaluation();
 
-  const {
-    targets,
-    evaluators,
-    activeDatasetId,
-    datasets,
-    results,
-    setEvaluatorMapping,
-    removeEvaluatorMapping,
-  } = useEvaluationsV3Store(
+  const { targets, evaluators, activeDatasetId, results } = useEvaluationsV3Store(
     useShallow((state) => ({
       targets: state.targets,
       evaluators: state.evaluators,
       activeDatasetId: state.activeDatasetId,
-      datasets: state.datasets,
       results: state.results,
-      setEvaluatorMapping: state.setEvaluatorMapping,
-      removeEvaluatorMapping: state.removeEvaluatorMapping,
     })),
   );
 
   const hasTargets = targets.length > 0;
   const isRunning = status === "running" || results.status === "running";
-  const _hasProgress = progress.total > 0;
+  const validate = () =>
+    validateWorkbench({ targets, evaluators, activeDatasetId, promptTemplateFields });
 
   const handleClick = async () => {
-    // If running, stop execution
-    if (isRunning) {
-      await abort();
-      return;
+    if (isRunning) return abort();
+    if (!hasTargets) return openDrawer("targetTypeSelector", {});
+    const validation = validate();
+    if (validation.isValid) return execute({ type: "full" });
+    // Open the drawer for the first entity with missing mappings.
+    if (validation.firstInvalidTarget) {
+      void openTargetEditor(validation.firstInvalidTarget.target);
+    } else if (validation.firstInvalidEvaluator) {
+      openEvaluatorMappings(validation.firstInvalidEvaluator);
     }
-
-    if (!hasTargets) {
-      // Open the target type selector to add a target
-      openDrawer("targetTypeSelector", {});
-      return;
-    }
-
-    // Validate all targets and evaluators
-    const validation = validateWorkbench({
-      targets,
-      evaluators,
-      activeDatasetId,
-      promptTemplateFields,
-    });
-
-    if (!validation.isValid) {
-      // Open the drawer for the first entity with missing mappings
-      if (validation.firstInvalidTarget) {
-        const target = validation.firstInvalidTarget.target;
-        // Open target editor with proper flow callbacks
-        void openTargetEditor(target);
-      } else if (validation.firstInvalidEvaluator) {
-        const { evaluator, targetId } = validation.firstInvalidEvaluator;
-
-        // A chip-style comparison evaluator isn't tied to one target — it needs the
-        // variants/golden-field picker (ComparisonConfigForm), not the generic
-        // per-target mappings UI below.
-        if (isComparisonEvaluator(evaluator)) {
-          openComparisonEditor(evaluator);
-          return;
-        }
-
-        const target = targets.find((r) => r.id === targetId);
-
-        // Build mappingsConfig for the evaluator drawer
-        const datasetIds = new Set(datasets.map((d) => d.id));
-        const isDatasetSource = (sourceId: string) => datasetIds.has(sourceId);
-        const activeDataset = datasets.find((d) => d.id === activeDatasetId);
-
-        const availableSources = [];
-        if (activeDataset) {
-          availableSources.push({
-            id: activeDataset.id,
-            name: activeDataset.name,
-            type: "dataset" as const,
-            fields: activeDataset.columns.map((col) => ({
-              name: col.name,
-              type: "str" as const,
-            })),
-          });
-        }
-        if (target) {
-          availableSources.push({
-            id: target.id,
-            name: resolveTargetName(target),
-            type: "signature" as const,
-            fields: target.outputs.map((o) => ({
-              name: o.identifier,
-              type: o.type as "str" | "float" | "bool",
-            })),
-          });
-        }
-
-        const storeMappings = evaluator.mappings[activeDatasetId]?.[targetId] ?? {};
-        const initialMappings: Record<string, UIFieldMapping> = {};
-        for (const [key, mapping] of Object.entries(storeMappings)) {
-          initialMappings[key] = convertToUIMapping(mapping);
-        }
-
-        const onMappingChange = (identifier: string, mapping: UIFieldMapping | undefined) => {
-          if (mapping) {
-            setEvaluatorMapping({
-              evaluatorId: evaluator.id,
-              datasetId: activeDatasetId,
-              targetId,
-              inputField: identifier,
-              mapping: convertFromUIMapping(mapping, isDatasetSource),
-            });
-          } else {
-            removeEvaluatorMapping({
-              evaluatorId: evaluator.id,
-              datasetId: activeDatasetId,
-              targetId,
-              inputField: identifier,
-            });
-          }
-        };
-
-        // onMappingChange must be registered via setFlowCallbacks (durable), NOT
-        // embedded in mappingsConfig (ephemeral complexProps).
-        setFlowCallbacks("evaluatorEditor", createEvaluatorEditorCallbacks({ onMappingChange }));
-
-        // Open the evaluator editor drawer. mappingsConfig is an object so it
-        // rides complexProps; the durable onMappingChange lives in flowCallbacks.
-        openDrawer("evaluatorEditor", {
-          evaluatorId: evaluator.dbEvaluatorId,
-          evaluatorType: evaluator.evaluatorType,
-          mappingsConfig: { availableSources, initialMappings },
-        });
-      }
-      return;
-    }
-
-    // All validations passed - run the full evaluation
-    await execute({ type: "full" });
-  };
-
-  // Determine button state and tooltip
-  const getTooltipContent = () => {
-    if (isAborting) {
-      return "Stopping evaluation...";
-    }
-    if (isRunning) {
-      return "Stop evaluation";
-    }
-    if (!hasTargets) {
-      return "Click to add a target";
-    }
-    const validation = validateWorkbench({
-      targets,
-      evaluators,
-      activeDatasetId,
-      promptTemplateFields,
-    });
-    if (!validation.isValid) {
-      if (validation.firstInvalidTarget) {
-        return `Configure missing mappings for target`;
-      }
-      if (validation.firstInvalidEvaluator) {
-        return `Configure missing mappings for evaluator`;
-      }
-    }
-    return "Run evaluation on all targets";
   };
 
   return (
-    <Tooltip content={getTooltipContent()} positioning={{ placement: "bottom" }} openDelay={200}>
+    <Tooltip
+      content={runTooltipOf({ isAborting, isRunning, hasTargets, validation: validate })}
+      positioning={{ placement: "bottom" }}
+      openDelay={200}
+    >
       <Button
         size="sm"
         variant="outline"

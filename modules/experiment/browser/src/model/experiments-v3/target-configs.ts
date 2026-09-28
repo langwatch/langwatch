@@ -1,5 +1,5 @@
 /** The workbench column a picked agent, evaluator or prompt becomes. */
-import type { AgentWithFields } from "@langwatch/agent-contract";
+import type { UiAgentListDrawerProps } from "@langwatch/browser-host/drawer";
 import type { RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import {
@@ -59,7 +59,9 @@ const agentConfigInputs = (
  * its function declares. A workflow agent's fields come from its Studio graph (the
  * API derives them); others fall back to their own config.
  */
-export const savedAgentTargetConfig = (savedAgent: AgentWithFields): TargetConfig => {
+export const savedAgentTargetConfig = (
+  savedAgent: UiAgentListDrawerProps["items"][number],
+): TargetConfig => {
   if (savedAgent.type === "connected") {
     const { inputs, outputs } = connectedTargetFields(savedAgent.config);
     return {

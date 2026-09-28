@@ -9,6 +9,12 @@ const optionalClick = async (context: Parameters<Action>[0], text: string): Prom
 export const signIn: Action = async (context) => {
   const { credential } = context;
   await goTo({ context, path: "/auth/signin" });
+  await context.side.page
+    .locator("input")
+    .locator("visible=true")
+    .first()
+    .waitFor({ timeout: 15_000 })
+    .catch(() => undefined);
   await context.snapshot("sign in");
   const filled = await fillField({ context, target: "email", value: credential.email }).then(
     () => true,
@@ -24,7 +30,20 @@ export const signIn: Action = async (context) => {
     await context.snapshot("after sign up");
     return;
   }
-  await fillField({ context, target: "password", value: credential.password });
+  const passwordShown = await fillField({
+    context,
+    target: "password",
+    value: credential.password,
+  }).then(
+    () => true,
+    () => false,
+  );
+  if (!passwordShown) {
+    // Identifier-first sign-in (main): the address step answers before the password shows.
+    await clickText({ context, text: "Continue" });
+    await context.side.waitUntilQuiet();
+    await fillField({ context, target: "password", value: credential.password });
+  }
   await clickText({ context, text: "Sign in" });
   await context.snapshot("after sign in");
 };

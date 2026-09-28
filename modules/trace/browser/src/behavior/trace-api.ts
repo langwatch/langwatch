@@ -27,8 +27,7 @@ import type {
   PresenceProjectInput,
   PresenceUpdateInput,
 } from "@langwatch/presence-contract";
-import type { MediaProbeResult } from "@langwatch/scenario-browser/surfaces/media-part";
-import type { SimulationRunStatus } from "@langwatch/scenario-contract";
+import type { MediaProbeResult, SimulationRunStatus } from "@langwatch/scenario-contract";
 import type { ShareLink, ShareResourceType, ShareVisibility } from "@langwatch/share-contract";
 import { type TimeInput } from "@langwatch/time";
 import type { ExportProgress, ExportProgressEvent } from "@langwatch/trace-browser-kit";

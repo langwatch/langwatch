@@ -72,6 +72,7 @@ export class ModelProviderScopeService {
       organizationId,
       page: 1,
       limit: 1,
+      includeGovernance: true,
     });
     const reference =
       firstPage.pagination.total > 1
@@ -79,6 +80,7 @@ export class ModelProviderScopeService {
             organizationId,
             page: firstPage.pagination.total,
             limit: 1,
+            includeGovernance: true,
           })
         : firstPage;
     const createdAt = reference.data[0]?.createdAt;

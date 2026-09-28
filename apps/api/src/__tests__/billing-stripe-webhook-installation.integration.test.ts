@@ -40,8 +40,9 @@ describe("the api process installation", () => {
       const owner = serverModules.find((module) => (module.transports ?? []).some(isCallback));
       const callback = owner?.transports?.find(isCallback);
       const contract = owner?.apiContract;
-      if (!owner || !callback || !(contract instanceof ModuleApiToken))
+      if (!owner || !callback || !(contract instanceof ModuleApiToken)) {
         throw new Error("no installed module declares the Stripe callback");
+      }
       expect(owner.name).toBe("billing");
       host.mount(callback.router(), () => runtime.service(contract));
 

@@ -7,7 +7,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { ModelProviderResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -89,9 +89,9 @@ export function createEvaluatorTestApp(
         users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
         workflows: createApiFixture<WorkflowApi>({ assertInProject: async () => void 0 }),
         modelProviders,
+        monitors: createApiFixture<MonitorApi>(),
       },
       members: {
-        prisma: createApiFixture<PrismaClient>(),
         publicBaseUrl: "https://langwatch.test",
       },
       config: undefined,

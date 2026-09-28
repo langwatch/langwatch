@@ -15,6 +15,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { UiPromptListDrawerProps } from "@langwatch/browser-host/drawer";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
@@ -26,19 +27,7 @@ import { LuArrowLeft } from "react-icons/lu";
 import { useAllPromptsForProject } from "../../behavior/use-all-prompts-for-project.ts";
 import { getDisplayHandle } from "../../prompt-reference.ts";
 
-export type PromptListDrawerProps = {
-  open?: boolean;
-  onClose?: () => void;
-  onSelect?: (prompt: {
-    id: string;
-    name: string;
-    version?: number;
-    versionId?: string;
-    inputs?: { identifier: string; type: string }[];
-    outputs?: { identifier: string; type: string }[];
-  }) => void;
-  onCreateNew?: () => void;
-};
+export type PromptListDrawerProps = UiPromptListDrawerProps;
 
 /**
  * Drawer for selecting an existing prompt or creating a new one: saved

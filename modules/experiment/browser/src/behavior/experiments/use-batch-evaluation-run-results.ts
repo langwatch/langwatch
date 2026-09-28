@@ -1,10 +1,11 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { downloadCsv } from "@langwatch/csv/download";
 import { readableDate } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
-import type { Experiment, Project } from "@langwatch/workflow-contract";
+import type { Experiment } from "@langwatch/workflow-contract";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
 
@@ -42,7 +43,7 @@ export const useBatchEvaluationResults = ({
   runId,
   isFinished,
 }: {
-  project: Project;
+  project: UiHostProject;
   experiment: Experiment;
   runId: string | undefined;
   isFinished: boolean;
@@ -158,6 +159,95 @@ export const useBatchEvaluationResults = ({
   };
 };
 
+type RunDatasetEntry = ExperimentRunWithItems["dataset"][number];
+type RunEvaluations = ExperimentRunWithItems["evaluations"];
+type EvaluationColumns = {
+  evaluationInputsColumns: Set<string>;
+  evaluationResultsColumns: Set<string>;
+};
+
+/** A predicted `node.col` value; old runs stored the end node's fields flat. */
+const predictedCell = (entry: RunDatasetEntry | undefined, key: string): string => {
+  const [node, col] = key.split(".") as [string, string];
+  const value = readKey(entry?.predicted?.[node], col);
+  const flat = value === undefined && node === "end" ? entry?.predicted?.[col] : value;
+  return cellText(flat ?? "");
+};
+
+const optionalText = (value: unknown): string => (value != null ? cellText(value) : "");
+
+/** An evaluation result cell: a failed or skipped evaluation says so, except in its details. */
+const evaluationResultCell = (evaluation: RunEvaluations[number] | undefined, col: string) => {
+  const value = readKey(evaluation, col);
+  if (col === "details") return optionalText(value);
+  if (evaluation?.status === "error") return "Error";
+  if (evaluation?.status === "skipped") return "Skipped";
+  if (typeof value === "boolean") return String(value);
+  if (!isNaN(Number(value))) return numeral(Number(value)).format("0.[00]");
+  return optionalText(value);
+};
+
+const evaluationCells = ({
+  evaluation,
+  columns,
+}: {
+  evaluation: RunEvaluations[number] | undefined;
+  columns: EvaluationColumns;
+}): string[] => [
+  ...[...columns.evaluationInputsColumns].map((col) => cellText(evaluation?.inputs?.[col])),
+  ...[...columns.evaluationResultsColumns].map((col) => evaluationResultCell(evaluation, col)),
+];
+
+/** The run's results as CSV headers and rows; cost and duration are the dataset entry's own. */
+const resultsCsvOf = ({
+  datasetByIndex,
+  datasetColumns,
+  predictedColumns,
+  resultsByEvaluator,
+}: {
+  datasetByIndex: Record<number, RunDatasetEntry>;
+  datasetColumns: Set<string>;
+  predictedColumns: Record<string, Set<string>>;
+  resultsByEvaluator: Record<string, RunEvaluations>;
+}) => {
+  const evaluationColumns = Object.entries(resultsByEvaluator).map(
+    ([evaluator, results]) => [evaluator, getEvaluationColumns(results)] as const,
+  );
+  const datasetHeaders = [...datasetColumns];
+  const predictedHeaders = Object.entries(predictedColumns).flatMap(([node, columns]) =>
+    [...columns].map((c) => `${node}.${c}`),
+  );
+  const fields = [
+    ...datasetHeaders,
+    ...predictedHeaders,
+    "Cost",
+    "Duration",
+    ...evaluationColumns.flatMap(([evaluator, columns]) =>
+      [...columns.evaluationInputsColumns, ...columns.evaluationResultsColumns].map(
+        (c) => `${evaluator} ${c}`,
+      ),
+    ),
+  ].map((h) => h.toLowerCase().replaceAll(" ", "_"));
+
+  const totalRows = Math.max(...Object.values(datasetByIndex).map((d) => d.index + 1));
+  const rows = Array.from({ length: totalRows }, (_, index) => {
+    const entry = datasetByIndex[index];
+    return [
+      ...datasetHeaders.map((col) => cellText(entry?.entry?.[col] ?? "")),
+      ...predictedHeaders.map((key) => predictedCell(entry, key)),
+      entry?.cost != null ? String(entry.cost) : "",
+      entry?.duration != null ? String(entry.duration) : "",
+      ...evaluationColumns.flatMap(([evaluator, columns]) =>
+        evaluationCells({
+          evaluation: resultsByEvaluator[evaluator]?.find((r) => r.index === index),
+          columns,
+        }),
+      ),
+    ];
+  });
+  return { fields, rows };
+};
+
 /**
  * CSV export of a batch evaluation run's results. Moved out of
  * `BatchEvaluationV2EvaluationResults` (Record 10: elements cannot fetch).
@@ -168,7 +258,7 @@ export const useBatchEvaluationDownloadCSV = ({
   runId,
   isFinished,
 }: {
-  project: Project;
+  project: UiHostProject;
   experiment: Experiment;
   runId: string | undefined;
   isFinished: boolean;
@@ -205,99 +295,14 @@ export const useBatchEvaluationDownloadCSV = ({
     if (!isDownloadCSVEnabled) {
       throw new Error("Results not loaded yet");
     }
-
-    const evaluationColumns = Object.fromEntries(
-      Object.entries(resultsByEvaluator).map(([ev, res]) => [ev, getEvaluationColumns(res)]),
-    );
-
-    const totalRows = Math.max(...Object.values(datasetByIndex).map((d) => d.index + 1));
-
-    const datasetHeaderList = Array.from(datasetColumns);
-    const predictedHeaderList = Object.entries(predictedColumns).flatMap(([node, columns]) =>
-      Array.from(columns).map((c) => `${node}.${c}`),
-    );
-    const evaluationHeaderTuples = Object.entries(evaluationColumns);
-
-    const csvHeaders = [
-      ...datasetHeaderList,
-      ...predictedHeaderList,
-      "Cost",
-      "Duration",
-      ...evaluationHeaderTuples.flatMap(
-        ([evaluator, { evaluationInputsColumns, evaluationResultsColumns }]) => [
-          ...Array.from(evaluationInputsColumns).map((c) => `${evaluator} ${c}`),
-          ...Array.from(evaluationResultsColumns).map((c) => `${evaluator} ${c}`),
-        ],
-      ),
-    ].map((h) => h.toLowerCase().replaceAll(" ", "_"));
-
-    const csvData: string[][] = Array.from({ length: totalRows }).map((_, index) => {
-      const datasetEntry = datasetByIndex[index];
-      const row: string[] = [];
-      // Dataset values
-      for (const col of datasetHeaderList) {
-        row.push(cellText(datasetEntry?.entry?.[col] ?? ""));
-      }
-      // Predicted values
-      for (const key of predictedHeaderList) {
-        const [node, col] = key.split(".") as [string, string];
-        let value = readKey(datasetEntry?.predicted?.[node], col);
-        if (value === undefined && node === "end") {
-          value = datasetEntry?.predicted?.[col];
-        }
-        row.push(cellText(value ?? ""));
-      }
-      // Cost and Duration (dataset values only to match previous behavior)
-      row.push(datasetEntry?.cost != null ? String(datasetEntry.cost) : "");
-      row.push(datasetEntry?.duration != null ? String(datasetEntry.duration) : "");
-      // Evaluation inputs/results per evaluator
-      for (const [
-        evaluator,
-        { evaluationInputsColumns, evaluationResultsColumns },
-      ] of evaluationHeaderTuples) {
-        const evaluation = resultsByEvaluator[evaluator]?.find((r) => r.index === index);
-        for (const col of Array.from(evaluationInputsColumns)) {
-          const v = evaluation?.inputs?.[col];
-          row.push(cellText(v));
-        }
-        for (const col of Array.from(evaluationResultsColumns)) {
-          if (col !== "details" && evaluation?.status === "error") {
-            row.push("Error");
-            continue;
-          }
-          if (col !== "details" && evaluation?.status === "skipped") {
-            row.push("Skipped");
-            continue;
-          }
-          const v = readKey(evaluation, col);
-          if (col === "details") {
-            row.push(v != null ? cellText(v) : "");
-          } else if (v === false) {
-            row.push("false");
-          } else if (v === true) {
-            row.push("true");
-          } else if (!isNaN(Number(v))) {
-            row.push(numeral(Number(v)).format("0.[00]"));
-          } else {
-            row.push(v != null ? cellText(v) : "");
-          }
-        }
-      }
-      return row;
+    const { fields, rows } = resultsCsvOf({
+      datasetByIndex,
+      datasetColumns,
+      predictedColumns,
+      resultsByEvaluator,
     });
-
-    // Non-null per the `isDownloadCSVEnabled` guard above (the early
-    // throw on line 208 ensures `run.data` is populated by the time we
-    // get here). `getRun` returns `ExperimentRunWithItems | null` since
-    // PR #3483 to handle the cold-start window where the row hasn't
-    // been folded into ClickHouse yet — see service comment.
-    const formattedDate = readableDate(run.data!.timestamps.createdAt).toISOString().split("T")[0];
-
-    downloadCsv({
-      fields: csvHeaders,
-      rows: csvData,
-      fileName: `${formattedDate}_${experiment.name}_${runId}.csv`,
-    });
+    const formattedDate = readableDate(run.data.timestamps.createdAt).toISOString().split("T")[0];
+    downloadCsv({ fields, rows, fileName: `${formattedDate}_${experiment.name}_${runId}.csv` });
   };
 
   return { downloadCSV, isDownloadCSVEnabled };

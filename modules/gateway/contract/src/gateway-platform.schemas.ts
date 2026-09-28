@@ -336,3 +336,17 @@ export const gatewayRevokeVirtualKeyBodySchema = z.object({});
 
 /** The retired provider-binding writes read no body; they answer 410 whatever was sent. */
 export const gatewayRetiredProviderBindingBodySchema = z.object({});
+
+/**
+ * The REST credential a project door presented: a scoped API key acts as its
+ * owning user, a legacy project key carries none and acts as a machine principal.
+ */
+export const gatewayRequestCredentialSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("apiKey"),
+    apiKeyId: z.string(),
+    userId: z.string().nullable(),
+    organizationId: z.string(),
+  }),
+  z.object({ kind: z.literal("legacyProjectKey") }),
+]);

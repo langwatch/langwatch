@@ -1,9 +1,8 @@
 import { Skeleton, Text, VStack } from "@chakra-ui/react";
-import { SessionsTable } from "@langwatch/coding-agent-browser/surfaces/activity";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 
+import { CodingAgentSessionsTable } from "../../../behavior/lent-coding-agent-tables.tsx";
 import { usePersonalContext } from "../../../behavior/use-personal-context.ts";
-import { withCodingAgentHost } from "../coding-agent-host-provider.tsx";
 import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
 
 /**
@@ -37,7 +36,10 @@ export function PersonalSessionsScreen() {
             true. */}
         {!isWorkspaceResolved && <Skeleton height="180px" borderRadius="md" />}
         {isWorkspaceResolved && personalProjectId ? (
-          <SessionsTable projectId={personalProjectId} projectSlug={personalProjectSlug} />
+          <CodingAgentSessionsTable
+            projectId={personalProjectId}
+            projectSlug={personalProjectSlug}
+          />
         ) : null}
         {isWorkspaceResolved && !personalProjectId && (
           <Text fontSize="sm" color="fg.muted">
@@ -49,8 +51,4 @@ export function PersonalSessionsScreen() {
   );
 }
 
-/**
- * The activity tables answer a port of their own, mounted here since
- * `@langwatch/coding-agent-browser` is ungoverned and `apps/ui` may not import it.
- */
-export default withCodingAgentHost(PersonalSessionsScreen);
+export default PersonalSessionsScreen;

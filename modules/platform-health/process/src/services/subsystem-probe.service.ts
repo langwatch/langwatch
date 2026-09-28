@@ -46,6 +46,8 @@ export type SubsystemProbeOutcome =
 export interface ProbeCredential {
   readonly authToken: string;
   readonly projectId: string | null;
+  /** The request that asked for the probe; every canary it sends stops with it. */
+  readonly signal: AbortSignal | undefined;
 }
 
 function canaryHeaders(authToken: string, projectId: string | null): Record<string, string> {
@@ -119,17 +121,23 @@ export class SubsystemProbeService {
     return new SubsystemProbeService(options.collaborators);
   }
 
-  async runCollector({ authToken, projectId }: ProbeCredential): Promise<SubsystemProbeOutcome> {
+  async runCollector({
+    authToken,
+    projectId,
+    signal,
+  }: ProbeCredential): Promise<SubsystemProbeOutcome> {
     const [restResponse, otelResponse] = await Promise.all([
       this.#postRestCanary({
         authToken,
         projectId,
+        signal,
         traceId: generate(TRACE_KSUID_RESOURCE).toString(),
         input: "\u{1F423}",
       }),
       this.#postOtelCanary({
         authToken,
         projectId,
+        signal,
         traceId: Buffer.from(randomBytes(16).toString("hex"), "hex").toString("base64"),
         input: "\u{1F423}",
       }),
@@ -141,11 +149,16 @@ export class SubsystemProbeService {
     return { ok: true, status: otelResponse.status, body: await otelResponse.json() };
   }
 
-  async runEvaluations({ authToken, projectId }: ProbeCredential): Promise<SubsystemProbeOutcome> {
+  async runEvaluations({
+    authToken,
+    projectId,
+    signal,
+  }: ProbeCredential): Promise<SubsystemProbeOutcome> {
     const response = await this.#withRetries(() =>
       this.#collaborators.canaries.post({
         path: "/api/evaluations/presidio/pii_detection/evaluate",
         headers: canaryHeaders(authToken, projectId),
+        signal,
         body: JSON.stringify({
           data: { input: "Hello, my name is John Canary and my email is canary@langwatch.ai." },
           settings: { entities: { email_address: true, person: true } },
@@ -164,7 +177,11 @@ export class SubsystemProbeService {
     return { ok: true, status: response.status, body: await response.json() };
   }
 
-  async runProcessor({ authToken, projectId }: ProbeCredential): Promise<SubsystemProbeOutcome> {
+  async runProcessor({
+    authToken,
+    projectId,
+    signal,
+  }: ProbeCredential): Promise<SubsystemProbeOutcome> {
     const restTraceId = generate(TRACE_KSUID_RESOURCE).toString();
     const otelTraceId = randomBytes(16).toString("base64");
     const startedAt = nowInstant().epochMilliseconds;
@@ -172,10 +189,17 @@ export class SubsystemProbeService {
     logger.info({ restTraceId, otelTraceId }, "Healthcheck started, sending canary traces");
 
     const [restResponse, otelResponse] = await Promise.all([
-      this.#postRestCanary({ authToken, projectId, traceId: restTraceId, input: "\u{1F424}" }),
+      this.#postRestCanary({
+        authToken,
+        projectId,
+        signal,
+        traceId: restTraceId,
+        input: "\u{1F424}",
+      }),
       this.#postOtelCanary({
         authToken,
         projectId,
+        signal,
         traceId: otelTraceId,
         input: "\u{1F424}",
         model: "openai/gpt-4.1-nano",
@@ -199,8 +223,8 @@ export class SubsystemProbeService {
     const otelBody = await otelResponse.json();
 
     const ingested = await Promise.all([
-      this.#awaitTrace({ traceId: restTraceId, authToken, projectId, label: "REST" }),
-      this.#awaitTrace({ traceId: otelTraceId, authToken, projectId, label: "OTLP" }),
+      this.#awaitTrace({ traceId: restTraceId, authToken, projectId, signal, label: "REST" }),
+      this.#awaitTrace({ traceId: otelTraceId, authToken, projectId, signal, label: "OTLP" }),
     ]);
     const missed = ingested.find((entry) => entry !== null);
     if (missed) {
@@ -249,10 +273,12 @@ export class SubsystemProbeService {
     projectId,
     workflowId,
     authToken,
+    signal,
   }: {
     projectId: string;
     workflowId: string;
     authToken: string;
+    signal: AbortSignal | undefined;
   }): Promise<SubsystemProbeOutcome> {
     if (!(await this.#collaborators.workflowExists({ workflowId, projectId }))) {
       return failure(404, "Workflow not found.", "workflow_absent");
@@ -262,6 +288,7 @@ export class SubsystemProbeService {
       this.#collaborators.canaries.post({
         path: `/api/workflows/${workflowId}/run`,
         headers: canaryHeaders(authToken, projectId),
+        signal,
         body: JSON.stringify({ input: "\u{1F425}" }),
       }),
     );
@@ -290,6 +317,7 @@ export class SubsystemProbeService {
   #postRestCanary({
     authToken,
     projectId,
+    signal,
     traceId,
     input,
   }: ProbeCredential & {
@@ -300,6 +328,7 @@ export class SubsystemProbeService {
     return this.#collaborators.canaries.post({
       path: "/api/collector",
       headers: canaryHeaders(authToken, projectId),
+      signal,
       body: JSON.stringify({
         spans: [
           {
@@ -319,6 +348,7 @@ export class SubsystemProbeService {
   #postOtelCanary({
     authToken,
     projectId,
+    signal,
     traceId,
     input,
     model,
@@ -363,6 +393,7 @@ export class SubsystemProbeService {
     return this.#collaborators.canaries.post({
       path: "/api/otel/v1/traces",
       headers: canaryHeaders(authToken, projectId),
+      signal,
       body: JSON.stringify(payload),
     });
   }
@@ -375,6 +406,7 @@ export class SubsystemProbeService {
     traceId,
     authToken,
     projectId,
+    signal,
     label,
   }: ProbeCredential & {
     traceId: string;
@@ -392,6 +424,7 @@ export class SubsystemProbeService {
         const response = await this.#collaborators.canaries.get({
           path: `/api/traces/${encodeURIComponent(traceId)}`,
           headers: readbackHeaders(authToken, projectId),
+          signal,
         });
         const fetchMs = nowInstant().epochMilliseconds - fetchStart;
         if (response.ok) {

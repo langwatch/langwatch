@@ -2,6 +2,7 @@ import { PROJECT_KIND, ProjectNotFoundError, type Team } from "@langwatch/projec
 import { fromDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { ProjectCredentialsService } from "../../../services/project-credentials.service.ts";
 import { MemoryProjectDatabase } from "../memory.project.database.ts";
 import { MemoryProjectRepository } from "../memory.project.repository.ts";
 
@@ -180,6 +181,59 @@ describe("MemoryProjectRepository", () => {
       });
       expect((await repository.findById("project_1"))?.lastCodingAgentSessionAt).toEqual(first);
       expect((await repository.findById("project_1"))?.lastCodingAgentPullRequestAt).toBeNull();
+    });
+  });
+
+  describe("given an application project beside the hidden governance project", () => {
+    let repository: MemoryProjectRepository;
+
+    beforeEach(async () => {
+      ({ repository } = seeded());
+      await repository.create(creation);
+      await repository.createInternalOrFindWinner({
+        id: "project_internal",
+        name: "Governance (internal)",
+        slug: `governance-${ORGANIZATION_ID}`,
+        apiKey: "sk-lw-internal",
+        teamId: TEAM_ID,
+      });
+    });
+
+    const listedIds = async (includeGovernance?: boolean) => {
+      const page = await repository.listAllByOrganization({
+        organizationId: ORGANIZATION_ID,
+        page: 1,
+        limit: 10,
+        includeGovernance,
+      });
+      const team = await repository.findAllByTeam({
+        organizationId: ORGANIZATION_ID,
+        teamId: TEAM_ID,
+        includeGovernance,
+      });
+      return {
+        organization: page.data.map((project) => project.id).toSorted(),
+        total: page.pagination.total,
+        team: team.map((project) => project.id).toSorted(),
+      };
+    };
+
+    /** @scenario "Project listings leave out the organization's governance project" */
+    it("lists only the application project by default", async () => {
+      expect(await listedIds()).toEqual({
+        organization: ["project_1"],
+        total: 1,
+        team: ["project_1"],
+      });
+    });
+
+    /** @scenario "A caller that covers every tenant asks for the governance project" */
+    it("lists the governance project when asked for it", async () => {
+      expect(await listedIds(true)).toEqual({
+        organization: ["project_1", "project_internal"],
+        total: 2,
+        team: ["project_1", "project_internal"],
+      });
     });
   });
 
@@ -393,6 +447,27 @@ describe("MemoryProjectRepository", () => {
       });
 
       expect(await repository.findLiveNonGovernanceIds(ORGANIZATION_ID)).toEqual(["project_1"]);
+    });
+  });
+
+  describe("given projects minted under either id format", () => {
+    it("reads back a project minted with a project KSUID", async () => {
+      const { repository } = seeded();
+      const id = ProjectCredentialsService.create().generateProjectId();
+
+      await repository.create({ ...creation, id });
+
+      expect(id).toMatch(/^project_[a-zA-Z0-9]+$/);
+      await expect(repository.findById(id)).resolves.toMatchObject({ id });
+    });
+
+    it("still reads back a project stored under the older nanoid id format", async () => {
+      const { repository } = seeded();
+      const legacyId = "V1StGXR8_Z5jdHi6B-myT";
+
+      await repository.create({ ...creation, id: legacyId });
+
+      await expect(repository.findById(legacyId)).resolves.toMatchObject({ id: legacyId });
     });
   });
 });

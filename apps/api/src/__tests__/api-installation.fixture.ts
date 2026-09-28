@@ -103,7 +103,6 @@ export async function bootApi({
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
         adminEmails: config.process.adminEmails,
         processName: "langwatch-api",
-        dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory") },
         storageResolver: void 0,
         storage: void 0,
         queue: void 0,
@@ -111,6 +110,7 @@ export async function bootApi({
         gatewayInternalProtocol: {},
         connectJudge: null,
         scenarioChildBundle,
+        rawSocketPort: 0,
         monitor: void 0,
         langwatchQl: {
           admin: { configured: false },

@@ -142,6 +142,7 @@ export const projectPaginationSchema = z
     page: z.number().int().positive(),
     limit: z.number().int().positive(),
     projectIds: z.array(z.string().min(1)).optional(),
+    includeGovernance: z.boolean().optional(),
   })
   .strict();
 export type ProjectPaginationInput = z.infer<typeof projectPaginationSchema>;

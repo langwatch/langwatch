@@ -614,7 +614,7 @@ function useCreateAgentTarget({
   openDrawer: Dispatchers["openDrawer"];
 }) {
   return useCallback(() => {
-    const onAgentSaved = (agent: TypedAgent) => {
+    const onAgentSaved = (agent: Pick<TypedAgent, "id" | "name" | "type">) => {
       const targetType = agent.type as NonNullable<TargetValue>["type"];
       handleTargetChange({ type: targetType, id: agent.id });
       toaster.create({

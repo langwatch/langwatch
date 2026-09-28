@@ -2,23 +2,26 @@ import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 
-import type { HmrContext, ViteDevServer } from "vite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { havenHmrGate } from "../havenHmrGate";
+import { createHmrGate, type HmrReloadChannel } from "../havenHmrGate";
 
 describe("havenHmrGate", () => {
   let dir: string;
   let sentMessages: unknown[];
-  let server: ViteDevServer;
+  let server: HmrReloadChannel;
 
   beforeEach(() => {
     vi.useFakeTimers();
     dir = mkdtempSync(path.join(tmpdir(), "haven-hmr-gate-"));
     sentMessages = [];
     server = {
-      ws: { send: (msg: unknown) => sentMessages.push(msg) },
-    } as unknown as ViteDevServer;
+      ws: {
+        send: (msg) => {
+          sentMessages.push(msg);
+        },
+      },
+    };
   });
 
   afterEach(() => {
@@ -26,17 +29,16 @@ describe("havenHmrGate", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  function fakeCtx(): HmrContext {
-    return { modules: ["mod"] } as unknown as HmrContext;
+  function fakeCtx(): string[] {
+    return ["mod"];
   }
 
   function build() {
-    const plugin = havenHmrGate({
+    const gate = createHmrGate({
       markerPath: path.join(dir, ".haven-hmr-gate"),
     });
-    // configureServer + handleHotUpdate are always plain functions on this plugin.
-    (plugin.configureServer as (s: ViteDevServer) => void)(server);
-    return plugin.handleHotUpdate as (ctx: HmrContext) => unknown;
+    gate.attach(server);
+    return (modules: string[]) => gate.hotUpdate(modules);
   }
 
   describe("given an isolated edit (no recent activity)", () => {
@@ -73,9 +75,9 @@ describe("havenHmrGate", () => {
       const markerPath = path.join(dir, ".haven-hmr-gate");
       writeFileSync(markerPath, String(Date.now() + 1000));
 
-      const plugin = havenHmrGate({ markerPath });
-      (plugin.configureServer as (s: ViteDevServer) => void)(server);
-      const handleHotUpdate = plugin.handleHotUpdate as (ctx: HmrContext) => unknown;
+      const gate = createHmrGate({ markerPath });
+      gate.attach(server);
+      const handleHotUpdate = (modules: string[]) => gate.hotUpdate(modules);
 
       expect(handleHotUpdate(fakeCtx())).toEqual([]);
       expect(sentMessages).toHaveLength(0);

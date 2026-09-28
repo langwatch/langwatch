@@ -16,6 +16,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authRequestHeadersFact, authTrpcTransport, callerEmailFact } from "../auth.trpc.ts";
 import { authTrpcTestMembers, type AuthTrpcTestContext } from "./auth.trpc.harness.ts";
 
+const CHALLENGE = "c".repeat(43);
 const isWithinBudget = vi.fn<AuthApi["isWithinBudget"]>();
 const route = vi.fn<AuthApi["route"]>();
 const addressIsRegistered = vi.fn<AuthApi["addressIsRegistered"]>();
@@ -254,11 +255,16 @@ describe("the signed-out front door", () => {
     it("hands over the caller and the address the session named, never one the caller typed", async () => {
       const signedIn = router.createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
 
-      await expect(signedIn.sendMyAddressConfirmation({})).resolves.toEqual({ sent: true });
+      sendMyAddressConfirmation.mockResolvedValueOnce({ identifierId: "idf_own" });
+
+      await expect(
+        signedIn.sendMyAddressConfirmation({ codeChallenge: CHALLENGE }),
+      ).resolves.toEqual({ sent: true, identifierId: "idf_own" });
 
       expect(sendMyAddressConfirmation).toHaveBeenCalledWith({
         actorId: "user_ana",
         email: "ana@acme.com",
+        codeChallenge: CHALLENGE,
       });
     });
 
@@ -266,21 +272,41 @@ describe("the signed-out front door", () => {
       const caller = router.createCaller({ actor: { id: "user_ana" }, email: null });
       sendMyAddressConfirmation.mockRejectedValueOnce(new NoAddressToConfirmError());
 
-      await expect(caller.sendMyAddressConfirmation({})).rejects.toThrow(
+      await expect(caller.sendMyAddressConfirmation({ codeChallenge: CHALLENGE })).rejects.toThrow(
         "This account has no email address to confirm.",
       );
-      expect(sendMyAddressConfirmation).toHaveBeenCalledWith({ actorId: "user_ana", email: null });
+      expect(sendMyAddressConfirmation).toHaveBeenCalledWith({
+        actorId: "user_ana",
+        email: null,
+        codeChallenge: CHALLENGE,
+      });
+    });
+
+    it("refuses a challenge that is not an S256 digest before reaching the app", async () => {
+      const signedIn = router.createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
+
+      await expect(
+        signedIn.sendMyAddressConfirmation({ codeChallenge: "plain" }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+      });
+      expect(sendMyAddressConfirmation).not.toHaveBeenCalled();
     });
   });
 
   describe("when a signed-in person asks whether their own address is confirmed", () => {
     it("asks about the address the session named, never one the caller typed", async () => {
-      getMyAddressConfirmation.mockResolvedValueOnce({ email: "ana@acme.com", confirmed: true });
+      getMyAddressConfirmation.mockResolvedValueOnce({
+        email: "ana@acme.com",
+        confirmed: true,
+        canSendConfirmation: true,
+      });
       const signedIn = router.createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
 
       await expect(signedIn.myAddressConfirmation()).resolves.toEqual({
         email: "ana@acme.com",
         confirmed: true,
+        canSendConfirmation: true,
       });
       expect(getMyAddressConfirmation).toHaveBeenCalledWith({ email: "ana@acme.com" });
     });

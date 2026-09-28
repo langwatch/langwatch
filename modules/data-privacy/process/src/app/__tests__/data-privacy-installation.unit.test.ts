@@ -11,7 +11,6 @@ import { dataPrivacyServer } from "../../data-privacy.server.ts";
 import {
   createDataPrivacyTestProjects,
   installableDataPrivacy,
-  dataPrivacyTestInfrastructure,
   dataPrivacyTestGraph,
 } from "./data-privacy.fixture.ts";
 
@@ -20,8 +19,7 @@ const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
 
 function process(role: "api" | "worker", googleCredentials?: string) {
   return createApp({ role })
-    .withModules([installableDataPrivacy(googleCredentials)])
-    .withMember("dataPrivacy", dataPrivacyTestInfrastructure())
+    .withModules([installableDataPrivacy({ googleCredentials })])
     .withMember("nodeEnvironment", undefined)
     .withConfig({ "data-privacy": { googleDlpDisabled: undefined, enforcement: undefined } })
     .provide({

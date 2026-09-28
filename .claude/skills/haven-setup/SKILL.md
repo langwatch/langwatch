@@ -1,13 +1,13 @@
 ---
 name: haven-setup
-description: "Bring the LangWatch dev stack up through thuishaven (make haven up) and get past the failures that look like a slow boot: the portless proxy's port and root-owned state, .localhost DNS drift on WSL2, the langy worker's missing opencode binary and TLS-refused egress, stale k8s callback URLs in .env, and a frozen log. The command reference and the no-container flags are in the root CLAUDE.md; this is only what CLAUDE.md does not say."
+description: "Bring the LangWatch dev stack up through thuishaven (make haven up) and get past the failures that look like a slow boot: the portless proxy's port and root-owned state, .localhost DNS drift on WSL2, the langy worker's missing opencode binary and TLS-refused egress, stale k8s callback URLs in .env, and a frozen log. The command reference and the no-container flags are in dev/docs/LOCAL_STACK.md; this is only what that doc does not say."
 user-invocable: true
 argument-hint: "[--with-observability] [--managed-db] [--foreground]"
 ---
 
 # haven, the parts that bite
 
-Read the "Local dev by hostname" section of the root `CLAUDE.md` first: it has
+Read `dev/docs/LOCAL_STACK.md` first: it has
 `make haven up`, `make haven status`, `haven logs`, the `LANGWATCH_HAVEN_CH=0` /
 `LANGWATCH_HAVEN_OBS=0` / `LANGY_UNSAFE_HOST_ACCESS=1` no-container path, and the
 `--agent` flag. `dev/haven.mk` and `tools/thuishaven/README.md` are the reference.

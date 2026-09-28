@@ -17,7 +17,7 @@ import (
 // avoid re-deriving the stacks' URLs.
 func writeRunPlan(t *testing.T, runDir string, plan RunnerPlan) {
 	t.Helper()
-	outDir := filepath.Join(runDir, "shots")
+	outDir := filepath.Join(runDir, "shots", string(EditionEnterprise))
 	if err := os.MkdirAll(outDir, 0o750); err != nil {
 		t.Fatalf("mkdir shots dir: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestATriageLoopRecapturesOnlyTheRoutesItFixed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenFindingsFile: %v", err)
 	}
-	if err := writer.WriteLine(Finding{Kind: FindingChanged, Route: "/{slug}/settings"}); err != nil {
+	if err := writer.WriteLine(Finding{Kind: ClassChanged, Route: "/{slug}/settings"}); err != nil {
 		t.Fatalf("seed WriteLine: %v", err)
 	}
 	writer.Close()
@@ -114,7 +114,7 @@ func TestATriageLoopRecapturesOnlyTheRoutesItFixed(t *testing.T) {
 					t.Fatalf("expected the seeded line plus at least the recapture's own, got %d:\n%s", len(lines), raw)
 				}
 				var first Finding
-				if err := json.Unmarshal([]byte(lines[0]), &first); err != nil || first.Route != "/{slug}/settings" || first.Kind != FindingChanged {
+				if err := json.Unmarshal([]byte(lines[0]), &first); err != nil || first.Route != "/{slug}/settings" || first.Kind != ClassChanged {
 					t.Fatalf("first (seeded) line was overwritten: %s", lines[0])
 				}
 			})

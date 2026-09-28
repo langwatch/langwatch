@@ -1,4 +1,3 @@
-import { InMemoryProcessStore } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 
 import { type WebhookId, type WebhookSecret } from "../../app/webhook.app.ts";
@@ -41,7 +40,6 @@ export class MemoryWebhookRepositories {
       events: MemoryWebhookEventsRepository.create(),
       retention: MemoryWebhookRetentionRepository.create({ database }),
       tenants: MemoryWebhookTenantsRepository.create(),
-      processStore: InMemoryProcessStore.createForLocalDevelopment(),
     };
   }
 }

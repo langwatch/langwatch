@@ -10,6 +10,7 @@ import { ChildProcessJobDataSchema, type ChildProcessJobData } from "@langwatch/
 import {
   createChildProcessLogger,
   decodeScenarioEgressPolicy,
+  createVoiceTransportRegistry,
   executeScenarioChild,
   flushScenarioOtelTraces,
   formatScenarioChildError,
@@ -21,6 +22,7 @@ import {
 
 import {
   readScenarioChildEnvironment,
+  readScenarioChildVoiceEnvironment,
   scenarioChildEnvironmentSource,
   type ScenarioChildEnvironment,
 } from "./config.ts";
@@ -98,6 +100,7 @@ async function main(): Promise<void> {
       httpPort: new WorkerScenarioChildHttp(environment),
       logger,
       nlpTimeouts: HttpNlpFetchChannel.timeoutsFromEnvironment(source),
+      voiceTransports: createVoiceTransportRegistry(readScenarioChildVoiceEnvironment(source)),
     },
   });
 

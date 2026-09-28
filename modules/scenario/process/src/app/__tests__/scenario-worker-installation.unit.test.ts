@@ -57,6 +57,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
     .withMember("nlpCodeBlockTimeoutSeconds", undefined)
     .withMember("isSaas", false)
     .withMember("nodeEnvironment", "test")
+    .withMember("rawSocketPort", 0)
     .withMember("scenarioChildBundle", {
       packageRoot: "/app/apps/scenario-child",
       sourcePath: "/app/apps/scenario-child/src/main.ts",

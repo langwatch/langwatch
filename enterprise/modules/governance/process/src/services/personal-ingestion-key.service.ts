@@ -111,7 +111,7 @@ export class PersonalIngestionKeyService {
     }
 
     const workspace = await this.organizations
-      .getPersonalWorkspace(input)
+      .getPersonalWorkspace({ userId: input.userId, organizationId: input.organizationId })
       .catch((error: unknown) => {
         if (TeamNotFoundError.is(error)) return null;
         throw error;

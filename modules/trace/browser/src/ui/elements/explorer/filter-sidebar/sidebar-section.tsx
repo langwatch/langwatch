@@ -73,6 +73,175 @@ const DRAG_HANDLE_GLYPH = "10px";
 // places the grip's right edge flush against it (= the gutter width).
 const DRAG_HANDLE_GUTTER_OFFSET = "-8px";
 
+function stopped(action: () => void) {
+  return (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    action();
+  };
+}
+
+/** The reorder grip, seated in the section's left gutter so the title aligns with the rows. */
+function SectionDragGrip({
+  title,
+  dragHandleProps,
+}: {
+  title: string;
+  dragHandleProps: React.HTMLAttributes<HTMLDivElement>;
+}) {
+  return (
+    <Box
+      {...dragHandleProps}
+      position="absolute"
+      insetInlineStart={DRAG_HANDLE_GUTTER_OFFSET}
+      top="50%"
+      transform="translateY(-50%)"
+      cursor="grab"
+      color="fg.subtle"
+      opacity={0.4}
+      transition="opacity 100ms ease, color 100ms ease"
+      _groupHover={{ opacity: 0.75 }}
+      _hover={{ opacity: 1, color: "fg" }}
+      _active={{ cursor: "grabbing" }}
+      _focusVisible={{
+        opacity: 1,
+        color: "fg",
+        outline: "2px solid",
+        outlineColor: "blue.focusRing",
+        outlineOffset: "1px",
+        borderRadius: "sm",
+      }}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      width={DRAG_HANDLE_HIT_AREA}
+      height={DRAG_HANDLE_HIT_AREA}
+      flexShrink={0}
+      aria-label={`Reorder ${title}: press Space to pick up, then arrow keys`}
+      title="Drag, or press Space to pick up with the keyboard"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Icon boxSize={DRAG_HANDLE_GLYPH}>
+        <GripVertical />
+      </Icon>
+    </Box>
+  );
+}
+
+function SectionTitle({
+  title,
+  icon: SectionIcon,
+  hasActive,
+}: {
+  title: string;
+  icon?: React.ElementType;
+  hasActive: boolean;
+}) {
+  return (
+    <HStack gap={1.5} minWidth={0} width="full" flex={1}>
+      {SectionIcon && (
+        <Icon
+          boxSize="12px"
+          flexShrink={0}
+          color={hasActive ? "fg" : "fg.subtle"}
+          _hover={{ fill: "fg" }}
+        >
+          <SectionIcon />
+        </Icon>
+      )}
+      <Text
+        textStyle="2xs"
+        fontWeight={hasActive ? "600" : "500"}
+        color={hasActive ? "fg" : "fg.subtle"}
+        textTransform="uppercase"
+        letterSpacing="0.02em"
+        transition="color 100ms ease"
+        // The Chakra Button recipe sets `text-align: center`, which the title
+        // inherits.
+        textAlign="start"
+        _hover={{ color: "fg" }}
+        // flex+minWidth=0: title claims width, truncate engages late.
+        flex={1}
+        minWidth={0}
+        truncate
+      >
+        {title}
+      </Text>
+    </HStack>
+  );
+}
+
+function SearchToggle({
+  title,
+  open,
+  onToggle,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      aria-label={open ? `Hide ${title} value search` : `Search ${title} values`}
+      aria-pressed={open}
+      width="16px"
+      height="16px"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      borderRadius="sm"
+      color={open ? "fg" : "fg.subtle"}
+      bg={open ? "bg.muted" : undefined}
+      cursor="pointer"
+      _hover={{ color: "fg", bg: "bg.muted" }}
+      transition="background 100ms ease, color 100ms ease"
+      onClick={stopped(onToggle)}
+    >
+      <Icon boxSize="11px">
+        <Search />
+      </Icon>
+    </chakra.button>
+  );
+}
+
+/** A numeric facet's slider/tick-list switch; the glyph shows the mode it switches to. */
+function ModeToggle({
+  title,
+  mode,
+  onToggle,
+}: {
+  title: string;
+  mode: "range" | "discrete";
+  onToggle: () => void;
+}) {
+  const isDiscrete = mode === "discrete";
+  return (
+    <Box width="16px" height="16px" flexShrink={0}>
+      <chakra.button
+        type="button"
+        aria-label={
+          isDiscrete ? `Show ${title} as a range slider` : `Show ${title} as a value list`
+        }
+        aria-pressed={isDiscrete}
+        width="16px"
+        height="16px"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        borderRadius="sm"
+        color="fg.subtle"
+        cursor="pointer"
+        _hover={{ color: "fg", bg: "bg.muted" }}
+        transition="background 100ms ease, color 100ms ease"
+        onClick={stopped(onToggle)}
+      >
+        <Icon boxSize="11px">{isDiscrete ? <SlidersHorizontal /> : <List />}</Icon>
+      </chakra.button>
+    </Box>
+  );
+}
+
 const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
   title,
   icon: SectionIcon,
@@ -99,16 +268,9 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
     onOpenChange?.(next);
   };
 
-  const handleTriggerClick: React.MouseEventHandler<HTMLButtonElement> = (e) => {
-    if (!e.shiftKey || !onShiftToggle) return;
-    e.preventDefault();
-    e.stopPropagation();
-    onShiftToggle(!effectiveOpen);
-  };
-
-  const handleTriggerKeyDown: React.KeyboardEventHandler<HTMLButtonElement> = (e) => {
-    if (!e.shiftKey || !onShiftToggle) return;
-    if (e.key !== "Enter" && e.key !== " ") return;
+  // Shift-click or Shift+Enter/Space on the title opens or closes every section.
+  const toggleAllOnShift = (e: React.MouseEvent | React.KeyboardEvent, isActivation: boolean) => {
+    if (!e.shiftKey || !onShiftToggle || !isActivation) return;
     e.preventDefault();
     e.stopPropagation();
     onShiftToggle(!effectiveOpen);
@@ -123,43 +285,7 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
             in-flow header content (icon + title) starts at the section's
             content edge, aligning with the value rows beneath (T20). */}
         <HStack gap={1} width="full" align="center" position="relative">
-          {dragHandleProps && (
-            <Box
-              {...dragHandleProps}
-              position="absolute"
-              insetInlineStart={DRAG_HANDLE_GUTTER_OFFSET}
-              top="50%"
-              transform="translateY(-50%)"
-              cursor="grab"
-              color="fg.subtle"
-              opacity={0.4}
-              transition="opacity 100ms ease, color 100ms ease"
-              _groupHover={{ opacity: 0.75 }}
-              _hover={{ opacity: 1, color: "fg" }}
-              _active={{ cursor: "grabbing" }}
-              _focusVisible={{
-                opacity: 1,
-                color: "fg",
-                outline: "2px solid",
-                outlineColor: "blue.focusRing",
-                outlineOffset: "1px",
-                borderRadius: "sm",
-              }}
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              width={DRAG_HANDLE_HIT_AREA}
-              height={DRAG_HANDLE_HIT_AREA}
-              flexShrink={0}
-              aria-label={`Reorder ${title}: press Space to pick up, then arrow keys`}
-              title="Drag, or press Space to pick up with the keyboard"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Icon boxSize={DRAG_HANDLE_GLYPH}>
-                <GripVertical />
-              </Icon>
-            </Box>
-          )}
+          {dragHandleProps && <SectionDragGrip title={title} dragHandleProps={dragHandleProps} />}
           <Collapsible.Trigger asChild>
             <Button
               variant="plain"
@@ -172,39 +298,10 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
               minHeight="unset"
               fontWeight="normal"
               title="Shift-click (or Shift+Enter) to expand or collapse all sections"
-              onClick={handleTriggerClick}
-              onKeyDown={handleTriggerKeyDown}
+              onClick={(e) => toggleAllOnShift(e, true)}
+              onKeyDown={(e) => toggleAllOnShift(e, e.key === "Enter" || e.key === " ")}
             >
-              <HStack gap={1.5} minWidth={0} width="full" flex={1}>
-                {SectionIcon && (
-                  <Icon
-                    boxSize="12px"
-                    flexShrink={0}
-                    color={hasActive ? "fg" : "fg.subtle"}
-                    _hover={{ fill: "fg" }}
-                  >
-                    <SectionIcon />
-                  </Icon>
-                )}
-                <Text
-                  textStyle="2xs"
-                  fontWeight={hasActive ? "600" : "500"}
-                  color={hasActive ? "fg" : "fg.subtle"}
-                  textTransform="uppercase"
-                  letterSpacing="0.02em"
-                  transition="color 100ms ease"
-                  // The Chakra Button recipe sets `text-align: center`, which the title
-                  // inherits.
-                  textAlign="start"
-                  _hover={{ color: "fg" }}
-                  // flex+minWidth=0: title claims width, truncate engages late.
-                  flex={1}
-                  minWidth={0}
-                  truncate
-                >
-                  {title}
-                </Text>
-              </HStack>
+              <SectionTitle title={title} icon={SectionIcon} hasActive={hasActive} />
             </Button>
           </Collapsible.Trigger>
           {/* Selection indicator ("any of" hint) — rendered as a sibling of
@@ -229,75 +326,26 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
           {/* Chevron and search toggle as siblings: fixed 16px slots, consistent position. */}
           <Box width="16px" height="16px" flexShrink={0}>
             {searchToggleProps && (
-              <chakra.button
-                type="button"
-                aria-label={
-                  searchToggleProps.open ? `Hide ${title} value search` : `Search ${title} values`
-                }
-                aria-pressed={searchToggleProps.open}
-                width="16px"
-                height="16px"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                borderRadius="sm"
-                color={searchToggleProps.open ? "fg" : "fg.subtle"}
-                bg={searchToggleProps.open ? "bg.muted" : undefined}
-                cursor="pointer"
-                _hover={{ color: "fg", bg: "bg.muted" }}
-                transition="background 100ms ease, color 100ms ease"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  // Pressing search on a collapsed section also expands it — otherwise
-                  // the input toggles open behind a closed Collapsible and the user
-                  // types into invisible chrome.
-                  if (!searchToggleProps.open && !effectiveOpen) {
-                    handleOpenChange(true);
-                  }
+              <SearchToggle
+                title={title}
+                open={searchToggleProps.open}
+                onToggle={() => {
+                  // Searching a collapsed section opens it, or the input would sit hidden.
+                  if (!searchToggleProps.open && !effectiveOpen) handleOpenChange(true);
                   searchToggleProps.onToggle();
                 }}
-              >
-                <Icon boxSize="11px">
-                  <Search />
-                </Icon>
-              </chakra.button>
+              />
             )}
           </Box>
           {/* Numeric facets get a presentation toggle (slider ↔ tick-list)
               between search and the chevron. The glyph shows the OTHER mode —
               what you'd switch to. */}
           {modeToggleProps && (
-            <Box width="16px" height="16px" flexShrink={0}>
-              <chakra.button
-                type="button"
-                aria-label={
-                  modeToggleProps.mode === "discrete"
-                    ? `Show ${title} as a range slider`
-                    : `Show ${title} as a value list`
-                }
-                aria-pressed={modeToggleProps.mode === "discrete"}
-                width="16px"
-                height="16px"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                borderRadius="sm"
-                color="fg.subtle"
-                cursor="pointer"
-                _hover={{ color: "fg", bg: "bg.muted" }}
-                transition="background 100ms ease, color 100ms ease"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  modeToggleProps.onToggle();
-                }}
-              >
-                <Icon boxSize="11px">
-                  {modeToggleProps.mode === "discrete" ? <SlidersHorizontal /> : <List />}
-                </Icon>
-              </chakra.button>
-            </Box>
+            <ModeToggle
+              title={title}
+              mode={modeToggleProps.mode}
+              onToggle={modeToggleProps.onToggle}
+            />
           )}
           <chakra.button
             type="button"
@@ -312,11 +360,7 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
             cursor="pointer"
             _hover={{ color: "fg" }}
             transition="color 100ms ease"
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              handleOpenChange(!effectiveOpen);
-            }}
+            onClick={stopped(() => handleOpenChange(!effectiveOpen))}
           >
             <Icon boxSize="12px">{effectiveOpen ? <ChevronUp /> : <ChevronDown />}</Icon>
           </chakra.button>

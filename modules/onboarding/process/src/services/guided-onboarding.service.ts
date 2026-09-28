@@ -81,6 +81,25 @@ export class GuidedOnboardingService {
     return { ...record.state, variant: record.variant };
   }
 
+  /** Tracks one event a peer's reaction names, never failing that reaction. */
+  trackEvent(input: {
+    userId: string;
+    event: string;
+    projectId: string | undefined;
+    properties: Readonly<Record<string, unknown>>;
+    uuid: string | undefined;
+  }): void {
+    this.events.track({
+      userId: input.userId,
+      event: input.event,
+      properties:
+        input.projectId === undefined
+          ? input.properties
+          : { ...input.properties, projectId: input.projectId },
+      ...(input.uuid === undefined ? {} : { uuid: input.uuid }),
+    });
+  }
+
   /** The picks from the value screen, in order. The first one starts now. */
   async recordPaths(
     actor: GuidedOnboardingActor,

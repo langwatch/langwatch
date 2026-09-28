@@ -46,7 +46,7 @@ export const browserSessionSchema = z
   .strict();
 export type BrowserSession = z.infer<typeof browserSessionSchema>;
 
-/** Whether Better Auth accepts a request's session token; no token, or no sign-in door, is anonymous. */
+/** Whether Better Auth accepts a session token; no token or no sign-in door reads as anonymous. */
 export type BrowserSessionVerification =
   | { kind: "verified"; verified: VerifiedBrowserSession }
   | { kind: "anonymous" };

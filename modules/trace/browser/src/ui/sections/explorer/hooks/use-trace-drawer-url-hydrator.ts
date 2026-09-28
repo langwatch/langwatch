@@ -1,3 +1,4 @@
+import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
 import { useEffect, useRef } from "react";
 
 import {
@@ -10,7 +11,6 @@ import {
   selectIsTraceEditDirty,
   useTraceEditStore,
 } from "../../../../behavior/trace-edit.store.ts";
-import { useDrawer, useDrawerParams } from "../../../../behavior/use-drawer.ts";
 import { enterTraceEditMode, exitTraceEditMode } from "../utils/trace-edit-mode.ts";
 
 /**

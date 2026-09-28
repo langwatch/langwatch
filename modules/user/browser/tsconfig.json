@@ -12,11 +12,9 @@
     "noImplicitReturns": true,
     "verbatimModuleSyntax": true,
     "paths": {
+      "@langwatch/auth-contract": ["../../auth/contract/src/index.ts"],
       "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
       "@langwatch/coding-agent-contract": ["../../coding-agent/contract/src/index.ts"],
-      "@langwatch/coding-agent-browser/surfaces/activity": [
-        "../../coding-agent/browser/src/activity.ts"
-      ],
       "@langwatch/enterprise-governance-contract": [
         "../../../enterprise/modules/governance/contract/src/index.ts"
       ],
@@ -34,10 +32,10 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/browser-host/tsconfig.build.json"
+      "path": "../../auth/contract/tsconfig.build.json"
     },
     {
-      "path": "../../coding-agent/browser/tsconfig.build.json"
+      "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
       "path": "../../coding-agent/browser-kit/tsconfig.build.json"

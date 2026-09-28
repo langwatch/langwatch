@@ -23,7 +23,7 @@ import { TraceApi } from "@langwatch/trace-contract";
 
 import { createCodingAgentLogFactsDispatchSubscriber } from "../eventing/coding-agent-log-facts-dispatch.subscriber.ts";
 import { LogProcessingAdapter, type LogProcessingPipeline } from "../eventing/log.pipeline.ts";
-import { createLogClickHouseResolver } from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
+import { ClickHouseCanonicalLogRecordAppendRepository } from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
 import { ClickHouseCanonicalLogRecordRepository } from "../repositories/clickhouse/clickhouse.canonical-log-record.repository.ts";
 import { CanonicalLogService } from "../services/canonical-log.service.ts";
 import { LogRequestCollectionService } from "../services/log-request-collection.service.ts";
@@ -75,7 +75,7 @@ export class LogApp implements LogApiContract {
 
   static create({ dependencies, members, config }: LogSetup): LogApp {
     const repository = ClickHouseCanonicalLogRecordRepository.create({
-      resolveClient: createLogClickHouseResolver(members.clickhouse),
+      resolveClient: ClickHouseCanonicalLogRecordAppendRepository.resolverOver(members.clickhouse),
       defaultRetentionDays: LOG_DEFAULT_RETENTION_DAYS,
       defaultReadLimit: LOG_DEFAULT_READ_LIMIT,
     });

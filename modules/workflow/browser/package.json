@@ -13,45 +13,15 @@
       "types": "./dist/workflow.web.d.ts",
       "default": "./src/workflow.web.ts"
     },
-    "./generate-api-snippet-dialog": {
-      "langwatch-declaration-source": "./src/generate-api-snippet-dialog.ts",
-      "types": "./dist/generate-api-snippet-dialog.d.ts",
-      "default": "./src/generate-api-snippet-dialog.ts"
-    },
     "./hoverable-big-text": {
       "langwatch-declaration-source": "./src/hoverable-big-text.ts",
       "types": "./dist/hoverable-big-text.d.ts",
       "default": "./src/hoverable-big-text.ts"
     },
-    "./run-via-api-tabs": {
-      "langwatch-declaration-source": "./src/run-via-api-tabs.ts",
-      "types": "./dist/run-via-api-tabs.d.ts",
-      "default": "./src/run-via-api-tabs.ts"
-    },
-    "./surfaces/deja-view-link": {
-      "langwatch-declaration-source": "./src/behavior/use-deja-view-link.ts",
-      "types": "./dist/behavior/use-deja-view-link.d.ts",
-      "default": "./src/behavior/use-deja-view-link.ts"
-    },
     "./feature-flag": {
       "langwatch-declaration-source": "./src/feature-flag.ts",
       "types": "./dist/feature-flag.d.ts",
       "default": "./src/feature-flag.ts"
-    },
-    "./version-history": {
-      "langwatch-declaration-source": "./src/version-history.ts",
-      "types": "./dist/version-history.d.ts",
-      "default": "./src/version-history.ts"
-    },
-    "./studio-scope": {
-      "langwatch-declaration-source": "./src/studio-scope.ts",
-      "types": "./dist/studio-scope.d.ts",
-      "default": "./src/studio-scope.ts"
-    },
-    "./fetch-sse": {
-      "langwatch-declaration-source": "./src/fetch-sse.ts",
-      "types": "./dist/fetch-sse.d.ts",
-      "default": "./src/fetch-sse.ts"
     }
   },
   "scripts": {
@@ -90,7 +60,6 @@
     "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/workflow-browser-kit": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
-    "@microsoft/fetch-event-source": "^2.0.1",
     "@monaco-editor/react": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@trpc/client": "catalog:",

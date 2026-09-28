@@ -69,18 +69,20 @@ describe("CommandBarLangyMode", () => {
   it("uses Escape as a mode-level back action without closing the parent surface", () => {
     const onExit = vi.fn();
     const parentKeyDown = vi.fn();
+    // The parent surface listens outside the mode's own tree, as the palette does.
+    const parent = document.body.appendChild(document.createElement("div"));
+    parent.addEventListener("keydown", parentKeyDown);
     render(
       <ChakraProvider value={defaultSystem}>
-        <div onKeyDown={parentKeyDown}>
-          <CommandBarLangyMode
-            query="question"
-            onQueryChange={() => undefined}
-            onSubmit={() => undefined}
-            onExit={onExit}
-            exiting={false}
-          />
-        </div>
+        <CommandBarLangyMode
+          query="question"
+          onQueryChange={() => undefined}
+          onSubmit={() => undefined}
+          onExit={onExit}
+          exiting={false}
+        />
       </ChakraProvider>,
+      { container: parent.appendChild(document.createElement("div")) },
     );
 
     fireEvent.keyDown(screen.getByRole("textbox", { name: "Ask Langy" }), {

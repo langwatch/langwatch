@@ -23,6 +23,11 @@ export const scenarioWeb = defineWebModule("scenario")
     },
   })
   .withDrawers({
+    suiteEditor: {
+      load: async () => ({
+        default: (await import("./ui/sections/suites/suite-form-drawer.tsx")).SuiteFormDrawer,
+      }),
+    },
     scenarioEditor: {
       load: async () => ({
         default: (await import("./ui/sections/scenarios/scenario-form-drawer.tsx"))
@@ -50,8 +55,13 @@ export const scenarioWeb = defineWebModule("scenario")
       }),
     },
   })
-  /** The Talk to it call panel and the parameter line, lent to agent (§3.4 rule 7). */
+  /** The call panel and parameter line lent to agent, the media renderer to trace (§3.4 rule 7). */
   .withCapabilities({
+    mediaPart: {
+      load: async () => ({
+        default: (await import("./ui/sections/media-part.tsx")).MediaPart,
+      }),
+    },
     parameterLineField: {
       load: async () => ({
         default: (await import("./ui/sections/agent-testing/run/lent-parameter-line-field.tsx"))

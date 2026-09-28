@@ -1,3 +1,4 @@
+import type { WireOf } from "@langwatch/api/web";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
 import type { Component, Field, NodeWithOptionalPosition } from "@langwatch/workflow-contract";
@@ -10,7 +11,7 @@ type SavedEvaluator = { id: string; name: string; evaluatorType?: string };
 type EvaluatorSaveResult = boolean | undefined;
 
 export type EvaluatorPickerCallbacks = {
-  onSelect: (evaluator: EvaluatorWithFields) => void;
+  onSelect: (evaluator: WireOf<EvaluatorWithFields>) => void;
   onCreateNew: () => void;
   onClose: () => void;
 };
@@ -75,7 +76,7 @@ function computeFieldsFromEvaluatorType(evaluatorType: string): {
 }
 
 /** The node's input and output fields, read off the evaluator the user picked. */
-function fieldsFromPickedEvaluator(evaluator: EvaluatorWithFields): {
+function fieldsFromPickedEvaluator(evaluator: WireOf<EvaluatorWithFields>): {
   inputs: Field[];
   outputs: Field[];
 } {

@@ -259,12 +259,14 @@ export class MemoryProjectRepository implements ProjectRepository {
     page: number;
     limit: number;
     projectIds?: string[];
+    includeGovernance?: boolean;
   }): Promise<PaginatedProjects> {
     const matching = this.#database
       .projects()
       .filter(
         (project) =>
           project.archivedAt === null &&
+          (input.includeGovernance === true || project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) &&
           this.#database.isInOrganization(project, input.organizationId) &&
           (!input.projectIds || input.projectIds.includes(project.id)),
       )
@@ -277,14 +279,18 @@ export class MemoryProjectRepository implements ProjectRepository {
     };
   }
 
-  async findAllByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
+  async findAllByTeam(input: {
+    organizationId: string;
+    teamId: string;
+    includeGovernance?: boolean;
+  }): Promise<Project[]> {
     return this.#database
       .projects()
       .filter(
         (project) =>
           project.teamId === input.teamId &&
           project.archivedAt === null &&
-          project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          (input.includeGovernance === true || project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) &&
           this.#database.isInOrganization(project, input.organizationId),
       )
       .toSorted(newestFirst);

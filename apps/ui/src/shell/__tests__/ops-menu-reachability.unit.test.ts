@@ -1,9 +1,5 @@
-import {
-  backofficeGroup,
-  isSettingsMenuItemActive,
-  opsGroup,
-  type SettingsMenuGroup,
-} from "@langwatch/navigation-browser/chrome";
+import type { SettingsMenuGroup } from "@langwatch/navigation-browser/chrome";
+import { navigationWeb } from "@langwatch/navigation-browser/declaration";
 /**
  * Every internal ops page the route table registers must be reachable from the settings
  * menu.
@@ -12,6 +8,9 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
+
+const { backofficeGroup, isSettingsMenuItemActive, opsGroup } =
+  await navigationWeb.installation.capabilities.chrome.load();
 
 /**
  * Every `/ops` address the route table registers. Parameter segments are

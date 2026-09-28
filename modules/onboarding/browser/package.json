@@ -23,7 +23,6 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
-    "@langwatch/model-provider-browser": "workspace:*",
     "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/onboarding-browser-kit": "workspace:*",

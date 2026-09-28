@@ -72,7 +72,7 @@ func BuildReport(changes []openapidiff.Change, result ProbeResult) Report {
 		// improved-error finding is drift the tool grants on sight — see
 		// improved-error.go and the README's "Improved-error acceptance": none
 		// of the three is a behavioral regression to fail the run over.
-		if finding.Kind != FindingSkipped && finding.Kind != FindingUnverifiedShape && finding.Kind != FindingErrorImproved {
+		if finding.Kind != FindingSkipped && finding.Kind != FindingUnverifiedShape && finding.Kind != FindingErrorImproved && finding.Kind != FindingRuled {
 			report.Differences++
 		}
 	}
@@ -102,6 +102,7 @@ var findingKindOrder = []string{
 	FindingProbeFailed,
 	FindingSkipped,
 	FindingUnverifiedShape,
+	FindingRuled,
 }
 
 // WriteHumanSummary renders the deterministic stdout summary: spec changes
@@ -194,13 +195,19 @@ func writeTotalsLine(output *strings.Builder, report Report) {
 	}
 	unverified := 0
 	improved := 0
+	ruled := 0
 	for _, finding := range report.Findings {
 		switch finding.Kind {
 		case FindingUnverifiedShape:
 			unverified++
 		case FindingErrorImproved:
 			improved++
+		case FindingRuled:
+			ruled++
 		}
+	}
+	if ruled > 0 {
+		fmt.Fprintf(output, "ruled: %d body difference(s) triaged as not defects, each under its reason (probe-rulings.go), not counted\n", ruled)
 	}
 	if unverified > 0 {
 		fmt.Fprintf(output, "unverified: %d list endpoints returned empty on both sides (item shape not exercised)\n", unverified)

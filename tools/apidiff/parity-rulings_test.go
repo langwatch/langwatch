@@ -219,3 +219,24 @@ func TestRuledOutServedRoutesAreRetired(t *testing.T) {
 		t.Error("hotel_bot is being ported, not retired")
 	}
 }
+
+func TestLiterallyServedMainRoutesAreIgnored(t *testing.T) {
+	for _, path := range []string{"/api/evaluations/v3/*", "/api/internal/gateway/connect/:operation"} {
+		if ignoreReason(path) != ignoreServedLiterally {
+			t.Errorf("%s: reason %q", path, ignoreReason(path))
+		}
+	}
+	if ignoreReason("/api/unsubscribe") != "" {
+		t.Error("unsubscribe is a real gap, not ignored")
+	}
+}
+
+func TestAMainAnyMethodRouteIsCoveredByAnyDeclaredMethod(t *testing.T) {
+	index := indexServed([]ServedRoute{{Method: "POST", Path: "/api/unsubscribe"}})
+	if !index.covers("ALL", routeKey("/api/unsubscribe")) {
+		t.Fatal("a declared POST should cover main's ALL: the method guard answers the rest")
+	}
+	if index.covers("ALL", routeKey("/api/other")) {
+		t.Fatal("an undeclared path was covered")
+	}
+}

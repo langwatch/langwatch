@@ -9,30 +9,18 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { type AgentInputBinding, type Field as AgentField } from "@langwatch/agent-contract";
+import type {
+  UiAgentWorkflowEditorDrawerProps,
+  UiAgentWorkflowMappingProps,
+} from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ArrowLeft } from "lucide-react";
-import type { ReactNode } from "react";
 
-import {
-  useWorkflowAgentEditor,
-  type WorkflowAgentEditorOptions,
-} from "../../behavior/use-workflow-agent-editor.ts";
+import { useWorkflowAgentEditor } from "../../behavior/use-workflow-agent-editor.ts";
 
-export interface AgentWorkflowMappingProps {
-  inputs: AgentField[];
-  outputs: AgentField[];
-  mappings: Record<string, AgentInputBinding>;
-  outputField?: string;
-  onMappingChange(identifier: string, mapping: AgentInputBinding | undefined): void;
-  onOutputFieldChange(field: string | undefined): void;
-}
+export type AgentWorkflowMappingProps = UiAgentWorkflowMappingProps;
 
-export interface AgentWorkflowEditorDrawerProps extends WorkflowAgentEditorOptions {
-  workflowCard?: ReactNode;
-  renderMappings(props: AgentWorkflowMappingProps): ReactNode;
-  onGoBack?: () => void;
-}
+export type AgentWorkflowEditorDrawerProps = UiAgentWorkflowEditorDrawerProps;
 
 export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps) {
   const form = useWorkflowAgentEditor(props);

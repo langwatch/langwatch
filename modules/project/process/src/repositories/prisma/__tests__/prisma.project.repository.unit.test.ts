@@ -99,6 +99,28 @@ describe("PrismaProjectRepository trace destinations", () => {
   });
 });
 
+describe("PrismaProjectRepository organization listing", () => {
+  const where = (includeGovernance?: boolean) => ({
+    archivedAt: null,
+    team: { organizationId: "org_1" },
+    ...(includeGovernance ? {} : { kind: { not: "internal_governance" } }),
+  });
+
+  it.each([undefined, true])("filters the governance kind unless asked (%s)", async (flag) => {
+    const { repository, project } = repositoryWithQueries({ findFirst: [] });
+
+    await repository.listAllByOrganization({
+      organizationId: "org_1",
+      page: 1,
+      limit: 5,
+      includeGovernance: flag,
+    });
+
+    expect(project.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: where(flag) }));
+    expect(project.count).toHaveBeenCalledWith({ where: where(flag) });
+  });
+});
+
 describe("PrismaProjectRepository.tryGetTraceDestination", () => {
   it("follows an archived stored pointer", async () => {
     const archived = { ...destination, archivedAt: new Date("2026-01-01T00:00:00.000Z") };

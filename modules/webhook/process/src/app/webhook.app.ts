@@ -1,5 +1,5 @@
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender } from "@langwatch/eventing";
+import type { EventingCommandSender, ProcessStore } from "@langwatch/eventing";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 /**
  * The webhook feature's application: what both doors (tRPC and REST) call.
@@ -100,8 +100,8 @@ export type WebhookTestDispatch = (
 export interface WebhookAppDependencies {
   /** Endpoint mutation and read, constructed once with the process store. */
   endpoints: WebhookEndpointRepository;
-  /** Endpoint delivery health, sharing the same durable process store. */
-  health: Pick<WebhookHealthService, "health">;
+  /** Endpoint delivery health over the kernel's process store; absent until the eventing build. */
+  health?: Pick<WebhookHealthService, "health">;
   /**
    * The emitted-events log. Undefined on a deployment without ClickHouse —
    * the log has no fallback store — which {@link WebhookApp.getEventsService}
@@ -121,12 +121,8 @@ export interface WebhookAppDependencies {
    * is exempt from the hourly dispatch cap.
    */
   testFireBounds: Pick<WebhookTestBoundsService, "assertTestFireWithinBounds">;
-  /**
-   * The same coalescing endpoint stream the delivery worker appends live
-   * spend outcomes to, shared over the process's one `processStore` member
-   * so a replay rides the exact live-delivery machinery.
-   */
-  endpointStream: WebhookEndpointStreamService;
+  /** The live-delivery endpoint stream a replay appends to, over the kernel's process store. */
+  endpointStream?: WebhookEndpointStreamService;
 }
 
 const storeReads = reads("rateLimiter", "redis");
@@ -140,7 +136,6 @@ type WebhookSetup = FeatureSetup<
 
 /** What the worker's delivery process manager is composed from; built only when consuming. */
 type WebhookDeliveryParts = Readonly<{
-  processStore: WebhookRepositories["processStore"];
   endpoints: WebhookEndpointRepository;
   retention: WebhookRepositories["retention"];
   getPlan: WebhookDeliveryProcessDeps["getPlan"];
@@ -176,22 +171,14 @@ export class WebhookApp implements WebhookApiContract {
         events: input.repositories.events,
         envelopes: WebhookEnvelopeService.create(),
       }),
-      health: WebhookHealthService.create({
-        endpoints: input.repositories.endpoints,
-        processStore: input.repositories.processStore,
-      }),
       assertEndpointsEntitled: built.assertEndpointsEntitled.bind(built),
       dispatch: deliver,
       testFireBounds: WebhookTestBoundsService.create({
         entitlement: input.dependencies.entitlement,
         rateLimiter: input.members.rateLimiter,
       }),
-      endpointStream: WebhookEndpointStreamService.create({
-        processStore: input.repositories.processStore,
-      }),
     });
     app.#delivery = {
-      processStore: input.repositories.processStore,
       endpoints: input.repositories.endpoints,
       retention: input.repositories.retention,
       getPlan: (organizationId) => entitlement.getActivePlan({ organizationId }),
@@ -206,14 +193,23 @@ export class WebhookApp implements WebhookApiContract {
   /** webhook_delivery for this role: the worker also hosts the delivery process manager. */
   deliveryPipeline({
     participation,
+    processStore,
   }: {
     participation: EventingParticipation;
+    processStore: ProcessStore;
   }): WebhookDeliveryDefinition {
     const parts = this.#delivery;
+    if (parts) {
+      this.#dependencies = {
+        ...this.#dependencies,
+        health: WebhookHealthService.create({ endpoints: parts.endpoints, processStore }),
+        endpointStream: WebhookEndpointStreamService.create({ processStore }),
+      };
+    }
     if (participation === "produce" || !parts) return buildWebhookDeliveryPipeline({});
     return buildWebhookDeliveryPipeline({
       deliveryProcess: WebhookDeliveryService.create({
-        processStore: parts.processStore,
+        processStore,
         endpoints: parts.endpoints,
         pruneExpiredIdempotencyReceipts: (now) =>
           parts.retention.pruneExpiredIdempotencyReceipts({ now }),
@@ -240,7 +236,7 @@ export class WebhookApp implements WebhookApiContract {
     return new WebhookApp(dependencies);
   }
 
-  readonly #dependencies: WebhookAppDependencies;
+  #dependencies: WebhookAppDependencies;
 
   private constructor(dependencies: WebhookAppDependencies) {
     this.#dependencies = dependencies;
@@ -278,7 +274,7 @@ export class WebhookApp implements WebhookApiContract {
     this.#dependencies.endpoints.findDeliverable(input);
   getDeliveries: WebhookApiContract["getDeliveries"] = (input) =>
     this.#dependencies.endpoints.getDeliveries(input);
-  getHealth: WebhookApiContract["getHealth"] = (input) => this.#dependencies.health.health(input);
+  getHealth: WebhookApiContract["getHealth"] = (input) => this.health.health(input);
   testFire: WebhookApiContract["testFire"] = async ({ organizationId, endpointId }) => {
     const { endpoints, dispatch, testFireBounds } = this.#dependencies;
     // Counted before anything else: a refused caller never reaches the
@@ -372,7 +368,11 @@ export class WebhookApp implements WebhookApiContract {
       throw new Error(`webhook endpoint ${endpoint.id} is not deliverable for replay`);
     }
 
-    await this.#dependencies.endpointStream.appendReplay({
+    const { endpointStream } = this.#dependencies;
+    if (!endpointStream) {
+      throw new Error("webhook replay needs the process store its eventing build supplies");
+    }
+    await endpointStream.appendReplay({
       organizationId,
       endpoint: deliverable,
       envelope,
@@ -398,7 +398,11 @@ export class WebhookApp implements WebhookApiContract {
 
   /** One endpoint's delivery health. */
   get health(): Pick<WebhookHealthService, "health"> {
-    return this.#dependencies.health;
+    const { health } = this.#dependencies;
+    if (!health) {
+      throw new Error("webhook health needs the process store its eventing build supplies");
+    }
+    return health;
   }
 
   /**

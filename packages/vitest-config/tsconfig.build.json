@@ -11,5 +11,9 @@
   "include": ["src/**/*.ts"],
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/*.test.*", "**/*.spec.*"],
 
-  "references": []
+  "references": [
+    {
+      "path": "../observability/tsconfig.build.json"
+    }
+  ]
 }

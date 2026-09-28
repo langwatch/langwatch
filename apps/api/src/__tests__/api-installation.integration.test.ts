@@ -272,8 +272,9 @@ describe("the api process installation", () => {
       const owner = serverModules.find((module) => (module.transports ?? []).some(isApproval));
       const approval = owner?.transports?.find(isApproval);
       const contract = owner?.apiContract;
-      if (!owner || !approval || !(contract instanceof ModuleApiToken))
+      if (!owner || !approval || !(contract instanceof ModuleApiToken)) {
         throw new Error("no installed module declares mcp-authorize");
+      }
       expect(owner.name).toBe("hosted-mcp");
       host.mount(approval.router(), () => runtime.service(contract));
       const post = (headers: Record<string, string>) =>
@@ -331,8 +332,9 @@ describe("the api process installation", () => {
       const owner = serverModules.find((module) => (module.transports ?? []).some(isIngest));
       const ingest = owner?.transports?.find(isIngest);
       const contract = owner?.apiContract;
-      if (!owner || !ingest || !(contract instanceof ModuleApiToken))
+      if (!owner || !ingest || !(contract instanceof ModuleApiToken)) {
         throw new Error("no installed module declares the ingest family");
+      }
       expect(owner.name).toBe("governance");
       host.mount(ingest.router(), () => runtime.service(contract));
       const paths = [

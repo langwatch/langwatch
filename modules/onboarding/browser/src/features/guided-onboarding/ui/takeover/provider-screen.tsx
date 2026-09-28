@@ -5,11 +5,11 @@
 import { Box, chakra, Flex, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
-import { EditModelProviderForm } from "@langwatch/model-provider-browser/edit-model-provider-form";
 import { guidedProvidersFor } from "@langwatch/onboarding-browser-kit";
 import { useEffect, useMemo, useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 
+import { LentEditModelProviderForm } from "../../../../behavior/lent-edit-model-provider-form.tsx";
 import { useGuidedProviderConnect } from "../../behavior/use-guided-provider-connect.ts";
 import { providerSegments, SKIP_TOUR_COPY } from "../../model/copy.ts";
 import { TakeoverRow } from "./takeover-row.tsx";
@@ -128,7 +128,7 @@ export function ProviderScreen({
           p={5}
           data-testid="provider-panel"
         >
-          <EditModelProviderForm
+          <LentEditModelProviderForm
             providerKey={selected.registryKey}
             modelProviderId="new"
             organizationId={organizationId}

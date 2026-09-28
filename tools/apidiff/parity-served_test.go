@@ -47,7 +47,7 @@ func TestDiffServedRoutesReportsUndocumentedRoutesTheBranchDoesNotServe(t *testi
 		"GET /llms.txt",
 		"GET /llms.txt/",
 		"ALL /api/unsubscribe",
-		"ALL /api/evaluations/v3/*",
+		"ALL /api/sample-wildcard/v3/*",
 	)
 	branch := servedRoutes(
 		"GET /api/prompts/:promptId/versions",
@@ -73,7 +73,7 @@ func TestDiffServedRoutesReportsUndocumentedRoutesTheBranchDoesNotServe(t *testi
 	parity := DiffServedRoutes(main, branch, comparison)
 
 	wantMissing := []string{
-		"ALL /api/evaluations/v3/* (unowned)",
+		"ALL /api/sample-wildcard/v3/* (unowned)",
 		"GET /api/langy/ui/actions langy",
 		"GET /llms.txt (unowned)",
 		"POST /api/webhooks/stripe (unowned)",

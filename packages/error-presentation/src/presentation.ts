@@ -2003,6 +2003,11 @@ const presentations = {
     describe: () =>
       "This deployment signs you in through your identity provider, so accounts are not created with a password here.",
   },
+  auth_email_sending_unavailable: {
+    title: "This installation does not send email",
+    describe: () =>
+      "Your address cannot be confirmed here until an administrator sets up an email provider.",
+  },
   auth_no_address_to_confirm: {
     title: "This account has no email address",
     describe: () => "Add an email address in your account settings, then confirm it.",

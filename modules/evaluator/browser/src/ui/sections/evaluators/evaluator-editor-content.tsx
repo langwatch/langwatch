@@ -1,9 +1,8 @@
 import { Box, Field, Input, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { Link } from "@langwatch/browser-host/link";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { toEpochMs } from "@langwatch/time";
-import { WorkflowCardDisplay } from "@langwatch/workflow-browser-kit";
+import { WorkflowCardDisplay, WorkflowCardLink } from "@langwatch/workflow-browser-kit";
 import { ExternalLink } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { FormProvider, useWatch } from "react-hook-form";
@@ -112,19 +111,21 @@ export function EvaluatorEditorContent({
             <Text fontSize="sm" color="fg.muted">
               This evaluator is powered by a workflow. Click below to open the workflow editor:
             </Text>
-            <Link
-              href={`/${workflow.projectSlug}/studio/${workflow.id}`}
-              data-testid="open-workflow-link"
-              target="_blank"
-            >
-              <WorkflowCardDisplay
-                name={workflow.name}
-                icon={workflow.icon}
-                updatedAtLabel={formatTimeAgo(toEpochMs(workflow.updatedAt))}
-                action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
-                width="300px"
-              />
-            </Link>
+            <WorkflowCardDisplay
+              name={workflow.name}
+              icon={workflow.icon}
+              updatedAtLabel={formatTimeAgo(toEpochMs(workflow.updatedAt))}
+              action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
+              width="300px"
+              opener={
+                <WorkflowCardLink
+                  label={workflow.name}
+                  href={`/${workflow.projectSlug}/studio/${workflow.id}`}
+                  target="_blank"
+                  data-testid="open-workflow-link"
+                />
+              }
+            />
           </VStack>
         )}
 

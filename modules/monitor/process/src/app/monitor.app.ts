@@ -12,7 +12,7 @@ import {
   AVAILABLE_EVALUATORS,
   EvaluatorApi,
   evaluatorsSchema,
-  getEvaluatorDefinitions,
+  findEvaluatorDefinitions,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -172,6 +172,13 @@ export class MonitorApp implements MonitorApi {
     return this.#monitors.getAllForProject(input);
   }
 
+  findByEvaluator(input: {
+    projectId: string;
+    evaluatorId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.#monitors.findByEvaluator(input);
+  }
+
   getById(input: MonitorIdInput): Promise<MonitorWithEvaluator> {
     return this.#monitors.getById(input);
   }
@@ -293,7 +300,7 @@ export class MonitorApp implements MonitorApi {
       tenantId: input.projectId,
       monitors: monitors.map((monitor) => ({
         id: monitor.id,
-        isGuardrail: getEvaluatorDefinitions(monitor.checkType)?.isGuardrail ?? false,
+        isGuardrail: findEvaluatorDefinitions(monitor.checkType)[0]?.isGuardrail ?? false,
       })),
       previousStartMs: this.#performance.previousPeriodStartMs({
         projectId: input.projectId,

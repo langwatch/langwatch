@@ -25,6 +25,12 @@ export const datasetWeb = defineWebModule("dataset")
     },
   })
   .withDrawers({
+    addOrEditDataset: {
+      load: async () => ({
+        default: (await import("./ui/sections/datasets/lent-add-or-edit-dataset-drawer.tsx"))
+          .LentAddOrEditDatasetDrawer,
+      }),
+    },
     selectDataset: {
       load: async () => ({
         default: (await import("./ui/sections/select-dataset-drawer.tsx")).SelectDatasetDrawer,

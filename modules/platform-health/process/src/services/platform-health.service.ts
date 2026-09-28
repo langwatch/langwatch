@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type {
   PlatformHealthCheck,
   PlatformHealthCheckName,
-  PlatformHealthQuery,
+  PlatformHealthCheckInput,
   PlatformHealthReport,
 } from "@langwatch/platform-health-contract";
 import { nowInstant } from "@langwatch/time";
@@ -28,13 +28,13 @@ export class PlatformHealthService {
     return new PlatformHealthService(options.probes);
   }
 
-  async checkAll(query: PlatformHealthQuery): Promise<PlatformHealthReport> {
+  async checkAll(query: PlatformHealthCheckInput): Promise<PlatformHealthReport> {
     return this.#report(await Promise.all(this.#probes.map((probe) => this.#run(probe, query))));
   }
 
   async checkOne(
     name: PlatformHealthCheckName,
-    query: PlatformHealthQuery,
+    query: PlatformHealthCheckInput,
   ): Promise<PlatformHealthReport> {
     const probe = this.#probes.find((candidate) => candidate.name === name);
     if (!probe) return this.#report([]);
@@ -49,7 +49,7 @@ export class PlatformHealthService {
     };
   }
 
-  async #run(probe: SubsystemProbe, query: PlatformHealthQuery): Promise<PlatformHealthCheck> {
+  async #run(probe: SubsystemProbe, query: PlatformHealthCheckInput): Promise<PlatformHealthCheck> {
     const startedAt = nowInstant().epochMilliseconds;
     try {
       const result = await probe.run(query);

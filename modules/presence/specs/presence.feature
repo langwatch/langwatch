@@ -44,3 +44,10 @@ Feature: Collaborative presence
     When the compatibility router handles the request
     Then it delegates to the process-owned Presence service
     And existing procedure names and payloads remain unchanged
+
+  @unit
+  Scenario: A langy conversation update reaches only the project it was published for
+    Given langy publishes a conversation update for one project through presence
+    When a subscriber listens on that project's tenant emitter and another on a second project's
+    Then only the first subscriber receives the update
+    And the payload carries the conversation's owner, so langy's watch can drop it for other users

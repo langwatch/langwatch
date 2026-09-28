@@ -180,22 +180,7 @@ export function resetLoggerCache(): void {
   loggerFactory.reset();
 }
 
-/**
- * Under vitest, every expected error path would otherwise log into the
- * test run. `LANGWATCH_TEST_LOGS=1` (or a level, e.g. `=debug`) restores
- * that output for a suite that opts back in; undefined outside vitest.
- */
-function testLoggerLevel(): string | undefined {
-  if (!isNodeRuntime || !process.env.VITEST) return undefined;
-  const testLogs = process.env.LANGWATCH_TEST_LOGS;
-  if (testLogs === "1") return undefined;
-  return testLogs || "silent";
-}
-
 export function createLogger(name: string, options?: CreateLoggerOptions): PinoLogger {
-  const level = testLoggerLevel();
-  // A bare pino() with no transport: no worker thread, nothing written.
-  if (level !== undefined) return pino({ name, level });
   return loggerFactory.createLogger(name, options);
 }
 

@@ -15,6 +15,36 @@ import (
 // database, so one key seeds fixtures both of them can read.
 const DefaultProjectKey = "sk-lw-local-development-key"
 
+// The identity the current seed creates for the local-dev organization
+// (apps/tasks's storage-seed task; tools/thuishaven/domain/identity.go names it).
+const (
+	SeededEmail    = "admin@mail.langwatch.localhost"
+	SeededPassword = "LocalHavenAdmin!2026"
+	SeededSlug     = "local-dev-project"
+)
+
+// RetiredSeededEmails are earlier seeded admins an older ref still creates.
+var RetiredSeededEmails = []string{"admin@haven.localhost"}
+
+// withSeededDefaults fills whatever the operator did not give from the seeded
+// identity; without it every route is rendered signed out, for an empty slug.
+func (identity SeedIdentity) withSeededDefaults() SeedIdentity {
+	if identity.ProjectKey == "" {
+		identity.ProjectKey = DefaultProjectKey
+	}
+	if identity.Email == "" {
+		identity.Email = SeededEmail
+		identity.FallbackEmails = RetiredSeededEmails
+	}
+	if identity.Password == "" {
+		identity.Password = SeededPassword
+	}
+	if identity.Slug == "" {
+		identity.Slug = SeededSlug
+	}
+	return identity
+}
+
 // SeedIdentity is the identity the run works as: the project key the fixtures
 // are posted with, and the credentials the runner's signIn action uses.
 type SeedIdentity struct {
@@ -22,6 +52,8 @@ type SeedIdentity struct {
 	Email      string `json:"email"`
 	Password   string `json:"password"`
 	Slug       string `json:"slug"`
+	// FallbackEmails are tried in order when Email does not sign in on a side.
+	FallbackEmails []string `json:"fallbackEmails,omitempty"`
 }
 
 // SeedRequest is one seeding step: which API to post to, as whom, and how

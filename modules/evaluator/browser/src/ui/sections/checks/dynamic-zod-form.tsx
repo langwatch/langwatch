@@ -18,7 +18,7 @@ import { camelCaseToTitleCase, titleCase } from "@langwatch/design-system/string
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { EvaluatorDefinition, EvaluatorTypes } from "@langwatch/evaluator-contract";
-import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { allModelOptions } from "@langwatch/model-provider-browser-kit";
 import React, { useMemo } from "react";
 import { Info, Plus, Trash2, X } from "react-feather";
@@ -363,7 +363,9 @@ const DynamicZodForm = ({
 
   const renderSchema = <T extends EvaluatorTypes>(schema: ZodType, basePath = "") => {
     if (schema instanceof z.ZodObject) {
-      const evaluatorDefinition = getEvaluatorDefinitions(evaluatorType) as EvaluatorDefinition<T>;
+      const [evaluatorDefinition] = findEvaluatorDefinitions(
+        evaluatorType,
+      ) as EvaluatorDefinition<T>[];
 
       const keys = Object.keys(schema.shape);
 

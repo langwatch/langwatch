@@ -239,7 +239,7 @@ void describe("createDebouncer", () => {
     });
     debouncer.note("a.ts");
     debouncer.cancel();
-    setTimeout(done, 50);
+    setTimeout(() => done(), 50);
   });
 });
 

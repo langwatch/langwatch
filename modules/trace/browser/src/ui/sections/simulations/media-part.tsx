@@ -1,10 +1,7 @@
-import {
-  MediaPart as SimulationMediaPart,
-  type MediaPartProps,
-  type MediaProbeResult,
-} from "@langwatch/scenario-browser/surfaces/media-part";
+import type { MediaPartProps, MediaProbeResult } from "@langwatch/scenario-contract";
 import { useEffect, useState } from "react";
 
+import { LentMediaPart } from "../../../behavior/lent-media-part.tsx";
 import { api } from "../../../behavior/trace-api.ts";
 
 /** Where the part's bytes live: a binary's own url, or a url-typed source. */
@@ -33,10 +30,6 @@ export function MediaPart(props: MediaPartProps) {
   const probeResult: MediaProbeResult = probe.isError ? null : probe.data;
 
   return (
-    <SimulationMediaPart
-      {...props}
-      probe={probeResult}
-      onProbeRequired={() => setProbeEnabled(true)}
-    />
+    <LentMediaPart {...props} probe={probeResult} onProbeRequired={() => setProbeEnabled(true)} />
   );
 }

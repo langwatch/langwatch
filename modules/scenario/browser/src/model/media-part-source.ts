@@ -1,4 +1,8 @@
-import { isSafeMediaUrl, type MediaPartData, parseNotCapturedMedia } from "./media-parts.ts";
+import {
+  isSafeMediaUrl,
+  type MediaPartData,
+  parseNotCapturedMedia,
+} from "@langwatch/trace-contract";
 
 export type MediaCategory = "audio" | "image" | "video" | "binary";
 

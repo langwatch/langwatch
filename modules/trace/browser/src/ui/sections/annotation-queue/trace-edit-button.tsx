@@ -2,9 +2,9 @@
 
 import { Button } from "@chakra-ui/react";
 import type { UiTraceEditButtonProps } from "@langwatch/browser-host/declarations";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Pencil } from "lucide-react";
 
-import { useDrawer } from "../../../behavior/use-drawer.ts";
 import { openTraceEditorFromConversation } from "../explorer/utils/trace-edit-mode.ts";
 
 export function TraceEditButton({ traceId, occurredAtMs, disabled }: UiTraceEditButtonProps) {

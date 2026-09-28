@@ -346,6 +346,7 @@ export const TargetHeader = memo(function TargetHeader({
 
   const headerRow = (
     <HStack
+      data-target-id={target.id}
       gap={2}
       width="full"
       // minWidth=0 allows name to truncate while keeping play button pinned.

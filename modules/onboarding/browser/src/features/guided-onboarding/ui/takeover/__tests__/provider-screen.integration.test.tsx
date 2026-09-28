@@ -19,8 +19,8 @@ vi.mock("../../../behavior/use-guided-provider-connect.ts", () => ({
   useGuidedProviderConnect: () => ({ onSaved: onSavedMock, skip: skipMock, isSaving: false }),
 }));
 
-vi.mock("@langwatch/model-provider-browser/edit-model-provider-form", () => ({
-  EditModelProviderForm: ({ providerKey }: { providerKey: string }) => (
+vi.mock("../../../../../behavior/lent-edit-model-provider-form.tsx", () => ({
+  LentEditModelProviderForm: ({ providerKey }: { providerKey: string }) => (
     <div data-testid="stub-form">{providerKey}</div>
   ),
 }));

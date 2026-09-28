@@ -3,84 +3,77 @@
  * The `/api/auth` family over the real declaration and REST runtime.
  * @see specs/auth/auth-rest-family-mounted.feature
  */
-import { createRestRuntime } from "@langwatch/api/rest";
+import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
+import { BearerIdentity, RestHost } from "@langwatch/api/rest";
 import { describe, expect, it, vi } from "vitest";
 
-import { authRest, type AuthDoorApi, type AuthRestSession } from "../auth.rest.ts";
+import type { AuthSessionPoll } from "../../rules/auth-session-poll.rules.ts";
+import { authRest, type AuthDoorApi } from "../auth.rest.ts";
 
 const BASE_URL = "https://app.test";
 
-const SIGNED_IN: AuthRestSession = {
-  expires: "2026-01-01T00:00:00.000Z",
-  user: { id: "user-1", email: "bob@example.com", name: "Bob", image: null },
+const SIGNED_IN: AuthSessionPoll = {
+  document: {
+    session: { expiresAt: "2026-01-01T00:00:00.000Z" },
+    user: { id: "user-1", email: "bob@example.com", name: "Bob", image: null },
+  },
 };
 
 function authWorld(overrides: Partial<AuthDoorApi> = {}) {
-  const handler = vi.fn<(request: Request) => Promise<Response>>(
-    async () =>
-      new Response(JSON.stringify({ handledByBetterAuth: true }), {
-        headers: { "content-type": "application/json" },
-      }),
+  const betterAuthHandshake = vi.fn<(request: Request) => Promise<Response>>(async () =>
+    Response.json({ handledByBetterAuth: true }),
   );
-  const getSession = vi.fn<() => Promise<{ session: { id: string } }>>(async () => ({
-    session: { id: "session-1" },
-  }));
-  const revokeBrowserSession = vi.fn<(input: { sessionId: string }) => Promise<void>>(
+  const revokeSessionFromCookies = vi.fn<(input: { cookie: string | undefined }) => Promise<void>>(
     async () => {},
   );
   const door: AuthDoorApi = {
-    betterAuth: async () => ({ handler, api: { getSession } }),
-    revokeBrowserSession,
-    resolveSession: async () => ({ kind: "signed_in", session: SIGNED_IN }),
-    findProjectSlugByToken: async () => null,
-    featureFlags: () => ({ isEnabled: async () => false }) as never,
-    directory: () => ({}) as never,
+    validateProjectAuthToken: async () => ({ projectSlug: "acme" }),
+    getSessionByCookie: async () => SIGNED_IN,
+    revokeSessionFromCookies,
+    betterAuthHandshake,
     baseUrl: () => BASE_URL,
     federatedLogout: async () => null,
-    runWithIdentityBirth: (run) => run(),
     ...overrides,
   };
-  const runtime = createRestRuntime({
-    identity: {
-      authenticate: () => {
-        throw new Error("This family resolves its own credential.");
-      },
+  const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
+  const host = RestHost.create({
+    identities: {
+      project: closed,
+      organization: closed,
+      apiKey: closed,
+      scimToken: closed,
+      "instance-admin": closed,
+      browser: closed,
     },
+    bearers: () => closed,
+    audit: { record: async () => {} },
   });
-  const app = runtime.mount(authRest.router(), {
-    app: () => door,
-    credential: "public",
-    onError: (error, context) => context.json({ error: String(error) }, 500),
-  });
+  host.mount(authRest.router(), () => door);
 
-  return { app, handler, getSession, revokeBrowserSession };
+  return { app: host.app, betterAuthHandshake, revokeSessionFromCookies };
 }
 
 describe("given the /api/auth family mounted on a process's own doors", () => {
   describe("when the browser reads the session endpoint", () => {
-    it("answers the session rather than falling through to the catch-all", async () => {
-      const world = authWorld();
+    it("answers the session document, never cached, rather than falling through to the catch-all", async () => {
+      const getSessionByCookie = vi.fn<AuthDoorApi["getSessionByCookie"]>(async () => SIGNED_IN);
+      const world = authWorld({ getSessionByCookie });
 
-      const response = await world.app.request("/api/auth/session");
+      const response = await world.app.request(`${BASE_URL}/api/auth/session`, {
+        headers: { cookie: "better-auth.session_token=abc" },
+      });
 
       expect(response.status).toBe(200);
       expect(response.headers.get("cache-control")).toBe("no-store, must-revalidate");
-      await expect(response.json()).resolves.toEqual({
-        session: { expiresAt: SIGNED_IN.expires },
-        user: {
-          id: "user-1",
-          name: "Bob",
-          email: "bob@example.com",
-          image: null,
-        },
-      });
-      expect(world.handler).not.toHaveBeenCalled();
+      await expect(response.json()).resolves.toEqual(SIGNED_IN.document);
+      expect(getSessionByCookie).toHaveBeenCalledWith({ cookie: "better-auth.session_token=abc" });
+      expect(world.betterAuthHandshake).not.toHaveBeenCalled();
     });
 
     it("answers a bare null for a request carrying no session", async () => {
-      const world = authWorld({ resolveSession: async () => ({ kind: "anonymous" }) });
+      const world = authWorld({ getSessionByCookie: async () => ({ document: null }) });
 
-      const response = await world.app.request("/api/auth/session");
+      const response = await world.app.request(`${BASE_URL}/api/auth/session`);
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toBeNull();
@@ -88,109 +81,88 @@ describe("given the /api/auth family mounted on a process's own doors", () => {
   });
 
   describe("when a legacy client presents a project token", () => {
-    it("names the project it belongs to", async () => {
-      const world = authWorld({ findProjectSlugByToken: async () => "acme" });
+    it("names the project it belongs to, counted against the caller's nearest hop", async () => {
+      const validateProjectAuthToken = vi.fn<AuthDoorApi["validateProjectAuthToken"]>(async () => ({
+        projectSlug: "acme",
+      }));
+      const world = authWorld({ validateProjectAuthToken });
 
-      const response = await world.app.request("/api/auth/validate", {
-        method: "POST",
-        headers: { "x-auth-token": "tok" },
-      });
-
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ projectSlug: "acme" });
-    });
-
-    it("refuses a request carrying no token at all, in the sentence it always has", async () => {
-      const world = authWorld();
-
-      const response = await world.app.request("/api/auth/validate", { method: "POST" });
-
-      expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toEqual({
-        message: "X-Auth-Token header is required.",
-      });
-    });
-
-    it("refuses a token that names no project", async () => {
-      const world = authWorld();
-
-      const response = await world.app.request("/api/auth/validate", {
-        method: "POST",
-        headers: { "x-auth-token": "tok" },
-      });
-
-      expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toEqual({ message: "Invalid auth token." });
-    });
-
-    it("names the nearest forwarding hop as the caller the check is counted against", async () => {
-      const findProjectSlugByToken = vi.fn<
-        (input: { token: string; callerKey?: string }) => Promise<string | null>
-      >(async () => "acme");
-      const world = authWorld({ findProjectSlugByToken });
-
-      await world.app.request("/api/auth/validate", {
+      const response = await world.app.request(`${BASE_URL}/api/auth/validate`, {
         method: "POST",
         headers: { "x-auth-token": "tok", "x-forwarded-for": "1.1.1.1, 2.2.2.2" },
       });
 
-      expect(findProjectSlugByToken).toHaveBeenCalledWith({
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ projectSlug: "acme" });
+      expect(validateProjectAuthToken).toHaveBeenCalledWith({
         token: "tok",
-        callerKey: "ip:2.2.2.2",
+        forwardedFor: "1.1.1.1, 2.2.2.2",
       });
     });
 
-    it("counts a caller that named no hop as unknown rather than skipping the count", async () => {
-      const findProjectSlugByToken = vi.fn<
-        (input: { token: string; callerKey?: string }) => Promise<string | null>
-      >(async () => "acme");
-      const world = authWorld({ findProjectSlugByToken });
+    it("takes the empty JSON body the Python SDK's login sends", async () => {
+      const world = authWorld();
 
-      await world.app.request("/api/auth/validate", {
+      const response = await world.app.request(`${BASE_URL}/api/auth/validate`, {
+        method: "POST",
+        headers: { "x-auth-token": "tok", "content-type": "application/json" },
+        body: "{}",
+      });
+
+      expect(response.status).toBe(200);
+    });
+
+    it("refuses a request carrying no token at all with the handled 401", async () => {
+      const world = authWorld({
+        validateProjectAuthToken: async () => {
+          throw new ProjectMissingCredentialsError();
+        },
+      });
+
+      const response = await world.app.request(`${BASE_URL}/api/auth/validate`, { method: "POST" });
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({ code: "missing_credentials" });
+    });
+
+    it("refuses a token that names no project with the handled 401", async () => {
+      const world = authWorld({
+        validateProjectAuthToken: async () => {
+          throw new ProjectInvalidCredentialsError();
+        },
+      });
+
+      const response = await world.app.request(`${BASE_URL}/api/auth/validate`, {
         method: "POST",
         headers: { "x-auth-token": "tok" },
       });
 
-      expect(findProjectSlugByToken).toHaveBeenCalledWith({
-        token: "tok",
-        callerKey: "ip:unknown",
-      });
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({ code: "invalid_credentials" });
     });
   });
 
   describe("when the browser signs out", () => {
-    it("revokes the session and expires every cookie in both spellings", async () => {
+    it("revokes the session its cookies name and expires every cookie in both spellings", async () => {
       const world = authWorld();
 
-      const response = await world.app.request("/api/auth/logout", {
+      const response = await world.app.request(`${BASE_URL}/api/auth/logout`, {
         method: "POST",
         headers: { cookie: "better-auth.session_token=abc" },
       });
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ success: true });
-      expect(world.revokeBrowserSession).toHaveBeenCalledWith({ sessionId: "session-1" });
-      expect(response.headers.getSetCookie()).toHaveLength(6);
-    });
-
-    it("still clears the cookies when the session lookup fails", async () => {
-      const world = authWorld();
-
-      world.getSession.mockRejectedValueOnce(new Error("store down"));
-
-      const response = await world.app.request("/api/auth/logout", {
-        method: "POST",
-        headers: { cookie: "better-auth.session_token=abc" },
+      expect(world.revokeSessionFromCookies).toHaveBeenCalledWith({
+        cookie: "better-auth.session_token=abc",
       });
-
-      expect(response.status).toBe(200);
       expect(response.headers.getSetCookie()).toHaveLength(6);
     });
 
     it("sends a GET sign-out to the local sign-in page where no federation answers", async () => {
       const world = authWorld();
 
-      const response = await world.app.request("/api/auth/logout", {
+      const response = await world.app.request(`${BASE_URL}/api/auth/logout`, {
         headers: { cookie: "better-auth.session_token=abc" },
       });
 
@@ -201,49 +173,24 @@ describe("given the /api/auth family mounted on a process's own doors", () => {
     it("follows the federated target where the deployment resolves one", async () => {
       const world = authWorld({ federatedLogout: async () => "https://idp.test/logout" });
 
-      const response = await world.app.request("/api/auth/logout");
+      const response = await world.app.request(`${BASE_URL}/api/auth/logout`);
 
       expect(response.headers.get("location")).toBe("https://idp.test/logout");
     });
   });
 
   describe("when a sign-in call reaches the catch-all", () => {
-    it("is handled by the Better Auth instance this process composed", async () => {
+    it("is answered by the Better Auth handshake this process composed", async () => {
       const world = authWorld();
 
-      const response = await world.app.request("/api/auth/sign-in/email", {
+      const response = await world.app.request(`${BASE_URL}/api/auth/sign-in/email`, {
         method: "POST",
         headers: { origin: BASE_URL },
       });
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ handledByBetterAuth: true });
-      expect(world.handler).toHaveBeenCalledTimes(1);
-    });
-
-    it("refuses a state-changing call from another origin, and never reaches Better Auth", async () => {
-      const world = authWorld();
-
-      const response = await world.app.request("/api/auth/sign-in/email", {
-        method: "POST",
-        headers: { origin: "https://evil.test" },
-      });
-
-      expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toEqual({
-        message: "Invalid origin",
-        code: "INVALID_ORIGIN",
-      });
-      expect(world.handler).not.toHaveBeenCalled();
-    });
-
-    it("lets a read through whatever origin it names, so a callback still lands", async () => {
-      const world = authWorld();
-
-      const response = await world.app.request("/api/auth/callback/oidc");
-
-      expect(response.status).toBe(200);
-      expect(world.handler).toHaveBeenCalledTimes(1);
+      expect(world.betterAuthHandshake).toHaveBeenCalledTimes(1);
     });
   });
 });

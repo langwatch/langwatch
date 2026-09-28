@@ -14,7 +14,20 @@ visualdiff run [-base REF] [-candidate REF] [-routes-only] [-flows a,b]
                [-viewport 1440x900] [-config PATH] [-root DIR]
                [-base-port N] [-run-dir DIR] [-boot-timeout DUR]
                [-dry-run] [-keep] [-agent] [-no-haven]
+               [-editions enterprise,free] [-no-baseline] [-refresh-baseline]
+               [-no-fail-fast] [-resume RUNID]
+visualdiff recapture -run RUNID [-routes a,b] [-flows x,y] [-edition E]
+visualdiff coverage [-base REF] [-candidate REF] [-config PATH]
+visualdiff gc [-kept] [-no-haven]
 ```
+
+Read `<run-dir>/summary.txt` first (a run also prints it; `-agent` leads it
+with a `rows= findings= reports=` line): counts per class and edition, the
+coverage verdict, the worst 20 findings one line each with the candidate's
+final path, its new failed API requests and its role diff, and every
+uncovered route. Everything the run wrote to stderr is in
+`<run-dir>/run.log`. The candidate renders the ref's last commit: a run warns
+when the candidate is `HEAD` and tracked files have uncommitted changes.
 
 Exit status is `0` for no findings, `1` for findings, `2` when the run could
 not be completed — the same ladder as `apidiff`.
@@ -55,7 +68,40 @@ not be completed — the same ladder as `apidiff`.
    either way.
 
 Start with `-dry-run`: it prints the plan and the flow list - the ports on
-`-no-haven`, the two haven slugs otherwise - and starts nothing.
+`-no-haven`, the two haven slugs otherwise - and, per edition, whether the
+base will be replayed from a baseline or rendered live. It starts nothing.
+
+## Baselines, editions and failing fast
+
+**Baselines.** Booting the base is most of a run's cost, and the base does
+not move while you fix your branch. Each live base pass is cached under
+`.visualdiff/baselines/<commit>-<edition>-<hash>/` (captures plus
+screenshots). The hash covers the configuration, viewport, the runner's own
+source and the UTC day, because seeded dates render as text. A run whose
+every edition has a baseline never checks out or boots the base at all: only
+the candidate stack comes up. `-refresh-baseline` re-renders and replaces
+it; `-no-baseline` neither reads nor writes one.
+
+**Editions.** Both refs seed the same signed local-dev enterprise licence onto
+`Organization.license` for `local-dev-organization`, and a null licence
+resolves to the open-source plan on both. A run captures the `enterprise`
+pass on the seeded licence; `-editions enterprise,free` adds a `free` pass
+on the same stacks with the licence cleared (`psql` against `haven db
+url`), at twice the capture time. Each pass has its own `shots/<edition>/`,
+`report/<edition>/` and edition-tagged `findings.jsonl` lines. `-no-haven`
+shares your own database, so it refuses `free`.
+
+**Signed in.** The runner signs in as the seeded admin
+(`admin@haven.localhost`) before the first route and renders
+`{slug}` as `local-dev-project`; `-email`, `-password` and `-slug`
+override it.
+
+**Failing fast.** The candidate is captured before the base, and each screen is
+diffed as soon as both sides exist. If the candidate's first three routes each
+throw, raise a page error or render blank, the run stops right away with the
+reason for each one (`-no-fail-fast` carries on anyway). Run with `-keep`,
+fix, then `recapture` the routes or flows that failed: it replays the base
+from the same baseline.
 
 ## Booting through haven
 
@@ -81,16 +127,10 @@ a machine without haven, or to reproduce the exact behaviour this replaced.
 
 Unlike `apidiff` (`specs/tooling/apidiff-on-haven.feature`), this path is
 **not** gated on layout: it runs `haven up` for whatever the checkout
-defines and lets haven's own readiness answer decide, rather than refusing a
-monolith (`platform/app`) ref up front. As of this writing that still means
-only the modular layout actually becomes ready - haven's two Node lanes are
-hardcoded to `pnpm --filter @langwatch/ui dev` and
-`pnpm --filter @langwatch/dev-runtime dev` (`tools/thuishaven/app/plan.go`),
-and neither package exists on the monolith checkout - but the failure is
-haven's own, surfaced through the ordinary boot timeout and backend log tail,
-not a bespoke refusal that would need updating the day haven learns to start
-what a monolith checkout defines. See
-`specs/tooling/visualdiff-on-haven.feature` for the bound scenarios.
+defines. haven boots a monolith (`platform/app`) checkout too - its single
+app lane replaces the ui and backend lanes (`tools/thuishaven/app/plan.go`,
+`plan_monolith.go`) - and a monolith stack is ready when that app lane is.
+See `specs/tooling/visualdiff-on-haven.feature` for the bound scenarios.
 
 ## Preparing a fresh worktree
 
@@ -148,20 +188,60 @@ ref's crash-loop on the port-based path.
 
 ## Classification
 
-The report's first pass is rule-based, and every row keeps both screenshots so
-a person can overrule it:
+One classifier (`classify.go`) decides every screen, for the report,
+`findings.jsonl` and `summary.txt` alike. Rules run in this order; the first
+that applies wins, and every row keeps both screenshots so a person can
+overrule it. The finding classes fail the run (exit 1):
 
-| Class              | Rule                                                           |
-| ------------------ | -------------------------------------------------------------- |
-| `regression`       | the candidate throws, or fails a step, where the base does not |
-| `restore-gap`      | the candidate hits a 404 on an `/api/` call the base does not  |
-| `intended-restore` | the base has no such screen and the candidate renders one      |
-| `noise`            | under 2% different with no errors on either side               |
-| `changed`          | a real difference none of the rules explains                   |
+| Class               | Rule                                                                        |
+| ------------------- | --------------------------------------------------------------------------- |
+| `missing-candidate` | the base captured the screen and the candidate never did                    |
+| `missing-base`      | the candidate captured the screen and the base never did - nothing compared |
+| `broken-both`       | the route or flow step fails on both refs                                   |
+| `regression`        | the candidate fails, or logs a console error, where the base does not      |
+| `not-found`         | the candidate shows its not-found page where the base renders the screen   |
+| `blank`             | the candidate page has no text at all, on any route or step                 |
+| `redirect`          | the candidate ends on a different path (ids masked) than the base           |
+| `api-error`         | a 4xx, 5xx or failed `/api/` or tRPC request the base does not make         |
+| `controls`          | a button, link, heading, tab or form field one side has and the other lacks |
+| `uncovered`         | a route either ref declares that `visualdiff.yaml` neither renders nor excludes |
 
-A failure rule beats a restore rule: a restored screen that throws is a
-regression, not a restoration. `regression` and `restore-gap` are the rows
-counted as findings, and they are what decides exit status 1.
+The informational classes are reported and never fail it:
+
+| Class              | Rule                                                        |
+| ------------------ | ----------------------------------------------------------- |
+| `intended-restore` | the base has no such screen, or fails, and the candidate renders one |
+| `copy`             | the same controls with different words                     |
+| `changed`          | a pixel difference over 2% none of the rules explains      |
+| `noise`            | under 2% different with nothing else wrong                 |
+
+Text evidence comes from each screen's accessibility tree
+(`page.locator("body").ariaSnapshot()`), compared with dates, times,
+relative times, ids and digits masked. Pages see one frozen `Date.now()`
+per pass, and `<time>` elements and relative times are masked in the
+pixels too.
+
+## Coverage
+
+Every route either ref declares is rendered by a `routes` entry, excluded
+under `coverage.excluded` with a reason, or reported `uncovered` - a
+finding. The base's routes are its pages directory (`coverage.basePages`,
+main's Next.js pages); the candidate's are its `"pages/..."` screen keys in
+`*.web.ts(x)`, or the `path:` a screen declares under its key. Both are read
+from git, so `visualdiff coverage` answers in a second without booting
+anything. A route's `{name}` placeholder is filled from `fixtures`, the ids
+the run seeds deterministically (the traces, today); dynamic routes with no
+seeded entity stay uncovered, loudly. Configured routes neither ref declares
+are listed as stale.
+
+## Cleaning up
+
+Every run first collects what dead runs left behind (`visualdiff gc` does
+the same on its own): a run directory whose `pid` names no live process
+loses its haven stacks (and with them their databases), its worktrees and,
+except for the newest one whose report may still be open, its directory.
+Registered `visualdiff-*` stacks no run owns are destroyed, then `git
+worktree prune` runs. A `-keep` run is left alone unless `gc -kept`.
 
 ## Findings stream and recapture
 
@@ -187,14 +267,13 @@ comparison is decided, fsynced before the run continues, so `tail -f
 }
 ```
 
-`kind` is one of `missing-on-candidate`, `changed`, `console-error`,
-`capture-failed`, `identical` - narrower than the report's own
-`Classification` above, because this is a live triage feed rather than the
-rule-based report. A flow's lines carry `flow` and `index` instead of
+Each line also carries `edition`, `finding` (whether the class fails the
+run) and text evidence (`evidence.url`, `evidence.requests`,
+`evidence.controls`). `kind` is a class from the table above. A flow's lines carry `flow` and `index` instead of
 `route`. `module` is a best-effort guess at the owning module, from
-the module directory names in `modules/catalogue.json` (matched
-against the route's first path segment or the flow id's leading word, plural
-tried too); empty when nothing matches. `evidence` paths are relative to the
+`modules/catalogue.json`'s module ids and subjects (matched against the
+route's first path segment or the flow id's leading word, singular tried
+too); empty when nothing matches. `evidence` paths are relative to the
 run root. The last line of a run (or a recapture) is always
 `{"kind":"run-complete","total":N,"counts":{...},"capturedAt":"..."}`.
 
@@ -202,17 +281,13 @@ Most kinds are decided, and written, the moment enough is known - a failed
 capture or a new console error need only one or two capture messages, a pixel
 diff needs the diff message too - all of which the runner streams off its
 stdout as it works (`RunRunner` pipes it live, not buffered until the process
-exits). `missing-on-candidate` is the one exception: nothing says "no more
+exits). A screen missing on one side is the one exception: nothing says "no more
 messages are coming for this route", so it can only be decided once the whole
-capture step ends, in the same pass that writes `run-complete`. One
-consequence of the runner's own two-full-passes order (base side captured
-completely, then candidate) is that today's runner still computes every pixel
-diff in one batch right before it reports "done" - so `changed`/`identical`
-lines arrive as a fast burst near the end of a run rather than spread across
-its whole duration, even though `capture-failed`/`console-error` lines do
-arrive throughout. Spreading diffs out too would mean interleaving the two
-sides' capture passes in `tools/visualdiff/runner/src/main.ts`, which is a
-bigger change to that package's execution model than this one made.
+capture step ends, in the same pass that writes `run-complete`.
+`uncovered` lines are appended once every edition has run. Pixel diffs
+stream too: the runner diffs each screen the moment its second side exists
+(`runner/src/pairing.ts`), so on a replayed baseline every
+`changed`/`noise` line lands as the candidate captures that screen.
 
 A triage loop fixes one thing, then wants to know if it worked, without
 re-booting both stacks:

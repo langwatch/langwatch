@@ -43,6 +43,8 @@ const ROLE = "worker";
 /** Every value is harmless and invented: nothing here is read from `.env`. */
 const SYNTHETIC_ENVIRONMENT: Readonly<Record<string, string>> = {
   NODE_ENV: "test",
+  // No quick tunnel from a test process: it would open a real one where cloudflared is on PATH.
+  VOICE_TUNNEL: "false",
   BASE_HOST: "http://langwatch.test",
 };
 
@@ -117,7 +119,6 @@ async function bootWorker({ live = false }: { live?: boolean } = {}) {
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
         adminEmails: config.process.adminEmails,
         processName: "langwatch-worker",
-        dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory") },
         storageResolver: void 0,
         storage: void 0,
         queue: void 0,
@@ -125,7 +126,7 @@ async function bootWorker({ live = false }: { live?: boolean } = {}) {
         gatewayInternalProtocol: {},
         connectJudge: null,
         scenarioChildBundle,
-        voicePublicUrl: { unavailable: "no media door in a test process" },
+        rawSocketPort: 0,
         monitor: void 0,
         langwatchQl: {
           admin: { configured: false },
