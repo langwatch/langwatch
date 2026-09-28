@@ -35,56 +35,60 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
 }> {
   const relayCaps = relayPayloadCaps(relayMaxPayloadMb);
 
-  return defineRestRouter(AgentApi)
-    .withNamespace("agents")
-    .withVersion(MANAGEMENT_API_VERSION)
-    // Added with the move to `/api/v1/agents`; the bare `/api/agents` belongs
-    // to the deprecated legacy family, which never had these routes.
-    .withAddressing("v1-only")
+  return (
+    defineRestRouter(AgentApi)
+      .withNamespace("agents")
+      .withVersion(MANAGEMENT_API_VERSION)
+      // Added with the move to `/api/v1/agents`; the bare `/api/agents` belongs
+      // to the deprecated legacy family, which never had these routes.
+      .withAddressing("v1-only")
 
-    .post("/connect/register", "registerConnectedAgentInstance")
-    .withInput(agentConnectRegisterInputSchema)
-    .withAccess(CONNECT_ACCESS)
-    .withOutput(agentConnectRegisterOutputSchema)
-    .withBodyLimit({
-      maxBytes: relayCaps.frameBytes,
-      onExceeded: () =>
-        new AgentPayloadTooLargeError({ what: "result", limitBytes: relayCaps.frameBytes }),
-    })
-    .withDocs({
-      summary: "Register this process's agents",
-      description:
-        "Returns a registered frame and instance token, or refuses at the status of the reason.",
-    })
-    .withMiddleware(agentConnectHeaders)
-    .handle(({ app, input }, credentials) => app.registerConnectedAgentInstance(input, credentials))
+      .post("/connect/register", "registerConnectedAgentInstance")
+      .withInput(agentConnectRegisterInputSchema)
+      .withAccess(CONNECT_ACCESS)
+      .withOutput(agentConnectRegisterOutputSchema)
+      .withBodyLimit({
+        maxBytes: relayCaps.frameBytes,
+        onExceeded: () =>
+          new AgentPayloadTooLargeError({ what: "result", limitBytes: relayCaps.frameBytes }),
+      })
+      .withDocs({
+        summary: "Register this process's agents",
+        description:
+          "Returns a registered frame and instance token, or refuses at the status of the reason.",
+      })
+      .withMiddleware(agentConnectHeaders)
+      .handle(({ app, input }, credentials) =>
+        app.registerConnectedAgentInstance(input, credentials),
+      )
 
-    .get("/connect/poll", "pollConnectedAgentInstance")
-    .withQuery(agentConnectPollQuerySchema)
-    .withAccess(CONNECT_ACCESS)
-    .withOutput(agentConnectPollOutputSchema)
-    .withDocs({
-      summary: "Wait for call and cancel frames while refreshing this instance's presence",
-    })
-    .withMiddleware(agentConnectHeaders)
-    .handle(({ app, input, signal }, credentials) =>
-      app.connectPoll(
-        { inFlightCallIds: (input.inFlight ?? "").split(",").filter(Boolean), signal },
-        credentials,
-      ),
-    )
+      .get("/connect/poll", "pollConnectedAgentInstance")
+      .withQuery(agentConnectPollQuerySchema)
+      .withAccess(CONNECT_ACCESS)
+      .withOutput(agentConnectPollOutputSchema)
+      .withDocs({
+        summary: "Wait for call and cancel frames while refreshing this instance's presence",
+      })
+      .withMiddleware(agentConnectHeaders)
+      .handle(({ app, input, signal }, credentials) =>
+        app.connectPoll(
+          { inFlightCallIds: (input.inFlight ?? "").split(",").filter(Boolean), signal },
+          credentials,
+        ),
+      )
 
-    .post("/connect/frames", "postConnectedAgentFrames")
-    .withInput(agentConnectFramesInputSchema)
-    .withAccess(CONNECT_ACCESS)
-    .withOutput(agentConnectFramesOutputSchema)
-    .withBodyLimit({
-      maxBytes: relayCaps.frameBytes,
-      onExceeded: () =>
-        new AgentPayloadTooLargeError({ what: "result", limitBytes: relayCaps.frameBytes }),
-    })
-    .withDocs({ summary: "Accept this instance's acknowledgements, results and deregistration" })
-    .withMiddleware(agentConnectHeaders)
-    .handle(({ app, input }, credentials) => app.connectFrames(input, credentials))
-    .build();
+      .post("/connect/frames", "postConnectedAgentFrames")
+      .withInput(agentConnectFramesInputSchema)
+      .withAccess(CONNECT_ACCESS)
+      .withOutput(agentConnectFramesOutputSchema)
+      .withBodyLimit({
+        maxBytes: relayCaps.frameBytes,
+        onExceeded: () =>
+          new AgentPayloadTooLargeError({ what: "result", limitBytes: relayCaps.frameBytes }),
+      })
+      .withDocs({ summary: "Accept this instance's acknowledgements, results and deregistration" })
+      .withMiddleware(agentConnectHeaders)
+      .handle(({ app, input }, credentials) => app.connectFrames(input, credentials))
+      .build()
+  );
 }
