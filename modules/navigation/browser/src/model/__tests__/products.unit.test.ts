@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 import { PRODUCTS, productById, productFromPathname } from "../products.ts";
 
 describe("product registry", () => {
-  describe("given the four products the registry declares", () => {
+  describe("given the five products the registry declares", () => {
     describe("when the registry is read", () => {
-      it("declares the four products in their fixed order", () => {
+      it("declares the five products in their fixed order", () => {
         expect(PRODUCTS.map((product) => product.id)).toEqual([
           "me",
           "llm-ops",
+          "dashboards",
           "gateway",
           "governance",
         ]);
@@ -17,6 +18,7 @@ describe("product registry", () => {
       it("advertises function in every pitch", () => {
         expect(productById("me").pitch).toBe("Track your coding assistants");
         expect(productById("llm-ops").pitch).toBe("Observe, evaluate and test your agents");
+        expect(productById("dashboards").pitch).toBe("Your saved dashboards, in one place");
         expect(productById("gateway").pitch).toBe("Route, meter and bill LLM usage");
         expect(productById("governance").pitch).toBe("Every AI tool, license, agent and dollar");
       });
@@ -27,6 +29,19 @@ describe("product registry", () => {
     it("gives LLM Ops a home only once a project is known", () => {
       expect(productById("llm-ops").homeHref({ projectSlug: "demo" })).toBe("/demo");
       expect(productById("llm-ops").homeHref({ projectSlug: null })).toBeNull();
+    });
+
+    it("gives Dashboards the project's Dashboards area once a project is known", () => {
+      expect(productById("dashboards").homeHref({ projectSlug: "demo" })).toBe("/demo/dashboards");
+      expect(productById("dashboards").homeHref({ projectSlug: null })).toBeNull();
+    });
+
+    /** @scenario "AC1 Flag off hides the area" */
+    it("gates Dashboards on its release flag and analytics:view", () => {
+      expect(productById("dashboards").gates).toEqual([
+        { flag: "release_dashboards" },
+        { permission: "analytics:view" },
+      ]);
     });
 
     it("points the org and personal products at fixed homes", () => {
@@ -47,6 +62,20 @@ describe("productFromPathname", () => {
     expect(productFromPathname("/governance/departments")).toBe("governance");
     expect(productFromPathname("/my-project/analytics")).toBe("llm-ops");
     expect(productFromPathname("/[project]/messages")).toBe("llm-ops");
+  });
+
+  it("maps a project's Dashboards area to the Dashboards product", () => {
+    expect(productFromPathname("/my-project/dashboards")).toBe("dashboards");
+    expect(productFromPathname("/my-project/dashboards/agent-flight-deck")).toBe("dashboards");
+    expect(productFromPathname("/[project]/dashboards")).toBe("dashboards");
+    expect(productFromPathname("/[project]/dashboards/board_1")).toBe("dashboards");
+  });
+
+  it("keeps every other project page in LLM Ops", () => {
+    expect(productFromPathname("/my-project")).toBe("llm-ops");
+    expect(productFromPathname("/my-project/analytics/dashboards")).toBe("llm-ops");
+    expect(productFromPathname("/my-project/dashboards-old")).toBe("llm-ops");
+    expect(productFromPathname("/dashboards")).toBe("llm-ops");
   });
 
   /** @scenario An ops page is never remembered as the last product */

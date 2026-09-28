@@ -4,75 +4,119 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { createUiQueryClient } from "@langwatch/browser-host/query-client";
-import { answeringUiTransport } from "@langwatch/browser-host/testing-transport";
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  uiDeclarations,
+  type UiDeclarations,
+  type UiSavedDashboardsProps,
+} from "@langwatch/browser-host/declarations";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { navigationApi } from "../../../behavior/navigation-api.ts";
+const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => ({
+  current: undefined,
+}));
+
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useUiDeclarations: () => declarations.current,
+}));
+
+vi.mock("../../../behavior/navigation-api.ts", () => ({
+  navigationApi: {
+    annotation: { getPendingItemsCount: { useQuery: () => ({ data: { count: 0 } }) } },
+    personalWorkspaceFeatures: { get: { useQuery: () => ({}) } },
+    limits: { getUsage: { useQuery: () => ({}) } },
+    ops: { getBadgeCounts: { useQuery: () => ({}) } },
+    featureFlag: { isEnabledForEachOrganization: { useQuery: () => ({}) } },
+  },
+}));
+
 import type { NavigationProject } from "../../../model/navigation-host.ts";
 import { WithStubNavigationHost } from "../../../testing.tsx";
-import { MainMenuSections } from "../main-menu.tsx";
+import { ProductSidebar } from "../product-sidebar.tsx";
 
 const PROJECT: NavigationProject = { id: "project-1", slug: "demo", name: "Demo" };
 
-const transport = answeringUiTransport(({ path }) =>
-  path === "annotation.getPendingItemsCount"
-    ? Promise.resolve({ count: 0 })
-    : Promise.reject(new Error(`No test answer for ${path}`)),
-);
+/** Stands in for analytics' lent list, echoing the board it was told is open. */
+function LentList({ activeDashboardId }: UiSavedDashboardsProps) {
+  return (
+    <div data-testid="saved-dashboards">Saved dashboards open:{activeDashboardId ?? "none"}</div>
+  );
+}
 
-function renderMenu({
-  dashboardsEnabled,
-  permissions = ["analytics:view"],
+const analyticsLends = uiDeclarations([
+  {
+    name: "analytics",
+    installation: {
+      capabilities: { savedDashboards: { load: async () => ({ default: LentList }) } },
+    },
+  },
+]);
+
+function renderSidebar({
+  surface,
+  pathname,
 }: {
-  dashboardsEnabled: boolean;
-  permissions?: readonly string[];
+  surface: "llm-ops" | "dashboards";
+  pathname: string;
 }) {
+  declarations.current = analyticsLends;
   return render(
     <ChakraProvider value={defaultSystem}>
-      <navigationApi.Provider client={transport} queryClient={createUiQueryClient()}>
-        <WithStubNavigationHost
-          readings={{
-            project: PROJECT,
-            pathname: "/[project]",
-            permissions,
-            flags: { release_dashboards: { enabled: dashboardsEnabled, isLoading: false } },
-          }}
-        >
-          <MainMenuSections showExpanded />
-        </WithStubNavigationHost>
-      </navigationApi.Provider>
+      <WithStubNavigationHost
+        readings={{
+          project: PROJECT,
+          pathname,
+          permissions: ["analytics:view"],
+          flags: { release_dashboards: { enabled: true, isLoading: false } },
+          commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
+        }}
+      >
+        <ProductSidebar surface={surface} isCompact={false} />
+      </WithStubNavigationHost>
     </ChakraProvider>,
   );
 }
 
-const dashboardsLink = () => screen.queryByRole("link", { name: "Dashboards" });
+afterEach(() => {
+  cleanup();
+  declarations.current = undefined;
+});
 
-describe("the Dashboards entry in the main menu", () => {
-  describe("given the dashboards flag is off for the project", () => {
-    /** @scenario "AC1 Flag off hides the area" */
-    it("shows no Dashboards entry", () => {
-      renderMenu({ dashboardsEnabled: false });
+describe("the Dashboards product sidebar", () => {
+  describe("given a board is open", () => {
+    /** @scenario "AC3 Sidebar matches the reference" */
+    it("holds only Quick Search and the saved-dashboards list, marking the open board", async () => {
+      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards/agent-flight-deck" });
 
-      expect(dashboardsLink()).toBeNull();
-      expect(screen.getByRole("link", { name: "Analytics" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();
+      expect(await screen.findByTestId("saved-dashboards")).toHaveTextContent(
+        "open:agent-flight-deck",
+      );
+      expect(screen.queryByRole("link", { name: "Home" })).toBeNull();
+      expect(screen.queryByText("Observe")).toBeNull();
+      expect(screen.queryByText("Test")).toBeNull();
+      expect(screen.queryByText("Build")).toBeNull();
     });
   });
 
-  describe("given the dashboards flag is on for the project", () => {
-    it("links the Dashboards area of the project", () => {
-      renderMenu({ dashboardsEnabled: true });
+  describe("given the area's own address", () => {
+    it("marks no board as open", async () => {
+      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards" });
 
-      expect(dashboardsLink()).toHaveAttribute("href", "/demo/dashboards");
+      expect(await screen.findByTestId("saved-dashboards")).toHaveTextContent("open:none");
     });
+  });
+});
 
-    describe("when the member lacks analytics:view", () => {
-      it("shows no Dashboards entry", () => {
-        renderMenu({ dashboardsEnabled: true, permissions: [] });
+describe("the LLM Ops sidebar", () => {
+  describe("given the dashboards flag is on and the member holds analytics:view", () => {
+    it("carries no Dashboards entry and no saved-dashboards list", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo" });
 
-        expect(dashboardsLink()).toBeNull();
-      });
+      expect(screen.getByRole("link", { name: "Analytics" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Dashboards" })).toBeNull();
+      expect(screen.queryByTestId("saved-dashboards")).toBeNull();
     });
   });
 });
