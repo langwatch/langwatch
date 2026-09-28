@@ -69,7 +69,8 @@ export const publicAppConfigProjectionDefinition = Config.define((c) => ({
     langevalsEndpoint: c.env("LANGEVALS_ENDPOINT", z.string().optional()),
   },
   identity: {
-    passkeys: c.env("PASSKEYS_ENABLED", z.enum(["off", "on"]).optional().default("off")),
+    /** Offered unless "off", as auth's own switch reads it: the dev server drew no passkeys. */
+    passkeys: c.env("PASSKEYS_ENABLED", z.enum(["off", "on"]).optional()),
   },
   licensePaymentUrl: c.env("STRIPE_LICENSE_PAYMENT_LINK_URL", z.string().min(1).optional()),
   hideDevIndicator: c.env("HIDE_DEV_INDICATOR", onOff),
@@ -233,7 +234,7 @@ function projectPublicAppConfig(
       ...(config.hideDevIndicator ? { hideDevIndicator: true } : {}),
     }),
     auth: {
-      passkeys: config.identity.passkeys === "on",
+      passkeys: config.identity.passkeys !== "off",
       identityFrontDoor: true,
       authProvider: config.authProviderName ?? config.authProvider,
     },
