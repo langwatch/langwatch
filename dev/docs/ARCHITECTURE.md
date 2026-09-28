@@ -1182,8 +1182,9 @@ Per-entity calendar work (a report's cron) is a keyed process manager on its own
 eventing `ScheduledJob` scheduler is retired, its table dropped a release after its code (Alex, 2026-09-26).
 An experiment run executes on its pipeline, never in a request: `StartRun` is a command, a process manager
 emits one cell intent per row and target, the worker runs each cell as a command appending its result
-events, and projections fold progress that SSE and polling read. Abort is a command the manager honours;
-concurrency is the group queue's, per run (Alex, 2026-09-28).
+events, and projections fold progress that SSE and polling read. Abort is a command the manager honours.
+The manager is the concurrency window: it sends N cell intents, then one per finished cell; phase 2 reads
+phase 1's outputs from the run's fold; a run without an experiment is keyed by runId (Alex, 2026-09-28).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
