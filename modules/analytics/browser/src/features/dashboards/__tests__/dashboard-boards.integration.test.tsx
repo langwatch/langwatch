@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  * A member's own boards against an in-memory dashboards and widgets server:
- * the header, the blank board, the picker (questions for Langy, blocks for the
- * board), the period and the block menu. @see modules/dashboard/specs/dashboards-v1.feature
+ * the header, the blank board, the picker (questions for Langy), the period
+ * and the block menu. @see modules/dashboard/specs/dashboards-v1.feature
  */
 
 import {
@@ -16,7 +16,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
-import { findBlock, LIBRARY_BLOCKS } from "../blocks/index.ts";
+import { findBlock } from "../blocks/index.ts";
 import { TRACE_COUNT_SQL } from "../blocks/model/block-queries.ts";
 import { BLOCK_QUESTION_SECTIONS } from "../model/block-questions.ts";
 import { blockWidgetDefinition } from "../model/board-blocks.ts";
@@ -239,7 +239,7 @@ const writesTo = (server: ReturnType<typeof inMemoryServer>) =>
 async function pickerRegions() {
   const dialog = await screen.findByRole("dialog");
   return within(dialog)
-    .getAllByRole("region")
+    .queryAllByRole("region")
     .map((region) => region.getAttribute("aria-label"));
 }
 
@@ -286,7 +286,7 @@ describe("a member's own board", () => {
 
     describe("when the member browses every section", () => {
       /** @scenario "AC12 Only working questions are offered" */
-      it("lists every question in its section and every library block under Blocks", async () => {
+      it("lists every question in its own section, and no Blocks section", async () => {
         openPicker();
 
         const dialog = await screen.findByRole("dialog");
@@ -298,15 +298,8 @@ describe("a member's own board", () => {
             expect(row).toBeEnabled();
           }
         }
-        const blocks = within(within(dialog).getByRole("region", { name: "Blocks" }));
-        expect(blocks.getAllByRole("button")).toHaveLength(LIBRARY_BLOCKS.length);
-        for (const { title } of LIBRARY_BLOCKS) {
-          expect(blocks.getByRole("button", { name: new RegExp(escape(title)) })).toBeEnabled();
-        }
-        expect(await pickerRegions()).toEqual([
-          ...BLOCK_QUESTION_SECTIONS.map(({ title }) => title),
-          "Blocks",
-        ]);
+        expect(await pickerRegions()).toEqual(BLOCK_QUESTION_SECTIONS.map(({ title }) => title));
+        expect(within(dialog).queryByRole("region", { name: "Blocks" })).toBeNull();
       });
     });
 
@@ -333,40 +326,6 @@ describe("a member's own board", () => {
         expect(writesTo(server)).toEqual([]);
       });
     });
-
-    describe("when they choose a block from Blocks", () => {
-      /** @scenario "AC11 Ask Langy by question" */
-      it("adds that one block to the board, where it renders the block's real data", async () => {
-        const user = userEvent.setup();
-        const { server, host } = openPicker();
-
-        const dialog = await screen.findByRole("dialog");
-        const blocks = within(within(dialog).getByRole("region", { name: "Blocks" }));
-        await user.click(blocks.getByRole("button", { name: /Trace count over time/ }));
-
-        await waitFor(() => expect(host.lastQuery).toEqual({ addBlock: void 0 }));
-        expect(host.langyAsks).toEqual([]);
-        const creates = callsTo(server, "dashboardWidgets.create");
-        expect(creates).toHaveLength(1);
-        expect(creates[0]?.input).toMatchObject({
-          projectId: "proj-1",
-          dashboardId: "board-1",
-          name: "Trace count over time",
-          queries: [{ name: "main", sql: TRACE_COUNT_SQL }],
-        });
-        const block = await screen.findByTestId("dashboard-block-trace-count-over-time");
-        await waitFor(() =>
-          expect(
-            callsTo(server, "analytics.lwql.query").some(
-              (call) => (call.input as Input).sql === TRACE_COUNT_SQL,
-            ),
-          ).toBe(true),
-        );
-        await waitFor(() => expect(within(block).queryByText("Loading")).toBeNull());
-        expect(within(block).queryByText("No data yet")).toBeNull();
-        expect(screen.getAllByTestId(/^dashboard-block-/)).toHaveLength(1);
-      });
-    });
   });
 
   describe("given the picker is open and Langy is not available to the member", () => {
@@ -374,7 +333,7 @@ describe("a member's own board", () => {
     it.each([
       ["the release flag is off", FLAG_ON, LANGY_MEMBER],
       ["the member may not start a conversation", LANGY_ON, MEMBER],
-    ])("shows only the Blocks section when %s", async (_case, flags, permissions) => {
+    ])("shows no questions and nothing to search when %s", async (_case, flags, permissions) => {
       openBoard({
         server: inMemoryServer({ boards: OWN_BOARDS }),
         query: { addBlock: "open" },
@@ -382,7 +341,8 @@ describe("a member's own board", () => {
         permissions,
       });
 
-      expect(await pickerRegions()).toEqual(["Blocks"]);
+      expect(await pickerRegions()).toEqual([]);
+      expect(await screen.findByText("Nothing matches your search.")).toBeInTheDocument();
       for (const { question } of BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions)) {
         expect(screen.queryByRole("button", { name: new RegExp(escape(question)) })).toBeNull();
       }
@@ -741,26 +701,6 @@ describe("the Agent Flight Deck", () => {
       expect(ask?.context[0]).toMatchObject({ label: FLIGHT_DECK.name });
       expect(ask?.context[0]?.ref).toContain("read-only");
       expect(writesTo(server)).toEqual([]);
-    });
-
-    /** @scenario "AC11 Ask Langy by question" */
-    it("adds a Blocks block to the chosen board of their own, never to the Flight Deck", async () => {
-      const user = userEvent.setup();
-      const server = inMemoryServer({ boards: OWN_BOARDS });
-      const { host } = openFlightDeck({ server, query: { addBlock: "open" } });
-
-      await screen.findByRole("option", { name: "Latency" });
-      await user.selectOptions(screen.getByRole("combobox", { name: "Add to" }), "board-2");
-      await user.click(screen.getByRole("button", { name: /Total cost over time/ }));
-
-      await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-2"]));
-      const creates = callsTo(server, "dashboardWidgets.create");
-      expect(creates).toHaveLength(1);
-      expect(creates[0]?.input).toMatchObject({
-        dashboardId: "board-2",
-        name: "Total cost over time",
-      });
-      expect(host.successes).toEqual([{ title: "Added to Latency" }]);
     });
 
     it("writes the picker's address when Add chart is pressed", async () => {

@@ -4,8 +4,6 @@
  * question; Langy answers from LangWatchQL over the board's period and grain.
  */
 
-import { type BlockDefinition, LIBRARY_BLOCKS } from "../blocks/index.ts";
-
 /** The icon a question row shows; the picker maps each name to a glyph. */
 export type BlockQuestionIcon =
   | "gauge"
@@ -329,12 +327,4 @@ export function searchBlockQuestions({
       ),
     }))
     .filter((section) => section.questions.length > 0);
-}
-
-/** The library blocks whose title or subtitle match a search, in library order. */
-export function searchLibraryBlocks(search: string): BlockDefinition[] {
-  const needle = search.trim().toLowerCase();
-  return LIBRARY_BLOCKS.filter(({ title, subtitle }) =>
-    `${title} ${subtitle}`.toLowerCase().includes(needle),
-  );
 }

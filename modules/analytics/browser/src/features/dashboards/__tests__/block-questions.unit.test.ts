@@ -9,11 +9,7 @@ import { describe, expect, it } from "vitest";
 import { findBlock, LIBRARY_BLOCKS } from "../blocks/index.ts";
 import * as blockQueries from "../blocks/model/block-queries.ts";
 import { boardPromptQuestion, FLIGHT_DECK_SUBJECT } from "../langy/model/board-langy.ts";
-import {
-  BLOCK_QUESTION_SECTIONS,
-  searchBlockQuestions,
-  searchLibraryBlocks,
-} from "../model/block-questions.ts";
+import { BLOCK_QUESTION_SECTIONS, searchBlockQuestions } from "../model/block-questions.ts";
 import {
   blockOfWidgetCode,
   blockWidgetDefinition,
@@ -102,15 +98,6 @@ describe("the picker's questions", () => {
         "latency-slo",
         "howto-latency",
       ]);
-    });
-
-    it("keeps only the library blocks whose title or subtitle match", () => {
-      expect(searchLibraryBlocks("latency").map(({ id }) => id)).toEqual([
-        "latency-percentiles",
-        "p95-latency-over-time",
-        "previous-period-comparison",
-      ]);
-      expect(searchLibraryBlocks("")).toHaveLength(LIBRARY_BLOCKS.length);
     });
   });
 });
