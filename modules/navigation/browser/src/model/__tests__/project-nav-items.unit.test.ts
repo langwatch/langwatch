@@ -2,7 +2,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { projectNavItemAt, projectNavItems, toProjectRoutePattern } from "../project-nav-items.ts";
+import {
+  dashboardsAreaAt,
+  projectNavItemAt,
+  projectNavItems,
+  toProjectRoutePattern,
+} from "../project-nav-items.ts";
 
 describe("given an address inside the reader's project", () => {
   describe("when the project home is on screen", () => {
@@ -67,6 +72,28 @@ describe("given the document title's read of the open destination", () => {
     /** The title then carries the project alone, which is what it did before. */
     it("names nothing rather than the closest guess", () => {
       expect(projectNavItemAt("/[project]/traces/abc123")).toBeUndefined();
+    });
+  });
+});
+
+describe("given the Dashboards area's read of the open board", () => {
+  describe("when a board is open", () => {
+    it("names the board", () => {
+      expect(dashboardsAreaAt("/[project]/dashboards/agent-flight-deck")).toEqual({
+        dashboardId: "agent-flight-deck",
+      });
+    });
+  });
+
+  describe("when the area's own address is open", () => {
+    it("is inside the area with no board yet", () => {
+      expect(dashboardsAreaAt("/[project]/dashboards")).toEqual({ dashboardId: void 0 });
+    });
+  });
+
+  describe("when a page outside the area shares its prefix", () => {
+    it("is outside the area", () => {
+      expect(dashboardsAreaAt("/[project]/dashboards-old")).toBeUndefined();
     });
   });
 });

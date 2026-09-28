@@ -65,6 +65,15 @@ export abstract class AnalyticsHostApi {
 
   abstract hasPermission(permission: string): boolean;
 
+  /**
+   * Whether the grants have arrived: before then `hasPermission` answers
+   * `false` for everything.
+   */
+  abstract isSettled(): boolean;
+
+  /** On, off, or `undefined` while the flag has not answered yet. */
+  abstract featureFlag(flag: string): boolean | undefined;
+
   abstract route(): AnalyticsRouteReading;
 
   /** Replaces the WHOLE query, so a screen can remove a key as well as set one. */
@@ -73,8 +82,8 @@ export abstract class AnalyticsHostApi {
     options?: { replace?: boolean },
   ): void;
 
-  /** Sends the reader somewhere else in the application. */
-  abstract navigate(to: string): void;
+  /** Sends the reader somewhere else; `replace` leaves no history entry to come back to. */
+  abstract navigate(to: string, options?: { replace?: boolean }): void;
 
   /** Opens automation's drawer, which owns alert authoring; analytics never renders it. */
   abstract openAutomationDrawer(request: AnalyticsAlertAuthoring): void;

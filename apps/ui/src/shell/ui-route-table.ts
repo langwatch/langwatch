@@ -752,6 +752,16 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/[project]/analytics/custom/[id]",
           },
 
+          // Dashboards v1 (behind release_dashboards; the screens gate themselves)
+          {
+            path: "/:project/dashboards",
+            page: "pages/[project]/dashboards/index",
+          },
+          {
+            path: "/:project/dashboards/:dashboardId",
+            page: "pages/[project]/dashboards/[dashboardId]",
+          },
+
           // Experiments
           {
             path: "/:project/experiments",
