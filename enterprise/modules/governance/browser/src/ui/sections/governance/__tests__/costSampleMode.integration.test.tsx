@@ -169,6 +169,7 @@ describe("the sample panels on the cost screen", () => {
   describe("given the organization has real cost figures", () => {
     beforeEach(withRealFigures);
 
+    /** @scenario "Sample panels step aside once the page has real figures" */
     it("keeps the invented panels off the screen", () => {
       renderScreen();
 
@@ -181,6 +182,7 @@ describe("the sample panels on the cost screen", () => {
       expect(screen.getByText("Engineering")).toBeInTheDocument();
     });
 
+    /** @scenario "Sample panels step aside once the page has real figures" */
     it("offers to show the sample panels rather than hiding the option", () => {
       renderScreen();
 
@@ -236,7 +238,23 @@ describe("the sample panels on the cost screen", () => {
     });
   });
 
+  describe("given every read answered empty and the reader has not chosen", () => {
+    beforeEach(withNothingMeasured);
+
+    /** @scenario "An empty page waits for an explicit sample choice" */
+    it("keeps the sample panels off until the reader asks for them", () => {
+      renderScreen();
+      expect(screen.queryAllByText(A_SAMPLE_FIGURE)).toHaveLength(0);
+
+      fireEvent.click(screen.getByRole("button", { name: "See sample data" }));
+
+      expect(screen.getAllByText(A_SAMPLE_FIGURE).length).toBeGreaterThan(0);
+      expect(screen.getByRole("status")).toHaveTextContent(/nothing here is real/i);
+    });
+  });
+
   describe("given a read has not answered yet", () => {
+    /** @scenario "An unanswered read shows no sample panels rather than flashing them" */
     it("shows no sample panels rather than flashing them up and pulling them away", () => {
       renderScreen();
 
@@ -247,6 +265,7 @@ describe("the sample panels on the cost screen", () => {
   describe("given the reader turns the sample panels on", () => {
     beforeEach(withRealFigures);
 
+    /** @scenario "The reader's own choice outlives the data underneath it" */
     it("shows them alongside the real ones", () => {
       renderScreen();
 
@@ -254,6 +273,10 @@ describe("the sample panels on the cost screen", () => {
 
       expect(screen.getAllByText(A_SAMPLE_FIGURE).length).toBeGreaterThan(0);
       expect(screen.getByText("Engineering")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Hide sample data" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
     });
 
     it("lets them turn the panels back off", () => {

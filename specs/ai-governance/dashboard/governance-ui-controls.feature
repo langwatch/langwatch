@@ -420,7 +420,7 @@ Feature: The controls every AI Governance page renders the same way
   # Sample mode
   # ===========================================================================
 
-  @unit
+  @integration
   Scenario: An empty page waits for an explicit sample choice
     Given every read on the page has answered and none of them holds a row
     When the page renders
@@ -429,28 +429,28 @@ Feature: The controls every AI Governance page renders the same way
     Then the sample panels are on screen
     And the banner says nothing on the page is real
 
-  @unit
+  @integration
   Scenario: Sample panels step aside once the page has real figures
     Given a read on the page holds a row
     When the page renders
     Then the sample panels are off screen
     And the toggle still offers to show them
 
-  @unit
+  @integration
   Scenario: An unanswered read shows no sample panels rather than flashing them
     Given at least one read has not answered yet
     When the page renders
     Then no sample panels are shown
     And none appear and disappear as the reads land
 
-  @unit
+  @integration
   Scenario: The reader's own choice outlives the data underneath it
     Given a page with real figures on it
     When the reader turns the sample panels on
     Then they stay on
     And the toggle reads as pressed
 
-  @unit
+  @integration
   Scenario: A page may reword the sample banner but not soften it
     Given a page states its own reason for its sample panels
     When the banner renders
@@ -463,25 +463,25 @@ Feature: The controls every AI Governance page renders the same way
   # not listening. The default is always the organization's own data.
   # Samples replace every displayed dataset only after an explicit choice.
 
-  @unit
+  @integration
   Scenario: One sample choice governs every governance page
     Given the reader turned the sample panels on for one page
     When they open a different governance page
     Then its sample panels are on as well
 
-  @unit
+  @integration
   Scenario: Turning the samples off on one page turns them off everywhere
     Given the reader turned the sample panels off for one page
     When they open a governance page with nothing measured on it
     Then no sample panels are shown there either
 
-  @unit
+  @integration
   Scenario: Every sample toggle on screen moves together
     Given two sample toggles are rendered at once
     When the reader presses one of them
     Then the other reads as pressed without waiting for a reload
 
-  @unit
+  @integration
   Scenario: A remembered sample choice survives leaving the page and coming back
     Given the reader turned the sample panels on for a page
     When they leave that page and return within the same sitting
