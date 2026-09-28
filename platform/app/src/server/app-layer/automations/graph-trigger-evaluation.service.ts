@@ -23,10 +23,6 @@
  * `lastRunAt`).
  */
 
-import {
-  type SlackActionParams,
-  slackDeliveryMethodOf,
-} from "@langwatch/automations/providers/slack";
 import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
@@ -49,9 +45,9 @@ import {
   graphAlertFireDigest,
 } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
 import {
-  type ResolvedSlackToken,
-  slackTokenMissingDispatchError,
-} from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
+  type SlackDestinationResolver,
+  slackConnectionMissingDispatchError,
+} from "~/server/app-layer/automations/slack-integration/slack-destination-resolver";
 import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import {
@@ -204,16 +200,8 @@ export interface GraphTriggerEvaluationDeps {
    * recording problem cannot suppress an alert.
    */
   recordEvaluation?(input: RecordEvaluationInput): Promise<void>;
-  /**
-   * ADR-093 §5 token resolution: the automation's own stored token, else the
-   * project's Slack integration, else null. Required — an absent resolver
-   * would silently skip project-scoped resolution, which is exactly the
-   * regression the wiring exists to prevent.
-   */
-  resolveSlackToken(params: {
-    projectId: string;
-    actionParams: Pick<SlackActionParams, "slackBotToken">;
-  }): Promise<ResolvedSlackToken | null>;
+  /** ADR-093 §5a: where a Slack delivery goes (connection, else legacy secret). */
+  resolveSlackDestination: SlackDestinationResolver;
   /** Base host for building deep links inside rendered templates
    *  (ADR-034 Phase 8.1). Injected, not read from env, so this service
    *  stays pure and testable. */
@@ -640,37 +628,34 @@ async function runGraphTriggerEvaluation({
       baseHost: deps.baseHost,
     });
 
-    // ADR-041: a bot connection posts via the Web API (gated blocks render);
-    // extract + decrypt the token here so the dispatch helper stays crypto-free.
-    //
-    // An unresolvable bot connection FAILS LOUD. Falling through to the webhook
-    // branch would be worse than useless: bot params carry no `slackWebhook`, so
-    // the dispatcher would log "no Slack webhook configured", report didSend
-    // false, and the customer would never learn their alert is broken. A
-    // non-retryable DispatchError dead-letters the row with an actionable signal.
+    // ADR-093 §5a: the connection's kind decides bot or webhook; the token or
+    // URL is resolved here so the dispatch helper stays crypto-free. Nothing to
+    // deliver with FAILS LOUD: a non-retryable DispatchError dead-letters the
+    // row with an actionable signal instead of a silent didSend false.
     let botDestination: { token: string; channel: string } | null = null;
+    let slackWebhook: string | null = null;
     if (trigger.action === "SEND_SLACK_MESSAGE") {
-      const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
-      if (slackDeliveryMethodOf(slackParams) === "bot") {
-        // ADR-093 §5: the automation's own token wins; the project's Slack
-        // integration serves the rest. The wired resolver owns the whole
-        // decision.
-        const resolved: ResolvedSlackToken | null =
-          await deps.resolveSlackToken({
-            projectId,
-            actionParams: slackParams,
-          });
-        if (!resolved) {
-          throw slackTokenMissingDispatchError({ triggerName: trigger.name });
-        }
-        const channel = slackParams.slackChannelId?.trim();
-        if (!channel) {
-          throw new DispatchError({
-            message: `Slack bot connection for alert "${trigger.name}" is missing its channel — the alert cannot be delivered.`,
-            retryable: false,
-          });
-        }
-        botDestination = { token: resolved.token, channel };
+      const destination = await deps.resolveSlackDestination({
+        projectId,
+        actionParams: trigger.actionParams,
+      });
+      if (!destination) {
+        throw slackConnectionMissingDispatchError({
+          triggerName: trigger.name,
+        });
+      }
+      if (destination.kind === "webhook") {
+        slackWebhook = destination.url;
+      } else if (!destination.channel) {
+        throw new DispatchError({
+          message: `Slack bot connection for alert "${trigger.name}" is missing its channel — the alert cannot be delivered.`,
+          retryable: false,
+        });
+      } else {
+        botDestination = {
+          token: destination.token,
+          channel: destination.channel,
+        };
       }
     }
 
@@ -730,7 +715,7 @@ async function runGraphTriggerEvaluation({
         project,
         context,
         recipients: params.members ?? [],
-        slackWebhook: params.slackWebhook ?? null,
+        slackWebhook,
         botDestination,
         fireDigest: graphAlertFireDigest({
           triggerId,

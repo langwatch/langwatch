@@ -126,13 +126,6 @@ export interface ConfigFormProps<S, TPreview = unknown> {
   ctx: ConfigFormCtx<TPreview>;
 }
 
-/** Project-level facts a preview needs that the draft slice cannot hold. */
-export interface PreviewDeliveryContext {
-  /** ADR-093 §5: the project has a Slack integration, so a Slack delivery has
-   *  a token even when the automation stores none of its own. */
-  hasProjectSlackIntegration: boolean;
-}
-
 /** Notify-specific client additions. Generic over slice and preview. */
 export interface NotifyClientDef<S = unknown, TPreview = unknown>
   extends ClientDef<S, TPreview> {
@@ -148,6 +141,8 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
      *  webhook. `botToken` is the freshly-typed token, or null to reuse the
      *  saved automation's stored token. */
     botDestination?: { channelId: string; botToken: string | null } | null;
+    /** The Slack connection the test fire delivers through (ADR-093 §5a). */
+    slackIntegrationId?: string | null;
     /** Generic HTTP destination (ADR-040): the full request shape the test
      *  fire sends through the SSRF-fenced sender. */
     webhookDestination?: {
@@ -160,13 +155,9 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
   /** Template strings contributed to the save payload (`templates`). */
   templatesFromSlice(slice: S): TemplateDraft;
   /** Render options the PREVIEW must mirror so it shows what will really be
-   *  delivered. Slack only renders the modern blocks (charts, tables, alert
-   *  banners) over a bot connection with a token behind it — without this the
-   *  preview would show a chart that the webhook is going to strip, or one that
-   *  a project with no Slack integration cannot send at all. `context` carries
-   *  the project-level facts the slice does not hold. Omit when the provider's
-   *  preview needs no delivery-specific options. */
-  previewOptions?(params: { slice: S; context: PreviewDeliveryContext }): {
+   *  delivered: Slack renders charts, tables and banners only over a bot
+   *  connection. Omit when the preview needs no delivery-specific options. */
+  previewOptions?(params: { slice: S }): {
     allowGatedBlocks?: boolean;
   };
 }

@@ -3,38 +3,26 @@ import type { TriggerActionParams } from "./triggerActionParams";
 
 /**
  * The one decision both Slack-destination display surfaces need: what kind
- * of delivery a `SEND_SLACK_MESSAGE` row actually is, and what's safe to
- * show for it. Pure and framework-free so `ViewAutomationDrawer.tsx` (the
- * drawer) and `pages/[project]/automations.tsx` (the list page's "Notifies"
- * cell) render the exact same call — each still owns its own JSX/styling,
- * only the underlying decision is shared.
- *
- * #6244: before this, both surfaces (independently) rendered every Slack
- * row as "Webhook"/"Slack webhook", including bot-token deliveries — which
- * never carry a webhook at all — so neither could answer "where does this
- * actually post?". Fixed once here instead of drifting into two
- * hand-maintained copies again.
+ * of delivery a `SEND_SLACK_MESSAGE` row actually is, which connection it
+ * goes through, and what's safe to show for it. Pure, so the view drawer and
+ * the automations list render the exact same call (#6244, ADR-093 §5a).
  */
 export type SlackDestinationPresentation =
   | {
       kind: "bot";
-      /** The destination channel's raw Slack id (e.g. `C0123456`), or
-       *  `null` when the automation hasn't had one chosen yet. No channel
-       *  NAME is ever persisted (only the composer, live and
-       *  bot-token-authenticated, can resolve one) — the id is still the
-       *  exact identifier the author picked, so it's shown plainly rather
-       *  than hidden. */
+      /** The name of the connection the row delivers through, or `null` for
+       *  a row still on its own secret, or whose connection is gone. */
+      connectionName: string | null;
+      /** The destination channel's raw Slack id (e.g. `C0123456`), or `null`
+       *  when none was chosen. Only the id is ever persisted. */
       channelId: string | null;
     }
   | {
       kind: "webhook";
+      connectionName: string | null;
       /** The webhook URL, ONLY when it's safe to show on hover — a real
-       *  Slack incoming webhook always starts `https://hooks.slack.com/…`.
-       *  `null` for an absent value, or a non-URL placeholder (e.g. a
-       *  future redaction substitute from the WS-8 REST-redaction work):
-       *  there is nothing meaningful to show on hover, so callers must
-       *  render the masked label with no tooltip rather than risk exposing
-       *  or misrepresenting the placeholder as though it were the URL. */
+       *  Slack incoming webhook on a row that stores its own. `null` for a
+       *  connection (its URL never reaches the browser) or a placeholder. */
       tooltipUrl: string | null;
     };
 
@@ -53,25 +41,50 @@ function safeSlackWebhookUrl(value: string | undefined): string | null {
   }
 }
 
-export function slackDestinationPresentation(
+export function slackDestinationPresentation({
+  actionParams,
+  connections,
+}: {
   actionParams: Pick<
     TriggerActionParams,
-    "slackDelivery" | "slackChannelId" | "slackWebhook"
-  >,
-): SlackDestinationPresentation {
+    "slackDelivery" | "slackChannelId" | "slackWebhook" | "slackIntegrationId"
+  >;
+  /** The connections the project can use, to name the row's one. */
+  connections: ReadonlyArray<{ id: string; name: string }> | undefined;
+}): SlackDestinationPresentation {
+  const connectionName = actionParams.slackIntegrationId
+    ? (connections?.find((c) => c.id === actionParams.slackIntegrationId)
+        ?.name ?? null)
+    : null;
   // Absent `slackDelivery` means a legacy row saved before bot delivery
-  // existed — back-compat default to webhook. The switch is exhaustive over
-  // `SlackDeliveryMethod`, so a new delivery method fails typecheck here
-  // instead of silently presenting as a webhook.
+  // existed. The switch is exhaustive, so a new method fails typecheck here.
   const delivery: SlackDeliveryMethod = actionParams.slackDelivery ?? "webhook";
   switch (delivery) {
     case "bot":
-      return { kind: "bot", channelId: actionParams.slackChannelId ?? null };
-    case "webhook": {
+      return {
+        kind: "bot",
+        connectionName,
+        channelId: actionParams.slackChannelId ?? null,
+      };
+    case "webhook":
       return {
         kind: "webhook",
+        connectionName,
         tooltipUrl: safeSlackWebhookUrl(actionParams.slackWebhook),
       };
-    }
   }
+}
+
+/** One line for the destination: the connection's name (or the delivery
+ *  kind when there is none) and, for a bot, the channel. */
+export function slackDestinationLabel(
+  destination: SlackDestinationPresentation,
+): string {
+  if (destination.kind === "webhook") {
+    return destination.connectionName ?? "Slack webhook";
+  }
+  const name = destination.connectionName ?? "Slack app";
+  return destination.channelId
+    ? `${name} · channel ${destination.channelId}`
+    : name;
 }

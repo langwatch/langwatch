@@ -15,6 +15,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { slackActionParamsSchema } from "@langwatch/automations/providers/slack";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -52,6 +53,7 @@ import {
 } from "~/server/api-key/auth-middleware";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import { isDemoProject } from "~/server/app-layer/authz/permission-adapters";
+import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import {
   predefinedEventsSchemas,
@@ -1287,6 +1289,17 @@ secured.access(triggersManageAuth).post(
 
     try {
       const validatedData = slackTriggerBodySchema.parse(body);
+      // ADR-093 §5a: the URL is stored once, as a connection; the automation
+      // keeps only its id. The actor follows the governance API's fallback.
+      const keyUser = c.get("apiKeyUserId");
+      const actionParams = await createSlackIntegrationService({
+        prisma,
+      }).connectActionParams({
+        projectId: project.id,
+        actorId: typeof keyUser === "string" ? keyUser : `svc_${project.id}`,
+        actionParams: { slackWebhook: validatedData.slack_webhook },
+      });
+      const storedParams = slackActionParamsSchema.parse(actionParams);
 
       await prisma.trigger.create({
         data: {
@@ -1295,7 +1308,7 @@ secured.access(triggersManageAuth).post(
           name: validatedData.name,
           message: validatedData.message,
           filters: JSON.stringify(validatedData.filters),
-          actionParams: { slackWebhook: validatedData.slack_webhook },
+          actionParams: storedParams,
           alertType: validatedData.alert_type,
         },
       });

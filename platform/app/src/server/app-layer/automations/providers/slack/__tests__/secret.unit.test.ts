@@ -15,16 +15,19 @@ import {
 } from "../server";
 
 describe("persistSlackActionParams", () => {
-  // Since ADR-093 §5 the composer stops asking for a token: the project's Slack
-  // integration serves the delivery, so persist must accept a bot connection
-  // with nothing in the token field rather than refusing it.
-  describe("when a bot connection carries no token at all", () => {
-    /** @scenario "New automations rely on the project integration, not a token of their own" */
-    it("stores no token rather than refusing the save", () => {
+  describe("when the params point at a connection", () => {
+    it("stores only the id, the method and a bot connection's channel", () => {
       const stored = persistSlackActionParams({
-        incoming: { slackDelivery: "bot", slackChannelId: "C1" },
+        incoming: {
+          slackIntegrationId: "conn-1",
+          slackDelivery: "bot",
+          slackChannelId: " C1 ",
+          slackBotToken: "xoxb-leaked",
+          slackWebhook: "https://hooks.slack.com/x",
+        },
       });
       expect(stored).toEqual({
+        slackIntegrationId: "conn-1",
         slackDelivery: "bot",
         slackChannelId: "C1",
       });
@@ -35,7 +38,6 @@ describe("persistSlackActionParams", () => {
   });
 
   describe("when the kept sentinel arrives on a row that already has one", () => {
-    /** @scenario "A legacy automation keeps delivering with its own token" */
     it("keeps the stored ciphertext", () => {
       expect(
         persistSlackActionParams({
@@ -109,6 +111,17 @@ describe("persistSlackActionParams", () => {
 });
 
 describe("redactSlackActionParams", () => {
+  it("drops a migrated row's legacy secrets once it points at a connection", () => {
+    expect(
+      redactSlackActionParams({
+        slackIntegrationId: "conn-1",
+        slackDelivery: "webhook",
+        slackWebhook: "https://hooks.slack.com/x",
+        slackBotToken: "enc(xoxb-old)",
+      }),
+    ).toEqual({ slackIntegrationId: "conn-1", slackDelivery: "webhook" });
+  });
+
   it("replaces the ciphertext with a set flag", () => {
     expect(
       redactSlackActionParams({

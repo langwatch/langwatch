@@ -1,7 +1,3 @@
-import {
-  type SlackActionParams,
-  slackDeliveryMethodOf,
-} from "@langwatch/automations/providers/slack";
 import { REPORT_TRIGGER_DEFAULTS } from "@langwatch/automations/templating/defaults";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import {
@@ -20,7 +16,7 @@ import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/de
 import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import type { ReportSource } from "~/server/app-layer/automations/report.builder";
 import { extractReportFromTriggerRow } from "~/server/app-layer/automations/report.builder";
-import type { ResolvedSlackToken } from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
+import type { SlackDestinationResolver } from "~/server/app-layer/automations/slack-integration/slack-destination-resolver";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 
@@ -35,15 +31,8 @@ export interface ReportDispatchDeps {
   sendEmail: typeof sendRenderedTriggerEmail;
   sendSlack: typeof sendRenderedSlackMessage;
   sendSlackBot: typeof postSlackChatMessage;
-  /**
-   * ADR-093 §5 token resolution: the report's own stored token, else the
-   * project's Slack integration, else null. Required — an absent resolver
-   * would silently skip project-scoped resolution.
-   */
-  resolveSlackToken(params: {
-    projectId: string;
-    actionParams: Pick<SlackActionParams, "slackBotToken">;
-  }): Promise<ResolvedSlackToken | null>;
+  /** ADR-093 §5a: where a Slack delivery goes (connection, else legacy secret). */
+  resolveSlackDestination: SlackDestinationResolver;
   filterSuppressedRecipients: (params: {
     projectId: string;
     triggerId: string;
@@ -174,8 +163,8 @@ type ReportContext = Parameters<typeof renderTriggerSlack>[0]["context"];
 
 /**
  * The Slack arm of a report delivery. A bot connection posts via the Web API
- * with the gate open (ADR-041); the report's own token wins and the project's
- * Slack integration serves the rest (ADR-093 §5). A report with neither
+ * with the gate open (ADR-041); the report's connection decides where it goes,
+ * else its own legacy secret (ADR-093 §5a). A report with neither
  * delivers nothing and records no fire — the same outcome every other
  * unusable configuration on this path has (no recipients, no webhook, no
  * channel). Report dispatch has no delivery-failure surface at all:
@@ -191,34 +180,25 @@ async function deliverReportSlack({
   trigger,
   projectId,
   context,
-  slackWebhook,
 }: {
   deps: ReportDispatchDeps;
   trigger: ReportTriggerRow;
   projectId: string;
   context: ReportContext;
-  slackWebhook: string | null;
 }): Promise<boolean> {
-  const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
-  if (slackDeliveryMethodOf(slackParams) === "bot") {
-    // ADR-093 §5 resolution order lives in the shared resolver, which the
-    // composition root always wires.
-    const resolved = await deps.resolveSlackToken({
-      projectId,
-      actionParams: slackParams,
-    });
-    const channel = slackParams.slackChannelId?.trim();
-    if (!resolved) {
-      logger.warn(
-        {
-          projectId,
-          triggerId: trigger.id,
-          code: "slack_integration_missing",
-        },
-        "Report has no Slack bot token of its own and the project has no Slack integration — nothing sent",
-      );
-      return false;
-    }
+  const destination = await deps.resolveSlackDestination({
+    projectId,
+    actionParams: trigger.actionParams,
+  });
+  if (!destination) {
+    logger.warn(
+      { projectId, triggerId: trigger.id, code: "slack_integration_missing" },
+      "Report has no usable Slack connection and no secret of its own — nothing sent",
+    );
+    return false;
+  }
+  if (destination.kind === "bot") {
+    const channel = destination.channel;
     if (!channel) {
       logger.warn(
         { projectId, triggerId: trigger.id, code: "slack_channel_missing" },
@@ -237,7 +217,7 @@ async function deliverReportSlack({
       allowGatedBlocks: true,
     });
     await deps.sendSlackBot({
-      token: resolved.token,
+      token: destination.token,
       channel,
       payload: rendered.payload,
       triggerName: trigger.name,
@@ -245,13 +225,6 @@ async function deliverReportSlack({
     return true;
   }
 
-  if (!slackWebhook) {
-    logger.warn(
-      { projectId, triggerId: trigger.id, code: "slack_webhook_missing" },
-      "Report is configured for Slack webhook delivery but has no webhook — nothing sent",
-    );
-    return false;
-  }
   const rendered = await renderTriggerSlack({
     templateType: resolveSlackTemplateType({
       configured: trigger.slackTemplateType,
@@ -262,7 +235,7 @@ async function deliverReportSlack({
     defaults: REPORT_TRIGGER_DEFAULTS,
   });
   await deps.sendSlack({
-    triggerWebhook: slackWebhook,
+    triggerWebhook: destination.url,
     triggerName: trigger.name,
     payload: rendered.payload,
   });
@@ -309,10 +282,7 @@ export async function dispatchScheduledReport({
   const project = await deps.loadProject(fire.projectId);
   if (!project) return;
 
-  const params = trigger.actionParams as {
-    members?: string[];
-    slackWebhook?: string;
-  };
+  const params = trigger.actionParams as { members?: string[] };
 
   // Every report carries its DATA, not just a link to it, over the window
   // `[previous slot, this slot]` — exactly the period this fire is responsible
@@ -403,7 +373,6 @@ export async function dispatchScheduledReport({
         trigger,
         projectId: project.id,
         context,
-        slackWebhook: params.slackWebhook ?? null,
       });
     }
 

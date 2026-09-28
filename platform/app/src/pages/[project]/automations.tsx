@@ -51,7 +51,10 @@ import {
   RUNAWAY_PAUSE_EXPLANATION,
   RUNAWAY_PAUSE_REASON,
 } from "~/features/automations/logic/pauseReasons";
-import { slackDestinationPresentation } from "~/features/automations/logic/slackDestinationPresentation";
+import {
+  slackDestinationLabel,
+  slackDestinationPresentation,
+} from "~/features/automations/logic/slackDestinationPresentation";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { showErrorToast } from "~/features/errors";
@@ -120,7 +123,7 @@ const sectionFromPath = (pathname: string): AutomationSection => {
 };
 
 function AutomationsPage() {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const router = useRouter();
   const section = sectionFromPath(router.pathname);
@@ -136,19 +139,12 @@ function AutomationsPage() {
     null,
   );
 
-  // ADR-093 §5: one query for the whole table, not one per row — every row's
-  // legacy-token nudge asks the same question about the same project. Writes
-  // need `project:update`, which the row nudge only offers to a caller that
-  // holds it; the server checks again either way.
-  const slackIntegration = api.slackIntegration.getStatus.useQuery(
+  // One query for the whole table, not one per row: every Slack row names
+  // its connection from the same list (ADR-093 §5a).
+  const slackConnections = api.slackIntegration.list.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id, refetchOnWindowFocus: false },
   );
-  const slackWorkspaceName = slackIntegration.data?.connected
-    ? slackIntegration.data.slackTeamName
-    : null;
-  const canSwitchSlackToken =
-    hasPermission("project:update") && !!slackWorkspaceName;
 
   const triggers = api.automation.getTriggers.useQuery(
     {
@@ -349,7 +345,12 @@ function AutomationsPage() {
   ) => {
     switch (action) {
       case "SEND_SLACK_MESSAGE":
-        return <SlackNotifyCell actionParams={actionParams} />;
+        return (
+          <SlackNotifyCell
+            actionParams={actionParams}
+            connections={slackConnections.data?.connections}
+          />
+        );
       case "SEND_EMAIL":
         return <EmailList emails={actionParams.members ?? []} />;
       case "ADD_TO_DATASET":
@@ -944,9 +945,6 @@ function AutomationsPage() {
                               applyChecks={applyChecks}
                               actionItems={actionItems}
                               triggerActionName={triggerActionName}
-                              slackWorkspaceName={slackWorkspaceName}
-                              canSwitchSlackToken={canSwitchSlackToken}
-                              projectId={project?.id ?? ""}
                               sharedRowProps={sharedRowProps}
                               activeCell={activeCell}
                               rowActionsMenu={rowActionsMenu}
@@ -987,41 +985,31 @@ function AutomationsPage() {
 }
 
 /**
- * The "Notifies" cell for a Slack automation row. #6244: this used to show
- * "Webhook" (with an empty tooltip) for every Slack row, including
- * bot-token deliveries that never carry a webhook at all. Shared decision
- * with `ViewAutomationDrawer.tsx`'s destination cell via
- * `slackDestinationPresentation`, so the two surfaces can't drift apart
- * again. Extracted out of `actionItems`'s switch (rather than inlined as a
- * branch there) purely to keep that switch's own complexity down — each
- * case stays a single expression.
+ * The "Notifies" cell for a Slack automation row: the connection it posts
+ * through, and the channel for a bot. Shares `slackDestinationPresentation`
+ * with the view drawer so the two cannot drift apart (#6244).
  */
 function SlackNotifyCell({
   actionParams,
+  connections,
 }: {
   actionParams: TriggerActionParams;
+  connections: ReadonlyArray<{ id: string; name: string }> | undefined;
 }) {
-  const destination = slackDestinationPresentation(actionParams);
-  if (destination.kind === "bot") {
-    return destination.channelId ? (
-      <Text lineClamp={1} display="block">
-        Slack app · channel {destination.channelId}
-      </Text>
-    ) : (
-      <Text lineClamp={1} display="block" color="fg.muted">
-        Slack app
-      </Text>
-    );
-  }
-  return destination.tooltipUrl ? (
+  const destination = slackDestinationPresentation({
+    actionParams,
+    connections,
+  });
+  const label = slackDestinationLabel(destination);
+  return destination.kind === "webhook" && destination.tooltipUrl ? (
     <Tooltip content={destination.tooltipUrl}>
       <Text lineClamp={1} display="block">
-        Slack webhook
+        {label}
       </Text>
     </Tooltip>
   ) : (
     <Text lineClamp={1} display="block">
-      Slack webhook
+      {label}
     </Text>
   );
 }

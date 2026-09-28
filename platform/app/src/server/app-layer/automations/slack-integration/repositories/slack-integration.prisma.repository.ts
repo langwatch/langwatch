@@ -1,172 +1,172 @@
-import type { SlackActionParams } from "@langwatch/automations/providers/slack";
 import type { PrismaClient, SlackIntegration } from "~/generated/prisma/client";
 import { TriggerAction } from "~/generated/prisma/client";
+import { isUniqueConstraintError } from "~/server/utils/prismaErrors";
 import type {
-  ClearOwnSlackTokenOutcome,
-  LegacySlackTokenAutomation,
+  SlackConnectionChanges,
+  SlackConnectionRecord,
   SlackIntegrationRepository,
+  SlackProjectScope,
 } from "./slack-integration.repository";
 
-/** The scope pair a project-scoped integration is stored under. */
-const projectScope = (projectId: string) => ({
-  scopeType: "PROJECT" as const,
-  scopeId: projectId,
-});
-
-/** Every live Slack automation in one project — the population both token
- *  reads below partition. */
-const liveSlackAutomationsIn = (projectId: string) => ({
-  projectId,
-  deleted: false,
-  action: TriggerAction.SEND_SLACK_MESSAGE,
-});
-
-/**
- * Whether an automation's stored params carry a token of its own. A
- * `slackBotToken` key that is present but empty means the same as absent, so
- * the answer is read off the value rather than the key.
- */
-const carriesOwnSlackToken = (actionParams: unknown): boolean => {
-  const params = (actionParams ?? {}) as Partial<SlackActionParams>;
-  return typeof params.slackBotToken === "string" && !!params.slackBotToken;
-};
-
-/** Whether the stored params deliver through the Web API rather than an
- *  incoming webhook; absent means webhook, as `slackDeliveryMethodOf` reads. */
-const deliversByBot = (actionParams: unknown): boolean =>
+/** The connection an automation's stored params point at, read without a cast. */
+const connectionIdOf = (actionParams: unknown): string | null =>
   typeof actionParams === "object" &&
   actionParams !== null &&
-  "slackDelivery" in actionParams &&
-  actionParams.slackDelivery === "bot";
+  "slackIntegrationId" in actionParams &&
+  typeof actionParams.slackIntegrationId === "string"
+    ? actionParams.slackIntegrationId
+    : null;
 
 export class PrismaSlackIntegrationRepository
   implements SlackIntegrationRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findByProject({
+  async findProjectScope({
     projectId,
   }: {
     projectId: string;
+  }): Promise<SlackProjectScope | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        id: true,
+        name: true,
+        team: {
+          select: { organization: { select: { id: true, name: true } } },
+        },
+      },
+    });
+    const organization = project?.team?.organization;
+    if (!project || !organization) return null;
+    return {
+      projectId: project.id,
+      projectName: project.name,
+      organizationId: organization.id,
+      organizationName: organization.name,
+    };
+  }
+
+  async findById({ id }: { id: string }): Promise<SlackIntegration | null> {
+    return this.prisma.slackIntegration.findUnique({ where: { id } });
+  }
+
+  async findAllUsableByProject({
+    organizationId,
+    projectId,
+  }: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<SlackIntegration[]> {
+    return this.prisma.slackIntegration.findMany({
+      where: {
+        organizationId,
+        OR: [
+          { scopeType: "ORGANIZATION", scopeId: organizationId },
+          { scopeType: "PROJECT", scopeId: projectId },
+        ],
+      },
+      orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+    });
+  }
+
+  async findByFingerprint({
+    organizationId,
+    secretFingerprint,
+  }: {
+    organizationId: string;
+    secretFingerprint: string;
   }): Promise<SlackIntegration | null> {
     return this.prisma.slackIntegration.findUnique({
-      where: { scopeType_scopeId: projectScope(projectId) },
+      where: {
+        organizationId_secretFingerprint: { organizationId, secretFingerprint },
+      },
     });
   }
 
-  async upsertForProject({
-    projectId,
+  async create({
+    record,
+    actorId,
+  }: {
+    record: SlackConnectionRecord;
+    actorId: string;
+  }): Promise<SlackIntegration | null> {
+    try {
+      return await this.prisma.slackIntegration.create({
+        data: { ...record, createdById: actorId, updatedById: actorId },
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) return null;
+      throw error;
+    }
+  }
+
+  async update({
+    id,
     organizationId,
-    botTokenEncrypted,
-    slackTeamId,
-    slackTeamName,
-    userId,
+    changes,
+    actorId,
   }: {
-    projectId: string;
+    id: string;
     organizationId: string;
-    botTokenEncrypted: string;
-    slackTeamId: string;
-    slackTeamName: string;
-    userId: string;
-  }): Promise<SlackIntegration> {
-    return this.prisma.slackIntegration.upsert({
-      where: { scopeType_scopeId: projectScope(projectId) },
-      create: {
-        ...projectScope(projectId),
-        organizationId,
-        botTokenEncrypted,
-        slackTeamId,
-        slackTeamName,
-        createdById: userId,
-        updatedById: userId,
-      },
-      update: {
-        organizationId,
-        botTokenEncrypted,
-        slackTeamId,
-        slackTeamName,
-        updatedById: userId,
-      },
-    });
+    changes: SlackConnectionChanges;
+    actorId: string;
+  }): Promise<SlackIntegration | null> {
+    try {
+      return await this.prisma.slackIntegration.update({
+        where: { id, organizationId },
+        data: { ...changes, updatedById: actorId },
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) return null;
+      throw error;
+    }
   }
 
-  async deleteForProject({ projectId }: { projectId: string }): Promise<void> {
+  async delete({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<void> {
     await this.prisma.slackIntegration.deleteMany({
-      where: projectScope(projectId),
+      where: { id, organizationId },
     });
   }
 
   /**
-   * Read the project's Slack automations and keep the ones carrying a token.
-   * The filter is in memory rather than a JSON-path predicate because the
-   * stored shape is a provider payload, not a column: a `slackBotToken` key
-   * present but empty means the same as absent, and a path filter cannot say
-   * so. A project's automations are counted in tens.
+   * Counted in memory: the connection id lives inside the provider payload, not
+   * a column, and an organization's Slack automations are counted in tens.
    */
-  async findAllWithOwnSlackToken({
-    projectId,
+  async countDependentAutomations({
+    organizationId,
+    ids,
   }: {
-    projectId: string;
-  }): Promise<LegacySlackTokenAutomation[]> {
-    const rows = await this.prisma.trigger.findMany({
-      where: liveSlackAutomationsIn(projectId),
-      select: { id: true, name: true, actionParams: true },
-      orderBy: { createdAt: "asc" },
+    organizationId: string;
+    ids: string[];
+  }): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    if (ids.length === 0) return counts;
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
     });
-    return rows
-      .filter((row) => carriesOwnSlackToken(row.actionParams))
-      .map(({ id, name }) => ({ id, name }));
-  }
-
-  /**
-   * The running automations that deliver through the integration: bot delivery
-   * with no token of its own. Incoming-webhook rows never touch it and paused
-   * rows deliver nothing, so neither stops delivering when it goes. Filtered in
-   * memory because an empty token string is not a token.
-   */
-  async countAllDeliveringThroughIntegration({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<number> {
+    if (projects.length === 0) return counts;
     const rows = await this.prisma.trigger.findMany({
-      where: { ...liveSlackAutomationsIn(projectId), active: true },
+      where: {
+        projectId: { in: projects.map((project) => project.id) },
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        active: true,
+        deleted: false,
+      },
       select: { actionParams: true },
     });
-    return rows.filter(
-      (row) =>
-        deliversByBot(row.actionParams) &&
-        !carriesOwnSlackToken(row.actionParams),
-    ).length;
-  }
-
-  async clearOwnSlackToken({
-    projectId,
-    triggerId,
-  }: {
-    projectId: string;
-    triggerId: string;
-  }): Promise<ClearOwnSlackTokenOutcome> {
-    // Optimistic read-modify-write: the JSON value is replaced whole, so the
-    // write only lands if the row is still the one that was read — otherwise
-    // it would silently undo a concurrent edit to the channel or templates.
-    // A lost race re-reads and tries again; the token being gone by then is
-    // the outcome the caller wanted anyway.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const row = await this.prisma.trigger.findFirst({
-        where: { id: triggerId, projectId, deleted: false },
-        select: { actionParams: true, updatedAt: true },
-      });
-      if (!row) return "failed";
-      const params = (row.actionParams ?? {}) as Partial<SlackActionParams>;
-      if (!params.slackBotToken) return "already_clear";
-      const { slackBotToken: _cleared, ...rest } = params;
-      const updated = await this.prisma.trigger.updateMany({
-        where: { id: triggerId, projectId, updatedAt: row.updatedAt },
-        data: { actionParams: rest },
-      });
-      if (updated.count === 1) return "cleared";
+    const wanted = new Set(ids);
+    for (const row of rows) {
+      const id = connectionIdOf(row.actionParams);
+      if (id && wanted.has(id)) counts.set(id, (counts.get(id) ?? 0) + 1);
     }
-    return "failed";
+    return counts;
   }
 }

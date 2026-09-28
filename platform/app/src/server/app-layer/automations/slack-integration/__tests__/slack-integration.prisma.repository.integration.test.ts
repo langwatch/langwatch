@@ -1,13 +1,8 @@
 /**
- * The Slack integration's storage against a real database, because the two
- * claims that matter here are claims about rows: that one project holds exactly
- * one integration however many times it is saved, and that the tenancy regime
- * accepts the queries this repository actually issues. An org-scoped model
- * outside every regime makes every query throw, and a mock cannot notice.
- *
- * The legacy-token half is here for the same reason: clearing a token is a
- * surgical edit inside a JSON column, and "the other fields survived" is only
- * true if the stored row says so.
+ * Slack connection storage against a real database: the claims here are about
+ * rows and the tenancy regime (an org-scoped model outside every regime makes
+ * each query throw, which a mock cannot notice), the fingerprint unique index,
+ * and counting automations across an organization's projects.
  */
 
 import { nanoid } from "nanoid";
@@ -21,81 +16,106 @@ import {
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { PrismaSlackIntegrationRepository } from "../repositories/slack-integration.prisma.repository";
+import type { SlackConnectionRecord } from "../repositories/slack-integration.repository";
 
-describe("Feature: the project's Slack integration", () => {
-  const ns = `slackint-${nanoid(8)}`;
+describe("Feature: Slack connections storage", () => {
+  const ns = `slackconn-${nanoid(8)}`;
 
   let organization: Organization | undefined;
   let team: Team | undefined;
   let project: Project | undefined;
+  let otherProject: Project | undefined;
   let repo: PrismaSlackIntegrationRepository;
 
-  const projectId = () => project!.id;
+  const orgId = () => organization!.id;
 
-  const storeSlackAutomation = (params: {
-    slackBotToken?: string;
-    channelId?: string;
-    slackDelivery?: "bot" | "webhook";
+  const record = (
+    overrides: Partial<SlackConnectionRecord>,
+  ): SlackConnectionRecord => ({
+    name: "Connection",
+    kind: "INCOMING_WEBHOOK",
+    scopeType: "PROJECT",
+    scopeId: project!.id,
+    organizationId: orgId(),
+    botTokenEncrypted: null,
+    webhookUrlEncrypted: "enc",
+    secretFingerprint: `fp-${nanoid(6)}`,
+    secretHint: "abcd",
+    slackTeamId: null,
+    slackTeamName: null,
+    ...overrides,
+  });
+
+  const storeSlackAutomation = ({
+    projectId,
+    slackIntegrationId,
+    active = true,
+  }: {
+    projectId: string;
+    slackIntegrationId: string;
     active?: boolean;
   }) =>
     prisma.trigger.create({
       data: {
         id: nanoid(),
         name: `Slack automation ${nanoid(4)}`,
-        projectId: projectId(),
+        projectId,
         action: TriggerAction.SEND_SLACK_MESSAGE,
-        active: params.active ?? true,
-        actionParams: {
-          slackDelivery: params.slackDelivery ?? "bot",
-          slackChannelId: params.channelId ?? "C0123",
-          ...(params.slackBotToken
-            ? { slackBotToken: params.slackBotToken }
-            : {}),
-        },
+        active,
+        actionParams: { slackIntegrationId, slackDelivery: "webhook" },
         filters: {},
         triggerKind: TriggerKind.AUTOMATION,
       },
     });
 
+  const createProject = (suffix: string) =>
+    prisma.project.create({
+      data: {
+        name: `Slack Project ${suffix}`,
+        slug: `--test-project-${ns}-${suffix}`,
+        teamId: team!.id,
+        language: "other",
+        framework: "other",
+        apiKey: `test-api-key-${ns}-${suffix}`,
+      },
+    });
+
   beforeAll(async () => {
     organization = await prisma.organization.create({
-      data: { name: "Slack Integration Org", slug: `--test-org-${ns}` },
+      data: { name: "Slack Connections Org", slug: `--test-org-${ns}` },
     });
     team = await prisma.team.create({
       data: {
-        name: "Slack Integration Team",
+        name: "Slack Connections Team",
         slug: `--test-team-${ns}`,
         organizationId: organization.id,
       },
     });
-    project = await prisma.project.create({
-      data: {
-        name: "Slack Integration Project",
-        slug: `--test-project-${ns}`,
-        teamId: team.id,
-        language: "other",
-        framework: "other",
-        apiKey: `test-api-key-${ns}`,
-      },
-    });
+    project = await createProject("a");
+    otherProject = await createProject("b");
     repo = new PrismaSlackIntegrationRepository(prisma);
   });
 
   beforeEach(async () => {
-    if (!project) return;
-    await prisma.trigger.deleteMany({ where: { projectId: project.id } });
+    if (!organization || !project || !otherProject) return;
+    await prisma.trigger.deleteMany({
+      where: { projectId: { in: [project.id, otherProject.id] } },
+    });
     await prisma.slackIntegration.deleteMany({
-      where: { scopeType: "PROJECT", scopeId: project.id },
+      where: { organizationId: organization.id },
     });
   });
 
   afterAll(async () => {
-    if (project) {
+    if (organization) {
       await prisma.slackIntegration.deleteMany({
-        where: { scopeType: "PROJECT", scopeId: project.id },
+        where: { organizationId: organization.id },
       });
-      await prisma.trigger.deleteMany({ where: { projectId: project.id } });
-      await prisma.project.delete({ where: { id: project.id } });
+    }
+    for (const each of [project, otherProject]) {
+      if (!each) continue;
+      await prisma.trigger.deleteMany({ where: { projectId: each.id } });
+      await prisma.project.delete({ where: { id: each.id } });
     }
     if (team) await prisma.team.delete({ where: { id: team.id } });
     if (organization) {
@@ -103,143 +123,107 @@ describe("Feature: the project's Slack integration", () => {
     }
   });
 
-  const connect = ({
-    botTokenEncrypted,
-    slackTeamName = "Acme HQ",
-  }: {
-    botTokenEncrypted: string;
-    slackTeamName?: string;
-  }) =>
-    repo.upsertForProject({
-      projectId: projectId(),
-      organizationId: organization!.id,
-      botTokenEncrypted,
-      slackTeamId: "T123",
-      slackTeamName,
-      userId: "user-1",
-    });
-
-  describe("when a project is connected twice", () => {
-    /** @scenario "Rotating the token needs no automation edits" */
-    it("holds one row, carrying the newest token", async () => {
-      await connect({ botTokenEncrypted: "enc(xoxb-old)" });
-      await connect({
-        botTokenEncrypted: "enc(xoxb-new)",
-        slackTeamName: "Acme HQ renamed",
-      });
-
-      const rows = await prisma.slackIntegration.findMany({
-        where: { scopeType: "PROJECT", scopeId: projectId() },
-      });
-      expect(rows).toHaveLength(1);
-      expect(rows[0]?.botTokenEncrypted).toBe("enc(xoxb-new)");
-      expect(rows[0]?.slackTeamName).toBe("Acme HQ renamed");
-    });
-  });
-
-  describe("when the project has no integration", () => {
-    it("reads back as absent rather than throwing", async () => {
-      expect(await repo.findByProject({ projectId: projectId() })).toBeNull();
-    });
-  });
-
-  describe("when automations in the project store their own token", () => {
-    /** @scenario "Settings counts the automations still on their own token" */
-    it("finds only the ones that actually carry one", async () => {
-      await storeSlackAutomation({ slackBotToken: "enc(xoxb-a)" });
-      await storeSlackAutomation({ slackBotToken: "enc(xoxb-b)" });
-      await storeSlackAutomation({});
-
-      const legacy = await repo.findAllWithOwnSlackToken({
-        projectId: projectId(),
-      });
-
-      expect(legacy).toHaveLength(2);
-    });
-
-    /** @scenario "Removing the connection reports how many automations stop delivering" */
-    it("counts the rest as delivering through the project integration", async () => {
-      await storeSlackAutomation({ slackBotToken: "enc(xoxb-a)" });
-      await storeSlackAutomation({});
-      await storeSlackAutomation({});
-
-      const dependents = await repo.countAllDeliveringThroughIntegration({
-        projectId: projectId(),
-      });
-
-      expect(dependents).toBe(2);
-    });
-
-    /** @scenario "Removing the connection reports how many automations stop delivering" */
-    it("leaves a deleted automation out of the count", async () => {
-      const row = await storeSlackAutomation({});
-      await prisma.trigger.update({
-        where: { id: row.id, projectId: projectId() },
-        data: { deleted: true },
-      });
-
-      const dependents = await repo.countAllDeliveringThroughIntegration({
-        projectId: projectId(),
-      });
-
-      expect(dependents).toBe(0);
-    });
-
-    /** @scenario "Removing the connection reports how many automations stop delivering" */
-    it("leaves incoming-webhook and paused automations out of the count", async () => {
-      await storeSlackAutomation({});
-      await storeSlackAutomation({ slackDelivery: "webhook" });
-      await storeSlackAutomation({ active: false });
-
-      const dependents = await repo.countAllDeliveringThroughIntegration({
-        projectId: projectId(),
-      });
-
-      expect(dependents).toBe(1);
-    });
-
-    /** @scenario "Switching a legacy automation to the project integration" */
-    it("clears the token and leaves the rest of the delivery alone", async () => {
-      const row = await storeSlackAutomation({
-        slackBotToken: "enc(xoxb-a)",
-        channelId: "C0999",
-      });
-
-      const outcome = await repo.clearOwnSlackToken({
-        projectId: projectId(),
-        triggerId: row.id,
-      });
-
-      expect(outcome).toBe("cleared");
-      const after = await prisma.trigger.findUniqueOrThrow({
-        where: { id: row.id, projectId: projectId() },
-      });
-      expect(after.actionParams).toEqual({
-        slackDelivery: "bot",
-        slackChannelId: "C0999",
-      });
-    });
-
-    /** @scenario "Bulk-switching clears each automation independently" */
-    it("reports an automation with nothing to clear as already clear", async () => {
-      const row = await storeSlackAutomation({});
-
-      expect(
-        await repo.clearOwnSlackToken({
-          projectId: projectId(),
-          triggerId: row.id,
+  describe("given organization, project and other-project connections", () => {
+    /** @scenario "A project lists its own connections and its organization's" */
+    it("lists the organization's and the project's own, not the other project's", async () => {
+      await repo.create({
+        record: record({
+          name: "B org",
+          scopeType: "ORGANIZATION",
+          scopeId: orgId(),
         }),
-      ).toBe("already_clear");
+        actorId: "user-1",
+      });
+      await repo.create({
+        record: record({ name: "A project" }),
+        actorId: "user-1",
+      });
+      await repo.create({
+        record: record({ name: "Other", scopeId: otherProject!.id }),
+        actorId: "user-1",
+      });
+
+      const listed = await repo.findAllUsableByProject({
+        organizationId: orgId(),
+        projectId: project!.id,
+      });
+
+      expect(listed.map((row) => row.name)).toEqual(["A project", "B org"]);
     });
   });
 
-  describe("when the integration is removed", () => {
-    it("leaves the project with none", async () => {
-      await connect({ botTokenEncrypted: "enc(xoxb-live)" });
+  describe("given a fingerprint the organization already holds", () => {
+    it("create answers null instead of storing a second copy", async () => {
+      await repo.create({
+        record: record({ secretFingerprint: "same" }),
+        actorId: "user-1",
+      });
 
-      await repo.deleteForProject({ projectId: projectId() });
+      const second = await repo.create({
+        record: record({ secretFingerprint: "same", name: "Copy" }),
+        actorId: "user-1",
+      });
 
-      expect(await repo.findByProject({ projectId: projectId() })).toBeNull();
+      expect(second).toBeNull();
+      await expect(
+        repo.findByFingerprint({
+          organizationId: orgId(),
+          secretFingerprint: "same",
+        }),
+      ).resolves.toMatchObject({ name: "Connection" });
+    });
+  });
+
+  describe("given automations across the organization's projects", () => {
+    it("counts only active ones pointing at each connection", async () => {
+      const shared = await repo.create({
+        record: record({ scopeType: "ORGANIZATION", scopeId: orgId() }),
+        actorId: "user-1",
+      });
+      const id = shared!.id;
+      await storeSlackAutomation({
+        projectId: project!.id,
+        slackIntegrationId: id,
+      });
+      await storeSlackAutomation({
+        projectId: otherProject!.id,
+        slackIntegrationId: id,
+      });
+      await storeSlackAutomation({
+        projectId: project!.id,
+        slackIntegrationId: id,
+        active: false,
+      });
+
+      const counts = await repo.countDependentAutomations({
+        organizationId: orgId(),
+        ids: [id],
+      });
+
+      expect(counts.get(id)).toBe(2);
+    });
+  });
+
+  describe("update and delete", () => {
+    it("are bounded by the organization", async () => {
+      const row = await repo.create({ record: record({}), actorId: "user-1" });
+      const id = row!.id;
+
+      await repo.update({
+        id,
+        organizationId: orgId(),
+        changes: { name: "Renamed" },
+        actorId: "user-2",
+      });
+      await repo.delete({ id, organizationId: "another-org" });
+
+      await expect(repo.findById({ id })).resolves.toMatchObject({
+        name: "Renamed",
+        updatedById: "user-2",
+      });
+
+      await repo.delete({ id, organizationId: orgId() });
+      await expect(repo.findById({ id })).resolves.toBeNull();
     });
   });
 });

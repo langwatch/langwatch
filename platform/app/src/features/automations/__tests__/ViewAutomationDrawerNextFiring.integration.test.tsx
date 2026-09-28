@@ -91,6 +91,10 @@ vi.mock("~/utils/api", () => ({
           fakeQuery([], options),
       },
     },
+    // Names a Slack row's connection; these automations are not Slack ones.
+    slackIntegration: {
+      list: { useQuery: () => ({ data: undefined }) },
+    },
     tracesV2: {
       list: {
         useQuery: (_input: unknown, options?: { enabled?: boolean }) =>

@@ -14,6 +14,8 @@ import type {
  * one place instead of three hand-maintained copies.
  */
 export interface TriggerActionParams {
+  /** The Slack connection a Slack automation delivers through (ADR-093 §5a). */
+  slackIntegrationId?: string;
   slackWebhook?: string;
   /** How a Slack automation reaches Slack — a legacy incoming webhook, or a
    *  Slack app bot token posting via the Web API. Absent means `"webhook"`
@@ -25,9 +27,8 @@ export interface TriggerActionParams {
    *  surfaces don't have. */
   slackChannelId?: string;
   /** Read-only echo: the row stores a Slack bot token of its own. The token
-   *  itself never reaches the browser — this flag is what the redaction hook
-   *  puts in its place, and it is what the legacy-token nudge reads
-   *  (ADR-093 section 5). */
+   *  itself never reaches the browser; this flag is what the redaction hook
+   *  puts in its place. */
   slackBotTokenSet?: boolean;
   members?: string[];
   datasetId?: string;

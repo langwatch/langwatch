@@ -29,7 +29,10 @@ import {
   RUNAWAY_PAUSE_EXPLANATION,
 } from "~/features/automations/logic/pauseReasons";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
-import { slackDestinationPresentation } from "~/features/automations/logic/slackDestinationPresentation";
+import {
+  slackDestinationLabel,
+  slackDestinationPresentation,
+} from "~/features/automations/logic/slackDestinationPresentation";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { TriggerKind } from "~/generated/prisma/client";
@@ -95,6 +98,12 @@ export function ViewAutomationDrawer({
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id && trigger?.action === "ADD_TO_DATASET" },
   );
+  const slackConnectionsQuery = api.slackIntegration.list.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project?.id && trigger?.action === "SEND_SLACK_MESSAGE",
+    },
+  );
   const datasetName = actionParams.datasetId
     ? (datasetsQuery.data?.find((d) => d.id === actionParams.datasetId)?.name ??
       null)
@@ -104,21 +113,13 @@ export function ViewAutomationDrawer({
     if (!trigger) return null;
     switch (trigger.action) {
       case "SEND_SLACK_MESSAGE": {
-        // #6244: see `slackDestinationPresentation` — shared with the list
-        // page's "Notifies" cell so the decision can't drift between them.
-        const destination = slackDestinationPresentation(actionParams);
-        if (destination.kind === "bot") {
-          return destination.channelId ? (
-            <Text textStyle="sm">
-              Slack app · channel {destination.channelId}
-            </Text>
-          ) : (
-            <Text textStyle="sm" color="fg.muted">
-              Slack app
-            </Text>
-          );
-        }
-        return destination.tooltipUrl ? (
+        // #6244: see `slackDestinationPresentation`, shared with the list.
+        const destination = slackDestinationPresentation({
+          actionParams,
+          connections: slackConnectionsQuery.data?.connections,
+        });
+        const label = slackDestinationLabel(destination);
+        return destination.kind === "webhook" && destination.tooltipUrl ? (
           <Tooltip content={destination.tooltipUrl}>
             <Text
               textStyle="sm"
@@ -126,11 +127,11 @@ export function ViewAutomationDrawer({
               width="fit-content"
               cursor="help"
             >
-              Slack webhook
+              {label}
             </Text>
           </Tooltip>
         ) : (
-          <Text textStyle="sm">Slack webhook</Text>
+          <Text textStyle="sm">{label}</Text>
         );
       }
       case "SEND_EMAIL":

@@ -28,27 +28,15 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({ openDrawer: vi.fn() }),
+}));
+
 vi.mock("~/utils/api", () => ({
   api: {
-    useUtils: () => ({
-      slackIntegration: {
-        getStatus: { invalidate: vi.fn() },
-        getLegacyTokenCensus: { invalidate: vi.fn() },
-      },
-    }),
     slackIntegration: {
-      getStatus: {
+      list: {
         useQuery: () => ({ data: undefined, isLoading: true, error: null }),
-      },
-      getLegacyTokenCensus: {
-        useQuery: () => ({ data: { count: 0, automations: [] } }),
-      },
-      connect: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      disconnect: {
-        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-      },
-      switchToIntegration: {
-        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
     github: {

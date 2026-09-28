@@ -26,6 +26,10 @@ export const SLACK_BOT_TOKEN_KEPT = "__kept__";
 
 export const slackActionParamsSchema = z
   .object({
+    /** The named Slack connection this automation delivers through (ADR-093
+     *  §5a). When set, the connection's kind decides the delivery method and
+     *  the legacy secret fields below are ignored and never stored. */
+    slackIntegrationId: z.string().min(1).optional(),
     slackDelivery: slackDeliveryMethodSchema.optional(),
     slackWebhook: z.string().optional(),
     /** Bot token — encrypted at rest server-side; never sent to the browser
@@ -37,6 +41,9 @@ export const slackActionParamsSchema = z
     slackBotTokenSet: z.boolean().optional(),
   })
   .superRefine((p, ctx) => {
+    // A connection carries its own secret; the server derives the method from
+    // its kind, and a bot connection's missing channel is refused there.
+    if (p.slackIntegrationId) return;
     const method = p.slackDelivery ?? "webhook";
     if (method === "webhook") {
       const url = p.slackWebhook?.trim();

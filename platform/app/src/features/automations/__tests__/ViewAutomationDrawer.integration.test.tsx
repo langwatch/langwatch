@@ -106,6 +106,15 @@ vi.mock("~/utils/api", () => ({
           fakeQuery(mockMatchingTraces, options),
       },
     },
+    slackIntegration: {
+      list: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(
+            { connections: [{ id: "conn-bot", name: "Alerts bot" }] },
+            options,
+          ),
+      },
+    },
   },
 }));
 
@@ -363,6 +372,29 @@ describe("ViewAutomationDrawer", () => {
       // all.
       expect(screen.getByText("Slack app · channel C0123456")).toBeDefined();
       expect(screen.queryByText("Slack webhook")).toBeNull();
+    });
+  });
+
+  describe("given a Slack automation that delivers through a connection", () => {
+    /** @scenario The automation view names its Slack destination */
+    it("names the connection and the channel", () => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Errors to #ops",
+        action: "SEND_SLACK_MESSAGE",
+        customGraphId: null,
+        filters: "{}",
+        actionParams: {
+          slackIntegrationId: "conn-bot",
+          slackDelivery: "bot",
+          slackChannelId: "C0123456",
+        },
+      };
+      mockRecentFires = [];
+
+      renderDrawer();
+
+      expect(screen.getByText("Alerts bot · channel C0123456")).toBeDefined();
     });
   });
 

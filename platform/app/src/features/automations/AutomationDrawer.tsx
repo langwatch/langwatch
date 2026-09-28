@@ -697,15 +697,6 @@ export function AutomationDrawer({
     dispatch({ type: "SET_NAME", value: `${graphName} automation` });
     seededNameFromGraph.current = true;
   }, [automationId, prefilledGraphId, graphName, dispatch]);
-  // ADR-093 §5: a Slack delivery with no token of its own still sends when the
-  // project has an integration, so the preview's block gate has to know.
-  const slackIntegrationStatus = api.slackIntegration.getStatus.useQuery(
-    { projectId },
-    { enabled: !!projectId, refetchOnWindowFocus: false },
-  );
-  const slackIntegrationConnected =
-    slackIntegrationStatus.data?.connected ?? false;
-
   const previewContext = useMemo<
     TemplateContext | GraphAlertTemplateContext | ReportTemplateContext
   >(() => {
@@ -795,9 +786,6 @@ export function AutomationDrawer({
       entry && isNotifyEntry(entry) && entry.client.previewOptions
         ? entry.client.previewOptions({
             slice: draft.slices[draft.action!] as never,
-            context: {
-              hasProjectSlackIntegration: slackIntegrationConnected,
-            },
           })
         : {};
     void (async () => {
@@ -879,7 +867,6 @@ export function AutomationDrawer({
     previewContext,
     isGraphAlert,
     isReport,
-    slackIntegrationConnected,
   ]);
 
   // Edit mode must not render the (blank) INITIAL_DRAFT form while the saved
@@ -923,6 +910,7 @@ export function AutomationDrawer({
         channel,
         webhook: target.webhook,
         botDestination: target.botDestination,
+        slackIntegrationId: target.slackIntegrationId,
         webhookDestination: target.webhookDestination,
         automationId,
         graphName,

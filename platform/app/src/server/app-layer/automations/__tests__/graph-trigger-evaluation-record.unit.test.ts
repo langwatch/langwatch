@@ -108,7 +108,7 @@ function makeDeps({
     getTimeseries: getTimeseries ?? (async () => series),
     triggerSent: new StubTriggerSentRepo(),
     // These fixtures never reach a Slack dispatch, so nothing resolves.
-    resolveSlackToken: async () => null,
+    resolveSlackDestination: async () => null,
     updateLastRunAt: async () => undefined,
     notifier: {
       dispatch: async () => ({

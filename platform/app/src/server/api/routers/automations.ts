@@ -5,7 +5,10 @@ import {
   NOTIFICATION_CADENCES,
 } from "@langwatch/automations/cadences";
 import { EMAIL_RX } from "@langwatch/automations/providers/email";
-import type { SlackActionParams } from "@langwatch/automations/providers/slack";
+import {
+  type SlackActionParams,
+  slackActionParamsSchema,
+} from "@langwatch/automations/providers/slack";
 import {
   DEFAULT_WEBHOOK_CONTENT_TYPE,
   WEBHOOK_HEADER_VALUE_KEPT,
@@ -60,10 +63,8 @@ import {
   extractReportFromTriggerRow,
   reportActionParamsSchema,
 } from "~/server/app-layer/automations/report.builder";
-import {
-  findSlackBotToken,
-  slackProjectTokenReader,
-} from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
+import { findSlackDestination } from "~/server/app-layer/automations/slack-integration/slack-destination-resolver";
+import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
 import { TriggerFilterValidationService } from "~/server/app-layer/automations/trigger-filter-validation.service";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
 import { createTriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.wiring";
@@ -116,6 +117,9 @@ const actionParamsSchema = z.object({
   // MUST NOT carry it or a hostile client can forge audit attribution
   // (builder5015-002 / applyr-002).
   members: z.string().array().optional(),
+  // ADR-093 §5a: the named connection a Slack automation delivers through.
+  // When set, the legacy secret fields below are ignored and never stored.
+  slackIntegrationId: z.string().optional(),
   slackWebhook: z.string().optional(),
   // ADR-041 Slack bot delivery. `slackBotToken` arrives as plaintext (or the
   // "kept" sentinel / blank on edit) and is encrypted server-side before
@@ -235,6 +239,8 @@ export const automationRouter = createTRPCRouter({
           // createdByUserId is server-stamped — do not accept from wire
           // (builder5015-002 / applyr-002).
           members: z.string().array().optional(),
+          slackIntegrationId: z.string().optional(),
+          slackChannelId: z.string().optional(),
           slackWebhook: z.string().optional(),
           datasetId: z.string().optional(),
           datasetMapping: z
@@ -302,13 +308,34 @@ export const automationRouter = createTRPCRouter({
         }
       }
 
+      let slackParams: SlackActionParams | null = null;
       if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
-        if (!input.actionParams.slackWebhook) {
+        if (
+          !input.actionParams.slackIntegrationId &&
+          !input.actionParams.slackWebhook
+        ) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Slack webhook is required",
+            message: "A Slack connection is required",
           });
         }
+        // ADR-093 §5a: store a connection id, never the webhook URL itself.
+        const connected = await createSlackIntegrationService({
+          prisma: ctx.prisma,
+        }).connectActionParams({
+          projectId: input.projectId,
+          actorId: ctx.session.user.id,
+          actionParams: input.actionParams,
+        });
+        const parsed = slackActionParamsSchema.safeParse(connected);
+        if (!parsed.success) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              parsed.error.errors[0]?.message ?? "Invalid Slack delivery",
+          });
+        }
+        slackParams = parsed.data;
       } else if (input.action === TriggerAction.SEND_EMAIL) {
         // Align with `upsert` (and `validateEmailRecipientFormats`): RFC
         // shape only. External recipients are intentionally allowed; the
@@ -333,7 +360,7 @@ export const automationRouter = createTRPCRouter({
           id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
           name: input.name,
           action: input.action,
-          actionParams: input.actionParams,
+          actionParams: slackParams ?? input.actionParams,
           filters: JSON.stringify(input.filters),
           projectId: input.projectId,
           lastRunAt: new Date().getTime(),
@@ -711,48 +738,32 @@ export const automationRouter = createTRPCRouter({
       return trigger ? redactTriggerForRead(trigger) : trigger;
     }),
   /**
-   * List the Slack channels a bot token can see, to populate the channel
-   * picker (ADR-041). Uses the freshly-typed token, or the saved automation's
-   * stored token (decrypted server-side, never returned). A missing
-   * `channels:read` scope comes back as `{ error: "missing_scope" }` so the UI
-   * degrades to manual entry instead of failing. A listing that succeeded but
-   * does not cover the whole workspace carries `gaps` saying why, so the picker
-   * can tell the author rather than presenting a short list as complete.
+   * Channels a bot connection can post to, for the composer's picker (ADR-093
+   * §5a). The connection must be usable by the project. A webhook connection or
+   * a missing one lists nothing (`no_token`); a missing `channels:read` scope
+   * comes back as `missing_scope`, and a partial listing carries its `gaps`.
    */
   listSlackChannels: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
-        botToken: z.string().nullable().default(null),
-        automationId: z.string().optional(),
+        slackIntegrationId: z.string(),
       }),
     )
     // triggers:update (not :view): this endpoint decrypts and exercises the
-    // stored Slack bot token — the same capability testFireTemplate gates on.
+    // connection's bot token, the same capability testFireTemplate gates on.
     .permission("triggers:update")
     .mutation(async ({ ctx, input }) => {
-      let token = input.botToken?.trim() || null;
-      if (!token) {
-        // ADR-093 §5: the saved automation's own token wins, and the project's
-        // Slack integration serves everything else — so the picker lists the
-        // workspace delivery will actually hit. A fresh draft with no
-        // automation id resolves against the project integration alone.
-        const saved = input.automationId
-          ? await getApp().triggers.getById({
-              triggerId: input.automationId,
-              projectId: input.projectId,
-            })
-          : null;
-        const resolved = await findSlackBotToken({
-          actionParams: (saved?.actionParams ?? {}) as SlackActionParams,
-          projectId: input.projectId,
-          projectIntegration: slackProjectTokenReader(ctx.prisma),
-        });
-        token = resolved?.token ?? null;
-      }
-      if (!token)
+      const secret = await createSlackIntegrationService({
+        prisma: ctx.prisma,
+      }).findUsableSecret({
+        id: input.slackIntegrationId,
+        projectId: input.projectId,
+      });
+      if (secret?.kind !== "BOT") {
         return { channels: [], error: "no_token" as string, gaps: [] };
-      return listSlackChannels(token);
+      }
+      return listSlackChannels(secret.token);
     }),
   updateTriggerFilters: protectedProcedure
     .input(
@@ -874,6 +885,10 @@ export const automationRouter = createTRPCRouter({
         /** The saved automation being edited, so a kept (un-retyped) bot token
          *  can be loaded + decrypted for the test fire. */
         automationId: z.string().optional(),
+        /** ADR-093 §5a: the draft's Slack connection. Wins over `webhook` and
+         *  `botDestination.botToken`; a bot connection still needs
+         *  `botDestination.channelId`. */
+        slackIntegrationId: z.string().optional(),
         // Present when the draft is a custom-graph alert: the test message
         // then renders the alert-shaped example context + alert defaults,
         // matching what a real fire sends. Detail fields only shape the
@@ -943,27 +958,49 @@ export const automationRouter = createTRPCRouter({
           }
           recipients = [email];
         }
-        // Resolve the Slack bot destination: the freshly-typed token, or the
-        // saved automation's stored (encrypted) token when it was kept on edit.
+        // Resolve the Slack destination the way a real delivery does (ADR-093
+        // §5a): the draft's connection, else a freshly typed legacy token, else
+        // the saved automation's own resolution. The kind decides the surface.
         let botDestination: { token: string; channel: string } | null = null;
-        if (input.channel === "slack" && input.botDestination) {
+        let slackWebhook = input.webhook;
+        if (input.channel === "slack" && input.slackIntegrationId) {
+          const secret = await createSlackIntegrationService({
+            prisma: ctx.prisma,
+          }).findUsableSecret({
+            id: input.slackIntegrationId,
+            projectId: input.projectId,
+          });
+          if (!secret) throw new SlackIntegrationMissingError();
+          if (secret.kind === "INCOMING_WEBHOOK") {
+            slackWebhook = secret.url;
+          } else {
+            const channel = input.botDestination?.channelId.trim();
+            if (!channel) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Pick a Slack channel before sending a test fire.",
+              });
+            }
+            botDestination = { token: secret.token, channel };
+          }
+        } else if (input.channel === "slack" && input.botDestination) {
           const channel = input.botDestination.channelId.trim();
           let token = input.botDestination.botToken?.trim() || null;
           if (!token) {
-            // Same resolution order the real delivery takes (ADR-093 §5), so a
-            // test fire proves the connection the automation will actually use.
             const saved = input.automationId
               ? await getApp().triggers.getById({
                   triggerId: input.automationId,
                   projectId: input.projectId,
                 })
               : null;
-            const resolved = await findSlackBotToken({
-              actionParams: (saved?.actionParams ?? {}) as SlackActionParams,
+            const destination = await findSlackDestination({
+              actionParams: saved?.actionParams,
               projectId: input.projectId,
-              projectIntegration: slackProjectTokenReader(ctx.prisma),
+              connections: createSlackIntegrationService({
+                prisma: ctx.prisma,
+              }),
             });
-            token = resolved?.token ?? null;
+            token = destination?.kind === "bot" ? destination.token : null;
           }
           if (!token) throw new SlackIntegrationMissingError();
           if (!channel) {
@@ -1054,7 +1091,7 @@ export const automationRouter = createTRPCRouter({
           project,
           draft: input.draft,
           recipients,
-          webhook: input.webhook,
+          webhook: slackWebhook,
           botDestination,
           webhookDestination,
           graphAlert: input.graphAlert,
@@ -1252,8 +1289,20 @@ export const automationRouter = createTRPCRouter({
       // resolve kept sentinels against the saved row (loaded lazily only
       // when a provider needs it), and reject invalid payloads (missing bot
       // token, kept headers after a URL change) as typed HandledErrors.
+      // ADR-093 §5a: a Slack save points at a usable connection (a freshly
+      // typed legacy secret becomes one) and takes its kind as the method.
+      const connectedActionParams =
+        input.action === TriggerAction.SEND_SLACK_MESSAGE
+          ? await createSlackIntegrationService({
+              prisma: ctx.prisma,
+            }).connectActionParams({
+              projectId: input.projectId,
+              actorId: ctx.session.user.id,
+              actionParams: parsedActionParams,
+            })
+          : parsedActionParams;
       const storedActionParams = await persistActionParamsFor(input.action, {
-        incoming: parsedActionParams,
+        incoming: connectedActionParams,
         loadExisting: async () =>
           input.triggerId
             ? (

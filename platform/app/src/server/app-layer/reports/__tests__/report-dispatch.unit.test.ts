@@ -13,6 +13,7 @@ import type {
 } from "@langwatch/automations/templating/templateContext";
 import type { Project, Trigger } from "~/generated/prisma/client";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
+import { slackDestinationResolver } from "~/server/app-layer/automations/slack-integration/slack-destination-resolver";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
 import {
   dispatchScheduledReport,
@@ -123,15 +124,10 @@ function makeDeps(
       sendSlack: sendSlack as unknown as ReportDispatchDeps["sendSlack"],
       sendSlackBot:
         sendSlackBot as unknown as ReportDispatchDeps["sendSlackBot"],
-      // The production resolver's own-token-first shape over the fake
-      // cipher: a stored ciphertext resolves, nothing else does.
-      resolveSlackToken: vi.fn(async ({ actionParams }) => {
-        const stored = actionParams.slackBotToken;
-        if (!stored) return null;
-        return {
-          token: stored.replace(/^enc\(/, "").replace(/\)$/, ""),
-          source: "automation" as const,
-        };
+      // The production resolver over the fake cipher and no connections: a
+      // report's own stored secret resolves, nothing else does.
+      resolveSlackDestination: slackDestinationResolver({
+        connections: { findUsableSecret: async () => null },
       }),
       filterSuppressedRecipients: vi.fn(async ({ emails }) => emails),
       listReportTraces:

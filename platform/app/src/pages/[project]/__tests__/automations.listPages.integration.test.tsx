@@ -47,8 +47,6 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     project: { id: "proj-1", slug: "test-project", name: "Test Project" },
     organization: { id: "org-1" },
     team: { slug: "team-1" },
-    // The page decides whether a row may offer "Use the project integration"
-    // off the caller's project permission.
     hasPermission: () => true,
   }),
 }));
@@ -104,11 +102,10 @@ vi.mock("~/utils/api", () => ({
     graphs: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
-    // ADR-093 §5: the page reads the project's Slack connection once and
-    // threads workspace name + switch permission down to the row nudges.
+    // ADR-093 §5a: the page names each Slack row's connection.
     slackIntegration: {
-      getStatus: {
-        useQuery: () => ({ data: { connected: false }, isLoading: false }),
+      list: {
+        useQuery: () => ({ data: { connections: [] }, isLoading: false }),
       },
     },
     useUtils: () => ({

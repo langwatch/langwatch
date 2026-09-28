@@ -3387,9 +3387,29 @@ const presentations = {
     },
   },
   slack_integration_missing: {
-    title: "Slack isn't connected for this project",
+    title: "This automation has no Slack connection",
     describe: () =>
-      "Connect Slack in this project's integration settings, then try again.",
+      "Pick a Slack connection in its delivery settings, or add one in the project's integration settings.",
+  },
+  slack_connection_exists: {
+    title: "That Slack secret is already saved",
+    // The name is customer-authored, so it is clamped like any other prose.
+    describe: (error) => {
+      const name = safeProse(str(error, "connectionName", ""));
+      return name
+        ? `It is already saved as "${name}". Use that connection instead.`
+        : "It is already saved as another connection. Use that one instead.";
+    },
+  },
+  slack_connection_in_use: {
+    title: "Automations still use this Slack connection",
+    describe: (error) => {
+      const count = num(error, "dependentAutomations", 0);
+      if (count === 1) return "1 automation stops delivering if you delete it.";
+      if (count > 1)
+        return `${count} automations stop delivering if you delete it.`;
+      return "Automations using it stop delivering if you delete it.";
+    },
   },
   missing_annotator: {
     title: "No annotator assigned",

@@ -90,8 +90,8 @@ vi.mock("~/utils/api", () => ({
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
     slackIntegration: {
-      getStatus: {
-        useQuery: () => ({ data: { connected: false }, isLoading: false }),
+      list: {
+        useQuery: () => ({ data: { connections: [] }, isLoading: false }),
       },
     },
     useUtils: () => ({

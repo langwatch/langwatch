@@ -1,41 +1,40 @@
--- The project's Slack workspace connection (ADR-093 section 5). Until now the
--- bot token was pasted into every automation separately: one workspace, one
--- bot, N copies of the credential, and N places to rotate it. This table holds
--- it once per project.
+-- Named Slack connections (ADR-093 §5a). An organization holds any number,
+-- each scoped to the whole organization or to one project, and each either a
+-- bot token (Web API) or an incoming webhook URL. Automations point at one by
+-- id instead of carrying their own copy of the credential.
 --
 -- Shape follows ADR-021's single-scope-per-row storage: inline
--- (scopeType, scopeId) columns plus the organizationId tenancy anchor, rather
--- than a bare projectId column. PROJECT is the only scope value today, so the
--- one-integration-per-project decision is the unique constraint; widening to a
--- team- or organization-shared workspace later becomes a new enum value and new
--- rows, not a schema rework.
+-- (scopeType, scopeId) plus the organizationId tenancy anchor. No foreign key,
+-- because scopeId is polymorphic (an Organization.id or a Project.id).
 --
--- botTokenEncrypted holds encrypt() ciphertext (AES-256-GCM, CREDENTIALS_SECRET)
--- and is never read back to a client. slackTeamId / slackTeamName are what
--- auth.test returned when the token was saved, so the settings card can name the
--- connected workspace without touching the secret.
---
--- There is no foreign key here and no cascade, deliberately: scopeId is
--- polymorphic (it holds a Project.id today and a Team.id or Organization.id
--- once the enum grows), so there is no single column a key could point at.
--- RetentionPolicy, DataPrivacyPolicy and CustomLLMModelCost carry the same
--- shape for the same reason. Projects are archived rather than deleted in the
--- product — no code path hard-deletes one — so a row cannot be orphaned by
--- ordinary use; a hard delete performed outside the product has to clear this
--- row's scope pair too, or the stored ciphertext outlives what it belonged to.
+-- botTokenEncrypted / webhookUrlEncrypted hold encrypt() ciphertext
+-- (AES-256-GCM, CREDENTIALS_SECRET); exactly one is set, matching kind, and
+-- neither is ever read back to a client. The ciphertext has a random IV, so
+-- secretFingerprint (an HMAC of the plaintext) is what makes one secret one
+-- connection per organization: the unique index is the merge rule.
+-- secretHint is the last four characters, for display. slackTeamId /
+-- slackTeamName are what auth.test returned for a bot token; null for webhooks.
 
 -- CreateEnum
-CREATE TYPE "SlackIntegrationScopeType" AS ENUM ('PROJECT');
+CREATE TYPE "SlackIntegrationScopeType" AS ENUM ('ORGANIZATION', 'PROJECT');
+
+-- CreateEnum
+CREATE TYPE "SlackIntegrationKind" AS ENUM ('BOT', 'INCOMING_WEBHOOK');
 
 -- CreateTable
 CREATE TABLE "SlackIntegration" (
     "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "kind" "SlackIntegrationKind" NOT NULL,
     "scopeType" "SlackIntegrationScopeType" NOT NULL,
     "scopeId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
-    "botTokenEncrypted" TEXT NOT NULL,
-    "slackTeamId" TEXT NOT NULL,
-    "slackTeamName" TEXT NOT NULL,
+    "botTokenEncrypted" TEXT,
+    "webhookUrlEncrypted" TEXT,
+    "secretFingerprint" TEXT NOT NULL,
+    "secretHint" TEXT NOT NULL,
+    "slackTeamId" TEXT,
+    "slackTeamName" TEXT,
     "createdById" TEXT NOT NULL,
     "updatedById" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -45,14 +44,14 @@ CREATE TABLE "SlackIntegration" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "SlackIntegration_scopeType_scopeId_key" ON "SlackIntegration"("scopeType", "scopeId");
+CREATE UNIQUE INDEX "SlackIntegration_organizationId_secretFingerprint_key" ON "SlackIntegration"("organizationId", "secretFingerprint");
 
 -- CreateIndex
-CREATE INDEX "SlackIntegration_organizationId_idx" ON "SlackIntegration"("organizationId");
+CREATE INDEX "SlackIntegration_scopeType_scopeId_idx" ON "SlackIntegration"("scopeType", "scopeId");
 
 -- To roll back, uncomment and run manually.
--- Down (manual): Dropping the table deletes every connected workspace's stored
--- token, and each project has to paste a fresh one; there is no way to recover
--- the values afterwards.
+-- Down (manual): dropping the table deletes every stored Slack connection;
+-- automations pointing at one stop delivering until reconnected.
 -- DROP TABLE "SlackIntegration";
+-- DROP TYPE "SlackIntegrationKind";
 -- DROP TYPE "SlackIntegrationScopeType";

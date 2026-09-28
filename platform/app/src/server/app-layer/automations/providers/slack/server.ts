@@ -30,6 +30,19 @@ export function persistSlackActionParams({
   incoming: SlackActionParams;
   existing?: SlackActionParams | null;
 }): SlackActionParams {
+  // A connection carries the secret (ADR-093 §5a): the row keeps only the id,
+  // the method its kind implies, and a bot connection's channel.
+  if (incoming.slackIntegrationId) {
+    const slackDelivery = slackDeliveryMethodOf(incoming);
+    const channel = incoming.slackChannelId?.trim();
+    return {
+      slackIntegrationId: incoming.slackIntegrationId,
+      slackDelivery,
+      ...(slackDelivery === "bot" && channel
+        ? { slackChannelId: channel }
+        : {}),
+    };
+  }
   const method = slackDeliveryMethodOf(incoming);
   if (method === "webhook") {
     return {
@@ -57,6 +70,17 @@ export function persistSlackActionParams({
 export function redactSlackActionParams(
   params: SlackActionParams,
 ): SlackActionParams {
+  // A migrated row keeps its legacy secret for one release; the connection is
+  // what it delivers through, so the secret has nothing left to say.
+  if (params.slackIntegrationId) {
+    const {
+      slackBotToken: _t,
+      slackWebhook: _w,
+      slackBotTokenSet: _s,
+      ...rest
+    } = params;
+    return rest;
+  }
   if (!params.slackBotToken) return params;
   const { slackBotToken: _drop, ...rest } = params;
   return { ...rest, slackBotTokenSet: true };
@@ -78,14 +102,12 @@ const def: ServerDef = {
   }: PersistActionParamsArgs) => {
     const params = incoming as SlackActionParams;
     const existing =
-      slackDeliveryMethodOf(params) === "bot"
+      !params.slackIntegrationId && slackDeliveryMethodOf(params) === "bot"
         ? ((await loadExisting()) as SlackActionParams | undefined)
         : undefined;
-    // No token check here any more (ADR-093 §5). A bot connection is allowed to
-    // store no token at all: the project's Slack integration serves it, and
-    // persist cannot see that column. The "nothing to deliver with" refusal
-    // moved to the one place that can read both storage locations — the
-    // dispatch-time resolver, which raises `slack_integration_missing`.
+    // No token check here (ADR-093 §5a): the save path points the params at a
+    // connection first, and "nothing to deliver with" is the dispatch-time
+    // resolver's refusal, `slack_integration_missing`.
     return persistSlackActionParams({ incoming: params, existing });
   },
   redactActionParams: (params) =>

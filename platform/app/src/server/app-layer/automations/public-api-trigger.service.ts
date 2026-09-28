@@ -2,10 +2,6 @@ import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
-import {
-  type SlackActionParams,
-  slackDeliveryMethodOf,
-} from "@langwatch/automations/providers/slack";
 import { DEFAULT_WEBHOOK_CONTENT_TYPE } from "@langwatch/automations/providers/webhook";
 import { generate as ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -63,7 +59,8 @@ import type {
   TriggerFireCursor,
   TriggerFirePage,
 } from "./repositories/trigger-fire-history.repository";
-import type { ResolvedSlackToken } from "./slack-integration/slack-token-resolver";
+import { findSlackDestination } from "./slack-integration/slack-destination-resolver";
+import type { SlackIntegrationService } from "./slack-integration/slack-integration.service";
 import type { TriggerService } from "./trigger.service";
 import type { TriggerFilterValidationService } from "./trigger-filter-validation.service";
 import type { TriggerFireHistoryService } from "./trigger-fire-history.service";
@@ -125,14 +122,13 @@ export class PublicApiTriggerService {
       testFire: (input: PublicApiTestFireInput) => Promise<TestFireResult>;
       resolveProject: (projectId: string) => Promise<DraftProject>;
       /**
-       * ADR-093 §5 token resolution: the automation's own stored token, else
-       * the project's Slack integration, else null. Required — an absent
-       * resolver would silently skip project-scoped resolution.
+       * ADR-093 §5a: saves point Slack params at a connection (a legacy secret
+       * becomes one), and a test fire resolves the connection a delivery uses.
        */
-      resolveSlackToken: (params: {
-        projectId: string;
-        actionParams: Pick<SlackActionParams, "slackBotToken">;
-      }) => Promise<ResolvedSlackToken | null>;
+      slackConnections: Pick<
+        SlackIntegrationService,
+        "connectActionParams" | "findUsableSecret"
+      >;
     },
   ) {}
 
@@ -156,16 +152,24 @@ export class PublicApiTriggerService {
   async create({
     projectId,
     input,
+    actorId,
   }: {
     projectId: string;
     input: PublicApiCreateInput;
+    /** Who a Slack connection created from a legacy secret is attributed to. */
+    actorId?: string;
   }): Promise<Trigger> {
     if (input.templates) validateTemplateDraft(input.templates);
 
     const isGraphAlert = !!input.customGraphId;
     const isReport = !isGraphAlert && !!input.report;
     const id = ksuid(KSUID_RESOURCES.TRIGGER).toString();
-    const data = await this.buildCreateData({ id, projectId, input });
+    const data = await this.buildCreateData({
+      id,
+      projectId,
+      input,
+      actorId: actorId ?? apiActorFallback(projectId),
+    });
 
     const trigger = await this.triggers.create({
       data: {
@@ -203,10 +207,12 @@ export class PublicApiTriggerService {
     id,
     projectId,
     input,
+    actorId,
   }: {
     id: string;
     projectId: string;
     input: PublicApiCreateInput;
+    actorId: string;
   }): Promise<Omit<Prisma.TriggerUncheckedCreateInput, "id" | "projectId">> {
     const filterQuery = this.readFilterQuery({
       filterQuery: input.filterQuery,
@@ -224,7 +230,12 @@ export class PublicApiTriggerService {
     });
     const delivery = (await persistPublicApiActionParams({
       action: input.action,
-      incoming: input.actionParams,
+      incoming: await this.connectSlackParams({
+        action: input.action,
+        projectId,
+        actorId,
+        actionParams: input.actionParams,
+      }),
     })) as Record<string, unknown>;
 
     if (input.customGraphId) {
@@ -370,10 +381,13 @@ export class PublicApiTriggerService {
     projectId,
     triggerId,
     input,
+    actorId,
   }: {
     projectId: string;
     triggerId: string;
     input: PublicApiUpdateInput;
+    /** Who a Slack connection created from a legacy secret is attributed to. */
+    actorId?: string;
   }): Promise<Trigger> {
     const stored = await this.getById({ projectId, triggerId });
     this.assertWhatIsFixedIsUnchanged({ stored, input });
@@ -392,7 +406,12 @@ export class PublicApiTriggerService {
         ? { traceDebounceMs: input.traceDebounceMs }
         : {}),
       ...(await this.conditionUpdate({ projectId, stored, input })),
-      ...(await this.actionParamsUpdate({ projectId, stored, input })),
+      ...(await this.actionParamsUpdate({
+        projectId,
+        stored,
+        input,
+        actorId: actorId ?? apiActorFallback(projectId),
+      })),
     };
 
     // A pinned cadence is stated on every save that could have moved the row
@@ -496,10 +515,12 @@ export class PublicApiTriggerService {
     projectId,
     stored,
     input,
+    actorId,
   }: {
     projectId: string;
     stored: Trigger;
     input: PublicApiUpdateInput;
+    actorId: string;
   }): Promise<Prisma.TriggerUncheckedUpdateInput> {
     const statedRule = await this.resolveStoredRule({ stored, input });
     const rule =
@@ -528,7 +549,15 @@ export class PublicApiTriggerService {
       return {
         actionParams: (await persistPublicApiActionParams({
           action: stored.action,
-          incoming: { ...input.actionParams, ...(rule ?? {}) },
+          incoming: {
+            ...(await this.connectSlackParams({
+              action: stored.action,
+              projectId,
+              actorId,
+              actionParams: input.actionParams,
+            })),
+            ...(rule ?? {}),
+          },
           stored: stored.actionParams,
         })) as Prisma.InputJsonValue,
       };
@@ -714,17 +743,24 @@ export class PublicApiTriggerService {
     }
   }
 
-  /** ADR-093 §5 resolution: the automation's own token first, then the
-   *  project's Slack integration — the wired resolver owns the whole
-   *  decision. */
-  private async resolveSlackTokenFor({
-    params,
+  /** Point Slack params at a connection before the provider persists them. */
+  private async connectSlackParams({
+    action,
     projectId,
+    actorId,
+    actionParams,
   }: {
-    params: SlackActionParams;
+    action: TriggerAction;
     projectId: string;
-  }): Promise<ResolvedSlackToken | null> {
-    return this.deps.resolveSlackToken({ projectId, actionParams: params });
+    actorId: string;
+    actionParams: Record<string, unknown>;
+  }): Promise<Record<string, unknown>> {
+    if (action !== TriggerAction.SEND_SLACK_MESSAGE) return actionParams;
+    return this.deps.slackConnections.connectActionParams({
+      projectId,
+      actorId,
+      actionParams,
+    });
   }
 
   private async savedSlackDestination({
@@ -739,43 +775,39 @@ export class PublicApiTriggerService {
       "channel" | "recipients" | "webhook" | "botDestination"
     >
   > {
-    // The stored delivery method decides the surface, exactly as it does at
-    // every dispatch site. Reading it off "is there a token?" was survivable
-    // while the only token lived on the row; with a project integration behind
-    // every row, a token now resolves for a WEBHOOK automation too, and a test
-    // fire would have posted through a surface the automation does not use.
-    if (slackDeliveryMethodOf(params as SlackActionParams) === "bot") {
-      const resolved = await this.resolveSlackTokenFor({
-        params: params as SlackActionParams,
-        projectId,
-      });
-      const botToken = resolved?.token ?? null;
-      const channelId = (params.slackChannelId ?? "") as string;
-      if (!botToken || !channelId) {
-        // Fail closed: falling through to the stored webhook would report a
-        // successful test fire through a surface the real delivery does not
-        // use, and the caller would read a broken bot connection as working.
-        throw new TestFireUnavailableError(
-          "slack",
-          "This automation delivers through a Slack connection, and no " +
-            "connected workspace and channel resolve for it.",
-        );
-      }
-      return {
-        channel: "slack",
-        recipients: [],
-        webhook: null,
-        botDestination: { token: botToken, channel: channelId },
-      };
-    }
-    const webhook = (params.slackWebhook ?? "") as string;
-    if (!webhook) {
+    // The same resolution a real delivery takes (ADR-093 §5a), so the surface
+    // is the connection's kind and a test fire proves what delivery will use.
+    const destination = await findSlackDestination({
+      actionParams: params,
+      projectId,
+      connections: this.deps.slackConnections,
+    });
+    if (!destination) {
       throw new TestFireUnavailableError(
         "slack",
-        "This automation has no Slack destination to test-fire to.",
+        "This automation has no Slack connection to test-fire to.",
       );
     }
-    return { channel: "slack", recipients: [], webhook };
+    if (destination.kind === "webhook") {
+      return { channel: "slack", recipients: [], webhook: destination.url };
+    }
+    if (!destination.channel) {
+      // Fail closed: a bot connection without a channel has nowhere to post.
+      throw new TestFireUnavailableError(
+        "slack",
+        "This automation delivers through a Slack connection, and no " +
+          "channel resolves for it.",
+      );
+    }
+    return {
+      channel: "slack",
+      recipients: [],
+      webhook: null,
+      botDestination: {
+        token: destination.token,
+        channel: destination.channel,
+      },
+    };
   }
 
   /** The full request a real delivery would make, signed the same way, so a
@@ -1212,4 +1244,9 @@ export interface PublicApiTestFireInput {
     timePeriodMinutes?: number;
   } | null;
   report?: { sourceKind: "traceQuery" | "customGraph" | "dashboard" } | null;
+}
+
+/** The actor for an API write with no user behind its key (governance precedent). */
+function apiActorFallback(projectId: string): string {
+  return `svc_${projectId}`;
 }

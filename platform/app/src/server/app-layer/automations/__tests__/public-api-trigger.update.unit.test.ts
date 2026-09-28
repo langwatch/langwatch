@@ -55,7 +55,10 @@ const makeService = (stored: Trigger) => {
     filterValidation: { assertWritable },
     testFire: vi.fn() as never,
     resolveProject: vi.fn() as never,
-    resolveSlackToken: vi.fn() as never,
+    slackConnections: {
+      connectActionParams: vi.fn(),
+      findUsableSecret: vi.fn(),
+    },
   });
   return { service, update, assertWritable, getFireHistoryPage };
 };

@@ -91,10 +91,9 @@ export class SlackIntegrationInvalidTokenError extends HandledError {
 }
 
 /**
- * Slack delivery had no token to use: the automation stores none of its own and
- * the project has no Slack integration (ADR-093 §5, step 3 of the resolution
- * order). Customer fault — connecting Slack in the project's integration
- * settings is the whole remediation.
+ * Slack delivery had nothing to deliver with: the automation's connection is
+ * gone or out of its project's reach, or it names none and stores no secret of
+ * its own (ADR-093 §5a resolution). Customer fault: pick or add a connection.
  */
 export class SlackIntegrationMissingError extends HandledError {
   declare readonly code: "slack_integration_missing";
@@ -106,6 +105,48 @@ export class SlackIntegrationMissingError extends HandledError {
       { httpStatus: 422 },
     );
     this.name = "SlackIntegrationMissingError";
+  }
+}
+
+/**
+ * The secret being saved is already stored in this organization as another
+ * connection (ADR-093 §5a: one secret is one connection per organization). The
+ * existing connection's name travels so the customer can pick it instead.
+ */
+export class SlackConnectionExistsError extends HandledError {
+  declare readonly code: "slack_connection_exists";
+
+  constructor({
+    connectionId,
+    connectionName,
+  }: {
+    connectionId: string;
+    connectionName: string;
+  }) {
+    super(
+      "slack_connection_exists",
+      "This Slack secret is already saved as another connection.",
+      { meta: { connectionId, connectionName }, httpStatus: 409 },
+    );
+    this.name = "SlackConnectionExistsError";
+  }
+}
+
+/**
+ * Deleting a connection active automations deliver through, unconfirmed. The
+ * count travels so the client can say what stops delivering; `force` deletes
+ * anyway (ADR-093 §5a).
+ */
+export class SlackConnectionInUseError extends HandledError {
+  declare readonly code: "slack_connection_in_use";
+
+  constructor({ dependentAutomations }: { dependentAutomations: number }) {
+    super(
+      "slack_connection_in_use",
+      "Automations still deliver through this Slack connection.",
+      { meta: { dependentAutomations }, httpStatus: 409 },
+    );
+    this.name = "SlackConnectionInUseError";
   }
 }
 

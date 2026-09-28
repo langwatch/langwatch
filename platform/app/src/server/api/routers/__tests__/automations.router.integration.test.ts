@@ -117,6 +117,22 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Slack connections have their own suites; this file pins the router's other
+// rules, so a Slack save passes its params through unchanged here.
+vi.mock(
+  "~/server/app-layer/automations/slack-integration/slack-integration.wiring",
+  () => ({
+    createSlackIntegrationService: () => ({
+      connectActionParams: async ({
+        actionParams,
+      }: {
+        actionParams: Record<string, unknown>;
+      }) => actionParams,
+      findUsableSecret: async () => null,
+    }),
+  }),
+);
+
 import {
   _resetMemoryPersistCapStore,
   consumePersistCapSlot,

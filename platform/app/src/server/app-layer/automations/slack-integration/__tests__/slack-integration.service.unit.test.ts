@@ -1,378 +1,419 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Fake cipher so these tests exercise the service's orchestration — validate,
-// then store, never the other way round — rather than AES itself.
+// Fake cipher and fingerprint so these tests exercise the service's
+// orchestration (validate, dedupe, then store) rather than AES or HMAC.
 vi.mock("~/utils/encryption", () => ({
   encrypt: (value: string) => `enc(${value})`,
   decrypt: (value: string) => value.replace(/^enc\(/, "").replace(/\)$/, ""),
 }));
+vi.mock("../slack-secret-fingerprint", () => ({
+  slackSecretFingerprint: ({ secret }: { secret: string }) =>
+    `fp(${secret.trim()})`,
+  slackSecretHint: ({ secret }: { secret: string }) => secret.trim().slice(-4),
+}));
 
-import type { HandledError } from "@langwatch/handled-error";
-import type { SlackIntegration } from "~/generated/prisma/client";
 import type { SlackWorkspaceIdentity } from "../../delivery/slackWebApi";
-import type {
-  ClearOwnSlackTokenOutcome,
-  LegacySlackTokenAutomation,
-  SlackIntegrationRepository,
-} from "../repositories/slack-integration.repository";
 import { SlackIntegrationService } from "../slack-integration.service";
+import {
+  FakeSlackIntegrationRepository,
+  PROJECTS,
+} from "./fakeSlackIntegrationRepository";
 
 type VerifyResult =
   | { ok: true; identity: SlackWorkspaceIdentity }
   | { ok: false; error: string };
 
-/** In-memory stand-in for the table, so the tests can read what was actually
- *  stored — the point of most of them is that the token never leaves. */
-class FakeSlackIntegrationRepository implements SlackIntegrationRepository {
-  rows = new Map<string, SlackIntegration>();
-  legacy: LegacySlackTokenAutomation[] = [];
-  /** Automations carrying no token of their own — everything the project
-   *  integration is the only delivery credential for. */
-  deliveringThroughIntegration: LegacySlackTokenAutomation[] = [];
-  unswitchable = new Set<string>();
-  clearedIds: string[] = [];
-  /** Rows that exist and carry no token — the `already_clear` case. Kept apart
-   *  from "no such row", which the contract calls `failed`. */
-  tokenless = new Set<string>();
-
-  async findByProject({ projectId }: { projectId: string }) {
-    return this.rows.get(projectId) ?? null;
-  }
-
-  async upsertForProject(params: {
-    projectId: string;
-    organizationId: string;
-    botTokenEncrypted: string;
-    slackTeamId: string;
-    slackTeamName: string;
-    userId: string;
-  }) {
-    const now = new Date("2026-08-13T12:00:00Z");
-    const row = {
-      id: `slack-${params.projectId}`,
-      scopeType: "PROJECT",
-      scopeId: params.projectId,
-      organizationId: params.organizationId,
-      botTokenEncrypted: params.botTokenEncrypted,
-      slackTeamId: params.slackTeamId,
-      slackTeamName: params.slackTeamName,
-      createdById: params.userId,
-      updatedById: params.userId,
-      createdAt: now,
-      updatedAt: now,
-    } as SlackIntegration;
-    this.rows.set(params.projectId, row);
-    return row;
-  }
-
-  async deleteForProject({ projectId }: { projectId: string }) {
-    this.rows.delete(projectId);
-  }
-
-  async findAllWithOwnSlackToken(_params: { projectId: string }) {
-    return this.legacy;
-  }
-
-  async countAllDeliveringThroughIntegration(_params: { projectId: string }) {
-    return this.deliveringThroughIntegration.length;
-  }
-
-  async clearOwnSlackToken({
-    triggerId,
-  }: {
-    triggerId: string;
-  }): Promise<ClearOwnSlackTokenOutcome> {
-    if (this.unswitchable.has(triggerId)) return "failed";
-    if (!this.legacy.some((row) => row.id === triggerId)) {
-      // Mirrors the Prisma repository: a row that is simply gone is `failed`;
-      // only a row that exists without a token is `already_clear`.
-      return this.tokenless.has(triggerId) ? "already_clear" : "failed";
-    }
-    this.clearedIds.push(triggerId);
-    this.legacy = this.legacy.filter((row) => row.id !== triggerId);
-    return "cleared";
-  }
-}
-
 const acme: VerifyResult = {
   ok: true,
-  identity: { teamId: "T123", teamName: "Acme HQ" },
-};
-
-function makeService({
-  repo = new FakeSlackIntegrationRepository(),
-  verify = async (): Promise<VerifyResult> => acme,
-}: {
-  repo?: FakeSlackIntegrationRepository;
-  verify?: (token: string) => Promise<VerifyResult>;
-} = {}) {
-  return { repo, service: new SlackIntegrationService(repo, verify) };
-}
-
-const setupInput = {
-  projectId: "project-1",
-  organizationId: "org-1",
-  userId: "user-1",
+  identity: { teamId: "T-ACME", teamName: "Acme Workspace" },
 };
 
 describe("SlackIntegrationService", () => {
-  describe("when a project manager connects Slack with a valid bot token", () => {
-    /** @scenario "Connecting Slack for a project" */
-    it("names the connected workspace and never hands back the token", async () => {
-      const { repo, service } = makeService();
+  let repo: FakeSlackIntegrationRepository;
+  let verify: ReturnType<
+    typeof vi.fn<(token: string) => Promise<VerifyResult>>
+  >;
+  let service: SlackIntegrationService;
 
-      const status = await service.setup({
-        ...setupInput,
-        botToken: "xoxb-live",
-      });
-
-      expect(status).toEqual({
-        connected: true,
-        slackTeamId: "T123",
-        slackTeamName: "Acme HQ",
-        connectedAt: expect.any(Date),
-        updatedAt: expect.any(Date),
-        dependentAutomations: 0,
-      });
-      expect(JSON.stringify(status)).not.toContain("xoxb-live");
-      expect(repo.rows.get("project-1")?.botTokenEncrypted).toBe(
-        "enc(xoxb-live)",
-      );
+  const addBot = (overrides: { secret?: string; name?: string } = {}) =>
+    service.create({
+      scope: PROJECTS["project-1"]!,
+      name: overrides.name ?? "Alerts bot",
+      kind: "BOT",
+      scopeType: "ORGANIZATION",
+      scopeId: "org-1",
+      secret: overrides.secret ?? "xoxb-alerts-1234",
+      actorId: "user-1",
     });
 
-    /** @scenario "Connecting Slack for a project" */
-    it("keeps the token out of the status read as well", async () => {
-      const { service } = makeService();
-      await service.setup({ ...setupInput, botToken: "xoxb-live" });
-
-      const status = await service.getStatus({ projectId: "project-1" });
-
-      expect(JSON.stringify(status)).not.toContain("xoxb-live");
-      expect(status.slackTeamName).toBe("Acme HQ");
-    });
+  beforeEach(() => {
+    repo = new FakeSlackIntegrationRepository();
+    verify = vi.fn(async () => acme);
+    service = new SlackIntegrationService(repo, verify);
   });
 
-  describe("when the workspace rejects the token", () => {
-    /** @scenario "A token Slack rejects is refused at setup" */
-    it("refuses with the invalid-token code and stores nothing", async () => {
-      const { repo, service } = makeService({
-        verify: async () => ({ ok: false, error: "invalid_auth" }),
-      });
+  describe("create()", () => {
+    describe("given a valid bot token scoped to the organization", () => {
+      /** @scenario "Adding a bot connection for the organization" */
+      it("stores it with the workspace Slack reported and returns no secret", async () => {
+        const view = await addBot();
 
-      const error = await service
-        .setup({ ...setupInput, botToken: "xoxb-dud" })
-        .then(
-          () => null,
-          (thrown: unknown) => thrown,
+        expect(verify).toHaveBeenCalledWith("xoxb-alerts-1234");
+        expect(view).toMatchObject({
+          name: "Alerts bot",
+          kind: "BOT",
+          scopeType: "ORGANIZATION",
+          scopeName: "Acme",
+          slackTeamName: "Acme Workspace",
+          secretHint: "1234",
+        });
+        expect(JSON.stringify(view)).not.toContain("xoxb-alerts-1234");
+        await expect(
+          service.findUsableSecret({ id: view.id, projectId: "project-2" }),
+        ).resolves.toEqual({ kind: "BOT", token: "xoxb-alerts-1234" });
+      });
+    });
+
+    describe("given an incoming webhook scoped to one project", () => {
+      /** @scenario "Adding a webhook connection for one project" */
+      it("shows only the last four characters and other projects cannot use it", async () => {
+        const url = "https://hooks.slack.com/services/T/B/wxyz";
+        const view = await service.create({
+          scope: PROJECTS["project-1"]!,
+          name: "Checkout alerts",
+          kind: "INCOMING_WEBHOOK",
+          scopeType: "PROJECT",
+          scopeId: "project-1",
+          secret: url,
+          actorId: "user-1",
+        });
+
+        expect(view).toMatchObject({
+          scopeType: "PROJECT",
+          scopeName: "Checkout",
+          secretHint: "wxyz",
+          slackTeamId: null,
+        });
+        expect(verify).not.toHaveBeenCalled();
+        await expect(
+          service.findUsableSecret({ id: view.id, projectId: "project-1" }),
+        ).resolves.toEqual({ kind: "INCOMING_WEBHOOK", url });
+        await expect(
+          service.findUsableSecret({ id: view.id, projectId: "project-2" }),
+        ).resolves.toBeNull();
+      });
+    });
+
+    describe("given a token the workspace rejects", () => {
+      /** @scenario "A token Slack rejects is refused at setup" */
+      it("refuses with the invalid-token code and stores nothing", async () => {
+        verify.mockResolvedValue({ ok: false, error: "invalid_auth" });
+
+        await expect(addBot()).rejects.toMatchObject({
+          code: "slack_integration_invalid_token",
+        });
+        expect(repo.rows.size).toBe(0);
+      });
+    });
+
+    describe("given Slack cannot be reached", () => {
+      it("fails as infrastructure, not as a refused token", async () => {
+        verify.mockResolvedValue({ ok: false, error: "request_failed" });
+
+        const error = await addBot().catch((caught: unknown) => caught);
+
+        expect(error).toBeInstanceOf(Error);
+        expect(error).not.toHaveProperty(
+          "code",
+          "slack_integration_invalid_token",
         );
-
-      expect((error as HandledError).code).toBe(
-        "slack_integration_invalid_token",
-      );
-      expect(repo.rows.size).toBe(0);
+        expect(repo.rows.size).toBe(0);
+      });
     });
 
-    it("reports an unreachable Slack as infrastructure, not as a bad token", async () => {
-      // "We could not reach Slack" must not reach the operator as "that token
-      // is invalid" — a plain Error degrades to the generic unknown at the
-      // boundary, which is what an infrastructure failure should read as.
-      const { repo, service } = makeService({
-        verify: async () => ({ ok: false, error: "request_failed" }),
+    describe("given the organization already stores the same token", () => {
+      /** @scenario "The same secret cannot be stored twice in an organization" */
+      it("refuses with the connection-exists code naming the existing connection", async () => {
+        await addBot({ name: "Alerts bot" });
+
+        await expect(addBot({ name: "Second copy" })).rejects.toMatchObject({
+          code: "slack_connection_exists",
+          meta: { connectionName: "Alerts bot" },
+        });
+        expect(repo.rows.size).toBe(1);
+      });
+    });
+  });
+
+  describe("listForProject()", () => {
+    it("lists usable connections with how many automations use each", async () => {
+      const bot = await addBot();
+      repo.dependents.set(bot.id, 2);
+
+      const { connections } = await service.listForProject({
+        projectId: "project-1",
       });
 
-      const error = await service
-        .setup({ ...setupInput, botToken: "xoxb-live" })
-        .then(
-          () => null,
-          (thrown: unknown) => thrown,
+      expect(connections).toEqual([
+        expect.objectContaining({ id: bot.id, dependentAutomations: 2 }),
+      ]);
+    });
+  });
+
+  describe("update()", () => {
+    describe("given a bot connection several automations deliver through", () => {
+      /** @scenario "Replacing a secret needs no automation edits" */
+      it("serves the new token to every automation pointing at the id", async () => {
+        const bot = await addBot();
+        const connection = repo.rows.get(bot.id)!;
+
+        await service.update({
+          scope: PROJECTS["project-1"]!,
+          connection,
+          secret: "xoxb-rotated-9999",
+          actorId: "user-2",
+        });
+
+        await expect(
+          service.findUsableSecret({ id: bot.id, projectId: "project-1" }),
+        ).resolves.toEqual({ kind: "BOT", token: "xoxb-rotated-9999" });
+        expect(repo.rows.get(bot.id)?.secretHint).toBe("9999");
+      });
+    });
+
+    describe("given a rename that leaves the secret untouched", () => {
+      /** @scenario "Editing a connection without retyping its secret keeps the secret" */
+      it("keeps the stored secret and does not ask Slack again", async () => {
+        const bot = await addBot();
+        verify.mockClear();
+
+        const view = await service.update({
+          scope: PROJECTS["project-1"]!,
+          connection: repo.rows.get(bot.id)!,
+          name: "Renamed bot",
+          actorId: "user-2",
+        });
+
+        expect(view.name).toBe("Renamed bot");
+        expect(verify).not.toHaveBeenCalled();
+        expect(repo.rows.get(bot.id)?.botTokenEncrypted).toBe(
+          "enc(xoxb-alerts-1234)",
         );
-
-      expect(error).toBeInstanceOf(Error);
-      expect((error as { code?: string }).code).toBeUndefined();
-      expect(repo.rows.size).toBe(0);
+      });
     });
 
-    /** @scenario "A token Slack rejects is refused at setup" */
-    it("leaves a working connection in place when a rotation is refused", async () => {
-      const repo = new FakeSlackIntegrationRepository();
-      const working = new SlackIntegrationService(repo, async () => acme);
-      await working.setup({ ...setupInput, botToken: "xoxb-live" });
+    describe("given a new secret another connection already holds", () => {
+      it("refuses with the connection-exists code", async () => {
+        const first = await addBot({
+          name: "First",
+          secret: "xoxb-first-1111",
+        });
+        const second = await addBot({
+          name: "Second",
+          secret: "xoxb-second-2222",
+        });
 
-      const rejecting = new SlackIntegrationService(repo, async () => ({
-        ok: false,
-        error: "token_revoked",
-      }));
-      await rejecting
-        .setup({ ...setupInput, botToken: "xoxb-dud" })
-        .catch(() => undefined);
-
-      expect(repo.rows.get("project-1")?.botTokenEncrypted).toBe(
-        "enc(xoxb-live)",
-      );
+        await expect(
+          service.update({
+            scope: PROJECTS["project-1"]!,
+            connection: repo.rows.get(second.id)!,
+            secret: "xoxb-first-1111",
+            actorId: "user-1",
+          }),
+        ).rejects.toMatchObject({
+          code: "slack_connection_exists",
+          meta: { connectionId: first.id },
+        });
+      });
     });
   });
 
-  describe("when the token is replaced in settings", () => {
-    /** @scenario "Rotating the token needs no automation edits" */
-    it("serves the new token to every automation without touching one", async () => {
-      const { repo, service } = makeService();
-      await service.setup({ ...setupInput, botToken: "xoxb-old" });
+  describe("delete()", () => {
+    describe("given a connection three active automations deliver through", () => {
+      /** @scenario "Deleting a connection in use says what stops delivering" */
+      it("refuses with the count, then removes it once confirmed", async () => {
+        const bot = await addBot();
+        repo.dependents.set(bot.id, 3);
+        const connection = repo.rows.get(bot.id)!;
 
-      await service.setup({ ...setupInput, botToken: "xoxb-new" });
+        await expect(
+          service.delete({ connection, force: false }),
+        ).rejects.toMatchObject({
+          code: "slack_connection_in_use",
+          meta: { dependentAutomations: 3 },
+        });
+        expect(repo.rows.has(bot.id)).toBe(true);
 
-      expect(await service.getBotToken({ projectId: "project-1" })).toBe(
-        "xoxb-new",
-      );
-      expect(repo.clearedIds).toEqual([]);
-      expect(repo.rows.size).toBe(1);
+        await expect(
+          service.delete({ connection, force: true }),
+        ).resolves.toEqual({ deleted: true, dependentAutomations: 3 });
+        expect(repo.rows.has(bot.id)).toBe(false);
+      });
     });
   });
 
-  describe("when automations in the project still carry their own token", () => {
-    /** @scenario "Settings counts the automations still on their own token" */
-    it("counts them", async () => {
-      const { repo, service } = makeService();
-      repo.legacy = [
-        { id: "automation-1", name: "Error spike" },
-        { id: "automation-2", name: "Latency watch" },
-      ];
+  describe("findOrCreateForSecret()", () => {
+    const webhook = "https://hooks.slack.com/services/T/B/abcd";
 
-      const automations = await service.getLegacyTokenAutomations({
+    it("creates a project connection named from the hint for a new webhook", async () => {
+      const result = await service.findOrCreateForSecret({
+        organizationId: "org-1",
         projectId: "project-1",
+        kind: "INCOMING_WEBHOOK",
+        secret: webhook,
+        actorId: "user-1",
       });
 
-      expect(automations).toHaveLength(2);
+      expect(result.created).toBe(true);
+      expect(repo.rows.get(result.id)).toMatchObject({
+        name: "Slack webhook ••••abcd",
+        scopeType: "PROJECT",
+        scopeId: "project-1",
+      });
     });
 
-    /** @scenario "Bulk-switching clears each automation independently" */
-    it("clears the ones it can and reports the one it cannot", async () => {
-      const { repo, service } = makeService();
-      await service.setup({ ...setupInput, botToken: "xoxb-live" });
-      repo.legacy = [
-        { id: "automation-1", name: "Error spike" },
-        { id: "automation-2", name: "Latency watch" },
-        { id: "automation-3", name: "Cost guard" },
-      ];
-      repo.unswitchable.add("automation-2");
-
-      const result = await service.clearLegacyTokens({
+    it("names a bot connection from its workspace, and keeps a token Slack refuses", async () => {
+      const named = await service.findOrCreateForSecret({
+        organizationId: "org-1",
         projectId: "project-1",
+        kind: "BOT",
+        secret: "xoxb-good-1234",
+        actorId: "user-1",
+      });
+      verify.mockResolvedValue({ ok: false, error: "token_revoked" });
+      const refused = await service.findOrCreateForSecret({
+        organizationId: "org-1",
+        projectId: "project-1",
+        kind: "BOT",
+        secret: "xoxb-revoked-5678",
+        actorId: "user-1",
       });
 
-      expect(result).toEqual({ cleared: 2, alreadyClear: 0, failed: 1 });
-      expect(repo.clearedIds).toEqual(["automation-1", "automation-3"]);
-      // The one that failed keeps its own token, so it keeps delivering.
-      expect(repo.legacy.map((row) => row.id)).toEqual(["automation-2"]);
+      expect(repo.rows.get(named.id)?.name).toBe("Acme Workspace");
+      expect(repo.rows.get(refused.id)).toMatchObject({
+        name: "Slack bot ••••5678",
+        slackTeamId: null,
+      });
     });
 
-    /** @scenario "Bulk-switching clears each automation independently" */
-    it("counts a row that throws as failed without stopping the batch", async () => {
-      const repo = new FakeSlackIntegrationRepository();
-      repo.legacy = [
-        { id: "automation-1", name: "Error spike" },
-        { id: "automation-2", name: "Latency watch" },
-      ];
-      repo.clearOwnSlackToken = async ({ triggerId }) => {
-        if (triggerId === "automation-1") throw new Error("row is locked");
-        return "cleared";
-      };
-      const service = new SlackIntegrationService(repo, async () => acme);
-      await service.setup({ ...setupInput, botToken: "xoxb-live" });
-
-      const result = await service.clearLegacyTokens({
+    it("reuses the existing connection, widening it when another project holds it", async () => {
+      const first = await service.findOrCreateForSecret({
+        organizationId: "org-1",
         projectId: "project-1",
+        kind: "INCOMING_WEBHOOK",
+        secret: webhook,
+        actorId: "user-1",
+      });
+      const again = await service.findOrCreateForSecret({
+        organizationId: "org-1",
+        projectId: "project-2",
+        kind: "INCOMING_WEBHOOK",
+        secret: webhook,
+        actorId: "user-2",
       });
 
-      expect(result).toEqual({ cleared: 1, alreadyClear: 0, failed: 1 });
-    });
-
-    /** @scenario "Bulk-switching clears each automation independently" */
-    it("reports an already-clear row as done rather than failed", async () => {
-      const { repo, service } = makeService();
-      await service.setup({ ...setupInput, botToken: "xoxb-live" });
-      repo.legacy = [{ id: "automation-1", name: "Error spike" }];
-      // Still a row, already switched over: the outcome the caller wanted.
-      repo.tokenless.add("automation-already-migrated");
-
-      const result = await service.clearLegacyTokens({
-        projectId: "project-1",
-        triggerIds: ["automation-1", "automation-already-migrated"],
+      expect(again).toEqual({ id: first.id, created: false });
+      expect(repo.rows.get(first.id)).toMatchObject({
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
       });
-
-      expect(result).toEqual({ cleared: 1, alreadyClear: 1, failed: 0 });
-    });
-
-    /** @scenario "Bulk-switching clears each automation independently" */
-    it("refuses to clear anything while the project has no integration", async () => {
-      const { repo, service } = makeService();
-      repo.legacy = [{ id: "automation-1", name: "Error spike" }];
-
-      await expect(
-        service.clearLegacyTokens({ projectId: "project-1" }),
-      ).rejects.toMatchObject({ code: "slack_integration_missing" });
-      expect(repo.clearedIds).toEqual([]);
     });
   });
 
-  describe("when automations in the project deliver through the integration", () => {
-    /** @scenario "Removing the connection reports how many automations stop delivering" */
-    it("names them in the status a client reads", async () => {
-      const { repo, service } = makeService();
-      await service.setup({ ...setupInput, botToken: "xoxb-live" });
-      repo.deliveringThroughIntegration = [
-        { id: "automation-1", name: "Error spike" },
-        { id: "automation-2", name: "Latency watch" },
-      ];
+  describe("connectActionParams()", () => {
+    describe("given a legacy webhook URL", () => {
+      it("stores it as a connection and keeps no secret of its own", async () => {
+        const params = await service.connectActionParams({
+          projectId: "project-1",
+          actorId: "user-1",
+          actionParams: {
+            slackWebhook: "https://hooks.slack.com/services/T/B/abcd",
+          },
+        });
 
-      const status = await service.getStatus({ projectId: "project-1" });
-
-      expect(status.dependentAutomations).toBe(2);
+        expect(params).toEqual({
+          slackIntegrationId: expect.any(String),
+          slackDelivery: "webhook",
+        });
+      });
     });
 
-    /** @scenario "Removing the connection reports how many automations stop delivering" */
-    it("reports how many were delivering through it when it is removed", async () => {
-      const { repo, service } = makeService();
-      await service.setup({ ...setupInput, botToken: "xoxb-live" });
-      repo.deliveringThroughIntegration = [
-        { id: "automation-1", name: "Error spike" },
-        { id: "automation-2", name: "Latency watch" },
-      ];
+    describe("given a bot connection id and a contradicting delivery method", () => {
+      it("derives the method from the kind and drops any legacy secret", async () => {
+        const bot = await addBot();
 
-      const result = await service.remove({ projectId: "project-1" });
+        const params = await service.connectActionParams({
+          projectId: "project-2",
+          actorId: "user-1",
+          actionParams: {
+            slackIntegrationId: bot.id,
+            slackDelivery: "webhook",
+            slackChannelId: " C0123 ",
+            slackWebhook: "https://hooks.slack.com/services/T/B/stale",
+            slackBotToken: "xoxb-stale",
+          },
+        });
 
-      expect(result).toEqual({ dependentAutomations: 2 });
-      expect(repo.rows.size).toBe(0);
+        expect(params).toEqual({
+          slackIntegrationId: bot.id,
+          slackDelivery: "bot",
+          slackChannelId: "C0123",
+        });
+      });
+
+      it("refuses a bot connection with no channel", async () => {
+        const bot = await addBot();
+
+        await expect(
+          service.connectActionParams({
+            projectId: "project-1",
+            actorId: "user-1",
+            actionParams: { slackIntegrationId: bot.id },
+          }),
+        ).rejects.toMatchObject({ code: "invalid_action_params" });
+      });
     });
 
-    /** @scenario "Removing the connection reports how many automations stop delivering" */
-    it("counts them before the connection is gone, not after", async () => {
-      // Counting after the delete would answer about a project that no longer
-      // has an integration, so the number the caller states would always be
-      // whatever the post-delete read happens to return.
-      const { repo, service } = makeService();
-      await service.setup({ ...setupInput, botToken: "xoxb-live" });
-      repo.deliveringThroughIntegration = [
-        { id: "automation-1", name: "Error spike" },
-      ];
-      repo.deleteForProject = async ({ projectId }) => {
-        repo.rows.delete(projectId);
-        repo.deliveringThroughIntegration = [];
-      };
+    describe("given a connection the project cannot use", () => {
+      it("refuses with the integration-missing code", async () => {
+        const url = "https://hooks.slack.com/services/T/B/only";
+        const own = await service.create({
+          scope: PROJECTS["project-1"]!,
+          name: "Checkout only",
+          kind: "INCOMING_WEBHOOK",
+          scopeType: "PROJECT",
+          scopeId: "project-1",
+          secret: url,
+          actorId: "user-1",
+        });
 
-      const result = await service.remove({ projectId: "project-1" });
-
-      expect(result).toEqual({ dependentAutomations: 1 });
+        await expect(
+          service.connectActionParams({
+            projectId: "project-2",
+            actorId: "user-1",
+            actionParams: { slackIntegrationId: own.id },
+          }),
+        ).rejects.toMatchObject({ code: "slack_integration_missing" });
+      });
     });
 
-    /** @scenario "Removing the connection reports how many automations stop delivering" */
-    it("reports none when every automation carries its own token", async () => {
-      const { repo, service } = makeService();
-      await service.setup({ ...setupInput, botToken: "xoxb-live" });
-      repo.legacy = [{ id: "automation-1", name: "Error spike" }];
+    describe("given a kept token and no connection", () => {
+      it("leaves the params for the provider to keep the stored secret", async () => {
+        const actionParams = {
+          slackDelivery: "bot",
+          slackBotToken: "__kept__",
+          slackChannelId: "C1",
+        };
 
-      const result = await service.remove({ projectId: "project-1" });
-
-      expect(result).toEqual({ dependentAutomations: 0 });
+        await expect(
+          service.connectActionParams({
+            projectId: "project-1",
+            actorId: "user-1",
+            actionParams,
+          }),
+        ).resolves.toBe(actionParams);
+        expect(repo.rows.size).toBe(0);
+      });
     });
   });
 });

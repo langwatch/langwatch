@@ -11,17 +11,23 @@ import type { Trigger } from "~/generated/prisma/client";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import type { PublicApiTestFireInput } from "../public-api-trigger.service";
 import { PublicApiTriggerService } from "../public-api-trigger.service";
+import type { SlackConnectionSecret } from "../slack-integration/slack-destination-resolver";
 import type { TriggerService } from "../trigger.service";
 
 /**
- * A test fire must reach the destination the automation is configured with —
- * and since ADR-093 §5 that is no longer decided by "does a token exist". The
- * project integration resolves a token for EVERY Slack row in a connected
- * project, so a webhook automation had one too, and the bot branch's
- * `token && channel` test would have taken it: the test fire would have posted
- * through the Web API, with the project's credential, on behalf of an
- * automation that delivers by webhook and has nothing to do with either.
+ * A test fire must reach the destination a real delivery would (ADR-093 §5a):
+ * the automation's connection decides the surface by its kind, whatever
+ * `slackDelivery` the row happens to carry, and an automation with no
+ * connection falls back to its own legacy secret.
  */
+
+const CONNECTIONS: Record<string, SlackConnectionSecret> = {
+  "conn-bot": { kind: "BOT", token: "xoxb-connection" },
+  "conn-webhook": {
+    kind: "INCOMING_WEBHOOK",
+    url: "https://hooks.slack.com/services/T000/B000/connection",
+  },
+};
 
 const savedTrigger = (actionParams: Record<string, unknown>): Trigger =>
   ({
@@ -46,15 +52,10 @@ const savedTrigger = (actionParams: Record<string, unknown>): Trigger =>
 
 function makeService({
   trigger,
-  overrides = {},
+  connections = CONNECTIONS,
 }: {
   trigger: Trigger;
-  overrides?: {
-    resolveSlackToken?: () => Promise<{
-      token: string;
-      source: "project_integration";
-    } | null>;
-  };
+  connections?: Record<string, SlackConnectionSecret>;
 }) {
   const testFire = vi.fn(async (_input: PublicApiTestFireInput) => ({
     channel: "slack" as const,
@@ -67,12 +68,11 @@ function makeService({
       fireHistory: {} as never,
       testFire,
       resolveProject: async () => ({ name: "Project", slug: "project" }),
-      // A connected project: the integration resolves a token for any row.
-      resolveSlackToken: async () => ({
-        token: "xoxb-project",
-        source: "project_integration" as const,
-      }),
-      ...overrides,
+      slackConnections: {
+        findUsableSecret: async ({ id }: { id: string }) =>
+          connections[id] ?? null,
+        connectActionParams: vi.fn(),
+      },
     } as never,
   );
   return { service, testFire };
@@ -82,31 +82,12 @@ const fire = (service: PublicApiTriggerService) =>
   service.testFire({ projectId: "project-1", triggerId: "automation-1" });
 
 describe("PublicApiTriggerService.testFire", () => {
-  describe("given a Slack automation that delivers by webhook", () => {
-    it("fires through its webhook, never the bot API the project's token opens", async () => {
+  describe("given a Slack automation pointing at a webhook connection", () => {
+    it("fires through the connection's webhook even when the row says bot", async () => {
       const { service, testFire } = makeService({
         trigger: savedTrigger({
-          slackDelivery: "webhook",
-          slackWebhook: "https://hooks.slack.com/services/T000/B000/xyz",
-        }),
-      });
-
-      await fire(service);
-
-      expect(testFire).toHaveBeenCalledWith(
-        expect.objectContaining({
-          channel: "slack",
-          webhook: "https://hooks.slack.com/services/T000/B000/xyz",
-        }),
-      );
-      expect(testFire.mock.calls[0]![0]).not.toHaveProperty("botDestination");
-    });
-
-    it("fires through its webhook even when it carries a stale bot channel", async () => {
-      const { service, testFire } = makeService({
-        trigger: savedTrigger({
-          slackDelivery: "webhook",
-          slackWebhook: "https://hooks.slack.com/services/T000/B000/xyz",
+          slackIntegrationId: "conn-webhook",
+          slackDelivery: "bot",
           slackChannelId: "C0123",
         }),
       });
@@ -116,17 +97,18 @@ describe("PublicApiTriggerService.testFire", () => {
       expect(testFire).toHaveBeenCalledWith(
         expect.objectContaining({
           channel: "slack",
-          webhook: "https://hooks.slack.com/services/T000/B000/xyz",
+          webhook: "https://hooks.slack.com/services/T000/B000/connection",
         }),
       );
       expect(testFire.mock.calls[0]![0]).not.toHaveProperty("botDestination");
     });
   });
 
-  describe("given a Slack automation that delivers as the bot", () => {
-    it("fires through the Web API with the resolved token and its channel", async () => {
+  describe("given a Slack automation pointing at a bot connection", () => {
+    it("fires through the Web API with the connection's token and its channel", async () => {
       const { service, testFire } = makeService({
         trigger: savedTrigger({
+          slackIntegrationId: "conn-bot",
           slackDelivery: "bot",
           slackChannelId: "C0123",
         }),
@@ -137,27 +119,57 @@ describe("PublicApiTriggerService.testFire", () => {
       expect(testFire).toHaveBeenCalledWith(
         expect.objectContaining({
           channel: "slack",
-          botDestination: { token: "xoxb-project", channel: "C0123" },
+          botDestination: { token: "xoxb-connection", channel: "C0123" },
         }),
       );
     });
 
-    it("refuses when no connection resolves, never falling back to a stored webhook", async () => {
+    it("refuses when the bot connection has no channel to post to", async () => {
       const { service, testFire } = makeService({
-        trigger: savedTrigger({
-          slackDelivery: "bot",
-          slackChannelId: "C0123",
-          // A webhook left behind by an earlier configuration must not
-          // become the test-fire surface for a bot automation.
-          slackWebhook: "https://hooks.slack.com/services/T000/B000/stale",
-        }),
-        overrides: { resolveSlackToken: async () => null },
+        trigger: savedTrigger({ slackIntegrationId: "conn-bot" }),
       });
 
       await expect(fire(service)).rejects.toMatchObject({
         code: "test_fire_unavailable",
       });
       expect(testFire).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a connection the project can no longer use", () => {
+    it("refuses, never falling back to a legacy webhook left on the row", async () => {
+      const { service, testFire } = makeService({
+        trigger: savedTrigger({
+          slackIntegrationId: "conn-deleted",
+          slackDelivery: "webhook",
+          slackWebhook: "https://hooks.slack.com/services/T000/B000/stale",
+        }),
+      });
+
+      await expect(fire(service)).rejects.toMatchObject({
+        code: "test_fire_unavailable",
+      });
+      expect(testFire).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a legacy automation with its own webhook and no connection", () => {
+    it("fires through its own webhook", async () => {
+      const { service, testFire } = makeService({
+        trigger: savedTrigger({
+          slackDelivery: "webhook",
+          slackWebhook: "https://hooks.slack.com/services/T000/B000/xyz",
+        }),
+      });
+
+      await fire(service);
+
+      expect(testFire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: "slack",
+          webhook: "https://hooks.slack.com/services/T000/B000/xyz",
+        }),
+      );
     });
   });
 });

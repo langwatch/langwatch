@@ -1,64 +1,82 @@
-import type { SlackIntegration } from "~/generated/prisma/client";
+import type {
+  SlackIntegration,
+  SlackIntegrationKind,
+  SlackIntegrationScopeType,
+} from "~/generated/prisma/client";
 
-/** An automation that still carries its own encrypted Slack bot token. */
-export interface LegacySlackTokenAutomation {
-  id: string;
-  name: string;
+/** Where a project sits: what an ORGANIZATION connection is checked against. */
+export interface SlackProjectScope {
+  projectId: string;
+  projectName: string;
+  organizationId: string;
+  organizationName: string;
 }
+
+/** Everything a stored connection holds, secret already in its at-rest form. */
+export interface SlackConnectionRecord {
+  name: string;
+  kind: SlackIntegrationKind;
+  scopeType: SlackIntegrationScopeType;
+  scopeId: string;
+  organizationId: string;
+  botTokenEncrypted: string | null;
+  webhookUrlEncrypted: string | null;
+  secretFingerprint: string;
+  secretHint: string;
+  slackTeamId: string | null;
+  slackTeamName: string | null;
+}
+
+/** The fields an edit may change. Kind and organization never change. */
+export type SlackConnectionChanges = Partial<
+  Omit<SlackConnectionRecord, "kind" | "organizationId">
+>;
 
 /**
- * Storage for the project's Slack workspace connection (ADR-093 §5), plus the
- * two reads the legacy-token migration needs over the automations that predate
- * it. Every method is bounded by the owning project — the row's scope pair is
- * `(PROJECT, projectId)`, and the tenancy regime rejects a query that names
- * neither the scope nor the organization.
+ * Storage for named Slack connections (ADR-093 §5a). Every read is bounded by
+ * a row id, the organization anchor or a scope pair, which is what the tenancy
+ * regime requires of this table.
  */
 export interface SlackIntegrationRepository {
-  findByProject(params: {
+  findProjectScope(params: {
     projectId: string;
+  }): Promise<SlackProjectScope | null>;
+
+  findById(params: { id: string }): Promise<SlackIntegration | null>;
+
+  /** The project's PROJECT connections plus its organization's ORGANIZATION ones. */
+  findAllUsableByProject(params: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<SlackIntegration[]>;
+
+  findByFingerprint(params: {
+    organizationId: string;
+    secretFingerprint: string;
   }): Promise<SlackIntegration | null>;
 
-  /**
-   * Store or replace the connection for one project. Rotation is the same
-   * write: a fresh ciphertext and a freshly pinned workspace over the same
-   * scope pair.
-   */
-  upsertForProject(params: {
-    projectId: string;
+  /** Null when the organization already holds this fingerprint (the unique index). */
+  create(params: {
+    record: SlackConnectionRecord;
+    actorId: string;
+  }): Promise<SlackIntegration | null>;
+
+  /** Null when the new fingerprint collides with another connection. */
+  update(params: {
+    id: string;
     organizationId: string;
-    botTokenEncrypted: string;
-    slackTeamId: string;
-    slackTeamName: string;
-    userId: string;
-  }): Promise<SlackIntegration>;
+    changes: SlackConnectionChanges;
+    actorId: string;
+  }): Promise<SlackIntegration | null>;
 
-  deleteForProject(params: { projectId: string }): Promise<void>;
-
-  /** Live automations in the project whose stored Slack params carry a token. */
-  findAllWithOwnSlackToken(params: {
-    projectId: string;
-  }): Promise<LegacySlackTokenAutomation[]>;
+  delete(params: { id: string; organizationId: string }): Promise<void>;
 
   /**
-   * How many active automations in the project deliver Slack messages through
-   * the project integration: bot delivery with no token of their own. A count,
-   * because the only caller states a number: what stops delivering if the
-   * connection goes away. Incoming-webhook and paused rows are not in it.
+   * Active, non-deleted Slack automations in any of the organization's projects
+   * pointing at each of `ids`, keyed by connection id (absent = none).
    */
-  countAllDeliveringThroughIntegration(params: {
-    projectId: string;
-  }): Promise<number>;
-
-  /**
-   * Drop the stored token from one automation's Slack params, leaving every
-   * other field alone. The outcomes are distinct so a bulk switch can report
-   * them honestly: `already_clear` is a row that carries no token — correct,
-   * not broken — while `failed` is a row that is gone or could not be written.
-   */
-  clearOwnSlackToken(params: {
-    projectId: string;
-    triggerId: string;
-  }): Promise<ClearOwnSlackTokenOutcome>;
+  countDependentAutomations(params: {
+    organizationId: string;
+    ids: string[];
+  }): Promise<Map<string, number>>;
 }
-
-export type ClearOwnSlackTokenOutcome = "cleared" | "already_clear" | "failed";

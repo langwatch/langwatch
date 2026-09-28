@@ -794,11 +794,10 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
-  // Inline single-scope-per-row (ADR-021, ADR-093 section 5), one row per
-  // scope. Same regime as RetentionPolicy: a query is bounded by a row id, the
-  // organizationId anchor, a (scopeType, scopeId) predicate, or the
-  // (scopeType, scopeId) compound unique the per-project read, upsert and
-  // delete all go through. No projectId column - the scope pair is the project.
+  // Named Slack connections (ADR-021, ADR-093 section 5a), many per scope. A
+  // query is bounded by a row id, the organizationId anchor (bare, or inside
+  // the (organizationId, secretFingerprint) compound unique), or a
+  // (scopeType, scopeId) predicate. No projectId column.
   SlackIntegration: {
     validateWhere: (where) => {
       const reason =
@@ -811,9 +810,8 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           typeof c.organizationId === "string" ||
           (c.organizationId && Array.isArray(c.organizationId.in)) ||
           hasScopePredicate(c) ||
-          (c.scopeType_scopeId &&
-            typeof c.scopeType_scopeId.scopeType === "string" &&
-            typeof c.scopeType_scopeId.scopeId === "string"),
+          typeof c.organizationId_secretFingerprint?.organizationId ===
+            "string",
       );
       return ok ? null : reason;
     },

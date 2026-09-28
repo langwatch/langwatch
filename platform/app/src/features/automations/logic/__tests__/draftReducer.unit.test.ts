@@ -62,12 +62,10 @@ describe("draftReducer", () => {
   describe("SET_SLICE", () => {
     it("updates exactly the provider's slice", () => {
       const slack = {
+        slackIntegrationId: "conn-hook",
         deliveryMethod: "webhook" as const,
-        webhook: "https://hooks.slack.com/services/T/B/X",
-        botToken: "",
         channelId: "",
-        botTokenAlreadySet: false,
-        isLegacyWebhook: false,
+        legacyParams: null,
         templateType: "string" as const,
         template: { value: "", usingDefault: true },
       };
@@ -542,6 +540,28 @@ describe("buildTestFirePayload sends the graph-alert discriminator", () => {
       expect(payload.graphAlert).toBeNull();
       expect(payload.channel).toBe("email");
       expect(payload.trigger.name).toBe("High latency");
+    });
+  });
+
+  describe("given a Slack draft that delivers through a connection", () => {
+    it("names the connection, and omits it when there is none", () => {
+      const withConnection = buildTestFirePayload({
+        draft: SAMPLE,
+        projectId: "proj_1",
+        channel: "slack",
+        webhook: null,
+        slackIntegrationId: "conn-hook",
+      });
+      const without = buildTestFirePayload({
+        draft: SAMPLE,
+        projectId: "proj_1",
+        channel: "slack",
+        webhook: null,
+        slackIntegrationId: null,
+      });
+
+      expect(withConnection).toMatchObject({ slackIntegrationId: "conn-hook" });
+      expect(without).not.toHaveProperty("slackIntegrationId");
     });
   });
 

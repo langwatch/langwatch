@@ -25,10 +25,7 @@ import {
 import { graphAlertActionParamsSchema } from "~/server/app-layer/automations/graph-alert.builder";
 import { PublicApiTriggerService } from "~/server/app-layer/automations/public-api-trigger.service";
 import { reportActionParamsSchema } from "~/server/app-layer/automations/report.builder";
-import {
-  findSlackBotToken,
-  slackProjectTokenReader,
-} from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
+import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
 import { TriggerFilterValidationService } from "~/server/app-layer/automations/trigger-filter-validation.service";
 import {
   decodeTriggerFireCursor,
@@ -84,43 +81,65 @@ const emailActionParamsSchema = z
 
 const slackActionParamsSchema = z
   .object({
+    slackIntegrationId: z
+      .string()
+      .optional()
+      .describe(
+        "The Slack connection this automation posts through: an " +
+          "organization connection or one of this project's, listed under " +
+          "Settings, Integrations, Slack. A bot connection also needs " +
+          "`slackChannelId`; a webhook connection needs nothing else. " +
+          "Preferred over `slackWebhook` and `slackBotToken`, and what a read " +
+          "returns in their place.",
+      ),
     slackDelivery: z
       .enum(["webhook", "bot"])
       .optional()
       .describe(
         "How the message reaches Slack. `webhook` posts to an incoming " +
-          "webhook URL, `bot` posts as the LangWatch Slack app. Absent means " +
-          "`webhook`.",
+          "webhook URL, `bot` posts as the LangWatch Slack app. With " +
+          "`slackIntegrationId` it follows the connection's kind. Absent " +
+          "without a connection means `webhook`.",
       ),
     slackWebhook: z
       .string()
       .optional()
       .describe(
-        "The incoming webhook URL, for `webhook` delivery. A credential: it " +
-          "reads back as the placeholder, and sending the placeholder back " +
-          "keeps the stored one.",
+        "Legacy, accepted for one release: an incoming webhook URL, for " +
+          "`webhook` delivery. It is stored as a Slack connection (an " +
+          "existing one holding the same URL, else a new project " +
+          "connection) and the automation keeps only that connection's id. " +
+          "Send `slackIntegrationId` instead.",
       ),
     slackChannelId: z
       .string()
       .optional()
-      .describe("The channel the bot posts in, for `bot` delivery."),
+      .describe(
+        "The channel the bot posts in, for a bot connection or `bot` " +
+          "delivery. Invite the LangWatch app to it first.",
+      ),
     slackBotToken: z
       .string()
       .optional()
       .describe(
-        "The bot token, for `bot` delivery. A credential: it never reads " +
-          "back. Send `slackBotTokenSet: true` to keep the stored one.",
+        "Legacy, accepted for one release: a bot token, for `bot` delivery. " +
+          "It is stored as a Slack connection (an existing one holding the " +
+          "same token, else a new project connection) and never reads back. " +
+          "Send `slackIntegrationId` instead.",
       ),
     slackBotTokenSet: z
       .boolean()
       .optional()
       .describe(
-        "Read: whether a bot token is stored. Write: `true` keeps the " +
-          "stored one.",
+        "Legacy. Read: whether an automation not yet moved to a connection " +
+          "still stores its own bot token. Write: `true` keeps it.",
       ),
   })
   .passthrough()
-  .describe("Slack delivery, by incoming webhook or by bot connection.");
+  .describe(
+    "Slack delivery through a Slack connection (`slackIntegrationId`), plus " +
+      "`slackChannelId` when the connection is a bot.",
+  );
 
 const webhookActionParamsWireSchema = z
   .object({
@@ -269,7 +288,9 @@ const triggerResponseSchema = z.object({
       "Where this automation delivers, with every credential value replaced " +
         "by the `[redacted]` placeholder. Which channel is configured, which " +
         "destination is set and which header names are in play all survive; " +
-        "the values never leave. Sending the placeholder back on an update " +
+        "the values never leave; a Slack automation names its connection by " +
+        "`slackIntegrationId` and carries no secret. Sending the placeholder " +
+        "back on an update " +
         "keeps the stored value. The rule this automation fires by is not " +
         "here — it is stated in `graphAlert` or `report`, and sending it in " +
         "this field is refused.",
@@ -393,7 +414,7 @@ const updateTriggerSchema = z.object({
         "and anything left out is removed — omit `headers` and it delivers " +
         "with none, omit `signingSecret` and its deliveries are no longer " +
         "signed. The one exception is a credential the read hid: send back " +
-        "the `[redacted]` placeholder (or, for a Slack bot connection, the " +
+        "the `[redacted]` placeholder (or, for a legacy Slack bot token, the " +
         "`slackBotTokenSet` flag the read echoes) and the stored credential " +
         "is kept, so reading an automation, changing one field and writing " +
         "the whole object back is safe. Only this channel's fields are " +
@@ -521,13 +542,7 @@ const triggerService = () =>
     fireHistory: TriggerFireHistoryService.create(prisma),
     filterValidation: TriggerFilterValidationService.create(prisma),
     testFire: (input) => getApp().triggerTemplates.testFire(input),
-    // ADR-093 §5: a test fire proves the same connection a real delivery would
-    // use — the automation's own token first, the project integration second.
-    resolveSlackToken: (params) =>
-      findSlackBotToken({
-        ...params,
-        projectIntegration: slackProjectTokenReader(prisma),
-      }),
+    slackConnections: createSlackIntegrationService({ prisma }),
     resolveProject: async (projectId) => {
       const project = await getApp().projects.getById(projectId);
       if (!project) throw new ProjectNotFoundError(projectId);
@@ -725,6 +740,7 @@ secured.access(requires("triggers:create")).post(
 
     const trigger = await triggerService().create({
       projectId: project.id,
+      actorId: c.get("apiKeyUserId") ?? undefined,
       input: {
         name: body.name,
         action: body.action as TriggerAction,
@@ -790,6 +806,7 @@ secured.access(requires("triggers:update")).patch(
 
     const updated = await triggerService().update({
       projectId: project.id,
+      actorId: c.get("apiKeyUserId") ?? undefined,
       triggerId: id,
       input: {
         action: body.action as TriggerAction | undefined,

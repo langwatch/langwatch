@@ -17,7 +17,6 @@ import {
 import { Fragment } from "react";
 import { HelpCircle, Plus } from "react-feather";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
-import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
@@ -27,8 +26,6 @@ import {
 import { matchesEveryTrace } from "~/features/automations/logic/matchesEveryTrace";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
-import { useSwitchToProjectIntegration } from "~/features/automations/logic/useSwitchToProjectIntegration";
-import { describeError } from "~/features/errors";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { automationContextChip } from "~/features/langy/logic/langyContextChips";
 import type { Monitor, TriggerAction } from "~/generated/prisma/client";
@@ -39,91 +36,6 @@ import { MatchesEveryTraceNotice } from "../MatchesEveryTraceNotice";
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 type TriggerStats = RouterOutputs["automation"]["getTriggerStats"][number];
 type ReportSchedule = RouterOutputs["automation"]["getReportSchedules"][number];
-
-/**
- * Row nudge for an automation that still stores its own Slack token
- * (ADR-093 §5). Delivery never retargets such a row on its own, so the only
- * thing that moves it onto the project integration is someone choosing to —
- * which means every unmigrated token has to stay visible where the automation
- * appears.
- *
- * The switch is confirmed, not one click: it deletes the only copy of a
- * credential the customer can no longer read or retype, and points the
- * automation at a workspace that may not be the one it posts to today. Same
- * ConfirmDialog the row's Delete uses, for the same reason.
- *
- * `workspaceName` is null when the project has no integration, and `canSwitch`
- * is false without `project:update` at this project — in either case the
- * automation is still flagged, but no affordance is offered that would break it
- * or be refused at the server.
- */
-export function OwnSlackTokenNudge({
-  projectId,
-  automationId,
-  automationName,
-  workspaceName,
-  canSwitch,
-}: {
-  projectId: string;
-  automationId: string;
-  automationName: string;
-  workspaceName: string | null;
-  canSwitch: boolean;
-}) {
-  const switchOver = useSwitchToProjectIntegration({
-    projectId,
-    automationId,
-    automationName,
-    workspaceName,
-  });
-
-  return (
-    <VStack align="start" gap={0} paddingTop={1}>
-      <Text textStyle="xs" color="fg.muted">
-        Uses its own Slack token
-      </Text>
-      {/* Both gates hold here, not only in the caller's composition: without
-          a workspace to fall through to, the switch would leave the
-          automation unable to deliver, and the server refuses it. */}
-      {canSwitch && workspaceName ? (
-        <Button
-          variant="plain"
-          size="xs"
-          height="auto"
-          paddingX={0}
-          color="fg.muted"
-          _hover={{ color: "fg" }}
-          loading={switchOver.isPending}
-          onClick={(event) => {
-            // The whole row opens the automation; this action is its own.
-            event.stopPropagation();
-            switchOver.setIsConfirming(true);
-          }}
-        >
-          Use the project integration
-        </Button>
-      ) : null}
-      {switchOver.isError ? (
-        <Text textStyle="xs" color="fg.error">
-          {describeError({
-            error: switchOver.error,
-            fallbackTitle: "Couldn't switch this automation",
-          })}
-        </Text>
-      ) : null}
-      <ConfirmDialog
-        open={switchOver.isConfirming}
-        onOpenChange={switchOver.setIsConfirming}
-        title={switchOver.confirmation.title}
-        message={switchOver.confirmation.message}
-        confirmLabel={switchOver.confirmation.confirmLabel}
-        tone="danger"
-        loading={switchOver.isPending}
-        onConfirm={switchOver.confirmSwitch}
-      />
-    </VStack>
-  );
-}
 
 /** Column header with a help tooltip explaining the metric. */
 export function MetricHeader({ label, help }: { label: string; help: string }) {
@@ -564,9 +476,6 @@ export function AutomationRow({
   applyChecks,
   actionItems,
   triggerActionName,
-  slackWorkspaceName,
-  canSwitchSlackToken,
-  projectId,
   sharedRowProps,
   activeCell,
   rowActionsMenu,
@@ -580,9 +489,6 @@ export function AutomationRow({
     actionParams: TriggerActionParams,
   ) => React.ReactNode;
   triggerActionName: (action: TriggerAction) => string;
-  slackWorkspaceName: string | null | undefined;
-  canSwitchSlackToken: boolean;
-  projectId: string;
   sharedRowProps: (
     trigger: EnhancedTrigger,
   ) => React.ComponentProps<typeof Table.Row>;
@@ -648,16 +554,6 @@ export function AutomationRow({
             >
               {actionItems(trigger.action, actionParams)}
             </HoverableBigText>
-            {trigger.action === "SEND_SLACK_MESSAGE" &&
-            actionParams.slackBotTokenSet ? (
-              <OwnSlackTokenNudge
-                projectId={projectId}
-                automationId={trigger.id}
-                automationName={trigger.name}
-                workspaceName={slackWorkspaceName ?? null}
-                canSwitch={canSwitchSlackToken}
-              />
-            ) : null}
           </VStack>
         </Table.Cell>
         <Table.Cell>

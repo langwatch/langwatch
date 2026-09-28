@@ -234,6 +234,32 @@ Most-specific-first is deliberate, and it is the safety property: an existing au
 
 This also strengthens the deferred multi-channel story: a future delivery row that needs Slack only needs a channel id, not a credential.
 
+### 5a. Amendment (2026-09-28): Slack connections are named and many
+
+§5's one-integration-per-project did not survive use: teams post to more than one workspace, some automations use incoming webhooks, and the same bot token was pasted into dozens of automations across projects. §5 is superseded where it disagrees with this section; its safety property (a connection is never silently retargeted) and its "the token never leaves the server" rule stand.
+
+**Model.** `SlackIntegration` is a named connection. An organization holds any number. Each has a `kind` (`BOT`: token over the Web API, any channel it is invited to, every block renders; `INCOMING_WEBHOOK`: one URL, one channel, charts and tables degrade) and a scope chosen per connection: `ORGANIZATION` (every project may use it; `scopeId` = organization id) or `PROJECT` (`scopeId` = project id). The secret is `encrypt()` ciphertext in `botTokenEncrypted` or `webhookUrlEncrypted`, matching the kind. `secretFingerprint` = HMAC-SHA256 of the plaintext keyed by `CREDENTIALS_SECRET`, unique per organization: **one secret is one connection per organization**. `secretHint` = last four characters, shown as `••••abcd`. Bot tokens are validated with `auth.test` on save and pin `slackTeamId`/`slackTeamName`; webhooks store no team.
+
+**Access.** A project can use: its `PROJECT` connections plus its organization's `ORGANIZATION` connections. Listing needs `project:view`. Creating, editing or deleting a `PROJECT` connection needs `project:update` at that project; an `ORGANIZATION` connection needs `organization:manage`. Moving scope needs the permission at both ends. Saving a secret that already exists in the organization refuses with `slack_connection_exists` (409), naming the existing connection, instead of storing a second copy. Deleting a connection that active automations use refuses with `slack_connection_in_use` (409, carries the count) unless the caller passes `force: true`; forced deletion leaves those automations failing with `slack_integration_missing`, which the drawer states before confirming.
+
+**Automations.** Slack `actionParams` gain `slackIntegrationId`. A bot connection also needs `slackChannelId`; a webhook connection needs nothing else. The composer writes `{ slackIntegrationId, slackDelivery: "bot" | "webhook" (derived from the kind), slackChannelId? }` and never a token or URL. The API, MCP and CLI accept `slackIntegrationId` (+ `slackChannelId`); a legacy `slackWebhook` or `slackBotToken` input is still accepted for one release and is stored as a connection through the same find-or-create-by-fingerprint the migration uses (project-scoped when new), so no new row carries its own secret.
+
+**Resolution at dispatch** (trace settlement, graph alerts, reports, API and dashboard test fires, channel discovery):
+
+```text
+1. slackIntegrationId set  → load it; must be usable by the trigger's project
+                             (same org, ORGANIZATION or matching PROJECT scope);
+                             missing or out of scope → slack_integration_missing
+2. else legacy own secret  → actionParams.slackBotToken / slackWebhook   (one release)
+3. else                    → slack_integration_missing
+```
+
+The legacy fields are read for one release after the migration below, then removed with their redaction machinery (expand/contract).
+
+**One-off migration** (`migrateSlackConnections`, idempotent, dry-run by default, `--apply` writes). For each organization, every Slack automation without a `slackIntegrationId` is grouped by its decrypted secret (bot token or webhook URL); pre-existing §5 project rows join the groups by fingerprint, and bot automations that carried no token (they posted through their project's §5 row) join that row's group. Each group becomes one connection: scope `PROJECT` if every member is in one project, else `ORGANIZATION` (the automations already shared the secret across those projects, so the organization already could post there). Name: the §5 row's workspace name if there is one, else `Slack bot ••••abcd` / `Slack webhook ••••abcd`. Each automation then gets `slackIntegrationId`; its legacy fields are left in place for the release. Undecryptable secrets are counted and skipped, never guessed. The run reports connections created, reused, automations linked and skipped.
+
+**Surface.** Settings → Integrations shows a Slack section listing every connection the project can use (name, kind, scope badge, workspace or hint, automations using it) with "Add Slack connection". Add and edit share one routed drawer, `slackConnection` (kind choice on create, name, scope via `ScopeChipPicker` with `allowedScopeTypes={["ORGANIZATION","PROJECT"]}` + `singleSelect`, secret field that shows the hint and is replaced only when typed, delete with the in-use count). The automation drawer's Slack step picks a connection, then (for a bot) a channel; its "New Slack connection" opens the same drawer and returns with the new connection selected, the way dataset creation does (`keepDraftOnSubFlowReturn` + `goBack`). The legacy-token census and "Use the project integration" nudges are removed: the migration replaces them.
+
 ### 6. Use-case templates ship their graph
 
 The #6716 finding: pick "Error spike" and the automation still has no graph behind it — the template saves no work. In the merged flow, graph-watching use-case cards (`AutomationsEducation.tsx`) carry a **graph specification** in their prefill, not just a name and an action. The Watch step shows it as a pre-filled rule over a graph that does not exist yet ("Creates graph: *Error rate*"), editable like any other. Saving creates the graph and the automation in **one Prisma transaction**: both writes are Postgres rows through Prisma (`CustomGraph`, `Trigger`), so the mechanism is a transaction, not a compensating delete — a refused automation write rolls the graph back with it, and a template can never strand an orphan graph (#6896 tracks orphan graphs as a defect class).

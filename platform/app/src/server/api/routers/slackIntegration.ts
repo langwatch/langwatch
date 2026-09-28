@@ -1,116 +1,235 @@
 /**
- * tRPC router for the project's Slack integration (ADR-093 §5).
- *
- *   getStatus:            whether Slack is connected for a project, which
- *                         workspace it reaches, and how many automations post
- *                         through it. Never the token.
- *   getLegacyTokenCensus: the automations in the project that still carry their
- *                         own Slack token — the migration's progress meter.
- *   connect:              set up or rotate the connection. The token is
- *                         validated against Slack before anything is stored.
- *   disconnect:           drop the connection, reporting how many automations
- *                         were posting through it.
- *   switchToIntegration:  clear the stored token on one or several automations
- *                         so their delivery falls through to the integration.
- *
- * Reading the connection state takes `triggers:view`, which every member of the
- * project holds, because the composer has to tell an author whether Slack is
- * connected before it knows whether to show a channel picker or a "connect
- * Slack" pointer. Changing it takes `project:update` — a bot token reaches the
- * whole workspace, and the composer is not where that decision belongs.
- *
- * Transport only: gates and delegation to the app-layer service.
- *
- * Spec: specs/automations/source-merge.feature.
+ * tRPC router for named Slack connections (ADR-093 §5a). Listing needs
+ * `project:view`; changing a PROJECT connection needs `project:update` there,
+ * an ORGANIZATION one `organization:manage`, and moving scope needs both ends.
+ * Transport only. Spec: specs/automations/slack-connections.feature.
  */
 
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import type { SlackProjectScope } from "~/server/app-layer/automations/slack-integration/repositories/slack-integration.repository";
 import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
-import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
+import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+  requireOrganizationPermission,
+  requireProjectPermission,
+} from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
+const kindSchema = z.enum(["BOT", "INCOMING_WEBHOOK"]);
+const scopeTypeSchema = z.enum(["ORGANIZATION", "PROJECT"]);
+const nameSchema = z.string().trim().min(1).max(120);
+const secretSchema = z.string().trim().min(1);
+
+const SLACK_WEBHOOK_PREFIX = "https://hooks.slack.com/";
+const webhookMessage = `Expected a Slack incoming webhook URL (${SLACK_WEBHOOK_PREFIX}…).`;
+
+type ScopeTarget = {
+  scopeType: z.infer<typeof scopeTypeSchema>;
+  scopeId: string;
+};
+
+type PermissionContext = Parameters<typeof requireProjectPermission>[0];
+
+/** A connection may only be scoped to the calling project or its organization. */
+function assertReachableScope({
+  scope,
+  target,
+}: {
+  scope: SlackProjectScope;
+  target: ScopeTarget;
+}): void {
+  const expected =
+    target.scopeType === "ORGANIZATION"
+      ? scope.organizationId
+      : scope.projectId;
+  if (target.scopeId !== expected) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "A Slack connection is scoped to this project or to its organization.",
+    });
+  }
+}
+
+async function requireManage({
+  ctx,
+  target,
+}: {
+  ctx: PermissionContext;
+  target: ScopeTarget;
+}): Promise<void> {
+  if (target.scopeType === "ORGANIZATION") {
+    await requireOrganizationPermission(
+      ctx,
+      target.scopeId,
+      "organization:manage",
+    );
+    return;
+  }
+  await requireProjectPermission(ctx, target.scopeId, "project:update");
+}
+
+/** Where an edit moves a connection; a bare scope type means this project or org. */
+function targetScope({
+  connection,
+  scope,
+  scopeType,
+  scopeId,
+}: {
+  connection: ScopeTarget;
+  scope: SlackProjectScope;
+  scopeType?: ScopeTarget["scopeType"];
+  scopeId?: string;
+}): ScopeTarget {
+  const type = scopeType ?? connection.scopeType;
+  if (scopeId !== undefined) return { scopeType: type, scopeId };
+  if (type === connection.scopeType) {
+    return { scopeType: type, scopeId: connection.scopeId };
+  }
+  return {
+    scopeType: type,
+    scopeId: type === "ORGANIZATION" ? scope.organizationId : scope.projectId,
+  };
+}
+
 export const slackIntegrationRouter = createTRPCRouter({
-  getStatus: protectedProcedure
+  list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("triggers:view")
+    .permission("project:view")
     .query(async ({ ctx, input }) => {
-      const status = await createSlackIntegrationService({
+      const { scope, connections } = await createSlackIntegrationService({
         prisma: ctx.prisma,
-      }).getStatus({ projectId: input.projectId });
-      // Whether THIS caller may change the connection of THIS project — the
-      // settings picker can reach projects the session is not on, and the
-      // session project's permission says nothing about those.
-      const canManage = await probeProjectPermission(
-        ctx,
-        input.projectId,
-        "project:update",
-      );
-      return { ...status, canManage };
+      }).listForProject({ projectId: input.projectId });
+      const [canManageProject, canManageOrganization] = await Promise.all([
+        probeProjectPermission(ctx, input.projectId, "project:update"),
+        probeOrganizationPermission(
+          ctx,
+          scope.organizationId,
+          "organization:manage",
+        ),
+      ]);
+      return {
+        connections: connections.map((connection) => ({
+          ...connection,
+          canManage:
+            connection.scopeType === "ORGANIZATION"
+              ? canManageOrganization
+              : canManageProject,
+        })),
+        canManageProject,
+        canManageOrganization,
+      };
     }),
 
-  getLegacyTokenCensus: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .permission("triggers:view")
-    .query(async ({ ctx, input }) => {
-      const automations = await createSlackIntegrationService({
-        prisma: ctx.prisma,
-      }).getLegacyTokenAutomations({ projectId: input.projectId });
-      return { count: automations.length, automations };
+  create: protectedProcedure
+    .input(
+      z
+        .object({
+          projectId: z.string(),
+          name: nameSchema,
+          kind: kindSchema,
+          scopeType: scopeTypeSchema,
+          scopeId: z.string(),
+          secret: secretSchema,
+        })
+        .refine(
+          (input) =>
+            input.kind !== "INCOMING_WEBHOOK" ||
+            input.secret.startsWith(SLACK_WEBHOOK_PREFIX),
+          { message: webhookMessage, path: ["secret"] },
+        ),
+    )
+    .permission("project:view")
+    .mutation(async ({ ctx, input }) => {
+      const service = createSlackIntegrationService({ prisma: ctx.prisma });
+      const scope = await service.getProjectScope({
+        projectId: input.projectId,
+      });
+      const target = { scopeType: input.scopeType, scopeId: input.scopeId };
+      assertReachableScope({ scope, target });
+      await requireManage({ ctx, target });
+      const connection = await service.create({
+        scope,
+        name: input.name,
+        kind: input.kind,
+        scopeType: input.scopeType,
+        scopeId: input.scopeId,
+        secret: input.secret,
+        actorId: ctx.session.user.id,
+      });
+      return { ...connection, canManage: true };
     }),
 
-  connect: protectedProcedure
+  update: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
-        botToken: z.string().min(1),
+        id: z.string(),
+        name: nameSchema.optional(),
+        scopeType: scopeTypeSchema.optional(),
+        scopeId: z.string().optional(),
+        secret: secretSchema.optional(),
       }),
     )
-    .permission("project:update")
+    .permission("project:view")
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await resolveOrganizationId(input.projectId);
-      if (!organizationId) {
-        // Every project hangs off a team and an organization, so a project
-        // without one is a data-integrity anomaly the customer cannot act on
-        // — it degrades to the generic unknown with a trace id, per ADR-045.
-        throw new Error(
-          `project ${input.projectId} resolves to no organization`,
-        );
+      const service = createSlackIntegrationService({ prisma: ctx.prisma });
+      const { connection, scope } = await service.getUsableByProject({
+        id: input.id,
+        projectId: input.projectId,
+      });
+      await requireManage({ ctx, target: connection });
+
+      const target = targetScope({
+        connection,
+        scope,
+        scopeType: input.scopeType,
+        scopeId: input.scopeId,
+      });
+      const moves =
+        target.scopeType !== connection.scopeType ||
+        target.scopeId !== connection.scopeId;
+      if (moves) {
+        assertReachableScope({ scope, target });
+        await requireManage({ ctx, target });
       }
-      return createSlackIntegrationService({ prisma: ctx.prisma }).setup({
-        projectId: input.projectId,
-        organizationId,
-        botToken: input.botToken,
-        userId: ctx.session.user.id,
+      if (
+        input.secret !== undefined &&
+        connection.kind === "INCOMING_WEBHOOK" &&
+        !input.secret.startsWith(SLACK_WEBHOOK_PREFIX)
+      ) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: webhookMessage });
+      }
+
+      const updated = await service.update({
+        scope,
+        connection,
+        name: input.name,
+        ...(moves ? target : {}),
+        secret: input.secret,
+        actorId: ctx.session.user.id,
       });
+      return { ...updated, canManage: true };
     }),
 
-  disconnect: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .permission("project:update")
-    .mutation(async ({ ctx, input }) => {
-      return createSlackIntegrationService({ prisma: ctx.prisma }).remove({
-        projectId: input.projectId,
-      });
-    }),
-
-  switchToIntegration: protectedProcedure
+  delete: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
-        // Absent means every automation in the project that still stores one —
-        // the settings card's bulk action. A single id is the row and drawer
-        // nudge.
-        automationIds: z.array(z.string()).optional(),
+        id: z.string(),
+        force: z.boolean().optional(),
       }),
     )
-    .permission("project:update")
+    .permission("project:view")
     .mutation(async ({ ctx, input }) => {
-      return createSlackIntegrationService({
-        prisma: ctx.prisma,
-      }).clearLegacyTokens({
+      const service = createSlackIntegrationService({ prisma: ctx.prisma });
+      const { connection } = await service.getUsableByProject({
+        id: input.id,
         projectId: input.projectId,
-        triggerIds: input.automationIds,
       });
+      await requireManage({ ctx, target: connection });
+      return service.delete({ connection, force: input.force ?? false });
     }),
 });

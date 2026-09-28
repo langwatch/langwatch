@@ -1,9 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import {
-  type SlackActionParams,
-  slackDeliveryMethodOf,
-} from "@langwatch/automations/providers/slack";
-import {
   DEFAULT_WEBHOOK_CONTENT_TYPE,
   type WebhookMethod,
 } from "@langwatch/automations/providers/webhook";
@@ -29,16 +25,17 @@ import {
   sendSlackWebhook,
 } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
-import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import {
   decryptWebhookHeaders,
   decryptWebhookSigningSecrets,
 } from "~/server/app-layer/automations/providers/webhook/server";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import {
-  type ResolvedSlackToken,
-  slackTokenMissingDispatchError,
-} from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
+  type SlackConnectionReader,
+  type SlackDestinationResolver,
+  slackConnectionMissingDispatchError,
+  slackDestinationResolver,
+} from "~/server/app-layer/automations/slack-integration/slack-destination-resolver";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
@@ -96,6 +93,11 @@ export function createLogOverflowHandler(): IntentExecutor<LogOverflowIntent> {
   };
 }
 
+/** An unwired dispatcher knows no connections: only legacy secrets resolve. */
+const NO_CONNECTIONS: SlackConnectionReader = {
+  findUsableSecret: async () => null,
+};
+
 interface ActionParams {
   members?: string[] | null;
   slackWebhook?: string | null;
@@ -149,16 +151,11 @@ export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
   /** ADR-040 §6 delivery-log writer. Optional: absent in tests. */
   recordWebhookDelivery?: WebhookDeliveryRecorder;
   /**
-   * ADR-093 §5 token resolution: the automation's own stored token, else the
-   * project's Slack integration, else null. Optional so a test that never
-   * dispatches to Slack does not have to fill it; absent behaves as "the
-   * project has no integration", which is what an unwired dispatcher had
-   * before this port existed.
+   * ADR-093 §5a: where a Slack delivery goes. Optional so a test that never
+   * dispatches to Slack need not fill it; absent resolves no connection, so
+   * only an automation's own legacy secret delivers.
    */
-  resolveSlackToken?: (params: {
-    projectId: string;
-    actionParams: Pick<SlackActionParams, "slackBotToken">;
-  }) => Promise<ResolvedSlackToken | null>;
+  resolveSlackDestination?: SlackDestinationResolver;
   /** ADR-031 per-trigger hourly email cap (dedupKey gates the INCR). */
   consumeEmailCapSlot: (args: {
     projectId: string;
@@ -546,27 +543,25 @@ async function dispatchNotifyDigest({
       break;
     }
     case TriggerAction.SEND_SLACK_MESSAGE: {
-      // ADR-041: a bot connection posts via the Web API with the gated
-      // chart/table/alert blocks open — never the legacy plain-text builder.
-      if (slackDeliveryMethodOf(params) === "bot") {
-        // ADR-093 §5: the automation's own token wins, and the project's Slack
-        // integration serves the rest. The two failures are told apart on
-        // purpose — a missing channel is this automation's configuration, a
-        // missing token anywhere is the project's.
-        // The wired resolver owns the whole decision, so the row's own token
-        // is only decrypted on the fallback path that actually reads it.
-        const ownTokenFallback = (): ResolvedSlackToken | null => {
-          const ownToken = decryptSlackBotToken(params);
-          return ownToken ? { token: ownToken, source: "automation" } : null;
-        };
-        const resolved: ResolvedSlackToken | null = deps.resolveSlackToken
-          ? await deps.resolveSlackToken({ projectId, actionParams: params })
-          : ownTokenFallback();
-        if (!resolved) {
-          throw slackTokenMissingDispatchError({ triggerName: trigger.name });
-        }
-        const token = resolved.token;
-        const channel = params.slackChannelId?.trim();
+      // ADR-093 §5a: the connection's kind decides the surface. A missing
+      // channel is this automation's configuration, a missing connection its
+      // delivery settings', so the two failures are told apart.
+      const resolveDestination =
+        deps.resolveSlackDestination ??
+        slackDestinationResolver({ connections: NO_CONNECTIONS });
+      const destination = await resolveDestination({
+        projectId,
+        actionParams: trigger.actionParams,
+      });
+      if (!destination) {
+        throw slackConnectionMissingDispatchError({
+          triggerName: trigger.name,
+        });
+      }
+      // ADR-041: a bot posts via the Web API with the gated blocks open.
+      if (destination.kind === "bot") {
+        const token = destination.token;
+        const channel = destination.channel;
         if (!channel) {
           throw new DispatchError({
             message: `Slack bot connection for trigger "${trigger.name}" is missing its channel`,
@@ -615,7 +610,7 @@ async function dispatchNotifyDigest({
           );
         }
         await sendRenderedSlackMessage({
-          triggerWebhook: params.slackWebhook ?? "",
+          triggerWebhook: destination.url,
           triggerName: trigger.name,
           payload: rendered.payload,
         });
@@ -623,7 +618,7 @@ async function dispatchNotifyDigest({
         break;
       }
       await sendSlackWebhook({
-        triggerWebhook: params.slackWebhook ?? "",
+        triggerWebhook: destination.url,
         triggerData,
         triggerName: trigger.name,
         projectSlug: project.slug,

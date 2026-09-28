@@ -1,4 +1,10 @@
-import { createLogger } from "@langwatch/observability";
+import { SLACK_BOT_TOKEN_KEPT } from "@langwatch/automations/providers/slack";
+import { z } from "zod";
+import type {
+  SlackIntegration,
+  SlackIntegrationKind,
+  SlackIntegrationScopeType,
+} from "~/generated/prisma/client";
 import { decrypt, encrypt } from "~/utils/encryption";
 import {
   fetchSlackWorkspaceIdentity,
@@ -6,235 +12,592 @@ import {
   type SlackWorkspaceIdentity,
 } from "../delivery/slackWebApi";
 import {
+  InvalidActionParamsError,
+  SlackConnectionExistsError,
+  SlackConnectionInUseError,
   SlackIntegrationInvalidTokenError,
   SlackIntegrationMissingError,
 } from "../errors";
 import type {
-  LegacySlackTokenAutomation,
+  SlackConnectionChanges,
   SlackIntegrationRepository,
+  SlackProjectScope,
 } from "./repositories/slack-integration.repository";
+import type {
+  SlackConnectionReader,
+  SlackConnectionSecret,
+} from "./slack-destination-resolver";
+import {
+  slackSecretFingerprint,
+  slackSecretHint,
+} from "./slack-secret-fingerprint";
 
-const logger = createLogger("langwatch:automations:slack-integration");
-
-/**
- * What a client is allowed to know about the project's Slack connection:
- * whether there is one, and which workspace it reaches. The token itself has no
- * representation here — it is decrypted at dispatch and channel discovery and
- * nowhere else.
- */
-export interface SlackIntegrationStatus {
-  connected: boolean;
+/** What a client may know about a connection. The secret has no field here. */
+export interface SlackConnectionView {
+  id: string;
+  name: string;
+  kind: SlackIntegrationKind;
+  scopeType: SlackIntegrationScopeType;
+  scopeId: string;
+  scopeName: string;
+  secretHint: string;
   slackTeamId: string | null;
   slackTeamName: string | null;
-  connectedAt: Date | null;
-  updatedAt: Date | null;
-  /**
-   * How many automations in the project post through this connection, so a
-   * client can say what stops delivering before it removes it. Carrying no
-   * token of their own, they have nothing else to post with.
-   */
   dependentAutomations: number;
+  updatedAt: Date;
 }
 
-const DISCONNECTED = {
-  connected: false,
-  slackTeamId: null,
-  slackTeamName: null,
-  connectedAt: null,
-  updatedAt: null,
-} as const;
+type VerifyToken = (
+  token: string,
+) => Promise<
+  { ok: true; identity: SlackWorkspaceIdentity } | { ok: false; error: string }
+>;
 
-/** Outcome of switching several automations off their own tokens at once. */
-export interface LegacyTokenClearResult {
-  cleared: number;
-  /** Rows that already carried no token — nothing to do, not a failure. */
-  alreadyClear: number;
-  failed: number;
-}
+/** What the public API reads back in place of a credential; never a secret. */
+const REDACTED_PLACEHOLDER = "[redacted]";
+
+/** The Slack fields of an automation save, read without a cast. */
+const slackSaveFieldsSchema = z.object({
+  slackIntegrationId: z.string().nullish(),
+  slackDelivery: z.enum(["webhook", "bot"]).nullish(),
+  slackWebhook: z.string().nullish(),
+  slackBotToken: z.string().nullish(),
+  slackChannelId: z.string().nullish(),
+});
+
+/** A secret the caller actually typed, as opposed to a kept or read-back value. */
+const freshSecret = (value: string | null | undefined): string | null => {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  if (trimmed === SLACK_BOT_TOKEN_KEPT || trimmed === REDACTED_PLACEHOLDER) {
+    return null;
+  }
+  return trimmed;
+};
+
+const defaultName = ({
+  kind,
+  secret,
+}: {
+  kind: SlackIntegrationKind;
+  secret: string;
+}): string =>
+  `${kind === "BOT" ? "Slack bot" : "Slack webhook"} ••••${slackSecretHint({ secret })}`;
 
 /**
- * The project's Slack integration (ADR-093 §5): set up once, rotated in one
- * place, and consumed by every Slack delivery in the project that does not
- * carry a token of its own.
- *
- * Setup and rotation are the same path — validate the token against Slack,
- * store the ciphertext, pin the workspace `auth.test` named — because a
- * rotation that skipped validation would swap a working connection for a broken
- * one and only say so at the next delivery.
+ * Named Slack connections (ADR-093 §5a): any number per organization, each a
+ * bot token or an incoming webhook, scoped to the organization or one project.
+ * One secret is one connection per organization; a bot token is checked with
+ * Slack before it is stored, and no secret is ever returned to a client.
  */
-export class SlackIntegrationService {
+export class SlackIntegrationService implements SlackConnectionReader {
   constructor(
     private readonly repo: SlackIntegrationRepository,
-    private readonly verifyToken: (
-      token: string,
-    ) => Promise<
-      | { ok: true; identity: SlackWorkspaceIdentity }
-      | { ok: false; error: string }
-    > = fetchSlackWorkspaceIdentity,
+    private readonly verifyToken: VerifyToken = fetchSlackWorkspaceIdentity,
   ) {}
 
-  async getStatus({
+  /** The project's organization and names. A project with none is corrupt data. */
+  async getProjectScope({
     projectId,
   }: {
     projectId: string;
-  }): Promise<SlackIntegrationStatus> {
-    const [row, dependentAutomations] = await Promise.all([
-      this.repo.findByProject({ projectId }),
-      this.repo.countAllDeliveringThroughIntegration({ projectId }),
-    ]);
-    if (!row) return { ...DISCONNECTED, dependentAutomations };
-    return {
-      connected: true,
-      slackTeamId: row.slackTeamId,
-      slackTeamName: row.slackTeamName,
-      connectedAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      dependentAutomations,
-    };
+  }): Promise<SlackProjectScope> {
+    const scope = await this.repo.findProjectScope({ projectId });
+    if (!scope) {
+      throw new Error(`project ${projectId} resolves to no organization`);
+    }
+    return scope;
   }
 
-  /**
-   * Connect Slack for a project, or rotate the token of an existing
-   * connection. Nothing is written unless Slack accepts the token, so a refused
-   * setup leaves a project with no integration exactly as it found it, and a
-   * refused rotation leaves the working one in place.
-   */
-  async setup({
-    projectId,
-    organizationId,
-    botToken,
-    userId,
-  }: {
-    projectId: string;
-    organizationId: string;
-    botToken: string;
-    userId: string;
-  }): Promise<SlackIntegrationStatus> {
-    const token = botToken.trim();
-    // A local slug, not "invalid_auth": `meta.slackError` carries Slack's own
-    // code, and Slack never saw this request.
-    if (!token) throw new SlackIntegrationInvalidTokenError("empty_token");
-
-    const verified = await this.verifyToken(token);
-    if (!verified.ok) {
-      // A transport failure is infrastructure, not a token refusal — it stays
-      // a plain Error and degrades to the generic unknown at the boundary.
-      if (isSlackTransportFailure(verified.error)) {
-        throw new Error(
-          `Slack auth.test did not answer usably: ${verified.error}`,
-        );
-      }
-      throw new SlackIntegrationInvalidTokenError(verified.error);
-    }
-
-    const row = await this.repo.upsertForProject({
+  async listForProject({ projectId }: { projectId: string }): Promise<{
+    scope: SlackProjectScope;
+    connections: SlackConnectionView[];
+  }> {
+    const scope = await this.getProjectScope({ projectId });
+    const rows = await this.repo.findAllUsableByProject({
+      organizationId: scope.organizationId,
       projectId,
-      organizationId,
-      botTokenEncrypted: encrypt(token),
-      slackTeamId: verified.identity.teamId,
-      slackTeamName: verified.identity.teamName,
-      userId,
+    });
+    const counts = await this.repo.countDependentAutomations({
+      organizationId: scope.organizationId,
+      ids: rows.map((row) => row.id),
     });
     return {
-      connected: true,
-      slackTeamId: row.slackTeamId,
-      slackTeamName: row.slackTeamName,
-      connectedAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      dependentAutomations:
-        await this.repo.countAllDeliveringThroughIntegration({ projectId }),
+      scope,
+      connections: rows.map((row) =>
+        this.toView({ row, scope, dependentAutomations: counts.get(row.id) }),
+      ),
     };
   }
 
-  /**
-   * Drop the connection, and say how many automations were posting through it.
-   * Every one of them carried no token of its own, so removal is the moment
-   * their delivery stops — the count is read before the delete, because after
-   * it there is nothing left to attribute them to.
-   */
-  async remove({
+  /** A connection the project may use, or `slack_integration_missing`. */
+  async getUsableByProject({
+    id,
     projectId,
   }: {
+    id: string;
     projectId: string;
-  }): Promise<{ dependentAutomations: number }> {
-    const dependentAutomations =
-      await this.repo.countAllDeliveringThroughIntegration({ projectId });
-    await this.repo.deleteForProject({ projectId });
-    return { dependentAutomations };
-  }
-
-  /**
-   * The decrypted project token, for dispatch and channel discovery only. Null
-   * when the project has no integration — the caller decides whether that is a
-   * refusal or a fall-through.
-   */
-  async getBotToken({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<string | null> {
-    const row = await this.repo.findByProject({ projectId });
-    if (!row) return null;
-    return decrypt(row.botTokenEncrypted);
-  }
-
-  /** The automations still carrying their own token — the migration's census. */
-  async getLegacyTokenAutomations({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<LegacySlackTokenAutomation[]> {
-    return this.repo.findAllWithOwnSlackToken({ projectId });
-  }
-
-  /**
-   * Switch automations onto the project integration by clearing the token they
-   * store. Refused outright while the project has no integration — clearing
-   * then would leave the automations with nothing to deliver with. Each row is
-   * independent: one that cannot be updated is counted as failed and keeps
-   * delivering with its own token, one that already carries no token is
-   * already where the switch was taking it, and the rest still move. Passing
-   * no ids switches every automation in the project that has one.
-   */
-  async clearLegacyTokens({
-    projectId,
-    triggerIds,
-  }: {
-    projectId: string;
-    triggerIds?: string[];
-  }): Promise<LegacyTokenClearResult> {
-    const integration = await this.repo.findByProject({ projectId });
-    if (!integration) throw new SlackIntegrationMissingError();
-
-    const targets =
-      triggerIds ??
-      (await this.repo.findAllWithOwnSlackToken({ projectId })).map(
-        (row) => row.id,
-      );
-
-    let cleared = 0;
-    let alreadyClear = 0;
-    let failed = 0;
-    for (const triggerId of targets) {
-      try {
-        const outcome = await this.repo.clearOwnSlackToken({
-          projectId,
-          triggerId,
-        });
-        if (outcome === "cleared") cleared++;
-        else if (outcome === "already_clear") alreadyClear++;
-        else failed++;
-      } catch (error) {
-        // The card reports "N switched, 1 failed" and tells the operator to
-        // try again. Without the cause, nobody — including support — can say
-        // why. The ids are opaque internal identifiers, logged raw on purpose.
-        logger.error(
-          { error, projectId, triggerId },
-          "clearing a legacy Slack token failed",
-        );
-        failed++;
-      }
+  }): Promise<{ connection: SlackIntegration; scope: SlackProjectScope }> {
+    const scope = await this.getProjectScope({ projectId });
+    const connection = await this.repo.findById({ id });
+    if (!connection || !isUsableBy({ connection, scope })) {
+      throw new SlackIntegrationMissingError();
     }
-    return { cleared, alreadyClear, failed };
+    return { connection, scope };
   }
+
+  async create({
+    scope,
+    name,
+    kind,
+    scopeType,
+    scopeId,
+    secret,
+    actorId,
+  }: {
+    scope: SlackProjectScope;
+    name: string;
+    kind: SlackIntegrationKind;
+    scopeType: SlackIntegrationScopeType;
+    scopeId: string;
+    secret: string;
+    actorId: string;
+  }): Promise<SlackConnectionView> {
+    const value = secret.trim();
+    const identity =
+      kind === "BOT" ? await this.verifyBotToken({ token: value }) : null;
+    const secretFingerprint = slackSecretFingerprint({ secret: value });
+    await this.assertSecretFree({
+      organizationId: scope.organizationId,
+      secretFingerprint,
+    });
+    const row = await this.repo.create({
+      record: {
+        name: name.trim(),
+        kind,
+        scopeType,
+        scopeId,
+        organizationId: scope.organizationId,
+        ...encryptedSecret({ kind, secret: value }),
+        secretFingerprint,
+        secretHint: slackSecretHint({ secret: value }),
+        slackTeamId: identity?.teamId ?? null,
+        slackTeamName: identity?.teamName ?? null,
+      },
+      actorId,
+    });
+    if (!row) {
+      await this.assertSecretFree({
+        organizationId: scope.organizationId,
+        secretFingerprint,
+      });
+      throw new Error("Slack connection create lost a race it cannot name");
+    }
+    return this.toView({ row, scope, dependentAutomations: 0 });
+  }
+
+  /** Rename, move or replace the secret. An absent secret keeps the stored one. */
+  async update({
+    scope,
+    connection,
+    name,
+    scopeType,
+    scopeId,
+    secret,
+    actorId,
+  }: {
+    scope: SlackProjectScope;
+    connection: SlackIntegration;
+    name?: string;
+    scopeType?: SlackIntegrationScopeType;
+    scopeId?: string;
+    secret?: string;
+    actorId: string;
+  }): Promise<SlackConnectionView> {
+    const changes: SlackConnectionChanges = {
+      ...(name === undefined ? {} : { name: name.trim() }),
+      ...(scopeType === undefined ? {} : { scopeType }),
+      ...(scopeId === undefined ? {} : { scopeId }),
+    };
+    const value = secret?.trim();
+    if (value) {
+      const identity =
+        connection.kind === "BOT"
+          ? await this.verifyBotToken({ token: value })
+          : null;
+      const secretFingerprint = slackSecretFingerprint({ secret: value });
+      await this.assertSecretFree({
+        organizationId: connection.organizationId,
+        secretFingerprint,
+        exceptId: connection.id,
+      });
+      Object.assign(changes, {
+        ...encryptedSecret({ kind: connection.kind, secret: value }),
+        secretFingerprint,
+        secretHint: slackSecretHint({ secret: value }),
+        slackTeamId: identity?.teamId ?? null,
+        slackTeamName: identity?.teamName ?? null,
+      });
+    }
+    const row = await this.repo.update({
+      id: connection.id,
+      organizationId: connection.organizationId,
+      changes,
+      actorId,
+    });
+    if (!row) {
+      await this.assertSecretFree({
+        organizationId: connection.organizationId,
+        secretFingerprint: changes.secretFingerprint ?? "",
+        exceptId: connection.id,
+      });
+      throw new Error("Slack connection update lost a race it cannot name");
+    }
+    const counts = await this.repo.countDependentAutomations({
+      organizationId: row.organizationId,
+      ids: [row.id],
+    });
+    return this.toView({
+      row,
+      scope,
+      dependentAutomations: counts.get(row.id),
+    });
+  }
+
+  /** Refused while active automations use it, unless `force` confirms it. */
+  async delete({
+    connection,
+    force,
+  }: {
+    connection: SlackIntegration;
+    force: boolean;
+  }): Promise<{ deleted: true; dependentAutomations: number }> {
+    const counts = await this.repo.countDependentAutomations({
+      organizationId: connection.organizationId,
+      ids: [connection.id],
+    });
+    const dependentAutomations = counts.get(connection.id) ?? 0;
+    if (dependentAutomations > 0 && !force) {
+      throw new SlackConnectionInUseError({ dependentAutomations });
+    }
+    await this.repo.delete({
+      id: connection.id,
+      organizationId: connection.organizationId,
+    });
+    return { deleted: true, dependentAutomations };
+  }
+
+  /**
+   * The connection holding this secret, created project-scoped if there is
+   * none. A match scoped to another project widens to the organization: both
+   * projects already hold the secret, the same rule as the migration (§5a).
+   * A bot token Slack refuses is still stored, named from its hint.
+   */
+  async findOrCreateForSecret({
+    organizationId,
+    projectId,
+    kind,
+    secret,
+    actorId,
+  }: {
+    organizationId: string;
+    projectId: string;
+    kind: SlackIntegrationKind;
+    secret: string;
+    actorId: string;
+  }): Promise<{ id: string; created: boolean }> {
+    const value = secret.trim();
+    const secretFingerprint = slackSecretFingerprint({ secret: value });
+    const existing = await this.repo.findByFingerprint({
+      organizationId,
+      secretFingerprint,
+    });
+    if (existing) {
+      await this.widenToOrganization({
+        connection: existing,
+        projectId,
+        actorId,
+      });
+      return { id: existing.id, created: false };
+    }
+
+    const verified = kind === "BOT" ? await this.verifyToken(value) : null;
+    const identity = verified?.ok ? verified.identity : null;
+    const row = await this.repo.create({
+      record: {
+        name: identity?.teamName ?? defaultName({ kind, secret: value }),
+        kind,
+        scopeType: "PROJECT",
+        scopeId: projectId,
+        organizationId,
+        ...encryptedSecret({ kind, secret: value }),
+        secretFingerprint,
+        secretHint: slackSecretHint({ secret: value }),
+        slackTeamId: identity?.teamId ?? null,
+        slackTeamName: identity?.teamName ?? null,
+      },
+      actorId,
+    });
+    if (row) return { id: row.id, created: true };
+
+    // Lost a race to a concurrent save of the same secret: that row is ours too.
+    const raced = await this.repo.findByFingerprint({
+      organizationId,
+      secretFingerprint,
+    });
+    if (!raced) throw new Error("Slack connection create lost a race");
+    await this.widenToOrganization({ connection: raced, projectId, actorId });
+    return { id: raced.id, created: false };
+  }
+
+  /** The dispatch reader: the decrypted secret, or null when out of reach. */
+  async findUsableSecret({
+    id,
+    projectId,
+  }: {
+    id: string;
+    projectId: string;
+  }): Promise<SlackConnectionSecret | null> {
+    const connection = await this.repo.findById({ id });
+    if (!connection) return null;
+    if (!(await this.reaches({ connection, projectId }))) return null;
+    return decryptedSecret(connection);
+  }
+
+  /**
+   * The Slack half of an automation save, pointed at a connection: a given id
+   * must be usable by the project, and a freshly typed legacy secret is stored
+   * as a connection. Either way the delivery method is the connection's kind
+   * and no secret stays in the params. A save with neither is left alone.
+   */
+  async connectActionParams({
+    projectId,
+    actorId,
+    actionParams,
+  }: {
+    projectId: string;
+    actorId: string;
+    actionParams: Record<string, unknown>;
+  }): Promise<Record<string, unknown>> {
+    const fields = slackSaveFieldsSchema.safeParse(actionParams);
+    if (!fields.success) return actionParams;
+    const connectionId =
+      fields.data.slackIntegrationId ??
+      (await this.connectLegacySecret({
+        projectId,
+        actorId,
+        fields: fields.data,
+      }));
+    if (!connectionId) return actionParams;
+
+    const { connection } = await this.getUsableByProject({
+      id: connectionId,
+      projectId,
+    });
+    const {
+      slackWebhook: _webhook,
+      slackBotToken: _token,
+      slackBotTokenSet: _tokenSet,
+      slackChannelId: _channel,
+      ...rest
+    } = actionParams;
+    if (connection.kind === "INCOMING_WEBHOOK") {
+      return {
+        ...rest,
+        slackIntegrationId: connection.id,
+        slackDelivery: "webhook",
+      };
+    }
+    const channel = fields.data.slackChannelId?.trim();
+    if (!channel) {
+      throw new InvalidActionParamsError(
+        "A Slack channel is required for a bot connection.",
+        "slackChannelId",
+      );
+    }
+    return {
+      ...rest,
+      slackIntegrationId: connection.id,
+      slackDelivery: "bot",
+      slackChannelId: channel,
+    };
+  }
+
+  /** A freshly typed legacy secret, stored as a connection; null when none. */
+  private async connectLegacySecret({
+    projectId,
+    actorId,
+    fields,
+  }: {
+    projectId: string;
+    actorId: string;
+    fields: z.infer<typeof slackSaveFieldsSchema>;
+  }): Promise<string | null> {
+    const kind: SlackIntegrationKind =
+      fields.slackDelivery === "bot" ? "BOT" : "INCOMING_WEBHOOK";
+    const secret = freshSecret(
+      kind === "BOT" ? fields.slackBotToken : fields.slackWebhook,
+    );
+    if (!secret) return null;
+    const scope = await this.getProjectScope({ projectId });
+    const { id } = await this.findOrCreateForSecret({
+      organizationId: scope.organizationId,
+      projectId,
+      kind,
+      secret,
+      actorId,
+    });
+    return id;
+  }
+
+  /** Whether the project may use the connection, reading its scope only if needed. */
+  private async reaches({
+    connection,
+    projectId,
+  }: {
+    connection: SlackIntegration;
+    projectId: string;
+  }): Promise<boolean> {
+    if (connection.scopeType === "PROJECT") {
+      return connection.scopeId === projectId;
+    }
+    const scope = await this.repo.findProjectScope({ projectId });
+    return !!scope && isUsableBy({ connection, scope });
+  }
+
+  private async widenToOrganization({
+    connection,
+    projectId,
+    actorId,
+  }: {
+    connection: SlackIntegration;
+    projectId: string;
+    actorId: string;
+  }): Promise<void> {
+    if (
+      connection.scopeType !== "PROJECT" ||
+      connection.scopeId === projectId
+    ) {
+      return;
+    }
+    await this.repo.update({
+      id: connection.id,
+      organizationId: connection.organizationId,
+      changes: {
+        scopeType: "ORGANIZATION",
+        scopeId: connection.organizationId,
+      },
+      actorId,
+    });
+  }
+
+  /**
+   * Slack must accept a bot token before it is stored. A transport failure is
+   * infrastructure, not a refusal, so it stays a plain Error (ADR-045).
+   */
+  private async verifyBotToken({
+    token,
+  }: {
+    token: string;
+  }): Promise<SlackWorkspaceIdentity> {
+    // A local slug, not "invalid_auth": Slack never saw this request.
+    if (!token) throw new SlackIntegrationInvalidTokenError("empty_token");
+    const verified = await this.verifyToken(token);
+    if (verified.ok) return verified.identity;
+    if (isSlackTransportFailure(verified.error)) {
+      throw new Error(
+        `Slack auth.test did not answer usably: ${verified.error}`,
+      );
+    }
+    throw new SlackIntegrationInvalidTokenError(verified.error);
+  }
+
+  private async assertSecretFree({
+    organizationId,
+    secretFingerprint,
+    exceptId,
+  }: {
+    organizationId: string;
+    secretFingerprint: string;
+    exceptId?: string;
+  }): Promise<void> {
+    const holder = await this.repo.findByFingerprint({
+      organizationId,
+      secretFingerprint,
+    });
+    if (holder && holder.id !== exceptId) {
+      throw new SlackConnectionExistsError({
+        connectionId: holder.id,
+        connectionName: holder.name,
+      });
+    }
+  }
+
+  private toView({
+    row,
+    scope,
+    dependentAutomations,
+  }: {
+    row: SlackIntegration;
+    scope: SlackProjectScope;
+    dependentAutomations: number | undefined;
+  }): SlackConnectionView {
+    return {
+      id: row.id,
+      name: row.name,
+      kind: row.kind,
+      scopeType: row.scopeType,
+      scopeId: row.scopeId,
+      scopeName:
+        row.scopeType === "ORGANIZATION"
+          ? scope.organizationName
+          : row.scopeId === scope.projectId
+            ? scope.projectName
+            : row.scopeId,
+      secretHint: row.secretHint,
+      slackTeamId: row.slackTeamId,
+      slackTeamName: row.slackTeamName,
+      dependentAutomations: dependentAutomations ?? 0,
+      updatedAt: row.updatedAt,
+    };
+  }
+}
+
+/** Whether the project may deliver through the connection (ADR-093 §5a). */
+function isUsableBy({
+  connection,
+  scope,
+}: {
+  connection: SlackIntegration;
+  scope: SlackProjectScope;
+}): boolean {
+  if (connection.organizationId !== scope.organizationId) return false;
+  return connection.scopeType === "ORGANIZATION"
+    ? connection.scopeId === scope.organizationId
+    : connection.scopeId === scope.projectId;
+}
+
+function decryptedSecret(
+  connection: SlackIntegration,
+): SlackConnectionSecret | null {
+  if (connection.kind === "BOT") {
+    return connection.botTokenEncrypted
+      ? { kind: "BOT", token: decrypt(connection.botTokenEncrypted) }
+      : null;
+  }
+  return connection.webhookUrlEncrypted
+    ? { kind: "INCOMING_WEBHOOK", url: decrypt(connection.webhookUrlEncrypted) }
+    : null;
+}
+
+function encryptedSecret({
+  kind,
+  secret,
+}: {
+  kind: SlackIntegrationKind;
+  secret: string;
+}): { botTokenEncrypted: string | null; webhookUrlEncrypted: string | null } {
+  return kind === "BOT"
+    ? { botTokenEncrypted: encrypt(secret), webhookUrlEncrypted: null }
+    : { botTokenEncrypted: null, webhookUrlEncrypted: encrypt(secret) };
 }

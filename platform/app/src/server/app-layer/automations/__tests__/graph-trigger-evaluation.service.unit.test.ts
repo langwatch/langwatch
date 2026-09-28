@@ -15,6 +15,7 @@ import {
   graphAlertIncidentKey,
   type OpenGraphTriggerSent,
 } from "../repositories/trigger.repository";
+import { slackDestinationResolver } from "../slack-integration/slack-destination-resolver";
 
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";
@@ -232,9 +233,10 @@ function makeHarness({
     triggerSent,
     updateLastRunAt,
     notifier: { dispatch },
-    // The harness project has no Slack integration and its triggers store no
-    // token, so resolution answers "nothing to deliver with".
-    resolveSlackToken: async () => null,
+    // No connection resolves, so only a trigger's own legacy secret delivers.
+    resolveSlackDestination: slackDestinationResolver({
+      connections: { findUsableSecret: async () => null },
+    }),
     baseHost: "https://app.langwatch.test",
     now: () => NOW,
   };
@@ -959,7 +961,7 @@ describe("evaluateGraphTrigger", () => {
   // branch. Bot params carry no `slackWebhook`, so the dispatcher logged "no
   // Slack webhook configured" and returned didSend false — a silent hole.
   describe("given a bot-delivery Slack alert whose connection cannot be resolved", () => {
-    /** @scenario "Slack delivery without any token fails with a named cause" */
+    /** @scenario "A connection outside the automation's reach fails with a named cause" */
     it("throws rather than falling through to the webhook branch", async () => {
       harness = makeHarness({
         trigger: makeTrigger({
@@ -970,7 +972,9 @@ describe("evaluateGraphTrigger", () => {
             timePeriod: 60,
             seriesName: "0/metadata.trace_id/cardinality",
             slackDelivery: "bot",
-            // No slackBotToken, no slackChannelId — and no slackWebhook either.
+            // A deleted connection; no legacy token and no webhook either.
+            slackIntegrationId: "conn-deleted",
+            slackChannelId: "C0123",
           },
         }),
         series: timeseries(15),
@@ -983,7 +987,7 @@ describe("evaluateGraphTrigger", () => {
           projectId: PROJECT_ID,
           reason: "real-time",
         }),
-      ).rejects.toThrow(/has no bot token/);
+      ).rejects.toThrow(/has no usable connection/);
 
       expect(harness.dispatch).not.toHaveBeenCalled();
       // The throw happens during bot-destination resolution, which runs BEFORE

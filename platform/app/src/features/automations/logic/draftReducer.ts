@@ -371,6 +371,7 @@ export function buildTestFirePayload({
   channel,
   webhook,
   botDestination,
+  slackIntegrationId,
   webhookDestination,
   automationId,
   graphName,
@@ -382,6 +383,8 @@ export function buildTestFirePayload({
   webhook: string | null;
   /** Slack bot connection: test-fires via the Web API to this channel. */
   botDestination?: { channelId: string; botToken: string | null } | null;
+  /** The Slack connection a Slack test fire delivers through (ADR-093 §5a). */
+  slackIntegrationId?: string | null;
   /** ADR-040 generic HTTP destination: the full request the test fire sends. */
   webhookDestination?: {
     url: string;
@@ -406,6 +409,7 @@ export function buildTestFirePayload({
     draft: templatesFromDraft(draft),
     webhook,
     botDestination: botDestination ?? null,
+    ...(slackIntegrationId ? { slackIntegrationId } : {}),
     webhookDestination: webhookDestination ?? null,
     ...(automationId ? { automationId } : {}),
     graphAlert: isGraphAlert

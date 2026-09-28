@@ -491,6 +491,8 @@ export const APP_ERROR_CODES = [
   "share_link_forbidden",
   "share_link_not_found",
   "share_read_rate_limited",
+  "slack_connection_exists",
+  "slack_connection_in_use",
   "slack_integration_invalid_token",
   "slack_integration_missing",
   "span_not_found",
