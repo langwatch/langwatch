@@ -310,3 +310,29 @@ Feature: An experiment run executes on its pipeline
     When a run over it is started
     Then it is refused as experiment_evaluation_too_many_rows
     And no run is started
+
+  # The SSE push path's worker half (spec section 7); bound to the frame rules and the channel.
+  @unit
+  Scenario: A run's recorded events stream as main's SSE frames
+    Given a run whose start is recorded with its total
+    When the event is read back as frames
+    Then it is main's execution_started frame with the run's id and total
+
+  @unit
+  Scenario: A board cell carried into a run is not streamed
+    Given a target result copied into the run from the board
+    When the event is read back as frames
+    Then no frame is streamed for it, as main streamed none
+
+  @unit
+  Scenario: A stopped run's stream ends stopped, and a failed run's with main's error frame
+    Given a run completed as stopped, and another completed as failed with a handled error
+    When their completions are read back as frames
+    Then the stopped run streams main's stopped frame
+    And the failed run streams main's error frame carrying the error's code
+
+  @unit
+  Scenario: A run's frames reach the stream that subscribed to the run, and no other
+    Given a stream subscribed to one run and another subscribed to a second run
+    When frames are published for the first run
+    Then the first stream hears them in order and the second hears none
