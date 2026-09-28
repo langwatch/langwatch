@@ -46,6 +46,12 @@ Feature: Shared project service
     And it rejects a personal workspace as a destination
     And it returns the portable project value
 
+  @unit
+  Scenario: Two projects with the same name get different addresses
+    Given two project ids minted back to back
+    When each mints a slug from the same project name
+    Then the two slugs differ
+
   Scenario: A project is created with a new team
     When the project service creates a project with a new team name
     Then it asks Organization to create the team
