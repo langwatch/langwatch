@@ -4,60 +4,11 @@
 import type { ChildProcess } from "node:child_process";
 import { Socket } from "node:net";
 
-/** Discriminates the handoff message from every other child IPC message. */
-export const VOICE_MEDIA_SOCKET_MESSAGE = "voice:twilio-media-socket" as const;
-
-/**
- * The handoff message: everything the child needs to finish the WebSocket
- * handshake itself — request line, headers, and the bytes the parent already
- * consumed (base64, since IPC JSON cannot carry a Buffer intact).
- */
-export interface VoiceMediaSocketMessage {
-  type: typeof VOICE_MEDIA_SOCKET_MESSAGE;
-  /** The nonce the upgrade authenticated with, for the child's own logging. */
-  nonce: string;
-  /** The upgrade request path, e.g. `/twilio/<nonce>`. */
-  url: string;
-  /** The upgrade request method (always GET for a WebSocket upgrade). */
-  method: string;
-  /** The upgrade request headers, needed to compute the Sec-WebSocket-Accept. */
-  headers: Record<string, string | string[] | undefined>;
-  /** Base64 of the bytes read off the socket during the upgrade (the head). */
-  headBase64: string;
-}
-
-/** True when every header value is a string, a string array, or undefined. */
-function isVoiceMediaSocketHeaders(
-  value: unknown,
-): value is Record<string, string | string[] | undefined> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return false;
-  }
-  return Object.values(value).every(
-    (headerValue) =>
-      typeof headerValue === "string" ||
-      headerValue === undefined ||
-      (Array.isArray(headerValue) && headerValue.every((entry) => typeof entry === "string")),
-  );
-}
-
-/**
- * Narrows an arbitrary IPC message to the voice handoff message, validating
- * every field, not just the discriminator — a malformed `headBase64` would
- * otherwise reach `Buffer.from`, which throws and can kill the child.
- */
-export function isVoiceMediaSocketMessage(message: unknown): message is VoiceMediaSocketMessage {
-  if (typeof message !== "object" || message === null) return false;
-  const candidate = message as Record<string, unknown>;
-  return (
-    candidate.type === VOICE_MEDIA_SOCKET_MESSAGE &&
-    typeof candidate.nonce === "string" &&
-    typeof candidate.url === "string" &&
-    typeof candidate.method === "string" &&
-    typeof candidate.headBase64 === "string" &&
-    isVoiceMediaSocketHeaders(candidate.headers)
-  );
-}
+import {
+  isVoiceMediaSocketMessage,
+  VOICE_MEDIA_SOCKET_MESSAGE,
+  type VoiceMediaSocketMessage,
+} from "@langwatch/scenario-contract";
 
 /**
  * Parent side: hand the accepted upgrade socket to the owning child. Resolves

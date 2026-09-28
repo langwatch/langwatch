@@ -1,11 +1,6 @@
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
-import { AutomationApi } from "@langwatch/automation-contract";
-import { DashboardApi } from "@langwatch/dashboard-contract";
-import { DatasetApi } from "@langwatch/dataset-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { MonitorApi } from "@langwatch/monitor-contract";
 import {
   OnboardingApi,
   type OnboardingApi as OnboardingApiContract,
@@ -14,7 +9,6 @@ import {
   type GuidedOnboardingStateWithInstance,
   type GuidedOnboardingStateWithVariant,
   type GuidedOnboardingTrackedEvent,
-  type IntegrationsCheckStatus,
   type OnboardingCallerInput,
   type OnboardingInitializeOrganizationInput,
   type OnboardingSignUpCaller,
@@ -23,19 +17,14 @@ import {
 import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { PromptApi } from "@langwatch/prompt-contract";
-import { ScenarioApi } from "@langwatch/scenario-contract";
-import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { HttpPostHogEventsChannel } from "../channels/http/http.posthog-events.channel.ts";
 import { withInstanceFacts } from "../rules/guided-onboarding-instance.rules.ts";
 import { GuidedOnboardingService } from "../services/guided-onboarding.service.ts";
-import { OnboardingChecksService } from "../services/onboarding-checks.service.ts";
-import type { IntegrationsChecksApi } from "../transport/integrations-checks.trpc.ts";
 
 type OnboardingSetup = FeatureSetup<typeof OnboardingApp.dependencies, never, undefined>;
 
-export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksApi {
+export class OnboardingApp implements OnboardingApiContract {
   static readonly contract = OnboardingApi;
   static readonly dependencies = {
     organizations: OrganizationApi,
@@ -45,19 +34,9 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
     gateway: GatewayApi,
     /** The project-to-organization hop a project-scoped read resolves through. */
     projects: ProjectApi,
-    /** The owners the setup checklist asks for each of its figures. */
-    workflows: WorkflowApi,
-    dashboards: DashboardApi,
-    datasets: DatasetApi,
-    monitors: MonitorApi,
-    automations: AutomationApi,
-    scenarios: ScenarioApi,
-    modelProviders: ModelProviderApi,
-    prompts: PromptApi,
   };
 
   readonly #guided: GuidedOnboardingService;
-  readonly #checks: OnboardingChecksService;
   readonly #permissions: AuthzApi;
   readonly #gateway: Pick<GatewayApi, "getDeploymentAddresses">;
   readonly #organizations: Pick<
@@ -68,14 +47,12 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
 
   private constructor(parts: {
     guided: GuidedOnboardingService;
-    checks: OnboardingChecksService;
     permissions: AuthzApi;
     gateway: Pick<GatewayApi, "getDeploymentAddresses">;
     organizations: Pick<OrganizationApi, "initializeOrganization" | "recordIntegrationMethod">;
     projects: Pick<ProjectApi, "getOrganizationId">;
   }) {
     this.#guided = parts.guided;
-    this.#checks = parts.checks;
     this.#permissions = parts.permissions;
     this.#gateway = parts.gateway;
     this.#organizations = parts.organizations;
@@ -93,26 +70,8 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
       events,
     });
 
-    const { dependencies } = setup;
-    const checks = OnboardingChecksService.create({
-      guided,
-      peers: {
-        projects: dependencies.projects,
-        workflows: dependencies.workflows,
-        dashboards: dependencies.dashboards,
-        datasets: dependencies.datasets,
-        monitors: dependencies.monitors,
-        automations: dependencies.automations,
-        scenarios: dependencies.scenarios,
-        modelProviders: dependencies.modelProviders,
-        prompts: dependencies.prompts,
-        permissions: dependencies.permissions,
-      },
-    });
-
     return new OnboardingApp({
       guided,
-      checks,
       permissions: setup.dependencies.permissions,
       gateway: setup.dependencies.gateway,
       organizations: setup.dependencies.organizations,
@@ -225,10 +184,6 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
     const { variant, ...state } = await this.#guided.getStateWithVariant({ organizationId });
 
     return { organizationId, variant, state };
-  }
-
-  getCheckStatus(input: { projectId: string }): Promise<IntegrationsCheckStatus> {
-    return this.#checks.getCheckStatus(input);
   }
 
   trackGuidedOnboardingEvent(input: GuidedOnboardingTrackedEvent): void {

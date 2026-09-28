@@ -1,3 +1,10 @@
+import { createLogger, type Logger } from "@langwatch/observability";
+import {
+  SCENARIO_LOG_CONTEXT_ENV,
+  scenarioLogContextSchema,
+  type ScenarioLogContext,
+} from "@langwatch/scenario-contract";
+
 type EnvironmentSource = Readonly<Record<string, string | undefined>>;
 
 /** What the child reads off the environment its parent stated, read once at the entrypoint. */
@@ -39,4 +46,33 @@ export function readScenarioChildVoiceEnvironment(source: EnvironmentSource): {
     baseHost: source.BASE_HOST,
     voicePublicBaseUrlUnavailableReason: source.VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON,
   };
+}
+
+/**
+ * Decode the parent's logger context. Returns an empty object when unset or malformed, never
+ * throwing; malformed JSON warns on stderr so it's still visible during incident response.
+ */
+export function decodeScenarioLogContext(raw: string | undefined): ScenarioLogContext {
+  if (!raw) {
+    return {};
+  }
+  try {
+    const parsed = scenarioLogContextSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : {};
+  } catch {
+    process.stderr.write(
+      `[child-logger] ${SCENARIO_LOG_CONTEXT_ENV} is not valid JSON; ignoring\n`,
+    );
+    return {};
+  }
+}
+
+/** The child's base logger, bound to the context its parent stated, so its logs join by id. */
+export function createChildProcessLogger(name: string, env: EnvironmentSource): Logger {
+  const context = decodeScenarioLogContext(env[SCENARIO_LOG_CONTEXT_ENV]);
+  const base = createLogger(name);
+  if (Object.keys(context).length === 0) {
+    return base;
+  }
+  return base.child(context);
 }

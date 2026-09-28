@@ -6,10 +6,17 @@ import { clearTimeout, setTimeout } from "node:timers";
 import { createLogger } from "@langwatch/observability";
 import {
   CHILD_PROCESS,
+  encodeScenarioEgressPolicy,
+  encodeScenarioLogContext,
+  isVoiceNonceRegisterMessage,
+  SCENARIO_EGRESS_POLICY_ENV,
+  SCENARIO_LOG_CONTEXT_ENV,
   ScenarioAgentInstanceSchema,
   VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV,
   type ChildProcessJobData,
+  type ScenarioEgressPolicy,
   type ScenarioExecutionResult,
+  type ScenarioLogContext,
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -18,20 +25,8 @@ import {
   type ScenarioChildExecutionSession,
   type ScenarioChildEnvironment,
 } from "../app/scenario.app.ts";
-import {
-  handleVoiceNonceRegisterMessage,
-  isVoiceNonceRegisterMessage,
-} from "../channels/voice-nonce-handoff.channels.ts";
-import {
-  encodeScenarioEgressPolicy,
-  SCENARIO_EGRESS_POLICY_ENV,
-  type ScenarioEgressPolicy,
-} from "../rules/child-egress-policy.rules.ts";
+import { handleVoiceNonceRegisterMessage } from "../channels/voice-nonce-handoff.channels.ts";
 import { resolveChildTlsEnv } from "../rules/child-tls-env.rules.ts";
-import {
-  encodeScenarioLogContext,
-  SCENARIO_LOG_CONTEXT_ENV,
-} from "../rules/scenario-log-context.rules.ts";
 import { ChildProcessSpawnService } from "./child-process-spawn.service.ts";
 import type {
   ExecutionJobData,
@@ -89,6 +84,7 @@ export type ScenarioChildProcessResult = {
 export class NodeScenarioChildService implements ScenarioChildBootstrap {
   static readonly parseResult = parseChildProcessResultValue;
   static readonly buildEnvironment = buildChildEnvironmentValue;
+  static readonly buildBaseEnvironment = buildBaseEnvironmentValue;
   static readonly buildOtelResourceAttributes = buildOtelResourceAttributesValue;
 
   static create(options: {
@@ -323,6 +319,35 @@ function buildChildEnvironmentValue(input: {
   labels: string[];
   telemetry: ScenarioChildTelemetry;
 }): NodeJS.ProcessEnv {
+  return buildBaseEnvironmentValue({
+    config: input.config,
+    labels: input.labels,
+    telemetry: input.telemetry,
+    logContext: {
+      scenarioRunId: input.jobData.scenarioRunId,
+      batchRunId: input.jobData.batchRunId,
+      projectId: input.jobData.projectId,
+      scenarioId: input.jobData.scenarioId,
+      setId: input.jobData.setId,
+    },
+    extra:
+      input.jobData.target.type === "voice"
+        ? {
+            ...voicePublicUrlEnvironment(input.config.voicePublicUrl),
+            BASE_HOST: input.config.baseHost,
+          }
+        : {},
+  });
+}
+
+/** What every scenario child is started with, whichever job it runs. */
+function buildBaseEnvironmentValue(input: {
+  config: ScenarioChildProcessConfig;
+  labels: string[];
+  telemetry: ScenarioChildTelemetry;
+  logContext: ScenarioLogContext;
+  extra?: Record<string, string | undefined>;
+}): NodeJS.ProcessEnv {
   const tlsEnvironment = resolveChildTlsEnv({
     isSaaS: input.config.isSaas,
     nodeEnv: input.config.nodeEnv,
@@ -334,19 +359,8 @@ function buildChildEnvironmentValue(input: {
     SCENARIO_HEADLESS: "true",
     OTEL_RESOURCE_ATTRIBUTES: buildOtelResourceAttributesValue(input.labels),
     [SCENARIO_EGRESS_POLICY_ENV]: encodeScenarioEgressPolicy(input.config.egress),
-    ...(input.jobData.target.type === "voice"
-      ? {
-          ...voicePublicUrlEnvironment(input.config.voicePublicUrl),
-          BASE_HOST: input.config.baseHost,
-        }
-      : {}),
-    [SCENARIO_LOG_CONTEXT_ENV]: encodeScenarioLogContext({
-      scenarioRunId: input.jobData.scenarioRunId,
-      batchRunId: input.jobData.batchRunId,
-      projectId: input.jobData.projectId,
-      scenarioId: input.jobData.scenarioId,
-      setId: input.jobData.setId,
-    }),
+    ...input.extra,
+    [SCENARIO_LOG_CONTEXT_ENV]: encodeScenarioLogContext(input.logContext),
     ...tlsEnvironment,
   });
 }

@@ -27,6 +27,11 @@ transport hosting, static serving, error formatting, lifecycle, signals,
 listeners, per-domain compositions, features trees — belongs to the framework
 packages below.
 
+`apps/scenario-child` is the one exception: a standalone program the scenario
+module spawns per run, which owns its own logic (adapters, turn execution) and
+reads the parent-child protocol from `@langwatch/scenario-contract` (Alex,
+2026-09-28).
+
 **The same code runs everywhere.** One `main.ts` per app, byte-identical
 across laptop, CI and production. Only the parsed environment differs. There
 is no dev-only branch anywhere in an app, because an app has nowhere to put

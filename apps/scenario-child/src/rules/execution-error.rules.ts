@@ -3,7 +3,7 @@
  * from infra, omits endpoints, strips noise, caps length.
  */
 
-import { goErrorEnvelopeSchema } from "./scenario-generate-nlpgo-error.rules.ts";
+import { goErrorEnvelopeSchema } from "@langwatch/scenario-contract";
 
 const MAX_DETAIL_LENGTH = 2_000;
 

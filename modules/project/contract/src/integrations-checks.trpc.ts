@@ -1,14 +1,15 @@
 /**
  * The `integrationsChecks.*` namespace: one procedure, how far a project has
- * been set up. Main's onboarding checks; the evidence is counted by its owners.
+ * been set up. The evidence belongs to nine other verticals, so the rollup
+ * arrives already counted and only its shape is declared here.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
-import { z } from "zod";
 
-import { integrationsCheckStatusSchema } from "./onboarding.responses.ts";
+import { projectScopeSchema } from "./project-trpc.schemas.ts";
+import { integrationsCheckStatusSchema } from "./project.responses.ts";
 
 export const integrationsChecksTrpc = defineTrpcContract("integrationsChecks")
   .query("getCheckStatus")
-  .withInput(z.object({ projectId: z.string() }))
+  .withInput(projectScopeSchema)
   .withOutput(integrationsCheckStatusSchema)
   .build();

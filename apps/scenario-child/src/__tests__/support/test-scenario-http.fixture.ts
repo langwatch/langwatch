@@ -4,7 +4,7 @@ import {
   type ScenarioHttpResponse,
   HttpSerializedHttpAgentChannel,
   type ScenarioHttp,
-} from "../../index.ts";
+} from "../../channels/http/http.serialized-http-agent.channel.ts";
 
 type ScenarioHttpRequest = Parameters<ScenarioHttp["fetch"]>[0];
 type ScenarioHttpAdapterOptions = ConstructorParameters<typeof HttpSerializedHttpAgentChannel>[0];

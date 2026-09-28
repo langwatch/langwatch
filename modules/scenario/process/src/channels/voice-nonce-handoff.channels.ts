@@ -1,80 +1,17 @@
 // Child -> parent Twilio stream-nonce registration: prevent 403 by registering nonce before dial.
-// Mirrors voice-socket-handoff message shape: type constant, guard, interface.
+// The messages themselves are the contract's; this file holds each side's handling of them.
 
 import type { ChildProcess } from "node:child_process";
 
-/** Discriminates the child's registration request from other IPC messages. */
-export const VOICE_NONCE_REGISTER_MESSAGE = "voice:register-nonce" as const;
-
-/** Discriminates the parent's ack from other IPC messages. */
-export const VOICE_NONCE_REGISTER_ACK_MESSAGE = "voice:register-nonce-ack" as const;
-
-/** Child -> parent: register `nonce` against the sending child. */
-export interface VoiceNonceRegisterMessage {
-  type: typeof VOICE_NONCE_REGISTER_MESSAGE;
-  /** Correlates the ack to this request; a child may have several in flight
-   *  only in theory (one nonce per dial), but the id keeps a stray/duplicate
-   *  ack from resolving the wrong wait. */
-  requestId: string;
-  nonce: string;
-}
-
-/** Parent -> child: the outcome of one registration request. */
-export interface VoiceNonceRegisterAckMessage {
-  type: typeof VOICE_NONCE_REGISTER_ACK_MESSAGE;
-  requestId: string;
-  ok: boolean;
-  /** Present only when `ok` is false, e.g. no listener booted in this
-   *  process. Customer-safe is not a concern here — this never reaches a
-   *  browser, only the child's own error message. */
-  error?: string;
-}
-
-/** Narrows an arbitrary IPC message to the nonce registration request. */
-export function isVoiceNonceRegisterMessage(
-  message: unknown,
-): message is VoiceNonceRegisterMessage {
-  return (
-    typeof message === "object" &&
-    message !== null &&
-    (message as { type?: unknown }).type === VOICE_NONCE_REGISTER_MESSAGE
-  );
-}
-
-/** Discriminates the parent's upgrade-refusal notice from other IPC messages. */
-export const VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE = "voice:media-upgrade-refused" as const;
-
-// Parent -> child: listener refused Twilio dial-back (e.g. expired nonce). Lets child fail fast.
-// Best-effort; if lost the child times out anyway.
-export interface VoiceMediaUpgradeRefusedMessage {
-  type: typeof VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE;
-  /** Human-readable cause, e.g. "nonce expired". Never customer-facing —
-   *  this dies inside the run's own error message, same as every other
-   *  reason string in this module. */
-  reason: string;
-}
-
-/** Narrows an arbitrary IPC message to the upgrade-refusal notice. */
-export function isVoiceMediaUpgradeRefusedMessage(
-  message: unknown,
-): message is VoiceMediaUpgradeRefusedMessage {
-  return (
-    typeof message === "object" &&
-    message !== null &&
-    (message as { type?: unknown }).type === VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE
-  );
-}
-
-/** Narrows an arbitrary IPC message to the nonce registration ack. */
-export function isVoiceNonceRegisterAckMessage(
-  message: unknown,
-): message is VoiceNonceRegisterAckMessage {
-  return (
-    typeof message === "object" &&
-    message !== null &&
-    (message as { type?: unknown }).type === VOICE_NONCE_REGISTER_ACK_MESSAGE
-  );
-}
+import { generate } from "@langwatch/ksuid";
+import {
+  isVoiceMediaUpgradeRefusedMessage,
+  isVoiceNonceRegisterAckMessage,
+  VOICE_NONCE_REGISTER_ACK_MESSAGE,
+  VOICE_NONCE_REGISTER_MESSAGE,
+  type VoiceNonceRegisterAckMessage,
+  type VoiceNonceRegisterMessage,
+} from "@langwatch/scenario-contract";
 
 /** IPC-bearing subset of `process` the child side needs; eases testing (a
  *  fake stands in for the real `process` and its IPC channel). */
@@ -271,4 +208,3 @@ export function raceAgainstUpgradeRefusal<T>(
     if (listener) proc.off("message", listener);
   });
 }
-import { generate } from "@langwatch/ksuid";

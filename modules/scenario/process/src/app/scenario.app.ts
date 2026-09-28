@@ -15,11 +15,10 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { DEFAULT_MODEL, ModelProviderApi } from "@langwatch/model-provider-contract";
-import { createLogger, type Logger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
-import type { AgentAdapter } from "@langwatch/scenario";
 import {
   DEFAULT_SET_ID,
   type RunConfigurationEntryResponse,
@@ -123,8 +122,9 @@ import {
   type ScenarioExecutionResult,
   type TestAgentRunInput,
   type TestAgentTurnInput,
-  type TargetAdapterData,
-  type LiteLLMParams,
+  type AgentTestTurnAnswer,
+  type AgentTestTurnJob,
+  type ScenarioLogContext,
   type TakenPendingNavigate,
   scenarioConfig,
   type ScenarioServerConfig,
@@ -150,15 +150,14 @@ import {
 } from "../channels/redis/redis.scenario-cancellation.channel.ts";
 import type { ScenarioEventBroadcastPublisher } from "../channels/redis/redis.scenario-event-broadcast.channel.ts";
 import { scenarioEventBroadcastChannels } from "../channels/scenario-event-broadcast-channels.registry.ts";
-import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
 import { voiceRecordingChannels } from "../channels/voice-recording-channels.registry.ts";
-import { createVoiceTransportRegistry } from "../channels/voice-transport.channels.ts";
 import {
   buildScenarioLifecyclePipeline,
   type ScenarioLifecyclePipeline,
 } from "../eventing/scenario-lifecycle.pipeline.ts";
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
+import { AgentTestTurnChildService } from "../services/agent-test-turn-child.service.ts";
 import { AgentTestService } from "../services/agent-test.service.ts";
 import { ConnectedTargetService } from "../services/connected-target.service.ts";
 import { ResultAtomsService } from "../services/result-atoms.service.ts";
@@ -430,6 +429,15 @@ export class ScenarioApp implements ScenarioApi {
       publicBaseUrl: setup.members.publicBaseUrl,
     });
 
+    const childHost = {
+      scenarioChildBundle: setup.members.scenarioChildBundle,
+      voicePublicUrl: voice.publicUrl,
+      nlpServiceUrl: setup.members.nlpServiceUrl,
+      isSaas: setup.members.isSaas,
+      nodeEnvironment: setup.members.nodeEnvironment,
+      publicBaseUrl: setup.members.publicBaseUrl,
+    };
+
     return new ScenarioApp({
       agentTesting: AgentTestService.create({
         agents: peers.agents,
@@ -440,15 +448,13 @@ export class ScenarioApp implements ScenarioApi {
         modelProviders: peers.modelProviders,
         simulations,
         config: prefetchConfig,
-        agentAdapters: SerializedAgentChannelRegistry.create({
-          voiceTransports: createVoiceTransportRegistry({
-            voicePublicBaseUrl: config.voicePublicBaseUrl,
-          }),
-          nlpTimeouts: {
-            ...config.nlpTimeouts,
-            engineCodeBlockTimeoutSeconds: Number(setup.members.nlpCodeBlockTimeoutSeconds),
-          },
+        turns: AgentTestTurnChildService.create({
+          config: ScenarioExecutorService.childConfig({ config, host: childHost }),
         }),
+        nlpTimeouts: {
+          ...config.nlpTimeouts,
+          engineCodeBlockTimeoutSeconds: Number(setup.members.nlpCodeBlockTimeoutSeconds),
+        },
         maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
       }),
       connectedTargets: ConnectedTargetService.create(setup.dependencies.agents),
@@ -554,14 +560,7 @@ export class ScenarioApp implements ScenarioApi {
           cancellations,
           cancellationSubscriptions,
           config: setup.config,
-          host: {
-            scenarioChildBundle: setup.members.scenarioChildBundle,
-            voicePublicUrl: voice.publicUrl,
-            nlpServiceUrl: setup.members.nlpServiceUrl,
-            isSaas: setup.members.isSaas,
-            nodeEnvironment: setup.members.nodeEnvironment,
-            publicBaseUrl: setup.members.publicBaseUrl,
-          },
+          host: childHost,
         }),
       }),
     });
@@ -1252,26 +1251,6 @@ export class ScenarioApp implements ScenarioApi {
   }
 }
 
-/** The serialized description one agent adapter is built from. */
-export type AgentAdapterBuildInput = {
-  adapterData: TargetAdapterData;
-  modelParams?: LiteLLMParams;
-  nlpServiceUrl: string;
-  projectApiKey?: string;
-  parameters?: RunParameterValues;
-  httpPort?: ScenarioHttp;
-  logger?: Logger;
-};
-
-/**
- * Builds the adapter that speaks to one agent. A port rather than a direct import of the
- * serialized-adapter registry: a service may not reach into its package's concrete adapters, so the
- * process that holds both supplies the registry.
- */
-export interface AgentAdapterFactory {
-  build(input: AgentAdapterBuildInput): AgentAdapter;
-}
-
 /** Payload broadcast when a queued or running scenario must be cancelled. */
 export type CancellationMessage = {
   projectId: string;
@@ -1299,6 +1278,18 @@ export interface ScenarioChildExecutionSession {
   abort(): Promise<void>;
 }
 
+/**
+ * Runs one agent-test turn in a fresh scenario child, the way a simulation runs, and reads back
+ * the child's answer line. The agent's adapter never runs in the process serving the request.
+ */
+export interface AgentTestTurnChild {
+  run(input: {
+    job: AgentTestTurnJob;
+    environment: ScenarioChildEnvironment;
+    logContext: ScenarioLogContext;
+  }): Promise<AgentTestTurnAnswer>;
+}
+
 export interface ScenarioChildBootstrap {
   start(input: {
     jobData: ExecutionJobData;
@@ -1319,28 +1310,6 @@ export interface ScenarioExecutionRunner {
   execute(jobData: ExecutionJobData): Promise<void>;
 
   skipCancelled(jobData: ExecutionJobData): void;
-}
-
-/** Response boundary required by serialized HTTP scenario targets. */
-export interface ScenarioHttpResponse {
-  ok: boolean;
-  status: number;
-  statusText: string;
-  headers: Pick<Headers, "get">;
-  json(): Promise<unknown>;
-  text(): Promise<string>;
-}
-
-/**
- * Named egress boundary for an HTTP scenario target. The application
- * composition supplies the SSRF-safe implementation; the scenario server
- * never imports an application fetch helper or a native-fetch fallback.
- */
-export interface ScenarioHttp {
-  fetch(input: {
-    url: string;
-    init: { method: string; headers: Record<string, string>; body?: string };
-  }): Promise<ScenarioHttpResponse>;
 }
 
 export interface ScenarioId {

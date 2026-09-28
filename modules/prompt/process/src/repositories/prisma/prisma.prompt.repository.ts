@@ -90,12 +90,6 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     return { prompts, ...(first ? { firstPromptAt: first.createdAt.getTime() } : {}) };
   }
 
-  countVersioned({ projectId }: { projectId: string }): Promise<number> {
-    return this.prisma.llmPromptConfig.count({
-      where: { projectId, deletedAt: null, versions: { some: {} } },
-    });
-  }
-
   async findOrganizationIdForProject(projectId: string): Promise<string> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },

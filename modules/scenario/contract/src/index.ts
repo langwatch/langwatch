@@ -108,3 +108,9 @@ export {
   type RunEvaluatorDefinition,
   type RunEvaluators,
 } from "./scenario-run-evaluators.ts";
+// The parent-child protocol of the scenario child: the environment codecs, the nlpgo error envelope
+// both sides read, and the voice IPC messages.
+export * from "./child-egress-policy.ts";
+export * from "./scenario-log-context.ts";
+export * from "./nlpgo-error-envelope.ts";
+export * from "./voice/voice-child-messages.ts";

@@ -5,15 +5,17 @@
 
 import type { Logger } from "@langwatch/observability";
 import * as ScenarioRunner from "@langwatch/scenario";
-import type { ChildProcessJobData, VoiceTransport } from "@langwatch/scenario-contract";
+import type { ChildProcessJobData } from "@langwatch/scenario-contract";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 
-import type { ScenarioHttp } from "../app/scenario.app.ts";
+import type { ScenarioHttp } from "../channels/http/http.serialized-http-agent.channel.ts";
 import { litellmModelChannels } from "../channels/litellm-model-channels.registry.ts";
 import type { NlpFetchTimeouts } from "../channels/nlp-fetch.channel.ts";
-import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
+import {
+  SerializedAgentChannelRegistry,
+  type VoiceAgentBuilder,
+} from "../channels/serialized-agent-channels.registry.ts";
 import { SerializedAgentChannel } from "../channels/serialized-agent.channel.ts";
-import type { VoiceTransportRunner } from "../channels/voice-transport.channel.ts";
 import {
   agentGreetsFirst,
   buildAgentGreetsFirstScript,
@@ -41,8 +43,8 @@ export interface ScenarioChildRuntime {
   logger: Logger;
   /** The operator's nlpgo deadlines, read by the process that started this. */
   nlpTimeouts?: NlpFetchTimeouts;
-  /** The voice transports, built with this child's environment drilled in. */
-  voiceTransports: Record<VoiceTransport, VoiceTransportRunner>;
+  /** Builds a voice target's adapter over the transports, with this child's environment. */
+  voiceAgents: VoiceAgentBuilder;
 }
 
 export interface ScenarioChildExecutionResult {
@@ -145,7 +147,7 @@ async function executeScenarioChildValue({
   // factories consume it as workflow.api_key; prompt and http ignore it.
   const adapter = SerializedAgentChannelRegistry.create({
     nlpTimeouts: runtime.nlpTimeouts,
-    voiceTransports: runtime.voiceTransports,
+    voiceAgents: runtime.voiceAgents,
   }).build({
     adapterData,
     modelParams,

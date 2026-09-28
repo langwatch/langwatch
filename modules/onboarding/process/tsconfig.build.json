@@ -30,15 +30,6 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../automation/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../dashboard/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../dataset/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../gateway/contract/tsconfig.build.json"
     },
     {
@@ -46,12 +37,6 @@
     },
     {
       "path": "../../langy/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../model-provider/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../monitor/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
@@ -69,19 +54,10 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
-      "path": "../../prompt/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../scenario/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../workflow/contract/tsconfig.build.json"
     }
   ]
 }

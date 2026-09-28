@@ -100,12 +100,10 @@ export class PrismaDashboardRepository
   }: {
     projectIds: readonly string[];
   }): Promise<DashboardUsageCount> {
-    const inScope = { projectId: { in: [...projectIds] } };
-    const [builderCharts, charts] = await Promise.all([
-      this.prisma.customGraph.count({ where: { ...inScope, kind: BUILDER_CHART_KIND } }),
-      this.prisma.customGraph.count({ where: inScope }),
-    ]);
-    return { builderCharts, charts };
+    const builderCharts = await this.prisma.customGraph.count({
+      where: { projectId: { in: [...projectIds] }, kind: BUILDER_CHART_KIND },
+    });
+    return { builderCharts };
   }
 
   async findAllDashboards(input: {

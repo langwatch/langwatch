@@ -229,8 +229,6 @@ export interface PromptApi {
   seedTagsForOrganization(input: { organizationId: string }): Promise<void>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<PromptUsageCount>;
-  /** The project's own live prompts with at least one version; the setup checklist's step. */
-  countVersionedPrompts(input: { projectId: string }): Promise<number>;
   /** The `/api/prompts` REST family's operations: its refusals keep the statuses they had. */
   getByAddress(input: {
     address: string;

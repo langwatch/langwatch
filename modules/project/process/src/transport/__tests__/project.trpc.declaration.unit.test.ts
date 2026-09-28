@@ -1,13 +1,14 @@
 /**
  * @vitest-environment node
- * The namespace the project mounts: wire names, kinds, declared answers
+ * The two namespaces the project mounts: wire names, kinds, declared answers
  * and the access each procedure carries. Read back off the declaration itself,
  * so nothing here depends on the shape of a tRPC internal.
  */
 import type { TrpcAccess, TrpcProcedureRequest } from "@langwatch/api/trpc";
-import { projectTrpc } from "@langwatch/project-contract";
+import { integrationsChecksTrpc, projectTrpc } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
+import { integrationsChecksTrpcTransport } from "../integrations-checks.trpc.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
 
 /** What a declaration asks a runtime to build, collected instead of built. */
@@ -43,6 +44,8 @@ describe("the project tRPC declarations", () => {
         "triggerTopicClustering",
         "update",
       ]);
+      expect(integrationsChecksTrpc.namespace).toBe("integrationsChecks");
+      expect(Object.keys(integrationsChecksTrpc.members)).toEqual(["getCheckStatus"]);
     });
 
     it("reads with a query and changes with a mutation", () => {
@@ -60,12 +63,14 @@ describe("the project tRPC declarations", () => {
         archiveById: "mutation",
         triggerTopicClustering: "mutation",
       });
+      expect(integrationsChecksTrpc.members.getCheckStatus?.kind).toBe("query");
     });
 
     it("declares an answer for every procedure", () => {
       for (const [name, member] of Object.entries(projectTrpc.members)) {
         expect([name, member.output !== undefined]).toEqual([name, true]);
       }
+      expect(integrationsChecksTrpc.members.getCheckStatus?.output).toBeDefined();
     });
   });
 
@@ -91,6 +96,20 @@ describe("the project tRPC declarations", () => {
         "project.getFieldRedactionStatus": { kind: "permission", permission: "project:view" },
         "project.archiveById": { kind: "permission", permission: "project:delete" },
         "project.triggerTopicClustering": { kind: "permission", permission: "project:update" },
+      });
+    });
+
+    /**
+     * `project:update` rather than `project:view`: the answer drives the setup
+     * checklist, and a reader who cannot change the project cannot act on a
+     * single step it lists.
+     */
+    it("gates the setup checklist on project:update", () => {
+      expect(declaredAccess(integrationsChecksTrpcTransport)).toEqual({
+        "integrationsChecks.getCheckStatus": {
+          kind: "permission",
+          permission: "project:update",
+        },
       });
     });
   });

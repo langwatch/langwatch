@@ -17,8 +17,9 @@ vi.mock("@langwatch/observability/tracing", () => ({
 }));
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
-import { HttpSerializedWorkflowAgentChannel } from "@langwatch/scenario-process";
 import type * as undiciModule from "undici";
+
+import { HttpSerializedWorkflowAgentChannel } from "../channels/http/http.serialized-workflow-agent.channel.ts";
 
 const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 

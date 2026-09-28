@@ -31,6 +31,10 @@ export {
   type ProjectPermissionScope,
 } from "./transport/project.trpc.ts";
 export {
+  type IntegrationsChecksApi,
+  integrationsChecksTrpcTransport,
+} from "./transport/integrations-checks.trpc.ts";
+export {
   GovernanceInternalProject,
   GovernanceInternalProjectService,
   ProjectOldestTeam,

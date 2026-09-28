@@ -68,11 +68,12 @@ vi.mock("@langwatch/observability/tracing", () => ({
 }));
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
+import type * as undiciModule from "undici";
+
 import {
   HttpSerializedCodeAgentChannel,
   SerializedCodeAgentAdapterError,
-} from "@langwatch/scenario-process";
-import type * as undiciModule from "undici";
+} from "../channels/http/http.serialized-code-agent.channel.ts";
 
 const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 

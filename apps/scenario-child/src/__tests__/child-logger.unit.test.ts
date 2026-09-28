@@ -30,12 +30,9 @@ vi.mock("@langwatch/observability", () => {
   };
 });
 
-import {
-  createChildProcessLogger,
-  decodeScenarioLogContext,
-  encodeScenarioLogContext,
-  SCENARIO_LOG_CONTEXT_ENV,
-} from "../index.ts";
+import { encodeScenarioLogContext, SCENARIO_LOG_CONTEXT_ENV } from "@langwatch/scenario-contract";
+
+import { createChildProcessLogger, decodeScenarioLogContext } from "../config.ts";
 
 describe("child-logger", () => {
   beforeEach(() => {

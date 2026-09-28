@@ -15,7 +15,6 @@ import type {
   CancellationSubscriber,
   ScenarioSecretCipher,
 } from "../app/scenario.app.ts";
-import { nlpFetchChannels } from "../channels/nlp-fetch-channels.registry.ts";
 import {
   NodeScenarioChildService,
   type ScenarioChildProcessConfig,
@@ -107,7 +106,6 @@ export class ScenarioExecutorService {
     resources?.own("scenario executor", async () => {
       const started = await running.catch(() => void 0);
       await started?.close();
-      await nlpFetchChannels.live.create().close();
     });
   }
 
@@ -160,7 +158,20 @@ export class ScenarioExecutorService {
   }
 
   #childConfig(): ScenarioChildProcessConfig {
-    const { config, host } = this.input;
+    return ScenarioExecutorService.childConfig({
+      config: this.input.config,
+      host: this.input.host,
+    });
+  }
+
+  /** How a scenario child is started here, whether it runs a simulation or one agent-test turn. */
+  static childConfig({
+    config,
+    host,
+  }: {
+    config: ScenarioServerConfig;
+    host: ScenarioExecutorHost;
+  }): ScenarioChildProcessConfig {
     return {
       packageRoot: host.scenarioChildBundle.packageRoot,
       sourcePath: host.scenarioChildBundle.sourcePath,

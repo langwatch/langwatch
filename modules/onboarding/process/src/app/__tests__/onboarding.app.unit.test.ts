@@ -1,8 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import { PermissionDeniedError, type AuthzApi } from "@langwatch/authz-contract";
-import type { AutomationApi } from "@langwatch/automation-contract";
-import type { DashboardApi } from "@langwatch/dashboard-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
 /**
  * The app authorizes the caller's exact organizationId before every
  * guided-onboarding read and write. Binds the `@integration` scenarios over
@@ -11,8 +8,6 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
  */
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
 import {
   EMPTY_GUIDED_ONBOARDING_STATE,
   type GuidedOnboardingRecord,
@@ -21,10 +16,7 @@ import {
 import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
-import type { PromptApi } from "@langwatch/prompt-contract";
-import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingApp } from "../onboarding.app.ts";
@@ -84,14 +76,6 @@ function buildApp(
           return ORGANIZATION_ID;
         },
       }),
-      workflows: createApiFixture<WorkflowApi>({}),
-      dashboards: createApiFixture<DashboardApi>({}),
-      datasets: createApiFixture<DatasetApi>({}),
-      monitors: createApiFixture<MonitorApi>({}),
-      automations: createApiFixture<AutomationApi>({}),
-      scenarios: createApiFixture<ScenarioApi>({}),
-      modelProviders: createApiFixture<ModelProviderApi>({}),
-      prompts: createApiFixture<PromptApi>({}),
     },
     config: void 0,
     resources: new ResourceScope(),

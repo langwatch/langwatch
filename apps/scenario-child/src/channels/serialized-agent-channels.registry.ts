@@ -4,26 +4,48 @@
  * modification: No changes to `build` needed
  */
 
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
-import type { VoiceTransport } from "@langwatch/scenario-contract";
+import type {
+  LiteLLMParams,
+  RunParameterValues,
+  TargetAdapterData,
+  VoiceAgentData,
+} from "@langwatch/scenario-contract";
 
-import { type AgentAdapterFactory, type AgentAdapterBuildInput } from "../app/scenario.app.ts";
 import { HttpSerializedCodeAgentChannel } from "./http/http.serialized-code-agent.channel.ts";
 import { HttpSerializedConnectedAgentChannel } from "./http/http.serialized-connected-agent.channel.ts";
-import { HttpSerializedHttpAgentChannel } from "./http/http.serialized-http-agent.channel.ts";
+import {
+  HttpSerializedHttpAgentChannel,
+  type ScenarioHttp,
+} from "./http/http.serialized-http-agent.channel.ts";
 import { HttpSerializedPromptConfigChannel } from "./http/http.serialized-prompt-config.channel.ts";
 import { HttpSerializedWorkflowAgentChannel } from "./http/http.serialized-workflow-agent.channel.ts";
 import type { NlpFetchTimeouts } from "./nlp-fetch.channel.ts";
-import type { VoiceTransportRunner } from "./voice-transport.channel.ts";
-import { createSerializedVoiceAgentAdapter } from "./voice-transport.channels.ts";
+
+/** The serialized description one agent adapter is built from. */
+export type AgentAdapterBuildInput = {
+  adapterData: TargetAdapterData;
+  modelParams?: LiteLLMParams;
+  nlpServiceUrl: string;
+  projectApiKey?: string;
+  parameters?: RunParameterValues;
+  httpPort?: ScenarioHttp;
+  logger?: Logger;
+};
+
+/**
+ * Builds a voice target's adapter over the transports. The entrypoint supplies it, since the
+ * transports still live with the live voice session in the scenario module.
+ */
+export type VoiceAgentBuilder = (data: VoiceAgentData) => AgentAdapter;
 
 /**
  * Creates an adapter from serialized data using the registry. @throws Error if adapter type is not
  * registered, or if the resolved factory is missing the credential it needs (modelParams for
  * prompt, projectApiKey for workflow/code).
  */
-export class SerializedAgentChannelRegistry implements AgentAdapterFactory {
+export class SerializedAgentChannelRegistry {
   /**
    * `nlpTimeouts` are the operator's nlpgo deadlines, read by the process that
    * composed this registry — an unset one falls back to the same default the
@@ -31,18 +53,17 @@ export class SerializedAgentChannelRegistry implements AgentAdapterFactory {
    */
   static create({
     nlpTimeouts,
-    voiceTransports,
+    voiceAgents,
   }: {
     nlpTimeouts?: NlpFetchTimeouts;
-    /** The voice transports by vendor, built with the process's environment drilled in. */
-    voiceTransports: Record<VoiceTransport, VoiceTransportRunner>;
+    voiceAgents: VoiceAgentBuilder;
   }): SerializedAgentChannelRegistry {
-    return new SerializedAgentChannelRegistry(nlpTimeouts ?? {}, voiceTransports);
+    return new SerializedAgentChannelRegistry(nlpTimeouts ?? {}, voiceAgents);
   }
 
   private constructor(
     private readonly nlpTimeouts: NlpFetchTimeouts,
-    private readonly voiceTransports: Record<VoiceTransport, VoiceTransportRunner>,
+    private readonly voiceAgents: VoiceAgentBuilder,
   ) {}
 
   build(input: AgentAdapterBuildInput): AgentAdapter {
@@ -105,10 +126,7 @@ export class SerializedAgentChannelRegistry implements AgentAdapterFactory {
       case "voice":
         // The runner reads the transport, agent and credential off the prefetched data and
         // dials; a missing credential fails the run with the transport's own message.
-        return createSerializedVoiceAgentAdapter({
-          data: adapterData,
-          registry: this.voiceTransports,
-        });
+        return this.voiceAgents(adapterData);
     }
   }
 }

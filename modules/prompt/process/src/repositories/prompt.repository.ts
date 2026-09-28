@@ -75,9 +75,6 @@ export abstract class LlmConfigRepository {
     since?: number;
   }): Promise<PromptUsageCount>;
 
-  /** The project's own prompts, not deleted, holding at least one version. */
-  abstract countVersioned(input: { projectId: string }): Promise<number>;
-
   abstract isHandleUnique(params: {
     handle: string;
     projectId: string;

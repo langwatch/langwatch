@@ -13,8 +13,7 @@ import type {
 import type * as undiciModule from "undici";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createVoiceTransportRegistry } from "../channels/voice-transport.channels.ts";
-import { SerializedAgentChannelRegistry } from "../index.ts";
+import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
 import { guardAgainstGlobalFetch } from "./support/global-fetch-guard.ts";
 
 // The workflow and code adapters call undici's own fetch, so that export is
@@ -89,7 +88,9 @@ describe("createAdapter — project API key threading", () => {
     /** @scenario "The workflow adapter sends the project's platform API key, not an LLM key" */
     it("emits the project API key as workflow.api_key on the outbound request", async () => {
       const adapter = SerializedAgentChannelRegistry.create({
-        voiceTransports: createVoiceTransportRegistry({}),
+        voiceAgents: () => {
+          throw new Error("no voice target in this test");
+        },
       }).build({
         adapterData: workflowData,
         modelParams,
@@ -118,7 +119,9 @@ describe("createAdapter — project API key threading", () => {
     /** @scenario "The code adapter sends the project's platform API key, not an LLM key" */
     it("emits the project API key as workflow.api_key on the outbound request", async () => {
       const adapter = SerializedAgentChannelRegistry.create({
-        voiceTransports: createVoiceTransportRegistry({}),
+        voiceAgents: () => {
+          throw new Error("no voice target in this test");
+        },
       }).build({
         adapterData: codeData,
         modelParams,
@@ -153,7 +156,9 @@ describe("createAdapter — project API key threading", () => {
       // touches neither key.
       expect(() =>
         SerializedAgentChannelRegistry.create({
-          voiceTransports: createVoiceTransportRegistry({}),
+          voiceAgents: () => {
+            throw new Error("no voice target in this test");
+          },
         }).build({
           adapterData: httpData,
           nlpServiceUrl,

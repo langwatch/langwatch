@@ -1,19 +1,12 @@
 /**
  * Bridges parent's logger context (scenarioRunId, batchRunId, projectId, scenarioId)
  * to spawned child process. Without this, child logs aren't joinable by ID (lw#3593).
+ * The child reads it back in apps/scenario-child/src/config.ts.
  */
 
 import { z } from "zod";
 
 export const SCENARIO_LOG_CONTEXT_ENV = "LANGWATCH_LOG_CONTEXT";
-
-export type ScenarioLogContext = {
-  scenarioRunId?: string;
-  batchRunId?: string;
-  projectId?: string;
-  scenarioId?: string;
-  setId?: string;
-};
 
 export const scenarioLogContextSchema = z.object({
   scenarioRunId: z.string().optional(),
@@ -22,6 +15,7 @@ export const scenarioLogContextSchema = z.object({
   scenarioId: z.string().optional(),
   setId: z.string().optional(),
 });
+export type ScenarioLogContext = z.infer<typeof scenarioLogContextSchema>;
 
 /**
  * Encode a logger context for transport across a process boundary, as a

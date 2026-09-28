@@ -1,19 +1,10 @@
 /**
- * What the scenario child process needs, and nothing else: it is a fresh `node` per simulation, so
- * everything reachable is parsed each run, and the server barrel dragged in REST and repositories.
+ * The voice transports the scenario child still takes from this package: the live voice session
+ * runs them here too, until it spawns a child of its own. Everything else the child runs is its
+ * own (apps/scenario-child), and this entry shrinks to nothing once voice moves there as well.
  */
 
-export { createChildProcessLogger } from "./app/scenario-composition.build.ts";
 export {
-  decodeScenarioEgressPolicy,
-  SCENARIO_EGRESS_POLICY_ENV,
-} from "./rules/child-egress-policy.rules.ts";
-export {
-  executeScenarioChild,
-  flushScenarioOtelTraces,
-  formatScenarioChildError,
-} from "./services/scenario-child-execution.service.ts";
-export { HttpNlpFetchChannel } from "./channels/http/http.nlp-fetch.channel.ts";
-export type { ScenarioHttp, ScenarioHttpResponse } from "./app/scenario.app.ts";
-export { createVoiceTransportRegistry } from "./channels/voice-transport.channels.ts";
-export type { PhoneTransportEnvironment } from "./channels/http/http.phone-voice-transport.channel.ts";
+  createSerializedVoiceAgentAdapter,
+  createVoiceTransportRegistry,
+} from "./channels/voice-transport.channels.ts";

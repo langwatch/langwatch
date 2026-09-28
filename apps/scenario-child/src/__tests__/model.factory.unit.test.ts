@@ -6,7 +6,7 @@ import { generateText, tool } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { HttpLitellmModelChannel } from "../index.ts";
+import { HttpLitellmModelChannel } from "../channels/http/http.litellm-model.channel.ts";
 
 const models = HttpLitellmModelChannel.create();
 

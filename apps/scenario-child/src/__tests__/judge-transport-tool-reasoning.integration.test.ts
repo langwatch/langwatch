@@ -5,7 +5,8 @@
  */
 
 import type { LiteLLMParams } from "@langwatch/scenario-contract";
-import { HttpLitellmModelChannel } from "@langwatch/scenario-process";
+
+import { HttpLitellmModelChannel } from "../channels/http/http.litellm-model.channel.ts";
 
 const models = HttpLitellmModelChannel.create();
 import { APICallError, generateText, tool } from "ai";

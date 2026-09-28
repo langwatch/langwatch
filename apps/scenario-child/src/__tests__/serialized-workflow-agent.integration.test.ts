@@ -13,8 +13,9 @@ import {
   ScenarioExecutionState,
 } from "@langwatch/scenario";
 import type { WorkflowAgentData } from "@langwatch/scenario-contract";
-import { HttpSerializedWorkflowAgentChannel } from "@langwatch/scenario-process";
 import { beforeAll, describe, expect, it } from "vitest";
+
+import { HttpSerializedWorkflowAgentChannel } from "../channels/http/http.serialized-workflow-agent.channel.ts";
 
 const NLP = process.env.LANGWATCH_NLP_SERVICE ?? "http://localhost:5561";
 const FIXTURES = resolve(__dirname, "fixtures");

@@ -8921,9 +8921,6 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
-      '@langwatch/onboarding-contract':
-        specifier: workspace:*
-        version: link:../../onboarding/contract
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
@@ -10407,15 +10404,6 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
-      '@langwatch/automation-contract':
-        specifier: workspace:*
-        version: link:../../automation/contract
-      '@langwatch/dashboard-contract':
-        specifier: workspace:*
-        version: link:../../dashboard/contract
-      '@langwatch/dataset-contract':
-        specifier: workspace:*
-        version: link:../../dataset/contract
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../gateway/contract
@@ -10425,12 +10413,6 @@ importers:
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
-      '@langwatch/model-provider-contract':
-        specifier: workspace:*
-        version: link:../../model-provider/contract
-      '@langwatch/monitor-contract':
-        specifier: workspace:*
-        version: link:../../monitor/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -10446,24 +10428,12 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
-      '@langwatch/prompt-contract':
-        specifier: workspace:*
-        version: link:../../prompt/contract
-      '@langwatch/scenario-contract':
-        specifier: workspace:*
-        version: link:../../scenario/contract
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/workflow-contract':
-        specifier: workspace:*
-        version: link:../../workflow/contract
-      '@trpc/server':
-        specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2)
       posthog-node:
         specifier: 'catalog:'
         version: 5.48.1(rxjs@7.8.2)
@@ -11364,9 +11334,6 @@ importers:
       '@langwatch/onboarding-browser-kit':
         specifier: workspace:*
         version: link:../../onboarding/browser-kit
-      '@langwatch/onboarding-contract':
-        specifier: workspace:*
-        version: link:../../onboarding/contract
       '@langwatch/organization-browser':
         specifier: workspace:*
         version: link:../../organization/browser
@@ -14263,15 +14230,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
-      '@langwatch/enterprise-gateway-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/enterprise-gateway/contract
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract
-      '@langwatch/gateway-contract':
-        specifier: workspace:*
-        version: link:../../gateway/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

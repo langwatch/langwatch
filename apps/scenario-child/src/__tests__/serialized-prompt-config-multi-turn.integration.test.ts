@@ -11,9 +11,10 @@ import {
   ScenarioExecutionState,
 } from "@langwatch/scenario";
 import type { LiteLLMParams, PromptConfigData } from "@langwatch/scenario-contract";
-import { HttpSerializedPromptConfigChannel } from "@langwatch/scenario-process";
 import { allowConsole, createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { HttpSerializedPromptConfigChannel } from "../channels/http/http.serialized-prompt-config.channel.ts";
 
 const LITELLM_PARAMS: LiteLLMParams = {
   api_key: "test-key",

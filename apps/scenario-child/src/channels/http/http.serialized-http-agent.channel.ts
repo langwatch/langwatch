@@ -19,10 +19,30 @@ import type { HttpAgentData, RunParameterValues } from "@langwatch/scenario-cont
 import { nowInstant } from "@langwatch/time";
 import { JSONPath } from "jsonpath-plus";
 
-import type { ScenarioHttp } from "../../app/scenario.app.ts";
 import { applyAuthentication } from "../../rules/http-auth.rules.ts";
 import * as ScenarioSecretReferenceAdapter from "../../rules/scenario-secret-reference.rules.ts";
 import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
+
+/** Response boundary required by serialized HTTP scenario targets. */
+export interface ScenarioHttpResponse {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  headers: Pick<Headers, "get">;
+  json(): Promise<unknown>;
+  text(): Promise<string>;
+}
+
+/**
+ * Named egress boundary for an HTTP scenario target. The child's entrypoint supplies the
+ * SSRF-safe implementation; no adapter reaches for native fetch.
+ */
+export interface ScenarioHttp {
+  fetch(input: {
+    url: string;
+    init: { method: string; headers: Record<string, string>; body?: string };
+  }): Promise<ScenarioHttpResponse>;
+}
 
 /**
  * Truncate a response body for log inclusion. Long bodies are useless in

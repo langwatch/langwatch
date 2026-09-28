@@ -11,14 +11,7 @@ export {
   recordTourInputSchema,
   recordVirtualKeyRevealInputSchema,
 } from "./onboarding.trpc.ts";
-export {
-  type GuidedOnboardingCheck,
-  guidedOnboardingCheckSchema,
-  type IntegrationsCheckStatus,
-  integrationsCheckStatusSchema,
-  type OrganizationInitialized,
-} from "./onboarding.responses.ts";
-export { integrationsChecksTrpc } from "./integrations-checks.trpc.ts";
+export type { OrganizationInitialized } from "./onboarding.responses.ts";
 export * from "./onboarding.api.ts";
 export * from "./onboarding.errors.ts";
 export * from "./onboarding-rest.schemas.ts";

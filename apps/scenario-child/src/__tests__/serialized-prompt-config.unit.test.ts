@@ -4,9 +4,10 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { LiteLLMParams, PromptConfigData } from "@langwatch/scenario-contract";
-import { HttpSerializedPromptConfigChannel } from "@langwatch/scenario-process";
 import { createTestLogger } from "@langwatch/test-harness";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { HttpSerializedPromptConfigChannel } from "../channels/http/http.serialized-prompt-config.channel.ts";
 
 // Mock dependencies
 vi.mock("ai", () => ({

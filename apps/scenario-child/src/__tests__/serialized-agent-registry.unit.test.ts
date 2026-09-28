@@ -5,13 +5,10 @@
 import type { LiteLLMParams, TargetAdapterData } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
-import { createVoiceTransportRegistry } from "../channels/voice-transport.channels.ts";
-import {
-  SerializedAgentChannelRegistry,
-  HttpSerializedCodeAgentChannel,
-  HttpSerializedHttpAgentChannel,
-  HttpSerializedPromptConfigChannel,
-} from "../index.ts";
+import { HttpSerializedCodeAgentChannel } from "../channels/http/http.serialized-code-agent.channel.ts";
+import { HttpSerializedHttpAgentChannel } from "../channels/http/http.serialized-http-agent.channel.ts";
+import { HttpSerializedPromptConfigChannel } from "../channels/http/http.serialized-prompt-config.channel.ts";
+import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
 
 describe("SerializedAgentRegistryAdapter", () => {
   const defaultModelParams: LiteLLMParams = {
@@ -31,7 +28,9 @@ describe("SerializedAgentRegistryAdapter", () => {
       };
 
       const adapter = SerializedAgentChannelRegistry.create({
-        voiceTransports: createVoiceTransportRegistry({}),
+        voiceAgents: () => {
+          throw new Error("no voice target in this test");
+        },
       }).build({
         adapterData,
         modelParams: defaultModelParams,
@@ -55,7 +54,9 @@ describe("SerializedAgentRegistryAdapter", () => {
       };
 
       const adapter = SerializedAgentChannelRegistry.create({
-        voiceTransports: createVoiceTransportRegistry({}),
+        voiceAgents: () => {
+          throw new Error("no voice target in this test");
+        },
       }).build({
         adapterData,
         modelParams: defaultModelParams,
@@ -79,7 +80,9 @@ describe("SerializedAgentRegistryAdapter", () => {
       };
 
       const adapter = SerializedAgentChannelRegistry.create({
-        voiceTransports: createVoiceTransportRegistry({}),
+        voiceAgents: () => {
+          throw new Error("no voice target in this test");
+        },
       }).build({
         adapterData,
         modelParams: defaultModelParams,
