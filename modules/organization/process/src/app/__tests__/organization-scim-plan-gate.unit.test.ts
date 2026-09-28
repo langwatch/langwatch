@@ -16,6 +16,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { describe, expect, it } from "vitest";
 
 import type { InviteAssignableRoles } from "../../rules/invite-contracts.rules.ts";
+import { SignupAnnouncementService } from "../../services/signup-announcement.service.ts";
 import { buildOrganizationInfrastructure } from "../organization-composition.build.ts";
 
 function planGateFor({ planType }: { planType: string }) {
@@ -29,6 +30,11 @@ function planGateFor({ planType }: { planType: string }) {
     logger: createApiFixture<Logger>(),
     redis: createApiFixture<RedisConnection>(),
     publicBaseUrl: undefined,
+    signupAnnouncements: SignupAnnouncementService.create({
+      channel: undefined,
+      publicBaseUrl: undefined,
+      logger: createApiFixture<Logger>(),
+    }),
     processName: "test",
     demoProject: { userId: "demo-user", projectId: "demo-project" },
     dependencies: {

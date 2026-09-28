@@ -50,6 +50,19 @@ class FakeUsageLimitEmail extends UsageLimitEmailChannel {
   }
 }
 
+function textOf(message: unknown): string {
+  if (typeof message === "object" && message !== null && "text" in message) {
+    if (typeof message.text === "string") return message.text;
+  }
+  throw new Error("expected a Slack message with a text fallback");
+}
+
+const sentTexts = (): string[] =>
+  mockSlackSend.mock.calls.map((call: unknown[]) => textOf(call[0]));
+
+const sentJson = (): string =>
+  JSON.stringify(mockSlackSend.mock.calls.map((call: unknown[]) => call[0]));
+
 describe("NotificationService", () => {
   let service: NotificationService;
   let errorReporter: FakeErrorReporter;
@@ -147,19 +160,20 @@ describe("NotificationService", () => {
         {
           limitType: "Monthly Traces",
           expected:
-            "Plan limit reached: Acme, jane@acme.com, Plan: Free, Monthly Traces: 12000/10000",
+            "⚠️ Plan limit reached · Organization: Acme · Admin: jane@acme.com · Plan: Free · Monthly Traces: 12,000/10,000",
         },
         {
           limitType: "Monthly Events",
           expected:
-            "Plan limit reached: Acme, jane@acme.com, Plan: Free, Monthly Events: 12000/10000",
+            "⚠️ Plan limit reached · Organization: Acme · Admin: jane@acme.com · Plan: Free · Monthly Events: 12,000/10,000",
         },
       ])("names the $limitType cap and the numbers behind it", async ({ limitType, expected }) => {
         config.slackPlanLimitChannel = "https://hooks.slack.com/test";
 
         await service.sendSlackPlanLimitAlert({ ...context, limitType });
 
-        expect(mockSlackSend).toHaveBeenCalledWith({ text: expected });
+        expect(sentTexts()).toEqual([expected]);
+        expect(sentJson()).toContain("https://app.langwatch.ai/admin#/organizations/org_1");
       });
 
       /** @scenario "Plan limit alert still sends when the organization has no admin email" */
@@ -171,9 +185,9 @@ describe("NotificationService", () => {
           adminEmail: undefined,
         });
 
-        expect(mockSlackSend).toHaveBeenCalledWith({
-          text: "Plan limit reached: Acme, unknown, Plan: Free, Monthly Traces: 12000/10000",
-        });
+        expect(sentTexts()).toEqual([
+          "⚠️ Plan limit reached · Organization: Acme · Admin: unknown · Plan: Free · Monthly Traces: 12,000/10,000",
+        ]);
       });
 
       /** @scenario "Plan limit alert reads the same way as the resource limit alert" */
@@ -188,13 +202,9 @@ describe("NotificationService", () => {
           max: 2,
         });
 
-        const sentTexts = mockSlackSend.mock.calls.map(
-          (args: unknown[]) => (args[0] as { text: string }).text,
-        );
-
-        expect(sentTexts).toEqual([
-          "Plan limit reached: Acme, jane@acme.com, Plan: Free, Monthly Traces: 12000/10000",
-          "Resource limit reached: Acme, jane@acme.com, Plan: Free, Team Members: 2/2",
+        expect(sentTexts()).toEqual([
+          "⚠️ Plan limit reached · Organization: Acme · Admin: jane@acme.com · Plan: Free · Monthly Traces: 12,000/10,000",
+          "⚠️ Resource limit reached · Organization: Acme · Admin: jane@acme.com · Plan: Free · Team Members: 2/2",
         ]);
       });
     });
@@ -231,9 +241,9 @@ describe("NotificationService", () => {
 
         await service.sendSlackResourceLimitAlert(context);
 
-        expect(mockSlackSend).toHaveBeenCalledWith({
-          text: "Resource limit reached: Acme, jane@acme.com, Plan: Launch, Workflows: 5/5",
-        });
+        expect(sentTexts()).toEqual([
+          "⚠️ Resource limit reached · Organization: Acme · Admin: jane@acme.com · Plan: Launch · Workflows: 5/5",
+        ]);
       });
     });
 
@@ -300,7 +310,54 @@ describe("NotificationService", () => {
       });
     });
 
+    describe("when the payment provider runs in test mode", () => {
+      it("links to the subscription in Stripe's test dashboard", async () => {
+        const testModeService = NotificationService.create({
+          config: {
+            ...config,
+            slackSubscriptionsChannel: "https://hooks.slack.com/subs",
+            stripeTestMode: true,
+          },
+          errorReporter,
+          usageLimitEmail,
+        });
+
+        await testModeService.sendSlackBillingThresholdFailureAlert(context);
+
+        expect(sentJson()).toContain(
+          "https://dashboard.stripe.com/test/subscriptions/sub_stripe_1",
+        );
+      });
+    });
+
+    describe("when the notice's props are refused", () => {
+      /** @scenario "A notice whose props are refused is reported, never thrown" */
+      it("reports the refusal and resolves", async () => {
+        const brokenService = NotificationService.create({
+          config: {
+            baseHost: "not a url",
+            slackSubscriptionsChannel: "https://hooks.slack.com/subs",
+          },
+          errorReporter,
+          usageLimitEmail,
+        });
+
+        await expect(
+          brokenService.sendSlackSubscriptionEvent({
+            type: "cancelled",
+            organizationId: "org_1",
+            organizationName: "Acme",
+            plan: "LAUNCH",
+            subscriptionId: "sub_1",
+          }),
+        ).resolves.toBeUndefined();
+        expect(mockSlackSend).not.toHaveBeenCalled();
+        expect(errorReporter.capture).toHaveBeenCalledTimes(1);
+      });
+    });
+
     describe("when SLACK_CHANNEL_SUBSCRIPTIONS is not set", () => {
+      /** @scenario "A notice whose channel is not configured is skipped" */
       it("returns without sending", async () => {
         config.slackSubscriptionsChannel = undefined;
 
@@ -311,6 +368,7 @@ describe("NotificationService", () => {
     });
 
     describe("when Slack webhook fails", () => {
+      /** @scenario "A Slack send that fails is reported, never thrown" */
       it("catches the error so checkout is never affected", async () => {
         config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
 
@@ -357,16 +415,16 @@ describe("NotificationService", () => {
           maxMessagesPerMonth: 10000,
         });
 
-        expect(mockSlackSend).toHaveBeenCalledWith({
-          blocks: expect.arrayContaining([
-            expect.objectContaining({
-              type: "header",
-              text: expect.objectContaining({
-                text: "Subscription activated",
+        expect(mockSlackSend).toHaveBeenCalledWith(
+          expect.objectContaining({
+            blocks: expect.arrayContaining([
+              expect.objectContaining({
+                type: "header",
+                text: expect.objectContaining({ text: "🎉 Subscription activated" }),
               }),
-            }),
-          ]),
-        });
+            ]),
+          }),
+        );
       });
     });
 
@@ -382,16 +440,16 @@ describe("NotificationService", () => {
           customerName: "John",
         });
 
-        expect(mockSlackSend).toHaveBeenCalledWith({
-          blocks: expect.arrayContaining([
-            expect.objectContaining({
-              type: "header",
-              text: expect.objectContaining({
-                text: "Prospective subscription interest",
+        expect(mockSlackSend).toHaveBeenCalledWith(
+          expect.objectContaining({
+            blocks: expect.arrayContaining([
+              expect.objectContaining({
+                type: "header",
+                text: expect.objectContaining({ text: "🌱 Prospective subscription interest" }),
               }),
-            }),
-          ]),
-        });
+            ]),
+          }),
+        );
       });
     });
 
@@ -408,16 +466,16 @@ describe("NotificationService", () => {
           cancellationDate: Temporal.Instant.from("2026-03-15T10:00:00Z"),
         });
 
-        expect(mockSlackSend).toHaveBeenCalledWith({
-          blocks: expect.arrayContaining([
-            expect.objectContaining({
-              type: "header",
-              text: expect.objectContaining({
-                text: "Subscription cancelled",
+        expect(mockSlackSend).toHaveBeenCalledWith(
+          expect.objectContaining({
+            blocks: expect.arrayContaining([
+              expect.objectContaining({
+                type: "header",
+                text: expect.objectContaining({ text: "📉 Subscription cancelled" }),
               }),
-            }),
-          ]),
-        });
+            ]),
+          }),
+        );
       });
 
       it("includes organization name and plan in the body", async () => {
@@ -480,9 +538,9 @@ describe("NotificationService", () => {
 
         expect(mockSlackSend).toHaveBeenCalledTimes(1);
         const body = mockSlackSend.mock.calls[0]?.[0];
-        expect(body.text).toBe(payload.headline);
-        expect(JSON.stringify(body.blocks)).toContain("*Company:*\\nacme.com");
-        expect(JSON.stringify(body.blocks)).toContain("instance `inst_1`");
+        expect(textOf(body)).toContain(payload.headline);
+        expect(JSON.stringify(body)).toContain("*Company*\\nacme.com");
+        expect(JSON.stringify(body)).toContain("*Instance*\\n`inst_1`");
       });
     });
 
@@ -493,72 +551,6 @@ describe("NotificationService", () => {
         await service.sendSlackSelfHostedSignal(payload);
 
         expect(mockSlackSend).not.toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe("sendSlackSignupEvent()", () => {
-    const payload = {
-      userName: "Jane Doe",
-      userEmail: "jane@example.com",
-      organizationName: "Acme Corp",
-      phoneNumber: "+31 20 123 4567",
-      utmCampaign: "launch-week",
-    };
-
-    describe("when SLACK_CHANNEL_SIGNUPS is not set", () => {
-      /** @scenario 'Missing Slack webhook does not block onboarding completion' */
-      it("returns without sending", async () => {
-        config.slackSignupsChannel = undefined;
-
-        await service.sendSlackSignupEvent(payload);
-
-        expect(mockSlackSend).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when optional fields are present", () => {
-      /** @scenario 'Slack notification sent after onboarding creates the organization' */
-      /** @scenario 'Slack notification includes optional campaign context when present' */
-      it("includes phone number and campaign in the Slack text", async () => {
-        config.slackSignupsChannel = "https://hooks.slack.com/signups";
-
-        await service.sendSlackSignupEvent(payload);
-
-        expect(mockSlackSend).toHaveBeenCalledWith({
-          text: "🔔 New user registered: Jane Doe, jane@example.com. Organization: Acme Corp, +31 20 123 4567, Campaign: launch-week",
-        });
-      });
-    });
-
-    describe("when optional fields are missing", () => {
-      /** @scenario 'Missing optional signup fields do not block the notification' */
-      it("sends the baseline signup notification text", async () => {
-        config.slackSignupsChannel = "https://hooks.slack.com/signups";
-
-        await service.sendSlackSignupEvent({
-          userName: "Jane Doe",
-          userEmail: "jane@example.com",
-          organizationName: "Acme Corp",
-        });
-
-        expect(mockSlackSend).toHaveBeenCalledWith({
-          text: "🔔 New user registered: Jane Doe, jane@example.com. Organization: Acme Corp",
-        });
-      });
-    });
-
-    describe("when Slack webhook fails", () => {
-      /** @scenario 'Slack delivery failure does not block onboarding completion' */
-      it("captures the exception and does not throw", async () => {
-        config.slackSignupsChannel = "https://hooks.slack.com/signups";
-
-        const error = new Error("signup webhook error");
-        mockSlackSend.mockRejectedValueOnce(error);
-
-        await service.sendSlackSignupEvent(payload);
-
-        expect(errorReporter.capture).toHaveBeenCalledWith(error);
       });
     });
   });
@@ -588,19 +580,9 @@ describe("NotificationService", () => {
 
         await service.sendSlackLicensePurchase(payload);
 
-        expect(mockSlackSend).toHaveBeenCalledWith(
-          expect.objectContaining({
-            text: "New License Purchase",
-            blocks: expect.arrayContaining([
-              expect.objectContaining({
-                type: "header",
-                text: expect.objectContaining({
-                  text: "New License Purchase",
-                }),
-              }),
-            ]),
-          }),
-        );
+        expect(sentTexts()).toEqual([
+          "🎉 New license purchase · Buyer: buyer@acme.com · Plan: GROWTH · Seats: 5 · Amount: $149.00",
+        ]);
       });
     });
   });

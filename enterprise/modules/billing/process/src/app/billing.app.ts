@@ -62,6 +62,7 @@ import {
 } from "../eventing/billing-reporting.pipeline.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
 import { fireScenarioCreated } from "../rules/nurturing-feature-adoption-service.rules.ts";
+import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import { resourceLimitCooldown } from "../services/billing-alert-cooldown.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
@@ -210,6 +211,10 @@ export class BillingApp
     stripeSecretKey: billingSecrets.stripeSecretKey,
     stripeWebhookSecret: billingSecrets.stripeWebhookSecret,
     licensePrivateKey: billingSecrets.licensePrivateKey,
+    internalSlackPlanLimitWebhook: billingSecrets.internalSlackPlanLimitWebhook,
+    internalSlackSubscriptionsWebhook: billingSecrets.internalSlackSubscriptionsWebhook,
+    internalSlackSelfHostedWebhook: billingSecrets.internalSlackSelfHostedWebhook,
+    internalSlackSignupsWebhook: billingSecrets.internalSlackSignupsWebhook,
   } as const;
   static readonly reads = ["isSaas", "nodeEnvironment", "mail", "publicBaseUrl"] as const;
 
@@ -217,7 +222,7 @@ export class BillingApp
     const signing = await setup.secrets.into(BillingApp.secrets.stripeWebhookSecret, (secret) =>
       StripeWebhookSignatureService.create(secret),
     );
-    const notices = BillingApp.#composeNotices(setup);
+    const notices = await BillingApp.#composeNotices(setup);
     const licensePurchase = await setup.secrets.into(
       BillingApp.secrets.licensePrivateKey,
       (privateKey) =>
@@ -259,22 +264,34 @@ export class BillingApp
     );
   }
 
-  /** Main's Slack, HubSpot and usage-limit mail notices, over the configured channels. */
-  static #composeNotices(setup: BillingSetup): BillingUsageNoticeService {
-    const { config } = setup;
-    return BillingUsageNoticeService.create({
-      config: {
-        baseHost: setup.members.publicBaseUrl,
-        slackPlanLimitChannel: config.slackPlanLimitChannel,
-        slackSignupsChannel: config.slackSignupsChannel,
-        slackSelfHostedChannel: config.slackSelfHostedChannel,
-        slackSubscriptionsChannel: config.slackSubscriptionsChannel,
-        hubspotPortalId: config.hubspotPortalId,
-        hubspotReachedLimitFormId: config.hubspotReachedLimitFormId,
-        hubspotFormId: config.hubspotFormId,
-      },
-      usageLimitEmail: usageLimitEmailChannels.ses.create(setup.members.mail),
-    });
+  /** Main's Slack, HubSpot and usage-limit mail notices; each Slack webhook is a secret. */
+  static async #composeNotices(setup: BillingSetup): Promise<BillingUsageNoticeService> {
+    const { config, secrets } = setup;
+    const handles = BillingApp.secrets;
+    return secrets.into(handles.stripeSecretKey, (stripeSecretKey) =>
+      secrets.into(handles.internalSlackPlanLimitWebhook, (slackPlanLimitChannel) =>
+        secrets.into(handles.internalSlackSubscriptionsWebhook, (slackSubscriptionsChannel) =>
+          secrets.into(handles.internalSlackSignupsWebhook, (slackSignupsChannel) =>
+            secrets.into(handles.internalSlackSelfHostedWebhook, (slackSelfHostedChannel) =>
+              BillingUsageNoticeService.create({
+                config: {
+                  baseHost: setup.members.publicBaseUrl,
+                  slackPlanLimitChannel,
+                  slackSignupsChannel,
+                  slackSelfHostedChannel,
+                  slackSubscriptionsChannel,
+                  stripeTestMode: isStripeTestModeKey({ secretKey: stripeSecretKey }),
+                  hubspotPortalId: config.hubspotPortalId,
+                  hubspotReachedLimitFormId: config.hubspotReachedLimitFormId,
+                  hubspotFormId: config.hubspotFormId,
+                },
+                usageLimitEmail: usageLimitEmailChannels.ses.create(setup.members.mail),
+              }),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   /** Main's usage-limit warning, sent over the process's mail member. */

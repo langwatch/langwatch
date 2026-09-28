@@ -51,6 +51,11 @@ export interface SsoArrivalJoinRequests {
   }): Promise<SsoArrivalJoinRequestRaised>;
 }
 
+/** Tells our own team somebody signed up through a domain rule; never fatal to the sign-in. */
+export interface SsoArrivalSignupAnnouncement {
+  announce(args: { userName: string; userEmail: string; organizationName: string }): Promise<void>;
+}
+
 export interface SsoArrivalNotifications {
   /** The durable notice an automatic admission owes the administrators. */
   joinedAutomatically(args: {
@@ -59,8 +64,6 @@ export interface SsoArrivalNotifications {
     domain: string;
     admissionId: string;
   }): Promise<void>;
-  /** Tells the team somebody signed up through a domain rule. */
-  announceSignup(args: { userName: string; userEmail: string; organizationName: string }): void;
   /** Starts the nurturing sequence an automatically added member gets. */
   startNurturing(args: {
     userId: string;

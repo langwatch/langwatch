@@ -1,0 +1,968 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`given the Slack notice registry > when billing-threshold-failure / a Stripe re… is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🚨 Annual events billing threshold not set",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Stripe subscription*
+\`sub_1QxAcmeExample\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Reason*
+billing_thresholds.amount_gte must be at least 50",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "text": {
+        "text": ">This subscription will bill its event overage as one renewal invoice until the threshold is applied - re-run the backfill or set it manually.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "billing-threshold-failure_0",
+          "style": "primary",
+          "text": {
+            "text": "Open in Stripe",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://dashboard.stripe.com/subscriptions/sub_1QxAcmeExample",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🚨 Annual events billing threshold not set · Stripe subscription: sub_1QxAcmeExample · Reason: billing_thresholds.amount_gte must be at least 50",
+}
+`;
+
+exports[`given the Slack notice registry > when billing-threshold-failure / in test mode is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🚨 Annual events billing threshold not set",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Stripe subscription*
+\`sub_1QxAcmeExample\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Reason*
+No such price",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "text": {
+        "text": ">This subscription will bill its event overage as one renewal invoice until the threshold is applied - re-run the backfill or set it manually.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "billing-threshold-failure_0",
+          "style": "primary",
+          "text": {
+            "text": "Open in Stripe",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://dashboard.stripe.com/test/subscriptions/sub_1QxAcmeExample",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🚨 Annual events billing threshold not set · Stripe subscription: sub_1QxAcmeExample · Reason: No such price",
+}
+`;
+
+exports[`given the Slack notice registry > when license-purchase / an annual licence is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🎉 New license purchase",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Buyer*
+morgan@acme.example",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Plan*
+ENTERPRISE",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Seats*
+25",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Amount*
+$12,500.00",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🎉 New license purchase · Buyer: morgan@acme.example · Plan: ENTERPRISE · Seats: 25 · Amount: $12,500.00",
+}
+`;
+
+exports[`given the Slack notice registry > when new-user / from a campaign is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "👋 New user registered",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Name*
+Morgan Ellis",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Email*
+morgan@acme.example",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Organization*
+Acme Robotics",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Phone*
++31 20 555 0100",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Campaign*
+launch-week",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "new-user_0",
+          "text": {
+            "text": "Open org in admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/admin#/organizations/organization_acme",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "👋 New user registered · Name: Morgan Ellis · Email: morgan@acme.example · Organization: Acme Robotics · Phone: +31 20 555 0100 · Campaign: launch-week",
+}
+`;
+
+exports[`given the Slack notice registry > when new-user / with only an email is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "👋 New user registered",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Name*
+Unknown",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Email*
+morgan@acme.example",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Organization*
+Unknown",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "👋 New user registered · Name: Unknown · Email: morgan@acme.example · Organization: Unknown",
+}
+`;
+
+exports[`given the Slack notice registry > when plan-limit-reached / monthly traces is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "⚠️ Plan limit reached",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Organization*
+Acme Robotics",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Admin*
+morgan@acme.example",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Plan*
+Free",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Monthly Traces*
+50,000/50,000",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "plan-limit-reached_0",
+          "style": "primary",
+          "text": {
+            "text": "Open org in admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/admin#/organizations/organization_acme",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "⚠️ Plan limit reached · Organization: Acme Robotics · Admin: morgan@acme.example · Plan: Free · Monthly Traces: 50,000/50,000",
+}
+`;
+
+exports[`given the Slack notice registry > when resource-limit-reached / no admin on re… is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "⚠️ Resource limit reached",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Organization*
+Acme Robotics",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Admin*
+unknown",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Plan*
+Free",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*projects*
+3/3",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "resource-limit-reached_0",
+          "style": "primary",
+          "text": {
+            "text": "Open org in admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/admin#/organizations/organization_acme",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "⚠️ Resource limit reached · Organization: Acme Robotics · Admin: unknown · Plan: Free · projects: 3/3",
+}
+`;
+
+exports[`given the Slack notice registry > when resource-limit-reached / team members is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "⚠️ Resource limit reached",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Organization*
+Acme Robotics",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Admin*
+morgan@acme.example",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Plan*
+Free",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*members*
+2/2",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "resource-limit-reached_0",
+          "style": "primary",
+          "text": {
+            "text": "Open org in admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/admin#/organizations/organization_acme",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "⚠️ Resource limit reached · Organization: Acme Robotics · Admin: morgan@acme.example · Plan: Free · members: 2/2",
+}
+`;
+
+exports[`given the Slack notice registry > when self-hosted-signal / a known company is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🌱 A self-hosted install is run by a company we already know",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Company*
+Acme Robotics",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Release*
+3.4.0",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Users*
+14",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Traces, last 28 days*
+482,113",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Instance*
+\`instance_7c1f0e\`",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "self-hosted-signal_0",
+          "style": "primary",
+          "text": {
+            "text": "Open in backoffice",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/backoffice/self-hosted-instances",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🌱 A self-hosted install is run by a company we already know · Company: Acme Robotics · Release: 3.4.0 · Users: 14 · Traces, last 28 days: 482,113 · Instance: instance_7c1f0e",
+}
+`;
+
+exports[`given the Slack notice registry > when self-hosted-signal / nothing reported y… is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🌱 A self-hosted install grew past a team",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Company*
+Unknown",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Release*
+unknown",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Users*
+-",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Traces, last 28 days*
+-",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Instance*
+\`instance_7c1f0e\`",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "self-hosted-signal_0",
+          "style": "primary",
+          "text": {
+            "text": "Open in backoffice",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/backoffice/self-hosted-instances",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🌱 A self-hosted install grew past a team · Company: Unknown · Release: unknown · Users: - · Traces, last 28 days: - · Instance: instance_7c1f0e",
+}
+`;
+
+exports[`given the Slack notice registry > when subscription-activated / a seat plan is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🎉 Subscription activated",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "text": {
+        "text": "*Acme Robotics* is live on *GROWTH_SEAT_EVENT*.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Subscription ID*
+\`subscription_2mNf0QJ7sW1x\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Start date*
+<!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Seats*
+12",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Traces/month*
+200,000",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "subscription-activated_0",
+          "text": {
+            "text": "Open org in admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/admin#/organizations/organization_acme",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🎉 Subscription activated · Acme Robotics is live on GROWTH_SEAT_EVENT. · Subscription ID: subscription_2mNf0QJ7sW1x · Start date: 2026-09-21T14:13Z · Seats: 12 · Traces/month: 200,000",
+}
+`;
+
+exports[`given the Slack notice registry > when subscription-activated / activated just… is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🎉 Subscription activated",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "text": {
+        "text": "*Acme Robotics* is live on *LAUNCH*.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Subscription ID*
+\`subscription_2mNf0QJ7sW1x\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Start date*
+Now",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Seats*
+-",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Traces/month*
+-",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "subscription-activated_0",
+          "text": {
+            "text": "Open org in admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/admin#/organizations/organization_acme",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🎉 Subscription activated · Acme Robotics is live on LAUNCH. · Subscription ID: subscription_2mNf0QJ7sW1x · Start date: Now · Seats: - · Traces/month: -",
+}
+`;
+
+exports[`given the Slack notice registry > when subscription-cancelled / cancelled is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "📉 Subscription cancelled",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "text": {
+        "text": "*Acme Robotics* has cancelled *GROWTH_SEAT_EVENT*.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Subscription ID*
+\`subscription_2mNf0QJ7sW1x\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Cancellation date*
+<!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "subscription-cancelled_0",
+          "text": {
+            "text": "Open org in admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/admin#/organizations/organization_acme",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "📉 Subscription cancelled · Acme Robotics has cancelled GROWTH_SEAT_EVENT. · Subscription ID: subscription_2mNf0QJ7sW1x · Cancellation date: 2026-09-21T14:13Z",
+}
+`;
+
+exports[`given the Slack notice registry > when subscription-prospective / from an unna… is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🌱 Prospective subscription interest",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "text": {
+        "text": "Triggered by a team member",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Organization*
+Acme Robotics",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Plan*
+LAUNCH",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Customer*
+Unknown",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "subscription-prospective_0",
+          "style": "primary",
+          "text": {
+            "text": "Open org in admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/admin#/organizations/organization_acme",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🌱 Prospective subscription interest · Triggered by a team member · Organization: Acme Robotics · Plan: LAUNCH · Customer: Unknown",
+}
+`;
+
+exports[`given the Slack notice registry > when subscription-prospective / with a note is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🌱 Prospective subscription interest",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "text": {
+        "text": "Triggered by Morgan Ellis",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Organization*
+Acme Robotics",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Plan*
+GROWTH_SEAT_EVENT",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Customer*
+Morgan Ellis",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "text": {
+        "text": ">Asked about annual billing for 40 seats.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "subscription-prospective_0",
+          "style": "primary",
+          "text": {
+            "text": "Open org in admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/admin#/organizations/organization_acme",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🌱 Prospective subscription interest · Triggered by Morgan Ellis · Organization: Acme Robotics · Plan: GROWTH_SEAT_EVENT · Customer: Morgan Ellis",
+}
+`;

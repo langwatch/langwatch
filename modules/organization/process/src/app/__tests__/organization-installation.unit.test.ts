@@ -11,6 +11,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { RoleApi } from "@langwatch/role-contract";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import type { ShareApi } from "@langwatch/share-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import type { UserApi } from "@langwatch/user-contract";
@@ -25,7 +26,8 @@ import { organizationServer } from "../../organization.server.ts";
  * is still being constructed is refused before boot returns, so it shows here.
  */
 function process(role: "api" | "worker") {
-  return createApp({ role })
+  const secrets = SecretsResolver.over(SecretsChain.start({ environment: {} }));
+  return createApp({ role, secrets: (owner, declared) => secrets.scopeTo(owner, declared) })
     .withModules([withMemoryRepositories(organizationServer)])
     .withMembers({
       encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },

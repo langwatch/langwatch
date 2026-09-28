@@ -19,6 +19,7 @@ const log = vi.hoisted(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), de
 vi.mock("@langwatch/observability", () => ({ createLogger: () => log }));
 
 import { SsoConnectionReadRepository } from "../../repositories/sso-connection.repository.ts";
+import type { SsoArrivalSignupAnnouncement } from "../../rules/sso-arrival-contract.rules.ts";
 import { SsoArrivalService } from "../sso-arrival.service.ts";
 
 /** Only the one read an arrival makes; the other two are never reached here. */
@@ -120,7 +121,7 @@ function serviceOver({
     );
   const findOrganization = vi.fn().mockResolvedValue(ORG);
   const joinedAutomatically = vi.fn<() => Promise<void>>().mockResolvedValue();
-  const announceSignup = vi.fn();
+  const announceSignup = vi.fn<SsoArrivalSignupAnnouncement["announce"]>().mockResolvedValue();
   const startNurturing = vi.fn();
   const adopt = vi.fn<() => Promise<void>>().mockResolvedValue();
 
@@ -138,7 +139,8 @@ function serviceOver({
       authz,
       memberships: { isMember, createMembership, applyPendingInvite, findOrganization },
       joinRequests: { requestFromSsoArrival },
-      notifications: { joinedAutomatically, announceSignup, startNurturing },
+      notifications: { joinedAutomatically, startNurturing },
+      signups: { announce: announceSignup },
       adoption: { adopt },
     }),
     isMember,
@@ -364,10 +366,17 @@ describe("given a domain-matched organization to join", () => {
     });
   });
 
+  /** @scenario "Joining through a domain or an SSO connection is announced too" */
   it("makes them a MEMBER, grants the organization scope and announces it", async () => {
     const parts = serviceOver({ row: connection() });
 
     await parts.service.joinOrganization({ user: USER, org: ORG, domain: "acme.com" });
+
+    expect(parts.announceSignup).toHaveBeenCalledWith({
+      userName: USER.name,
+      userEmail: USER.email,
+      organizationName: ORG.name,
+    });
 
     expect(parts.createMembership).toHaveBeenCalledWith({
       userId: USER.id,
@@ -381,6 +390,16 @@ describe("given a domain-matched organization to join", () => {
       organizationId: ORG.id,
       organizationName: ORG.name,
     });
+  });
+
+  it("still admits them when the sign-up announcement cannot be posted", async () => {
+    const parts = serviceOver({ row: connection() });
+    parts.announceSignup.mockRejectedValue(new Error("slack down"));
+
+    await expect(
+      parts.service.joinOrganization({ user: USER, org: ORG, domain: "acme.com" }),
+    ).resolves.toBeUndefined();
+    expect(parts.createMembership).toHaveBeenCalledTimes(1);
   });
 
   it("re-asserts the grant when a concurrent callback already wrote the row", async () => {

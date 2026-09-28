@@ -160,6 +160,46 @@
       },
     },
     {
+      // Customer-configured Slack never uses our own notice templates (Alex, 2026-09-28).
+      "files": ["modules/automation/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@langwatch/internal-slack",
+                "message": "Internal Slack is for messages LangWatch sends itself; customer Slack stays in automation's channels.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // Repeats both entries: a later override replaces the rule's options for the files it matches.
+      "files": ["modules/automation/process/src/**"],
+      "excludeFiles": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@langwatch/api/rest",
+                "importNames": ["RestErrorHandler", "jsonResponse", "rateLimitedResponse"],
+                "message": "Delete it and throw a HandledError from the handler; the mount serialises every response.",
+              },
+              {
+                "name": "@langwatch/internal-slack",
+                "message": "Internal Slack is for messages LangWatch sends itself; customer Slack stays in automation's channels.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
       // A module's contract and process export the shapes other modules call.
       "files": [
         "modules/*/contract/src/**",

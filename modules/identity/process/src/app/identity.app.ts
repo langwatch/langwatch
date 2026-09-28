@@ -1,8 +1,3 @@
-/**
- * The identity feature's application: guards, ledger writer, backfill,
- * newborn sweep, join-request/SSO-connection/directory-sync guards — every
- * capability crossing a package boundary today (ADR-101, 115, 116, 117).
- */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
@@ -43,8 +38,15 @@ import {
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { EmailDelivery } from "@langwatch/mail";
+/**
+ * The identity feature's application: guards, ledger writer, backfill,
+ * newborn sweep, join-request/SSO-connection/directory-sync guards — every
+ * capability crossing a package boundary today (ADR-101, 115, 116, 117).
+ */
+import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
+import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
@@ -52,6 +54,7 @@ import { UserApi } from "@langwatch/user-contract";
 import { addressConfirmationMailChannels } from "../channels/address-confirmation-mail-channels.registry.ts";
 import { joinRequestNotificationMailChannels } from "../channels/join-request-notification-mail-channels.registry.ts";
 import { organizationMfaRequirementMailChannels } from "../channels/organization-mfa-requirement-mail-channels.registry.ts";
+import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
 import { LoggedSsoBreakGlassWarningChannel } from "../channels/sso-break-glass-warning.channel.ts";
 import {
   ssoDomainProofChannels,
@@ -116,6 +119,7 @@ import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { SignInAccountLookupService } from "../services/signin-account-lookup.service.ts";
 import { SignInRouterService } from "../services/signin-router.service.ts";
+import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
 import { SsoArrivalAdoptionService } from "../services/sso-arrival-adoption.service.ts";
 import { SsoArrivalService } from "../services/sso-arrival.service.ts";
 import { SsoAssertionService } from "../services/sso-assertion.service.ts";
@@ -418,8 +422,19 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     "adminEmails",
     "publicBaseUrl",
   ] as const;
+  /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and auth. */
+  static readonly secrets = { internalSlackSignupsWebhook } as const;
 
-  static create(setup: IdentitySetup): IdentityApp {
+  static async create(setup: IdentitySetup): Promise<IdentityApp> {
+    const signupAnnouncements = await setup.secrets.into(
+      IdentityApp.secrets.internalSlackSignupsWebhook,
+      (webhookUrl) =>
+        SignupAnnouncementService.create({
+          channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
+          publicBaseUrl: setup.members.publicBaseUrl,
+          logger: createLogger("langwatch:identity:signup-announcement"),
+        }),
+    );
     const engineProviders = SsoEngineProviderService.create({
       credentials: setup.repositories.ssoCredentials,
       rows: setup.repositories.ssoEngineProviders,
@@ -567,6 +582,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       memberships: arrivalMemberships(setup.dependencies.organizations),
       authz: setup.dependencies.permissions,
       adoption: SsoArrivalAdoptionService.create(backfill),
+      signups: signupAnnouncements,
     });
     const ssoTestArrival = SsoTestArrivalService.create({
       accounts: testArrivalAccounts(setup.dependencies.auth),

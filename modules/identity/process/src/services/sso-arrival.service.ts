@@ -16,6 +16,7 @@ import type {
   SsoArrivalJoinRequests,
   SsoArrivalMemberships,
   SsoArrivalNotifications,
+  SsoArrivalSignupAnnouncement,
 } from "../rules/sso-arrival-contract.rules.ts";
 
 const logger = createLogger("langwatch:identity:sso-arrival");
@@ -35,6 +36,8 @@ export interface SsoArrivalServiceDeps {
   /** Absent leaves an admission silent: it still happens, and the notice it
    *  owes is logged rather than sent. */
   notifications?: SsoArrivalNotifications;
+  /** Absent leaves a domain sign-up unannounced in our own Slack. */
+  signups?: SsoArrivalSignupAnnouncement;
 }
 
 /**
@@ -301,11 +304,11 @@ export class SsoArrivalService {
         : "Auto-added new user to SSO organization (default MEMBER)",
     );
 
-    this.deps.notifications?.announceSignup({
-      userName: user.name,
-      userEmail: user.email,
-      organizationName: org.name,
-    });
+    void this.deps.signups
+      ?.announce({ userName: user.name, userEmail: user.email, organizationName: org.name })
+      .catch((error: unknown) =>
+        logger.error({ error, organizationId: org.id }, "the sign-up announcement was not posted"),
+      );
 
     this.deps.notifications?.startNurturing({
       userId: user.id,

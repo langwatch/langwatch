@@ -6,6 +6,7 @@ export { Secret, SecretHandle, type SecretSchema } from "./secret.ts";
 export {
   credentialsSecret,
   gatewayInternalSecret,
+  internalSlackSignupsWebhook,
   openAiApiKey,
   sessionSecret,
   signInProviderSecrets,

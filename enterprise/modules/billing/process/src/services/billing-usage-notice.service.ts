@@ -6,8 +6,19 @@ import type {
   SignupNotificationPayload,
   SubscriptionNotificationPayload,
 } from "@langwatch/enterprise-billing-contract";
+import {
+  billingThresholdFailureNotice,
+  licensePurchaseNotice,
+  planLimitReachedNotice,
+  resourceLimitReachedNotice,
+  selfHostedSignalNotice,
+  subscriptionActivatedNotice,
+  subscriptionCancelledNotice,
+  subscriptionProspectiveNotice,
+  type NoticeOrigin,
+} from "@langwatch/internal-slack";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
 
 import { billingSlackChannels } from "../channels/billing-slack-channels.registry.ts";
 import type {
@@ -20,16 +31,8 @@ import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.
 import type { UsageLimitEmailChannel } from "../channels/usage-limit-email.channel.ts";
 import {
   type HubspotFormBody,
-  billingThresholdFailureText,
-  cancelledBlocks,
-  confirmedBlocks,
   hubspotFormUrl,
-  licensePurchaseBlocks,
-  planLimitAlertText,
   planLimitFormBody,
-  prospectiveBlocks,
-  resourceLimitAlertText,
-  signupAlertText,
   signupFormBody,
 } from "../rules/billing-usage-notice-copy.rules.ts";
 import {
@@ -69,6 +72,8 @@ type NotificationServiceOptions = {
     slackSignupsChannel?: string;
     slackSelfHostedChannel?: string;
     slackSubscriptionsChannel?: string;
+    /** Stripe links open the test dashboard. */
+    stripeTestMode?: boolean;
     hubspotPortalId?: string;
     hubspotReachedLimitFormId?: string;
     hubspotFormId?: string;
@@ -123,14 +128,23 @@ export class NotificationService {
     return `${this.config.baseHost ?? DEFAULT_APP_URL}/admin#/organizations/${organizationId}`;
   }
 
+  /** Where and when a notice was sent, for its footer. */
+  private origin(): NoticeOrigin {
+    return {
+      environment: new URL(this.config.baseHost ?? DEFAULT_APP_URL).host,
+      sentAt: nowInstant().epochMilliseconds,
+    };
+  }
+
+  /** The notice is built inside the try: a refused prop is reported like a failed send. */
   private async sendSlackMessage({
     channelUrl,
-    body,
+    message,
     missingConfigLog,
     errorLog,
   }: {
     channelUrl?: string;
-    body: BillingSlackMessage;
+    message: (origin: NoticeOrigin) => BillingSlackMessage;
     missingConfigLog?: string;
     errorLog: string;
   }): Promise<void> {
@@ -143,7 +157,7 @@ export class NotificationService {
     }
 
     try {
-      await this.slack.send({ webhookUrl: channelUrl, message: body });
+      await this.slack.send({ webhookUrl: channelUrl, message: message(this.origin()) });
     } catch (error) {
       logger.error({ error }, errorLog);
       this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
@@ -189,7 +203,8 @@ export class NotificationService {
   async sendSlackPlanLimitAlert(context: PlanLimitNotificationContext): Promise<void> {
     await this.sendSlackMessage({
       channelUrl: this.config.slackPlanLimitChannel,
-      body: { text: planLimitAlertText(context) },
+      message: (origin) =>
+        planLimitReachedNotice.render({ props: this.limitProps(context), origin }),
       errorLog: "Failed to send Slack plan-limit notification",
     });
   }
@@ -200,7 +215,8 @@ export class NotificationService {
   async sendSlackResourceLimitAlert(context: ResourceLimitNotificationContext): Promise<void> {
     await this.sendSlackMessage({
       channelUrl: this.config.slackPlanLimitChannel,
-      body: { text: resourceLimitAlertText(context) },
+      message: (origin) =>
+        resourceLimitReachedNotice.render({ props: this.limitProps(context), origin }),
       errorLog: "Failed to send Slack resource-limit notification",
     });
   }
@@ -218,7 +234,15 @@ export class NotificationService {
   }): Promise<void> {
     await this.sendSlackMessage({
       channelUrl: this.config.slackSubscriptionsChannel,
-      body: { text: billingThresholdFailureText({ stripeSubscriptionId, reason }) },
+      message: (origin) =>
+        billingThresholdFailureNotice.render({
+          props: {
+            stripeSubscriptionId,
+            reason,
+            stripeTestMode: this.config.stripeTestMode ?? false,
+          },
+          origin,
+        }),
       missingConfigLog:
         "SLACK_CHANNEL_SUBSCRIPTIONS is not configured; skipping billing-threshold failure alert",
       errorLog: "Failed to send Slack billing-threshold failure notification",
@@ -226,37 +250,52 @@ export class NotificationService {
   }
 
   /**
-   * Sends a Slack notification for subscription events (prospective or confirmed).
+   * Sends a Slack notification for subscription events (prospective, confirmed or cancelled).
    */
   async sendSlackSubscriptionEvent(payload: SubscriptionNotificationPayload): Promise<void> {
-    const adminLink = this.getAdminLink(payload.organizationId);
-
-    let blocks: BillingSlackMessage["blocks"];
-    switch (payload.type) {
-      case "prospective":
-        blocks = prospectiveBlocks({ payload, adminLink });
-        break;
-      case "confirmed":
-        blocks = confirmedBlocks({
-          payload,
-          adminLink,
-          startDateText: NotificationService.formatDate(payload.startDate),
-          seatsText: NotificationService.formatNumber(payload.maxMembers),
-          messagesPerMonthText: NotificationService.formatNumber(payload.maxMessagesPerMonth),
-        });
-        break;
-      case "cancelled":
-        blocks = cancelledBlocks({
-          payload,
-          adminLink,
-          cancellationDateText: NotificationService.formatDate(payload.cancellationDate),
-        });
-        break;
-    }
+    const adminUrl = this.getAdminLink(payload.organizationId);
 
     await this.sendSlackMessage({
       channelUrl: this.config.slackSubscriptionsChannel,
-      body: { blocks },
+      message: (origin) => {
+        switch (payload.type) {
+          case "prospective":
+            return subscriptionProspectiveNotice.render({
+              props: {
+                organizationName: payload.organizationName,
+                plan: payload.plan,
+                customerName: payload.customerName,
+                note: payload.note,
+                adminUrl,
+              },
+              origin,
+            });
+          case "confirmed":
+            return subscriptionActivatedNotice.render({
+              props: {
+                organizationName: payload.organizationName,
+                plan: payload.plan,
+                subscriptionId: payload.subscriptionId,
+                startedAt: payload.startDate?.epochMilliseconds,
+                seats: payload.maxMembers,
+                tracesPerMonth: payload.maxMessagesPerMonth,
+                adminUrl,
+              },
+              origin,
+            });
+          case "cancelled":
+            return subscriptionCancelledNotice.render({
+              props: {
+                organizationName: payload.organizationName,
+                plan: payload.plan,
+                subscriptionId: payload.subscriptionId,
+                cancelledAt: payload.cancellationDate?.epochMilliseconds,
+                adminUrl,
+              },
+              origin,
+            });
+        }
+      },
       missingConfigLog:
         "SLACK_CHANNEL_SUBSCRIPTIONS is not configured; skipping subscription notification",
       errorLog: "Failed to send Slack subscription notification",
@@ -264,71 +303,29 @@ export class NotificationService {
   }
 
   /**
-   * Sends a Slack notification for a new signup.
-   */
-  async sendSlackSignupEvent(payload: SignupNotificationPayload): Promise<void> {
-    await this.sendSlackMessage({
-      channelUrl: this.config.slackSignupsChannel,
-      body: { text: signupAlertText(payload) },
-      missingConfigLog: "SLACK_CHANNEL_SIGNUPS is not configured; skipping signup notification",
-      errorLog: "Failed to send Slack signup notification",
-    });
-  }
-
-  /**
    * Sends a Slack notification for a license purchase.
    */
   async sendSlackLicensePurchase(payload: LicensePurchaseNotificationPayload): Promise<void> {
-    const amountFormatted = new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: payload.currency,
-    }).format(payload.amountPaid / 100);
-
     await this.sendSlackMessage({
       channelUrl: this.config.slackSubscriptionsChannel,
-      body: {
-        text: "New License Purchase",
-        blocks: licensePurchaseBlocks({ payload, amountFormatted }),
-      },
+      message: (origin) => licensePurchaseNotice.render({ props: payload, origin }),
       errorLog: "Failed to send Slack license purchase notification",
     });
   }
 
   /** A self-hosted lead signal; falls back to the signups channel when unset. */
   async sendSlackSelfHostedSignal(payload: SelfHostedSignalNotificationPayload): Promise<void> {
-    const company = payload.organizationName ?? payload.leadingDomain ?? "Unknown";
-    const fields: { type: "mrkdwn"; text: string }[] = [
-      { type: "mrkdwn", text: `*Company:*\n${company}` },
-      { type: "mrkdwn", text: `*Release:*\n${payload.version ?? "unknown"}` },
-      { type: "mrkdwn", text: `*Users:*\n${NotificationService.formatNumber(payload.users)}` },
-      {
-        type: "mrkdwn",
-        text: `*Traces, last 28 days:*\n${NotificationService.formatNumber(payload.traces28d)}`,
-      },
-    ];
-
     await this.sendSlackMessage({
       channelUrl: this.config.slackSelfHostedChannel ?? this.config.slackSignupsChannel,
-      body: {
-        text: payload.headline,
-        blocks: [
-          { type: "header", text: { type: "plain_text", text: payload.headline } },
-          { type: "section", fields },
-          {
-            type: "context",
-            elements: [
-              {
-                type: "mrkdwn",
-                text: `<${payload.instanceUrl}|Open in backoffice> · instance \`${payload.instanceId}\``,
-              },
-            ],
-          },
-        ],
-      },
+      message: (origin) => selfHostedSignalNotice.render({ props: payload, origin }),
       missingConfigLog:
         "Neither SLACK_CHANNEL_SELF_HOSTED nor SLACK_CHANNEL_SIGNUPS is configured; skipping self-hosted signal",
       errorLog: "Failed to send Slack self-hosted signal notification",
     });
+  }
+
+  private limitProps(context: PlanLimitNotificationContext | ResourceLimitNotificationContext) {
+    return { ...context, adminUrl: this.getAdminLink(context.organizationId) };
   }
 
   // -------------------------------------------------------------------------
@@ -394,18 +391,5 @@ export class NotificationService {
       logger.error({ error }, errorLog);
       this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
     }
-  }
-
-  private static formatNumber(value?: number | null) {
-    return typeof value === "number" ? value.toLocaleString() : "-";
-  }
-
-  private static formatDate(value?: Instant | null) {
-    return value
-      ? new Intl.DateTimeFormat("en-US", {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }).format(toDate(value))
-      : "Now";
   }
 }

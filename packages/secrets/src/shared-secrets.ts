@@ -22,6 +22,12 @@ export const virtualKeyPepper = Secret.load("LW_VIRTUAL_KEY_PEPPER", { optional:
  */
 export const openAiApiKey = Secret.load("OPENAI_API_KEY", { optional: true });
 
+/**
+ * LangWatch's own sign-ups Slack webhook, never a customer's: organization,
+ * auth and identity announce there; billing falls back to it.
+ */
+export const internalSlackSignupsWebhook = Secret.load("SLACK_CHANNEL_SIGNUPS", { optional: true });
+
 /** Each sign-in provider's client secret: auth mounts them, sso reports whether one mounted. */
 export const signInProviderSecrets = {
   googleClientSecret: Secret.load("GOOGLE_CLIENT_SECRET", { optional: true }),

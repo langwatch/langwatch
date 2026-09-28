@@ -175,6 +175,9 @@ document, is the authority on filenames):
   subject, per-tier implementations, a memory twin each, a registry offering
   `{ live, memory }`. Repository = owned state; channel = unowned messages;
   service = behaviour over both.
+  Messages to ourselves are `@langwatch/internal-slack` templates sent through
+  the owning module's Slack channel. Slack a customer configures stays in
+  automation's channels and never uses this package (Alex, 2026-09-28).
 - `eventing/` — one folder: the pipeline and everything it names (§9).
 - `transport/` — declarations only (§8).
 - `rules/` — pure functions and constants; no clock, no I/O. Value types (data
