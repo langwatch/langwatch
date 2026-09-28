@@ -413,6 +413,61 @@ export class TriggerFilterQueryInvalidError extends HandledError {
   }
 }
 
+/** A keyed condition written as a bare list, e.g. `evaluations.passed` with no
+ *  monitor. It names nothing to select by, so it would match no trace. */
+export class TriggerFilterKeyRequiredError extends HandledError {
+  declare readonly code: "trigger_filter_key_required";
+
+  constructor({ field, example }: { field: string; example: string }) {
+    super(
+      "trigger_filter_key_required",
+      `The "${field}" condition needs a key, so a bare list matches nothing. ` +
+        `Write it nested: ${example}`,
+      {
+        meta: { field: "filters", filterField: field, example },
+        httpStatus: 422,
+      },
+    );
+    this.name = "TriggerFilterKeyRequiredError";
+  }
+}
+
+/** An evaluation condition keyed by an Evaluator's id. Results carry the id of
+ *  the monitor that ran, so it would never match; the monitors using that
+ *  evaluator are named so the caller can key by one of them. */
+export class TriggerFilterMonitorRequiredError extends HandledError {
+  declare readonly code: "trigger_filter_monitor_required";
+
+  constructor({
+    field,
+    evaluatorId,
+    monitorIds,
+  }: {
+    field: string;
+    evaluatorId: string;
+    monitorIds: string[];
+  }) {
+    const remedy =
+      monitorIds.length > 0
+        ? `Key it by a monitor that runs it instead: ${monitorIds
+            .map((id) => `"${id}"`)
+            .join(", ")}.`
+        : "No monitor in this project runs it yet; add one and key the " +
+          "condition by the monitor's id.";
+    super(
+      "trigger_filter_monitor_required",
+      `The "${field}" condition is keyed by "${evaluatorId}", which is an ` +
+        "evaluator, not a monitor. Evaluation results carry the id of the " +
+        `monitor that ran, so it would match nothing. ${remedy}`,
+      {
+        meta: { field: "filters", filterField: field, evaluatorId, monitorIds },
+        httpStatus: 422,
+      },
+    );
+    this.name = "TriggerFilterMonitorRequiredError";
+  }
+}
+
 /**
  * A webhook automation's destination changed in the same save that asked to
  * keep the stored header values.

@@ -15660,6 +15660,45 @@
             "project_api_key": []
           }
         ]
+      },
+      "get": {
+        "operationId": "getApiDatasetBySlugEntries",
+        "description": "List entries of a dataset (paginated). Same as GET /:slugOrId/records.",
+        "responses": {},
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 50
+            }
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slug",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/{slugOrId}": {
@@ -55368,6 +55407,12 @@
                               "type": "string"
                             }
                           },
+                          "inconclusiveCriteria": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
                           "error": {
                             "type": "string"
                           },
@@ -76270,47 +76315,64 @@
     "/api/triggers/{id}/fires": {
       "get": {
         "operationId": "getApiTriggersByIdFires",
-        "description": "What this automation has done: its fires, newest first. Metadata only — no trace ids and no trace content.",
+        "description": "What this automation has done: its fires, newest first. Metadata only — no trace ids and no trace content. Send `nextCursor` back as `cursor` to read the page after this one.",
         "responses": {
           "200": {
             "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "triggerId": {
-                        "type": "string"
-                      },
-                      "customGraphId": {
-                        "type": [
-                          "string",
-                          "null"
+                  "type": "object",
+                  "properties": {
+                    "fires": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "triggerId": {
+                            "type": "string"
+                          },
+                          "customGraphId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "firedAt": {
+                            "type": "string"
+                          },
+                          "resolvedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "triggerId",
+                          "customGraphId",
+                          "firedAt",
+                          "resolvedAt"
                         ]
                       },
-                      "firedAt": {
-                        "type": "string"
-                      },
-                      "resolvedAt": {
-                        "type": [
-                          "string",
-                          "null"
-                        ]
-                      }
+                      "description": "One page of fires, newest first."
                     },
-                    "required": [
-                      "id",
-                      "triggerId",
-                      "customGraphId",
-                      "firedAt",
-                      "resolvedAt"
-                    ]
-                  }
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Pass as `cursor` to read the page after this one. Null on the last page."
+                    }
+                  },
+                  "required": [
+                    "fires",
+                    "nextCursor"
+                  ]
                 }
               }
             }
@@ -76431,6 +76493,14 @@
               "maximum": 100,
               "default": 20
             }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            },
+            "description": "The `nextCursor` from the previous page. Omit for the newest fires."
           },
           {
             "schema": {

@@ -669,11 +669,64 @@ describe("Feature: automations over the public API express what the dashboard ex
       );
 
       expect(response.status).toBe(200);
-      const fires = (await response.json()) as { firedAt: string }[];
+      const { fires, nextCursor } = (await response.json()) as {
+        fires: { firedAt: string }[];
+        nextCursor: string | null;
+      };
       expect(fires).toHaveLength(2);
+      expect(nextCursor).toBeNull();
       expect(new Date(fires[0]!.firedAt).getTime()).toBeGreaterThan(
         new Date(fires[1]!.firedAt).getTime(),
       );
+    });
+
+    /** @scenario "Fire history pages over the API" */
+    it("walks back a page at a time with the cursor it hands out", async () => {
+      const created = await emailAutomation(`Pages ${ns}`);
+      await prisma.triggerSent.createMany({
+        data: [0, 1, 2].map((age) => ({
+          triggerId: created.id,
+          projectId: projectId(),
+          traceId: `trace-page-${age}-${ns}`,
+          createdAt: new Date(Date.now() - age * 60_000),
+        })),
+      });
+
+      const first = await app.request(
+        `/api/triggers/${created.id}/fires?limit=2`,
+        { headers: headers() },
+      );
+      const firstPage = (await first.json()) as {
+        fires: { id: string }[];
+        nextCursor: string | null;
+      };
+      expect(firstPage.fires).toHaveLength(2);
+      expect(firstPage.nextCursor).toEqual(expect.any(String));
+
+      const second = await app.request(
+        `/api/triggers/${created.id}/fires?limit=2&cursor=${firstPage.nextCursor}`,
+        { headers: headers() },
+      );
+      const secondPage = (await second.json()) as {
+        fires: { id: string }[];
+        nextCursor: string | null;
+      };
+      expect(secondPage.fires).toHaveLength(1);
+      expect(secondPage.nextCursor).toBeNull();
+      expect(firstPage.fires.map((fire) => fire.id)).not.toContain(
+        secondPage.fires[0]!.id,
+      );
+    });
+
+    it("refuses a cursor it did not issue", async () => {
+      const created = await emailAutomation(`Bad cursor ${ns}`);
+
+      const response = await app.request(
+        `/api/triggers/${created.id}/fires?cursor=not-a-cursor`,
+        { headers: headers() },
+      );
+
+      expect(response.status).toBe(422);
     });
   });
 

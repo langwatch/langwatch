@@ -29,6 +29,11 @@ import {
   findSlackBotToken,
   slackProjectTokenReader,
 } from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
+import { TriggerFilterValidationService } from "~/server/app-layer/automations/trigger-filter-validation.service";
+import {
+  decodeTriggerFireCursor,
+  encodeTriggerFireCursor,
+} from "~/server/app-layer/automations/trigger-fire-cursor";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
 import {
   redactTriggerForPublicApi,
@@ -418,6 +423,16 @@ const fireSchema = z.object({
   resolvedAt: z.string().nullable(),
 });
 
+const firePageSchema = z.object({
+  fires: z.array(fireSchema).describe("One page of fires, newest first."),
+  nextCursor: z
+    .string()
+    .nullable()
+    .describe(
+      "Pass as `cursor` to read the page after this one. Null on the last page.",
+    ),
+});
+
 const testFireSchema = z.object({
   channel: z.enum(["email", "slack", "webhook"]),
   recipientCount: z.number(),
@@ -504,6 +519,7 @@ const triggerService = () =>
   new PublicApiTriggerService(getApp().triggers, {
     graphs: AutomationCustomGraphService.create(prisma),
     fireHistory: TriggerFireHistoryService.create(prisma),
+    filterValidation: TriggerFilterValidationService.create(prisma),
     testFire: (input) => getApp().triggerTemplates.testFire(input),
     // ADR-093 §5: a test fire proves the same connection a real delivery would
     // use — the automation's own token first, the project integration second.
@@ -617,13 +633,14 @@ secured.access(requires("triggers:view")).get(
   describeRoute({
     description:
       "What this automation has done: its fires, newest first. Metadata only — " +
-      "no trace ids and no trace content.",
+      "no trace ids and no trace content. Send `nextCursor` back as `cursor` " +
+      "to read the page after this one.",
     responses: {
       ...baseResponses,
       200: {
         description: "Success",
         content: {
-          "application/json": { schema: resolver(z.array(fireSchema)) },
+          "application/json": { schema: resolver(firePageSchema) },
         },
       },
       404: {
@@ -638,28 +655,43 @@ secured.access(requires("triggers:view")).get(
     "query",
     z.object({
       limit: z.coerce.number().int().min(1).max(100).default(20),
+      cursor: z
+        .string()
+        .optional()
+        .refine(
+          (cursor) =>
+            cursor === undefined || decodeTriggerFireCursor(cursor) !== null,
+          { message: "Not a cursor this endpoint issued." },
+        )
+        .describe(
+          "The `nextCursor` from the previous page. Omit for the newest fires.",
+        ),
     }),
   ),
   async (c) => {
     const project = c.get("project");
     const { id } = c.req.param();
-    const { limit } = c.req.valid("query");
+    const { limit, cursor } = c.req.valid("query");
 
-    const fires = await triggerService().getFireHistory({
+    const page = await triggerService().getFireHistory({
       projectId: project.id,
       triggerId: id,
       limit,
+      cursor: cursor === undefined ? null : decodeTriggerFireCursor(cursor),
     });
 
-    return c.json(
-      fires.map((fire) => ({
+    return c.json({
+      fires: page.fires.map((fire) => ({
         id: fire.id,
         triggerId: fire.triggerId,
         customGraphId: fire.customGraphId,
         firedAt: fire.createdAt.toISOString(),
         resolvedAt: fire.resolvedAt ? fire.resolvedAt.toISOString() : null,
       })),
-    );
+      nextCursor: page.nextCursor
+        ? encodeTriggerFireCursor(page.nextCursor)
+        : null,
+    });
   },
 );
 

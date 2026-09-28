@@ -35,6 +35,8 @@ describe("Feature: the project's Slack integration", () => {
   const storeSlackAutomation = (params: {
     slackBotToken?: string;
     channelId?: string;
+    slackDelivery?: "bot" | "webhook";
+    active?: boolean;
   }) =>
     prisma.trigger.create({
       data: {
@@ -42,8 +44,9 @@ describe("Feature: the project's Slack integration", () => {
         name: `Slack automation ${nanoid(4)}`,
         projectId: projectId(),
         action: TriggerAction.SEND_SLACK_MESSAGE,
+        active: params.active ?? true,
         actionParams: {
-          slackDelivery: "bot",
+          slackDelivery: params.slackDelivery ?? "bot",
           slackChannelId: params.channelId ?? "C0123",
           ...(params.slackBotToken
             ? { slackBotToken: params.slackBotToken }
@@ -180,6 +183,19 @@ describe("Feature: the project's Slack integration", () => {
       });
 
       expect(dependents).toBe(0);
+    });
+
+    /** @scenario "Removing the connection reports how many automations stop delivering" */
+    it("leaves incoming-webhook and paused automations out of the count", async () => {
+      await storeSlackAutomation({});
+      await storeSlackAutomation({ slackDelivery: "webhook" });
+      await storeSlackAutomation({ active: false });
+
+      const dependents = await repo.countAllDeliveringThroughIntegration({
+        projectId: projectId(),
+      });
+
+      expect(dependents).toBe(1);
     });
 
     /** @scenario "Switching a legacy automation to the project integration" */

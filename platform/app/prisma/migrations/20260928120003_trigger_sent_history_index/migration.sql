@@ -1,13 +1,41 @@
 -- Backs the fire-history keyset walk (trigger-fire-history.prisma.repository):
 -- WHERE "projectId" = ? AND "triggerId" = ? (plus the cursor predicate)
--- ORDER BY "createdAt" DESC, "id" DESC — a backward scan over this index.
+-- ORDER BY "createdAt" DESC, "id" DESC - a backward scan over this index.
 --
--- LOCKING NOTE: plain `CREATE INDEX` takes a SHARE lock on "TriggerSent" —
--- reads keep working, fire writes block until the build finishes. The table
--- holds one row per delivered fire, so the build is a brief single heap read
--- during deploy. `CREATE INDEX CONCURRENTLY` would avoid the pause but cannot
--- run inside a transaction, which the Prisma migration setup requires.
-CREATE INDEX "TriggerSent_projectId_triggerId_createdAt_id_idx" ON "TriggerSent"("projectId", "triggerId", "createdAt", "id");
+-- How big the table is: "TriggerSent" is not one row per delivered fire. Every
+-- trace an automation matches is claimed with a row (claimSend, unique on
+-- triggerId + traceId) before any cadence or digest decides whether to send,
+-- and graph alerts add one row per incident. It grows with matched traces, so
+-- on a busy project it is the largest automation table by far.
+--
+-- IF NOT EXISTS is deliberate, as in 20260831120000_grant_role_key_live_index.
+-- A deployment with a large "TriggerSent" should build this ahead of the
+-- release, outside Prisma's transaction, where CONCURRENTLY can run:
+--   CREATE INDEX CONCURRENTLY "TriggerSent_projectId_triggerId_createdAt_id_idx"
+--     ON "TriggerSent" ("projectId", "triggerId", "createdAt", "id");
+-- and this statement then becomes the no-op that records the same intent.
+--
+-- The trap in that path: a CREATE INDEX CONCURRENTLY that FAILS leaves an
+-- invalid index under this exact name, IF NOT EXISTS then skips, and the
+-- planner never uses an invalid index. Anyone taking the concurrent path must
+-- check
+--   SELECT indisvalid FROM pg_index WHERE indexrelid =
+--     '"TriggerSent_projectId_triggerId_createdAt_id_idx"'::regclass;
+-- and DROP INDEX before retrying.
+--
+-- LOCKING NOTE: left alone, the plain build takes a SHARE lock on
+-- "TriggerSent" for its whole length. Reads keep working; writes wait - and
+-- every trigger claim is a write, so while it builds, automation dispatch for
+-- every project stalls on the claim insert. The build is a full heap read of a
+-- table that grows per matched trace, so expect seconds on a small install and
+-- plan the concurrent prebuild above for any install with real traffic. It is
+-- not mandatory because CONCURRENTLY cannot run inside the transaction Prisma
+-- wraps a migration in, and requiring the prebuild would fail this migration
+-- on every fresh install.
+CREATE INDEX IF NOT EXISTS "TriggerSent_projectId_triggerId_createdAt_id_idx"
+  ON "TriggerSent" ("projectId", "triggerId", "createdAt", "id");
 
--- To roll back, uncomment and run manually:
--- DROP INDEX "TriggerSent_projectId_triggerId_createdAt_id_idx";
+-- Down (manual rollback; uncomment and run). The index carries no row data of
+-- its own. A plain DROP INDEX takes ACCESS EXCLUSIVE and blocks reads too;
+-- outside Prisma's transaction, DROP INDEX CONCURRENTLY does not block:
+-- DROP INDEX CONCURRENTLY IF EXISTS "TriggerSent_projectId_triggerId_createdAt_id_idx";

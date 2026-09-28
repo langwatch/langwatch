@@ -64,6 +64,7 @@ import {
   findSlackBotToken,
   slackProjectTokenReader,
 } from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
+import { TriggerFilterValidationService } from "~/server/app-layer/automations/trigger-filter-validation.service";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
 import { createTriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.wiring";
 import { redactTriggerForRead } from "~/server/app-layer/automations/trigger-redaction";
@@ -271,6 +272,14 @@ export const automationRouter = createTRPCRouter({
       // report shape), so the condition is always required here.
       if (!hasActionableTriggerFilters(input.filters)) {
         throw toTemplateTRPCError(new TriggerFiltersRequiredError());
+      }
+      try {
+        await TriggerFilterValidationService.create(ctx.prisma).assertWritable({
+          projectId: input.projectId,
+          filters: input.filters,
+        });
+      } catch (err) {
+        throw toTemplateTRPCError(err);
       }
 
       const project = await getApp().projects.getById(input.projectId);
@@ -754,7 +763,7 @@ export const automationRouter = createTRPCRouter({
       }),
     )
     .permission("triggers:update")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { sanitized, unknownFields } = sanitizeTriggerFilters(
         input.filters,
       );
@@ -789,6 +798,14 @@ export const automationRouter = createTRPCRouter({
         ) {
           throw toTemplateTRPCError(new TriggerFiltersRequiredError());
         }
+      }
+      try {
+        await TriggerFilterValidationService.create(ctx.prisma).assertWritable({
+          projectId: input.projectId,
+          filters: sanitized,
+        });
+      } catch (err) {
+        throw toTemplateTRPCError(err);
       }
 
       const trigger = await getApp().triggers.update({
@@ -1008,15 +1025,24 @@ export const automationRouter = createTRPCRouter({
         // it and cannot send it. Resolve it from the saved trigger so a test
         // fire signs exactly as a real one does, which is the only way an
         // author can point the button at their receiver's verification.
+        // A secret belongs to the saved endpoint, so a draft pointed elsewhere
+        // is refused, as kept header values are: signing there would hand
+        // valid signatures to whoever controls the new URL.
         if (webhookDestination && input.automationId) {
           const row = await getApp().triggers.getById({
             triggerId: input.automationId,
             projectId: input.projectId,
           });
-          const signingSecrets = decryptWebhookSigningSecrets(
-            (row?.actionParams ?? {}) as WebhookStoredActionParams,
-          );
+          const stored = (row?.actionParams ?? {}) as WebhookStoredActionParams;
+          const signingSecrets = decryptWebhookSigningSecrets(stored);
           if (signingSecrets.length > 0) {
+            if (stored.url !== webhookDestination.url) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message:
+                  "Save the new destination URL before sending a signed test fire. The signing secret is only used with the saved URL.",
+              });
+            }
             webhookDestination = { ...webhookDestination, signingSecrets };
           }
         }
@@ -1202,6 +1228,20 @@ export const automationRouter = createTRPCRouter({
         !hasActionableTriggerFilters(input.filters)
       ) {
         throw toTemplateTRPCError(new TriggerFiltersRequiredError());
+      }
+      // Only a trace automation stores its structured conditions, and only
+      // when no query supersedes them.
+      if (!isGraphAlert && !isReport && filterQuery === null) {
+        try {
+          await TriggerFilterValidationService.create(
+            ctx.prisma,
+          ).assertWritable({
+            projectId: input.projectId,
+            filters: input.filters,
+          });
+        } catch (err) {
+          throw toTemplateTRPCError(err);
+        }
       }
 
       // ADR-041 Slack bot delivery: encrypt a freshly-entered bot token (or

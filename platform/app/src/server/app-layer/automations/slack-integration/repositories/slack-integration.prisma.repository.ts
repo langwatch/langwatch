@@ -31,6 +31,14 @@ const carriesOwnSlackToken = (actionParams: unknown): boolean => {
   return typeof params.slackBotToken === "string" && !!params.slackBotToken;
 };
 
+/** Whether the stored params deliver through the Web API rather than an
+ *  incoming webhook; absent means webhook, as `slackDeliveryMethodOf` reads. */
+const deliversByBot = (actionParams: unknown): boolean =>
+  typeof actionParams === "object" &&
+  actionParams !== null &&
+  "slackDelivery" in actionParams &&
+  actionParams.slackDelivery === "bot";
+
 export class PrismaSlackIntegrationRepository
   implements SlackIntegrationRepository
 {
@@ -111,10 +119,10 @@ export class PrismaSlackIntegrationRepository
   }
 
   /**
-   * The same population read the same way, kept on the other side of the same
-   * predicate: an automation with no token of its own has nothing to deliver
-   * with except the project integration. Counted in memory for the reason the
-   * read above is filtered in memory — an empty token string is not a token.
+   * The running automations that deliver through the integration: bot delivery
+   * with no token of its own. Incoming-webhook rows never touch it and paused
+   * rows deliver nothing, so neither stops delivering when it goes. Filtered in
+   * memory because an empty token string is not a token.
    */
   async countAllDeliveringThroughIntegration({
     projectId,
@@ -122,10 +130,14 @@ export class PrismaSlackIntegrationRepository
     projectId: string;
   }): Promise<number> {
     const rows = await this.prisma.trigger.findMany({
-      where: liveSlackAutomationsIn(projectId),
+      where: { ...liveSlackAutomationsIn(projectId), active: true },
       select: { actionParams: true },
     });
-    return rows.filter((row) => !carriesOwnSlackToken(row.actionParams)).length;
+    return rows.filter(
+      (row) =>
+        deliversByBot(row.actionParams) &&
+        !carriesOwnSlackToken(row.actionParams),
+    ).length;
   }
 
   async clearOwnSlackToken({

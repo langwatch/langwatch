@@ -3487,6 +3487,22 @@ const presentations = {
       "differently. Create the one you want and delete this one.",
   },
 
+  trigger_filter_key_required: {
+    title: "This condition needs a key",
+    describe: (error) =>
+      `"${safeProse(str(error, "filterField", "This field"))}" selects by a key, ` +
+      "such as a monitor or a metadata key, so a plain list matches nothing. " +
+      "Pick the key, then the values.",
+  },
+
+  trigger_filter_monitor_required: {
+    title: "Key this condition by a monitor",
+    describe: () =>
+      "Evaluation results carry the id of the monitor that ran, not the " +
+      "evaluator's, so this condition would match nothing. Choose the " +
+      "monitor instead.",
+  },
+
   trigger_filter_query_invalid: {
     title: "This trace query could not be read",
     describe: () =>

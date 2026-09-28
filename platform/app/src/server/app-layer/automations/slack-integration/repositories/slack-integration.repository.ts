@@ -40,11 +40,10 @@ export interface SlackIntegrationRepository {
   }): Promise<LegacySlackTokenAutomation[]>;
 
   /**
-   * How many live automations in the project deliver Slack messages through
-   * the project integration — the exact complement of
-   * `findAllWithOwnSlackToken` over the same rows. It is a count rather than a
-   * list because the only caller states a number: what stops delivering if the
-   * connection goes away.
+   * How many active automations in the project deliver Slack messages through
+   * the project integration: bot delivery with no token of their own. A count,
+   * because the only caller states a number: what stops delivering if the
+   * connection goes away. Incoming-webhook and paused rows are not in it.
    */
   countAllDeliveringThroughIntegration(params: {
     projectId: string;

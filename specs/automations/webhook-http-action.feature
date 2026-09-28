@@ -135,6 +135,13 @@ Feature: Webhook (generic HTTP) automation action
       When they press "Send a test" again
       Then the test fire is rejected asking them to retry later
 
+    @unit
+    Scenario: A test fire at a changed URL is not signed with the stored secret
+      Given a saved webhook automation with a signing secret
+      When its draft is test-fired at a different URL than the saved one
+      Then the test fire is refused and asks for the new URL to be saved first
+      And nothing is sent
+
   Rule: Delivery is SSRF-fenced
 
     @unit

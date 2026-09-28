@@ -59,8 +59,13 @@ import {
   type ReportActionParams,
   reportActionParamsSchema,
 } from "./report.builder";
+import type {
+  TriggerFireCursor,
+  TriggerFirePage,
+} from "./repositories/trigger-fire-history.repository";
 import type { ResolvedSlackToken } from "./slack-integration/slack-token-resolver";
 import type { TriggerService } from "./trigger.service";
+import type { TriggerFilterValidationService } from "./trigger-filter-validation.service";
 import type { TriggerFireHistoryService } from "./trigger-fire-history.service";
 import {
   deliveryFieldNames,
@@ -116,6 +121,7 @@ export class PublicApiTriggerService {
     private readonly deps: {
       graphs: AutomationCustomGraphService;
       fireHistory: TriggerFireHistoryService;
+      filterValidation: Pick<TriggerFilterValidationService, "assertWritable">;
       testFire: (input: PublicApiTestFireInput) => Promise<TestFireResult>;
       resolveProject: (projectId: string) => Promise<DraftProject>;
       /**
@@ -244,9 +250,11 @@ export class PublicApiTriggerService {
     // A trace automation must say which traces it is about; an alert's
     // condition is its threshold and a report's is its schedule, and both
     // persist an empty condition set by construction.
-    if (filterQuery === null && !hasActionableTriggerFilters(filters)) {
-      throw new TriggerFiltersRequiredError();
-    }
+    await this.assertCreatedConditionWritable({
+      projectId,
+      filterQuery,
+      filters,
+    });
     return {
       name: input.name,
       action: input.action,
@@ -259,6 +267,24 @@ export class PublicApiTriggerService {
       actionParams: delivery as Prisma.InputJsonValue,
       ...this.templateColumns(input.templates),
     };
+  }
+
+  /** Structured conditions a query does not supersede are the condition, so
+   *  they must select something and be written in a shape that can match. */
+  private async assertCreatedConditionWritable({
+    projectId,
+    filterQuery,
+    filters,
+  }: {
+    projectId: string;
+    filterQuery: string | null;
+    filters: Record<string, TriggerFilterValue>;
+  }): Promise<void> {
+    if (filterQuery !== null) return;
+    if (!hasActionableTriggerFilters(filters)) {
+      throw new TriggerFiltersRequiredError();
+    }
+    await this.deps.filterValidation.assertWritable({ projectId, filters });
   }
 
   private async graphAlertCreateData({
@@ -358,12 +384,14 @@ export class PublicApiTriggerService {
       ...this.templateColumns(input.templates),
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.active !== undefined ? { active: input.active } : {}),
+      // Resuming clears the pause record, the same as `setActive` does.
+      ...(input.active === true ? { pausedReason: null, pausedAt: null } : {}),
       ...(input.message !== undefined ? { message: input.message } : {}),
       ...(input.alertType !== undefined ? { alertType: input.alertType } : {}),
       ...(input.traceDebounceMs !== undefined
         ? { traceDebounceMs: input.traceDebounceMs }
         : {}),
-      ...this.conditionUpdate({ projectId, stored, input }),
+      ...(await this.conditionUpdate({ projectId, stored, input })),
       ...(await this.actionParamsUpdate({ projectId, stored, input })),
     };
 
@@ -411,8 +439,13 @@ export class PublicApiTriggerService {
     }
   }
 
-  /** What the automation is about, as far as this save states it. */
-  private conditionUpdate({
+  /**
+   * What the automation is about, as far as this save states it. A save that
+   * touches the condition is judged on the condition it leaves behind, so
+   * clearing the query of a query-only automation is refused the way a create
+   * with no condition is. Alerts and reports have no trace condition.
+   */
+  private async conditionUpdate({
     projectId,
     stored,
     input,
@@ -420,29 +453,28 @@ export class PublicApiTriggerService {
     projectId: string;
     stored: Trigger;
     input: PublicApiUpdateInput;
-  }): Prisma.TriggerUncheckedUpdateInput {
+  }): Promise<Prisma.TriggerUncheckedUpdateInput> {
+    if (input.filterQuery === undefined && input.filters === undefined) {
+      return {};
+    }
     const query =
       input.filterQuery !== undefined
         ? this.readFilterQuery({ filterQuery: input.filterQuery, projectId })
         : (stored.filterQuery ?? null);
-    const data: Prisma.TriggerUncheckedUpdateInput =
-      input.filterQuery !== undefined ? { filterQuery: query } : {};
-    if (input.filters === undefined) return data;
-
-    const filters = this.sanitizeFilters(input.filters);
-    // Editing is the other way to end up with a match-everything automation:
-    // create it with a real condition, then clear it here. The stored row
-    // decides whether that is allowed — an automation whose condition lives in
-    // its query keeps a legitimately empty structured set, and alerts and
-    // reports have no trace condition to require at all.
-    if (
-      !hasActionableTriggerFilters(filters) &&
-      stored.triggerKind === TriggerKind.AUTOMATION &&
-      (query ?? "").trim() === ""
-    ) {
-      throw new TriggerFiltersRequiredError();
+    const filters =
+      input.filters !== undefined
+        ? this.sanitizeFilters(input.filters)
+        : storedFilters(stored);
+    assertTraceAutomationHasCondition({ stored, query, filters });
+    if (input.filters !== undefined) {
+      await this.deps.filterValidation.assertWritable({ projectId, filters });
     }
-    return { ...data, filters: JSON.stringify(filters) };
+    return {
+      ...(input.filterQuery !== undefined ? { filterQuery: query } : {}),
+      ...(input.filters !== undefined
+        ? { filters: JSON.stringify(filters) }
+        : {}),
+    };
   }
 
   /**
@@ -565,23 +597,26 @@ export class PublicApiTriggerService {
     return deleted;
   }
 
-  /** What this automation has been doing: its fires, newest first. Metadata
-   *  only — no trace ids and no trace content, the same contract the drawer's
-   *  "Recent fires" panel reads. */
+  /** One page of what this automation has been doing, newest first; the
+   *  cursor resumes after the last fire of the page before. Metadata only — no
+   *  trace ids and no trace content, the contract the drawer's history reads. */
   async getFireHistory({
     projectId,
     triggerId,
     limit,
+    cursor,
   }: {
     projectId: string;
     triggerId: string;
     limit: number;
-  }) {
+    cursor: TriggerFireCursor | null;
+  }): Promise<TriggerFirePage> {
     await this.getById({ projectId, triggerId });
-    return this.deps.fireHistory.getAllRecentFiresForTrigger({
+    return this.deps.fireHistory.getFireHistoryPage({
       projectId,
       triggerId,
       limit,
+      cursor,
     });
   }
 
@@ -1089,6 +1124,40 @@ export class PublicApiTriggerService {
     if (!limit.allowed)
       throw new TriggerTestFireRateLimitedError(limit.resetAt);
   }
+}
+
+/** A trace automation must keep a condition after the save: create's rule,
+ *  applied to what an update leaves behind. */
+function assertTraceAutomationHasCondition({
+  stored,
+  query,
+  filters,
+}: {
+  stored: Trigger;
+  query: string | null;
+  filters: Record<string, unknown>;
+}): void {
+  if (stored.triggerKind !== TriggerKind.AUTOMATION) return;
+  if ((query ?? "").trim() !== "") return;
+  if (!hasActionableTriggerFilters(filters)) {
+    throw new TriggerFiltersRequiredError();
+  }
+}
+
+/** The structured conditions on a stored row, which older rows hold as an
+ *  object rather than the JSON string written today. Unreadable reads as none. */
+function storedFilters(stored: Trigger): Record<string, unknown> {
+  let value: unknown = stored.filters;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value))
+    : {};
 }
 
 export interface PublicApiCreateInput {

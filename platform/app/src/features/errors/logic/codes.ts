@@ -571,6 +571,8 @@ export const APP_ERROR_CODES = [
   "trace_sharing_disabled",
   "trigger_action_immutable",
   "trigger_action_params_unknown_fields",
+  "trigger_filter_key_required",
+  "trigger_filter_monitor_required",
   "trigger_filter_query_invalid",
   "trigger_filters_required",
   "trigger_filters_unsupported",

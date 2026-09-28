@@ -352,11 +352,46 @@ Feature: Automations over the public API
       Then they come back newest first
 
     @integration
+    Scenario: Fire history pages over the API
+      Given an automation that has fired more times than one page holds
+      When its fires are read over the API a page at a time
+      Then each page carries a cursor to the next until the last carries none
+      And no fire appears on two pages
+
+    @unit
+    Scenario: Resuming over the API clears the pause record
+      Given an automation the platform paused for runaway volume
+      When it is updated over the API with active set to true
+      Then it no longer records why or when it was paused
+
+    @integration
     Scenario: Pausing and resuming round-trips over the API
       Given an automation that emails on matching traces
       When it is paused and then resumed over the API
       Then each call answers with the state it is now in
       And the automation no longer claims it was paused
+
+  Rule: A condition that can never match is refused at the save
+
+    @unit
+    Scenario: A keyed condition written without its key is refused
+      When an automation is saved with "evaluations.passed" or "metadata.value" as a bare list
+      Then the save is refused with trigger_filter_key_required
+      And the message names the field and shows the nested shape to write instead
+
+    @unit
+    Scenario: An evaluation condition keyed by an evaluator names its monitors
+      Given an evaluator that two monitors in the project run
+      When an automation is saved with an evaluation condition keyed by the evaluator's id
+      Then the save is refused with trigger_filter_monitor_required
+      And the message names both monitors' ids to key by instead
+
+    @unit
+    Scenario: Clearing the only condition over the API is refused
+      Given an automation whose only condition is its trace query
+      When the query is cleared over the API with nothing in its place
+      Then the update is refused with trigger_filters_required
+      And the automation keeps its query
 
   Rule: The automation an id names is the caller's own
 

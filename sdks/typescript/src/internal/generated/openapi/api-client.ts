@@ -1415,7 +1415,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** @description List entries of a dataset (paginated). Same as GET /:slugOrId/records. */
+        get: operations["getApiDatasetBySlugEntries"];
         put?: never;
         /** @description Add entries to a dataset */
         post: operations["postApiDatasetBySlugEntries"];
@@ -4331,7 +4332,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description What this automation has done: its fires, newest first. Metadata only — no trace ids and no trace content. */
+        /** @description What this automation has done: its fires, newest first. Metadata only — no trace ids and no trace content. Send `nextCursor` back as `cursor` to read the page after this one. */
         get: operations["getApiTriggersByIdFires"];
         put?: never;
         post?: never;
@@ -10389,6 +10390,21 @@ export interface operations {
                 };
             };
         };
+        responses: never;
+    };
+    getApiDatasetBySlugEntries: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: never;
     };
     postApiDatasetBySlugEntries: {
@@ -25797,6 +25813,7 @@ export interface operations {
                         reasoning?: string;
                         metCriteria: string[];
                         unmetCriteria: string[];
+                        inconclusiveCriteria?: string[];
                         error?: string;
                         evaluations?: {
                             evaluatorId: string;
@@ -33551,6 +33568,8 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                /** @description The `nextCursor` from the previous page. Omit for the newest fires. */
+                cursor?: string;
             };
             header?: never;
             path: {
@@ -33567,12 +33586,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        id: string;
-                        triggerId: string;
-                        customGraphId: string | null;
-                        firedAt: string;
-                        resolvedAt: string | null;
-                    }[];
+                        /** @description One page of fires, newest first. */
+                        fires: {
+                            id: string;
+                            triggerId: string;
+                            customGraphId: string | null;
+                            firedAt: string;
+                            resolvedAt: string | null;
+                        }[];
+                        /** @description Pass as `cursor` to read the page after this one. Null on the last page. */
+                        nextCursor: string | null;
+                    };
                 };
             };
             /** @description Bad Request */
