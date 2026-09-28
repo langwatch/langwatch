@@ -554,31 +554,36 @@ const evaluationStatusSchema = z.union([
   z.literal("processed"),
 ]);
 
+/**
+ * The `json_encoded_event` payload of a `langwatch.evaluation.custom` span
+ * event. The SDKs write `null` for every field the caller left out, so each
+ * optional field takes null as well as absence.
+ */
 export const sdkEvaluationSchema = z.looseObject({
-  evaluation_id: z.string().optional(),
-  evaluator_id: z.string().optional(),
-  span_id: z.string().optional(),
+  evaluation_id: z.string().nullish(),
+  evaluator_id: z.string().nullish(),
+  span_id: z.string().nullish(),
   name: z.string(),
-  type: z.string().optional(),
-  is_guardrail: z.boolean().optional(),
-  status: z.enum(["processed", "skipped", "error"]).optional(),
-  passed: z.boolean().optional(),
-  score: z.number().optional(),
-  label: z.string().optional(),
-  details: z.string().optional(),
-  cost_id: z.string().optional(),
+  type: z.string().nullish(),
+  is_guardrail: z.boolean().nullish(),
+  status: z.enum(["processed", "skipped", "error"]).nullish(),
+  passed: z.boolean().nullish(),
+  score: z.number().nullish(),
+  label: z.string().nullish(),
+  details: z.string().nullish(),
+  cost_id: z.string().nullish(),
   error: z
     .object({
       message: z.string(),
-      stacktrace: z.array(z.string()).optional(),
+      stacktrace: z.array(z.string()).nullish(),
     })
-    .optional(),
+    .nullish(),
   timestamps: z
     .object({
-      started_at: z.number().optional(),
-      finished_at: z.number().optional(),
+      started_at: z.number().nullish(),
+      finished_at: z.number().nullish(),
     })
-    .optional(),
+    .nullish(),
 });
 
 export type SdkEvaluation = z.infer<typeof sdkEvaluationSchema>;
