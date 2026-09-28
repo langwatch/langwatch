@@ -1,5 +1,4 @@
 import { isUniqueConstraintError } from "@langwatch/prisma-client/errors";
-import { type Instant, toDate } from "@langwatch/time";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { parseEvaluatorAttachments, type EvaluatorAttachment } from "@langwatch/scenario-contract";
 import {
@@ -16,6 +15,7 @@ import {
   type SuiteScope,
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
+import { type Instant, toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import { SuiteRepository } from "../suite.repository.ts";

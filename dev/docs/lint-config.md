@@ -1,6 +1,6 @@
 # Why the oxlint configs look the way they do
 
-The configs are the rules. This page holds what is *history* about them: what
+The configs are the rules. This page holds what is _history_ about them: what
 was measured, what was rejected, what Biome used to do. A comment in a config
 that only records one of those belongs here instead, so the config stays
 readable as a list of decisions in force.
@@ -61,19 +61,19 @@ because of what it could not do, not because seeding was wrong: a key carried no
 count, so a listed file was exempt however many NEW violations it gained, and the
 shrink-only check could not see that — it refused new keys, and growth inside an
 existing key adds none. Nothing expired. And it blocked its own repair, because a
-wave meeting a baselined *interface* stopped there and left the flagged
+wave meeting a baselined _interface_ stopped there and left the flagged
 implementations unfixable. Two rules had every occurrence suppressed and so
 enforced nothing anywhere while reading as clean.
 
 The table below is kept as the historical measurement that seeded it.
 
-| Rule | Measured | Finding |
-| --- | --- | --- |
-| `langwatch/refusal-is-a-handled-error` | 2026-09-10 | 70 files, 80 reports, 20 modules. The channel conversion (ADR-144 decision 9) empties `services/` of conduits and the rows go with it |
-| `langwatch/dangling-barrel-export` | 2026-09-10 | 80 reports across 30 files, every one a specifier no file answers to, left by an in-flight move |
-| `langwatch/empty-catch` | 2026-09-10 | 320 reports across 216 files |
-| `langwatch/stand-in-cast` | 2026-09-10 | 328 reports across 178 files |
-| `langwatch/transport-imports-a-repository` | 2026-09-10 | 9 reports across 9 files |
+| Rule                                       | Measured   | Finding                                                                                                                               |
+| ------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `langwatch/refusal-is-a-handled-error`     | 2026-09-10 | 70 files, 80 reports, 20 modules. The channel conversion (ADR-144 decision 9) empties `services/` of conduits and the rows go with it |
+| `langwatch/dangling-barrel-export`         | 2026-09-10 | 80 reports across 30 files, every one a specifier no file answers to, left by an in-flight move                                       |
+| `langwatch/empty-catch`                    | 2026-09-10 | 320 reports across 216 files                                                                                                          |
+| `langwatch/stand-in-cast`                  | 2026-09-10 | 328 reports across 178 files                                                                                                          |
+| `langwatch/transport-imports-a-repository` | 2026-09-10 | 9 reports across 9 files                                                                                                              |
 
 `dangling-barrel-export` is now `unresolved-relative-import`, `empty-catch` is
 native `no-empty`, and `transport-imports-a-repository` folded into
@@ -111,34 +111,34 @@ reason it wrote down: unscoped, `no-focused-tests` matches any function called
 
 So the next person does not spend an afternoon re-litigating them.
 
-| Rule | Findings | Why not |
-| --- | --- | --- |
-| `no-magic-numbers` | 19882 | every threshold and index |
-| `id-length` (min 2) | 4163 | `i`, `j`, `e` are conventional |
-| `require-await` | 2351 | async-for-interface is a real shape |
-| `typescript/no-non-null-assertion` | 1797 | 489 source, 1308 test |
-| `no-negated-condition` | 612 | unicorn variant 311 |
-| `max-classes-per-file` (1) | 332 | |
-| `no-await-in-loop` | 388 in 170 files | sequential iteration is often the point (ordering, backpressure), which a linter cannot tell from a missed batch |
-| `no-eq-null` | 226 | this is the `== null` idiom; rejected on principle, not on count |
-| `max-params` (max 4) | 85 in 69 files | at max 3 it is 241. CLAUDE.md's named-parameters rule wants this, but no threshold cheap enough to adopt is tight enough to mean anything |
-| `typescript/no-extraneous-class` | 54 in 47 files | |
-| `typescript/no-import-type-side-effects` | 34 in 33 files | |
-| `no-loop-func` | 2 | both are the same deliberate abort-latch: the closure exists in order to publish itself to the outer `wake` binding. Adopting it buys a rewrite of correct code or a suppression |
+| Rule                                     | Findings         | Why not                                                                                                                                                                          |
+| ---------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `no-magic-numbers`                       | 19882            | every threshold and index                                                                                                                                                        |
+| `id-length` (min 2)                      | 4163             | `i`, `j`, `e` are conventional                                                                                                                                                   |
+| `require-await`                          | 2351             | async-for-interface is a real shape                                                                                                                                              |
+| `typescript/no-non-null-assertion`       | 1797             | 489 source, 1308 test                                                                                                                                                            |
+| `no-negated-condition`                   | 612              | unicorn variant 311                                                                                                                                                              |
+| `max-classes-per-file` (1)               | 332              |                                                                                                                                                                                  |
+| `no-await-in-loop`                       | 388 in 170 files | sequential iteration is often the point (ordering, backpressure), which a linter cannot tell from a missed batch                                                                 |
+| `no-eq-null`                             | 226              | this is the `== null` idiom; rejected on principle, not on count                                                                                                                 |
+| `max-params` (max 4)                     | 85 in 69 files   | at max 3 it is 241. CLAUDE.md's named-parameters rule wants this, but no threshold cheap enough to adopt is tight enough to mean anything                                        |
+| `typescript/no-extraneous-class`         | 54 in 47 files   |                                                                                                                                                                                  |
+| `typescript/no-import-type-side-effects` | 34 in 33 files   |                                                                                                                                                                                  |
+| `no-loop-func`                           | 2                | both are the same deliberate abort-latch: the closure exists in order to publish itself to the outer `wake` binding. Adopting it buys a rewrite of correct code or a suppression |
 
 Measured and left off from the Biome carry-over, same rule — a backlog big
 enough that a register would be the whole tree:
 
-| Rule | Findings |
-| --- | --- |
-| `max-lines-per-function` | 4730 (Biome `noExcessiveLinesPerFunction`, warn; 747 on the surviving paths) |
-| `typescript/consistent-type-imports` | 260 in 205 files (`useImportType`) |
-| `max-params` | 223 (`useMaxParams`; rejected above as well) |
-| `no-shadow` | 433 (on for contract and server only, above) |
-| `max-depth` | 82 (on with a register, above) |
-| `no-useless-assignment` | 25 |
-| `vitest/no-disabled-tests` | 43 (`noSkippedTests`, Biome warn) |
-| `jest/no-standalone-expect` | 135 (`noMisplacedAssertion`, Biome warn) |
+| Rule                                 | Findings                                                                     |
+| ------------------------------------ | ---------------------------------------------------------------------------- |
+| `max-lines-per-function`             | 4730 (Biome `noExcessiveLinesPerFunction`, warn; 747 on the surviving paths) |
+| `typescript/consistent-type-imports` | 260 in 205 files (`useImportType`)                                           |
+| `max-params`                         | 223 (`useMaxParams`; rejected above as well)                                 |
+| `no-shadow`                          | 433 (on for contract and server only, above)                                 |
+| `max-depth`                          | 82 (on with a register, above)                                               |
+| `no-useless-assignment`              | 25                                                                           |
+| `vitest/no-disabled-tests`           | 43 (`noSkippedTests`, Biome warn)                                            |
+| `jest/no-standalone-expect`          | 135 (`noMisplacedAssertion`, Biome warn)                                     |
 
 ### The Biome carry-over
 
@@ -167,21 +167,21 @@ findings; oxlint has nothing for the general shape (`foo(a = 1)`).
 
 None of these is retired because it stopped being desirable.
 
-| Biome rule | Findings | Status |
-| --- | --- | --- |
-| `noFloatingPromises` | 39 | TYPE-AWARE. oxlint ships `typescript/no-floating-promises` and `typescript/no-misused-promises`, but they need `--type-aware` and the `oxlint-tsgolint` companion binary, which is not a dependency of this repository. Enabling the names without it silences nothing and reports nothing. The largest single loss in the migration, and the blocker named by `specs/dependencies/oxc-toolchain.feature` ("Type-aware promise checks remain blocking") |
-| `noMisusedPromises` | 19 | same |
-| `useOptionalChain` | 2 | same: `typescript/prefer-optional-chain` is type-aware only. Verified inert without `--type-aware` on a fixture (`foo && foo.bar`) |
-| `useLiteralKeys` | 0 | same, `typescript/dot-notation` (`o["k"]`) |
-| `noMisrefactoredShorthandAssign` | | `a =- b` for `a -= b`. Neither oxlint nor eslint has a rule for it |
-| `noImplicitAnyLet` | 35 | No oxlint rule. `let x;` widening to any is a TypeScript-semantics check and lands with type-aware linting or not at all |
-| `noEvolvingTypes` | 46 | same |
-| `useAsConstAssertion` | | No oxlint rule |
-| `useForOf` | | No oxlint rule (`unicorn/no-for-loop` does not exist in 1.78.0) |
-| `useSpreadOverApply` | | oxlint's `prefer-spread` is a different rule: 212 findings here against Biome's 0, so it is not a carry |
-| `noForIn` | 2 | `guard-for-in` is the nearest and is narrower: it requires a guard rather than banning `for-in` |
-| `noExcessiveCognitiveComplexity` | 1194 | eslint's `complexity` is cyclomatic, not cognitive. Biome never blocked on this one either — its baseline was four figures |
-| Next.js rules | | `noHeadElement`, `noImgElement`, `noDocumentImportInPage`, `noHeadImportInDocument`, `noNextAsyncClientComponent`, `noUnwantedPolyfillio`, `useGoogleFontPreconnect`, `useGoogleFontDisplay`, `noSyncScripts`. The app is a Vite app; these had nothing to match before the move and have nothing now |
+| Biome rule                       | Findings | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `noFloatingPromises`             | 39       | TYPE-AWARE. oxlint ships `typescript/no-floating-promises` and `typescript/no-misused-promises`, but they need `--type-aware` and the `oxlint-tsgolint` companion binary, which is not a dependency of this repository. Enabling the names without it silences nothing and reports nothing. The largest single loss in the migration, and the blocker named by `specs/dependencies/oxc-toolchain.feature` ("Type-aware promise checks remain blocking") |
+| `noMisusedPromises`              | 19       | same                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `useOptionalChain`               | 2        | same: `typescript/prefer-optional-chain` is type-aware only. Verified inert without `--type-aware` on a fixture (`foo && foo.bar`)                                                                                                                                                                                                                                                                                                                      |
+| `useLiteralKeys`                 | 0        | same, `typescript/dot-notation` (`o["k"]`)                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `noMisrefactoredShorthandAssign` |          | `a =- b` for `a -= b`. Neither oxlint nor eslint has a rule for it                                                                                                                                                                                                                                                                                                                                                                                      |
+| `noImplicitAnyLet`               | 35       | No oxlint rule. `let x;` widening to any is a TypeScript-semantics check and lands with type-aware linting or not at all                                                                                                                                                                                                                                                                                                                                |
+| `noEvolvingTypes`                | 46       | same                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `useAsConstAssertion`            |          | No oxlint rule                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `useForOf`                       |          | No oxlint rule (`unicorn/no-for-loop` does not exist in 1.78.0)                                                                                                                                                                                                                                                                                                                                                                                         |
+| `useSpreadOverApply`             |          | oxlint's `prefer-spread` is a different rule: 212 findings here against Biome's 0, so it is not a carry                                                                                                                                                                                                                                                                                                                                                 |
+| `noForIn`                        | 2        | `guard-for-in` is the nearest and is narrower: it requires a guard rather than banning `for-in`                                                                                                                                                                                                                                                                                                                                                         |
+| `noExcessiveCognitiveComplexity` | 1194     | eslint's `complexity` is cyclomatic, not cognitive. Biome never blocked on this one either — its baseline was four figures                                                                                                                                                                                                                                                                                                                              |
+| Next.js rules                    |          | `noHeadElement`, `noImgElement`, `noDocumentImportInPage`, `noHeadImportInDocument`, `noNextAsyncClientComponent`, `noUnwantedPolyfillio`, `useGoogleFontPreconnect`, `useGoogleFontDisplay`, `noSyncScripts`. The app is a Vite app; these had nothing to match before the move and have nothing now                                                                                                                                                   |
 
 ### The class-A migration (ADR-135 / ADR-140)
 

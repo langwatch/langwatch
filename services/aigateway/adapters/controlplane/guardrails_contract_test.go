@@ -189,7 +189,7 @@ var monorepoRoot = filepath.Join("..", "..", "..", "..")
 // repoint one site and leave another stale -- which is the drift ADR-076
 // already caused once.
 func controlPlaneRootFor(root string) string {
-	return filepath.Join(root, "modules", "gateway", "server")
+	return filepath.Join(root, "modules", "gateway", "process")
 }
 
 // The two witnesses that decide skip-versus-fail. Neither is a bare directory:
@@ -597,16 +597,16 @@ func TestRequireControlPlaneDispatchesTheVerdictItWasGiven(t *testing.T) {
 /** @scenario "the data plane and the control plane agree on the wire shape" */
 func TestControlPlaneSchemaAgreesOnTheWireShape(t *testing.T) {
 	text := readControlPlaneSource(t,
-		"modules", "gateway", "server", "src", "transport", "api-rest",
-		"gateway-internal.api.ts")
+		"modules", "gateway", "contract", "src",
+		"gateway-internal.schemas.ts")
 
-	start := strings.Index(text, "const guardrailCheckRequestSchema")
+	start := strings.Index(text, "const gatewayInternalGuardrailCheckSchema")
 	if start < 0 {
-		t.Fatal("guardrailCheckRequestSchema not found in the control plane route")
+		t.Fatal("gatewayInternalGuardrailCheckSchema not found in the gateway contract")
 	}
 	end := strings.Index(text[start:], "});")
 	if end < 0 {
-		t.Fatal("could not delimit guardrailCheckRequestSchema")
+		t.Fatal("could not delimit gatewayInternalGuardrailCheckSchema")
 	}
 	schema := text[start : start+end]
 
@@ -618,18 +618,24 @@ func TestControlPlaneSchemaAgreesOnTheWireShape(t *testing.T) {
 	if strings.Contains(schema, `"pre"`) || strings.Contains(schema, `"post"`) {
 		t.Error("control plane request schema still accepts the storage enum values instead of the wire directions")
 	}
+	if !strings.Contains(schema, "direction: z.enum(GUARDRAIL_WIRE_DIRECTIONS)") {
+		t.Error("control plane request schema no longer reads its directions from GUARDRAIL_WIRE_DIRECTIONS")
+	}
 
 	// The accepted directions live in one exported constant so both the route
 	// and this test read the same source of truth. The schema used to inline
 	// the storage enum instead, so every live gateway call failed validation.
-	service := readControlPlaneSource(t,
-		"modules", "gateway", "server", "src", "services",
-		"gateway-guardrail-evaluation.service.ts")
-	for _, direction := range []string{"request", "response", "stream_chunk"} {
-		if !strings.Contains(service, `"`+direction+`"`) {
-			t.Errorf("control plane does not accept direction %q", direction)
-		}
+	directions := readControlPlaneSource(t,
+		"modules", "gateway", "contract", "src",
+		"gateway-guardrail.ts")
+	const directionsMarker = `export const GUARDRAIL_WIRE_DIRECTIONS = ["request", "response", "stream_chunk"] as const;`
+	if !strings.Contains(directions, directionsMarker) {
+		t.Errorf("GUARDRAIL_WIRE_DIRECTIONS no longer reads %s", directionsMarker)
 	}
+
+	service := readControlPlaneSource(t,
+		"modules", "gateway", "process", "src", "services",
+		"gateway-guardrail-evaluation.service.ts")
 
 	// Both sides must name the verdict field "decision" and agree on the values
 	// it can carry. The Go struct read "action" once, which is absent from the

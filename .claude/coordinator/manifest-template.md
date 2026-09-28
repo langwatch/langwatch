@@ -14,7 +14,7 @@ until it can.
 
 Objective: <one sentence, outcome-shaped>
 Owner: <lane name, or `unassigned`>
-Model: <opus | fable | sonnet | haiku>   <one clause saying why>
+Model: <opus | fable | sonnet | haiku> <one clause saying why>
 Budget: <n> tool calls or <n> minutes, whichever comes first
 Handoff: .claude/handoffs/<task-id>.md
 
@@ -24,9 +24,9 @@ Handoff: .claude/handoffs/<task-id>.md
 modules except X", never a regex, never "all dirty files". A lane resolves this
 list literally.
 
-  modules/trace/contract/src/**
-  modules/trace/process/src/transport/**
-  modules/trace/process/src/__tests__/**
+modules/trace/contract/src/**
+modules/trace/process/src/transport/**
+modules/trace/process/src/**tests**/**
 
 If two lanes will run at once, check by eye that their lists cannot intersect.
 That check is the coordinator's single most valuable minute.>
@@ -36,10 +36,10 @@ That check is the coordinator's single most valuable minute.>
 <Files this lane will plausibly need and must not edit. Name them here rather
 than relying on the lane to recognise one, and say who owns them.
 
-  apps/api/src/app-rest/api-rest.doors.ts              coordinator
-  apps/api/src/app/api-production.composition.ts       coordinator
-  apps/ui/src/features/catalogue.json                  coordinator
-  packages/architecture-enforcer/src/*-baseline.json       coordinator
+apps/api/src/app-rest/api-rest.doors.ts coordinator
+apps/api/src/app/api-production.composition.ts coordinator
+apps/ui/src/features/catalogue.json coordinator
+packages/architecture-enforcer/src/*-baseline.json coordinator
 
 The lane writes the exact lines it needs into its handoff, section 10, and
 carries on with whatever else it can do.>
@@ -49,8 +49,8 @@ carries on with whatever else it can do.>
 <Where to look, so the lane does not go exploring. Exemplars, the module it is
 copying, the origin/main router it must stay wire-compatible with.
 
-  modules/annotation/**                     the reference shape - copy this
-  modules/organization/process/src/transport/**   the transport exemplar
+modules/annotation/** the reference shape - copy this
+modules/organization/process/src/transport/** the transport exemplar
 
 Naming these is worth many turns: a lane with no exemplar greps for one.>
 
@@ -60,8 +60,8 @@ Naming these is worth many turns: a lane with no exemplar greps for one.>
 of routes - concrete enough to compare against. Link the reference rather than
 restating it:
 
-  Follow `.claude/skills/module/references/convert.md`. End shape:
-  defineModule("trace").withRepositories(...).withApp(TraceApp).withTransports(...)
+Follow `.claude/skills/module/references/convert.md`. End shape:
+defineModule("trace").withRepositories(...).withApp(TraceApp).withTransports(...)
 
 If this section needs more than about fifteen lines, the guidance belongs in a
 skill reference and this section should link to it.>
@@ -70,18 +70,18 @@ skill reference and this section should link to it.>
 
 <What must not change. The public wire is almost always one of them:
 
-  - Route paths, procedure names, inputs, outputs, statuses and permissions stay
-    as they are on origin/main. Record any unavoidable difference with a reason.
-  - No new dependency without declaring it in package.json first.
-  - The branch boots after every landed step.>
+- Route paths, procedure names, inputs, outputs, statuses and permissions stay
+  as they are on origin/main. Record any unavoidable difference with a reason.
+- No new dependency without declaring it in package.json first.
+- The branch boots after every landed step.>
 
 ## Checks
 
 <Exactly what this lane runs, and nothing wider. These are the checks the handoff
 reports against.
 
-  pnpm --filter @langwatch/trace-process test src/transport
-  pnpm --filter @langwatch/trace-process typecheck   (once, at the end)
+pnpm --filter @langwatch/trace-process test src/transport
+pnpm --filter @langwatch/trace-process typecheck (once, at the end)
 
 Follows `.claude/skills/core/testing-rules.md`. Never a whole-tree check.>
 
@@ -89,10 +89,10 @@ Follows `.claude/skills/core/testing-rules.md`. Never a whole-tree check.>
 
 <When to stop and write the handoff, beyond finishing. The standard set:
 
-  - a shared path is needed
-  - a check fails in a way you cannot fix within budget
-  - the budget is reached
-  - this manifest turns out to be wrong
+- a shared path is needed
+- a check fails in a way you cannot fix within budget
+- the budget is reached
+- this manifest turns out to be wrong
 
 Add any task-specific ones here.>
 
@@ -100,11 +100,11 @@ Add any task-specific ones here.>
 
 <Checkable claims, not a feeling. The lane is done when every line here is true:
 
-  - 6 trace-export routes answer on the paths they answer on origin/main
-  - the transport mount test passes
-  - baseline rows trace|nested-transport and trace|legacy-transport-runtime can
-    be dropped
-  - `pnpm --filter @langwatch/trace-process typecheck` is clean
+- 6 trace-export routes answer on the paths they answer on origin/main
+- the transport mount test passes
+- baseline rows trace|nested-transport and trace|legacy-transport-runtime can
+  be dropped
+- `pnpm --filter @langwatch/trace-process typecheck` is clean
 
 If a criterion is not checkable, rewrite it until it is.>
 ```

@@ -17,7 +17,12 @@ const targets = [
   // SOURCE under mail's own strictness — 26 errors that exist only on a fresh
   // worktree, where nothing has built ksuid yet.
   { name: "@langwatch/ksuid", dir: "packages/ksuid", entry: "dist/index.d.ts" },
-  { name: "@langwatch/mail", dir: "packages/mail", entry: "dist/index.js" },
+  {
+    name: "@langwatch/mail",
+    dir: "packages/mail",
+    entry: "dist/index.js",
+    needs: ["@langwatch/ksuid"],
+  },
 ];
 
 const mtime = (path) => {
@@ -43,9 +48,13 @@ const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 
 // a test hook wants only `@langwatch/mail`, and building the SDK to run a unit
 // suite would cost a minute for nothing.
 const requested = process.argv.slice(2);
-const selected = requested.length
-  ? targets.filter((target) => requested.includes(target.name))
-  : targets;
+const wanted = new Set(
+  requested.flatMap((name) => [
+    name,
+    ...(targets.find((target) => target.name === name)?.needs ?? []),
+  ]),
+);
+const selected = requested.length ? targets.filter((target) => wanted.has(target.name)) : targets;
 const unknown = requested.filter((name) => !targets.some((target) => target.name === name));
 if (unknown.length) {
   console.error(`ensure-built: no such target: ${unknown.join(", ")}`);

@@ -115,19 +115,69 @@ describe("formatSpansDigestBounded", () => {
 
     /** @scenario "A digest over the budget becomes the structure plus the spans worth reading" */
     it("spends the remaining budget expanding the highest-ranked spans", () => {
-      const skeletonOnly = bounded(trace, 700);
-      // Room for exactly one of these spans on top of the skeleton.
-      const withExpansions = bounded(trace, 2_500);
+      const skeletonOnly = bounded(trace, 150);
+      const withExpansions = bounded(trace, 1_200);
 
       expect(withExpansions.isTruncated).toBe(true);
       expect(withExpansions.estimatedTokens).toBeGreaterThan(skeletonOnly.estimatedTokens);
-      expect(withExpansions.estimatedTokens).toBeLessThanOrEqual(2_500);
+      expect(withExpansions.estimatedTokens).toBeLessThanOrEqual(1_200);
       // Ranked first, so it is the body a reader gets when only some fit.
       expect(withExpansions.text).toContain("boom payload");
-      // Everything ranked below it waits for a budget that fits them.
-      expect(withExpansions.text).not.toContain("model payload");
+      // The next in rank gets what is left, cut in the middle.
+      expect(withExpansions.text).toContain("model payload");
+      expect(withExpansions.text).toMatch(/tokens omitted from the middle/);
+      // Everything ranked below them waits for a budget that fits them.
       expect(withExpansions.text).not.toContain("slow payload");
       expect(withExpansions.text).not.toContain("root payload");
+    });
+  });
+
+  describe("given a long agent loop and an 8,000-token budget", () => {
+    const loop = Array.from({ length: 16 }, (_, i) =>
+      span({
+        spanId: `step${i}`,
+        name: `step-${i}`,
+        type: i % 2 === 0 ? "llm" : "tool",
+        startedAt: i * 1_000,
+        finishedAt: i * 1_000 + 900,
+        text: `step ${i} ${"reasoning about the refund policy ".repeat(60)}`,
+      }),
+    );
+
+    /** @scenario "A bounded digest spends the caller's budget, not the judge tool's" */
+    it("expands past the judge tool's 4,096-token limit, up to the budget", () => {
+      const result = bounded(loop, 8_000);
+
+      expect(result.isTruncated).toBe(true);
+      expect(result.estimatedTokens).toBeGreaterThan(6_000);
+      expect(result.estimatedTokens).toBeLessThanOrEqual(8_000);
+    });
+
+    /** @scenario "A bounded digest spends the caller's budget, not the judge tool's" */
+    it("never tells a reader without tools to call one", () => {
+      const result = bounded(loop, 8_000);
+
+      expect(result.text).not.toMatch(/grep_trace|expand_trace|\[TRUNCATED\]/);
+    });
+  });
+
+  describe("given one span too large to expand whole", () => {
+    /** @scenario "A bounded digest spends the caller's budget, not the judge tool's" */
+    it("expands it keeping its opening and its ending", () => {
+      const huge = span({
+        spanId: "huge",
+        name: "final-answer",
+        type: "llm",
+        text: `OPENING ${"filler words here ".repeat(4_000)} ENDING`,
+      });
+
+      const result = bounded([span({ spanId: "root", name: "root", text: "hi" }), huge], 2_000);
+
+      expect(result.estimatedTokens).toBeLessThanOrEqual(2_000);
+      expect(result.estimatedTokens).toBeGreaterThan(1_500);
+      expect(result.text).toContain("OPENING");
+      expect(result.text).toContain("ENDING");
+      expect(result.text).toMatch(/tokens omitted from the middle/);
     });
   });
 
@@ -142,6 +192,22 @@ describe("formatSpansDigestBounded", () => {
 
       expect(result.isTruncated).toBe(true);
       expect(result.estimatedTokens).toBeLessThanOrEqual(120);
+    });
+
+    /** @scenario "A structure too large for the budget is cut" */
+    it("keeps the first and the last spans on whole lines, with a marker between them", () => {
+      const spans = Array.from({ length: 200 }, (_, i) =>
+        span({ spanId: `s${i}`, name: `step-number-${i}-with-a-long-name`, text: "x" }),
+      );
+
+      const result = bounded(spans, 400);
+
+      expect(result.text).toContain("step-number-0-with-a-long-name");
+      expect(result.text).toContain("step-number-199-with-a-long-name");
+      expect(result.text).toMatch(/tokens omitted from the middle/);
+      expect(result.text.split("\n").every((line) => !line.startsWith("-with-a-long-name"))).toBe(
+        true,
+      );
     });
   });
 });

@@ -110,7 +110,7 @@ these rules guarantee). The containers keep their own `start:prepare:db`, which
 becomes an idempotent second pass, so a first install, a non-helm install and
 `docker compose` are unchanged. `app.migrations.preRoll: false` opts out.
 
-**Still to land**: a CI job that boots the *base branch's* code against a
+**Still to land**: a CI job that boots the _base branch's_ code against a
 database migrated by the head branch — the direct test of rule 1 through 4,
 rather than their syntactic shadow. It needs a live Postgres and ClickHouse, the
 goose binary, and two checkouts, so it is specified here and built separately.

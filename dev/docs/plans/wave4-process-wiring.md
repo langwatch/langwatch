@@ -31,7 +31,6 @@ of the lines that changed.
 - Correction: `apps/tasks/src/platform/object-storage-migrate.composition.ts` and `api-production.composition.ts` were clean at
   HEAD, not in the 09-07 pile; the pile's wiring core is the twelve untracked worker files.
 
-
 **Date:** 2026-09-08 · **Owner lane:** one Opus agent after the wave-3 lane (`882ebfa479`) · **Reviewed by:** Fable
 
 Same rules as waves 1 to 3 (`strict-feature-layout.md` section 8: Read/Edit/Write only, no git writes, no baselines, HEAD-variant blobs for
@@ -80,6 +79,7 @@ Follow-ups outside this lane: five `@scenario` titles over 100 columns in `specs
 
 `installApiPlatformHealth({ apiKey: config.platformHealth.apiKey, probeApiKey: config.platformHealth.probeApiKey,
 probes })` in `apps/api/src/features/platform-health/platform-health.composition.ts` returns `{ app, rest }`.
+
 - `apps/api/src/app-rest/app-rest.process-features.ts`: `ApiProcessRestServices.platformHealth?: MountableRestApp | undefined`;
   after the `healthProbes` push, `if (services.platformHealth) features.push(services.platformHealth);`.
 - `apps/api/src/app/api-production.composition.ts`: field `composedPlatformHealth: ComposedPlatformHealthFeature | undefined`;
@@ -99,6 +99,7 @@ permissions: this.composedAuthz.app, organizations: this.composedOrganization.ap
 this.resolvePlanProvider(options) })` (async, not optional; the enclosing block is synchronous today).
 `ComposedRoleFeature` is `{ app: RoleApi, routers(mount) → { role, roleBinding } }`; it no longer carries `authzApp`
 (`authzApp: this.composedRole.authzApp` → `this.composedAuthz.app`) nor `roles` (`this.composedRole.roles` → `.app`).
+
 - `apps/api/src/app-trpc/app-trpc.features.ts`: `roleBinding: createRoleBindingTrpcRouter(mount)` → `roleRouters.roleBinding`;
   `team: roleRouters.team` → the team router now belongs to organization: move `composeTeamPorts` +
   `createTeamTrpcRouter` (old body at `git show 7c2e9ec87e:apps/api/src/features/role/role.composition.ts` lines 174–214)
@@ -127,6 +128,7 @@ Follow-up in authz web: `authz-api.ts` hand-writes the role maps → `ContractAp
 `installApiSuite({ prisma, peers: { scenarios, agents, prompts, projects }, infrastructure, rest: { credential, platformUrl,
 errors } })` returns `{ app, routers(mount) → { suites }, rest: MountableRestApp[] }`; `mountSuiteRest` in
 `apps/api/src/features/suite/suite-rest.mount.ts`.
+
 - `apps/api/src/features/scenario/scenario.composition.ts`: replace the `SuiteApp.create({...})` block with the install
   (peers `scenarioApi`, `options.agents`, `promptApp`, `options.projects`; infrastructure `execution`,
   `resolveClickHouseClient`, `defaultRetentionDays`, `generateId`, optional `connectedPresence`; `database` gone);
@@ -137,10 +139,10 @@ errors } })` returns `{ app, routers(mount) → { suites }, rest: MountableRestA
   `ApiPackagedRestServices`, the three family-name union members `"run-plans" | "suites" | "test-suites"`, and the three
   `mount(...)` calls.
 - `apps/api/src/app/api-production.composition.ts`: `rest: { credential: (input) => this.composedHandlerCredentials.authenticate(input),
-  platformUrl: <ports.platformUrl the packaged families used>, errors: ApiRestObservabilityComposition.create().legacyErrorHandler }`;
+platformUrl: <ports.platformUrl the packaged families used>, errors: ApiRestObservabilityComposition.create().legacyErrorHandler }`;
   beside the secret loop (~line 2368) `for (const suiteRestApp of this.composedSuite?.rest ?? []) rest.route("/", suiteRestApp);`.
 - `apps/api/src/tasks/openapi-document/openapi-document.surface.ts` `mountProcessTailFamilies`: mount `mountSuiteRest({ suites:
-  refuse("The suite application"), credential: refuse("The project credential door"), platformUrl: () => "", errors: refuseAtRuntime })`.
+refuse("The suite application"), credential: refuse("The project credential door"), platformUrl: () => "", errors: refuseAtRuntime })`.
 - Regenerate `apps/api/src/features/discovery/openapi-document.json` + `docs/api-reference/openapiLangWatch.json` once apps/api
   compiles: the alias family's operation ids become the declared names with version suffixes (`listSuites`, `listSuites_latest`, …).
 
@@ -167,14 +169,14 @@ five feature webs plus tsconfig/vitest aliases (gateway, governance) — same la
 
 - New `apps/api/src/app-rest/app-rest.process-features.ts` port beside `handlerManagedCredential` (~line 153):
   `export type ApiOrganizationDoorPort = (input: { request: Request; permission: AuthzPermission }) => Promise<Readonly<{
-  organizationId: string; apiKeyId: string; userId: string | null; markUsed: () => void }>>;` built where `ApiRestSecurity`
+organizationId: string; apiKeyId: string; userId: string | null; markUsed: () => void }>>;` built where `ApiRestSecurity`
   is built from `authenticateOrganizationThrowing` + `authorizeOrganizationPermissionThrowing` + the class-mismatch refusal
   (`apps/api/src/api-rest.security.ts:54-130`, all four errors already exist; it throws, never returns `{ ok }`).
 - New `apps/api/src/features/role/role-rest.mount.ts`: `mountRoleRest({ roles, door, enterpriseGate, errors })` →
   `createRestRuntime({ identity: { authenticate: door → { actor: userId ? { type: "user", id } : null, scope: { tier:
-  "organization", id: organizationId }, markUsed } } })`, a `WeakMap<Request, string>` carrying the organization to
+"organization", id: organizationId }, markUsed } } })`, a `WeakMap<Request, string>` carrying the organization to
   `facts: [bindRestMiddleware(roleRestFacts, ctx => ({ organizationId }))]` (suite's mount is the pattern), `middleware:
-  [enterpriseGate]`, `onError: errors`. Mount it where `app-rest.packaged-families.ts` used to mount `roles`; re-point
+[enterpriseGate]`, `onError: errors`. Mount it where `app-rest.packaged-families.ts` used to mount `roles`; re-point
   `api-rest.roles-family.integration.test.ts`; bind the `@unimplemented` scenario "A project key presented to an
   organization route is refused with the body the family already publishes" in `packages/api/specs/transport-declaration-split.feature`
   from that test. authz's `authzRoleBindingRest` mounts the same way once its declaration gains `.withCredential("organizationKey")`
@@ -188,7 +190,7 @@ five feature webs plus tsconfig/vitest aliases (gateway, governance) — same la
   `UserApp` import.
 - `apps/api/src/features/organization/__tests__/person-features.composition.integration.test.ts:156`: await the compose.
 - `apps/worker/src/app/worker-user-app.composition.ts:132`: `.withFeature(userServer, { infrastructure: { credentialIssuer,
-  avatarStorage, passwords } })` (`database` gone; `passwords: UserPasswordHasherPort` new — lift `BcryptPasswordHasher` from
+avatarStorage, passwords } })` (`database` gone; `passwords: UserPasswordHasherPort` new — lift `BcryptPasswordHasher` from
   `apps/api/src/features/user/user.composition.ts` into a module both processes import).
 - oxlint baseline keys for `web/src/screens/personal-workspace/*.screen.tsx` re-key to `web/src/ui/sections/personal-workspace/`
   (root session, after lint L2).
@@ -200,15 +202,14 @@ Auth's directory is typed `UserService` and calls `tryFindByEmail`/`create`/`cre
 — decide whether it becomes `UserApi` operations or an auth-owned port; `GdprUserDataEraseRepository` walks other features'
 tables (tasks catalogue) and is not a user repository.
 
-
 ## evaluation (door landed `ccf912e810`; legacy REST family still on the deleted builders)
 
 - `apps/api/src/app/api-production.composition.ts:127-130`: import `installApiEvaluation` in place of `composeEvaluationFeature`
   and `refusingEvaluationFeature`. Line ~4326 `this.composedEvaluation = refusingEvaluationFeature()` goes with its branch: a
   process installs the feature or leaves `composedEvaluation` unset. Line ~4389 becomes
   `this.composedEvaluation = await installApiEvaluation({ infrastructure, peers: { workflows, traces, modelProviders },
-  collaborators: { runTraceEvaluation: (input) => this.requireEvaluatorExecution().runEvaluationForTrace(input),
-  probeEvaluatorRuntime, trackEvaluationRan, environment }, processName, eventing, resolveClickHouse, dataRetention })`.
+collaborators: { runTraceEvaluation: (input) => this.requireEvaluatorExecution().runEvaluationForTrace(input),
+probeEvaluatorRuntime, trackEvaluationRan, environment }, processName, eventing, resolveClickHouse, dataRetention })`.
   `runEvaluationForTrace` no longer takes a `ctx` first argument; the probe and the analytics callback are required.
   `~1420`/`~1458` (`evaluation: this.composedEvaluation`, `evaluations: this.composedEvaluation.app`) and `~2116`/`~4419`
   (`reportEvaluation`) stand; `.app` is now the whole `EvaluationApi`.
@@ -279,7 +280,7 @@ tables (tasks catalogue) and is not a user repository.
   import; `:242` `MonitorService` → `MonitorApi`; `:703`/`:794` collapse `composedExecutionMonitors` and `composedMonitors`
   into one `composedMonitors: MonitorApi | undefined`; `:3318-3334` `composeMonitor` becomes
   `async … Promise<ComposedMonitorFeature>` calling `await installApiMonitor({ infrastructure, peers: { permissions,
-  evaluators, workflowReplication }, resolveClickHouseClient })` and setting `this.composedMonitors = composed.app`;
+evaluators, workflowReplication }, resolveClickHouseClient })` and setting `this.composedMonitors = composed.app`;
   `:1262` awaits it; `:4071-4083` `resolveMonitors` (which built a Postgres adapter on demand) is deleted and `:3768`,
   `:3832`, `:4040` read `this.composedMonitor.app`; `:4354-4355` `composeMonitorService(...)` → `this.composedMonitor.app`,
   which means monitor composes BEFORE the execution half (today's order is the reverse; evaluators and workflow
@@ -287,7 +288,7 @@ tables (tasks catalogue) and is not a user repository.
 - `apps/api/src/app-trpc/app-trpc.context.ts:38,166`: `MonitorApp` (server) → `MonitorApi` (contract).
 - `apps/api/src/app-trpc/app-trpc.features.ts:129`: `composed.monitor.router(mount)` → `composed.monitor.routers(mount).monitors`.
 - `apps/api/src/app-rest/app-rest.packaged-families.ts:46-47,148,226-230,528-537`: `createMonitorRestApp` → `mountMonitorRest({
-  monitors, credential, platformUrl, errors })` from `apps/api/src/features/monitor/monitor-rest.mount.ts`; the
+monitors, credential, platformUrl, errors })` from `apps/api/src/features/monitor/monitor-rest.mount.ts`; the
   `monitorMappingsSchema` port goes (the declaration carries the contract's own schema); `MonitorApp` → `MonitorApi`.
 - `apps/api/src/index.ts:250`: delete `export { createMonitorRestApp }`; nothing outside apps/api imports it.
 - `apps/worker/src/app/worker-evaluation-execution.composition.ts:23,70-77`: `PostgresMonitorAdapter.create` → boot
@@ -314,12 +315,12 @@ tables (tasks catalogue) and is not a user repository.
 ## dataset (door landed `bce3912c7e`; nine routes wait on the runtime)
 
 - `apps/api/src/app/api-production.composition.ts:76-79`: import `installApiDataset` only; `:1229-1233` → `this.composedDataset =
-  await installApiDataset({ prisma, peers: { experiments, permissions }, infrastructure: datasetInfrastructure, rest: {
-  credential, platformUrl, errors } })`, no refusing twin; `:4333` `composeDatasetService({ infrastructure })` is gone — the
+await installApiDataset({ prisma, peers: { experiments, permissions }, infrastructure: datasetInfrastructure, rest: {
+credential, platformUrl, errors } })`, no refusing twin; `:4333` `composeDatasetService({ infrastructure })` is gone — the
   workflow runtime's `peers.datasets` wants the deleted `DatasetService` contract, so it takes `this.composedDataset.app`
   (`DatasetApi`) and `PostgresWorkflowAdapter`'s parameter type follows (workflow lane, note it).
 - `apps/api/src/app-rest/app-rest.packaged-families.ts:430-443`: the family is no longer built here; `mount("dataset", () =>
-  composed.dataset.rest)` (`installApiDataset` returns `rest: MountableRestApp`).
+composed.dataset.rest)` (`installApiDataset` returns `rest: MountableRestApp`).
 - `apps/api/src/app-rest/app-rest.process-features.ts:86,495-497`: delete the `mountDatasetGenerateRest` import and the
   `authoring?.datasetGenerate` block; `api-authoring-rest.composition.ts` drops the `"dataset-generate"` door name.
 - tRPC root (`src/app-trpc/app-trpc.composed.ts` and supports): `routers(mount)` returns `dataset`, `datasetRecord`,
@@ -333,13 +334,13 @@ tables (tasks catalogue) and is not a user repository.
 - Worker: `worker-dataset-normalization.composition.ts:17,77`, `worker-evaluation-app.composition.ts:20,73`,
   `worker-scenario-execution.composition.ts:10,270` build `PostgresDatasetAdapter`, deleted and its repositories private →
   a worker-side boot in `apps/worker/src/features/dataset/` (`withPersistence("postgres", { prisma }).withFeature(datasetServer,
-  { infrastructure }).boot({ role: "worker" })`) yielding one `DatasetApi`; `worker-dataset-normalization.composition.ts:45`
+{ infrastructure }).boot({ role: "worker" })`) yielding one `DatasetApi`; `worker-dataset-normalization.composition.ts:45`
   `PrismaDatasetContentRepository.create(options.database)` → `.create({ prisma: options.database })`.
 - Surface key: `modules/dataset/browser/package.json` export `./surfaces/dataset-table` → `./dataset-table`;
   `apps/ui/src/features/catalogue.json` `experiments.uses.surfaces` gains `@langwatch/dataset-browser/dataset-table`; five
   imports in `modules/experiment/browser/src/{behavior/experiments-v3/use-dataset-sync.ts,
-  ui/sections/experiments-v3/evaluations-v3-dataset-table-provider.tsx, ui/sections/experiments-v3/table-settings-menu.tsx,
-  ui/sections/experiments-v3/evaluations-v3-table.tsx, ui/elements/experiments-v3/autosave-status.tsx}` repoint. One commit.
+ui/sections/experiments-v3/evaluations-v3-dataset-table-provider.tsx, ui/sections/experiments-v3/table-settings-menu.tsx,
+ui/sections/experiments-v3/evaluations-v3-table.tsx, ui/elements/experiments-v3/autosave-status.tsx}` repoint. One commit.
 - `specs/errors/handled-error-surfaces.feature:22,29,35,42` describe the deleted per-feature tRPC translation middleware;
   handled errors cross tRPC natively now. Rewrite or retire those four scenarios (spec owner).
 - Baseline rows removed by the root session: nine `dataset|*`.
@@ -350,15 +351,15 @@ tables (tasks catalogue) and is not a user repository.
   import; `evaluatorApi: EvaluatorApp | undefined` → `EvaluatorApi | undefined` (contract). In `composeExecutionFeatures`,
   where `this.evaluatorApi = EvaluatorApp.create({ evaluators, modelProviders })` stood, compose the feature there:
   `this.composedEvaluator = infrastructure && modelProviders && this.composedAuthz?.app ? composeEvaluatorFeature({
-  infrastructure, peers: { evaluators, modelProviders, permissions: this.composedAuthz.app, workflows: () =>
-  this.composedWorkflow.app } }) : undefined; this.evaluatorApi = this.composedEvaluator?.app;` (the lazy `workflows`
+infrastructure, peers: { evaluators, modelProviders, permissions: this.composedAuthz.app, workflows: () =>
+this.composedWorkflow.app } }) : undefined; this.evaluatorApi = this.composedEvaluator?.app;` (the lazy `workflows`
   accessor is what lets `composeWorkflowFeature` take this app as its peer a few lines later). Delete the later ternary that
   built the feature with `app: this.evaluatorApi` or the refusing twin. Its two readers guard: `...(this.composedEvaluator ?
-  { evaluatorApp: this.composedEvaluator.app } : {})` and `...(this.composedEvaluator ? { evaluator: this.composedEvaluator }
-  : {})`.
+{ evaluatorApp: this.composedEvaluator.app } : {})` and `...(this.composedEvaluator ? { evaluator: this.composedEvaluator }
+: {})`.
 - `apps/api/src/app-trpc/app-trpc.context.ts`: `evaluatorApp: EvaluatorApp` → `EvaluatorApi`.
 - `apps/api/src/app-rest/app-rest.packaged-families.ts:40-41,133,423-435`: `createEvaluatorsRestApp` → `mountEvaluatorRest({
-  evaluators, credential: ports.handlerManagedCredential, platformUrl: ports.platformUrl, errors: ports.legacyErrors })`
+evaluators, credential: ports.handlerManagedCredential, platformUrl: ports.platformUrl, errors: ports.legacyErrors })`
   from `apps/api/src/features/evaluator/evaluator-rest.mount.ts`; `EvaluatorApp` → `EvaluatorApi`.
 - `apps/api/src/index.ts:183-190`: drop `createEvaluatorsRestApp` and `EvaluatorAppVariables` from the re-export block.
 - `apps/api/src/features/monitor/monitor.composition.ts:13,129`: `EvaluatorReplicationApi` → `EvaluatorReplicationService`;

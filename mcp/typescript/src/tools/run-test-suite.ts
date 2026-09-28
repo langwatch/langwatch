@@ -1,6 +1,6 @@
 import type { RunParameters, RunPlanTarget } from "../langwatch-api-run-plans.js";
-import { toWireTargets } from "../schemas/run-plan.js";
 import { runTestSuite as apiRunTestSuite } from "../langwatch-api-test-suites.js";
+import { toWireTargets } from "../schemas/run-plan.js";
 import { formatRunPlanRun } from "./format-run-plan.js";
 
 /**

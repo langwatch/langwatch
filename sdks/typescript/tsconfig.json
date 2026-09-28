@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.shared.json",
   "compilerOptions": {
     // This package emits: `noEmit` from the shared base is turned back off
     // here so a `tsc -p` build still writes its declarations.

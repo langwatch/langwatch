@@ -645,12 +645,20 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
     await store.commit(commit({ target: ref("in-one", "project-1"), messages: [] }));
     await store.commit(commit({ target: ref("in-two", "project-2"), messages: [] }));
     await store.commit(
-      commit({ target: { ...ref("other-name"), processName: `${processName}-other` }, messages: [] }),
+      commit({
+        target: { ...ref("other-name"), processName: `${processName}-other` },
+        messages: [],
+      }),
     );
 
-    const keys = await store.findProcessKeys({ processName, projectIds: ["project-1", "project-2"] });
+    const keys = await store.findProcessKeys({
+      processName,
+      projectIds: ["project-1", "project-2"],
+    });
     expect(keys.toSorted()).toEqual(["in-one", "in-two"]);
-    expect(await store.findProcessKeys({ processName, projectIds: ["project-2"] })).toEqual(["in-two"]);
+    expect(await store.findProcessKeys({ processName, projectIds: ["project-2"] })).toEqual([
+      "in-two",
+    ]);
     expect(await store.findProcessKeys({ processName, projectIds: [] })).toEqual([]);
   });
 

@@ -1,6 +1,7 @@
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
+import { makeBatchRun, makeScenarioRunData } from "../model/run-history-fixtures.ts";
 import {
   availableGroupByOptions,
   computeBatchRunSummary,
@@ -15,7 +16,6 @@ import {
   groupRunsByTargetKey,
   resolveOriginLabel,
 } from "../model/run-history-transforms.ts";
-import { makeBatchRun, makeScenarioRunData } from "./test-helpers.ts";
 
 describe("groupRunsByTargetKey()", () => {
   describe("when the same agent ran on two sets of parameters", () => {

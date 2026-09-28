@@ -58,10 +58,13 @@ void describe("given a structured line", () => {
   });
 
   void it("insets a message that carries its own newlines", () => {
-    const got = render('{"level":"fatal","msg":"rejected: [\\n  {\\n    \\"code\\": \\"bad\\"\\n  }\\n]"}', {
-      lane: "worker",
-      at,
-    });
+    const got = render(
+      '{"level":"fatal","msg":"rejected: [\\n  {\\n    \\"code\\": \\"bad\\"\\n  }\\n]"}',
+      {
+        lane: "worker",
+        at,
+      },
+    );
     for (const row of got.split("\n").slice(1)) {
       assert.ok(row.startsWith("    "), `continuation ${row} must be inset, not at the margin`);
     }

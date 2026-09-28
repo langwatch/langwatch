@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { formatEvaluatorSchema } from "../tools/discover-evaluator-schema.js";
 
 describe("formatEvaluatorSchema()", () => {

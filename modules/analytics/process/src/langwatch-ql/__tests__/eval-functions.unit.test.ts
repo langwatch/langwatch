@@ -165,6 +165,50 @@ describe("given nesting the validator does not allow", () => {
       expect(codesOf(result)).toContain("APP_FUNCTION_POSITION");
     });
   });
+
+  describe("when an eval's alias is named outside the SELECT list", () => {
+    function withTail(tail: string): LangWatchQLValidation {
+      return validateLangWatchQL({
+        sql: `SELECT TraceId, eval_score(CapturedOutput, 'How polite', 1, 5) AS s FROM analytics.traces ${tail}`,
+        ...POLICY,
+      });
+    }
+
+    /** @scenario "Sorting by an eval's alias is refused rather than sorting by the text it judges" */
+    it("refuses ORDER BY the alias and names the two-step pattern over analytics.judgments", () => {
+      const result = withTail("ORDER BY s DESC");
+
+      expect(codesOf(result)).toContain("APP_FUNCTION_POSITION");
+      expect(messagesOf(result)).toContain("analytics.judgments");
+    });
+
+    /** @scenario "Sorting by an eval's alias is refused rather than sorting by the text it judges" */
+    it("refuses ORDER BY the eval's position in the SELECT list", () => {
+      expect(codesOf(withTail("ORDER BY 2 DESC"))).toContain("APP_FUNCTION_POSITION");
+    });
+
+    /** @scenario "Grouping or filtering on an eval's alias is refused" */
+    it("refuses GROUP BY the alias", () => {
+      expect(codesOf(withTail("GROUP BY TraceId, s"))).toContain("APP_FUNCTION_POSITION");
+    });
+
+    /** @scenario "Grouping or filtering on an eval's alias is refused" */
+    it("refuses HAVING on the alias", () => {
+      expect(codesOf(withTail("GROUP BY TraceId, CapturedOutput HAVING s > 3"))).toContain(
+        "APP_FUNCTION_POSITION",
+      );
+    });
+
+    /** @scenario "Grouping or filtering on an eval's alias is refused" */
+    it("refuses WHERE on the alias", () => {
+      expect(codesOf(withTail("WHERE s > 3"))).toContain("APP_FUNCTION_POSITION");
+    });
+
+    /** @scenario "Sorting by an eval's alias is refused rather than sorting by the text it judges" */
+    it("accepts sorting by a plain column beside the eval", () => {
+      expect(codesOf(withTail("ORDER BY TraceId"))).toEqual([]);
+    });
+  });
 });
 
 describe("given arguments that do not match a signature", () => {

@@ -158,14 +158,14 @@ The control plane answers with stable codes, and the gateway's status switch
 maps each one. Left unmapped, a terminal refusal would reach the caller as a
 retryable 503.
 
-| Code | Status | Meaning |
-|---|---|---|
-| `connect_license_not_registered` | 401 | the token is not in the registry |
-| `connect_license_revoked` | 403 | revoked by LangWatch |
-| `connect_license_expired` | 403 | the term has ended |
-| `connect_wrong_instance` | 403 | bound to another instance |
-| `connect_instance_required` | 400 | no `X-LangWatch-Instance` |
-| `connect_service_not_entitled` | 403 | the license does not include the service |
+| Code                             | Status | Meaning                                  |
+| -------------------------------- | ------ | ---------------------------------------- |
+| `connect_license_not_registered` | 401    | the token is not in the registry         |
+| `connect_license_revoked`        | 403    | revoked by LangWatch                     |
+| `connect_license_expired`        | 403    | the term has ended                       |
+| `connect_wrong_instance`         | 403    | bound to another instance                |
+| `connect_instance_required`      | 400    | no `X-LangWatch-Instance`                |
+| `connect_service_not_entitled`   | 403    | the license does not include the service |
 
 The first five are declared in the Go gateway, so `herrgen` carries them into the
 app's error registry and each has customer copy. Entitlement is checked by the
@@ -535,54 +535,54 @@ A customer on an offline license must notice nothing when they upgrade. Where a
 cleaner design and this guarantee disagree, the guarantee wins. Each line names
 the test that pins it.
 
-| Guarantee | Pinned by |
-|---|---|
-| A license issued before this change verifies with the same public key and the same schema, and re-serializes byte for byte. | `ee/licensing/__tests__/offlineLicenseCompat.unit.test.ts`, on a fixture minted with the licensing code of `origin/main` |
-| The embedded production public key is unchanged. | same file, "is still verified against the production public key main shipped" |
-| With no `connect.*` value set, seat enforcement is the same hard cap: the seat past the licensed count is refused, the one within it is admitted. | same file, "keeps the hard seat cap" and "keeps admitting a seat within the licensed count" |
-| Validating and enforcing an offline license makes no network call and never reads the registry. | same file, "makes no network call and never reads the registry": `fetch` is stubbed to throw, and the database stub throws on any model but `Organization` |
-| No new required environment variable or Helm value. Every `LANGWATCH_CONNECT_*` variable is optional, and the one that exists only refuses. | `offlineLicenseCompat.unit.test.ts`, "parses with every Connect variable absent, none of them required" |
-| A license minted before this change names no hosted service, so no outbound path builds a client. | same file, "names no hosted service, so no path builds a client" |
-| With no judge key and a license naming no hosted service, every judgement is skipped and neither `fetch` nor undici is called. | same file, "skips every judgement and calls nothing" |
-| A pass of the license sync over an install holding that license reaches the client for no organization at all. | same file, "syncs nothing and posts its statistics where it always did" |
-| The product statistics keep their destination: an install with no entitled license posts to `app.langwatch.ai/api/track_usage`, as it always has. | same file, and `usageStatsHost.unit.test.ts`, "given an install on an offline license" |
-| A chart render that changes no value carries no `LANGWATCH_CONNECT_` variable at all. | `charts/langwatch/tests/connect-env.sh` |
-| The migration is additive and needs only the normal `prisma migrate deploy`: one enum, one empty table, one column with a default. | `20260919120000_issued_license_registry`, replayed on a scratch database |
-| The usage statistics worker behaves as before and `/api/track_usage` stays. | `track-usage-security.integration.test.ts` stays green; the destination moves to the connect host only for an install whose license names a hosted service |
-| The license page of an install is unchanged. The one control removed, "New License", was only ever rendered on LangWatch Cloud. | `LicenseStatus.integration.test.tsx` |
+| Guarantee                                                                                                                                         | Pinned by                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A license issued before this change verifies with the same public key and the same schema, and re-serializes byte for byte.                       | `ee/licensing/__tests__/offlineLicenseCompat.unit.test.ts`, on a fixture minted with the licensing code of `origin/main`                                   |
+| The embedded production public key is unchanged.                                                                                                  | same file, "is still verified against the production public key main shipped"                                                                              |
+| With no `connect.*` value set, seat enforcement is the same hard cap: the seat past the licensed count is refused, the one within it is admitted. | same file, "keeps the hard seat cap" and "keeps admitting a seat within the licensed count"                                                                |
+| Validating and enforcing an offline license makes no network call and never reads the registry.                                                   | same file, "makes no network call and never reads the registry": `fetch` is stubbed to throw, and the database stub throws on any model but `Organization` |
+| No new required environment variable or Helm value. Every `LANGWATCH_CONNECT_*` variable is optional, and the one that exists only refuses.       | `offlineLicenseCompat.unit.test.ts`, "parses with every Connect variable absent, none of them required"                                                    |
+| A license minted before this change names no hosted service, so no outbound path builds a client.                                                 | same file, "names no hosted service, so no path builds a client"                                                                                           |
+| With no judge key and a license naming no hosted service, every judgement is skipped and neither `fetch` nor undici is called.                    | same file, "skips every judgement and calls nothing"                                                                                                       |
+| A pass of the license sync over an install holding that license reaches the client for no organization at all.                                    | same file, "syncs nothing and posts its statistics where it always did"                                                                                    |
+| The product statistics keep their destination: an install with no entitled license posts to `app.langwatch.ai/api/track_usage`, as it always has. | same file, and `usageStatsHost.unit.test.ts`, "given an install on an offline license"                                                                     |
+| A chart render that changes no value carries no `LANGWATCH_CONNECT_` variable at all.                                                             | `charts/langwatch/tests/connect-env.sh`                                                                                                                    |
+| The migration is additive and needs only the normal `prisma migrate deploy`: one enum, one empty table, one column with a default.                | `20260919120000_issued_license_registry`, replayed on a scratch database                                                                                   |
+| The usage statistics worker behaves as before and `/api/track_usage` stays.                                                                       | `track-usage-security.integration.test.ts` stays green; the destination moves to the connect host only for an install whose license names a hosted service |
+| The license page of an install is unchanged. The one control removed, "New License", was only ever rendered on LangWatch Cloud.                   | `LicenseStatus.integration.test.tsx`                                                                                                                       |
 
 The registry and the token derivation exist only on the issuing and the hosted
 side. `validateLicense`, `LicenseHandler` and the seat guard import neither.
 
 ## Threat model
 
-| Threat | What happens | Bound |
-|---|---|---|
-| A license key leaks (an email is forwarded) | Once an install has bound the license, a caller without its instance id is refused. Before first use, the attacker can bind first; the real install then sees `connect_wrong_instance`, and LangWatch reissues and revokes. | Spend is capped by the organization budget. License keys stop travelling by email once sync delivers them. |
-| The token and instance id are replayed from another network | Both travel only under TLS to the two hosts. They are bearer secrets; replay with both succeeds. | The budget cap, per-license spend rows that make the use visible, and revocation in seconds. |
-| A revoked license with a cached gateway credential | Revoking revokes the managed key; the change feed evicts the cache entry on the next poll. The 15 minute JWT expiry is the backstop. | While the control plane is unreachable the gateway serves stale entries for up to its 6 hour hard grace. Exposure is capped by the budget. |
-| Hash enumeration | The token is the SHA-256 of a payload that contains a 2048-bit RSA signature. It can not be guessed. The shape check and the negative cache keep a flood of unknown tokens off Postgres. | Refusals never include customer name, seats or term. |
-| A read of the registry table | Rows hold `sha256(token)`, never the token, and a SHA-256 of a 256-bit value can not be reversed. A held reissued license is encrypted. | The encryption key lives outside the database. |
-| A self-hosted admin tampers with the client | They can forge nothing LangWatch signs. They can patch the seat guard out of their own build, as they always could. Hosted usage can not be under-reported because LangWatch meters it. Seats can be under-reported by a patched build. | A license that stops syncing raises a signal after seven days, and the contract's audit clause covers the rest. |
-| A customer changes its own cap | `PUT /v1/budget` is bounded by the contract maximum on the registry row. | The install only offers it to organization admins. |
+| Threat                                                      | What happens                                                                                                                                                                                                                            | Bound                                                                                                                                      |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| A license key leaks (an email is forwarded)                 | Once an install has bound the license, a caller without its instance id is refused. Before first use, the attacker can bind first; the real install then sees `connect_wrong_instance`, and LangWatch reissues and revokes.             | Spend is capped by the organization budget. License keys stop travelling by email once sync delivers them.                                 |
+| The token and instance id are replayed from another network | Both travel only under TLS to the two hosts. They are bearer secrets; replay with both succeeds.                                                                                                                                        | The budget cap, per-license spend rows that make the use visible, and revocation in seconds.                                               |
+| A revoked license with a cached gateway credential          | Revoking revokes the managed key; the change feed evicts the cache entry on the next poll. The 15 minute JWT expiry is the backstop.                                                                                                    | While the control plane is unreachable the gateway serves stale entries for up to its 6 hour hard grace. Exposure is capped by the budget. |
+| Hash enumeration                                            | The token is the SHA-256 of a payload that contains a 2048-bit RSA signature. It can not be guessed. The shape check and the negative cache keep a flood of unknown tokens off Postgres.                                                | Refusals never include customer name, seats or term.                                                                                       |
+| A read of the registry table                                | Rows hold `sha256(token)`, never the token, and a SHA-256 of a 256-bit value can not be reversed. A held reissued license is encrypted.                                                                                                 | The encryption key lives outside the database.                                                                                             |
+| A self-hosted admin tampers with the client                 | They can forge nothing LangWatch signs. They can patch the seat guard out of their own build, as they always could. Hosted usage can not be under-reported because LangWatch meters it. Seats can be under-reported by a patched build. | A license that stops syncing raises a signal after seven days, and the contract's audit clause covers the rest.                            |
+| A customer changes its own cap                              | `PUT /v1/budget` is bounded by the contract maximum on the registry row.                                                                                                                                                                | The install only offers it to organization admins.                                                                                         |
 
 ## Operator names
 
-| Kind | Name |
-|---|---|
-| Env (Cloud) | `LANGWATCH_LICENSE_PRIVATE_KEY`, `STRIPE_SECRET_KEY` |
-| Env (install) | `LANGWATCH_CONNECT_DISABLED`, `LANGWATCH_CONNECT_LICENSE_ENDPOINT`, `LANGWATCH_CONNECT_GATEWAY_ENDPOINT`, `LANGWATCH_CONNECT_INSTANCE_ID`, `DISABLE_USAGE_STATS`, `SERVICE_VERSION`, `HTTPS_PROXY` |
-| Helm | `app.connect.disabled`, `app.connect.licenseEndpoint`, `app.connect.gatewayEndpoint`, `app.connect.instanceId` |
-| Entitlement | `LicenseData.connectServices`, signed into the license |
-| Instance identity | `InstanceIdentity` (one row: `instanceId`, `lastReportAt`, `lastReportError`) |
-| Install opt-out | `Organization.connectServicesDisabled` (empty by default, so an entitled service is on) |
-| Seat change | backoffice "Change seats", `licenseRegistry.changeSeats`, `ConnectedSeatChange` |
-| Refresh | License page "Refresh license", `license.refresh`, `syncLicenseNow` |
-| Gateway host | `POST /v1/instant-evals/classify`, `GET /v1/usage`, `PUT /v1/budget` |
-| Control plane, gateway only | `POST /api/internal/gateway/connect/:operation` (HMAC signed) |
-| Connect host | `POST /v1/license/sync` (answers `{services, license?}`), `POST /v1/stats` |
-| Contract budget | `GatewayBudget.externalId = connect-contract`, metadata `connect_cap_set_by` |
-| Error codes | `connect_service_not_entitled`, `connect_license_required`, `connect_budget_not_set`, `connect_budget_above_contract_maximum`, `connect_budget_exhausted`, `connect_disabled`, `connect_unreachable`, `hosted_service_unavailable` |
+| Kind                        | Name                                                                                                                                                                                                                               |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Env (Cloud)                 | `LANGWATCH_LICENSE_PRIVATE_KEY`, `STRIPE_SECRET_KEY`                                                                                                                                                                               |
+| Env (install)               | `LANGWATCH_CONNECT_DISABLED`, `LANGWATCH_CONNECT_LICENSE_ENDPOINT`, `LANGWATCH_CONNECT_GATEWAY_ENDPOINT`, `LANGWATCH_CONNECT_INSTANCE_ID`, `DISABLE_USAGE_STATS`, `SERVICE_VERSION`, `HTTPS_PROXY`                                 |
+| Helm                        | `app.connect.disabled`, `app.connect.licenseEndpoint`, `app.connect.gatewayEndpoint`, `app.connect.instanceId`                                                                                                                     |
+| Entitlement                 | `LicenseData.connectServices`, signed into the license                                                                                                                                                                             |
+| Instance identity           | `InstanceIdentity` (one row: `instanceId`, `lastReportAt`, `lastReportError`)                                                                                                                                                      |
+| Install opt-out             | `Organization.connectServicesDisabled` (empty by default, so an entitled service is on)                                                                                                                                            |
+| Seat change                 | backoffice "Change seats", `licenseRegistry.changeSeats`, `ConnectedSeatChange`                                                                                                                                                    |
+| Refresh                     | License page "Refresh license", `license.refresh`, `syncLicenseNow`                                                                                                                                                                |
+| Gateway host                | `POST /v1/instant-evals/classify`, `GET /v1/usage`, `PUT /v1/budget`                                                                                                                                                               |
+| Control plane, gateway only | `POST /api/internal/gateway/connect/:operation` (HMAC signed)                                                                                                                                                                      |
+| Connect host                | `POST /v1/license/sync` (answers `{services, license?}`), `POST /v1/stats`                                                                                                                                                         |
+| Contract budget             | `GatewayBudget.externalId = connect-contract`, metadata `connect_cap_set_by`                                                                                                                                                       |
+| Error codes                 | `connect_service_not_entitled`, `connect_license_required`, `connect_budget_not_set`, `connect_budget_above_contract_maximum`, `connect_budget_exhausted`, `connect_disabled`, `connect_unreachable`, `hosted_service_unavailable` |
 
 ## Consequences
 

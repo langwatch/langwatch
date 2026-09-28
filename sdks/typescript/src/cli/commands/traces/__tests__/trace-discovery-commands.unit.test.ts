@@ -12,12 +12,12 @@ const mockSearch = vi.fn();
 const mockReference = vi.fn();
 
 vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, TracesApiService: vi.fn() };
 });
 
 vi.mock("@/client-sdk/services/query/query-api.service", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, QueryApiService: vi.fn() };
 });
 

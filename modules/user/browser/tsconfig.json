@@ -26,13 +26,13 @@
   "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
   "references": [
     {
-      "path": "../../auth/contract/tsconfig.build.json"
-    },
-    {
       "path": "tsconfig.build.json"
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../auth/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/browser-host/tsconfig.build.json"

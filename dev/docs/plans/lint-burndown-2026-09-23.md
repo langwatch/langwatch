@@ -89,12 +89,12 @@ Groups: **identity** (identity, auth, authz, organization, user, api-key, projec
 Whole-tree oxlint 7,673 → 5,561 (−2,112) in 118 simple lanes (S2-01a…S2-39b, `lane-opus-medium`, 70-call budget), each
 committed with `--only`. The planner now finds **0 simple lanes**. What remains is parked or belongs to the queued design lanes.
 
-| wave | lanes | fixed | parked |
-| --- | --- | --- | --- |
-| W1 correctness | 6 | 91 | 66 |
-| W3 shape and naming | 18 | 347 | 213 |
-| W4 test doubles | 41 | 796 | 654 |
-| W5 readability | 53 | 879 | 1,013 |
+| wave                | lanes | fixed | parked |
+| ------------------- | ----- | ----- | ------ |
+| W1 correctness      | 6     | 91    | 66     |
+| W3 shape and naming | 18    | 347   | 213    |
+| W4 test doubles     | 41    | 796   | 654    |
+| W5 readability      | 53    | 879   | 1,013  |
 
 Parked ledger: `.claude/handoffs/parked/lint-fix-S2-*.tsv` (≈2,000 rows, file · line · rule · reason) plus 109 class-parked rows
 (depth-bound complexity, one block carrying ≥60% of a score, eventing `any`). Largest decision groups: complexity needing a real

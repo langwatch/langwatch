@@ -4351,6 +4351,26 @@
           "name": "InconclusiveCriteria",
           "type": "Array(String)",
           "comment": ""
+        },
+        {
+          "name": "Criteria.Criterion",
+          "type": "Array(String)",
+          "comment": ""
+        },
+        {
+          "name": "Criteria.Requirement",
+          "type": "Array(String)",
+          "comment": ""
+        },
+        {
+          "name": "Criteria.Status",
+          "type": "Array(LowCardinality(String))",
+          "comment": ""
+        },
+        {
+          "name": "Criteria.Reasoning",
+          "type": "Array(String)",
+          "comment": ""
         }
       ]
     },

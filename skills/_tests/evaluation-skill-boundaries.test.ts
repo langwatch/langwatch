@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { describe, expect, it } from "vitest";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -44,18 +45,18 @@ describe("evaluation skill boundaries", () => {
     expect(source).not.toContain("langwatch monitor create");
   });
 
-	/** @scenario An ambiguous evaluation request is asked with the question tool */
-	it("asks the experiment-vs-evaluator question with the question tool", () => {
-		const source = readSkill("evaluations");
+  /** @scenario An ambiguous evaluation request is asked with the question tool */
+  it("asks the experiment-vs-evaluator question with the question tool", () => {
+    const source = readSkill("evaluations");
 
-		// The question tool is the one way to put a user-owned decision to the
-		// user in Langy, and "which of these gets tested" is exactly that
-		// decision. A choices fence no longer renders, and prose would ask the
-		// agent to break its own rule.
-		expect(source).toContain("`question` tool");
-		expect(source).not.toContain('"kind": "choices"');
-		expect(source).not.toContain("Send the question as a single line of prose");
-	});
+    // The question tool is the one way to put a user-owned decision to the
+    // user in Langy, and "which of these gets tested" is exactly that
+    // decision. A choices fence no longer renders, and prose would ask the
+    // agent to break its own rule.
+    expect(source).toContain("`question` tool");
+    expect(source).not.toContain('"kind": "choices"');
+    expect(source).not.toContain("Send the question as a single line of prose");
+  });
 
   it("organizes the dogfood scenarios into focused files", () => {
     const scenarioFiles = fs

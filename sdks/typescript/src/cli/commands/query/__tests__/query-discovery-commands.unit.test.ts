@@ -11,7 +11,7 @@ const mockSchema = vi.fn();
 const mockReference = vi.fn();
 
 vi.mock("@/client-sdk/services/query/query-api.service", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, QueryApiService: vi.fn() };
 });
 

@@ -5,21 +5,12 @@
     {
       "$why": "rung 0. A primitive is a leaf: it is what everything else is built from.",
       "sourceTag": "layer:primitive",
-      "onlyDependOnLibsWithTags": [
-        "layer:primitive",
-        "layer:test",
-        "layer:tooling"
-      ]
+      "onlyDependOnLibsWithTags": ["layer:primitive", "layer:test", "layer:tooling"]
     },
     {
       "$why": "rung 1. A client wraps one conduit and knows nothing above it.",
       "sourceTag": "layer:client",
-      "onlyDependOnLibsWithTags": [
-        "layer:client",
-        "layer:primitive",
-        "layer:test",
-        "layer:tooling"
-      ]
+      "onlyDependOnLibsWithTags": ["layer:client", "layer:primitive", "layer:test", "layer:tooling"]
     },
     {
       "$why": "rung 2. Owned state: the only layer permitted to name a raw client.",
@@ -178,55 +169,37 @@
     {
       "$why": "Core must not depend on enterprise. Enterprise may depend on core. Applications and the generated install lists carry no tier, so they are exempt by construction.",
       "sourceTag": "tier:core",
-      "onlyDependOnLibsWithTags": [
-        "tier:core",
-        "layer:test",
-        "layer:tooling"
-      ]
+      "onlyDependOnLibsWithTags": ["tier:core", "layer:test", "layer:tooling"]
     },
     {
       "$why": "Composition names every half.",
       "sourceTag": "layer:composition",
-      "onlyDependOnLibsWithTags": [
-        "*"
-      ]
+      "onlyDependOnLibsWithTags": ["*"]
     },
     {
       "$why": "Applications compose.",
       "sourceTag": "layer:app",
-      "onlyDependOnLibsWithTags": [
-        "*"
-      ]
+      "onlyDependOnLibsWithTags": ["*"]
     },
     {
       "sourceTag": "layer:test",
-      "onlyDependOnLibsWithTags": [
-        "*"
-      ]
+      "onlyDependOnLibsWithTags": ["*"]
     },
     {
       "sourceTag": "layer:tooling",
-      "onlyDependOnLibsWithTags": [
-        "*"
-      ]
+      "onlyDependOnLibsWithTags": ["*"]
     },
     {
       "sourceTag": "layer:sdk",
-      "onlyDependOnLibsWithTags": [
-        "*"
-      ]
+      "onlyDependOnLibsWithTags": ["*"]
     },
     {
       "sourceTag": "layer:service",
-      "onlyDependOnLibsWithTags": [
-        "*"
-      ]
+      "onlyDependOnLibsWithTags": ["*"]
     },
     {
       "sourceTag": "layer:mcp",
-      "onlyDependOnLibsWithTags": [
-        "*"
-      ]
+      "onlyDependOnLibsWithTags": ["*"]
     },
     {
       "sourceTag": "layer:framework",

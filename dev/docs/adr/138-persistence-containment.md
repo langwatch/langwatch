@@ -33,15 +33,15 @@ through costs nothing and removes the cast entirely.
 
 ## Decision
 
-| Rule | Layer | Meaning |
-| --- | --- | --- |
-| `langwatch/store-containment` | plugin | Prisma, ClickHouse and Redis are named only under the module's own `repositories/<store>/` (Redis also `channels/redis/`), and never in an application. Replaces `prisma-containment`, `clickhouse-containment` and `redis-containment` (2026-09-23); `typed-prisma-seam` was deleted. |
-| `langwatch/clickhouse-tenant-id` | plugin | Every table a ClickHouse repository queries carries a bound `TenantId` predicate in its own scope, or the query declares itself `unscoped` with a reason. |
-| `langwatch/clickhouse-no-version-order-limit` | plugin | No `ORDER BY <version> DESC LIMIT 1` over heavy columns; dedupe with the IN-tuple form. |
-| `langwatch/prisma-count-in-list-query` | plugin | No `_count` inside a `findMany`: Prisma builds it as an uncorrelated join over the whole related table. |
-| `prisma-table-ownership` | architecture-enforcer | Code outside a module's own Prisma repository may not reach that module's tables. |
-| `prisma-migration-access` | architecture-enforcer | The raw and scoped Prisma client capabilities are for a `SystemMigration` and its owning repository only. |
-| `clickhouse-table-ownership` | architecture-enforcer | One module writes a ClickHouse table; every other module reads it through that module's api. |
+| Rule                                          | Layer                 | Meaning                                                                                                                                                                                                                                                                                |
+| --------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `langwatch/store-containment`                 | plugin                | Prisma, ClickHouse and Redis are named only under the module's own `repositories/<store>/` (Redis also `channels/redis/`), and never in an application. Replaces `prisma-containment`, `clickhouse-containment` and `redis-containment` (2026-09-23); `typed-prisma-seam` was deleted. |
+| `langwatch/clickhouse-tenant-id`              | plugin                | Every table a ClickHouse repository queries carries a bound `TenantId` predicate in its own scope, or the query declares itself `unscoped` with a reason.                                                                                                                              |
+| `langwatch/clickhouse-no-version-order-limit` | plugin                | No `ORDER BY <version> DESC LIMIT 1` over heavy columns; dedupe with the IN-tuple form.                                                                                                                                                                                                |
+| `langwatch/prisma-count-in-list-query`        | plugin                | No `_count` inside a `findMany`: Prisma builds it as an uncorrelated join over the whole related table.                                                                                                                                                                                |
+| `prisma-table-ownership`                      | architecture-enforcer | Code outside a module's own Prisma repository may not reach that module's tables.                                                                                                                                                                                                      |
+| `prisma-migration-access`                     | architecture-enforcer | The raw and scoped Prisma client capabilities are for a `SystemMigration` and its owning repository only.                                                                                                                                                                              |
+| `clickhouse-table-ownership`                  | architecture-enforcer | One module writes a ClickHouse table; every other module reads it through that module's api.                                                                                                                                                                                           |
 
 The plugin rules are per-import and per-query, so one file is enough
 to decide. The three policies need the schema and the whole catalogue at

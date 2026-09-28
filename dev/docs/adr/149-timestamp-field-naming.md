@@ -10,14 +10,14 @@ A field called `createdAt` does not say what it holds. Measured across
 to at least four different runtime shapes:
 
 | type behind a bare `*At` | occurrences |
-| --- | --- |
-| `Date` | 4,919 |
-| `number` | 507 |
-| `z.date()` | 254 |
-| `z.number()` | 156 |
-| `string` | 20 |
-| `z.string()` | 53 |
-| `Temporal.Instant` | 12 |
+| ------------------------ | ----------- |
+| `Date`                   | 4,919       |
+| `number`                 | 507         |
+| `z.date()`               | 254         |
+| `z.number()`             | 156         |
+| `string`                 | 20          |
+| `z.string()`             | 53          |
+| `Temporal.Instant`       | 12          |
 
 **663 of those are a plain number.** An epoch count under a name that does not
 say "epoch" is ambiguous at every call site: seconds and milliseconds differ by
@@ -42,12 +42,12 @@ What is missing is the unit in the name.
 
 **The suffix names the representation. New code only.**
 
-| spelling | representation | example |
-| --- | --- | --- |
-| `createdAt` | ISO 8601 string | `"2026-09-17T14:33:13.210Z"` |
-| `createdAtMs` | epoch milliseconds | `1789658793210` |
-| `createdAtUnix` | epoch seconds | `1789658793` |
-| `createdAtNano` | epoch nanoseconds | `1789658793210000000` |
+| spelling        | representation     | example                      |
+| --------------- | ------------------ | ---------------------------- |
+| `createdAt`     | ISO 8601 string    | `"2026-09-17T14:33:13.210Z"` |
+| `createdAtMs`   | epoch milliseconds | `1789658793210`              |
+| `createdAtUnix` | epoch seconds      | `1789658793`                 |
+| `createdAtNano` | epoch nanoseconds  | `1789658793210000000`        |
 
 `Unix` means seconds, which is what it means everywhere else. Milliseconds are
 `Ms`, which is what the 241 existing `*AtMs` fields already say, so they are
@@ -63,7 +63,7 @@ Three consequences of the table worth stating outright:
   ever comes off the wire. This ADR does not restate that rule and no new rule
   may report the same fact — see ADR-135 on one rule, one place.
 - **Inside the platform a moment is still a `Temporal.Instant`**, per
-  `langwatch/temporal-only`. This ADR governs the *name* of a field that has
+  `langwatch/temporal-only`. This ADR governs the _name_ of a field that has
   already been decided to hold a serialised timestamp: a wire contract, a log
   attribute, a stored column read back as a number. It does not license a new
   epoch count where an `Instant` belongs.
@@ -74,7 +74,7 @@ It means exactly what ADR-146 means by it for `find*`: a new or moved field
 takes the correct suffix, and the existing ones are left alone. The ~5,600
 existing fields are not a backlog anyone is expected to clear.
 
-This is deliberately *not* enforced by a lint rule today, and that needs saying
+This is deliberately _not_ enforced by a lint rule today, and that needs saying
 plainly because the reflex in this repository is to add one. Measured
 2026-09-17, a rule reporting "a numeric timestamp whose name omits its unit"
 would fire **672** times:

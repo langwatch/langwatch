@@ -3,7 +3,7 @@
  * store: nothing pre-fetched, held or enumerated — each fetch walks the
  * adapters front to back for ONE id and forgets the answer it hands over.
  */
-import { spawn } from "node:child_process";
+import childProcess from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -102,7 +102,7 @@ function run(
   args: readonly string[],
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, [...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = childProcess.spawn(command, [...args], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString("utf8")));

@@ -6,17 +6,17 @@ like a slow boot are covered by the `haven-setup` skill.
 
 ## Processes
 
-| Process | Package | What it is |
-|---|---|---|
-| `apps/ui` | `@langwatch/ui` | The browser application (Vite SPA, :5560) |
-| `apps/api` | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle (:6560) |
-| `apps/worker` | `@langwatch/worker` | Queues, schedulers, projections, subscribers |
-| `apps/tasks` | `@langwatch/tasks` | One-shot migrations and backfills, run before serve |
-| `apps/server` | `@langwatch/server` | The `npx @langwatch/server` CLI |
-| `services/aigateway` | Go | Virtual-key data plane (:5563) |
-| `services/nlpgo` | Go | Optimization-studio executions and evaluators (:5561) |
-| `services/langyagent` | Go | Langy conversation manager (PORT+4) |
-| `services/langevals` | Python | Evaluators |
+| Process               | Package                   | What it is                                            |
+| --------------------- | ------------------------- | ----------------------------------------------------- |
+| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA, :5560)             |
+| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle (:6560)  |
+| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers          |
+| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills, run before serve   |
+| `apps/server`         | `@langwatch/server`       | The `npx @langwatch/server` CLI                       |
+| `services/aigateway`  | Go                        | Virtual-key data plane (:5563)                        |
+| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators (:5561) |
+| `services/langyagent` | Go                        | Langy conversation manager (PORT+4)                   |
+| `services/langevals`  | Python                    | Evaluators                                            |
 
 ui, api and worker always run together. A stack missing one serves pages and
 quietly processes no jobs, which looks healthy until a job was expected to run.
@@ -101,11 +101,11 @@ in one process. It is a launcher, not a process role: each still resolves its
 own secrets, config and graph; boot is worker then api, and shutdown drains the
 worker first. Production runs three Node deployments.
 
-| Script | What runs |
-|---|---|
-| `pnpm dev` | ui + backend + go (+ langy when selected) |
-| `pnpm dev:ui` / `dev:backend` / `dev:go` | one lane alone |
-| `pnpm dev:api` + `pnpm dev:worker` | the production process shape; use when a blocked worker job must not read as API latency |
+| Script                                   | What runs                                                                                |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `pnpm dev`                               | ui + backend + go (+ langy when selected)                                                |
+| `pnpm dev:ui` / `dev:backend` / `dev:go` | one lane alone                                                                           |
+| `pnpm dev:api` + `pnpm dev:worker`       | the production process shape; use when a blocked worker job must not read as API latency |
 
 Both Node lanes restart on change, debounced by
 `LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (default 750 ms); the Go lane restarts through

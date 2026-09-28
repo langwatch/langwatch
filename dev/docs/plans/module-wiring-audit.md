@@ -53,7 +53,7 @@ Severity: high — a customer-facing screen is live with no backend behind any
 of its calls. Already tracked as debt (three baseline keys), not news, but it
 is the most consequential single gap in the sweep.
 
-### 2. `AuditLogApi` has zero installed providers — 5 modules boot with an unresolved required peer (tracked as `audit-log|installer-not-booted`, but the *cause* below is new)
+### 2. `AuditLogApi` has zero installed providers — 5 modules boot with an unresolved required peer (tracked as `audit-log|installer-not-booted`, but the _cause_ below is new)
 
 `modules/catalogue.json:404-409` lists exactly one `audit-log` entry, rooted at
 `modules/audit-log` — contract-only (`contract/`, `specs/`, `adrs/`, no
@@ -72,6 +72,7 @@ no hits in `apps/`).
 
 Five installed modules declare `auditLog: AuditLogApi` as a **required**
 dependency:
+
 - `modules/agent/process/src/app/agent.app.ts:94,96`
 - `modules/automation/process/src/app/automation.app.ts:258,264`
 - `modules/evaluator/process/src/app/evaluator.app.ts:120,124`
@@ -176,62 +177,62 @@ among the ranked findings above.
 catalogued is `yes` for every row (sourced from `modules/catalogue.json`); the
 column is kept to show the check was made against the file, not skipped.
 
-| module | catalogued | Api provided | transports mounted | browser declared | peers resolvable | verdict |
-|---|---|---|---|---|---|---|
-| agent | yes | yes | yes | yes | **no — AuditLogApi unresolved** | FINDING (peer) |
-| analytics | yes | yes | yes | yes | yes | wired |
-| annotation | yes | yes | yes | N/A (no browser) | yes | wired |
-| api-key | yes | yes | yes | yes | yes | wired |
-| auth | yes | yes | yes | yes | yes | wired (tracked channel debt) |
-| authz | yes | yes | yes | yes | yes | wired |
-| automation | yes | yes | yes | yes | **no — AuditLogApi unresolved** | FINDING (peer) |
-| coding-agent | yes | yes | yes | yes | yes | wired |
-| dashboard | yes | yes | yes | N/A (no browser pkg) | yes | wired |
-| data-privacy | yes | yes | yes | yes | yes | wired |
-| data-retention | yes | yes | yes | yes | yes | wired |
-| dataset | yes | yes | yes | yes | yes | wired |
-| entitlement | yes | yes | yes | N/A (no browser) | yes | wired |
-| evaluation | yes | yes | yes | N/A (no browser) | yes | wired |
-| evaluator | yes | yes | yes | yes | **no — AuditLogApi unresolved** | FINDING (peer) |
-| experiment | yes | yes | yes | yes | yes | wired |
-| feature-flag | yes | yes | yes | yes | yes | wired |
-| gateway | yes | yes | yes | yes | yes | wired |
-| github | yes | yes | yes | yes | yes | wired (tracked channel debt) |
-| hosted-mcp | yes | yes | **no — declared, unmounted** | N/A (no browser) | yes | **FINDING** |
-| identity | yes | yes | yes (no transports needed) | N/A (no browser) | yes | wired |
-| langy | yes | yes | yes | **N/A by design, but shared outside kit law** | yes | FINDING (kit law) |
-| log | yes | yes | yes (no transports needed) | N/A (no browser) | yes | wired |
-| metric | yes | yes | yes (no transports needed) | N/A (no browser) | yes | wired |
-| model-provider | yes | yes | yes | yes | yes | wired |
-| monitor | yes | yes | yes | yes | yes | wired |
-| navigation | yes | N/A (browser-only) | N/A | yes | N/A | wired |
-| notification | yes | yes | yes (no transports needed) | yes | yes | wired (tracked channel debt) |
-| onboarding | yes | N/A (browser-only) | N/A | yes | N/A | wired |
-| ops | yes | yes | yes | yes | yes | wired |
-| organization | yes | yes | yes | yes | yes | wired |
-| platform-health | yes | yes | yes | N/A (no browser) | yes | wired |
-| presence | yes | yes | yes | yes | yes | wired |
-| project | yes | yes | yes | yes | yes | wired |
-| prompt | yes | yes | yes | yes | yes | wired |
-| role | yes | yes | yes | N/A (no browser) | yes | wired |
-| scenario | yes | yes | yes | yes | yes | wired |
-| secret | yes | yes | yes | yes | yes | wired |
-| share | yes | yes | yes | yes | yes | wired |
-| stored-object | yes | yes | yes | N/A (no browser) | yes | wired |
-| suite | yes | yes | yes | **N/A by design, but shared outside kit law** | yes | FINDING (kit law) |
-| topic | yes | yes | yes | yes | yes | wired |
-| trace | yes | yes | yes | yes | yes | wired |
-| user | yes | yes | yes | yes | yes | wired |
-| webhook | yes | yes | yes | N/A (no browser) | yes | wired |
-| workflow | yes | yes | yes | yes | yes | wired (tracked channel debt) |
-| audit-log (core) | yes | yes (token only) | N/A (no process) | N/A | N/A | **FINDING — real impl exists uncatalogued, see #2** |
-| billing | yes | **no Api, no app** | **no — nothing mounted** | yes (browser only) | N/A | **FINDING, see #1** |
-| governance | yes | yes | yes | yes | yes | wired |
-| licensing | yes | yes | yes | yes | yes | wired |
-| managed-provider | yes | yes | yes | **exists, dead — not listed, no consumer** | yes | FINDING, see #5 |
-| saas | yes | **no Api, no app** | N/A (no process) | **exists, dead — not listed, no consumer** | N/A | **FINDING, see #4** |
-| scim | yes | yes | yes | yes | **no — AuditLogApi unresolved** | FINDING (peer) |
-| sso | yes | yes | yes | N/A (no browser) | **no — AuditLogApi unresolved** | FINDING (peer) |
+| module           | catalogued | Api provided       | transports mounted           | browser declared                              | peers resolvable                | verdict                                             |
+| ---------------- | ---------- | ------------------ | ---------------------------- | --------------------------------------------- | ------------------------------- | --------------------------------------------------- |
+| agent            | yes        | yes                | yes                          | yes                                           | **no — AuditLogApi unresolved** | FINDING (peer)                                      |
+| analytics        | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| annotation       | yes        | yes                | yes                          | N/A (no browser)                              | yes                             | wired                                               |
+| api-key          | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| auth             | yes        | yes                | yes                          | yes                                           | yes                             | wired (tracked channel debt)                        |
+| authz            | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| automation       | yes        | yes                | yes                          | yes                                           | **no — AuditLogApi unresolved** | FINDING (peer)                                      |
+| coding-agent     | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| dashboard        | yes        | yes                | yes                          | N/A (no browser pkg)                          | yes                             | wired                                               |
+| data-privacy     | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| data-retention   | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| dataset          | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| entitlement      | yes        | yes                | yes                          | N/A (no browser)                              | yes                             | wired                                               |
+| evaluation       | yes        | yes                | yes                          | N/A (no browser)                              | yes                             | wired                                               |
+| evaluator        | yes        | yes                | yes                          | yes                                           | **no — AuditLogApi unresolved** | FINDING (peer)                                      |
+| experiment       | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| feature-flag     | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| gateway          | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| github           | yes        | yes                | yes                          | yes                                           | yes                             | wired (tracked channel debt)                        |
+| hosted-mcp       | yes        | yes                | **no — declared, unmounted** | N/A (no browser)                              | yes                             | **FINDING**                                         |
+| identity         | yes        | yes                | yes (no transports needed)   | N/A (no browser)                              | yes                             | wired                                               |
+| langy            | yes        | yes                | yes                          | **N/A by design, but shared outside kit law** | yes                             | FINDING (kit law)                                   |
+| log              | yes        | yes                | yes (no transports needed)   | N/A (no browser)                              | yes                             | wired                                               |
+| metric           | yes        | yes                | yes (no transports needed)   | N/A (no browser)                              | yes                             | wired                                               |
+| model-provider   | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| monitor          | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| navigation       | yes        | N/A (browser-only) | N/A                          | yes                                           | N/A                             | wired                                               |
+| notification     | yes        | yes                | yes (no transports needed)   | yes                                           | yes                             | wired (tracked channel debt)                        |
+| onboarding       | yes        | N/A (browser-only) | N/A                          | yes                                           | N/A                             | wired                                               |
+| ops              | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| organization     | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| platform-health  | yes        | yes                | yes                          | N/A (no browser)                              | yes                             | wired                                               |
+| presence         | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| project          | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| prompt           | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| role             | yes        | yes                | yes                          | N/A (no browser)                              | yes                             | wired                                               |
+| scenario         | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| secret           | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| share            | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| stored-object    | yes        | yes                | yes                          | N/A (no browser)                              | yes                             | wired                                               |
+| suite            | yes        | yes                | yes                          | **N/A by design, but shared outside kit law** | yes                             | FINDING (kit law)                                   |
+| topic            | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| trace            | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| user             | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| webhook          | yes        | yes                | yes                          | N/A (no browser)                              | yes                             | wired                                               |
+| workflow         | yes        | yes                | yes                          | yes                                           | yes                             | wired (tracked channel debt)                        |
+| audit-log (core) | yes        | yes (token only)   | N/A (no process)             | N/A                                           | N/A                             | **FINDING — real impl exists uncatalogued, see #2** |
+| billing          | yes        | **no Api, no app** | **no — nothing mounted**     | yes (browser only)                            | N/A                             | **FINDING, see #1**                                 |
+| governance       | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| licensing        | yes        | yes                | yes                          | yes                                           | yes                             | wired                                               |
+| managed-provider | yes        | yes                | yes                          | **exists, dead — not listed, no consumer**    | yes                             | FINDING, see #5                                     |
+| saas             | yes        | **no Api, no app** | N/A (no process)             | **exists, dead — not listed, no consumer**    | N/A                             | **FINDING, see #4**                                 |
+| scim             | yes        | yes                | yes                          | yes                                           | **no — AuditLogApi unresolved** | FINDING (peer)                                      |
+| sso              | yes        | yes                | yes                          | N/A (no browser)                              | **no — AuditLogApi unresolved** | FINDING (peer)                                      |
 
 ## Modules fully wired, no findings of any kind
 

@@ -1,5 +1,7 @@
 import { createServer, type Server } from "http";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { initConfig } from "../config.js";
 
 // --- Canned responses for each API endpoint ---

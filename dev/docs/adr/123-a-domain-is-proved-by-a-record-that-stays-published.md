@@ -36,7 +36,7 @@ bought it. Between those two facts, the design managed to be both slower than
 necessary and weaker than it looked.
 
 Removing the operator is not free, and the cost is not where it first appears.
-The review was never a real ownership check, but it *was* the place a human
+The review was never a real ownership check, but it _was_ the place a human
 noticed two other things: that `gmail.com` is not a company, and that this
 organization is on its four-hundredth domain today. Those have to become rules
 before the human goes, or removing them is a downgrade.
@@ -175,15 +175,15 @@ looking.
 
 The narrowness is the decision, not an implementation detail:
 
-| | LAPSED |
-|---|---|
-| Existing members signing in | unchanged |
-| Connection lifecycle state | unchanged (stays ACTIVE) |
-| Routing, `verifiedDomains`, domain ownership | unchanged |
-| Provisioning an unknown subject on first sign-in | **stops** |
-| Walking in by domain (automatic joining) | **stops** |
-| Asking to join | still works — it reaches a human |
-| Inviting somebody | still works |
+|                                                  | LAPSED                           |
+| ------------------------------------------------ | -------------------------------- |
+| Existing members signing in                      | unchanged                        |
+| Connection lifecycle state                       | unchanged (stays ACTIVE)         |
+| Routing, `verifiedDomains`, domain ownership     | unchanged                        |
+| Provisioning an unknown subject on first sign-in | **stops**                        |
+| Walking in by domain (automatic joining)         | **stops**                        |
+| Asking to join                                   | still works — it reaches a human |
+| Inviting somebody                                | still works                      |
 
 Two enforcement points, both per domain:
 

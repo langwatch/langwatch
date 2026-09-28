@@ -68,9 +68,9 @@ export function buildDisplayInput(span: Pick<Span, "input" | "params">): string 
   const io = span.input;
   if (io && io.type === "chat_messages" && Array.isArray(io.value)) {
     const system = extractSystemInstructions(span.params ?? null);
-    const alreadyHasSystem = io.value.some(
-      (m) => !!m && typeof m === "object" && "role" in m && m.role === "system",
-    );
+    const first: unknown = io.value[0];
+    const alreadyHasSystem =
+      !!first && typeof first === "object" && "role" in first && first.role === "system";
     if (system && !alreadyHasSystem) {
       return JSON.stringify([{ role: "system", content: system }, ...io.value]);
     }

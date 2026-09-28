@@ -52,7 +52,10 @@ type Orchestrator struct {
 	// `haven install` does. Nil elsewhere; see prereqTools for what a graph
 	// without one reports.
 	prereqs PrereqTools
-	log     *zap.Logger
+	// goos is the platform prerequisites are planned and installed for. Empty
+	// means the running one; tests pin it to exercise the macOS install path.
+	goos string
+	log  *zap.Logger
 
 	// isGoverning guards the slow half of a pressure tick, which runs off the
 	// tick so publishing stays bounded. governance is what a caller waits on to

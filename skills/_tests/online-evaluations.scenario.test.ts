@@ -1,12 +1,14 @@
+import path from "path";
+import { fileURLToPath } from "url";
+
 import scenario, {
   type ScenarioExecutionStateLike,
   assertSkillWasRead,
   bashCommands,
 } from "@langwatch/scenario";
 import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
+
 import {
   createClaudeCodeAgent,
   createSkillTestWorkDir,

@@ -40,7 +40,7 @@ export default defineBrowserVitestConfig();
 Name test files `*.browser.test.tsx`. That suffix is the whole contract: the
 shared jsdom builder excludes it, the browser config collects it, and
 `run-package-suites.ts` runs the script off the manifest — so declaring
-`test:browser` *is* being in CI. There is no list to add yourself to.
+`test:browser` _is_ being in CI. There is no list to add yourself to.
 
 **The lane installs its own browser**, in its own script — note the
 `playwright install` ahead of `vitest` above. That is not decoration. There is

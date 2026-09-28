@@ -105,7 +105,7 @@ func TestArgvBuilders(t *testing.T) {
 }
 
 func TestParseStatus(t *testing.T) {
-	status, err := ParseStatus([]byte(`{"stacks":[{"slug":"a","apiPort":6560,"live":true,"lanes":[{"name":"backend","listening":true}],"services":[{"name":"app","url":"https://app.a.langwatch.localhost"}]}]}`))
+	status, err := ParseStatus([]byte(`{"stacks":[{"slug":"a","apiPort":6560,"live":true,"lanes":[{"name":"api","listening":true}],"services":[{"name":"app","url":"https://app.a.langwatch.localhost"}]}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,9 +120,9 @@ func TestParseStatus(t *testing.T) {
 func TestStackReadyRequiresEveryNamedLaneListening(t *testing.T) {
 	status := Status{Stacks: []StackStatus{{
 		Slug: "s1", Live: true,
-		Lanes: []LaneStatus{{Name: "ui", Listening: true}, {Name: "backend", Listening: false}},
+		Lanes: []LaneStatus{{Name: "ui", Listening: true}, {Name: "api", Listening: false}},
 	}}}
-	if _, ready := StackReady(status, "s1", "ui", "backend"); ready {
+	if _, ready := StackReady(status, "s1", "ui", "api"); ready {
 		t.Fatal("a stack missing one required lane was reported ready")
 	}
 	if _, ready := StackReady(status, "s1", "ui"); !ready {

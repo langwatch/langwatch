@@ -127,7 +127,7 @@ named one disappears without its allowlist being tightened.
 2. **Prisma moves into the repository tier.** In
    `app-layer/identity/` and `better-auth/`, a query (`prisma.<model>.`,
    `prisma.$transaction`) appears only in `repositories/**`, `*.repository.ts`,
-   `*.adapter.ts` and `*-adapters.ts`. `runtime.ts` may *hold* the client to
+   `*.adapter.ts` and `*-adapters.ts`. `runtime.ts` may _hold_ the client to
    construct repositories; it may not query with it. The auth routers and the
    auth route touch no `account`, `session`, `passkey`, `verification`,
    `ssoProvider` or `ssoConnection` row directly.

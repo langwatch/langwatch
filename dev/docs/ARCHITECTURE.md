@@ -96,7 +96,7 @@ A module is one folder owning up to four workspace packages.
 `modules/catalogue.json` maps every subject to exactly one owning module.
 The owning module's process serves the subject's endpoints and runs its collection; another module's
 share crosses only as its `*Api` ops. Where main hosted a subject elsewhere (`traces.logCollection`),
-the port moves it to its owner — main decides *what*, the record decides *where* (Alex, 2026-09-25).
+the port moves it to its owner — main decides _what_, the record decides _where_ (Alex, 2026-09-25).
 A tRPC namespace belongs to one module: a procedure main hosted under another subject's namespace
 moves into its owner's namespace and the wire path moves with it (Alex, 2026-09-25).
 Operator views over enterprise subjects (license registry, self-hosted instances) live in an enterprise
@@ -1098,7 +1098,7 @@ never thinks about resolution at all. The per-module resolver adapters
 - A protocol whose handler must write the raw Node response itself (hosted MCP's SDK transports) is a
   declared raw HTTP door, `RawHttpProtocol` (`@langwatch/api`): exact paths, prefixes claiming a path and
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
-  close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
+close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
   `close` runs at shutdown, before the stores close (Alex, 2026-09-27).
 - The **process** mounts declarations; `boot()` opens the hosts. A module
   never mounts anything.

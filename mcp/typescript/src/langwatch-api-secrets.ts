@@ -1,5 +1,5 @@
-import { makeRequest } from "./langwatch-api.js";
 import { getConfig } from "./config.js";
+import { makeRequest } from "./langwatch-api.js";
 
 export interface SecretSummary {
   id: string;
@@ -21,7 +21,7 @@ export async function listSecrets(): Promise<SecretSummary[]> {
   const targetProjectId = projectId();
   return makeRequest(
     "GET",
-    `/api/v1/secret?projectId=${encodeURIComponent(targetProjectId)}`,
+    `/api/v1/secrets?projectId=${encodeURIComponent(targetProjectId)}`,
   ) as Promise<SecretSummary[]>;
 }
 
@@ -29,12 +29,12 @@ export async function getSecret(id: string): Promise<SecretSummary> {
   const targetProjectId = projectId();
   return makeRequest(
     "GET",
-    `/api/v1/secret/${encodeURIComponent(id)}?projectId=${encodeURIComponent(targetProjectId)}`,
+    `/api/v1/secrets/${encodeURIComponent(id)}?projectId=${encodeURIComponent(targetProjectId)}`,
   ) as Promise<SecretSummary>;
 }
 
 export async function createSecret(data: { name: string; value: string }): Promise<SecretSummary> {
-  return makeRequest("POST", "/api/v1/secret", {
+  return makeRequest("POST", "/api/v1/secrets", {
     projectId: projectId(),
     ...data,
   }) as Promise<SecretSummary>;
@@ -42,14 +42,14 @@ export async function createSecret(data: { name: string; value: string }): Promi
 
 export async function updateSecret(params: { id: string; value: string }): Promise<SecretSummary> {
   const { id, value } = params;
-  return makeRequest("PUT", `/api/v1/secret/${encodeURIComponent(id)}`, {
+  return makeRequest("PUT", `/api/v1/secrets/${encodeURIComponent(id)}`, {
     projectId: projectId(),
     value,
   }) as Promise<SecretSummary>;
 }
 
 export async function deleteSecret(id: string): Promise<{ id: string; deleted: boolean }> {
-  return makeRequest("DELETE", `/api/v1/secret/${encodeURIComponent(id)}`, {
+  return makeRequest("DELETE", `/api/v1/secrets/${encodeURIComponent(id)}`, {
     projectId: projectId(),
   }) as Promise<{ id: string; deleted: boolean }>;
 }

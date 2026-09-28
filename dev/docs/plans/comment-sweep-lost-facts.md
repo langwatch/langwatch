@@ -11,8 +11,8 @@ across seventeen lanes. Anything a lane reports as compressed-out gets copied
 here at collection, so the record outlives the lane that found it.
 
 **The standing decision this implements.** The user twice refused to raise the
-5-line maximum: *"what comments need to be 5+ lines? if it's that important,
-ADR it."* So the intended destination for everything below is an ADR under
+5-line maximum: _"what comments need to be 5+ lines? if it's that important,
+ADR it."_ So the intended destination for everything below is an ADR under
 `dev/docs/adr/`, with a one-line pointer left in the code. Until that ADR is
 written, the text here is the only copy outside git history.
 
@@ -38,7 +38,7 @@ written, the text here is the only copy outside git history.
 
 1. **The pricing and PII invariant** —
    `modules/gateway/process/src/eventing/gateway-spend-commands.process.ts`,
-   file header. Spend is priced once at ingest and the event *carries* that
+   file header. Spend is priced once at ingest and the event _carries_ that
    cost, so no two readers can disagree about it; the event holds no prompt or
    response content and no PII. A financial and security invariant, worth a
    permanent home. The surviving comment kept "no PII", which is **not** the
@@ -84,7 +84,7 @@ Recorded for a second reading; none is believed load-bearing on its own.
   `worker-trace-capability-services.composition.ts`.
 - `repositories/prisma/prisma.gateway-budget-scope-target.repository.ts` — the
   enumeration of who reads it (budgets list, detail page, VK drawer,
-  budget-overview service). The *why* was kept: one team never renders under
+  budget-overview service). The _why_ was kept: one team never renders under
   two names.
 
 ### One deliberate blank line
@@ -193,7 +193,7 @@ squeeze every integration test in every remaining lane — ops, automation,
 identity and model-provider all have them.
 
 These three read as directives and markers, not narrative, and an author cannot
-delete them: `@vitest-environment` *is* the test's environment selection. They
+delete them: `@vitest-environment` _is_ the test's environment selection. They
 belong in `STRUCTURAL_TAG_LINE` in
 `packages/oxlint-rules/grammar/comment-block-policy.mjs` alongside `@see`.
 
@@ -251,7 +251,7 @@ which makes them worth reading alongside
    gist in each.
 
 **Why these three matter beyond the sweep.** Each one is a duplication or a
-missing feature that exists *because* web-to-web imports are constrained, and
+missing feature that exists _because_ web-to-web imports are constrained, and
 each carried the reasoning for tolerating it. That reasoning is precisely what
 the web-package-boundaries drive needs when it decides what to extract into
 `surfaces/*`. Lanes 7-16 of that drive have never run; these notes are evidence
@@ -336,7 +336,7 @@ project link (the optional `apiToken` carries it).
    `resolveUnsubscribeView`. The surviving sentence says the public
    unsubscribe read throttles against a shared bucket to resist token
    brute-forcing. What is gone is the part that matters when someone later
-   "simplifies" it: a request carrying a *missing* address must still consume
+   "simplifies" it: a request carrying a _missing_ address must still consume
    from the bucket rather than short-circuit past it, because a bypass on the
    unknown-address path is exactly what makes enumeration cheap.
 
@@ -368,11 +368,11 @@ finding at `server/maintenance/process-retention-sweep.intent.ts:14`.
 11. **The two facts behind `isCeremonyAbandoned`.** `passkey-failure.ts`, 16
     lines cut to one sentence, and the clearest attack-shape-plus-defence pair
     the sweep has hit. Gone: (a) WebAuthn reports a dismissed sheet, a
-    superseded request and an abandoned prompt *identically* to "no credential
+    superseded request and an abandoned prompt _identically_ to "no credential
     matched", deliberately, so that watching the prompt tells an attacker
     nothing; (b) the better-auth passkey plugin does not throw on an abandoned
     ceremony — it **resolves**, carrying a synthetic `code:
-    ERROR_CEREMONY_ABORTED` / `status: 400`, a refusal's clothes on something
+ERROR_CEREMONY_ABORTED` / `status: 400`, a refusal's clothes on something
     the server never saw. (b) is the whole reason the check reads the resolved
     `code` instead of a thrown exception's `name`, and it now looks arbitrary.
 
@@ -415,7 +415,7 @@ it.
 
 14. **A partially failed adapter should bank its progress, not discard it.**
     `contract/src/puller.ts`, `PullResult.unreadPage`. Return the advanced
-    cursor, the events already in hand, *and* the flag — rather than throwing
+    cursor, the events already in hand, _and_ the flag — rather than throwing
     the batch away. The flag and its purpose survive; the pattern adapter
     authors are meant to follow does not.
 
@@ -446,7 +446,7 @@ regression that nobody has fixed yet.
     the part that took someone a day: in `packages/api/src/rest/runtime.ts`,
     `validators()` installs the hook that raises `requestValidationErrorFrom`
     but **not** the wrapper that `build()` in
-    `packages/api/src/rest/request.ts:284-301` puts *around* the validator.
+    `packages/api/src/rest/request.ts:284-301` puts _around_ the validator.
     Hono raises a malformed body as `HTTPException(400)` from inside its own
     validator, before any hook runs, and that exception carries no `error`
     string, so it also misses `isStatusCarryingError` and collapses to an
@@ -504,7 +504,7 @@ every agent running on the box.
 ## Wave 4 — `modules/langy` and `modules/authz`
 
 Five candidates from the lane; three are worth keeping, and the second is the
-only one in the whole drive to drop a *named security property*.
+only one in the whole drive to drop a _named security property_.
 
 20. **Why the Langy bucket-coverage invariant exists at all.**
     `modules/langy/contract/src/langy-permission-policy.ts`,
@@ -529,7 +529,7 @@ only one in the whole drive to drop a *named security property*.
     `modules/langy/contract/src/cards/__tests__/digest.unit.test.ts`. The
     original enumerated them precisely: trace search returns
     `{ traces, pagination.totalHits }`, dataset list `{ data,
-    pagination.total }`, prompt/evaluator/scenario lists are bare arrays,
+pagination.total }`, prompt/evaluator/scenario lists are bare arrays,
     experiment status is a single run document, analytics is a timeseries.
     The compressed version keeps the first two and collapses the rest to
     "others are bare arrays or documents", losing the analytics-timeseries
@@ -546,7 +546,7 @@ carries none — so spec-parity binding is unaffected.
 
 ## Wave 5 — `modules/experiment` and `modules/workflow`
 
-Three candidates, all three a *mechanism* compressed to its *effect*. That is
+Three candidates, all three a _mechanism_ compressed to its _effect_. That is
 the recurring shape in execution-engine code: the effect is easy to restate
 short, the mechanism is what someone actually needed.
 
@@ -664,7 +664,7 @@ highest proportion of rules learned from incidents. Five cuts worth keeping.
     ingest route**. An absence with a reason is not recoverable by reading the
     file — there is nothing there to read. This is the shape of comment most
     worth keeping and easiest to cut, since it documents what the code does
-    *not* do.
+    _not_ do.
 
 32. **`BLOB_RELEASE_GRACE_TTL_SECONDS` and "lazy does not mean four days".**
     `packages/group-queue/src/blobLeases.ts` class doc. Partially recoverable —
@@ -681,8 +681,8 @@ The cause is now understood rather than guessed. The stripper walks characters
 and treats `/` + `*` as opening a block comment and a quote as opening a string
 — **inside regex literals too**. `tenantGuard.ts` holds
 `/(?:^|[\s.(])TenantId\s*=\s*(?:'[^']*'|"[^"]*")/i` and a `"/*"` string literal;
-once the scanner desyncs it consumes until the next `*/`, and *how far that
-reaches depends on the length of the comments*. So editing comments changes its
+once the scanner desyncs it consumes until the next `*/`, and _how far that
+reaches depends on the length of the comments_. So editing comments changes its
 output even when no code moved. Backticks in comments desync it the same way.
 
 **Use this instead** — robust, and it is what settled both files:
@@ -720,8 +720,8 @@ skills/_tests/agent-workflow-protocol.scenario.test.ts
 this repository has any of them**, so the citation resolves to nothing for every
 other reader, and to nothing at all once this working copy is gone.
 
-`project.app.ts:85` is the sharp case: it explains why the app *refuses to boot
-in `apps/worker`* and defers the reasoning to the gitignored handoff. That is a
+`project.app.ts:85` is the sharp case: it explains why the app _refuses to boot
+in `apps/worker`_ and defers the reasoning to the gitignored handoff. That is a
 load-bearing behavioural rule whose justification is one `rm` away.
 
 The fix is not to delete the citations but to move what they point at into
@@ -755,7 +755,7 @@ keep.
 35. **Why the legacy pill opens on hover, focus and click.**
     `modules/navigation/browser/src/ui/elements/legacy-pill.tsx`. Kept: why it is a
     popover rather than a tooltip. Cut: that the open-on-hover/focus/click
-    behaviour is what keeps it reachable by pointer *and* keyboard. That is an
+    behaviour is what keeps it reachable by pointer _and_ keyboard. That is an
     accessibility requirement, and an accessibility requirement with no
     surviving statement is one that gets "simplified" away.
 
@@ -763,7 +763,7 @@ keep.
 
 This slice was cleared twice: once by a lane that split blocks instead of
 shortening them, and once properly after the splits were merged back. The three
-facts below were cut by the *correction*, which is the honest cost of meeting
+facts below were cut by the _correction_, which is the honest cost of meeting
 the budget rather than evading it.
 
 36. **Why scanning source text is a safe substitute for constructing the server.**
@@ -803,7 +803,7 @@ the budget rather than evading it.
     The lane met it as an over-budget block and cleared the finding by inserting
     a blank line to split the JSDoc from the divider beneath it. That is lesson 8
     in substance — dividing rather than shortening — and it escaped the orphan
-    regex, which only matches a *single-line* `/** … */` before the blank. The
+    regex, which only matches a _single-line_ `/** … */` before the blank. The
     coordinator deleted the block and the by-then-empty "Data building" divider
     instead.
 
@@ -815,7 +815,7 @@ the budget rather than evading it.
 40. **What a marker attribute's value actually holds.**
     `modules/data-privacy/contract/src/data-privacy.markers.ts`,
     `PRIVACY_PII_INCOMPLETE_MARKER_ATTR`. The compliance-critical half survives —
-    the marker says strict redaction was *requested* and only the essential floor
+    the marker says strict redaction was _requested_ and only the essential floor
     applied, so the read path must not present the content as fully scrubbed.
     Gone: "the value is the level that was requested (`strict`)." That is the
     attribute's payload shape, and a reader of the constant alone now has no
@@ -865,7 +865,7 @@ the budget rather than evading it.
     comment "Keeping only one is the rotation bug this helper exists to make
     impossible", pinned by `specs/webhooks/signature-vectors.json`.
 
-    What is genuinely thinner is only the *rationale* for the vector-file
+    What is genuinely thinner is only the _rationale_ for the vector-file
     pattern. Also cut, and likewise recoverable: the `SsoConnection` exemption's
     addressing mechanism in `packages/prisma-client/src/organization-guard.ts`,
     whose exemption reason - two legitimately cross-organization reads - is

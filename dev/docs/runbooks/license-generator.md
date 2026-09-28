@@ -73,12 +73,12 @@ LANGWATCH_LICENSE_PRIVATE_KEY=$(cat private.pem) \
 
 Arguments:
 
-| Flag            | Required | Default                | Description                                                                                                                                     |
-| --------------- | -------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--org-id`      | yes      | —                      | Target `Organization.id` to attach the license to. Org must already exist.                                                                      |
+| Flag            | Required | Default                | Description                                                                                                                           |
+| --------------- | -------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `--org-id`      | yes      | —                      | Target `Organization.id` to attach the license to. Org must already exist.                                                            |
 | `--plan`        | no       | `ENTERPRISE`           | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `enterprise/modules/licensing/contract/src/license-plan-templates.ts`. |
-| `--max-members` | no       | `50`                   | Seat cap. Must be ≥ 1.                                                                                                                          |
-| `--email`       | no       | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field.                                                                                   |
+| `--max-members` | no       | `50`                   | Seat cap. Must be ≥ 1.                                                                                                                |
+| `--email`       | no       | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field.                                                                         |
 
 Output: prints the encoded license key to stdout + writes/updates the
 `Organization.license` + `Organization.licenseExpiresAt` columns. The

@@ -9,6 +9,7 @@ import {
   type InstantEvalClassifierLimits,
   type InstantEvalQuestion,
 } from "@langwatch/instant-eval-contract";
+import { cutToEstimatedTokensKeepingEnds } from "@langwatch/trace-contract";
 
 import { instantEvalScoreLevels, toClassifierQuestions } from "./instant-eval-judge-wire.rules.ts";
 
@@ -19,37 +20,6 @@ import { instantEvalScoreLevels, toClassifierQuestions } from "./instant-eval-ju
  */
 export function estimateTokensFromBytes(text: string): number {
   return Math.ceil(new TextEncoder().encode(text).length / 4);
-}
-
-/**
- * Cut a string down to an estimated token count, on a character boundary: a
- * byte cut can land inside a multi-byte character, so the cut moves back to
- * the last complete one rather than shipping a half-decoded character.
- */
-export function cutToEstimatedTokens({
-  text,
-  maxTokens,
-}: {
-  text: string;
-  maxTokens: number;
-}): string {
-  const bytes = new TextEncoder().encode(text);
-  const limit = Math.max(0, maxTokens) * 4;
-  if (bytes.length <= limit) return text;
-  return new TextDecoder().decode(bytes.subarray(0, characterBoundaryAtOrBefore({ bytes, limit })));
-}
-
-/** The largest index at or before `limit` that ends a whole UTF-8 character. */
-function characterBoundaryAtOrBefore({
-  bytes,
-  limit,
-}: {
-  bytes: Uint8Array;
-  limit: number;
-}): number {
-  let end = limit;
-  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end--;
-  return end;
 }
 
 /**
@@ -95,20 +65,55 @@ export interface PreparedInstantEvalText {
 }
 
 /**
- * Cuts a text to a budget. Measured with the generic rule rather than the
- * denser one, because the extraction functions cut their `max_tokens`
- * argument by it: a conversation rendered to fit must not be cut twice.
+ * Cuts a text to a budget, keeping both ends, measured at the densest ratio
+ * judged text has shown (JSON-heavy traces 2.0 bytes per token, prose
+ * transcripts up to 3.3): at the average ratio a dense text is refused as too large.
  */
 export function prepareInstantEvalText({
   text,
   budgetTokens,
+  limits = INSTANT_EVAL_CLASSIFIER_LIMITS,
 }: {
   text: string;
   budgetTokens: number;
+  limits?: InstantEvalClassifierLimits;
 }): PreparedInstantEvalText {
-  if (estimateTokensFromBytes(text) <= budgetTokens) return { text, isTruncated: false };
-  return { text: cutToEstimatedTokens({ text, maxTokens: budgetTokens }), isTruncated: true };
+  const bytesPerToken = limits.fitBytesPerInputToken;
+  if (new TextEncoder().encode(text).length <= Math.floor(budgetTokens * bytesPerToken)) {
+    return { text, isTruncated: false };
+  }
+  return {
+    text: cutToEstimatedTokensKeepingEnds({ text, maxTokens: budgetTokens, bytesPerToken }),
+    isTruncated: true,
+  };
 }
+
+/**
+ * The text cut again after the judge refused it as too large: to the budget
+ * at a ratio below any judged text measured, or to three quarters of its
+ * length when that is shorter, so the retry always sends less.
+ */
+export function cutInstantEvalTextForRetry({
+  text,
+  budgetTokens,
+  limits = INSTANT_EVAL_CLASSIFIER_LIMITS,
+}: {
+  text: string;
+  budgetTokens: number;
+  limits?: InstantEvalClassifierLimits;
+}): string {
+  const bytesPerToken = limits.retryBytesPerInputToken;
+  const threeQuarters =
+    (new TextEncoder().encode(text).length * TOO_LARGE_RETRY_FRACTION) / bytesPerToken;
+  return cutToEstimatedTokensKeepingEnds({
+    text,
+    maxTokens: Math.floor(Math.min(budgetTokens, threeQuarters)),
+    bytesPerToken,
+  });
+}
+
+/** The most of a refused text the retry keeps. */
+const TOO_LARGE_RETRY_FRACTION = 0.75;
 
 /**
  * What one classification is expected to cost in input tokens, counting the

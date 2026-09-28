@@ -18,9 +18,9 @@ everything else lives in a module's `browser/` package. Full shape: record
 
 ```ts
 const ui = await createUi({ mount: "root" })
-  .withModules(browserModules)   // generated from the catalogue
+  .withModules(browserModules) // generated from the catalogue
   .render();
-mountShell(ui);                  // shell/: providers + router over declarations
+mountShell(ui); // shell/: providers + router over declarations
 ```
 
 `createUi` reads the injected public config from a DOM meta tag by default,
@@ -90,7 +90,7 @@ purity — many consumers means a kit; the composition root means the slot.
 ## The kit law (record §3.4) — when a different module needs a piece of yours
 
 A module's `*-browser` package is **closed**: nothing else ever imports it,
-ever. The moment a *different* module needs a hook, store or component this
+ever. The moment a _different_ module needs a hook, store or component this
 module owns, that thing **moves** (never copies) to a new package,
 `<name>-browser-kit` — sharing is declared by moving code, never observed by
 reaching in.

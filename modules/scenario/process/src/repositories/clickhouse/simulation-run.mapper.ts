@@ -1,4 +1,5 @@
 import {
+  resolveCriterionResults,
   SimulationRunStatus,
   SimulationVerdict,
   type SimulationRunData,
@@ -11,12 +12,14 @@ import {
   type ClickHouseEvaluationColumns,
   columnsToEvaluations,
 } from "../../rules/simulation-evaluation-columns.rules.ts";
+import { type ClickHouseCriteriaColumns, columnsToCriteria } from "./simulation-criteria.mapper.ts";
 
 /**
  * Timestamp columns arrive as Unix milliseconds via toUnixTimestamp64Milli().
  * Messages are stored as parallel Nested arrays (Messages.id, Messages.role, etc).
  */
-export interface ClickHouseSimulationRunRow extends Partial<ClickHouseEvaluationColumns> {
+export interface ClickHouseSimulationRunRow
+  extends Partial<ClickHouseEvaluationColumns>, Partial<ClickHouseCriteriaColumns> {
   ScenarioRunId: string;
   ScenarioId: string;
   BatchRunId: string;
@@ -152,6 +155,12 @@ export function mapClickHouseRowToScenarioRunData(
   const unmetCriteria = row.UnmetCriteria ?? [];
   const inconclusiveCriteria = row.InconclusiveCriteria ?? [];
   const evaluations = columnsToEvaluations(row);
+  const criteria = resolveCriterionResults({
+    criteria: columnsToCriteria(row),
+    metCriteria,
+    unmetCriteria,
+    inconclusiveCriteria,
+  });
 
   const results =
     verdictEnum != null
@@ -161,6 +170,7 @@ export function mapClickHouseRowToScenarioRunData(
           metCriteria,
           unmetCriteria,
           ...(inconclusiveCriteria.length > 0 && { inconclusiveCriteria }),
+          criteria,
           error: row.Error ?? undefined,
           ...(evaluations.length > 0 && { evaluations }),
         }

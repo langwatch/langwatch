@@ -50,7 +50,7 @@ The catalogue answers "what is the number". It never answers "may this
 succeed". Enforcement stays exactly where it is: seat guards in organization,
 identity and SCIM, the visibility window in trace, the dispatch ceiling in
 automation. Stripe price ids, the checkout, the webhooks and proration stay in
-billing — the catalogue holds the amount a customer is *quoted*, not the thing
+billing — the catalogue holds the amount a customer is _quoted_, not the thing
 we charge against. Refusal and upgrade copy stay in the presentation registry
 and the refusing feature; the catalogue is data, not words a customer reads.
 `@langwatch/mail` keeps importing nothing from it: the sender passes resolved
@@ -117,12 +117,12 @@ dispute name it in a typed `disputed` field, and a test asserts the dispute
 list is exactly the four the census found, so a fifth drift fails rather than
 being absorbed.
 
-| Dispute | In the catalogue | The other value |
-| --- | --- | --- |
-| `free-plan-two-definitions` | 2 members, 50,000 a month, publishing allowed | 1 member, 1,000 a month, publishing refused |
-| `pro-volume-below-free` | Pro 10,000 a month, 5 members | Pro 100,000 a month, 10 members; Free is 50,000, above it |
-| `growth-copy-volume` | Growth 100,000 a month | the pricing page says 200,000 |
-| `automation-ceiling-three-ways` | per plan: 50 / 150 / 300 / 500 / 5,000 | buckets of 50 / 500 / 5,000; a test pinning 100 / 1,000 / 10,000 |
+| Dispute                         | In the catalogue                              | The other value                                                  |
+| ------------------------------- | --------------------------------------------- | ---------------------------------------------------------------- |
+| `free-plan-two-definitions`     | 2 members, 50,000 a month, publishing allowed | 1 member, 1,000 a month, publishing refused                      |
+| `pro-volume-below-free`         | Pro 10,000 a month, 5 members                 | Pro 100,000 a month, 10 members; Free is 50,000, above it        |
+| `growth-copy-volume`            | Growth 100,000 a month                        | the pricing page says 200,000                                    |
+| `automation-ceiling-three-ways` | per plan: 50 / 150 / 300 / 500 / 5,000        | buckets of 50 / 500 / 5,000; a test pinning 100 / 1,000 / 10,000 |
 
 Resolving each is a product decision with a customer consequence, so each lands
 in its own commit with the before and after values in the message.

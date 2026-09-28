@@ -356,7 +356,7 @@ account holds — and two answers:
   password screen the person cannot pass. The old behaviour was a dead end
   dressed as a form.
 - an identifier **an account does exist for** routes to a method screen
-  showing the methods *that account* holds, strongest-first, instead of
+  showing the methods _that account_ holds, strongest-first, instead of
   every method the instance offers. A passkey-only account no longer gets a
   password box that can only fail.
 
@@ -384,7 +384,7 @@ policy refuses the method  → picker (local)       method_not_*
   covers a wrong password and an address with no account alike
   (`server/better-auth/handled-errors.ts`,
   `specs/auth/sign-in-failure-messages.feature`). Knowing an account exists
-  is now cheap; knowing *which half of a submitted pair was wrong* is still
+  is now cheap; knowing _which half of a submitted pair was wrong_ is still
   never told, because that is what turns a credential-stuffing run from
   guessing pairs into guessing one field at a time.
 - **The lookup stays rate-limited.** `auth.route` keeps its per-address
@@ -395,8 +395,8 @@ policy refuses the method  → picker (local)       method_not_*
   (`specs/auth/password-reset.feature`). Reset sends mail to an address, and
   a mailer that answers differently for a registered address is an oracle
   with a delivery mechanism attached.
-- **The router still reads no secret.** It learns *that* an account exists
-  and *which kinds* of method it holds. It never reads a credential, a
+- **The router still reads no secret.** It learns _that_ an account exists
+  and _which kinds_ of method it holds. It never reads a credential, a
   hash, a passkey's material or a session.
 
 ### Revision (2026-08-25) — the method screen is ranked, and starts the ceremony

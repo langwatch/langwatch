@@ -1,7 +1,9 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { describe, expect, it } from "vitest";
+
 import { listNativeSkills, renderSkill } from "../_compiler/native.js";
 import { listPublishedSkills } from "../_lib/feature-skills.js";
 
@@ -277,7 +279,7 @@ describe("the documentation paths the skills tell the agent to fetch", () => {
    */
   function docsPaths(rendered: string): string[] {
     return extractAll(rendered, /langwatch docs ([a-z0-9/_<>|-]+)/g).filter(
-      (docsPath) => !docsPath.includes("<")
+      (docsPath) => !docsPath.includes("<"),
     );
   }
 
@@ -297,7 +299,7 @@ describe("the documentation paths the skills tell the agent to fetch", () => {
       expect(checked, "expected the skills to name documentation pages").toBeGreaterThan(5);
       expect(
         missing,
-        `these pages would 404 for the agent that fetched them: ${missing.join(", ")}`
+        `these pages would 404 for the agent that fetched them: ${missing.join(", ")}`,
       ).toEqual([]);
     });
   });

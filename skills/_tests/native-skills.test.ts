@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
+import { describe, expect, it } from "vitest";
+
 import { listNativeSkills, listPublishedSkills, renderSkill } from "../_compiler/native.js";
 import { FEATURE_SKILLS, NATIVE_ONLY_SKILLS } from "../_lib/feature-skills.js";
 
@@ -204,14 +206,11 @@ describe("native skill generation", () => {
         const body = renderSkill(skills.find((s) => s.slug === slug)!);
         expect(body, `${slug}: redaction rule`).toContain("[REDACTED]");
         expect(body, `${slug}: redaction rule`).toContain("invent a stand-in");
-        expect(body, `${slug}: naming rule`).toContain(
-          "stops being reproducible",
-        );
+        expect(body, `${slug}: naming rule`).toContain("stops being reproducible");
         expect(body, `${slug}: lookup rule`).toContain("fixtures or test data");
-        expect(
-          body,
-          `${slug}: the trace's own identifiers are not copied`,
-        ).not.toContain("verbatim into the situation");
+        expect(body, `${slug}: the trace's own identifiers are not copied`).not.toContain(
+          "verbatim into the situation",
+        );
       }
     });
   });

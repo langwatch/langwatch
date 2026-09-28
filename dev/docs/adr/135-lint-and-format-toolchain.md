@@ -77,12 +77,12 @@ declaration itself. `no-restricted-imports` gives one flat string.
 
 ### The registries
 
-| Registry | Where | Count | Enforced by |
-| --- | --- | --- | --- |
-| oxlint built-ins | `.oxlintrc.jsonc` `rules` and `overrides` | 1 workspace-wide, the rest scoped | `pnpm lint` |
-| `langwatch` plugin | `packages/oxlint-rules/src/rules/*.rule.mjs` | 34 defined, 30 enabled | `pnpm lint` |
-| ast-grep | `dev/lint/ast-grep/rules/*.yml` | 13 rules in 21 files | the `ast-grep` CI job and CodeRabbit |
-| architecture-enforcer | `packages/architecture-enforcer/src/policies/index.ts` | 31 policies | `pnpm lint` |
+| Registry              | Where                                                  | Count                             | Enforced by                          |
+| --------------------- | ------------------------------------------------------ | --------------------------------- | ------------------------------------ |
+| oxlint built-ins      | `.oxlintrc.jsonc` `rules` and `overrides`              | 1 workspace-wide, the rest scoped | `pnpm lint`                          |
+| `langwatch` plugin    | `packages/oxlint-rules/src/rules/*.rule.mjs`           | 34 defined, 30 enabled            | `pnpm lint`                          |
+| ast-grep              | `dev/lint/ast-grep/rules/*.yml`                        | 13 rules in 21 files              | the `ast-grep` CI job and CodeRabbit |
+| architecture-enforcer | `packages/architecture-enforcer/src/policies/index.ts` | 31 policies                       | `pnpm lint`                          |
 
 ### The baseline is a ratchet, not an amnesty
 
@@ -153,7 +153,7 @@ a separate change with its own cost, recorded here rather than done here:
   built-in measured rather than adopted.** `no-explicit-any` and
   `typescript/no-explicit-any` (1,782 findings/336 files; the ast-grep rule
   only ever matched 751/175) share no baseline rows, and `pnpm lint:oxlint`
-  runs `--quiet`, which hides a "warn" and hard-fails an unbaselined "error"  - 
+  runs `--quiet`, which hides a "warn" and hard-fails an unbaselined "error" -
   so the built-in stays out of the config, measured but not adopted.
   `no-empty-test` and `no-test-without-assertion` were true duplicates of
   `vitest/expect-expect`, which was already enabled by oxlint's own default at
@@ -181,7 +181,7 @@ a separate change with its own cost, recorded here rather than done here:
   either a hard failure or 376 hand-written override paths, which is exactly
   what the baseline replaced; the structured `{what, why, fix}` message
   becomes one flat string; and `package-boundaries` cannot follow them,
-  because its `sealedExports` check reads the *target* package's `exports`
+  because its `sealedExports` check reads the _target_ package's `exports`
   map and its `featureLayer` check needs the layer rank of both ends.
 - **`no-dupe-class-members` is available and not enabled**, while
   `langwatch/service-quality` reimplements half of it.
@@ -226,49 +226,49 @@ registries themselves, not written here.
 
 `no-nested-ternary` keeps its row in ADR-140.
 
-| Rule | Layer | Meaning |
-| --- | --- | --- |
-| `no-empty` | oxlint built-in | An empty block, an empty `catch` included; a comment inside it does not count as handling. Replaces `langwatch/empty-catch`. |
-| `typescript/array-type` | oxlint built-in | `T[]`, never `Array<T>`. |
-| `typescript/consistent-type-imports` | oxlint built-in | A binding used only as a type is imported with `import type`, so nothing of the target runs. |
-| `node/no-process-env` | oxlint built-in | Module code does not read `process.env`; config is declared and drilled. Off only for the categories of path the config names (boot files, tests, tooling, published SDKs). |
-| `import/no-cycle` | oxlint built-in | No import cycle between files. |
-| `import/export` | oxlint built-in | No name exported twice from one module. |
-| `import/no-self-import` | oxlint built-in | A module does not import itself. |
-| `import/no-empty-named-blocks` | oxlint built-in | No `import {} from`. |
-| `import/no-absolute-path` | oxlint built-in | No import by absolute filesystem path. |
-| `import/no-mutable-exports` | oxlint built-in | No exported `let` or `var`. |
-| `import/no-duplicates` | oxlint built-in | One import statement per module specifier. |
-| `promise/no-multiple-resolved` | oxlint built-in | A promise executor resolves or rejects once. |
-| `promise/catch-or-return` | oxlint built-in | A promise chain is returned or handles its rejection. |
-| `promise/no-return-wrap` | oxlint built-in | No `Promise.resolve`/`Promise.reject` wrapping inside a `then`. |
-| `unicorn/no-array-sort` | oxlint built-in | `toSorted`, not the mutating `sort`. |
-| `jsx-a11y/no-autofocus` | oxlint built-in | No `autoFocus`. |
-| `jsx-a11y/no-static-element-interactions` | oxlint built-in | A static element with a handler states a role. |
-| `jsx-a11y/click-events-have-key-events` | oxlint built-in | A click handler has a keyboard equivalent. |
-| `jsx-a11y/aria-role` | oxlint built-in | A `role` is a valid ARIA role. |
-| `jsx-a11y/media-has-caption` | oxlint built-in | Audio and video carry captions. |
-| `jsx-a11y/mouse-events-have-key-events` | oxlint built-in | Hover handlers have focus equivalents. |
-| `jsx-a11y/role-supports-aria-props` | oxlint built-in | An `aria-*` prop is one the role supports. |
-| `jsx-a11y/no-noninteractive-tabindex` | oxlint built-in | No `tabIndex` on a non-interactive element. |
-| `jsx-a11y/img-redundant-alt` | oxlint built-in | Alt text does not say "image" or "picture". |
-| `jsx-a11y/autocomplete-valid` | oxlint built-in | `autoComplete` holds a valid token. |
+| Rule                                      | Layer           | Meaning                                                                                                                                                                     |
+| ----------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `no-empty`                                | oxlint built-in | An empty block, an empty `catch` included; a comment inside it does not count as handling. Replaces `langwatch/empty-catch`.                                                |
+| `typescript/array-type`                   | oxlint built-in | `T[]`, never `Array<T>`.                                                                                                                                                    |
+| `typescript/consistent-type-imports`      | oxlint built-in | A binding used only as a type is imported with `import type`, so nothing of the target runs.                                                                                |
+| `node/no-process-env`                     | oxlint built-in | Module code does not read `process.env`; config is declared and drilled. Off only for the categories of path the config names (boot files, tests, tooling, published SDKs). |
+| `import/no-cycle`                         | oxlint built-in | No import cycle between files.                                                                                                                                              |
+| `import/export`                           | oxlint built-in | No name exported twice from one module.                                                                                                                                     |
+| `import/no-self-import`                   | oxlint built-in | A module does not import itself.                                                                                                                                            |
+| `import/no-empty-named-blocks`            | oxlint built-in | No `import {} from`.                                                                                                                                                        |
+| `import/no-absolute-path`                 | oxlint built-in | No import by absolute filesystem path.                                                                                                                                      |
+| `import/no-mutable-exports`               | oxlint built-in | No exported `let` or `var`.                                                                                                                                                 |
+| `import/no-duplicates`                    | oxlint built-in | One import statement per module specifier.                                                                                                                                  |
+| `promise/no-multiple-resolved`            | oxlint built-in | A promise executor resolves or rejects once.                                                                                                                                |
+| `promise/catch-or-return`                 | oxlint built-in | A promise chain is returned or handles its rejection.                                                                                                                       |
+| `promise/no-return-wrap`                  | oxlint built-in | No `Promise.resolve`/`Promise.reject` wrapping inside a `then`.                                                                                                             |
+| `unicorn/no-array-sort`                   | oxlint built-in | `toSorted`, not the mutating `sort`.                                                                                                                                        |
+| `jsx-a11y/no-autofocus`                   | oxlint built-in | No `autoFocus`.                                                                                                                                                             |
+| `jsx-a11y/no-static-element-interactions` | oxlint built-in | A static element with a handler states a role.                                                                                                                              |
+| `jsx-a11y/click-events-have-key-events`   | oxlint built-in | A click handler has a keyboard equivalent.                                                                                                                                  |
+| `jsx-a11y/aria-role`                      | oxlint built-in | A `role` is a valid ARIA role.                                                                                                                                              |
+| `jsx-a11y/media-has-caption`              | oxlint built-in | Audio and video carry captions.                                                                                                                                             |
+| `jsx-a11y/mouse-events-have-key-events`   | oxlint built-in | Hover handlers have focus equivalents.                                                                                                                                      |
+| `jsx-a11y/role-supports-aria-props`       | oxlint built-in | An `aria-*` prop is one the role supports.                                                                                                                                  |
+| `jsx-a11y/no-noninteractive-tabindex`     | oxlint built-in | No `tabIndex` on a non-interactive element.                                                                                                                                 |
+| `jsx-a11y/img-redundant-alt`              | oxlint built-in | Alt text does not say "image" or "picture".                                                                                                                                 |
+| `jsx-a11y/autocomplete-valid`             | oxlint built-in | `autoComplete` holds a valid token.                                                                                                                                         |
 
 The native rules scoped by an `overrides` block are listed here for the reader;
 the guard reads only the workspace-wide `rules` blocks, so they are not a
 decision table:
 
-| Native rule | Scope | Meaning |
-| --- | --- | --- |
-| `max-params` (`max: 3`) | module, package and app source, not tests | More than three parameters becomes one destructured object. |
-| `typescript/return-await` (`in-try-catch`) | modules, apps, packages, SDK and MCP source | `return await` only inside a `try`. Replaces `langwatch/return-await-outside-try`. |
-| `typescript/no-explicit-any` | TypeScript source, not tests | No `any` in source. |
-| `no-console` | process source (apps and module process halves), not tests | Log through `createLogger`. |
-| `no-restricted-imports` | process source, not tests | No `RestErrorHandler`, `jsonResponse` or `rateLimitedResponse`: a REST handler throws a `HandledError`. Replaces `langwatch/rest-no-error-handler-override`. |
-| `typescript/explicit-module-boundary-types` | module contract and process source, not tests | An exported function states its result type. Replaces the explicit-result half of `langwatch/fallible-result-naming`. |
+| Native rule                                 | Scope                                                      | Meaning                                                                                                                                                      |
+| ------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `max-params` (`max: 3`)                     | module, package and app source, not tests                  | More than three parameters becomes one destructured object.                                                                                                  |
+| `typescript/return-await` (`in-try-catch`)  | modules, apps, packages, SDK and MCP source                | `return await` only inside a `try`. Replaces `langwatch/return-await-outside-try`.                                                                           |
+| `typescript/no-explicit-any`                | TypeScript source, not tests                               | No `any` in source.                                                                                                                                          |
+| `no-console`                                | process source (apps and module process halves), not tests | Log through `createLogger`.                                                                                                                                  |
+| `no-restricted-imports`                     | process source, not tests                                  | No `RestErrorHandler`, `jsonResponse` or `rateLimitedResponse`: a REST handler throws a `HandledError`. Replaces `langwatch/rest-no-error-handler-override`. |
+| `typescript/explicit-module-boundary-types` | module contract and process source, not tests              | An exported function states its result type. Replaces the explicit-result half of `langwatch/fallible-result-naming`.                                        |
 
 ### Toolchain-owned policies
 
-| Rule | Layer | Meaning |
-| --- | --- | --- |
+| Rule              | Layer                 | Meaning                                                                                                          |
+| ----------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `workspace-seams` | architecture-enforcer | A policy reads the workspace through the run's one snapshot; it does not walk, parse or resolve the tree itself. |

@@ -41,8 +41,8 @@ layout:
 
 | Was                                                          | Read as                                                                                       |
 | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `platform/app/src/server/<feature>/**`                       | `modules/<feature>/server/src/**`                                                   |
-| `platform/app/src/{components,hooks,features}/**`            | `modules/<feature>/web/src/**`, or `apps/ui/src/**` for the shell                   |
+| `platform/app/src/server/<feature>/**`                       | `modules/<feature>/server/src/**`                                                             |
+| `platform/app/src/{components,hooks,features}/**`            | `modules/<feature>/web/src/**`, or `apps/ui/src/**` for the shell                             |
 | `platform/app/src/server/app-layer/**`, `src/runtime/app/**` | `apps/api/src/app/**` (the API's composition root)                                            |
 | `platform/app/src/workers.ts`, `src/runtime/worker/**`       | `apps/worker/src/app/**`                                                                      |
 | `platform/app/src/pages/**`                                  | `apps/ui/src/**` routes                                                                       |

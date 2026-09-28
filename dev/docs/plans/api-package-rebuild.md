@@ -8,13 +8,13 @@ annotation reference shape (ADR-133).
 
 `packages/api/src`, tests excluded, on 2026-09-08:
 
-| Measure | Value |
-| --- | --- |
-| Source files / lines | 79 / 14,903 (`rest/` 45 + `rest/security/` 5, `trpc/` 19) |
-| Public exports | 269, of which 108 have no importer outside the package |
-| Tests | 57 files, 13,081 lines, almost all of them testing the framework's own layering |
-| Specs | 10 files, 147 scenarios |
-| Files over 300 lines | 15; the five largest are 990, 982, 978, 782, 727 |
+| Measure              | Value                                                                           |
+| -------------------- | ------------------------------------------------------------------------------- |
+| Source files / lines | 79 / 14,903 (`rest/` 45 + `rest/security/` 5, `trpc/` 19)                       |
+| Public exports       | 269, of which 108 have no importer outside the package                          |
+| Tests                | 57 files, 13,081 lines, almost all of them testing the framework's own layering |
+| Specs                | 10 files, 147 scenarios                                                         |
+| Files over 300 lines | 15; the five largest are 990, 982, 978, 782, 727                                |
 
 The size is not incidental. The package carries **three REST construction paths and two
 tRPC ones**, and the reference path runs on top of the other two:
@@ -58,12 +58,12 @@ with a three-generic signature just to hand the declaration a runtime.
 
 Machinery nobody uses, kept alive by tests and specs of its own:
 
-| Machinery | Lines | Real use |
-| --- | --- | --- |
-| Rate limit + response cache ports (`RateLimiter`, `ResponseCache`, `capabilities.ts`) | ~250 + 21 spec scenarios | 1 `.withRateLimit()` call, 0 `.withCache()`, 0 importers of either port |
-| SSE chain (`sse.ts`, `SseChain`, `registerSse`) | 138 + 7 scenarios | 0 users outside the package |
-| Dated-version fallback, preview namespace, withdrawal (`versioning`, `route-mounting`, `public-rest-routing`) | 1,124 | 5 distinct dates in use, `withdraw` 7 sites, preview 0, header selection 2 files |
-| Service defaults, groups, any-method routes, raw response | in `builder`/`definition`/`pipeline` | groups 4, any-method 4, `.withRawResponse` 163 (legacy families answering outside the contract) |
+| Machinery                                                                                                     | Lines                                | Real use                                                                                        |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Rate limit + response cache ports (`RateLimiter`, `ResponseCache`, `capabilities.ts`)                         | ~250 + 21 spec scenarios             | 1 `.withRateLimit()` call, 0 `.withCache()`, 0 importers of either port                         |
+| SSE chain (`sse.ts`, `SseChain`, `registerSse`)                                                               | 138 + 7 scenarios                    | 0 users outside the package                                                                     |
+| Dated-version fallback, preview namespace, withdrawal (`versioning`, `route-mounting`, `public-rest-routing`) | 1,124                                | 5 distinct dates in use, `withdraw` 7 sites, preview 0, header selection 2 files                |
+| Service defaults, groups, any-method routes, raw response                                                     | in `builder`/`definition`/`pipeline` | groups 4, any-method 4, `.withRawResponse` 163 (legacy families answering outside the contract) |
 
 Feature knowledge inside the framework: `media-response.ts` (stored-object headers),
 `personal-caller.ts` (personal-workspace keys), `rbac-vocabulary.ts` (roles),
@@ -75,8 +75,8 @@ Access policy spread over two vocabularies for the same three decisions: `access
 (`requires`, `publicEndpoint`, `internalSecret`, `handlerManagedAuth`, `anyAuthenticated`,
 `apiKeyPermission` for REST), `rest/security/*` (registry, declaration check, OpenAPI
 security), and `trpc-permission-builder` + `trpc-declared-authz` + the five `appTrpc*Policy`
-functions for tRPC. The vocabulary of *what a permission is* already lives in
-`@langwatch/authz-contract` (4,379 lines) and *who is calling* in `@langwatch/actor`.
+functions for tRPC. The vocabulary of _what a permission is_ already lives in
+`@langwatch/authz-contract` (4,379 lines) and _who is calling_ in `@langwatch/actor`.
 
 ## The shape to reach
 
@@ -138,9 +138,9 @@ type Credential = "session" | "projectKey" | "organizationKey" | "internalSecret
 // The one check. Both runtimes call it after parse, with the caller the process authenticated.
 function decide(input: {
   declaration: AccessDeclaration;
-  caller: Caller;              // from ports.identity.authenticate(request)
-  input: unknown;              // parsed; the scope ids are read from it
-  authorize: AuthorizePort;    // ports.authorization.forRequest(...)
+  caller: Caller; // from ports.identity.authenticate(request)
+  input: unknown; // parsed; the scope ids are read from it
+  authorize: AuthorizePort; // ports.authorization.forRequest(...)
 }): Promise<{ actor: Actor | null; scope: AuthzDeclaredScopeId | null }>;
 
 function securityRequirement(credential: Credential): OpenApiSecurityRequirement; // for rest-openapi
@@ -148,7 +148,7 @@ function securityRequirement(credential: Credential): OpenApiSecurityRequirement
 
 `decide` owns: the scope-lineage guard, the blank-scope-id refusal, the project-id
 mismatch refusal, the fail-closed backstop ("a procedure that ran no check refuses").
-Permission and declaration *types* come from `@langwatch/authz-contract`; nothing here
+Permission and declaration _types_ come from `@langwatch/authz-contract`; nothing here
 mirrors them. `defineTrpcRouter` and `defineRestRouter` both produce `AccessDeclaration`
 from `.withPermission()` / `.noPermission()` / `.serviceAuthorized()`; REST additionally
 names the `Credential` on the router (`defineRestRouter(Api).withNamespace("annotations")
@@ -162,28 +162,28 @@ them once in its own composition; today's `api-rest.security.ts` (638 lines) and
 
 ```ts
 type ApiRuntimePorts = {
-  identity: { authenticate(request): Promise<Caller> };        // session, api key, org key, internal secret
-  authorization: { forRequest(caller): AuthorizePort };        // getDecision, getProjectAnyDecision, checkScopeLineage
+  identity: { authenticate(request): Promise<Caller> }; // session, api key, org key, internal secret
+  authorization: { forRequest(caller): AuthorizePort }; // getDecision, getProjectAnyDecision, checkScopeLineage
   audit: { record(entry): Promise<void>; redact(procedure, args): unknown };
   errors: { report(error): void; translate(cause): TranslatedCause | undefined };
-  idempotency?: IdempotencyReceiptStore;                        // only if a REST route declares it
+  idempotency?: IdempotencyReceiptStore; // only if a REST route declares it
 };
 ```
 
 ### What leaves the package
 
-| Today | Goes to | Why |
-| --- | --- | --- |
-| `rest/media-response.ts` | stored-object server | knows stored-object headers |
-| `rest/personal-caller.ts` | user server | knows personal-workspace keys |
-| `rest/rbac-vocabulary.ts` | role feature | the roles catalogue |
-| `rest/management-audit.ts`, `rest/broadcast.ts`, `rest/platform-url.ts` | the features that declare them, or `apps/api` | process ports a family declared through the framework for no reason |
-| `trpc/trpc-audit-redaction.ts` | model-provider (list) + `ports.audit.redact` (hook) | the framework redacts, the owner says what |
-| `trpc/trpc-audit.ts` exemptions | `ports.audit` | the process decides what it records |
-| `errors.ts` envelope, `http-errors.ts`, `schemas.ts`, `base-responses.ts` (legacy flat envelope) | deleted with `SecuredApp` | the canonical envelope is `HandledError`; the flat one dies with the raw-Hono families |
-| `schema.ts` (Standard Schema `ApiSchema`) | deleted | contracts are zod |
-| `RateLimiter`, `ResponseCache`, `capabilities.ts` | deleted | 0 importers |
-| `sse.ts` | deleted; a stream is a tRPC subscription | 0 users |
+| Today                                                                                            | Goes to                                             | Why                                                                                    |
+| ------------------------------------------------------------------------------------------------ | --------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `rest/media-response.ts`                                                                         | stored-object server                                | knows stored-object headers                                                            |
+| `rest/personal-caller.ts`                                                                        | user server                                         | knows personal-workspace keys                                                          |
+| `rest/rbac-vocabulary.ts`                                                                        | role feature                                        | the roles catalogue                                                                    |
+| `rest/management-audit.ts`, `rest/broadcast.ts`, `rest/platform-url.ts`                          | the features that declare them, or `apps/api`       | process ports a family declared through the framework for no reason                    |
+| `trpc/trpc-audit-redaction.ts`                                                                   | model-provider (list) + `ports.audit.redact` (hook) | the framework redacts, the owner says what                                             |
+| `trpc/trpc-audit.ts` exemptions                                                                  | `ports.audit`                                       | the process decides what it records                                                    |
+| `errors.ts` envelope, `http-errors.ts`, `schemas.ts`, `base-responses.ts` (legacy flat envelope) | deleted with `SecuredApp`                           | the canonical envelope is `HandledError`; the flat one dies with the raw-Hono families |
+| `schema.ts` (Standard Schema `ApiSchema`)                                                        | deleted                                             | contracts are zod                                                                      |
+| `RateLimiter`, `ResponseCache`, `capabilities.ts`                                                | deleted                                             | 0 importers                                                                            |
+| `sse.ts`                                                                                         | deleted; a stream is a tRPC subscription            | 0 users                                                                                |
 
 `bodyLimit` stays, as a router option (`.withBodyLimit(bytes)`): fifteen ingestion
 families apply it and it is wire policy, not feature knowledge.
@@ -241,10 +241,10 @@ Phase 3  api lane     delete everything the table below names; four specs; READM
    `trpc-failure-trace.ts`, `trpc-caller-trace.ts`; the output check from
    `trpc-service-builder.ts` (`validateDeclaredOutput`, `guardStream`). `mount` builds the
    procedure record directly on `root.procedure.input(member.input).use(chain).query|mutation|
-   subscription(handler)`; no service builder in between. `defineTrpcRouter(...).build().router`
+subscription(handler)`; no service builder in between. `defineTrpcRouter(...).build().router`
    takes the runtime, not a `TrpcService`.
 3. **`rest/rest-runtime.ts`**: `createRestRuntime(ports)` returning `{ mount(declaration, app):
-   Hono }`. One handler per route: body limit, authenticate, parse params/query/body with the
+Hono }`. One handler per route: body limit, authenticate, parse params/query/body with the
    declared schemas, `decide`, handler, output check, respond (204 on void), audit;
    `onError` renders `HandledError` as its envelope and everything else as 500 + trace id.
    Paths: `/api/<ns>/<version>/<path>` exact and `/api/<ns>/<path>` for the router's version.

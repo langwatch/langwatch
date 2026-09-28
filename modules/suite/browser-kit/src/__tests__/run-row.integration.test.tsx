@@ -8,9 +8,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "../model/run-history-fixtures.ts";
 import { RunRow } from "../ui/sections/run-row.tsx";
 import { cssRulesForElement } from "./emotion-test-css.ts";
-import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

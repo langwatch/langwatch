@@ -4,7 +4,7 @@ import type { ExtractorContext } from "../services/canonical-attributes.service.
 import {
   extractSystemInstructionFromMessages,
   normalizeToMessages,
-  stripSystemMessages,
+  stripLiftedSystemMessage,
 } from "./canonical-message.rules.ts";
 import {
   isLangWatchStructuredValue,
@@ -39,7 +39,7 @@ function publishInputChatMessages(
     ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, systemInstruction);
   }
 
-  const chatMsgs = systemInstruction ? stripSystemMessages(messages) : messages;
+  const chatMsgs = systemInstruction ? stripLiftedSystemMessage(messages) : messages;
   if (chatMsgs.length > 0) {
     ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
   }

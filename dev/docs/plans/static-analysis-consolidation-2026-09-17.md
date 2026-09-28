@@ -7,21 +7,21 @@
 >
 > ### Shipped
 >
-> | change | result |
-> | --- | --- |
-> | Debt register deleted, 7 per-file exemptions deleted, `correctness` promoted to error | the gate went from **6,569** concealed to an honest count |
-> | `node/no-process-env`, `import` (7 rules), `promise` (3), `jsx-a11y` (12), `unicorn/no-array-sort`, `import/no-duplicates`, `reportUnusedDisableDirectives` | **+4,184**, including **50 real import cycles** nothing had ever checked |
-> | `oxlint-tsgolint` installed, `--type-aware` wired into `lint:oxlint` | **+2,225** across the 14 rules that were registered but inert; `no-floating-promises` is **334**, not the 39 the old register recorded. Costs 58s → **3m57s** |
-> | oxfmt `sortImports` + `sortPackageJson` | enabled |
-> | `-f github` | added as `lint:oxlint:ci`, restoring inline PR annotations |
-> | 6 duplicate ast-grep rules deleted | they duplicated 3 oxlint plugin rules with narrower path coverage |
-> | dead baseline machinery deleted | `overengineering.mjs` read a file that did not exist; CI fetched 3 deleted baselines |
-> | `declarations.ts` reads built `.d.ts` | **>6m22s / 3.1 GB (killed unfinished) → 3.7s / 226 MB**, and it now actually runs. Found **310 real leaks** |
-> | every traversal routed through the shared snapshot | 13 `createSourceFile`, 22 `walkFiles`, 5 private resolvers; new `workspace-seams` policy prevents regression |
+> | change                                                                                                                                                      | result                                                                                                                                                        |
+> | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | Debt register deleted, 7 per-file exemptions deleted, `correctness` promoted to error                                                                       | the gate went from **6,569** concealed to an honest count                                                                                                     |
+> | `node/no-process-env`, `import` (7 rules), `promise` (3), `jsx-a11y` (12), `unicorn/no-array-sort`, `import/no-duplicates`, `reportUnusedDisableDirectives` | **+4,184**, including **50 real import cycles** nothing had ever checked                                                                                      |
+> | `oxlint-tsgolint` installed, `--type-aware` wired into `lint:oxlint`                                                                                        | **+2,225** across the 14 rules that were registered but inert; `no-floating-promises` is **334**, not the 39 the old register recorded. Costs 58s → **3m57s** |
+> | oxfmt `sortImports` + `sortPackageJson`                                                                                                                     | enabled                                                                                                                                                       |
+> | `-f github`                                                                                                                                                 | added as `lint:oxlint:ci`, restoring inline PR annotations                                                                                                    |
+> | 6 duplicate ast-grep rules deleted                                                                                                                          | they duplicated 3 oxlint plugin rules with narrower path coverage                                                                                             |
+> | dead baseline machinery deleted                                                                                                                             | `overengineering.mjs` read a file that did not exist; CI fetched 3 deleted baselines                                                                          |
+> | `declarations.ts` reads built `.d.ts`                                                                                                                       | **>6m22s / 3.1 GB (killed unfinished) → 3.7s / 226 MB**, and it now actually runs. Found **310 real leaks**                                                   |
+> | every traversal routed through the shared snapshot                                                                                                          | 13 `createSourceFile`, 22 `walkFiles`, 5 private resolvers; new `workspace-seams` policy prevents regression                                                  |
 >
 > ### Reversed by evidence — do NOT follow the body on these
 >
-> - **§6 "Do not move the enforcer to TypeScript 7 *yet*" understates it: TS7 is
+> - **§6 "Do not move the enforcer to TypeScript 7 _yet_" understates it: TS7 is
 >   a regression, not a deferral.** Measured like-for-like over 8,280 files, TS7
 >   is **3.8x slower** (37.2s vs 9.9s) because it has **no in-process parser at
 >   all** — only Go, out-of-process — and re-reading an already-fetched file
@@ -63,12 +63,12 @@
 >
 > ### Where the number is
 >
-> | point | errors |
-> | --- | --- |
-> | what CI blocked on before | 6,569 |
-> | no baseline, no exemptions, correctness at error | 10,258 |
-> | + every rule added today | 14,442 |
-> | + type-aware | 16,642 |
+> | point                                                   | errors                         |
+> | ------------------------------------------------------- | ------------------------------ |
+> | what CI blocked on before                               | 6,569                          |
+> | no baseline, no exemptions, correctness at error        | 10,258                         |
+> | + every rule added today                                | 14,442                         |
+> | + type-aware                                            | 16,642                         |
 > | after the auto-fix sweep and the first mechanical lanes | **12,142** (+2,225 type-aware) |
 >
 > The remaining work is overwhelmingly hand edits: only **2.5%** of the tree's
@@ -91,10 +91,10 @@ Decisions taken by the user, 2026-09-17, and assumed throughout:
 
 ## 1. The number
 
-| configuration | errors |
-| --- | --- |
-| what CI blocks on today | **6,569** |
-| the debt register deleted | 7,491 |
+| configuration                                                                       | errors     |
+| ----------------------------------------------------------------------------------- | ---------- |
+| what CI blocks on today                                                             | **6,569**  |
+| the debt register deleted                                                           | 7,491      |
 | register deleted **and** per-file exemptions removed **and** `correctness` at error | **10,258** |
 
 **10,258 is the honest target**, across **90 rules**. The gap to today's 6,569
@@ -124,18 +124,18 @@ ratio.)
 
 Everything a machine can do, in full:
 
-| rule | before | after | fixed |
-| --- | --- | --- | --- |
-| `eslint(no-unused-vars)` | 99 | 19 | −80 |
-| `react-hooks(exhaustive-deps)` | 137 | 79 | −58 |
-| `langwatch(logical-statement-spacing)` | 55 | 0 | −55 |
-| `langwatch(banned-test-model-names)` | 16 | 0 | −16 |
-| `unicorn(prefer-string-starts-ends-with)` | 11 | 0 | −11 |
-| `typescript(array-type)` | 12 | 4 | −8 |
-| `langwatch(module-app-only-across-packages)` | 1,072 | 1,063 | −9 |
-| `unicorn(no-new-array)` | 6 | 0 | −6 |
-| `eslint(no-useless-escape)` | 3 | 0 | −3 |
-| six others | | | −7 |
+| rule                                         | before | after | fixed |
+| -------------------------------------------- | ------ | ----- | ----- |
+| `eslint(no-unused-vars)`                     | 99     | 19    | −80   |
+| `react-hooks(exhaustive-deps)`               | 137    | 79    | −58   |
+| `langwatch(logical-statement-spacing)`       | 55     | 0     | −55   |
+| `langwatch(banned-test-model-names)`         | 16     | 0     | −16   |
+| `unicorn(prefer-string-starts-ends-with)`    | 11     | 0     | −11   |
+| `typescript(array-type)`                     | 12     | 4     | −8    |
+| `langwatch(module-app-only-across-packages)` | 1,072  | 1,063 | −9    |
+| `unicorn(no-new-array)`                      | 6      | 0     | −6    |
+| `eslint(no-useless-escape)`                  | 3      | 0     | −3    |
+| six others                                   |        |       | −7    |
 
 Two cautions on that table. The 58 `exhaustive-deps` fixes come from
 `--fix-dangerously`, which **adds dependencies and can change render
@@ -159,8 +159,8 @@ printed**; without it, the findings appear. So 146 rules — `react-hooks/exhaus
 every registered-but-inert type-aware rule — have been enforcing nothing.
 
 This also falsifies a comment in the tree. `.oxlintrc.jsonc:72` tunes
-`vitest/valid-expect` to `maxArgs: 2` and says *"The 9 real ones, an async
-matcher never awaited, still report."* They do not: at `warn`, under `--quiet`,
+`vitest/valid-expect` to `maxArgs: 2` and says _"The 9 real ones, an async
+matcher never awaited, still report."_ They do not: at `warn`, under `--quiet`,
 it reports nothing at all.
 
 ## 3. Turn it all on — the exact change
@@ -189,7 +189,7 @@ One commit. Expect CI red at 10,258 until the drive lands.
    two exemption override blocks at `:291-299` and `:302-333` (seven `"off"`
    entries: `temporal-only`, `stand-in-cast`, `no-inline-dynamic-import`,
    `condition-shape`, `comment-block-size`, `cognitive-complexity`,
-   `empty-catch`). Keep the *enabling* override blocks — `:178`, `:188`, `:237`,
+   `empty-catch`). Keep the _enabling_ override blocks — `:178`, `:188`, `:237`,
    `:247` turn rules **on** for a path and are not exemptions.
 4. **Delete the baseline-reading code**, which is already dead (§5.1).
 
@@ -204,24 +204,24 @@ level deep, and never measure from a config outside the repo root.
 
 90 rules fire. The head is where the drive lives:
 
-| findings | rule | character of the work |
-| --- | --- | --- |
-| 2,081 | `langwatch(stand-in-cast)` | the single largest item; entirely hidden by one exemption today |
-| 1,072 | `langwatch(module-app-only-across-packages)` | cross-package imports; architectural, not mechanical |
-| 1,013 | `langwatch(cognitive-complexity)` | function-by-function decomposition |
-| 773 | `langwatch(fallible-result-naming)` | `find*`/`get*` vocabulary; **changes behaviour at call sites** — see the `find-is-not-a-nullable-suffix` and `fallible-rename-changes-the-impl` notes |
-| 543 | `langwatch(temporal-only)` | |
-| 449 | `eslint(no-nested-ternary)` | |
-| 448 | `langwatch(no-try-prefix)` | same hazard as `fallible-result-naming` |
-| 380 | `langwatch(package-boundaries)` | |
-| 265 | `langwatch(no-inline-dynamic-import)` | |
-| 231 | `langwatch(service-classes)` | |
-| 216 | `langwatch(condition-shape)` | |
-| 182 | `eslint(complexity)` | |
-| 159 | `vitest(no-conditional-expect)` | test hygiene |
-| 145 | `langwatch(repository-takes-only-its-store)` | |
-| 144 | `langwatch(feature-source-layout)` | file moves |
-| 137 | `react-hooks(exhaustive-deps)` | 58 auto-fixable, **all needing review** |
+| findings | rule                                         | character of the work                                                                                                                                 |
+| -------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2,081    | `langwatch(stand-in-cast)`                   | the single largest item; entirely hidden by one exemption today                                                                                       |
+| 1,072    | `langwatch(module-app-only-across-packages)` | cross-package imports; architectural, not mechanical                                                                                                  |
+| 1,013    | `langwatch(cognitive-complexity)`            | function-by-function decomposition                                                                                                                    |
+| 773      | `langwatch(fallible-result-naming)`          | `find*`/`get*` vocabulary; **changes behaviour at call sites** — see the `find-is-not-a-nullable-suffix` and `fallible-rename-changes-the-impl` notes |
+| 543      | `langwatch(temporal-only)`                   |                                                                                                                                                       |
+| 449      | `eslint(no-nested-ternary)`                  |                                                                                                                                                       |
+| 448      | `langwatch(no-try-prefix)`                   | same hazard as `fallible-result-naming`                                                                                                               |
+| 380      | `langwatch(package-boundaries)`              |                                                                                                                                                       |
+| 265      | `langwatch(no-inline-dynamic-import)`        |                                                                                                                                                       |
+| 231      | `langwatch(service-classes)`                 |                                                                                                                                                       |
+| 216      | `langwatch(condition-shape)`                 |                                                                                                                                                       |
+| 182      | `eslint(complexity)`                         |                                                                                                                                                       |
+| 159      | `vitest(no-conditional-expect)`              | test hygiene                                                                                                                                          |
+| 145      | `langwatch(repository-takes-only-its-store)` |                                                                                                                                                       |
+| 144      | `langwatch(feature-source-layout)`           | file moves                                                                                                                                            |
+| 137      | `react-hooks(exhaustive-deps)`               | 58 auto-fixable, **all needing review**                                                                                                               |
 
 The tail — 74 rules under 137 findings each, 1,380 total — is where the
 cheapest complete wins are: 20 rules have 10 or fewer findings and can be
@@ -256,11 +256,11 @@ Each duplicates an oxlint plugin rule with **narrower** path coverage — the
 ast-grep copies scope to `apps/**` and `packages/**`, missing all of
 `modules/**` — and different wording. One of them blocks CI at `error`.
 
-| ast-grep file | duplicates | keep |
-| --- | --- | --- |
-| `no-inline-dynamic-import{,-tsx}.yml` | `no-inline-dynamic-import.rule.mjs:34` | the plugin (it carries the 5 exemptions) |
-| `use-action-based-test-name{,-tsx}.yml` | `test-description-is-an-action.rule.mjs:74` | the plugin (full-tree, blocking) |
-| `require-bdd-describe-context{,-tsx}.yml` | `test-description-is-an-action.rule.mjs:59-67` | the plugin (models the MDN exemption) |
+| ast-grep file                             | duplicates                                     | keep                                     |
+| ----------------------------------------- | ---------------------------------------------- | ---------------------------------------- |
+| `no-inline-dynamic-import{,-tsx}.yml`     | `no-inline-dynamic-import.rule.mjs:34`         | the plugin (it carries the 5 exemptions) |
+| `use-action-based-test-name{,-tsx}.yml`   | `test-description-is-an-action.rule.mjs:74`    | the plugin (full-tree, blocking)         |
+| `require-bdd-describe-context{,-tsx}.yml` | `test-description-is-an-action.rule.mjs:59-67` | the plugin (models the MDN exemption)    |
 
 ADR-135 already deleted two such pairs once; three grew back. Delete the six
 `.yml`, their fixtures and snapshots, and update ADR-135's registry table.
@@ -308,12 +308,12 @@ Each of these cost real time to disprove during this audit:
   share, so no mechanism — tsgolint included — removes work that is being done
   twice.
 - **oxlint plugins can never receive types.**
-  `node_modules/oxlint/dist/plugins-dev.d.ts:3373`: *"Oxlint does not offer any
-  parser services."* That is a design position, not a gap. No house rule becomes
+  `node_modules/oxlint/dist/plugins-dev.d.ts:3373`: _"Oxlint does not offer any
+  parser services."_ That is a design position, not a gap. No house rule becomes
   type-aware through that door. `--type-aware` exists but drives
   `oxlint-tsgolint` — **not installed here** — and it powers only built-in rules.
 
-What *is* duplicated and removable: **one emit** (§5.3), and **31 redundant
+What _is_ duplicated and removable: **one emit** (§5.3), and **31 redundant
 traversals inside the enforcer** — 23 stray `walkFiles(` sites, 19 stray
 `ts.createSourceFile` sites, and 5 policies building their own module resolver
 with a cold cache, all bypassing the shared snapshot and mtime-validated parse
@@ -358,15 +358,15 @@ which cites a deleted file.
 Each is measured, and each adds to a number the drive is trying to empty. None
 should land during the drive.
 
-| change | findings added | machine-fixable | why |
-| --- | --- | --- | --- |
-| `options.reportUnusedDisableDirectives: "error"` | **172** | 0, but each is a one-line deletion | 172 of the tree's 458 suppressions suppress nothing. `packages/prisma-client` holds 140 |
-| `import` plugin, six named rules | **91** | 4 | `import/no-cycle` finds **50 real import cycles** nothing else here checks |
-| `promise`, three named rules | **51** | 0 | `no-multiple-resolved` (29) is a real double-settle bug class |
-| `jsx-a11y`, ten named rules | **89** | 50 | 39 hand edits buys keyboard/ARIA correctness on a product with no other a11y gate |
-| install `oxlint-tsgolint`, `--type-aware` | unmeasured | — | lights up 14 registered-but-inert rules. `specs/dependencies/oxc-toolchain.feature` calls it blocking; the old register calls it "the largest single loss in the migration". Measure before committing — it builds a TS program and CI lint will rise materially |
-| `-f github` output format | 0 | — | restores the inline diff annotations the CI comment at `:960` records as lost. Only useful once counts are small (GitHub renders 10 annotations per step) |
-| commit `.vscode/settings.json` + `extensions.json` | 0 | — | there is **no** `.vscode/` (gitignored at `.gitignore:35`) and no editor config anywhere: CI enforces thousands of errors a developer's editor shows none of |
+| change                                             | findings added | machine-fixable                    | why                                                                                                                                                                                                                                                              |
+| -------------------------------------------------- | -------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `options.reportUnusedDisableDirectives: "error"`   | **172**        | 0, but each is a one-line deletion | 172 of the tree's 458 suppressions suppress nothing. `packages/prisma-client` holds 140                                                                                                                                                                          |
+| `import` plugin, six named rules                   | **91**         | 4                                  | `import/no-cycle` finds **50 real import cycles** nothing else here checks                                                                                                                                                                                       |
+| `promise`, three named rules                       | **51**         | 0                                  | `no-multiple-resolved` (29) is a real double-settle bug class                                                                                                                                                                                                    |
+| `jsx-a11y`, ten named rules                        | **89**         | 50                                 | 39 hand edits buys keyboard/ARIA correctness on a product with no other a11y gate                                                                                                                                                                                |
+| install `oxlint-tsgolint`, `--type-aware`          | unmeasured     | —                                  | lights up 14 registered-but-inert rules. `specs/dependencies/oxc-toolchain.feature` calls it blocking; the old register calls it "the largest single loss in the migration". Measure before committing — it builds a TS program and CI lint will rise materially |
+| `-f github` output format                          | 0              | —                                  | restores the inline diff annotations the CI comment at `:960` records as lost. Only useful once counts are small (GitHub renders 10 annotations per step)                                                                                                        |
+| commit `.vscode/settings.json` + `extensions.json` | 0              | —                                  | there is **no** `.vscode/` (gitignored at `.gitignore:35`) and no editor config anywhere: CI enforces thousands of errors a developer's editor shows none of                                                                                                     |
 
 **Enable named rules, never a category.** Measured whole-tier costs, for the
 record: `suspicious` 41,117 · `pedantic` 46,750 · `style` **611,127** ·
@@ -374,20 +374,20 @@ record: `suspicious` 41,117 · `pedantic` 46,750 · `style` **611,127** ·
 
 ## 8. Rejected, with the reason
 
-| rejected | measured | why |
-| --- | --- | --- |
-| `jsdoc` plugin | 19,481 correctness / 54,592 all | no house JSDoc convention, no codemod |
-| `react-perf` plugin | 8,993 | inline handlers in props are the house idiom; cannot reach zero |
-| `node` plugin | 5,761 | `no-sync` 3,748 unfixable; `no-process-env` duplicates `langwatch/secrets-through-source` |
-| `nextjs` / `vue` plugins | 0 / 7 | no Next.js; 7 stray Vue files |
-| `jest` plugin | 1,488 duplicates | already correctly decided at `.oxlintrc.jsonc:27-31` |
-| oxfmt `sortImports` | **+8,598 files** | largest blast radius measured, on top of a 2,072-file backlog |
-| any other oxfmt option | whole-tree rewrite | all six options in `.oxfmtrc.json` are **already oxfmt 0.63 defaults**; only `ignorePatterns` is load-bearing |
-| `unicorn/no-array-sort` | 1,206 → 5 after fix | 99.6% fixable and tempting, but rewrites 1,201 call sites in one commit. If ever, land it alone |
-| `import/no-duplicates` | 901 → 149 after fix | 149 hand edits for an aesthetic merge of two import lines |
-| collapsing `tsconfig.json` into `tsconfig.build.json` | 165 packages carry both | the double parse is real but deliberate: build excludes tests and sets `noEmitOnError`, check includes tests and sets `noEmit`. Collapsing either stops checking tests or lets a test failure block consumers' declaration emit. Warm run is 26.8s; leave it |
-| oxlint in `.githooks/pre-commit` | 51.2s per commit | unusable at the current JS-plugin cost; the editor LSP is the right pre-CI loop |
-| a reviewdog-style diff filter | — | `-f github` gives native annotations for free, and the CI comment at `:944-962` already argues the delta gate away on its merits |
+| rejected                                              | measured                        | why                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `jsdoc` plugin                                        | 19,481 correctness / 54,592 all | no house JSDoc convention, no codemod                                                                                                                                                                                                                        |
+| `react-perf` plugin                                   | 8,993                           | inline handlers in props are the house idiom; cannot reach zero                                                                                                                                                                                              |
+| `node` plugin                                         | 5,761                           | `no-sync` 3,748 unfixable; `no-process-env` duplicates `langwatch/secrets-through-source`                                                                                                                                                                    |
+| `nextjs` / `vue` plugins                              | 0 / 7                           | no Next.js; 7 stray Vue files                                                                                                                                                                                                                                |
+| `jest` plugin                                         | 1,488 duplicates                | already correctly decided at `.oxlintrc.jsonc:27-31`                                                                                                                                                                                                         |
+| oxfmt `sortImports`                                   | **+8,598 files**                | largest blast radius measured, on top of a 2,072-file backlog                                                                                                                                                                                                |
+| any other oxfmt option                                | whole-tree rewrite              | all six options in `.oxfmtrc.json` are **already oxfmt 0.63 defaults**; only `ignorePatterns` is load-bearing                                                                                                                                                |
+| `unicorn/no-array-sort`                               | 1,206 → 5 after fix             | 99.6% fixable and tempting, but rewrites 1,201 call sites in one commit. If ever, land it alone                                                                                                                                                              |
+| `import/no-duplicates`                                | 901 → 149 after fix             | 149 hand edits for an aesthetic merge of two import lines                                                                                                                                                                                                    |
+| collapsing `tsconfig.json` into `tsconfig.build.json` | 165 packages carry both         | the double parse is real but deliberate: build excludes tests and sets `noEmitOnError`, check includes tests and sets `noEmit`. Collapsing either stops checking tests or lets a test failure block consumers' declaration emit. Warm run is 26.8s; leave it |
+| oxlint in `.githooks/pre-commit`                      | 51.2s per commit                | unusable at the current JS-plugin cost; the editor LSP is the right pre-CI loop                                                                                                                                                                              |
+| a reviewdog-style diff filter                         | —                               | `-f github` gives native annotations for free, and the CI comment at `:944-962` already argues the delta gate away on its merits                                                                                                                             |
 
 ## 9. Two things this plan does not fix
 

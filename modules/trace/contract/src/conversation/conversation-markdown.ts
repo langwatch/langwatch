@@ -1,4 +1,4 @@
-import { formatDuration, formatRelativeTime, isoTimestamp } from "../trace-time-format.ts";
+import { formatDuration, isoTimestamp } from "../trace-time-format.ts";
 import { extractSystemText } from "../transcript/transcript-text-extraction.ts";
 import type { ConversationTurnSource, ParsedTurn } from "./parsed-turns.ts";
 
@@ -92,7 +92,8 @@ function turnChunks({
     {
       id: `turn-${turnNumber}-header`,
       turnNumber,
-      markdown: `## Turn ${turnNumber} — ${formatRelativeTime(turn.timestamp)} · ${model} · ${formatDuration(turn.durationMs)}`,
+      // An absolute time, so the same thread renders the same text on any day.
+      markdown: `## Turn ${turnNumber} · ${isoTimestamp(turn.timestamp)} · ${model} · ${formatDuration(turn.durationMs)}`,
     },
   ];
 

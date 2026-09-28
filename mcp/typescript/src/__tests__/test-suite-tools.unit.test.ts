@@ -21,13 +21,13 @@ vi.mock("../langwatch-api-scenarios.js", () => ({
   updateScenario: vi.fn(),
 }));
 
+import type { RunPlanRunResult } from "../langwatch-api-run-plans.js";
 import {
   createScenario,
   listScenarios,
   updateScenario,
   type ScenarioSummary,
 } from "../langwatch-api-scenarios.js";
-import type { RunPlanRunResult } from "../langwatch-api-run-plans.js";
 import {
   archiveTestSuite,
   createTestSuite,
@@ -38,7 +38,6 @@ import {
   updateTestSuite,
   type TestSuite,
 } from "../langwatch-api-test-suites.js";
-
 import { handleArchiveTestSuite } from "../tools/archive-test-suite.js";
 import { handleCreateScenario } from "../tools/create-scenario.js";
 import { handleCreateTestSuite } from "../tools/create-test-suite.js";
@@ -476,9 +475,7 @@ describe("handleCreateTestSuite()", () => {
       const result = await handleCreateTestSuite({
         name: "Case lookups",
         fields: [goldenSqlField],
-        evaluators: [
-          { evaluatorId: "evaluator_sql", mappings: sqlAttachment.mappings },
-        ],
+        evaluators: [{ evaluatorId: "evaluator_sql", mappings: sqlAttachment.mappings }],
       });
 
       expect(result).toContain("- golden_sql (text)");
@@ -527,7 +524,12 @@ describe("handleUpdateTestSuite()", () => {
       await handleUpdateTestSuite({
         id: "suite_abc123",
         evaluators: [
-          { id: "att_sql", evaluatorId: "evaluator_sql", required: false, mappings: sqlAttachment.mappings },
+          {
+            id: "att_sql",
+            evaluatorId: "evaluator_sql",
+            required: false,
+            mappings: sqlAttachment.mappings,
+          },
         ],
       });
 
@@ -543,7 +545,10 @@ describe("handleUpdateTestSuite()", () => {
     it("confirms the new state, with each evaluator's gate and mappings", async () => {
       const result = await handleUpdateTestSuite({ id: "suite_abc123", name: "Case lookups v2" });
 
-      expect(mockUpdateTestSuite).toHaveBeenCalledWith({ id: "suite_abc123", name: "Case lookups v2" });
+      expect(mockUpdateTestSuite).toHaveBeenCalledWith({
+        id: "suite_abc123",
+        name: "Case lookups v2",
+      });
       expect(result).toContain('Test suite "Case lookups v2" updated.');
       expect(result).toContain("- golden_sql (text)");
       expect(result).toContain("evaluator_sql (reports only, attachment att_sql)");

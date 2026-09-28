@@ -44,13 +44,13 @@ in.
 
 ### What `.oxfmtrc.json` sets, and why
 
-| Setting | Value | Reason |
-| --- | --- | --- |
-| `printWidth` | 100 | The width the repository's code was already written at. Narrower reflows every argument list. |
-| `tabWidth` / `useTabs` | 2, spaces | Matches the existing tree and the SDK `.editorconfig` files. |
-| `semi` | true | Removes the whole class of automatic-semicolon-insertion surprises. |
-| `singleQuote` | false | Double quotes, so a string containing an apostrophe does not change quoting style. |
-| `trailingComma` | all | A one-line diff when an argument is appended, rather than two. |
+| Setting                | Value     | Reason                                                                                        |
+| ---------------------- | --------- | --------------------------------------------------------------------------------------------- |
+| `printWidth`           | 100       | The width the repository's code was already written at. Narrower reflows every argument list. |
+| `tabWidth` / `useTabs` | 2, spaces | Matches the existing tree and the SDK `.editorconfig` files.                                  |
+| `semi`                 | true      | Removes the whole class of automatic-semicolon-insertion surprises.                           |
+| `singleQuote`          | false     | Double quotes, so a string containing an apostrophe does not change quoting style.            |
+| `trailingComma`        | all       | A one-line diff when an argument is appended, rather than two.                                |
 
 `ignorePatterns` holds three kinds of path and nothing else: build output and
 dependency trees (`node_modules`, `dist`, `build`, `coverage`, `.next`),

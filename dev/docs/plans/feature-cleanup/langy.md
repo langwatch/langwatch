@@ -855,9 +855,9 @@ Non-test files outside `modules/langy/` that import each package:
 
 | package                     | importers |
 | --------------------------- | --------- |
-| `@langwatch/langy-browser`      | 93        |
+| `@langwatch/langy-browser`  | 93        |
 | `@langwatch/langy-contract` | 49        |
-| `@langwatch/langy-process`   | 17        |
+| `@langwatch/langy-process`  | 17        |
 
 The 17 server importers:
 

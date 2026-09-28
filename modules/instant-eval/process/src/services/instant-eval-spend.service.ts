@@ -4,9 +4,9 @@
  * debits and the same monthly meter see it. @see specs/instant-evals/instant-eval-billing.feature
  */
 
-import type { Instant } from "@langwatch/time";
 import type { InstantEvalPricing } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
+import type { Instant } from "@langwatch/time";
 
 import {
   type InstantEvalPricedSpend,

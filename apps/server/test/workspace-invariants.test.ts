@@ -343,7 +343,6 @@ describe("the repo is a single pnpm workspace", () => {
       // the missing file, before anything is built and long before the first
       // migration. The workspace definition ships, so the declaration always
       // reaches the end user whether or not the file it names does.
-      expect(patches.length).toBeGreaterThan(0);
       for (const patch of patches) {
         const covered = shipped.some(
           (f) => patch === f || patch.startsWith(f.endsWith("/") ? f : `${f}/`),

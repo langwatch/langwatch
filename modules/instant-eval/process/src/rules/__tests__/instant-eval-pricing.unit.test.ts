@@ -14,6 +14,7 @@ import {
 describe("given a response from the classifier", () => {
   describe("when the cost is computed", () => {
     /** @scenario "The cost is the tokens at the classifier's published rate" */
+    /** @scenario "Cost is the input tokens at the published rate, and output is free" */
     it("charges the published rate for the input tokens only", () => {
       expect(instantEvalCostUsd({ inputTokens: 1_000_000 })).toBeCloseTo(
         INSTANT_EVAL_PRICING.usdPerMillionInputTokens,
@@ -33,6 +34,7 @@ describe("given a response from the classifier", () => {
 
   describe("when the customer price is computed", () => {
     /** @scenario "The customer price is the cost at the published markup" */
+    /** @scenario "The customer price carries the platform markup" */
     it("is the cost times the markup", () => {
       const costUsd = instantEvalCostUsd({ inputTokens: 2_000_000 });
 

@@ -74,6 +74,7 @@ describe("given the installed web modules", () => {
         "/:project/annotations",
         "/:project/annotations/all",
         "/:project/annotations/me",
+        "/:project/annotations/my-queue",
         "/:project/annotations/:slug",
         "/:project/automations",
         "/:project/automations/automations",

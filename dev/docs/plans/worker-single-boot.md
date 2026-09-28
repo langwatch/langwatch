@@ -7,12 +7,12 @@ Measured 2026-09-17 on `feat/strict-feature-layout-v0`.
 `.withProvided(...)` injects an already-built application into a graph that
 cannot resolve it itself.
 
-| | `apps/api` | `apps/worker` |
-| --- | --- | --- |
-| `createApp` graphs | **1** | **8** |
-| `*.composition.ts` files | **2** | **59** |
-| references to the generated `serverModules` list | **7** | **0** |
-| `.withProvided(...)` stitches | **1** | **46** |
+|                                                  | `apps/api` | `apps/worker` |
+| ------------------------------------------------ | ---------- | ------------- |
+| `createApp` graphs                               | **1**      | **8**         |
+| `*.composition.ts` files                         | **2**      | **59**        |
+| references to the generated `serverModules` list | **7**      | **0**         |
+| `.withProvided(...)` stitches                    | **1**      | **46**        |
 
 The api boots once over the generated list:
 

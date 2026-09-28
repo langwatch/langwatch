@@ -94,33 +94,33 @@ export class SecretsApiService {
   async getAll(): Promise<SecretResponse[]> {
     const projectId = this.projectId();
     return this.request<SecretResponse[]>(
-      `/api/v1/secret?projectId=${encodeURIComponent(projectId)}`,
+      `/api/v1/secrets?projectId=${encodeURIComponent(projectId)}`,
     );
   }
 
   async get(id: string): Promise<SecretResponse> {
     const projectId = this.projectId();
     return this.request<SecretResponse>(
-      `/api/v1/secret/${encodeURIComponent(id)}?projectId=${encodeURIComponent(projectId)}`,
+      `/api/v1/secrets/${encodeURIComponent(id)}?projectId=${encodeURIComponent(projectId)}`,
     );
   }
 
   async create(body: { name: string; value: string }): Promise<SecretResponse> {
-    return this.request<SecretResponse>("/api/v1/secret", {
+    return this.request<SecretResponse>("/api/v1/secrets", {
       method: "POST",
       body: JSON.stringify({ projectId: this.projectId(), ...body }),
     });
   }
 
   async update(id: string, body: { value: string }): Promise<SecretResponse> {
-    return this.request<SecretResponse>(`/api/v1/secret/${encodeURIComponent(id)}`, {
+    return this.request<SecretResponse>(`/api/v1/secrets/${encodeURIComponent(id)}`, {
       method: "PUT",
       body: JSON.stringify({ projectId: this.projectId(), ...body }),
     });
   }
 
   async delete(id: string): Promise<SecretDeleteResponse> {
-    return this.request<SecretDeleteResponse>(`/api/v1/secret/${encodeURIComponent(id)}`, {
+    return this.request<SecretDeleteResponse>(`/api/v1/secrets/${encodeURIComponent(id)}`, {
       method: "DELETE",
       body: JSON.stringify({ projectId: this.projectId() }),
     });

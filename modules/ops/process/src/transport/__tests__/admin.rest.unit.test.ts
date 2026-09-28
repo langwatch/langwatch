@@ -1,7 +1,7 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /** @vitest-environment node */
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import type { OpsApi } from "@langwatch/ops-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 

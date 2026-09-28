@@ -11,7 +11,7 @@ baseline below are history; see the last section.
 ADR-150 made Nx the task runner. It infers one project per pnpm workspace
 member from `package.json`, which means the graph already knows every project
 and every declared edge between them — but it knows nothing about what a
-project *is*. `modules/trace/browser` and `packages/time` are the same kind of
+project _is_. `modules/trace/browser` and `packages/time` are the same kind of
 node to it.
 
 Meanwhile the architecture's boundary rules are stated in prose and enforced,
@@ -80,7 +80,7 @@ enterprise code.
 
 The graph check has one blind spot worth stating, because it is the reason to
 install the oxlint plugin rather than rely on the script: Nx builds edges from
-*declared* dependencies, so an import of a package that `package.json` does not
+_declared_ dependencies, so an import of a package that `package.json` does not
 list is invisible to it. `prompt-browser-kit` importing
 `@langwatch/workflow-browser` was exactly that — undeclared, therefore absent
 from the graph, therefore also absent from `nx affected`, which would replay a
@@ -98,8 +98,8 @@ nx add @nx/oxlint
 {
   "jsPlugins": ["@nx/oxlint/boundaries-plugin"],
   "rules": {
-    "@nx/enforce-module-boundaries": ["error", { /* dev/nx/module-boundaries.json */ }]
-  }
+    "@nx/enforce-module-boundaries": ["error", {/* dev/nx/module-boundaries.json */}],
+  },
 }
 ```
 

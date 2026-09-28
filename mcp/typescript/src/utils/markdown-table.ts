@@ -11,7 +11,7 @@ const MAX_CELL_LENGTH = 200;
 /** One cell: escaped, flattened to a line, and bounded. */
 export function markdownCell(value: unknown): string {
   if (value === null || value === undefined) return "";
-  const text = typeof value === "object" ? JSON.stringify(value) : String(value);
+  const text = cellText(value);
   const escaped = escapeMarkdown(text);
   return escaped.length > MAX_CELL_LENGTH ? `${escaped.slice(0, MAX_CELL_LENGTH - 1)}…` : escaped;
 }
@@ -38,4 +38,21 @@ export function markdownTable({
     lines.push(`| ${headers.map((header) => markdownCell(row[header])).join(" | ")} |`);
   }
   return lines.join("\n");
+}
+
+function cellText(value: {}): string {
+  switch (typeof value) {
+    case "string":
+      return value;
+    case "number":
+    case "boolean":
+    case "bigint":
+      return String(value);
+    case "symbol":
+      return value.toString();
+    case "function":
+      return value.name;
+    default:
+      return JSON.stringify(value);
+  }
 }

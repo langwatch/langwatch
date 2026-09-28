@@ -9,12 +9,12 @@ than trusting the numbers.
 
 35 web packages publish **276** export entries.
 
-| first path segment | entries |
-| --- | --- |
-| `surfaces/` | 104 |
-| `drawers/` | 12 |
-| `testing/` | 5 |
-| root (`.`) | 15 |
+| first path segment     | entries |
+| ---------------------- | ------- |
+| `surfaces/`            | 104     |
+| `drawers/`             | 12      |
+| `testing/`             | 5       |
+| root (`.`)             | 15      |
 | **one-off namespaces** | **140** |
 
 So a vocabulary already exists and already carries most of the weight -
@@ -71,11 +71,11 @@ grouped by domain - is presentation.
 That rule needs no refactoring to adopt, because the tiers are already
 determinable from the import graph exactly as it stands today:
 
-| tier | entries |
-| --- | --- |
-| app-only, nothing but `apps/*` imports it | **73** |
+| tier                                          | entries |
+| --------------------------------------------- | ------- |
+| app-only, nothing but `apps/*` imports it     | **73**  |
 | peer-importable, some other module imports it | **174** |
-| imported by nothing at all | **29** |
+| imported by nothing at all                    | **29**  |
 
 Two consequences worth stating plainly. The shared tier is the **majority** -
 174 against 73 - so a design assuming modules mostly talk to the application
@@ -93,11 +93,11 @@ coupling as public API. The tier has to be a decision the owning package makes,
 with private as the default - and the measurement says the deliberate set is far
 smaller than the derived one. Of the **172** entries some peer module imports:
 
-| imported by | entries |
-| --- | --- |
+| imported by             | entries |
+| ----------------------- | ------- |
 | exactly one peer module | **125** |
-| two peer modules | 33 |
-| **three or more** | **14** |
+| two peer modules        | 33      |
+| **three or more**       | **14**  |
 
 So **14** entries are shared and 158 are bilateral couplings published as though
 they were an API. An entry with exactly one consumer is not a shared component
@@ -129,13 +129,13 @@ node "$CLAUDE_JOB_DIR/tmp/tier-split.mjs"   # the script that produced the table
 A closed vocabulary of entry kinds, with the kinds distinguished by what a cycle
 through them costs rather than by what the code looks like:
 
-| kind | what it holds | may cross a module boundary |
-| --- | --- | --- |
-| `surfaces/` | components mounted by a host, props in | yes |
-| `embeddables/` | components another module renders in its own tree | yes |
-| `drawers/` | drawer components, registered centrally by the shell | never peer-to-peer; the shell mounts them |
-| `wiring/` | hooks, context, stores - anything holding state | **application only, not peer-to-peer** |
-| `testing/` | fixtures and harnesses, never in the production graph | yes, test scope only |
+| kind           | what it holds                                         | may cross a module boundary               |
+| -------------- | ----------------------------------------------------- | ----------------------------------------- |
+| `surfaces/`    | components mounted by a host, props in                | yes                                       |
+| `embeddables/` | components another module renders in its own tree     | yes                                       |
+| `drawers/`     | drawer components, registered centrally by the shell  | never peer-to-peer; the shell mounts them |
+| `wiring/`      | hooks, context, stores - anything holding state       | **application only, not peer-to-peer**    |
+| `testing/`     | fixtures and harnesses, never in the production graph | yes, test scope only                      |
 
 The 140 one-off namespaces then sort into those five, which is mechanical. The
 work that is not mechanical is the handful of current cross-module imports that

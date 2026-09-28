@@ -1,6 +1,7 @@
-import { pointClaudeMdAtSkills } from "@langwatch/scenario";
 import fs from "node:fs";
 import path from "node:path";
+
+import { pointClaudeMdAtSkills } from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
 
 import {

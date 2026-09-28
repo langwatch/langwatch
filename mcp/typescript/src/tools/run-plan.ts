@@ -5,10 +5,7 @@ import {
   type RunPlanTarget,
 } from "../langwatch-api-run-plans.js";
 import { toWireTargets } from "../schemas/run-plan.js";
-import {
-  type EvaluatorAttachmentInput,
-  toWireAttachments,
-} from "../schemas/suite-fields.js";
+import { type EvaluatorAttachmentInput, toWireAttachments } from "../schemas/suite-fields.js";
 import { formatRunPlanRun } from "./format-run-plan.js";
 
 /**

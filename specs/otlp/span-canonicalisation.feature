@@ -22,6 +22,22 @@ Feature: Every supported instrumentation canonicalises to the same span shape
     When the span is canonicalised
     Then its operation, provider, model and response metadata are preserved
 
+  @unit
+  Scenario: OTel GenAI agent and tool spans are typed by their operation
+    Given spans from an instrumentation no vendor canonicaliser claims
+    When a span with gen_ai.operation.name invoke_agent or execute_tool is canonicalised
+    Then the invoke_agent span is typed agent and the execute_tool span is typed tool
+    And neither is typed llm, even when it names a model or an agent
+    And a failed tool span keeps its error
+
+  @unit
+  Scenario: A system message later in the conversation stays in the input messages
+    Given a chat input that opens with a system prompt and carries a later system turn with retrieved passages
+    When the span is canonicalised
+    Then the opening system prompt moves to gen_ai.system_instructions
+    And the later system turn stays in gen_ai.input.messages
+    And a reader that restores the system prompt still restores it, and takes the passages for no prompt
+
   @unit @unimplemented
   Scenario: A span from an unrecognised instrumentation is kept, not dropped
     Given a span carrying attributes no canonicaliser claims

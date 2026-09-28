@@ -14,7 +14,7 @@ Branch `feat/strict-feature-layout-v0`. Nothing was modified, staged or run beyo
 | H1     | High         | SCIM webhook intake: non-constant-time secret compare, no replay protection, organization chosen from the payload | `enterprise/scim/.../api-rest/scim-webhook-intake.api.ts:49`             |
 | H2     | High         | License signing **private key** written verbatim into the audit table                                             | `packages/api/src/trpc/trpc-audit-redaction.ts:44`                       |
 | H3     | High         | Every per-IP rate limit on the unauthenticated tRPC surface keys on the literal string `"unknown"`                | `apps/api/src/api.application.ts:602`                                    |
-| H4     | High         | Organization REST apps resolve sub-org-tier permissions at **organization** scope (11 routes)                     | `modules/project/.../project.api.ts:251,263,344,353`           |
+| H4     | High         | Organization REST apps resolve sub-org-tier permissions at **organization** scope (11 routes)                     | `modules/project/.../project.api.ts:251,263,344,353`                     |
 | H5     | High         | MCP access token outlives the grant it was minted from (30 days, no re-check)                                     | `hosted-mcp/.../api-mcp/hosted-mcp.api.ts:66,505`                        |
 | H6     | High         | Legacy project key reads any organization's OTTL rules by id                                                      | `enterprise/governance/.../api-rest/governance.api.ts:299`               |
 | H7     | High         | Prompt tag assignment writes into the prompt's owning project, not the authorized one                             | `prompt/.../api-rest/prompt.api.ts:455`                                  |
@@ -639,17 +639,17 @@ costs an unindexed JSON-path `findMany`, `prisma.ingestion-source.repository.ts:
 **M11 — Raw `error.message` / `error.stack` reaching response bodies.** ADR-045 and CLAUDE.md forbid
 this outright: an unhandled cause must degrade to a generic message plus a trace id.
 
-| file:line                                                           | surface                                                                                                |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `workflow/.../api-rest/workflow-studio.api.ts:168, 207, 212`        | `/code-completion`, `/post_event` (`:207` also returns `error.cause` verbatim)                         |
+| file:line                                                             | surface                                                                                                |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `workflow/.../api-rest/workflow-studio.api.ts:168, 207, 212`          | `/code-completion`, `/post_event` (`:207` also returns `error.cause` verbatim)                         |
 | `annotation/.../transport/annotation.rest.ts:162,194,219,279,313,396` | every annotation REST route                                                                            |
-| `evaluation/.../api-rest/evaluations-legacy.api.ts:551`             | `POST /api/evaluations/batch/log_results`                                                              |
-| `experiment/.../api-rest/experiment-dspy-steps.api.ts:218`          | `POST /api/dspy/log_steps`                                                                             |
-| `scenario/.../api-rest/scenario-generate.api.ts:204-208`            | `POST /api/scenario/generate`                                                                          |
-| `evaluation/.../adapters/workflow-evaluation.adapter.ts:50`         | `traceback: [error.stack]` → `evaluation.api.ts:288` returns the Node stack with absolute server paths |
-| `trace/.../api-rest/collector.api.ts:659-666, 736-741`              | ingestion-pipeline error strings in `partialSuccess.errorMessage`                                      |
-| `gateway/.../api-rest/gateway-internal.api.ts:313`                  | response body names `LW_GATEWAY_INTERNAL_SECRET`                                                       |
-| `ops/.../api-rest/ops-clickhouse-explain.api.ts:124`                | raw ClickHouse engine prose                                                                            |
+| `evaluation/.../api-rest/evaluations-legacy.api.ts:551`               | `POST /api/evaluations/batch/log_results`                                                              |
+| `experiment/.../api-rest/experiment-dspy-steps.api.ts:218`            | `POST /api/dspy/log_steps`                                                                             |
+| `scenario/.../api-rest/scenario-generate.api.ts:204-208`              | `POST /api/scenario/generate`                                                                          |
+| `evaluation/.../adapters/workflow-evaluation.adapter.ts:50`           | `traceback: [error.stack]` → `evaluation.api.ts:288` returns the Node stack with absolute server paths |
+| `trace/.../api-rest/collector.api.ts:659-666, 736-741`                | ingestion-pipeline error strings in `partialSuccess.errorMessage`                                      |
+| `gateway/.../api-rest/gateway-internal.api.ts:313`                    | response body names `LW_GATEWAY_INTERNAL_SECRET`                                                       |
+| `ops/.../api-rest/ops-clickhouse-explain.api.ts:124`                  | raw ClickHouse engine prose                                                                            |
 
 The sharpest are `log_results` and `log_steps`: a ClickHouse or Prisma failure surfaces the driver's
 message — host, port, database name — to any project key. **Fix:** re-throw and let

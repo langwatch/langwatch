@@ -23,10 +23,10 @@ const TERMINAL = ["SUCCESS", "FAILED", "ERROR", "CANCELLED", "STALLED"];
 
 describe("given an agent defined in the application's own code", () => {
   const langwatch: LangWatch = client();
-  let agent: ConnectedAgent<Record<string, never>> | undefined;
+  const agents: ConnectedAgent<Record<string, never>>[] = [];
 
   afterAll(async () => {
-    await agent?.disconnect().catch(() => undefined);
+    await Promise.all(agents.map((agent) => agent.disconnect().catch(() => undefined)));
   });
 
   describe("when a test suite runs a scenario against it", () => {
@@ -38,10 +38,12 @@ describe("given an agent defined in the application's own code", () => {
         const name = unique("sdk-app-agent");
         let calls = 0;
 
-        agent = connectAgent({ name, environment: "development" }, async () => {
-          calls += 1;
-          return "LangWatch watches what your language models do.";
-        });
+        agents.push(
+          connectAgent({ name, environment: "development" }, async () => {
+            calls += 1;
+            return "LangWatch watches what your language models do.";
+          }),
+        );
 
         const connected = await pollUntil({
           what: `the connected agent ${name}`,

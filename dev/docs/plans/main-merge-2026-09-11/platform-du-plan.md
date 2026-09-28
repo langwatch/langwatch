@@ -13,28 +13,28 @@ the bottom of this file.
 **Not one of the 312 is a file main created after the fork.** Every one is an edit
 to a file that already existed at the merge base. So there is no hidden new module
 in here - only changes to code this branch has rewritten somewhere else. That is
-what makes the per-file question answerable: *is main's edit superseded by the
-rewrite, or is it a capability the new module does not have?*
+what makes the per-file question answerable: _is main's edit superseded by the
+rewrite, or is it a capability the new module does not have?_
 
 **The churn is not spread evenly.** Two thirds of it is four coherent bodies of
 work, and the long tail is genuinely small:
 
-| Destination | files | lines | Status |
-| --- | ---: | ---: | --- |
-| **Governance port** (`ee/governance`, `ingestion-pull-processing`, `pages/governance`) | 58 | 10,890 | **already scoped** - its own lane, decided in `directory-rename-split-decisions.md` |
-| `src/app/api/openapiLangWatch.json` | 1 | 4,430 | **generated** - regenerate, never merge |
-| `modules/analytics` | 40 | 1,840 | lane live |
-| `modules/suite` | 18 | 1,635 | needs an owner |
-| `modules/scenario` | 28 | 1,403 | lane live |
-| `packages/eventing` + owning module | 18 | 1,104 | needs an owner |
-| `apps/ui` | 18 | 852 | needs an owner |
-| `platform/app/package.json` | 1 | 699 | dependency manifest - coordinator |
-| `apps/api` routers | 12 | 690 | needs an owner |
-| `modules/dataset` | 4 | 548 | needs an owner |
-| `modules/agent` | 15 | 527 | needs an owner |
-| `modules/annotation` | 6 | 468 | needs an owner |
-| `modules/trace` | 2 | 295 | needs an owner |
-| long tail | 91 | 3,148 | routable, see below |
+| Destination                                                                            | files |  lines | Status                                                                              |
+| -------------------------------------------------------------------------------------- | ----: | -----: | ----------------------------------------------------------------------------------- |
+| **Governance port** (`ee/governance`, `ingestion-pull-processing`, `pages/governance`) |    58 | 10,890 | **already scoped** - its own lane, decided in `directory-rename-split-decisions.md` |
+| `src/app/api/openapiLangWatch.json`                                                    |     1 |  4,430 | **generated** - regenerate, never merge                                             |
+| `modules/analytics`                                                                    |    40 |  1,840 | lane live                                                                           |
+| `modules/suite`                                                                        |    18 |  1,635 | needs an owner                                                                      |
+| `modules/scenario`                                                                     |    28 |  1,403 | lane live                                                                           |
+| `packages/eventing` + owning module                                                    |    18 |  1,104 | needs an owner                                                                      |
+| `apps/ui`                                                                              |    18 |    852 | needs an owner                                                                      |
+| `platform/app/package.json`                                                            |     1 |    699 | dependency manifest - coordinator                                                   |
+| `apps/api` routers                                                                     |    12 |    690 | needs an owner                                                                      |
+| `modules/dataset`                                                                      |     4 |    548 | needs an owner                                                                      |
+| `modules/agent`                                                                        |    15 |    527 | needs an owner                                                                      |
+| `modules/annotation`                                                                   |     6 |    468 | needs an owner                                                                      |
+| `modules/trace`                                                                        |     2 |    295 | needs an owner                                                                      |
+| long tail                                                                              |    91 |  3,148 | routable, see below                                                                 |
 
 **38% of the churn is the governance port**, which is already a decided piece of
 work. It should come out of the merge entirely, exactly as its 58 `UA` siblings
@@ -58,8 +58,8 @@ src/hooks/**, src/features/navigation/**    -> apps/ui
 platform/app/scripts/**                     -> dev/scripts
 ```
 
-Nothing in the 312 is genuinely homeless. The open question is never *where does
-this belong* - it is *does main's edit still say something the new code does not*.
+Nothing in the 312 is genuinely homeless. The open question is never _where does
+this belong_ - it is _does main's edit still say something the new code does not_.
 
 ## How to work it
 
@@ -76,7 +76,7 @@ time:
 Two failure modes, both already paid for once in this merge:
 
 - **Do not answer "already there" from a filename or symbol grep.** The rewrite
-  renamed almost everything. Search for what the code *does*.
+  renamed almost everything. Search for what the code _does_.
 - **Do not answer "superseded" just because the file is deleted.** That is the
   `DU` category restating itself, not a finding.
 

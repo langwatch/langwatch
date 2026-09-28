@@ -510,3 +510,9 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When "nobody@home.net" is submitted through IdentityApi.routeSignIn
     Then the decision routes to sign-up with the reason code "identifier_unknown"
     And the decision offers no method at all
+
+  @unit
+  Scenario: The served page names the identifier-first screens as the sign-in front door
+    Given any deployment, whatever its environment says
+    When the auth module projects its browser config
+    Then the browser is told the identifier-first screens are the front door

@@ -325,7 +325,7 @@ how far each version's fold actually got, in this order:
    which version folded further.
 5. `toString(AppliedEventIds) DESC` — the four keys above are best-effort,
    not total: two concurrent versions can tie on every one. The watermark's
-   *contents* discriminate where its length cannot (two writers racing the
+   _contents_ discriminate where its length cannot (two writers racing the
    same committed version folded different batches, so their merged id
    sets differ even at equal size), giving every read the same winner
    without a schema change. Cost is bounded: serialisation runs only over

@@ -952,7 +952,7 @@ const MOCK_ROUTES: MockRoute[] = [
   },
   {
     method: "GET",
-    matches: (url) => url.startsWith("/api/v1/secret?"),
+    matches: (url) => url.startsWith("/api/v1/secrets?"),
     status: 200,
     answer: () => [
       {
@@ -985,7 +985,7 @@ const MOCK_ROUTES: MockRoute[] = [
   },
   {
     method: "POST",
-    matches: (url) => url === "/api/v1/secret",
+    matches: (url) => url === "/api/v1/secrets",
     status: 201,
     answer: () => ({
       id: "secret_new",
@@ -997,7 +997,7 @@ const MOCK_ROUTES: MockRoute[] = [
   },
   {
     method: "PUT",
-    matches: (url) => url === "/api/v1/secret/secret_abc",
+    matches: (url) => url === "/api/v1/secrets/secret_abc",
     status: 200,
     answer: () => ({
       id: "secret_abc",
@@ -1009,7 +1009,7 @@ const MOCK_ROUTES: MockRoute[] = [
   },
   {
     method: "DELETE",
-    matches: (url) => url === "/api/v1/secret/secret_abc",
+    matches: (url) => url === "/api/v1/secrets/secret_abc",
     status: 200,
     answer: () => ({ id: "secret_abc", deleted: true }),
   },

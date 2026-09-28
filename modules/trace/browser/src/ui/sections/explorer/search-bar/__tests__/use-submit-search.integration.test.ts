@@ -151,9 +151,7 @@ describe("given the text has bare words", () => {
           decidedBy: "classifier",
         }),
       );
-      expect(useFilterStore.getState().queryText).toBe(
-        '"cannot connect to database"',
-      );
+      expect(useFilterStore.getState().queryText).toBe('"cannot connect to database"');
       // The classifier's own answer, so there is nothing to explain.
       expect(useFilterStore.getState().searchNotice).toBeNull();
     });
@@ -242,16 +240,12 @@ describe("given the text has bare words", () => {
       const { result } = renderSubmit();
       act(() => result.current.submitSearch("annoyed users status:error"));
       act(() => lastCall().options.onError?.(new Error("network")));
-      expect(useFilterStore.getState().queryText).toBe(
-        'status:error AND "annoyed users"',
-      );
+      expect(useFilterStore.getState().queryText).toBe('status:error AND "annoyed users"');
       expect(useFilterStore.getState().parseError).toBeNull();
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "warning",
-          description: expect.stringContaining(
-            "The words were searched as a phrase instead.",
-          ),
+          description: expect.stringContaining("The words were searched as a phrase instead."),
         }),
       );
     });

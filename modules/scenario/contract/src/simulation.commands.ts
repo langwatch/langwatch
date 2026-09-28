@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { scenarioCriterionResultSchema } from "./scenario-criterion-result.ts";
 import { scenarioEvaluationResultSchema } from "./schemas/event-schemas.ts";
 import { simulationTargetSchema } from "./simulation-target.ts";
 import { simulationMessageSchema } from "./simulation.ts";
@@ -69,6 +70,7 @@ export const simulationFinishRunSchema = z.object({
       metCriteria: z.array(z.string()).default([]),
       unmetCriteria: z.array(z.string()).default([]),
       inconclusiveCriteria: z.array(z.string()).optional(),
+      criteria: z.array(scenarioCriterionResultSchema).optional(),
       error: z.string().optional(),
     })
     .optional(),

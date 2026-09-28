@@ -50,8 +50,7 @@ structurally (an `issues` array and a `flatten` method) and converts with
 `ValidationError.fromZodError`. Both majors satisfy both.
 
 **That structural check is load-bearing.** Replacing it with
-`instanceof z.ZodError` turns every identity validation failure into an unknown
-500. Use a structural check at any boundary that can receive a schema or an
+`instanceof z.ZodError` turns every identity validation failure into an unknown 500. Use a structural check at any boundary that can receive a schema or an
 error it did not itself create.
 
 Errors cross the boundary safely. Schemas do not, and nothing can make them:

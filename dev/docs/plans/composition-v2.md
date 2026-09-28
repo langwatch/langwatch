@@ -5,21 +5,21 @@ the build order, the exact types, and the recipe a conversion lane follows.
 
 ## What dies
 
-| File or symbol | When |
-| --- | --- |
-| `apps/api/src/features/<m>/<m>.composition.ts` (`installApi<M>`) | as `<m>` converts |
-| `apps/api/src/features/<m>/<m>-rest.mount.ts`, `<m>-trpc.mount.ts` | as `<m>` converts |
-| `apps/api/src/features/<m>/<m>-absence.ts`, `<m>.composition.types.ts` | as `<m>` converts |
-| lines naming `<m>` in `api-production.composition.ts`, `app-trpc.features.ts`, `api-rest.doors.ts` | as `<m>` converts |
-| `apps/api/src/app/api-production.composition.ts` (4,989 lines) | when the last module converts |
-| `apps/worker/src/app/worker-production.composition.ts` (2,530 lines) | when the last module converts |
-| `apps/api/src/app-rest/api-rest.doors.ts` (909 lines) | with `api-production` |
-| `<M>Infrastructure` interfaces, `createTestInfrastructure`, `createTestApp`, any "fakes" bag | as `<m>` converts |
-| `.needs<I>()(...)` and `Needs<...>` | already dead - never built this way; see below |
-| `withPersistence`, `persistenceFor`, `pool.prisma === undefined ? "memory" : "postgres"` | as `application.ts` is rewired onto `@langwatch/infrastructure` |
-| `defineModule`, `serverFeature`, `ServerFeatureBuilder.build()` | step 2 |
-| `contributesWorkerWork` | step 2 |
-| every `refusing<M>Feature` and `Logged<M>Absence` | as `<m>` converts |
+| File or symbol                                                                                     | When                                                            |
+| -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `apps/api/src/features/<m>/<m>.composition.ts` (`installApi<M>`)                                   | as `<m>` converts                                               |
+| `apps/api/src/features/<m>/<m>-rest.mount.ts`, `<m>-trpc.mount.ts`                                 | as `<m>` converts                                               |
+| `apps/api/src/features/<m>/<m>-absence.ts`, `<m>.composition.types.ts`                             | as `<m>` converts                                               |
+| lines naming `<m>` in `api-production.composition.ts`, `app-trpc.features.ts`, `api-rest.doors.ts` | as `<m>` converts                                               |
+| `apps/api/src/app/api-production.composition.ts` (4,989 lines)                                     | when the last module converts                                   |
+| `apps/worker/src/app/worker-production.composition.ts` (2,530 lines)                               | when the last module converts                                   |
+| `apps/api/src/app-rest/api-rest.doors.ts` (909 lines)                                              | with `api-production`                                           |
+| `<M>Infrastructure` interfaces, `createTestInfrastructure`, `createTestApp`, any "fakes" bag       | as `<m>` converts                                               |
+| `.needs<I>()(...)` and `Needs<...>`                                                                | already dead - never built this way; see below                  |
+| `withPersistence`, `persistenceFor`, `pool.prisma === undefined ? "memory" : "postgres"`           | as `application.ts` is rewired onto `@langwatch/infrastructure` |
+| `defineModule`, `serverFeature`, `ServerFeatureBuilder.build()`                                    | step 2                                                          |
+| `contributesWorkerWork`                                                                            | step 2                                                          |
+| every `refusing<M>Feature` and `Logged<M>Absence`                                                  | as `<m>` converts                                               |
 
 **`FeatureInstallOptions.rest.onError` does NOT die.** It survives, renamed
 where it moves: a legacy family's wire error shape is a customer-visible
@@ -49,7 +49,7 @@ The member record itself is built, tested and unconnected to any module:
   `buildClaimedMembers({ source, claims })` (builds exactly the union of
   claimed names, in the source's order, wrapping a member-only refusal as
   `MissingMemberError { module, member, cause }`), and `membersFor(members,
-  names)` (the per-module slice). This file is imported by `application.ts`
+names)` (the per-module slice). This file is imported by `application.ts`
   but not yet called from it - see the gap below.
 - `packages/eventing/src/pipeline/eventingModule.ts`'s `defineEventingModule`
   and `.withEventing(...)` on the module builder, landed at c747279e4e and in
@@ -90,7 +90,7 @@ written to replace:
 - `application.ts` imports `buildClaimedMembers` and `membersFor` from
   `module-members.ts` and never calls either.
 - `persistenceFor(members)` still reads `pool.prisma === undefined ? "memory"
-  : "postgres"` - the exact inference ADR-144 decision 2 refuses.
+: "postgres"` - the exact inference ADR-144 decision 2 refuses.
 - `packages/runtime-composition/tests/infrastructure-needs.unit.test.ts` still
   exercises the discarded `.needs<I>()(...)` / `.build()` shape against
   `createApp({ role, infrastructure: {...} })`, a signature `application.ts`
@@ -159,7 +159,7 @@ Building it, and wiring an App's `static readonly reads` into what
 
 ```ts
 export function createApp(options: {
-  role: ServerRole;                                  // "api" | "worker" | "tasks"
+  role: ServerRole; // "api" | "worker" | "tasks"
   config: Readonly<Record<string, unknown>>;
   members?: { readonly [N in MemberName]?: ProcessMembers[N] };
 }): ApplicationBuilder;
@@ -177,7 +177,7 @@ needs is present (decision 2), never from one process-wide word. `role` and
 half-configured and `boot()` takes nothing. `withModule` (singular),
 `withInfrastructure`, `withPersistence` and `withProvided` are gone; a module
 wanting a peer names its token in `static dependencies` instead (and decision
-7's open peer-seam gap is what still has to answer how a *test* supplies one
+7's open peer-seam gap is what still has to answer how a _test_ supplies one
 without booting the peer's whole graph).
 
 Boot order:
@@ -204,7 +204,7 @@ Landed:
 
 Not landed:
 
-- the REST runtime still cannot resolve a credential *object* for a route - a
+- the REST runtime still cannot resolve a credential _object_ for a route - a
   family asking whether the key itself (not just its holder) may act
   organization-wide still binds that fact with `bindRestMiddleware`. `api-key`
   is the one module this blocks; every other converted module is unaffected.
@@ -219,15 +219,20 @@ Not landed:
 `start:prepare:files`, reads `modules/catalogue.json`:
 
 ```jsonc
-{ "id": "api-key", "root": "modules/api-key", "classification": "core",
-  "tier": "core", "subjects": ["api-key"] }
+{
+  "id": "api-key",
+  "root": "modules/api-key",
+  "classification": "core",
+  "tier": "core",
+  "subjects": ["api-key"],
+}
 ```
 
 and writes, checked in:
 
 - `modules/server-modules.generated.ts` -
   `export const serverModules = [agentServer, analyticsServer,
-  annotationServer, apiKeyServer, …] as const;`
+annotationServer, apiKeyServer, …] as const;`
 - `modules/web-modules.generated.ts` - the same for the web half.
 
 This landed at a different location than either document originally said:
@@ -265,7 +270,7 @@ Per module, in one lane, one commit:
 1. `api-production.composition.ts` loses the module's lines.
 2. `apps/api/src/features/<m>/` is deleted.
 3. `modules/<m>/server/src/<m>.server.ts` gains `static readonly reads =
-   reads(...)` on its App, only where the App genuinely reads a member -
+reads(...)` on its App, only where the App genuinely reads a member -
    annotation and api-key needed none.
 4. the address inventory is regenerated and reviewed as a diff of **zero**
    lines.
@@ -291,12 +296,12 @@ A Sonnet lane follows this and nothing else.
      rows the revocation queries never find);
    - **the module's own config slice**, where the value has an environment
      binding the module already declares - give the App a `static readonly
-     configSchema` and read `setup.config` (api-key's `API_KEY_PEPPER`);
+configSchema` and read `setup.config` (api-key's `API_KEY_PEPPER`);
    - **a named member**, stated with `static readonly reads = reads(...)`
      on the App, and only then.
-   A member that fits none of the four is a finding to report, not a member to
-   invent. Annotation and api-key both landed with an empty `reads` - naming a
-   member at all is the exception, not the default step.
+     A member that fits none of the four is a finding to report, not a member to
+     invent. Annotation and api-key both landed with an empty `reads` - naming a
+     member at all is the exception, not the default step.
 3. Name the declaration with `defineServerModule` and end the chain on the
    last `with*` call it needs. There is no `.build()` and no separate
    `.needs(...)` step: naming a member the record does not have is a compile

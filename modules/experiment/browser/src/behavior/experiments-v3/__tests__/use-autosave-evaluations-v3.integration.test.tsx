@@ -238,14 +238,12 @@ describe("Autosave evaluation state", () => {
     mockMutateAsync.mockRejectedValueOnce(new Error("Network error"));
 
     act(() => {
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue({
-          datasetId: "test-data",
-          row: 0,
-          columnId: "input",
-          value: customerContent,
-        });
+      useEvaluationsV3Store.getState().setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: customerContent,
+      });
     });
 
     await act(async () => {
@@ -361,14 +359,12 @@ describe("Autosave evaluation state", () => {
       });
 
       act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .setCellValue({
-            datasetId: "test-data",
-            row: 0,
-            columnId: "input",
-            value: "an edit that will lose",
-          });
+        useEvaluationsV3Store.getState().setCellValue({
+          datasetId: "test-data",
+          row: 0,
+          columnId: "input",
+          value: "an edit that will lose",
+        });
       });
       await act(async () => {
         vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
@@ -383,14 +379,12 @@ describe("Autosave evaluation state", () => {
       // Standing down: further edits do not save while stale.
       mockMutateAsync.mockClear();
       act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .setCellValue({
-            datasetId: "test-data",
-            row: 0,
-            columnId: "input",
-            value: "another edit",
-          });
+        useEvaluationsV3Store.getState().setCellValue({
+          datasetId: "test-data",
+          row: 0,
+          columnId: "input",
+          value: "another edit",
+        });
       });
       await act(async () => {
         vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
@@ -418,14 +412,12 @@ describe("Autosave evaluation state", () => {
       });
 
       act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .setCellValue({
-            datasetId: "test-data",
-            row: 0,
-            columnId: "input",
-            value: "an edit that will lose",
-          });
+        useEvaluationsV3Store.getState().setCellValue({
+          datasetId: "test-data",
+          row: 0,
+          columnId: "input",
+          value: "an edit that will lose",
+        });
       });
       await act(async () => {
         vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
@@ -472,14 +464,12 @@ describe("Autosave evaluation state", () => {
       });
 
       act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .setCellValue({
-            datasetId: "test-data",
-            row: 0,
-            columnId: "input",
-            value: "an edit made during the run",
-          });
+        useEvaluationsV3Store.getState().setCellValue({
+          datasetId: "test-data",
+          row: 0,
+          columnId: "input",
+          value: "an edit made during the run",
+        });
       });
       await act(async () => {
         vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
@@ -517,14 +507,12 @@ describe("Autosave evaluation state", () => {
       });
 
       act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .setCellValue({
-            datasetId: "test-data",
-            row: 0,
-            columnId: "input",
-            value: "an edit that will lose",
-          });
+        useEvaluationsV3Store.getState().setCellValue({
+          datasetId: "test-data",
+          row: 0,
+          columnId: "input",
+          value: "an edit that will lose",
+        });
       });
       await act(async () => {
         vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
@@ -563,14 +551,12 @@ describe("Autosave evaluation state", () => {
       });
 
       act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .setCellValue({
-            datasetId: "test-data",
-            row: 0,
-            columnId: "input",
-            value: "typed right after a reload",
-          });
+        useEvaluationsV3Store.getState().setCellValue({
+          datasetId: "test-data",
+          row: 0,
+          columnId: "input",
+          value: "typed right after a reload",
+        });
       });
       await act(async () => {
         vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);

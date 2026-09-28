@@ -29,12 +29,12 @@ delta is meaningful.
 Baseline, `pnpm --filter @langwatch/ui build`, four consecutive runs, tree warm
 (a prior `dist/` present, `node_modules` hot; no cold-cache run was measured):
 
-| run | wall | vite's own "built in" | CPU |
-| --- | ---- | --------------------- | --- |
-| 1   | 25.6 s | 21.6 s | 18.4 |
-| 2   | 29.9 s | 24.9 s | 18.3 |
-| 3   | 22.6 s | 15.6 s | 18.3 |
-| 4   | 16.0 s | 13.9 s | 18.4 |
+| run | wall   | vite's own "built in" | CPU  |
+| --- | ------ | --------------------- | ---- |
+| 1   | 25.6 s | 21.6 s                | 18.4 |
+| 2   | 29.9 s | 24.9 s                | 18.3 |
+| 3   | 22.6 s | 15.6 s                | 18.3 |
+| 4   | 16.0 s | 13.9 s                | 18.4 |
 
 The brief's "~7–8 s" is plausible on an idle machine — the best wall clock seen
 here was 10.9 s — and the gap to 30 s is contention, not configuration. The
@@ -55,15 +55,15 @@ any measurement. Probe passthrough reproduced the baseline exactly (17.45 vs
 
 `node --cpu-prof`, one production build (23.9 s wall on the profiled run):
 
-| bucket | self time | what it is |
-| ------ | --------- | ---------- |
-| idle | 8.1 s | main thread waiting on rolldown's Rust threads |
-| `(program)` | 4.4 s | native / napi frames on the main thread |
-| rolldown `bindingify-input-options` | 4.4 s | marshalling results across the napi boundary |
-| vite `chunks/node.js` | 3.4 s | vite's own JS build pipeline |
-| GC | 1.5 s | |
-| `rmSync` | 0.5 s | emptying the previous 154 MB `dist/` |
-| sass | 0.36 s | |
+| bucket                              | self time | what it is                                     |
+| ----------------------------------- | --------- | ---------------------------------------------- |
+| idle                                | 8.1 s     | main thread waiting on rolldown's Rust threads |
+| `(program)`                         | 4.4 s     | native / napi frames on the main thread        |
+| rolldown `bindingify-input-options` | 4.4 s     | marshalling results across the napi boundary   |
+| vite `chunks/node.js`               | 3.4 s     | vite's own JS build pipeline                   |
+| GC                                  | 1.5 s     |                                                |
+| `rmSync`                            | 0.5 s     | emptying the previous 154 MB `dist/`           |
+| sass                                | 0.36 s    |                                                |
 
 Top self-time functions are almost entirely sourcemap machinery:
 `transformToRollupSourceMap` 1.67 s, `get map` 1.47 s, `originalPositionFor`
@@ -87,14 +87,14 @@ from the emitted sourcemaps, is **8858 modules / 76.8 MB of source**.
 
 Heaviest contributors (source bytes in the graph):
 
-| KB | modules | package |
-| -- | ------- | ------- |
-| 15557 | 506 | `@shikijs/langs` |
-| 8909 | 192 | `modules/analytics` (7.9 MB of it one file, `vega-lite-schema-validator.generated.js`) |
-| 5886 | 6 | `react-icons` (md 2.1 MB, fa6 1.7 MB, fa 1.3 MB, lu 774 KB) |
-| 3589 | 737 | `modules/trace` |
-| 2829 | 130 | `@shikijs/themes` |
-| 2745 | 65 | `mermaid` |
+| KB    | modules | package                                                                                |
+| ----- | ------- | -------------------------------------------------------------------------------------- |
+| 15557 | 506     | `@shikijs/langs`                                                                       |
+| 8909  | 192     | `modules/analytics` (7.9 MB of it one file, `vega-lite-schema-validator.generated.js`) |
+| 5886  | 6       | `react-icons` (md 2.1 MB, fa6 1.7 MB, fa 1.3 MB, lu 774 KB)                            |
+| 3589  | 737     | `modules/trace`                                                                        |
+| 2829  | 130     | `@shikijs/themes`                                                                      |
+| 2745  | 65      | `mermaid`                                                                              |
 
 ### Heavy browser dependencies: clean, with one latent seam
 
@@ -102,7 +102,7 @@ Checked against the graph by module path, not by grep of source:
 `elevenlabs` **0 modules**, `grpc` 0, `ffmpeg` 0, `@opentelemetry/sdk-node` 0,
 `sdk-trace-node` 0, `@aws-sdk` 0, `nodemailer` 0, `pino` 0, `undici` 0,
 `@google/genai` 0 (not declared anywhere in the workspace). The other session's
-removals have landed. Three ElevenLabs *URL strings* remain in
+removals have landed. Three ElevenLabs _URL strings_ remain in
 `assets/src-hPi9mBWw.js`; those are our own code, not an SDK.
 
 The latent seam: `apps/ui/src/features/simulations/ui/voice/transports/elevenlabs-convai.client.ts:7`
@@ -119,7 +119,7 @@ production browser source. See the proposed hunk below.
 `modules/gateway/browser/package.json:48` pins `"shiki": "^3.15.0"` where
 `packages/design-system` and `modules/onboarding/browser` use `catalog:` (`^4.3.0`).
 The browser graph therefore carries **two complete copies of shiki** —
-`@shikijs/langs@3.23.0` *and* `@shikijs/langs@4.3.0`, plus two
+`@shikijs/langs@3.23.0` _and_ `@shikijs/langs@4.3.0`, plus two
 `@shikijs/engine-oniguruma` each with its own 608 KB inlined wasm. Measured
 redundancy: **343 duplicated module identities, 10.1 MB of redundant source,
 22 MB of output** (stubbing the v3 copy took `dist/` from 154 MB to 132 MB).
@@ -130,26 +130,26 @@ Its build-time value is **zero** — see the table. Its value is bundle size.
 
 Interleaved A/B unless noted. Negative = faster.
 
-| lever | ΔCPU-s | Δ% | verdict |
-| ----- | ------ | -- | ------- |
-| `build.sourcemap: false` | **−4.3** | −26 % | the only large lever; changes output |
-| `output.sourcemapExcludeSources: true` | −0.73 | −4.8 % | keeps maps, drops embedded sources |
-| `build.reportCompressedSize: false` | −0.48 | −3.0 % | **free** — no output change |
-| react-icons barrels replaced by export-name-preserving stubs (−5.9 MB) | −0.47 | −2.6 % | noise-level; reject |
-| `vega-lite-schema-validator.generated.js` stubbed (−7.9 MB, one module) | −0.2 | ~0 | noise; reject |
-| shiki v3 duplicate removed (−230 modules, −10.1 MB source, −22 MB output) | **0** | 0 | reject *for speed* |
-| drop custom `resolveId` plugin + `manualChunks` JS hook | 0 | 0 | reject |
-| `--configLoader bundle` instead of `runner` | −0.15 | ~1 % | noise; reject |
-| `advancedChunks.minSize: 30000` | 0 | 0 | did not merge (1385 → 1404 chunks); reject |
-| `NODE_OPTIONS=--max-semi-space-size=64` | −0.11 | ~0 | noise; reject |
-| `build.minify: false` | **+1.5** | +9 % | minifying is *cheaper* than writing the bigger output it avoids |
-| `build.target: "es2022"` | +1.7 | +10 % | reject |
-| `build.target: "esnext"` | +1.0 | +6 % | reject |
+| lever                                                                     | ΔCPU-s   | Δ%     | verdict                                                         |
+| ------------------------------------------------------------------------- | -------- | ------ | --------------------------------------------------------------- |
+| `build.sourcemap: false`                                                  | **−4.3** | −26 %  | the only large lever; changes output                            |
+| `output.sourcemapExcludeSources: true`                                    | −0.73    | −4.8 % | keeps maps, drops embedded sources                              |
+| `build.reportCompressedSize: false`                                       | −0.48    | −3.0 % | **free** — no output change                                     |
+| react-icons barrels replaced by export-name-preserving stubs (−5.9 MB)    | −0.47    | −2.6 % | noise-level; reject                                             |
+| `vega-lite-schema-validator.generated.js` stubbed (−7.9 MB, one module)   | −0.2     | ~0     | noise; reject                                                   |
+| shiki v3 duplicate removed (−230 modules, −10.1 MB source, −22 MB output) | **0**    | 0      | reject _for speed_                                              |
+| drop custom `resolveId` plugin + `manualChunks` JS hook                   | 0        | 0      | reject                                                          |
+| `--configLoader bundle` instead of `runner`                               | −0.15    | ~1 %   | noise; reject                                                   |
+| `advancedChunks.minSize: 30000`                                           | 0        | 0      | did not merge (1385 → 1404 chunks); reject                      |
+| `NODE_OPTIONS=--max-semi-space-size=64`                                   | −0.11    | ~0     | noise; reject                                                   |
+| `build.minify: false`                                                     | **+1.5** | +9 %   | minifying is _cheaper_ than writing the bigger output it avoids |
+| `build.target: "es2022"`                                                  | +1.7     | +10 %  | reject                                                          |
+| `build.target: "esnext"`                                                  | +1.0     | +6 %   | reject                                                          |
 
 Notes on the rejected ones, because the reasons are the interesting part:
 
 - **Minifier choice is not a lever.** `oxc` (the default) is already in use, and
-  turning minification off makes the build *slower*, because the sourcemap and
+  turning minification off makes the build _slower_, because the sourcemap and
   write phases then handle far more bytes. Terser was not measured; there is no
   reason to reach for it.
 - **Target is not a lever, in either direction.** Both a lower target (`es2022`)
@@ -192,7 +192,7 @@ status and output completeness before its number is believed.
    `modules/gateway/browser/package.json`. Note it requires a lockfile update, so it
    cannot land without an install.
 
-And the thing with the largest effect on how long a build *feels*: it is
+And the thing with the largest effect on how long a build _feels_: it is
 main-thread-bound at parallelism ~1.3, so two concurrent builds on this machine
 cost more wall clock than every lever in the table put together. That is a
 scheduling matter (`dev/scripts/check-queue.mjs` governs typecheck, not vite
@@ -261,7 +261,7 @@ Requires `pnpm install` to regenerate `pnpm-lock.yaml`; the Docker build uses
 
 Our whole use of the SDK is three calls (`Conversation.startSession` with six
 callbacks, `endSession`, `getInputVolume`), so a lazy import is a two-line
-change. Two things it is *not*: a "types-only" import — `startSession` does
+change. Two things it is _not_: a "types-only" import — `startSession` does
 microphone capture, audio worklets, VAD and PCM playback, so dropping the SDK
 means owning that, not just the WebSocket; and a case for a lighter SDK —
 `@elevenlabs/client` is already the browser-side package, and the alternative

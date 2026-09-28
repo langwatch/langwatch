@@ -1,8 +1,5 @@
 import { getTestSuite as apiGetTestSuite } from "../langwatch-api-test-suites.js";
-import {
-  formatEvaluatorAttachments,
-  formatSuiteFields,
-} from "./format-suite-details.js";
+import { formatEvaluatorAttachments, formatSuiteFields } from "./format-suite-details.js";
 
 /**
  * Handles the platform_get_test_suite MCP tool invocation.

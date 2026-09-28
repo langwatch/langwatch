@@ -58,7 +58,7 @@ func (f *fakeTools) Install(_ context.Context, command string) error {
 
 // installOrchestrator builds the smallest graph the install command needs.
 func installOrchestrator(tools *fakeTools, store *fakeStore, proxy Proxy) *Orchestrator {
-	return &Orchestrator{prereqs: tools, store: store, proxy: proxy}
+	return &Orchestrator{prereqs: tools, store: store, proxy: proxy, goos: "darwin"}
 }
 
 // missingPortlessProxy is a machine where portless has never been installed.

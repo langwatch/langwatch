@@ -444,9 +444,10 @@ describe("createTracingProxy Integration Tests", () => {
 
   describe("when filtering methods", () => {
     it("does not trace getters", async () => {
+      const getterValue = "getter value";
       class TestClass {
         get getterProperty() {
-          return "getter value";
+          return getterValue;
         }
 
         publicMethod() {

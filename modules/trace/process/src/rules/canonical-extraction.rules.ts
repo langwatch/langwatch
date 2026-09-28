@@ -7,7 +7,7 @@ import {
   decodeMessagesPayload,
   extractSystemInstructionFromMessages,
   normalizeToMessages,
-  stripSystemMessages,
+  stripLiftedSystemMessage,
 } from "./canonical-message.rules.ts";
 
 export type MessageSource =
@@ -45,7 +45,7 @@ const extractMessagesFromAttr = ({
   if (config.extractSystemInstructions) {
     const systemInstruction = extractSystemInstructionFromMessages(msgs);
     // Strip system messages — they go to gen_ai.system_instructions
-    const chatMsgs = systemInstruction ? stripSystemMessages(msgs) : msgs;
+    const chatMsgs = systemInstruction ? stripLiftedSystemMessage(msgs) : msgs;
     if (chatMsgs.length > 0) {
       ctx.setAttr(config.attrKey, chatMsgs);
     }

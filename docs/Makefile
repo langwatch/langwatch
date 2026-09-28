@@ -22,7 +22,7 @@ generate-openapi-evals:
 .PHONY: generate-api-reference
 generate-api-reference:
 	@echo "Generating API reference pages from OpenAPI spec..."
-	@../apps/api/node_modules/.bin/tsx scripts/generate-api-reference-pages.ts
+	@node --experimental-transform-types --no-warnings scripts/generate-api-reference-pages.ts
 	@echo "✅ API reference pages generated and docs.json updated"
 
 .PHONY: view-docs

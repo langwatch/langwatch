@@ -5,12 +5,12 @@
  * @see specs/instant-evals/instant-eval-billing.feature
  */
 
-import type { Instant } from "@langwatch/time";
 import {
   INSTANT_EVAL_REQUEST_TYPE,
   type InstantEvalPricing,
 } from "@langwatch/instant-eval-contract";
 import { generate } from "@langwatch/ksuid";
+import type { Instant } from "@langwatch/time";
 
 import { INSTANT_EVAL_PRICING } from "./instant-eval-pricing.rules.ts";
 

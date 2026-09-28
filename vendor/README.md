@@ -24,6 +24,15 @@ transports read `voice.openTwilioTunnel` and `voice.twilioAgent` off the SDK's
 Swap it for the published npm 1.7.0 once that exists, so the same code is not
 vendored twice.
 
+This build sends `inconclusiveCriteria` but not the per-criterion `criteria`
+array (status, requirement and reasoning for each criterion) on the run
+finished event. The platform already ingests, stores and shows that array
+(`specs/scenarios/judge-criterion-verdicts.feature`), and suite runs post their
+events through the same `/api/scenario-events` path as any SDK, so bumping to a
+scenario release that carries per-criterion verdicts needs no platform change.
+Until then the run view derives each criterion from the met, unmet and
+inconclusive lists, without reasoning.
+
 ## Updating
 
 1. Published version: `npm pack @langwatch/scenario@<version>` here.

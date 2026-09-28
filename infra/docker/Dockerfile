@@ -42,6 +42,12 @@ COPY feature-map.json ./feature-map.json
 # the TypeScript SDK's e2e suites, the skills compiler and apps/server (the npx
 # self-host CLI, which is published separately) never enter the image.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
+# The lockfile resolves @langwatch/scenario to a vendored tarball.
+# Every package tsconfig extends the root ones, and build:types builds tsconfig.build.json.
+COPY tsconfig.base.json tsconfig.shared.json tsconfig.build.json tsconfig.emit.json ./
+COPY vendor ./vendor
+# The root postinstall runs this script.
+COPY dev/scripts/install-check-shims.mjs ./dev/scripts/install-check-shims.mjs
 # Every workspace member's manifest must be present or `--frozen-lockfile`
 # has nothing to check the lockfile against. This one carries no source into
 # the image — only the manifest the workspace needs to stay coherent.
@@ -88,6 +94,8 @@ COPY apps/ui/package.json ./apps/ui/package.json
 # The boot-chain task runner: prisma-migrate, clickhouse-migrate,
 # lwql-provision, and every other feature-owned task.
 COPY apps/tasks/package.json ./apps/tasks/package.json
+# The scenario child program, a workspace dependency of the api and the worker.
+COPY apps/scenario-child/package.json ./apps/scenario-child/package.json
 # Four filters, because the four applications are four dependency subtrees
 # and none is a subset of the others.
 RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
@@ -95,6 +103,13 @@ COPY apps/worker ./apps/worker
 COPY apps/api ./apps/api
 COPY apps/ui ./apps/ui
 COPY apps/tasks ./apps/tasks
+COPY apps/scenario-child ./apps/scenario-child
+# What `start:prepare:files` and `ensure:built` read: the generator scripts, the
+# OpenAPI document the SDK derives its REST client from, and the web declarations
+# project the browser packages reference.
+COPY dev/scripts ./dev/scripts
+COPY dev/tsconfig.web-declarations.json ./dev/tsconfig.web-declarations.json
+COPY specs/api-reference/openapi-document.json ./specs/api-reference/openapi-document.json
 # The trailing `...` on each filter makes pnpm build each application's
 # workspace DEPENDENCIES first, in topological order, and pnpm skips the
 # members that declare no `build`. That order is load-bearing twice over: the
@@ -113,7 +128,11 @@ COPY apps/tasks ./apps/tasks
 # `tsc -b` over the generated root solution rather than a compiler process per
 # package, so the filtered application builds below find their dependencies'
 # .d.ts already on disk instead of emitting them 38 processes at a time.
-RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm run build:types \
+# The same preparation the CI build runs: generated files (modules, Prisma client,
+# langy skills) and the four dist-resolving packages (SDK, mcp-server, ksuid, mail)
+# before `build:types`, which reads their declarations.
+RUN pnpm start:prepare:files && pnpm ensure:built \
+ && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build:types \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build
 
 # Remove dev dependencies — not needed at runtime, and on the order of a
@@ -227,6 +246,8 @@ COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.
 COPY --from=builder /app/feature-map.json ./feature-map.json
 
 ENV NODE_ENV=production
+# The api process listens on API_PORT (6560 unset); the image serves on 5560.
+ENV API_PORT=5560
 EXPOSE 5560
 
 # Set bash as the default shell

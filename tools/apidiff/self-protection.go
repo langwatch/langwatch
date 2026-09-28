@@ -29,7 +29,7 @@ import (
 //  3. Every credential is re-read at the end of the run and the run fails if
 //     one stopped authenticating.
 
-// Seeded identities: the rows packages/prisma-client/prisma/seed.ts creates.
+// Seeded identities: the rows apps/tasks/src/storage-seed/storage-seed.ts creates.
 // Both instances hold them identically, and the run's own credentials are
 // columns on them.
 const (

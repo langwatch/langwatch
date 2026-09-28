@@ -4,7 +4,6 @@
  * the platform simulation.
  */
 import "dotenv/config";
-
 import { openai } from "@ai-sdk/openai";
 import scenario, { AgentRole, type AgentAdapter } from "@langwatch/scenario";
 import type { ModelMessage } from "ai";

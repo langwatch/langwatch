@@ -200,7 +200,9 @@ function worker(input: {
   };
   const discover = vi.fn(input.discover ?? (async () => ({ discovered: 0 })));
   const identityMatch = vi.fn(input.runIdentityMatch ?? (async () => undefined));
-  const departmentSync = vi.fn(async (_input: { events: NormalizedPullEvent[] }) => ({ assigned: 0 }));
+  const departmentSync = vi.fn(async (_input: { events: NormalizedPullEvent[] }) => ({
+    assigned: 0,
+  }));
   const unpricedWindows = {
     getUnpricedUsageWindow: vi.fn(
       async (): Promise<UnpricedUsageWindow> =>

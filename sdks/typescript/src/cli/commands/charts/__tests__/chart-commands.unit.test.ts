@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ChartsApiError, ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
 
 vi.mock("@/client-sdk/services/charts/charts-api.service", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     ChartsApiService: vi.fn(),

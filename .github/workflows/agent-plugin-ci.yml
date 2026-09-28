@@ -85,14 +85,16 @@ jobs:
           --filter "langwatch..."
           --filter "@langwatch/agent-plugin..."
 
-      - name: Typecheck
-        run: pnpm --filter @langwatch/agent-plugin run typecheck
-
       # The launcher is plain ESM with no build. The CLI it runs is the one
       # thing to build here, and the integration test would build it on
       # demand anyway; doing it as its own step keeps a build failure readable.
+      # It comes before the typecheck, whose references reach observability,
+      # which imports the built SDK.
       - name: Build the CLI
         run: pnpm --filter langwatch run build
+
+      - name: Typecheck
+        run: pnpm --filter @langwatch/agent-plugin run typecheck
 
       # Unit tests read the manifests and run the launcher against fake CLIs;
       # integration tests run it against the built CLI, a local collector and a

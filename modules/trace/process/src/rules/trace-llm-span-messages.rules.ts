@@ -1,4 +1,4 @@
-import type { PromptStudioSpanResult } from "@langwatch/trace-contract";
+import { extractSystemInstructions, type PromptStudioSpanResult } from "@langwatch/trace-contract";
 
 type ChatMessage = PromptStudioSpanResult["messages"][number];
 
@@ -88,4 +88,22 @@ export function parseLLMSpanMessages(attrs: Record<string, unknown>): ChatMessag
   }
 
   return messages;
+}
+
+/**
+ * The system prompt field of an LLM span: the prompt canonicalisation lifted into
+ * `gen_ai.system_instructions`, else an opening system message, else no field. A later
+ * system turn (retrieved passages) is conversation content, not the prompt.
+ */
+export function systemPromptFieldOfLlmSpan({
+  attrs,
+  messages,
+}: {
+  attrs: Record<string, unknown>;
+  messages: ChatMessage[];
+}): { systemPrompt?: ChatMessage["content"] } {
+  const lifted = extractSystemInstructions(attrs);
+  if (lifted !== null) return { systemPrompt: lifted };
+  const first = messages[0];
+  return first?.role === "system" ? { systemPrompt: first.content } : {};
 }

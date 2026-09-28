@@ -8,7 +8,11 @@ import type {
   ScenarioParameterDefinition,
   ScenarioParameterValue,
 } from "@langwatch/scenario-contract";
-import { deriveCanonicalOverrides, targetIdentityKey, targetSortKey } from "@langwatch/suite-contract";
+import {
+  deriveCanonicalOverrides,
+  targetIdentityKey,
+  targetSortKey,
+} from "@langwatch/suite-contract";
 
 import { toLineRunParameters } from "../../../../model/agent-testing/run/parameter-line.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";

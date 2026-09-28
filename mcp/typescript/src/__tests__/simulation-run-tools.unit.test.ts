@@ -11,10 +11,7 @@ vi.mock("../langwatch-api-simulation-runs.js", () => ({
   listSimulationRuns: vi.fn(),
 }));
 
-import {
-  getSimulationRun,
-  type SimulationRunSummary,
-} from "../langwatch-api-simulation-runs.js";
+import { getSimulationRun, type SimulationRunSummary } from "../langwatch-api-simulation-runs.js";
 import { handleGetSimulationRun } from "../tools/get-simulation-run.js";
 
 const mockGetSimulationRun = vi.mocked(getSimulationRun);

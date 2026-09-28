@@ -37,20 +37,20 @@ before the user has done anything wrong.
 
 ## Decision
 
-| Rule | Layer | Meaning |
-| --- | --- | --- |
-| `langwatch/no-tautological-assertion` | plugin | `expect(x).toBe(x)` and its kin compare a value with itself and cannot fail. |
-| `langwatch/no-form-watch-in-child` | plugin | A component holding `form` as a prop uses `useWatch`, never `form.watch()`. |
-| `langwatch/test-description-is-an-action` | plugin | Nested `describe` blocks read `given <precondition>` then `when <action>`. |
-| `langwatch/shared-setup-is-a-hook` | plugin | Setup repeated across sibling tests belongs in a hook. |
-| `langwatch/unit-test-does-not-render` | plugin | A test that renders a component is an integration test, not a unit test. |
-| `langwatch/banned-test-model-names` | plugin | A test names `gpt-5-mini`, not a retired or overpriced model. Fixable. |
-| `langwatch/no-logger-spy` | plugin | No `vi.spyOn` on a real logger; assert through `createTestLogger()`. |
-| `langwatch/no-prototype-stub` | plugin | No test double built by `Object.create(Class.prototype)`. |
-| `vitest/valid-expect` | oxlint built-in | `expect` takes at most two arguments; the second labels which iteration failed. |
-| `vitest/expect-expect` | oxlint built-in | A test calls `expect` or a named `expect*`/`assert*` helper; a test that asserts nothing cannot fail. |
-| `vitest/valid-title` | oxlint built-in | A test title is a string and does not start with "should". |
-| `vitest/require-mock-type-parameters` | oxlint built-in | Off (amendment below). |
+| Rule                                      | Layer           | Meaning                                                                                               |
+| ----------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------- |
+| `langwatch/no-tautological-assertion`     | plugin          | `expect(x).toBe(x)` and its kin compare a value with itself and cannot fail.                          |
+| `langwatch/no-form-watch-in-child`        | plugin          | A component holding `form` as a prop uses `useWatch`, never `form.watch()`.                           |
+| `langwatch/test-description-is-an-action` | plugin          | Nested `describe` blocks read `given <precondition>` then `when <action>`.                            |
+| `langwatch/shared-setup-is-a-hook`        | plugin          | Setup repeated across sibling tests belongs in a hook.                                                |
+| `langwatch/unit-test-does-not-render`     | plugin          | A test that renders a component is an integration test, not a unit test.                              |
+| `langwatch/banned-test-model-names`       | plugin          | A test names `gpt-5-mini`, not a retired or overpriced model. Fixable.                                |
+| `langwatch/no-logger-spy`                 | plugin          | No `vi.spyOn` on a real logger; assert through `createTestLogger()`.                                  |
+| `langwatch/no-prototype-stub`             | plugin          | No test double built by `Object.create(Class.prototype)`.                                             |
+| `vitest/valid-expect`                     | oxlint built-in | `expect` takes at most two arguments; the second labels which iteration failed.                       |
+| `vitest/expect-expect`                    | oxlint built-in | A test calls `expect` or a named `expect*`/`assert*` helper; a test that asserts nothing cannot fail. |
+| `vitest/valid-title`                      | oxlint built-in | A test title is a string and does not start with "should".                                            |
+| `vitest/require-mock-type-parameters`     | oxlint built-in | Off (amendment below).                                                                                |
 
 `no-test-without-assertion` and `no-empty-test` were ast-grep rules that
 duplicated `vitest/expect-expect`, a built-in already enabled at oxlint's own

@@ -76,7 +76,9 @@ test("complex product areas share one local navigation layout", async ({ page },
     });
   }
 
-  expect(measurements.map(({ navigationWidth }) => navigationWidth)).toEqual([220, 220, 220]);
+  expect(measurements.map(({ navigationWidth }) => navigationWidth)).toEqual(
+    sections.map(() => 220),
+  );
   expect(new Set(measurements.map(({ containerWidth }) => containerWidth)).size).toBe(1);
   expect(new Set(measurements.map(({ borderColor }) => borderColor)).size).toBe(1);
   for (const { borderColor } of measurements) {
@@ -84,22 +86,24 @@ test("complex product areas share one local navigation layout", async ({ page },
     expect(borderColor).not.toBe("rgba(0, 0, 0, 0)");
   }
 
-  const governanceNavigation = page.getByRole("navigation", {
-    name: "AI Governance navigation",
+  // The rail marks the page it is on: following one of its links moves the
+  // active state off Overview.
+  const automationsNavigation = page.getByRole("navigation", {
+    name: "Automations navigation",
   });
-  await governanceNavigation.getByRole("link", { name: "Inventory", exact: true }).click();
-  await expect(page).toHaveURL("/governance/inventory");
+  await automationsNavigation.getByRole("link", { name: "Alerts", exact: true }).click();
+  await expect(page).toHaveURL(`/${projectSlug}/automations/alerts`);
 
   // The URL flips synchronously on pushState, but the router only commits the
   // new location once the lazily-loaded route resolves; until then the nav
   // still renders the previous page's active state. Poll instead of sampling
   // once so the assertion waits for that commit like every other matcher here.
   await expect(async () => {
-    const overviewBackground = await governanceNavigation
+    const overviewBackground = await automationsNavigation
       .getByRole("link", { name: "Overview", exact: true })
       .evaluate((element) => getComputedStyle(element).backgroundColor);
-    const activeBackground = await governanceNavigation
-      .getByRole("link", { name: "Inventory", exact: true })
+    const activeBackground = await automationsNavigation
+      .getByRole("link", { name: "Alerts", exact: true })
       .evaluate((element) => getComputedStyle(element).backgroundColor);
     expect(overviewBackground).not.toBe(activeBackground);
   }).toPass({ timeout: 15_000 });

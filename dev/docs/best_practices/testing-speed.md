@@ -32,17 +32,17 @@ specifier can become `@langwatch/test-harness/vitest-config` in one pass.
 
 ## What the helper sets, and why
 
-| key | value | why |
-| --- | --- | --- |
-| `test.pool` | `"forks"` | vitest 5's own default, declared so a package never drifts onto `vmThreads`, which cannot disable isolation |
-| `test.isolate` | `false` for every kind, `jsdom` included | a fresh worker per test file re-evaluates the whole module graph per file; off, the graph is evaluated once per worker |
-| `test.maxWorkers` | `1` in fast mode, when isolation is off | collapses the run onto one child process instead of one per core, cutting fork/spawn overhead on top of the isolation win. Not set when a package asks for `isolate: true`, where separate workers are the point |
-| `test.fsModuleCache` | `true` in fast mode | persists transformed modules to `node_modules/.vitest-cache` between runs, so a rerun skips the transform share |
-| `test.css` | `false` in fast mode | skips CSS parse/transform on import; no package under the helper asserts on real computed CSS |
-| `test.fileParallelism` | `true` | the default, declared because `fileParallelism: false` silently pins `maxWorkers` to 1 |
-| `test.watch` | `false` | a run in CI or from an agent never watches |
-| `test.environment` | `"node"` or `"jsdom"` | per-file `@vitest-environment` docblocks still win |
-| `test.exclude` | `["**/node_modules/**", "**/dist/**"]` | the default a package overrides when it has a second lane |
+| key                    | value                                    | why                                                                                                                                                                                                              |
+| ---------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test.pool`            | `"forks"`                                | vitest 5's own default, declared so a package never drifts onto `vmThreads`, which cannot disable isolation                                                                                                      |
+| `test.isolate`         | `false` for every kind, `jsdom` included | a fresh worker per test file re-evaluates the whole module graph per file; off, the graph is evaluated once per worker                                                                                           |
+| `test.maxWorkers`      | `1` in fast mode, when isolation is off  | collapses the run onto one child process instead of one per core, cutting fork/spawn overhead on top of the isolation win. Not set when a package asks for `isolate: true`, where separate workers are the point |
+| `test.fsModuleCache`   | `true` in fast mode                      | persists transformed modules to `node_modules/.vitest-cache` between runs, so a rerun skips the transform share                                                                                                  |
+| `test.css`             | `false` in fast mode                     | skips CSS parse/transform on import; no package under the helper asserts on real computed CSS                                                                                                                    |
+| `test.fileParallelism` | `true`                                   | the default, declared because `fileParallelism: false` silently pins `maxWorkers` to 1                                                                                                                           |
+| `test.watch`           | `false`                                  | a run in CI or from an agent never watches                                                                                                                                                                       |
+| `test.environment`     | `"node"` or `"jsdom"`                    | per-file `@vitest-environment` docblocks still win                                                                                                                                                               |
+| `test.exclude`         | `["**/node_modules/**", "**/dist/**"]`   | the default a package overrides when it has a second lane                                                                                                                                                        |
 
 `kind: "unit"` is `kind: "node"` plus the console-output guard. It does not
 change isolation.
@@ -55,7 +55,7 @@ shape, so a package with a suite that breaks under one of them can opt a single
 run out without editing this helper or its own config.
 
 `test.maxWorkers` is a request, not a guarantee. vitest applies
-`VITEST_MAX_WORKERS` *after* it resolves the config, so an exported worker count
+`VITEST_MAX_WORKERS` _after_ it resolves the config, so an exported worker count
 wins over the `1` above - which is what CI wants, since it sets the runner's
 physical core count. A suite that must be serial for correctness therefore
 withdraws the variable rather than trusting the helper; see

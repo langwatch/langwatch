@@ -139,18 +139,16 @@ export async function getOrgAndTeamIds(page: Page): Promise<{
   // "Failed to parse URL". Mirrors getProjectSlug and the batched tRPC shape.
   const response = await page.request.get(
     "/api/trpc/organization.getAll?batch=1&input=" +
-      encodeURIComponent(JSON.stringify({ "0": { json: {} } })),
+      encodeURIComponent(JSON.stringify({ "0": {} })),
   );
   const json = (await response.json().catch(() => null)) as {
     "0"?: {
       result?: {
-        data?: {
-          json?: { id: string; teams?: { id: string }[] }[];
-        };
+        data?: { id: string; teams?: { id: string }[] }[];
       };
     };
   } | null;
-  const org = (json?.["0"]?.result?.data?.json ?? [])[0];
+  const org = (json?.["0"]?.result?.data ?? [])[0];
   if (!org?.id || !org.teams?.[0]?.id) {
     throw new Error(
       `Could not extract org/team IDs (status ${response.status()}): ${JSON.stringify(json).slice(
@@ -184,7 +182,7 @@ export async function activateEnterpriseLicense(page: Page): Promise<void> {
   const { organizationId } = await getOrgAndTeamIds(page);
   const response = await page.request.post("/api/trpc/license.upload?batch=1", {
     data: {
-      "0": { json: { organizationId, licenseKey: E2E_ENTERPRISE_LICENSE_KEY } },
+      "0": { organizationId, licenseKey: E2E_ENTERPRISE_LICENSE_KEY },
     },
   });
   const result = await response.json().catch(() => null);
@@ -203,7 +201,7 @@ export async function activateEnterpriseLicense(page: Page): Promise<void> {
 export async function removeEnterpriseLicense(page: Page): Promise<void> {
   const { organizationId } = await getOrgAndTeamIds(page);
   const response = await page.request.post("/api/trpc/license.remove?batch=1", {
-    data: { "0": { json: { organizationId } } },
+    data: { "0": { organizationId } },
   });
   const result = await response.json().catch(() => null);
   if (!response.ok() || result?.["0"]?.error) {

@@ -447,9 +447,9 @@ describe("given the listing mark and the run refusal read the same agents", () =
       })
         .assertConnectedAgentsRunnable({ agents: [agent], actor })
         .then(
-        () => false,
-        () => true,
-      );
+          () => false,
+          () => true,
+        );
 
       expect(refused).toBe(!marked);
     }

@@ -37,11 +37,11 @@ is the reason this is right now.
 Small, but the largest of the 23 and the only ones where a real paragraph may be
 going:
 
-| Page | Real added lines | Main's page |
-| --- | --- | --- |
-| `ai-governance/data-privacy.mdx` | 25 | `docs/platform/data-privacy.mdx` |
-| `ai-gateway/cookbooks/production-runbook.mdx` | 20 | `cookbooks/prometheus-alerts.mdx` + `grafana-dashboard.mdx` |
-| `ai-governance/audit-log.mdx` | 19 | `docs/platform/audit-log.mdx` |
+| Page                                          | Real added lines | Main's page                                                 |
+| --------------------------------------------- | ---------------- | ----------------------------------------------------------- |
+| `ai-governance/data-privacy.mdx`              | 25               | `docs/platform/data-privacy.mdx`                            |
+| `ai-gateway/cookbooks/production-runbook.mdx` | 20               | `cookbooks/prometheus-alerts.mdx` + `grafana-dashboard.mdx` |
+| `ai-governance/audit-log.mdx`                 | 19               | `docs/platform/audit-log.mdx`                               |
 
 Recover any of them with `git show <pre-merge-sha>:<path>`; the pre-merge tip is
 tagged `pre-main-merge-2026-09-11`.

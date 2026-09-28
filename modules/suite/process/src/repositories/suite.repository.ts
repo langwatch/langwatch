@@ -1,5 +1,4 @@
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
-import type { Instant } from "@langwatch/time";
 import type {
   CreateSuiteCommand,
   RunPlanConfigInput,
@@ -8,6 +7,7 @@ import type {
   SuiteScope,
   UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
+import type { Instant } from "@langwatch/time";
 
 export abstract class SuiteRepository {
   abstract create: (input: CreateSuiteCommand & { id: string; slug: string }) => Promise<Suite>;

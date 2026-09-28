@@ -17,10 +17,9 @@ import {
   createEvaluator,
   updateEvaluator,
 } from "../langwatch-api-evaluators.js";
-
-import { handleListEvaluators } from "../tools/list-evaluators.js";
-import { handleGetEvaluator } from "../tools/get-evaluator.js";
 import { handleCreateEvaluator } from "../tools/create-evaluator.js";
+import { handleGetEvaluator } from "../tools/get-evaluator.js";
+import { handleListEvaluators } from "../tools/list-evaluators.js";
 import { handleUpdateEvaluator } from "../tools/update-evaluator.js";
 
 const mockListEvaluators = vi.mocked(listEvaluators);

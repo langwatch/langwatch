@@ -2,8 +2,8 @@
   "name": "acme-support",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "description": "ACME shop support agent, the demo application for LangWatch dogfooding",
+  "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",

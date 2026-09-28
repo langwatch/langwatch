@@ -15,7 +15,8 @@ export default defineModuleVitestConfig({
     // `e2e/` is the end-to-end lane: Playwright specs (`playwright test`) and
     // scenario suites that drive a real deployment through an LLM judge, each
     // with its own runner and config. Vitest's default include would collect
-    // both and fail on the first `@playwright/test` import.
-    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
+    // both and fail on the first `@playwright/test` import. `scripts/__tests__`
+    // holds node:test suites the build job runs with `node --test`.
+    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**", "scripts/__tests__/**"],
   },
 });

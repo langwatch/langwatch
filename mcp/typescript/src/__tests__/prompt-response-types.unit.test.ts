@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { PromptDetailResponse, PromptMutationResponse } from "../langwatch-api.js";
 
 describe("Prompt response type interfaces", () => {

@@ -96,7 +96,9 @@ paths = ['''enterprise/modules/licensing/process/src/testing\.ts''']
 [[allowlists]]
 description = "Test RSA keypair the license fixtures are signed with; verifies nothing in production"
 targetRules = ["private-key"]
-paths = ['''enterprise/modules/licensing/process/src/__tests__/fixtures/license-keys\.fixture\.ts''']
+paths = [
+  '''enterprise/modules/licensing/process/src/__tests__/fixtures/license-keys\.fixture\.ts''',
+]
 
 # The offline license compatibility fixture (ADR-139): one license minted with
 # the licensing code of main before connected self-hosted landed, so a test can
@@ -347,10 +349,7 @@ regexes = ['''^your-api-key$''']
 [[allowlists]]
 description = "Synthetic credentials the code-agent adapter's echoed-secret redaction tests plant (lw#3439)"
 targetRules = ["generic-api-key"]
-regexes = [
-  '''^sk-live-abcdef0123456789$''',
-  '''^shh-9f3a2b7c4e$''',
-]
+regexes = ['''^sk-live-abcdef0123456789$''', '''^shh-9f3a2b7c4e$''']
 
 # `vk-lw-YOUR_VIRTUAL_KEY`, the placeholder an earlier commit on the AI Gateway
 # docs branch put in the `Authorization: Bearer` header of the DNS and TLS
@@ -441,9 +440,7 @@ regexes = [
 [[allowlists]]
 description = "Governance tool-card row identifiers are UI keys, not credentials"
 targetRules = ["generic-api-key"]
-paths = [
-  '''^platform/app/ee/governance/dashboard/components/toolCatalog/toolCards\.ts$''',
-]
+paths = ['''^platform/app/ee/governance/dashboard/components/toolCatalog/toolCards\.ts$''']
 
 # `dGhlIHNhbXBsZSBub25jZQ==`, the `Sec-WebSocket-Key` in the raw upgrade
 # requests the voice listener tests write onto a socket. A `Sec-WebSocket-Key`

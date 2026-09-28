@@ -298,7 +298,11 @@ func prereqCommand(st domain.PrereqStatus) string {
 	}
 	// Resolved for THIS platform: a `brew install` line printed on Linux is
 	// not advice, it is a command that exits 127.
-	command, manual := c.InstallOn(runtime.GOOS)
+	platform := st.Platform
+	if platform == "" {
+		platform = runtime.GOOS
+	}
+	command, manual := c.InstallOn(platform)
 	if command == "" {
 		return manual
 	}

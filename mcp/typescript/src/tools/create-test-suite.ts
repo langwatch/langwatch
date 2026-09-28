@@ -4,10 +4,7 @@ import {
   type SuiteField,
   toWireAttachments,
 } from "../schemas/suite-fields.js";
-import {
-  formatEvaluatorAttachments,
-  formatSuiteFields,
-} from "./format-suite-details.js";
+import { formatEvaluatorAttachments, formatSuiteFields } from "./format-suite-details.js";
 
 /**
  * Handles the platform_create_test_suite MCP tool invocation.
@@ -35,9 +32,7 @@ export async function handleCreateTestSuite(params: {
     ...formatEvaluatorAttachments(suite.evaluators),
     "",
     `> File scenarios in it with \`platform_create_scenario\` or \`platform_update_scenario\`, passing testSuiteId \`${suite.id}\`${
-      suite.fields && suite.fields.length > 0
-        ? ` and a value per field under \`fields\``
-        : ""
+      suite.fields && suite.fields.length > 0 ? ` and a value per field under \`fields\`` : ""
     }.`,
   ].join("\n");
 }

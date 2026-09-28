@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/dashboards/dashboards-api.service";
 
 vi.mock("@/client-sdk/services/dashboards/dashboards-api.service", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     DashboardsApiService: vi.fn(),

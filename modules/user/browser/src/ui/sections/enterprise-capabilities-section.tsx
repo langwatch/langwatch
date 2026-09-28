@@ -211,7 +211,16 @@ export function EnterpriseCapabilitiesSection() {
 
         {!isEnterprise && (
           <HStack gap={3}>
-            <Button asChild size="sm" colorPalette="orange">
+            {/* White on orange.600 is 3.4:1, short of WCAG AA for 14px text;
+                orange.700 carries it at 4.6:1 (license-contrast e2e test). */}
+            <Button
+              asChild
+              size="sm"
+              colorPalette="orange"
+              bg="orange.700"
+              color="white"
+              _hover={{ bg: "orange.800", color: "white" }}
+            >
               <a href="/settings/license">Activate a license</a>
             </Button>
             <Button asChild size="sm" variant="outline">

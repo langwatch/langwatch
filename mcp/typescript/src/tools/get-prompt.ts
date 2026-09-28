@@ -27,7 +27,7 @@ function normalizeTag(tag: unknown): DeploymentTag | undefined {
 function fieldEntry(field: unknown): string {
   if (field && typeof field === "object" && "identifier" in field) {
     const typed = field as { identifier: unknown; type?: unknown };
-    return `- **${String(typed.identifier)}**: ${String(typed.type ?? "unknown")}`;
+    return `- **${String(typed.identifier)}**: ${typeof typed.type === "string" ? typed.type : "unknown"}`;
   }
   return `- ${JSON.stringify(field)}`;
 }

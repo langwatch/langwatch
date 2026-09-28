@@ -11,11 +11,11 @@ handoff.
 
 ## Confirmed by direct search, zero occurrences on this branch
 
-| Missing | Verified | What it is |
-| --- | --- | --- |
-| `assertVoiceTargetsAllowed` | **0 files** | server-side gate refusing a `voice` suite target when `release_voice_agents_enabled` is off |
-| `VoiceAgentsDisabledError` | **0 files** | the refusal it raises |
-| voice nonce handoff wiring | registry defined, **no callers** | `registerVoiceNonceHandoffListener` / `getVoiceNonceRegistry` are never called from the child-spawn path |
+| Missing                     | Verified                         | What it is                                                                                               |
+| --------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `assertVoiceTargetsAllowed` | **0 files**                      | server-side gate refusing a `voice` suite target when `release_voice_agents_enabled` is off              |
+| `VoiceAgentsDisabledError`  | **0 files**                      | the refusal it raises                                                                                    |
+| voice nonce handoff wiring  | registry defined, **no callers** | `registerVoiceNonceHandoffListener` / `getVoiceNonceRegistry` are never called from the child-spawn path |
 
 **The voice gate is the one to fix first.** `modules/suite`'s wire schema accepts
 `"voice"` as a target type and nothing checks the flag before create or update, so
@@ -28,11 +28,11 @@ implements never happens.
 
 ## Behaviour main fixed that this branch still has wrong
 
-| Where | What |
-| --- | --- |
+| Where                                                               | What                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `modules/annotation/.../prisma.annotation-queue-item.repository.ts` | still pages the review queue with plain `skip`/`take`. Main replaced that with seek-based walking (`queueWalkOrder`, `queueWalkNeighbourhood`) **because offset paging skipped and duplicated items** as the queue mutated under the reviewer. There is no next-item walk method here at all |
-| `modules/navigation/browser/src/ui/sections/shell-page-body.tsx` | alert banners render straight into a plain `VStack`. Main wrapped them in a positioned `zIndex="docked"` layer because page content - a z-indexed container, the home hero's bloom - was washing the banner text out |
-| `modules/analytics/browser/src/ui/sections/graph-card-header.tsx` | no add-alert or edit-alert bell wired to the automations drawer, plus no inline widget rename. **This branch's own code comment says so**: "THE ALERT BELL DID NOT TRAVEL" |
+| `modules/navigation/browser/src/ui/sections/shell-page-body.tsx`    | alert banners render straight into a plain `VStack`. Main wrapped them in a positioned `zIndex="docked"` layer because page content - a z-indexed container, the home hero's bloom - was washing the banner text out                                                                         |
+| `modules/analytics/browser/src/ui/sections/graph-card-header.tsx`   | no add-alert or edit-alert bell wired to the automations drawer, plus no inline widget rename. **This branch's own code comment says so**: "THE ALERT BELL DID NOT TRAVEL"                                                                                                                   |
 
 That comment is worth dwelling on. Someone noticed the loss, wrote it down in the
 code, and it still shipped that way - which is the argument for this whole
@@ -111,13 +111,13 @@ main pointing at flat paths we no longer have. Diffing main's OWN change
 (`:1:` base against `:3:` theirs, not ours against theirs) shows that is true
 for exactly two files. The rest dropped real work:
 
-| Dropped | What it was |
-| --- | --- |
-| `report-grid` / `draggable-graph-card` / `graph-card-menu` / `analytics-reports.screen` | the #7870 ChartGrid rewiring itself - placements replacing the size-option dnd model |
-| `graph-card-menu` | removal of the Edit item pointing at the workbench route **we just deleted** - keeping ours leaves a dead link |
-| `lwqlTimeWindow` / `lwqlGranularity*` | the `period_*` -> `dashboard_context_*` reserved-parameter rename |
-| `analytics-registry` | unknown group returned a raw `TypeError` instead of `undefined` |
-| `no-background-work` | `@scenario` title rename - ours was pointing at a title no feature file carries |
+| Dropped                                                                                 | What it was                                                                                                    |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `report-grid` / `draggable-graph-card` / `graph-card-menu` / `analytics-reports.screen` | the #7870 ChartGrid rewiring itself - placements replacing the size-option dnd model                           |
+| `graph-card-menu`                                                                       | removal of the Edit item pointing at the workbench route **we just deleted** - keeping ours leaves a dead link |
+| `lwqlTimeWindow` / `lwqlGranularity*`                                                   | the `period_*` -> `dashboard_context_*` reserved-parameter rename                                              |
+| `analytics-registry`                                                                    | unknown group returned a raw `TypeError` instead of `undefined`                                                |
+| `no-background-work`                                                                    | `@scenario` title rename - ours was pointing at a title no feature file carries                                |
 
 Two of those are worth stating plainly. The **parameter rename was half-applied
 on this branch**: the contract already declared `dashboard_context_*` and carries

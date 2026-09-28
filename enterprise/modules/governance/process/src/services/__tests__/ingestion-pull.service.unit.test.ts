@@ -56,7 +56,11 @@ describe("given a run that took over from one that outlived its allowance", () =
   /** @scenario "A run replaced before it finished records that it was abandoned" */
   it("records the abandonment naming the replacement before asking the provider", async () => {
     const { service, outcome } = pullService(async () => ({ nextCursor: "c2", eventCount: 1 }));
-    await service.execute({ tenantId: "project-1", attempt: 1, pull: pull({ abandonedRunId: "run-1" }) });
+    await service.execute({
+      tenantId: "project-1",
+      attempt: 1,
+      pull: pull({ abandonedRunId: "run-1" }),
+    });
 
     expect(outcome.failedCalls).toEqual([
       expect.objectContaining({
@@ -112,9 +116,9 @@ describe("given a transport failure", () => {
   it("rethrows while attempts remain", async () => {
     const { service, outcome } = pullService(() => Promise.reject(new Error("reset")));
 
-    await expect(service.execute({ tenantId: "project-1", attempt: 1, pull: pull() })).rejects.toThrow(
-      "reset",
-    );
+    await expect(
+      service.execute({ tenantId: "project-1", attempt: 1, pull: pull() }),
+    ).rejects.toThrow("reset");
     expect(outcome.failedCalls).toEqual([]);
   });
 

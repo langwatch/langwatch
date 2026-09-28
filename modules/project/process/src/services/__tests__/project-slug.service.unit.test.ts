@@ -5,7 +5,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { mintProjectSlug } from "../../rules/project-slug-service.rules.ts";
+import { mintProjectSlug, projectIdSlugToken } from "../../rules/project-slug-service.rules.ts";
+import { ProjectCredentialsService } from "../project-credentials.service.ts";
 
 const mint = (name: string, projectId = "abcdef0123") => mintProjectSlug(name, projectId);
 
@@ -76,6 +77,21 @@ describe("mintProjectSlug", () => {
       // guard for a future in which the suffix goes away, and this test says
       // so rather than claiming a refusal the code does not make.
       expect(mintProjectSlug("settings", "")).toBe("settings-");
+    });
+  });
+});
+
+describe("projectIdSlugToken", () => {
+  describe("given two project ids minted back to back", () => {
+    /** @scenario Two projects with the same name get different addresses */
+    it("gives the same name two different slugs", () => {
+      const credentials = ProjectCredentialsService.create();
+      const first = credentials.generateProjectId();
+      const second = credentials.generateProjectId();
+
+      expect(mintProjectSlug("Application", projectIdSlugToken(first))).not.toBe(
+        mintProjectSlug("Application", projectIdSlugToken(second)),
+      );
     });
   });
 });

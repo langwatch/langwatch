@@ -38,13 +38,13 @@ rewritten. Both go stale, and neither is read at the moment it matters.
 
 ## Decision
 
-| Rule | Layer | Meaning |
-| --- | --- | --- |
-| `langwatch/cognitive-complexity` | plugin | SonarSource cognitive complexity, maximum 15; 25 in `.tsx`, 40 in tests. |
-| `langwatch/comment-block-size` | plugin | A comment block of more than 5 lines, or a comment line past 100 columns, errors. |
-| `no-nested-ternary` | oxlint built-in | A ternary inside another ternary's consequent or alternate. Enabled workspace-wide. |
-| `langwatch/unbounded-loop` | plugin | `for (;;)` and `while (true)` in strict server source: the exit belongs in the header. |
-| `service-ceilings` | architecture-enforcer | A service module or method past its line, statement, complexity or line-length ceiling. |
+| Rule                             | Layer                 | Meaning                                                                                 |
+| -------------------------------- | --------------------- | --------------------------------------------------------------------------------------- |
+| `langwatch/cognitive-complexity` | plugin                | SonarSource cognitive complexity, maximum 15; 25 in `.tsx`, 40 in tests.                |
+| `langwatch/comment-block-size`   | plugin                | A comment block of more than 5 lines, or a comment line past 100 columns, errors.       |
+| `no-nested-ternary`              | oxlint built-in       | A ternary inside another ternary's consequent or alternate. Enabled workspace-wide.     |
+| `langwatch/unbounded-loop`       | plugin                | `for (;;)` and `while (true)` in strict server source: the exit belongs in the header.  |
+| `service-ceilings`               | architecture-enforcer | A service module or method past its line, statement, complexity or line-length ceiling. |
 
 `max-depth` (maximum 4) is enabled the same way, scoped by an `overrides`
 block rather than workspace-wide, and carries one baseline entry.

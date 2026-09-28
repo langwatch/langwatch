@@ -6,6 +6,7 @@
  */
 
 import {
+  INSTANT_EVAL_CLASSIFIER_LIMITS,
   InstantEvalClassifierUnavailableError,
   type InstantEvalQuestion,
 } from "@langwatch/instant-eval-contract";
@@ -215,28 +216,32 @@ describe("given a limiter that records what each permit asks for", () => {
 describe("given a text the judge refuses as too large", () => {
   describe("when it is refused once", () => {
     /** @scenario "A text the classifier refuses as too large is cut once and retried" */
-    it("sends it again at three quarters of its length", async () => {
-      const lengths: number[] = [];
+    it("sends it again at three quarters of its length, keeping both ends", async () => {
+      const sent: string[] = [];
       endpoint()
         .intercept({ path: "/v1/systemone", method: "POST" })
         .reply(400, (options) => {
-          lengths.push(JSON.parse(sentText(options.body)).state.length);
+          sent.push(JSON.parse(sentText(options.body)).state);
           return TOO_LARGE;
         });
       endpoint()
         .intercept({ path: "/v1/systemone", method: "POST" })
         .reply(200, (options) => {
-          lengths.push(JSON.parse(sentText(options.body)).state.length);
+          sent.push(JSON.parse(sentText(options.body)).state);
           return ANSWER;
         });
 
       const judgement = await judge().classify({
         projectId: "project-1",
-        text: "x".repeat(400),
+        text: `OPENING ${"x".repeat(385)} ENDING`,
         questions: [QUESTION],
       });
 
-      expect(lengths).toEqual([400, 300]);
+      expect(sent.map((text) => text.length)).toEqual([400, expect.any(Number)]);
+      expect(sent[1]!.length).toBeLessThan(400);
+      expect(sent[1]!.length).toBeLessThanOrEqual(300);
+      expect(sent[1]!.startsWith("OPENING")).toBe(true);
+      expect(sent[1]!.endsWith("ENDING")).toBe(true);
       expect(judgement.verdicts).toHaveLength(1);
       expect(judgement.isTextTruncated).toBe(true);
     });
@@ -257,6 +262,98 @@ describe("given a text the judge refuses as too large", () => {
       });
 
       expect(judgement.skippedReason).toBe("classifier_input_too_large");
+    });
+  });
+});
+
+/**
+ * A support transcript as the extraction functions render it: turn headings,
+ * prose, and tool calls with JSON arguments and results. About 250 KB.
+ */
+function longSupportTranscript(): string {
+  const turns: string[] = ["## User (2026-09-20T10:00:00.000Z)\nI want a refund for order 1234."];
+  for (let i = 0; i < 700; i++) {
+    turns.push(
+      `## Assistant (2026-09-20T10:${String(i % 60).padStart(2, "0")}:00.000Z)\n` +
+        `Let me check order ${1000 + i} for you.\n\n### Tool call search_orders\n` +
+        "```json\n" +
+        JSON.stringify({ order_id: 1000 + i, include: ["lines", "payments", "refunds"] }) +
+        "\n```\n\n### Tool result\n```json\n" +
+        JSON.stringify({
+          id: 1000 + i,
+          status: "processing",
+          lines: [{ sku: `SKU-${i}-A`, qty: 1, price_cents: 1999 }],
+          payments: [{ id: `pay_${i}`, amount_cents: 1999, method: "card" }],
+        }) +
+        "\n```",
+    );
+  }
+  turns.push(
+    "## Assistant (2026-09-20T11:00:00.000Z)\nYour refund for order 1234 was issued today.",
+  );
+  return turns.join("\n\n");
+}
+
+/**
+ * A judge that counts the state at `bytesPerToken` and refuses it past the
+ * state cap less the questions, as the live API does.
+ */
+function judgeCountingAt(bytesPerToken: number, sent: string[]) {
+  const capBytes =
+    (INSTANT_EVAL_CLASSIFIER_LIMITS.stateTokens - instantEvalQuestionTokens([QUESTION])) *
+    bytesPerToken;
+  for (let send = 0; send < 3; send++) {
+    endpoint()
+      .intercept({ path: "/v1/systemone", method: "POST" })
+      .reply((options) => {
+        const state: string = JSON.parse(sentText(options.body)).state;
+        sent.push(state);
+        const fits = new TextEncoder().encode(state).length <= capBytes;
+        const data: object = fits ? ANSWER : TOO_LARGE;
+        return { statusCode: fits ? 200 : 400, data };
+      });
+  }
+}
+
+describe("given a long transcript that tokenises densely", () => {
+  describe("when it is judged at the densest measured ratio", () => {
+    /** @scenario "A long transcript that tokenises densely is judged on the first send" */
+    it("fits on the first send and marks the row truncated", async () => {
+      const sent: string[] = [];
+      judgeCountingAt(INSTANT_EVAL_CLASSIFIER_LIMITS.fitBytesPerInputToken, sent);
+      const transcript = longSupportTranscript();
+
+      const judgement = await judge().classify({
+        projectId: "project-1",
+        text: transcript,
+        questions: [QUESTION],
+      });
+
+      expect(new TextEncoder().encode(transcript).length).toBeGreaterThan(200_000);
+      expect(sent).toHaveLength(1);
+      expect(judgement.skippedReason).toBeUndefined();
+      expect(judgement.verdicts).toHaveLength(1);
+      expect(judgement.isTextTruncated).toBe(true);
+      expect(sent[0]!.endsWith("Your refund for order 1234 was issued today.")).toBe(true);
+    });
+  });
+
+  describe("when the judge counts it denser than any measured ratio", () => {
+    /** @scenario "The too-large retry cuts enough for a text denser than any measured" */
+    it("is refused once, then the retry fits and the verdict comes back", async () => {
+      const sent: string[] = [];
+      judgeCountingAt(1.7, sent);
+
+      const judgement = await judge().classify({
+        projectId: "project-1",
+        text: longSupportTranscript(),
+        questions: [QUESTION],
+      });
+
+      expect(sent).toHaveLength(2);
+      expect(judgement.skippedReason).toBeUndefined();
+      expect(judgement.verdicts).toHaveLength(1);
+      expect(judgement.isTextTruncated).toBe(true);
     });
   });
 });

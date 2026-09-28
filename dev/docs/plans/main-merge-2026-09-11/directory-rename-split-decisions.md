@@ -16,8 +16,8 @@ split across several destinations with no majority.
 So this is not 14 unrelated decisions. It is **one policy and 14 placements**, and
 five of the placements are empty.
 
-The policy, from the plan's own rule: *main's change either lands somewhere, or it
-is dropped with a stated reason.* A file main added is work someone did after the
+The policy, from the plan's own rule: _main's change either lands somewhere, or it
+is dropped with a stated reason._ A file main added is work someone did after the
 fork. The split conflict is git saying "I do not know where this goes", never
 "this is not needed".
 
@@ -25,22 +25,22 @@ fork. The split conflict is git saying "I do not know where this goes", never
 
 `added` counts files main created under that path since the merge base, recursively.
 
-| # | Split directory | added | Decision |
-| --- | --- | --- | --- |
-| 1 | `platform/app/ee/governance/services/__tests__` | 35 | governance port - see below |
-| 2 | `platform/app/src/components/governance` | 96 | governance port - see below |
-| 3 | `platform/app/ee/governance/dashboard/logic` | 5 | governance port - see below |
-| 4 | `platform/app/ee/governance/__tests__` | 4 | governance port - see below |
-| 5 | `platform/app/ee/governance/dashboard/logic/__tests__` | 2 | (inside #3) |
-| 6 | `platform/app/src/server/app-layer/traces` | 4 | `modules/trace/process/src/**` |
-| 7 | `platform/app/src/server/app-layer/traces/__tests__` | 1 | (inside #6) |
-| 8 | `platform/app/src/tasks/__tests__` | 1 | `apps/tasks/src/**/__tests__` |
-| 9 | `platform/app/src/utils/__tests__` | 1 | `apps/ui/src/features/personal-workspace/**` - verify first |
-| 10 | `platform/app/ee/governance/services/department/__tests__` | 0 | **nothing to place** |
-| 11 | `platform/app/src/components/agents/connected/__tests__` | 0 | **nothing to place** |
-| 12 | `platform/app/src/components/scenarios/utils` | 0 | **nothing to place** |
-| 13 | `platform/app/src/server/app-layer/langy/execution/__tests__` | 0 | **nothing to place** |
-| 14 | `platform/app/src/server/app-layer/langy/streaming` | 0 | **nothing to place** |
+| #   | Split directory                                               | added | Decision                                                    |
+| --- | ------------------------------------------------------------- | ----- | ----------------------------------------------------------- |
+| 1   | `platform/app/ee/governance/services/__tests__`               | 35    | governance port - see below                                 |
+| 2   | `platform/app/src/components/governance`                      | 96    | governance port - see below                                 |
+| 3   | `platform/app/ee/governance/dashboard/logic`                  | 5     | governance port - see below                                 |
+| 4   | `platform/app/ee/governance/__tests__`                        | 4     | governance port - see below                                 |
+| 5   | `platform/app/ee/governance/dashboard/logic/__tests__`        | 2     | (inside #3)                                                 |
+| 6   | `platform/app/src/server/app-layer/traces`                    | 4     | `modules/trace/process/src/**`                              |
+| 7   | `platform/app/src/server/app-layer/traces/__tests__`          | 1     | (inside #6)                                                 |
+| 8   | `platform/app/src/tasks/__tests__`                            | 1     | `apps/tasks/src/**/__tests__`                               |
+| 9   | `platform/app/src/utils/__tests__`                            | 1     | `apps/ui/src/features/personal-workspace/**` - verify first |
+| 10  | `platform/app/ee/governance/services/department/__tests__`    | 0     | **nothing to place**                                        |
+| 11  | `platform/app/src/components/agents/connected/__tests__`      | 0     | **nothing to place**                                        |
+| 12  | `platform/app/src/components/scenarios/utils`                 | 0     | **nothing to place**                                        |
+| 13  | `platform/app/src/server/app-layer/langy/execution/__tests__` | 0     | **nothing to place**                                        |
+| 14  | `platform/app/src/server/app-layer/langy/streaming`           | 0     | **nothing to place**                                        |
 
 **Five of the fourteen (10-14) decide themselves.** Git is confused about a
 directory main did not add to. Take the branch's side and record it; there is no
@@ -48,13 +48,13 @@ work behind them.
 
 ## The four small ones
 
-| File main added | Where it goes |
-| --- | --- |
-| `traces/span-ingestion-tally.ts` + its test | `modules/trace/process/src/services/` |
-| `traces/trace-ingestion.metrics.ts` | `modules/trace/process/src/services/` - the branch already has `modules/trace/specs/trace-ingestion-metrics.feature`, so the spec is here and the implementation is what is arriving |
-| `traces/repositories/__tests__/trace-list.clickhouse.repository.unit.test.ts` | `modules/trace/process/src/repositories/clickhouse/__tests__/` |
-| `tasks/__tests__/provisionLwql.redaction.unit.test.ts` | `apps/tasks/src/**/__tests__/` - `provisionLwql` has one content hit on the branch, a ClickHouse migration, so confirm the task still exists before placing its test |
-| `utils/__tests__/personalProject.unit.test.ts` | `personalProject` has 53 content hits; the concept lives as `personal-workspace`. Read the test and place it with whatever it actually asserts |
+| File main added                                                               | Where it goes                                                                                                                                                                        |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `traces/span-ingestion-tally.ts` + its test                                   | `modules/trace/process/src/services/`                                                                                                                                                |
+| `traces/trace-ingestion.metrics.ts`                                           | `modules/trace/process/src/services/` - the branch already has `modules/trace/specs/trace-ingestion-metrics.feature`, so the spec is here and the implementation is what is arriving |
+| `traces/repositories/__tests__/trace-list.clickhouse.repository.unit.test.ts` | `modules/trace/process/src/repositories/clickhouse/__tests__/`                                                                                                                       |
+| `tasks/__tests__/provisionLwql.redaction.unit.test.ts`                        | `apps/tasks/src/**/__tests__/` - `provisionLwql` has one content hit on the branch, a ClickHouse migration, so confirm the task still exists before placing its test                 |
+| `utils/__tests__/personalProject.unit.test.ts`                                | `personalProject` has 53 content hits; the concept lives as `personal-workspace`. Read the test and place it with whatever it actually asserts                                       |
 
 **`spanIngestionTally`, `inventorySummary`, `sourceHealthDisplay` and
 `confirmArchiveSource` have zero content hits on this branch.** They are main's

@@ -104,7 +104,7 @@ export async function requestSignUpVerificationToken(
   email: string,
 ): Promise<string> {
   const response = await request.post("/api/trpc/auth.requestSignUpVerification?batch=1", {
-    data: { "0": { json: { email } } },
+    data: { "0": { email } },
   });
   return signUpVerificationTokenAfterResponse(response, email);
 }
@@ -133,10 +133,13 @@ export async function signUpVerificationTokenAfterResponse(
   return findSignUpTokenFor(email);
 }
 
-const confirmedAddressSchema = z.object({
-  addressProof: z.string().min(1),
-  email: z.string().email(),
-});
+const confirmedAddressSchema = z.tuple([
+  z.object({
+    result: z.object({
+      data: z.object({ addressProof: z.string().min(1), email: z.string().email() }),
+    }),
+  }),
+]);
 
 /**
  * Proves a fresh address through the same public endpoints as the sign-up
@@ -148,19 +151,20 @@ export async function requestSignUpAddressProof(
   email: string,
 ): Promise<string> {
   const token = await requestSignUpVerificationToken(request, email);
-  const confirmationResponse = await request.post("/api/auth/sign-up/confirm-address", {
-    data: { token },
-    headers: betterAuthRequestHeaders(),
-  });
+  const confirmationResponse = await request.post(
+    "/api/trpc/auth.completeSignUpVerification?batch=1",
+    { data: { "0": { token } } },
+  );
   const confirmationBody: unknown = await confirmationResponse.json().catch(() => null);
   const confirmation = confirmedAddressSchema.safeParse(confirmationBody);
-  if (!confirmationResponse.ok() || !confirmation.success || confirmation.data.email !== email) {
+  const confirmed = confirmation.success ? confirmation.data[0].result.data : null;
+  if (!confirmationResponse.ok() || !confirmed || confirmed.email !== email) {
     throw new Error(
-      `confirm-address failed for ${email}: ${confirmationResponse.status()} ${JSON.stringify(confirmationBody).slice(0, 300)}`,
+      `completeSignUpVerification failed for ${email}: ${confirmationResponse.status()} ${JSON.stringify(confirmationBody).slice(0, 300)}`,
     );
   }
 
-  return confirmation.data.addressProof;
+  return confirmed.addressProof;
 }
 
 /**
@@ -221,28 +225,26 @@ export async function thenTheLinkSignsMeInWithNoSecondPrompt(
 export async function givenMyAccountHasAWorkspace(page: Page): Promise<void> {
   const getAll = await page.request.get(
     "/api/trpc/organization.getAll?batch=1&input=" +
-      encodeURIComponent(JSON.stringify({ "0": { json: {} } })),
+      encodeURIComponent(JSON.stringify({ "0": {} })),
   );
   const data = (await getAll.json().catch(() => null)) as {
     "0"?: {
       result?: {
-        data?: { json?: { teams?: { projects?: unknown[] }[] }[] };
+        data?: { teams?: { projects?: unknown[] }[] }[];
       };
     };
   } | null;
-  const orgs = data?.["0"]?.result?.data?.json ?? [];
+  const orgs = data?.["0"]?.result?.data ?? [];
   const hasProject = orgs.some((o) => (o.teams ?? []).some((t) => (t.projects ?? []).length > 0));
   if (hasProject) return;
 
   const response = await page.request.post("/api/trpc/onboarding.initializeOrganization?batch=1", {
     data: {
       "0": {
-        json: {
-          orgName: "Front Door Test Org",
-          projectName: "Front Door Test Project",
-          language: "other",
-          framework: "other",
-        },
+        orgName: "Front Door Test Org",
+        projectName: "Front Door Test Project",
+        language: "other",
+        framework: "other",
       },
     },
   });
@@ -272,12 +274,11 @@ export async function thenIAmCalledByMyEmailNeverNull(page: Page, email: string)
   // behind it. Answer them the way a person in a hurry does, then carry on.
   await whenIDeclineWhatTheShellOffersFirst(page);
   await page.getByRole("button", { name: `Open user menu for ${email}` }).click();
-  const group = page.getByText(new RegExp(`\\(${escapeRegExp(email)}\\)`));
+  // The menu's account line: the email alone for a nameless account, never
+  // "null (you@x.com)" or empty parentheses around it.
+  const group = page.getByRole("menu").getByText(email, { exact: true });
   await expect(group).toBeVisible({ timeout: 10000 });
-  await expect(group).not.toContainText("null");
-  // The literal bug this guards: no name renders the email on both sides of
-  // the parenthesis, e.g. "you@x.com (you@x.com)" — never "null (you@x.com)".
-  await expect(group).toContainText(email);
+  await expect(page.getByRole("menu")).not.toContainText("null");
 }
 
 /**
@@ -345,10 +346,6 @@ export async function whenIDeclineTheJoinTakeover(page: Page): Promise<void> {
   await expect(takeover).not.toBeVisible();
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 // =============================================================================
 // Sign-in: address -> password, and around it
 // =============================================================================
@@ -365,7 +362,7 @@ export async function givenARegisteredAccount(
   const addressProof = await requestSignUpAddressProof(page.request, email);
   const response = await page.request.post("/api/trpc/user.register?batch=1", {
     data: {
-      "0": { json: { addressProof, email, password } },
+      "0": { addressProof, email, password },
     },
   });
   if (!response.ok()) {

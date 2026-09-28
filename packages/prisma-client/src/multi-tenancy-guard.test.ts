@@ -7,7 +7,7 @@ import {
   PROJECT_TENANCY_REGIMES,
   SCOPED_MODEL_NAMES,
 } from "./multi-tenancy-guard.ts";
-import { ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
+import { guardOrganizationId, ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
 
 /**
  * Regression tests for multitenancy guard's exempt list. Org-scoped models need exemption
@@ -1223,6 +1223,39 @@ describe("guardProjectId — ShareLink", () => {
           },
         }),
       ).resolves.toBe("ok");
+    });
+  });
+});
+
+describe("guardOrganizationId — JoinRequest", () => {
+  const runOrganizationGuard = (params: GuardParams) =>
+    guardOrganizationId(
+      params,
+      vi.fn(async () => "ok"),
+    );
+
+  describe("when one person asks what they are waiting on", () => {
+    /** @scenario "A person's own pending join requests are read across organizations" */
+    it("permits a read bounded by that user", async () => {
+      await expect(
+        runOrganizationGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { userId: "user-1", state: "PENDING" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a read names no organization and no user", () => {
+    it("refuses the sweep over everybody's requests", async () => {
+      await expect(
+        runOrganizationGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { state: "PENDING" } },
+        }),
+      ).rejects.toThrow(/organizationId/);
     });
   });
 });

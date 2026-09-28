@@ -8,6 +8,7 @@ export * from "./run-note.ts";
 export * from "./scenario-content-template.ts";
 export * from "./scenario-dev-tunnel-error.ts";
 export * from "./scenario-failure-results.ts";
+export * from "./scenario-criterion-result.ts";
 export * from "./scenario-infra-error.ts";
 export * from "./scenario.parameters.ts";
 export * from "./scenario.api.ts";

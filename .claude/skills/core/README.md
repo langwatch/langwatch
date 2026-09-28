@@ -6,11 +6,11 @@ manifest, lane and coordinator would otherwise each restate in their own words.
 
 Three files, three questions:
 
-| File | Answers |
-| --- | --- |
+| File                  | Answers                                            |
+| --------------------- | -------------------------------------------------- |
 | `repository-rules.md` | What may an agent run and edit in this repository? |
-| `testing-rules.md` | Which checks does an agent run, and how narrow? |
-| `handoff-rules.md` | How does an agent hand work to the next one? |
+| `testing-rules.md`    | Which checks does an agent run, and how narrow?    |
+| `handoff-rules.md`    | How does an agent hand work to the next one?       |
 
 ## How to use it
 
@@ -30,7 +30,7 @@ how lanes came to be working from instructions that had already been superseded.
 Architecture rules. Where code lives, what a module is, what an app or a
 repository is here - that is `architecture-guide` and the `module` skill's
 references, and this directory must not restate any of it. These three files
-are about *operating the repository*, not about the shape of the code in it.
+are about _operating the repository_, not about the shape of the code in it.
 
 Incident history, superseded designs and migration narrative do not belong here
 either. Those go in `dev/docs/adr/`, `dev/docs/plans/` or a handoff, and are

@@ -53,7 +53,7 @@ repository and say in the report that you chose it.
 
 ## Do not confirm the asker's priors
 
-You will usually be pointed at the folder that *feels* messy. It is frequently
+You will usually be pointed at the folder that _feels_ messy. It is frequently
 not the one holding the residue. Sweep what you were asked to sweep, and if it
 comes back clean, say that plainly and show why the suspected files are live.
 A negative result delivered with evidence is a finding. Padding the list with

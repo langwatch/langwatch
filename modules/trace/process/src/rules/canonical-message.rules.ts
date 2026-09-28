@@ -205,12 +205,14 @@ export const extractSystemInstructionFromMessages = (messages: unknown): string 
 export const isSystemRole = (role: unknown): boolean => role === "system" || role === "developer";
 
 /**
- * Filters out system-role messages (including the `developer` spelling) from
- * a messages array. System instructions are extracted separately via
- * extractSystemInstructionFromMessages.
+ * Removes the first system-role message, the one extractSystemInstructionFromMessages
+ * lifts into `gen_ai.system_instructions`. Later system turns (retrieved passages, injected
+ * notes) are conversation content and stay.
  */
-export const stripSystemMessages = (messages: unknown[]): unknown[] =>
-  messages.filter((m) => !(isRecord(m) && isSystemRole(m.role)));
+export const stripLiftedSystemMessage = (messages: unknown[]): unknown[] => {
+  const index = messages.findIndex((m) => isRecord(m) && isSystemRole(m.role));
+  return index === -1 ? messages : messages.filter((_, i) => i !== index);
+};
 
 /**
  * Best-effort "messages" decoding from unknown payloads: an array is

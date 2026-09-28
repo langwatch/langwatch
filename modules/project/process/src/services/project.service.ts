@@ -47,7 +47,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
-import { mintProjectSlug } from "../rules/project-slug-service.rules.ts";
+import { mintProjectSlug, projectIdSlugToken } from "../rules/project-slug-service.rules.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
 import { ProjectMetadataService } from "./project-metadata.service.ts";
 
@@ -325,9 +325,8 @@ export class ProjectService {
       teamId = team.id;
     }
 
-    const generatedId = this.credentials.generateProjectId();
-    const projectId = `project_${generatedId}`;
-    const slug = mintProjectSlug(input.name, generatedId);
+    const projectId = this.credentials.generateProjectId();
+    const slug = mintProjectSlug(input.name, projectIdSlugToken(projectId));
     const existing = await this.repository.findBySlugInTeam({ slug, teamId });
     if (existing) {
       throw new ProjectSlugConflictError(

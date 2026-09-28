@@ -1,9 +1,10 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.shared.json",
   "compilerOptions": {
-    // This package emits: `noEmit` from the shared base is turned back off
-    // here so a `tsc -p` build still writes its declarations.
+    // This package emits declarations only (tsup writes the JavaScript), so
+    // `noEmit` from the shared base is turned back off for them.
     "noEmit": false,
+    "emitDeclarationOnly": true,
     "module": "ESNext",
     "declaration": true,
     "declarationMap": true,

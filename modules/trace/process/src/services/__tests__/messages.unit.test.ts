@@ -4,7 +4,7 @@ import {
   extractLastUserMessageText,
   extractMessageContentText,
   extractSystemInstructionFromMessages,
-  stripSystemMessages,
+  stripLiftedSystemMessage,
 } from "../../rules/canonical-message.rules.ts";
 
 describe("extractMessageContentText", () => {
@@ -98,19 +98,31 @@ describe("extractSystemInstructionFromMessages", () => {
   });
 });
 
-describe("stripSystemMessages", () => {
-  describe("when messages carry system and developer roles", () => {
-    it("strips both spellings and keeps the conversation", () => {
-      const stripped = stripSystemMessages([
+describe("stripLiftedSystemMessage", () => {
+  describe("when messages open with a system turn and carry a later one", () => {
+    /** @scenario "A system message later in the conversation stays in the input messages" */
+    it("removes only the lifted system turn and keeps the later one", () => {
+      const stripped = stripLiftedSystemMessage([
         { role: "system", content: "be brief" },
-        { role: "developer", content: "You are OpenCode." },
         { role: "user", content: "hi" },
+        { role: "system", content: "Retrieved context: opening hours 9 to 17" },
         { role: "assistant", content: "hello!" },
       ]);
       expect(stripped).toEqual([
         { role: "user", content: "hi" },
+        { role: "system", content: "Retrieved context: opening hours 9 to 17" },
         { role: "assistant", content: "hello!" },
       ]);
+    });
+  });
+
+  describe("when the lifted turn uses the developer spelling", () => {
+    it("removes it like a system turn", () => {
+      const stripped = stripLiftedSystemMessage([
+        { role: "developer", content: "You are OpenCode." },
+        { role: "user", content: "hi" },
+      ]);
+      expect(stripped).toEqual([{ role: "user", content: "hi" }]);
     });
   });
 });

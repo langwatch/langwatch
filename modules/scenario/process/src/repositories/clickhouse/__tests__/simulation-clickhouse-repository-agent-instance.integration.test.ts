@@ -54,6 +54,7 @@ function finishedRunWithInstance(scenarioRunId: string): SimulationRunState["dat
     MetCriteria: [],
     UnmetCriteria: [],
     InconclusiveCriteria: [],
+    Criteria: [],
     Error: null,
     Evaluations: [],
     DurationMs: 1500,

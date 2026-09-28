@@ -6,9 +6,9 @@ cleanup.
 
 ## The two
 
-|           | file                                                                                        | fields | reached from                                                               |
-| --------- | ------------------------------------------------------------------------------------------- | -----: | -------------------------------------------------------------------------- |
-| preview   | `platform/app/src/server/filters/precondition-matchers.ts` (273 lines)                      |     30 | `traces.api.ts:494`, the monitor **sample preview**                        |
+|           | file                                                                               | fields | reached from                                                               |
+| --------- | ---------------------------------------------------------------------------------- | -----: | -------------------------------------------------------------------------- |
+| preview   | `platform/app/src/server/filters/precondition-matchers.ts` (273 lines)             |     30 | `traces.api.ts:494`, the monitor **sample preview**                        |
 | execution | `modules/evaluation/process/src/services/evaluation-precondition.service.ts` (210) |     17 | `evaluation-execution-preparation.service.ts:102`, the monitor **running** |
 
 The preview is injected as a port at `platform/app/src/server/api/root.ts:653`

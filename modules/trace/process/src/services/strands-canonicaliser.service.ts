@@ -7,7 +7,7 @@ import { extractOutputMessages, recordValueType } from "../rules/canonical-extra
 import { isRecord, parseJsonSafely } from "../rules/canonical-guard.rules.ts";
 import {
   extractSystemInstructionFromMessages,
-  stripSystemMessages,
+  stripLiftedSystemMessage,
 } from "../rules/canonical-message.rules.ts";
 import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
@@ -167,7 +167,7 @@ export class StrandsCanonicaliserService implements AttributeCanonicaliser {
       }
     }
 
-    const chatMessages = stripSystemMessages(inputMessages);
+    const chatMessages = stripLiftedSystemMessage(inputMessages);
     if (chatMessages.length > 0) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMessages);
       ctx.recordRule(`${this.id}:events->gen_ai.input.messages`);

@@ -1,12 +1,13 @@
 import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { authClient } from "../../behavior/auth-client.tsx";
 import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
+import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.ts";
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { CheckYourEmail } from "../../ui/elements/check-your-email.tsx";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../../ui/elements/front-door-field.tsx";
@@ -60,8 +61,13 @@ export default function ForgotPassword() {
 }
 
 function ForgotPasswordForm() {
+  // The sign-in step hands over the address just typed, in the fragment; read
+  // at first paint to prefill the field, then taken out of the address bar.
+  const [carriedEmail] = useState(readCarriedEmail);
+  useEffect(forgetCarriedEmail, []);
   const form = useForm<z.infer<typeof forgotPasswordSchema>>({
     resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: { email: carriedEmail ?? "" },
   });
   const [isLoading, setIsLoading] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);

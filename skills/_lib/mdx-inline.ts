@@ -1,11 +1,12 @@
 import fs from "fs";
 import path from "path";
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkMdx from "remark-mdx";
-import remarkFrontmatter from "remark-frontmatter";
-import remarkStringify from "remark-stringify";
+
 import type { Root, RootContent } from "mdast";
+import remarkFrontmatter from "remark-frontmatter";
+import remarkMdx from "remark-mdx";
+import remarkParse from "remark-parse";
+import remarkStringify from "remark-stringify";
+import { unified } from "unified";
 
 export interface InlineOptions {
   // When provided, partials referenced more than once collapse to a stub on

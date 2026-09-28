@@ -150,9 +150,9 @@ Messages:
 - Spec: `specs/tooling/lint-cognitive-complexity.feature`
 - Enforced: yes, at `error`
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `max` | integer | `15` | — |
+| Option | Type    | Default | Description |
+| ------ | ------- | ------- | ----------- |
+| `max`  | integer | `15`    | —           |
 
 Messages:
 
@@ -192,11 +192,11 @@ Messages:
 - Spec: `specs/tooling/lint-condition-shape.feature`
 - Enforced: yes, at `error`
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `maxCalls` | integer | `1` | — |
-| `maxHops` | integer | `2` | — |
-| `maxOperators` | integer | `2` | — |
+| Option         | Type    | Default | Description |
+| -------------- | ------- | ------- | ----------- |
+| `maxCalls`     | integer | `1`     | —           |
+| `maxHops`      | integer | `2`     | —           |
+| `maxOperators` | integer | `2`     | —           |
 
 Messages:
 

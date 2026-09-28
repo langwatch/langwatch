@@ -48,3 +48,8 @@ function slugifyProjectName(value: string): string {
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
 }
+
+/** The id's changing end: a KSUID's resource prefix and timestamp head repeat across ids. */
+export function projectIdSlugToken(projectId: string): string {
+  return projectId.slice(-PROJECT_ID_SLUG_CHARS);
+}

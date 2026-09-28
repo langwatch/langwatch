@@ -19,10 +19,7 @@ export function describeMapping(mapping: ScenarioMapping): string {
 
 export function formatSuiteFields(fields: SuiteField[] | undefined): string[] {
   if (!fields || fields.length === 0) return [];
-  return [
-    "\n## Fields",
-    ...fields.map((field) => `- ${field.identifier} (${field.type})`),
-  ];
+  return ["\n## Fields", ...fields.map((field) => `- ${field.identifier} (${field.type})`)];
 }
 
 export function formatEvaluatorAttachments(
@@ -78,9 +75,7 @@ export interface SimulationRunEvaluation {
   details?: string;
 }
 
-export function formatEvaluations(
-  evaluations: SimulationRunEvaluation[] | undefined,
-): string[] {
+export function formatEvaluations(evaluations: SimulationRunEvaluation[] | undefined): string[] {
   if (!evaluations || evaluations.length === 0) return [];
   const lines = ["\n## Evaluators"];
   for (const evaluation of evaluations) {

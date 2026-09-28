@@ -3,9 +3,10 @@
  * per-key and per-address limits bound what one caller can consume.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { AddressInfo } from "node:net";
 import { createServer, type Server as HttpServer } from "node:http";
+import type { AddressInfo } from "node:net";
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { initConfig } from "../config.js";
 import { createApiKeyVerifier } from "../http-security.js";

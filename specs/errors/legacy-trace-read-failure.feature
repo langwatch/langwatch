@@ -36,3 +36,9 @@ Feature: A legacy trace read failure degrades to the generic unknown
     Given a caller whose project credential resolves
     When it posts a search body the family's own schema rejects
     Then the answer names the offending field rather than an unknown failure
+
+  @integration
+  Scenario: A legacy digest read answers the rendered digest
+    Given a caller whose project credential resolves
+    When it asks the legacy trace route for a trace in the digest format
+    Then formatted_trace carries the rendered digest text, not an empty object

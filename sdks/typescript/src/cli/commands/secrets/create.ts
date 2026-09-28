@@ -39,7 +39,7 @@ export const createSecretCommand = async (
   const spinner = createSpinner(`Creating secret "${name}"...`).start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/v1/secret`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/secrets`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

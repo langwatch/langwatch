@@ -9,7 +9,7 @@ argument-hint: "[surface to reseed, or blank for all]"
 
 `dev/docs/ARCHITECTURE.md` is THE record — rulings land there first, in the
 same change that makes them (that rule lives in memory and in the record
-itself). Everything else that *teaches* — CLAUDE.md, skills, best-practices
+itself). Everything else that _teaches_ — CLAUDE.md, skills, best-practices
 docs — is a derived surface and drifts. This skill is the sweep that brings
 them back.
 
@@ -72,7 +72,7 @@ them back.
 ## Guardrails
 
 - The record wins every conflict. If a surface disagrees with the record and
-  the surface looks *right*, that is a finding to raise (the record may have
+  the surface looks _right_, that is a finding to raise (the record may have
   a gap), not a licence to keep the surface — say so in the report instead
   of silently choosing.
 - Never invent a ruling to fill a gap a surface exposes. Gaps go in the

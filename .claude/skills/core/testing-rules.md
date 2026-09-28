@@ -51,7 +51,7 @@ Interrupted vitest workers reparent to pid 1 and keep holding their memory.
   ClickHouse endpoints.
 - `createTestLogger()` returns `{ logger, lines }` - a real pino instance writing
   synchronously into an in-memory array, read back with `lines.find(level,
-  msgIncludes)`. `createLogger` is silent under vitest, so a test that asserts on
+msgIncludes)`. `createLogger` is silent under vitest, so a test that asserts on
   logging never calls it directly.
 
 A `{ getById: vi.fn() }` object literal or a class stub in a test is a defect to

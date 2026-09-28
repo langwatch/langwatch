@@ -7,8 +7,8 @@ import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-co
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { makeBatchRun, makeScenarioRunData } from "../model/run-history-fixtures.ts";
 import { BatchSection } from "../ui/sections/batch-section.tsx";
-import { makeBatchRun, makeScenarioRunData } from "./test-helpers.ts";
 
 vi.mock("../ui/elements/runs/summary-status-icon.tsx", () => ({
   SummaryStatusIcon: () => <span data-testid="summary-status-icon" />,

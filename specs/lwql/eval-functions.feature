@@ -115,6 +115,20 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     When the statement is validated
     Then it is refused with APP_FUNCTION_POSITION
 
+  @unit
+  Scenario: Sorting by an eval's alias is refused rather than sorting by the text it judges
+    Given a statement projecting eval_score(CapturedOutput, 'How polite', 1, 5) AS s
+    When it orders by s, or by the eval's position in the SELECT list
+    Then it is refused with APP_FUNCTION_POSITION
+    And the message says to run the eval first and sort over analytics.judgments
+    And ordering the same statement by TraceId is accepted
+
+  @unit
+  Scenario: Grouping or filtering on an eval's alias is refused
+    Given a statement projecting eval_score(CapturedOutput, 'How polite', 1, 5) AS s
+    When it names s in GROUP BY, HAVING or WHERE
+    Then it is refused with APP_FUNCTION_POSITION
+
   # ---------------------------------------------------------------------------
   # Arguments
   # ---------------------------------------------------------------------------

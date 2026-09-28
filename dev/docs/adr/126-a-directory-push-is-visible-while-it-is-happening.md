@@ -8,7 +8,7 @@
 plan `../identity-platform/delivery-plan.md`.
 
 **Builds on:** ADR-122 (reconciliation is a visible surface, and the
-organization view renders "projections *and the event log*" — this is the
+organization view renders "projections _and the event log_" — this is the
 event-log half, plus the one thing the event log cannot answer),
 ADR-101 (what an identity fact may carry), ADR-110 (facts state themselves).
 
@@ -61,7 +61,7 @@ question it answers is about the last few minutes.
 `ScimRequestLog` row per request that got past authentication: when, which
 connection, the method and the resource, the status we answered, and — when we
 refused — a stable reason slug and our own short sentence. It is deliberately
-*not* an event:
+_not_ an event:
 
 - A request authors nothing. Event truth is what the system decided; an HTTP
   round trip that was refused decided nothing, and ADR-110's "facts state
@@ -76,7 +76,7 @@ refused — a stable reason slug and our own short sentence. It is deliberately
 token that does not verify. Two reasons, and the second is the load-bearing
 one: we do not know whose organization to file it under, and a table written
 by unauthenticated traffic is a table anybody on the internet can fill. The
-`403` case *is* recorded — a lapsed plan is a credential we recognize.
+`403` case _is_ recorded — a lapsed plan is a credential we recognize.
 
 **What answers the unattributable case instead is the token's own row.** A
 token that has never verified has `lastUsedAt` null, and the tokens table

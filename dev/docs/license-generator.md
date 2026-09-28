@@ -59,12 +59,12 @@ LANGWATCH_LICENSE_PRIVATE_KEY=$(cat private.pem) \
 
 Arguments:
 
-| Flag | Required | Default | Description |
-|---|---|---|---|
-| `--org-id` | yes | — | Target `Organization.id` to attach the license to. Org must already exist. |
-| `--plan` | no | `ENTERPRISE` | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `platform/app/ee/licensing/planTemplates.ts`. |
-| `--max-members` | no | `50` | Seat cap. Must be ≥ 1. |
-| `--email` | no | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field. |
+| Flag            | Required | Default                | Description                                                                                                  |
+| --------------- | -------- | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `--org-id`      | yes      | —                      | Target `Organization.id` to attach the license to. Org must already exist.                                   |
+| `--plan`        | no       | `ENTERPRISE`           | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `platform/app/ee/licensing/planTemplates.ts`. |
+| `--max-members` | no       | `50`                   | Seat cap. Must be ≥ 1.                                                                                       |
+| `--email`       | no       | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field.                                                |
 
 Output: prints the encoded license key to stdout + writes/updates the
 `Organization.license` + `Organization.licenseExpiresAt` columns. The
@@ -117,7 +117,7 @@ unset, and is safe to call on every seed run.
 
 ## What about reproducing the unlicensed baseline?
 
-It is the default, so there is nothing to generate. Just *don't* call the
+It is the default, so there is nothing to generate. Just _don't_ call the
 generator. `getActivePlan()` returns the unlicensed baseline when
 `Organization.license` is empty or the license has expired.
 
@@ -130,7 +130,7 @@ generator. `getActivePlan()` returns the unlicensed baseline when
   unlock anything for other orgs on the same instance. So even if a dev
   generates a wide-window license for their dogfood org, the blast radius
   is one org on their local stack.
-- The verifier uses the *public* key in `constants.ts` and never reads
+- The verifier uses the _public_ key in `constants.ts` and never reads
   `LANGWATCH_LICENSE_PRIVATE_KEY`. That variable is read by this script, by the
   purchase webhook and by the backoffice Licenses screen, all on LangWatch
   Cloud. A self-hosted install must not have it set.

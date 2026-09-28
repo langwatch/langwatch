@@ -25,12 +25,19 @@ import {
 } from "../../rules/simulation-evaluation-columns.rules.ts";
 import type { SimulationRunStateRepository } from "../simulation-run-state.repository.ts";
 import type { SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
+import {
+  type ClickHouseCriteriaColumns,
+  columnsToCriteria,
+  CRITERIA_COLUMNS_SQL,
+  criteriaToColumns,
+} from "./simulation-criteria.mapper.ts";
 
 const TABLE_NAME = "simulation_runs" as const;
 
 const logger = createLogger("langwatch:simulation-processing:run-state-repository");
 
-interface ClickHouseSimulationRunRecord extends ClickHouseEvaluationColumns {
+interface ClickHouseSimulationRunRecord
+  extends ClickHouseEvaluationColumns, Partial<ClickHouseCriteriaColumns> {
   ProjectionId: string;
   TenantId: string;
   ScenarioRunId: string;
@@ -133,6 +140,7 @@ export class ClickHouseSimulationRunStateRepository<
       MetCriteria: record.MetCriteria ?? [],
       UnmetCriteria: record.UnmetCriteria ?? [],
       InconclusiveCriteria: record.InconclusiveCriteria ?? [],
+      Criteria: columnsToCriteria(record),
       Error: record.Error,
       Evaluations: columnsToEvaluations(record),
       DurationMs: record.DurationMs ? parseInt(record.DurationMs, 10) : null,
@@ -192,6 +200,7 @@ export class ClickHouseSimulationRunStateRepository<
       MetCriteria: data.MetCriteria,
       UnmetCriteria: data.UnmetCriteria,
       InconclusiveCriteria: data.InconclusiveCriteria,
+      ...criteriaToColumns(data.Criteria ?? []),
       Error: data.Error,
       ...evaluationsToColumns(data.Evaluations),
       DurationMs: data.DurationMs?.toString() ?? null,
@@ -249,6 +258,7 @@ export class ClickHouseSimulationRunStateRepository<
             t.Verdict AS Verdict, t.Reasoning AS Reasoning,
             t.MetCriteria AS MetCriteria, t.UnmetCriteria AS UnmetCriteria,
             t.InconclusiveCriteria AS InconclusiveCriteria,
+            ${CRITERIA_COLUMNS_SQL.replaceAll("`Criteria.", "t.`Criteria.")},
             t.Error AS Error,
             ${EVALUATION_COLUMNS_SQL.replaceAll("`Evaluations.", "t.`Evaluations.")},
             toString(t.DurationMs) AS DurationMs,
