@@ -70,7 +70,7 @@ sso_env_of() {
   awk '
     $0 ~ "^# Source: langwatch/templates/app/deployment.yaml" { grab=1; next }
     grab && /^# Source:/ { grab=0 }
-    grab && /- name: (NEXTAUTH_PROVIDER|AUTH0_|AZURE_AD_|COGNITO_|GITHUB_CLIENT|GITLAB_|GOOGLE_|OKTA_|ONELOGIN_|OIDC_)/ {
+    grab && /- name: (AUTH_PROVIDER|AUTH0_|AZURE_AD_|COGNITO_|GITHUB_CLIENT|GITLAB_|GOOGLE_|OKTA_|ONELOGIN_|OIDC_)/ {
       gsub(/^[ -]*name: /, ""); print
     }
   ' "$(render "$flags")" | sort -u
@@ -122,7 +122,7 @@ test_provider_env_reaches_the_container() {
 
     local expected
     expected=$(printf '%s\n' \
-      "NEXTAUTH_PROVIDER" \
+      "AUTH_PROVIDER" \
       "${prefix}_CLIENT_ID" \
       "${prefix}_CLIENT_SECRET" \
       "${prefix}_ISSUER" | sort -u)
@@ -136,9 +136,9 @@ $actual"
     fi
 
     local selected
-    selected=$(env_value_of "$flags" NEXTAUTH_PROVIDER)
+    selected=$(env_value_of "$flags" AUTH_PROVIDER)
     if [[ "$selected" != "$provider" ]]; then
-      fail "$provider selection" "NEXTAUTH_PROVIDER is '$selected', expected '$provider'"
+      fail "$provider selection" "AUTH_PROVIDER is '$selected', expected '$provider'"
     fi
 
     local issuer
@@ -173,16 +173,45 @@ test_client_secret_can_come_from_a_secret_reference() {
 test_unconfigured_providers_emit_nothing() {
   local actual
   actual=$(sso_env_of "$BASE")
-  if [[ "$actual" != "NEXTAUTH_PROVIDER" ]]; then
+  if [[ "$actual" != "AUTH_PROVIDER" ]]; then
     fail "default render" \
-      "expected only NEXTAUTH_PROVIDER with no provider configured, got:
+      "expected only AUTH_PROVIDER with no provider configured, got:
 $actual"
   fi
+}
+
+# Earlier charts rendered NEXTAUTH_PROVIDER ahead of app.extraEnvs, so an
+# operator's own NEXTAUTH_PROVIDER there won. AUTH_PROVIDER outranks it in the
+# app, so rendering one from the default values key would switch such an
+# install to email mode on upgrade.
+# @scenario "A provider selected in extraEnvs survives the upgrade"
+test_provider_in_extra_envs_is_not_overridden() {
+  local name flags actual selected
+  for name in NEXTAUTH_PROVIDER AUTH_PROVIDER; do
+    flags="$BASE \
+      --set app.extraEnvs[0].name=$name \
+      --set app.extraEnvs[0].value=okta"
+    actual=$(sso_env_of "$flags")
+    selected=$(env_value_of "$flags" "$name")
+    if [[ "$name" == "NEXTAUTH_PROVIDER" && -n "$actual" ]]; then
+      fail "extraEnvs $name" \
+        "expected the chart to render no AUTH_PROVIDER of its own, got:
+$actual"
+    fi
+    if [[ "$name" == "AUTH_PROVIDER" && "$actual" != "AUTH_PROVIDER" ]]; then
+      fail "extraEnvs $name" "expected a single AUTH_PROVIDER entry, got:
+$actual"
+    fi
+    if [[ "$selected" != "okta" ]]; then
+      fail "extraEnvs $name value" "$name is '$selected', expected 'okta'"
+    fi
+  done
 }
 
 test_provider_env_reaches_the_container
 test_client_secret_can_come_from_a_secret_reference
 test_unconfigured_providers_emit_nothing
+test_provider_in_extra_envs_is_not_overridden
 
 if ((failures > 0)); then
   echo

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
 import { GrantsAccessListingRepository } from "../access-listing.grants.repository";
-import { PrismaAccessListingRepository } from "../access-listing.prisma.repository";
 
 /**
  * The grants head speaks the ledger's vocabulary; the Access surface renders
@@ -31,8 +30,16 @@ const grantRow = (seed: GrantRowSeed) => ({
   principalId: seed.principalId,
   roleKey: seed.roleKey,
   legacyRole: seed.legacyRole ?? null,
+  source: "grants-service",
   scopeType: seed.scopeType ?? "TEAM",
   scopeId: seed.scopeId ?? "team-1",
+  token: null,
+  permission: null,
+  resourceKind: null,
+  projectId: null,
+  createdByUserId: null,
+  expiresAt: null,
+  maxViews: null,
   occurredAt: seed.occurredAt ?? new Date("2026-01-05T00:00:00Z"),
   updatedAt: new Date("2026-02-01T00:00:00Z"),
 });
@@ -64,8 +71,61 @@ const prismaWith = (data: {
 };
 
 describe("GrantsAccessListingRepository", () => {
+  describe("when mutation planning reads canonical bindings", () => {
+    it("uses the shared mapping and business timestamps without loading decoration", async () => {
+      const customGrant = grantRow({
+        id: "g-custom",
+        principalType: "GROUP",
+        principalId: "group-1",
+        roleKey: "custom:role-1",
+        legacyRole: "ADMIN",
+      });
+      const { prisma, repository } = prismaWith({ grants: [customGrant] });
+      const bindings = await repository.findBindingRows({
+        organizationId: ORG,
+        where: { id: customGrant.id },
+      });
+      expect(bindings).toEqual([
+        {
+          id: "g-custom",
+          organizationId: ORG,
+          userId: null,
+          groupId: "group-1",
+          apiKeyId: null,
+          role: "ADMIN",
+          customRoleId: "role-1",
+          scopeType: "TEAM",
+          scopeId: "team-1",
+          createdAt: customGrant.occurredAt,
+          updatedAt: customGrant.updatedAt,
+        },
+      ]);
+      expect(prisma.user.findMany).not.toHaveBeenCalled();
+      expect(prisma.group.findMany).not.toHaveBeenCalled();
+      expect(prisma.role.findMany).not.toHaveBeenCalled();
+    });
+
+    it("keeps revocation and tenant fences outside caller predicates", async () => {
+      const { prisma, repository } = prismaWith({});
+      await repository.findBindingRows({
+        organizationId: ORG,
+        where: { organizationId: "another-org", revokedAt: { not: null } },
+      });
+      expect(prisma.grant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: ORG,
+            revokedAt: null,
+            AND: expect.arrayContaining([
+              { organizationId: "another-org", revokedAt: { not: null } },
+            ]),
+          }),
+        }),
+      );
+    });
+  });
+
   describe("when the grant rows carry facts the legacy vocabulary cannot express", () => {
-    /** @scenario "Dormant facts never appear as bindings in a listing" */
     it("skips every fact the legacy vocabulary cannot carry instead of defaulting it", async () => {
       const { repository } = prismaWith({
         grants: [
@@ -124,7 +184,7 @@ describe("GrantsAccessListingRepository", () => {
       expect(rows.map((row) => row.id)).toEqual(["g-member"]);
     });
 
-    /** @scenario "Dormant facts never appear as bindings in a listing" */
+    /** @scenario "A grants listing excludes legacy-only rows" */
     it("asks the query itself to exclude resource, platform and dormant rows", async () => {
       const { prisma, repository } = prismaWith({});
 
@@ -285,46 +345,13 @@ describe("GrantsAccessListingRepository", () => {
     });
   });
 
-  describe("when the two heads list the same imported binding", () => {
-    /** @scenario "A listing row keeps its identity across the cutover" */
-    it("lists it under the same id on both heads", async () => {
-      // The imported grant ADOPTS the binding's row id, so the two heads are
-      // the same row to a consumer holding its id.
-      const sharedId = "rb_1";
-      const legacyPrisma = {
-        roleBinding: {
-          findMany: vi.fn().mockResolvedValue([
-            {
-              id: sharedId,
-              organizationId: ORG,
-              userId: "alice",
-              groupId: null,
-              apiKeyId: null,
-              role: "MEMBER",
-              customRoleId: null,
-              scopeType: "TEAM",
-              scopeId: "team-1",
-              createdAt: new Date("2026-01-05T00:00:00Z"),
-              user: {
-                id: "alice",
-                name: "Alice",
-                email: "a@x.io",
-                image: null,
-              },
-              group: null,
-              apiKey: null,
-              customRole: null,
-            },
-          ]),
-        },
-      };
-      const legacy = new PrismaAccessListingRepository(
-        legacyPrisma as unknown as Prisma.TransactionClient,
-      );
-      const { repository: grants } = prismaWith({
+  describe("when listing an imported binding", () => {
+    /** @scenario "A grants listing returns current binding facts" */
+    it("preserves the complete access row, including its original business time", async () => {
+      const { repository } = prismaWith({
         grants: [
           grantRow({
-            id: sharedId,
+            id: "rb_1",
             principalType: "USER",
             principalId: "alice",
             roleKey: "member",
@@ -333,21 +360,30 @@ describe("GrantsAccessListingRepository", () => {
         users: [{ id: "alice", name: "Alice", email: "a@x.io", image: null }],
       });
 
-      const [legacyRows, grantRows] = await Promise.all([
-        legacy.findUserBindings({ organizationId: ORG, userId: "alice" }),
-        grants.findUserBindings({ organizationId: ORG, userId: "alice" }),
-      ]);
+      const rows = await repository.findUserBindings({
+        organizationId: ORG,
+        userId: "alice",
+      });
 
-      expect(legacyRows[0]?.id).toBe(sharedId);
-      expect(grantRows[0]?.id).toBe(sharedId);
-      // Not just the id: the whole rendered row. The two heads are read by
-      // one page, so any column that differs is a cell that changes on the
-      // day the organization cuts over. `createdAt` is the one to watch -
-      // legacy reports the binding's own createdAt, the grants head reports
-      // the fact's occurredAt, and they agree only because the import
-      // backdates it. Stamped at import time instead, every "since when" on
-      // the Access page would jump to cutover day.
-      expect(grantRows[0]).toEqual(legacyRows[0]);
+      expect(rows).toEqual([
+        {
+          id: "rb_1",
+          organizationId: ORG,
+          userId: "alice",
+          groupId: null,
+          apiKeyId: null,
+          role: "MEMBER",
+          customRoleId: null,
+          scopeType: "TEAM",
+          scopeId: "team-1",
+          createdAt: new Date("2026-01-05T00:00:00Z"),
+          updatedAt: new Date("2026-02-01T00:00:00Z"),
+          user: { id: "alice", name: "Alice", email: "a@x.io", image: null },
+          group: null,
+          apiKey: null,
+          customRole: null,
+        },
+      ]);
     });
   });
 
@@ -467,7 +503,7 @@ describe("GrantsAccessListingRepository", () => {
   });
 
   describe("when the role editor's roles are listed", () => {
-    /** @scenario "A cut-over organization's role editor lists roles from the ledger's head" */
+    /** @scenario "A role listing reads current role facts" */
     it("serves the Role head's rows in the CustomRole column shape, business time first", async () => {
       const { prisma, repository } = prismaWith({
         roles: [
@@ -541,6 +577,50 @@ describe("GrantsAccessListingRepository", () => {
       expect(prisma.group.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: { in: ["group-1"] }, organizationId: ORG },
+        }),
+      );
+    });
+
+    it("lists several groups in one canonical read", async () => {
+      const { prisma, repository } = prismaWith({
+        grants: [
+          grantRow({
+            id: "g-group-1",
+            principalType: "GROUP",
+            principalId: "group-1",
+            roleKey: "member",
+          }),
+          grantRow({
+            id: "g-group-2",
+            principalType: "GROUP",
+            principalId: "group-2",
+            roleKey: "viewer",
+          }),
+        ],
+        groups: [
+          { id: "group-1", name: "SRE", scimSource: null },
+          { id: "group-2", name: "Support", scimSource: null },
+        ],
+      });
+
+      const rowsByGroup = await repository.findGroupsBindings({
+        organizationId: ORG,
+        groupIds: ["group-1", "group-2"],
+      });
+
+      expect(rowsByGroup.get("group-1")).toHaveLength(1);
+      expect(rowsByGroup.get("group-2")).toHaveLength(1);
+      expect(prisma.grant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: ORG,
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                principalType: "GROUP",
+                principalId: { in: ["group-1", "group-2"] },
+              }),
+            ]),
+          }),
         }),
       );
     });
@@ -624,6 +704,72 @@ describe("GrantsAccessListingRepository", () => {
       expect(where.AND).toContainEqual({
         OR: [{ principalType: "USER", principalId: "alice" }],
       });
+    });
+  });
+
+  describe("when API-key bindings are listed", () => {
+    it("groups live grants by key and keeps the organization and role fences", async () => {
+      const { prisma, repository } = prismaWith({
+        grants: [
+          grantRow({
+            id: "g-key-1",
+            principalType: "API_KEY",
+            principalId: "key-1",
+            roleKey: "admin",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
+          grantRow({
+            id: "g-key-custom",
+            principalType: "API_KEY",
+            principalId: "key-1",
+            roleKey: "custom:role-1",
+            scopeType: "PROJECT",
+            scopeId: "project-1",
+          }),
+        ],
+        apiKeys: [{ id: "key-1", name: "Deploy" }],
+        roles: [
+          {
+            id: "role-1",
+            organizationId: ORG,
+            name: "Deploy role",
+            description: null,
+            permissions: [],
+            kind: "custom",
+            occurredAt: new Date("2026-01-01T00:00:00Z"),
+            updatedAt: new Date("2026-01-01T00:00:00Z"),
+          },
+        ],
+      });
+
+      const bindings = await repository.findApiKeyBindings({
+        organizationId: ORG,
+        apiKeyIds: ["key-1", "key-foreign"],
+      });
+
+      expect(bindings.get("key-1")).toMatchObject([
+        expect.objectContaining({ id: "g-key-1", apiKeyId: "key-1" }),
+        expect.objectContaining({
+          id: "g-key-custom",
+          customRoleId: "role-1",
+          customRole: { id: "role-1", name: "Deploy role", permissions: [] },
+        }),
+      ]);
+      expect(bindings.get("key-foreign")).toEqual([]);
+      expect(prisma.grant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: ORG,
+            principalId: { not: null },
+          }),
+        }),
+      );
+      expect(prisma.apiKey.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { in: ["key-1"] }, organizationId: ORG },
+        }),
+      );
     });
   });
 });

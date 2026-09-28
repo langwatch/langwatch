@@ -474,3 +474,166 @@ export function escapeValue(value: string): string {
   }
   return value;
 }
+
+/**
+ * A sentence as one free-text clause. Several words become one quoted phrase
+ * (substring semantics, one AST node), a single safe word stays bare. Empty
+ * input yields an empty clause so the caller can append it without a check.
+ */
+export function quoteAsPhrase(sentence: string): string {
+  const collapsed = sentence.replace(/\s+/g, " ").trim();
+  if (!collapsed) return "";
+  return escapeValue(collapsed);
+}
+
+/**
+ * Two queries joined with AND, each parenthesised when it carries an OR so the
+ * join cannot rebind it (`a OR b` AND `c` must read `(a OR b) AND c`). Either
+ * side may be empty, in which case the other is returned untouched.
+ */
+export function combineQueries({
+  base,
+  addition,
+}: {
+  base: string;
+  addition: string;
+}): string {
+  const left = base.trim();
+  const right = addition.trim();
+  if (!left) return right;
+  if (!right) return left;
+  const guard = (query: string): string =>
+    bindsAsOr(query) ? `(${query})` : query;
+  return `${guard(left)} AND ${guard(right)}`;
+}
+
+/**
+ * Whether joining this query with AND would rebind an OR it already holds.
+ *
+ * Read from the parsed top level rather than from the text: a query can both
+ * start with `(` and end with `)` without being one group — `(a) OR (b)` does
+ * — and treating that as already grouped produced `(a) OR (b) AND c`, which
+ * is a different result set than the caller asked for. Text that does not
+ * parse is grouped whenever it spells an `OR` at all, since the join must not
+ * be the thing that decides how it binds.
+ */
+/**
+ * The word a node contributes to the sentence, or `null` when it stays in the
+ * explicit query. A bare, unquoted, un-negated word outside any `OR` is the
+ * only thing the router may be handed; everything else was written the way
+ * the writer meant it.
+ */
+function liftableWord(
+  node: LiqeQuery,
+  keepExplicit: ReadonlySet<LiqeQuery>,
+): string | null {
+  if (node.type !== "Tag") return null;
+  if (keepExplicit.has(node)) return null;
+  if (node.field.type !== "ImplicitField") return null;
+  if (node.expression.type !== "LiteralExpression") return null;
+  if (node.expression.quoted) return null;
+  return String(node.expression.value);
+}
+
+/**
+ * Every tag with an `OR` above it, at any depth. Such a tag cannot be taken
+ * out of the query on its own: what is left behind rebinds, and the caller
+ * rejoins the two halves with AND.
+ */
+function tagsUnderOr(
+  ast: LiqeQuery,
+  inOr = false,
+  found: Set<LiqeQuery> = new Set(),
+): Set<LiqeQuery> {
+  if (ast.type === "Tag") {
+    if (inOr) found.add(ast);
+    return found;
+  }
+  if (ast.type === "UnaryOperator") {
+    return tagsUnderOr(ast.operand, inOr, found);
+  }
+  if (ast.type === "ParenthesizedExpression") {
+    return tagsUnderOr(ast.expression, inOr, found);
+  }
+  if (ast.type === "LogicalExpression") {
+    const underOr = inOr || ast.operator.operator === "OR";
+    tagsUnderOr(ast.left, underOr, found);
+    tagsUnderOr(ast.right, underOr, found);
+  }
+  return found;
+}
+
+function bindsAsOr(query: string): boolean {
+  try {
+    const ast = parse(query);
+    return ast.type === "LogicalExpression" && ast.operator.operator === "OR";
+  } catch {
+    return /\bOR\b/.test(query);
+  }
+}
+
+/**
+ * The two halves of a typed search: the bare words in the order typed, as one
+ * sentence, and the explicit query left when they are taken out. A submit
+ * with a sentence is something the search router decides about; one without
+ * is a filter applied as typed.
+ *
+ * A quoted phrase (`"refund policy"`) and a negated word (`-refund`) both stay
+ * explicit: the writer already said how to search them, and a router turning
+ * either into a question would lose the quotes or the negation. A word under
+ * an `OR` stays explicit for the same reason: the caller joins the two halves
+ * with AND, so lifting `refund` out of `status:error OR refund` would return
+ * it as `status:error AND refund`. Text that does not parse has no halves:
+ * the sentence is empty and the query is returned as it came, so the parse
+ * error surfaces where it always did.
+ */
+export function splitBareWords(currentQuery: string): {
+  sentence: string;
+  explicitQuery: string;
+} {
+  const trimmed = currentQuery.trim();
+  if (!trimmed) return { sentence: "", explicitQuery: "" };
+  try {
+    const ast = parse(trimmed);
+    // `filterAST` hands the predicate a negated word's operand with no sign of
+    // the negation, so the negated tags are marked first.
+    const negatedTags = new Set<LiqeQuery>();
+    walkAST(ast, (node, negated) => {
+      if (negated) negatedTags.add(node);
+    });
+    const keepExplicit = new Set<LiqeQuery>([
+      ...negatedTags,
+      ...tagsUnderOr(ast),
+    ]);
+    const bare: string[] = [];
+    const explicit = filterAST(ast, (node) => {
+      const word = liftableWord(node, keepExplicit);
+      if (word === null) return true;
+      bare.push(word);
+      return false;
+    });
+    if (bare.length === 0) return { sentence: "", explicitQuery: trimmed };
+    return {
+      sentence: bare.join(" "),
+      explicitQuery: isEmptyAST(explicit) ? "" : serialize(explicit),
+    };
+  } catch {
+    return { sentence: "", explicitQuery: trimmed };
+  }
+}
+
+/**
+ * The same query with its bare words collapsed into one quoted phrase, the
+ * explicit `field:value` terms kept as typed. This is what the "search it as
+ * one phrase" fix applies when a sentence trips the node ceiling, and what an
+ * undo restores after the router turned a sentence into a filter. Returns the
+ * input untouched when it does not parse or has no bare words.
+ */
+export function requoteBareTerms(currentQuery: string): string {
+  const { sentence, explicitQuery } = splitBareWords(currentQuery);
+  if (!sentence) return currentQuery;
+  return combineQueries({
+    base: explicitQuery,
+    addition: quoteAsPhrase(sentence),
+  });
+}

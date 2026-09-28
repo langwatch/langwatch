@@ -21,6 +21,7 @@
 import Parse from "papaparse";
 import type { ExportableRun } from "~/server/app-layer/simulations/repositories/simulation.repository";
 import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
+import { neutralizeFormula } from "~/utils/csvFormulaGuard";
 
 /**
  * The columns a person reads, shortest and highest-signal first so the useful
@@ -82,9 +83,19 @@ const TAIL_COLUMNS = [
  * per criterion, so repeating both full lists on every one of those rows
  * would bloat the file to say nothing new.
  */
-const CRITERIA_LIST_COLUMNS = ["met_criteria", "unmet_criteria"] as const;
+const CRITERIA_LIST_COLUMNS = [
+  "met_criteria",
+  "unmet_criteria",
+  "inconclusive_criteria",
+] as const;
 
-const CRITERIA_COLUMNS = ["criterion", "met"] as const;
+/**
+ * An inconclusive criterion is one the judge could not decide, most often
+ * because the trace evidence never arrived. It is unmet (met is "false") and
+ * flagged, so a pivot can keep "the agent did not do it" apart from "no one
+ * could tell".
+ */
+const CRITERIA_COLUMNS = ["criterion", "met", "inconclusive"] as const;
 
 const MESSAGE_COLUMNS = [
   "message_index",
@@ -127,8 +138,15 @@ export function serializeRunsToCriteriaCsv({
   for (const run of runs) {
     const core = buildCoreValues(run);
     const tail = buildTailValues(run);
+    const inconclusive = new Set(run.results?.inconclusiveCriteria ?? []);
     const push = (criterion: string, met: boolean) =>
-      rows.push([...core, text(criterion), String(met), ...tail]);
+      rows.push([
+        ...core,
+        text(criterion),
+        String(met),
+        String(!met && inconclusive.has(criterion)),
+        ...tail,
+      ]);
 
     for (const criterion of run.results?.metCriteria ?? [])
       push(criterion, true);
@@ -208,6 +226,7 @@ function buildCriteriaListValues(run: ExportableRun): string[] {
   return [
     jsonArray(run.results?.metCriteria),
     jsonArray(run.results?.unmetCriteria),
+    jsonArray(run.results?.inconclusiveCriteria),
   ];
 }
 
@@ -333,19 +352,20 @@ function stringOrEmpty(value: unknown): string {
 /**
  * Neutralize a free-text cell against spreadsheet formula injection.
  *
- * A cell whose first character is `=`, `+`, `-`, `@`, TAB or CR is evaluated
- * as a formula by Excel and Sheets. RFC 4180 quoting does not prevent this —
- * quoting protects the CSV grammar, not the spreadsheet that reads it. Since
- * scenario names, judge reasoning, criteria and message content are all
- * user- or model-controlled, and the entire point of this file is to be
- * opened in a spreadsheet, every free-text cell is prefixed with an
- * apostrophe, which those tools strip on display and treat as literal text.
+ * Scenario names, judge reasoning, criteria and message content are all user-
+ * or model-controlled, and the entire point of this file is to be opened in a
+ * spreadsheet, so every free-text cell goes through the guard.
  *
- * Deliberately applied only to text: numbers and timestamps are generated
- * here, and prefixing a negative number would corrupt it.
+ * The rule itself lives in `~/utils/csvFormulaGuard`; this file used to carry
+ * its own copy, written independently of the browser-side one. Delegating also
+ * picks up the guard's number exemption, so a text cell that happens to read
+ * `-5` stays a number to the reader rather than becoming quoted text.
+ *
+ * Still applied only to text: numbers and timestamps are generated here and
+ * never need it.
  */
 function text(value: string): string {
-  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return neutralizeFormula(value);
 }
 
 /**

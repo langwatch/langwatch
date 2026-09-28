@@ -42,7 +42,7 @@ import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
 import { confirmSwitchAllToProjectIntegration } from "~/features/automations/logic/slackLegacyTokenCopy";
 import { SLACK_APP_MANIFEST } from "~/features/automations/providers/slack/slackAppManifest";
-import { describeError } from "~/features/errors";
+import { describeError, showErrorToast } from "~/features/errors";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -162,12 +162,57 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
                     </Button>
                   </VStack>
                 )}
+
+                <LangyCodeAccessPreference />
               </VStack>
             </Card.Body>
           </Card.Root>
         )}
       </VStack>
     </SettingsLayout>
+  );
+}
+
+/**
+ * The remembered answer to "how should Langy reach my code" (ADR-129). The
+ * choice is made in the chat, so this line only appears once one is stored,
+ * and its one job is to let the reader take it back.
+ */
+function LangyCodeAccessPreference() {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id;
+  const preference = api.langy.getCodeAccessPreference.useQuery(
+    { projectId: projectId ?? "" },
+    { enabled: !!projectId, retry: false },
+  );
+  const clear = api.langy.setCodeAccessPreference.useMutation({
+    onSuccess: () => void preference.refetch(),
+    onError: (error) =>
+      showErrorToast({ error, title: "Could not clear the choice" }),
+  });
+
+  if (preference.data?.preference !== "github" || !projectId) return null;
+
+  return (
+    <HStack
+      gap={3}
+      justifyContent="space-between"
+      borderTopWidth="1px"
+      borderColor="border.muted"
+      paddingTop={3}
+    >
+      <Text fontSize="sm" color="fg.muted">
+        Langy uses GitHub for code changes
+      </Text>
+      <Button
+        size="sm"
+        variant="outline"
+        loading={clear.isPending}
+        onClick={() => clear.mutate({ projectId, preference: null })}
+      >
+        Change
+      </Button>
+    </HStack>
   );
 }
 

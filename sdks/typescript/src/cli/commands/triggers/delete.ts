@@ -8,6 +8,7 @@ import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the deletion result rather than printing it: the output port renders
@@ -24,7 +25,7 @@ export const deleteTriggerCommand = async (
   const spinner = createSpinner(`Deleting trigger "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
+    const response = await langwatchFetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
       signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
       method: "DELETE",
       headers: buildAuthHeaders({ apiKey }),

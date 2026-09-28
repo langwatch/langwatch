@@ -52,9 +52,13 @@ emitted_ceilings() {
     sort -u
 }
 
+# Deployments only: hook Jobs that reuse langwatch.sharedEnv (the LWQL access
+# render) carry the variable too, but they never call nlpgo.
 emitted_ceiling_count() {
   printf '%s' "$render_out" |
-    grep -c 'name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS' || true
+    awk '/^kind: / { kind = $2 }
+         /name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS/ && kind == "Deployment" { n++ }
+         END { print n + 0 }'
 }
 
 # Renders with the given flags and asserts all three callers carry $3.

@@ -9,7 +9,7 @@
  *     the SAME reader the card's own "View in Trace Explorer" button uses
  *     (`readTraceSearchQuery`), so the chips and the card can never disagree
  *     about what the agent actually searched. The live transport hands us
- *     opencode's shell payload (`{ command: "langwatch trace search …" }` —
+ *     the raw shell payload (`{ command: "langwatch trace search …" }` —
  *     the envelope retypes the NAME only), and that reader is the one that
  *     knows how to open it.
  *

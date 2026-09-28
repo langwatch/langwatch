@@ -43,8 +43,30 @@ export interface FacetItem {
    * as "no matches" rather than "loading."
    */
   synthetic?: boolean;
+  /**
+   * What `count` means. `pending`: no filtered count has landed for this
+   * input and the row shows none; `stale`: the previous input's count, shown
+   * muted while the new one loads; absent or `settled`: the count for the
+   * active filter.
+   */
+  countState?: "settled" | "stale" | "pending";
   /** Set only for the evaluator facet — see {@link FacetItemAggregates}. */
   aggregates?: FacetItemAggregates;
+  /** Set only for the event facet — see {@link EventMetricValues}. */
+  eventMetrics?: EventMetricValues[];
+}
+
+/**
+ * Per-metric-key value tallies the event facet attaches so its drilldown
+ * (thumbs_up_down → vote values) renders from the discover payload without
+ * a second query. Values are the stored strings, verbatim — a click filters
+ * on `event.attribute.<key>:<value>` and must round-trip exactly.
+ */
+export interface EventMetricValues {
+  /** Full storage key, e.g. `event.metrics.vote` — display strips the
+   *  prefix, filtering keeps the full key. */
+  key: string;
+  values: { value: string; count: number }[];
 }
 
 export interface AttributeKey {
@@ -86,6 +108,9 @@ export interface CategoricalSection extends SectionBase {
      * without firing a second query.
      */
     aggregates?: FacetItemAggregates;
+    /** Forwarded from the discover response. Only set on the event facet —
+     *  drives the per-event metric drilldown. */
+    eventMetrics?: EventMetricValues[];
   }[];
   /**
    * True when this section was synthesised from FACET_DEFAULTS before the

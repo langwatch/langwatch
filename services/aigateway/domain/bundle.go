@@ -23,6 +23,17 @@ type Bundle struct {
 	// ExpiresAt is when this bundle's JWT expires (for cache refresh).
 	ExpiresAt time.Time
 
+	// ConnectServices lists the hosted services the license behind this bundle
+	// is entitled to, from the resolve-key answer's connect_services claim.
+	//
+	// Non-nil ONLY when the presented credential was a license token, which is
+	// what tells a connected install's traffic apart from an ordinary virtual
+	// key's: a license entitled to nothing decodes to an empty non-nil slice,
+	// a virtual key leaves the claim absent and the field nil. An entitlement
+	// check therefore asks "is this non-nil" first and never refuses a key the
+	// registry knows nothing about.
+	ConnectServices []string
+
 	// VirtualKeyExpiresAt is the terminal validity instant of the KEY itself,
 	// from the vk_expires_at claim. Unlike ExpiresAt, which is a refresh
 	// boundary a grace window may be built on, nothing extends this one: past
@@ -40,6 +51,24 @@ type Bundle struct {
 // instant would answer a request the control plane rejects.
 func (b *Bundle) KeyExpired(now time.Time) bool {
 	return !b.VirtualKeyExpiresAt.IsZero() && !now.Before(b.VirtualKeyExpiresAt)
+}
+
+// ConnectServiceManagedModels is the entitlement a license needs before its
+// traffic may reach the platform's own models. Spelled the way the license
+// registry, the install's opt-in and the hosted routes all spell it.
+const ConnectServiceManagedModels = "managed_models"
+
+// LicenseCredential reports whether this bundle was resolved from a license
+// token rather than from a virtual key.
+func (b *Bundle) LicenseCredential() bool {
+	return b.ConnectServices != nil
+}
+
+// EntitledToConnectService reports whether the license behind this bundle
+// includes one hosted service. A bundle that is not a license credential is
+// entitled to nothing: the caller asks LicenseCredential first.
+func (b *Bundle) EntitledToConnectService(service string) bool {
+	return slices.Contains(b.ConnectServices, service)
 }
 
 // BundleConfig holds the policy knobs configured per virtual key.
@@ -540,6 +569,28 @@ type RateLimits struct {
 // BudgetConfig holds spending controls.
 type BudgetConfig struct {
 	Scopes []BudgetScope
+
+	// ValidUntil is the earliest instant at which one of Scopes leaves the
+	// period its SpentMicroUSD was read in — the earliest `resets_at` the
+	// control plane stamped on a scope that can block. Zero when no scope
+	// carries a usable boundary (no budgets, or none with a limit).
+	//
+	// Past this instant every spend figure here describes a period that has
+	// ended, so the cache holding this config must re-read it rather than
+	// revalidate it. Revalidating is not enough: the config ETag is built
+	// from the key's revision and its provider set, neither of which moves
+	// when a period rolls, so a conditional refresh comes back 304 and the
+	// figures never change. A budget that reached its limit in the old
+	// period then keeps rejecting requests in the new one.
+	//
+	// The change feed does not close this. The BUDGET_UPDATED that evicts
+	// this entry is emitted by a debit — by a request that got through — and
+	// a blocked key cannot produce one. Eviction is project-wide, so a
+	// sibling key with traffic clears the block for the whole project; a
+	// project whose only traffic is the blocked key has no sibling, and stays
+	// blocked until an admin edits something or the process restarts. Hence a
+	// boundary the gateway keeps on its own schedule.
+	ValidUntil time.Time
 }
 
 // BudgetScope is a single budget limit with its current spend (microdollars).

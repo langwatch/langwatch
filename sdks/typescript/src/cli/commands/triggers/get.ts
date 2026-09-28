@@ -9,6 +9,7 @@ import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the trigger rather than printing it: the output port renders it in
@@ -27,7 +28,7 @@ export const getTriggerCommand = async (
   const spinner = createSpinner(`Fetching trigger "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
+    const response = await langwatchFetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
       signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
       headers: buildAuthHeaders({ apiKey }),
     });

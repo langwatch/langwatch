@@ -5,8 +5,11 @@
  * matters is that re-pushing the same state emits nothing at all, because an
  * IdP re-pushes on every sync and after every failure.
  */
+
+import { roleKeyForTeamRole } from "@langwatch/authz";
+import { grantFactToRow } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import {
@@ -22,7 +25,7 @@ const attachBindings = vi.fn();
 const revokeBindings = vi.fn();
 
 const prisma = {
-  roleBinding: { findMany },
+  grant: { findMany },
 } as unknown as PrismaClient;
 
 const writer = {
@@ -38,23 +41,45 @@ const memberOfOrg: DesiredScimGrant = {
   scopeId: ORG_ID,
 };
 
-const storedMemberRow = {
-  id: "rb_1",
-  userId: USER_ID,
-  groupId: null,
-  apiKeyId: null,
-  scopeType: RoleBindingScopeType.ORGANIZATION,
-  scopeId: ORG_ID,
-  role: TeamUserRole.MEMBER,
-  customRoleId: null,
-};
+function storedGrant({
+  id = "rb_1",
+  organizationId = ORG_ID,
+  role = TeamUserRole.MEMBER,
+  customRoleId = null,
+}: {
+  id?: string;
+  organizationId?: string;
+  role?: TeamUserRole;
+  customRoleId?: string | null;
+} = {}) {
+  return grantFactToRow({
+    organizationId,
+    grant: {
+      grantId: id,
+      principal: { type: "user", id: USER_ID },
+      roleKey: customRoleId
+        ? `custom:${customRoleId}`
+        : roleKeyForTeamRole(role),
+      legacyRole: customRoleId ? TeamUserRole.CUSTOM : role,
+      scope: { type: RoleBindingScopeType.ORGANIZATION, id: organizationId },
+      source: "scim",
+      occurredAtMs: 1_700_000_000_000,
+    },
+  });
+}
+
+const storedMemberRow = storedGrant();
 
 const reconcile = ({
   desired,
-  where = { userId: USER_ID },
+  where = { principal: { type: "user", id: USER_ID } },
 }: {
   desired: DesiredScimGrant[];
-  where?: Prisma.RoleBindingWhereInput;
+  where?: {
+    principal: { type: "user" | "group" | "apiKey"; id: string };
+    scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId?: string;
+  };
 }) =>
   reconcileScimGrants({
     prisma,
@@ -119,9 +144,7 @@ describe("reconcileScimGrants", () => {
 
   describe("when a stored grant differs only by its role", () => {
     it("revokes the stale one and attaches the asserted one", async () => {
-      findMany.mockResolvedValue([
-        { ...storedMemberRow, role: TeamUserRole.VIEWER },
-      ]);
+      findMany.mockResolvedValue([storedGrant({ role: TeamUserRole.VIEWER })]);
 
       const outcome = await reconcile({ desired: [memberOfOrg] });
 
@@ -133,7 +156,7 @@ describe("reconcileScimGrants", () => {
   describe("when the principal holds a custom-role grant at the same scope", () => {
     it("tells it apart from the built-in one by its role id", async () => {
       findMany.mockResolvedValue([
-        { ...storedMemberRow, id: "rb_custom", customRoleId: "cr_1" },
+        storedGrant({ id: "rb_custom", customRoleId: "cr_1" }),
       ]);
 
       const outcome = await reconcile({ desired: [memberOfOrg] });
@@ -146,26 +169,31 @@ describe("reconcileScimGrants", () => {
   });
 
   /**
-   * The slice a push is authoritative over is a caller-supplied Prisma filter,
-   * so the only thing keeping a directory sync inside its own tenant is where
-   * the organization lands in that object. It goes LAST, and both halves of
-   * the reconcile — the read that decides what to revoke, and the revoke
-   * itself — carry it.
+   * The slice a push is authoritative over is a closed principal/scope filter;
+   * the organization is always supplied separately by the service.
    */
   describe("when the caller-supplied filter names a different organization", () => {
     describe("when the projection is read", () => {
-      it("re-states this organization last, so the filter cannot widen out of the tenant", async () => {
+      it("keeps the organization fence when the scope names another organization", async () => {
         findMany.mockResolvedValue([]);
 
         await reconcile({
           desired: [],
-          where: { userId: USER_ID, organizationId: "org_other" },
+          where: {
+            principal: { type: "user", id: USER_ID },
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: "org_other",
+          },
         });
 
         expect(findMany).toHaveBeenCalledTimes(1);
         expect(findMany.mock.calls[0]![0].where).toEqual({
-          userId: USER_ID,
           organizationId: ORG_ID,
+          principalType: "USER",
+          principalId: USER_ID,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: "org_other",
+          revokedAt: null,
         });
       });
     });
@@ -176,7 +204,11 @@ describe("reconcileScimGrants", () => {
 
         await reconcile({
           desired: [],
-          where: { userId: USER_ID, organizationId: "org_other" },
+          where: {
+            principal: { type: "user", id: USER_ID },
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: "org_other",
+          },
         });
 
         expect(revokeBindings).toHaveBeenCalledWith(
@@ -194,7 +226,11 @@ describe("reconcileScimGrants", () => {
 
         await reconcile({
           desired: [memberOfOrg],
-          where: { userId: USER_ID, organizationId: "org_other" },
+          where: {
+            principal: { type: "user", id: USER_ID },
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: "org_other",
+          },
         });
 
         expect(attachBindings).toHaveBeenCalledWith(

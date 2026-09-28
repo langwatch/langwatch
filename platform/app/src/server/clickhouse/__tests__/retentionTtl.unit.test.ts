@@ -1,10 +1,41 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { RETENTION_MANAGED_TABLES } from "../../data-retention/retentionPolicy.schema";
+import {
+  classifyEventLogRowRetention,
+  EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE,
+  eventLogRetentionCategorySqlPredicate,
+} from "../../data-retention/event-log-retention-policy";
+import {
+  INDEFINITE_DEFAULT_RETENTION_TABLES,
+  PRODUCTION_STORAGE_METER_TABLES,
+  RETENTION_CATEGORIES,
+  RETENTION_MANAGED_TABLES,
+  RETENTION_TABLE_CATEGORY_MAP,
+  RETENTION_TTL_MANAGED_TABLES,
+} from "../../data-retention/retentionPolicy.schema";
+import { AGGREGATE_TYPE_IDENTIFIERS } from "../../event-sourcing/schemas/typeIdentifiers";
 import {
   buildRetentionTTLExpression,
   hasRetentionTTL,
   TABLE_TTL_CONFIG,
 } from "../ttlReconciler";
+
+const MIGRATIONS_DIR = join(process.cwd(), "src/server/clickhouse/migrations");
+
+/**
+ * Migration numbers move whenever a branch rebases past someone else's, so
+ * these assertions match on the descriptive half of the filename instead.
+ */
+const migrationEndingIn = (suffix: string): string => {
+  const matches = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(suffix));
+  if (matches.length !== 1) {
+    throw new Error(
+      `expected exactly one migration ending in ${suffix}, found ${matches.length}`,
+    );
+  }
+  return join(MIGRATIONS_DIR, matches[0]!);
+};
 
 describe("buildRetentionTTLExpression", () => {
   // The IF(_retention_days > 0, ...) guard is a safety net, not a normal path:
@@ -108,6 +139,126 @@ describe("RETENTION_MANAGED_TABLES", () => {
     expect(RETENTION_MANAGED_TABLES).toContain("dspy_steps");
   });
 
+  /**
+   * Security history lives in `event_log`, and `event_log` carries a FINITE
+   * retention TTL like every other managed table — so nothing about the table
+   * keeps an identity or authorization event alive. The only thing that does
+   * is the row-level predicate: every finite category's retroactive UPDATE
+   * negates the indefinite guard, so a row the classifier calls "indefinite"
+   * is never handed a `_retention_days` at all and falls to the far-future
+   * sentinel instead.
+   *
+   * Both halves of that have to hold together, and they are written in two
+   * different modules — the classifier that stamps a row on the way in, and
+   * the SQL that rewrites rows already stored. An aggregate added to one and
+   * not the other is how a security event acquires a finite lifetime without
+   * anybody choosing to give it one.
+   */
+  /** @scenario Tenant retention never enrolls durable security projections */
+  it("never enrolls durable identity, SSO, SCIM, or authorization state", () => {
+    const eventLog = TABLE_TTL_CONFIG.find((c) => c.table === "event_log");
+    // The premise. If this ever stops being true the rest of the test is
+    // measuring nothing, because the table would keep its rows regardless.
+    expect(eventLog?.retentionTTLColumn).toBeDefined();
+    expect(RETENTION_MANAGED_TABLES).toContain("event_log");
+
+    // A security event type overrides the aggregate, whatever the aggregate
+    // is — the safety net for rows written before the aggregate map knew
+    // about them. Asserted over EVERY registered aggregate rather than a
+    // hand-picked few, so a new one cannot arrive outside the net.
+    for (const AggregateType of AGGREGATE_TYPE_IDENTIFIERS) {
+      for (const EventType of [
+        "lw.identity.something_happened",
+        "lw.authz.something_happened",
+      ]) {
+        expect(
+          classifyEventLogRowRetention({ AggregateType, EventType }),
+          `${AggregateType} / ${EventType}`,
+        ).toBe("indefinite");
+      }
+    }
+
+    // The aggregates that are indefinite on their own account, derived by
+    // running the classifier rather than restated here: adding one, or moving
+    // one onto a customer policy, changes this set and is meant to.
+    const indefiniteAggregateTypes = AGGREGATE_TYPE_IDENTIFIERS.filter(
+      (AggregateType) =>
+        classifyEventLogRowRetention({
+          AggregateType,
+          EventType: `lw.other.${AggregateType}.something_happened`,
+        }) === "indefinite",
+    );
+    expect(indefiniteAggregateTypes.length).toBeGreaterThan(0);
+
+    for (const category of RETENTION_CATEGORIES) {
+      const predicate = eventLogRetentionCategorySqlPredicate(category);
+      // Every finite category excludes the whole guard. Compared against the
+      // generated constant, not a transcription of it, so the two cannot
+      // drift apart while both still look right.
+      expect(predicate).toContain(
+        `NOT ${EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE}`,
+      );
+
+      // What the category positively selects, with the negated guard removed
+      // first — the guard names the indefinite aggregates itself, and leaving
+      // it in would make every category look like it selects them.
+      const selection = predicate.replace(
+        `NOT ${EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE}`,
+        "",
+      );
+      const positivelySelected =
+        /AggregateType IN \(([^)]*)\)/.exec(selection)?.[1] ?? "";
+
+      for (const aggregateType of indefiniteAggregateTypes) {
+        expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).toContain(
+          `'${aggregateType}'`,
+        );
+        expect(
+          positivelySelected,
+          `${category} selects ${aggregateType}`,
+        ).not.toContain(`'${aggregateType}'`);
+      }
+    }
+  });
+
+  /**
+   * The reconciler and the policy schema are two lists of table names that
+   * have to be the same list, and neither one can see the other. A gated table
+   * missing a `retentionTTLColumn` here silently keeps its rows forever, so a
+   * customer's shortened policy — or their deletion request — quietly does
+   * not reach it. A table carrying one WITHOUT being in the gate is the mirror
+   * failure: the reconciler writes a `_retention_days` clause onto a table
+   * nothing ever populates that column for.
+   *
+   * The gate is `RETENTION_TTL_MANAGED_TABLES`, not the customer-facing
+   * `RETENTION_MANAGED_TABLES`. It is deliberately the wider of the two: the
+   * governance cost tables carry `_retention_days` and default it to zero, so
+   * the reconciler installs the clause and nothing expires until a day count
+   * is stamped on a row. Asking the customer set here would read that
+   * defaulted-to-forever table as an unmanaged one carrying a stray column.
+   */
+  it("gives a retention TTL to the gated tables and to nothing else", () => {
+    const withRetentionTTL = TABLE_TTL_CONFIG.filter(
+      (config) => config.retentionTTLColumn !== undefined,
+    ).map((config) => config.table);
+
+    expect([...withRetentionTTL].sort()).toEqual(
+      [...RETENTION_TTL_MANAGED_TABLES].sort(),
+    );
+
+    // The remainder is cold-storage-only on purpose: an entry outside the gate
+    // must carry no retention column at all, which is what keeps billing and
+    // durable security tables out of a tenant policy even if one of them is
+    // added to this config for cold storage.
+    for (const config of TABLE_TTL_CONFIG) {
+      if (RETENTION_TTL_MANAGED_TABLES.includes(config.table)) continue;
+      expect(
+        config.retentionTTLColumn,
+        `${config.table} is outside the reconciler gate but carries a retention column`,
+      ).toBeUndefined();
+    }
+  });
+
   it("does not include billable_events", () => {
     expect(RETENTION_MANAGED_TABLES).not.toContain("billable_events");
   });
@@ -141,9 +292,7 @@ describe("gateway_spend retention exemption", () => {
     ).toBeUndefined();
   });
 
-  it("declares its fixed 13-month delete in the migration itself", async () => {
-    const { readFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
+  it("declares its fixed 13-month delete in the migration itself", () => {
     const migration = readFileSync(
       join(
         process.cwd(),
@@ -155,5 +304,129 @@ describe("gateway_spend retention exemption", () => {
       "TTL toDateTime(OccurredAt) + INTERVAL 13 MONTH DELETE",
     );
     expect(migration).not.toContain("_retention_days");
+  });
+});
+
+describe("governance cost tables keep data indefinitely by default", () => {
+  // These two tables used to be exempt from retention the way `gateway_spend`
+  // still is: a fixed 13-month DELETE hardcoded in their own migration and no
+  // entry in either reconciler map. That reasoning was "a customer policy must
+  // never hard-delete a cost record" — true, and the fixed timer was a blunt
+  // way to guarantee it, because it also hard-deleted the record itself after
+  // thirteen months with no way to keep it, shorten it, or ask the question
+  // per tenant.
+  //
+  // Migration 00095 replaces the timer with the `_retention_days` column,
+  // DEFAULTING TO 0. Zero is the indefinite sentinel, so the default answer is
+  // now "keep forever" and a row is deleted only if a day count is deliberately
+  // stamped on it. The original guarantee survives by a different route: these
+  // tables stay OUT of RETENTION_TABLE_CATEGORY_MAP, so no customer-facing
+  // retention policy can reach them (and they stay out of the storage meter,
+  // which the same map drives). They are in the separate
+  // INDEFINITE_DEFAULT_RETENTION_TABLES list, and the reconciler gates on the
+  // union of the two.
+  //
+  // If the "not in RETENTION_MANAGED_TABLES" assertions below fail, someone has
+  // wired money records into the customer retention cascade, where
+  // `resolveRetention` would floor them to 49 days and start deleting.
+  const GOVERNANCE_COST_TABLES = [
+    "governance_cost_rollup_1d",
+    "governance_cost_rollup_restatement_index",
+  ] as const;
+
+  it.each(
+    GOVERNANCE_COST_TABLES,
+  )("%s is in the TTL reconciler config", (table) => {
+    expect(TABLE_TTL_CONFIG.find((c) => c.table === table)).toBeDefined();
+  });
+
+  it.each(
+    GOVERNANCE_COST_TABLES,
+  )("%s is outside the customer retention cascade and the storage meter", (table) => {
+    expect(RETENTION_MANAGED_TABLES).not.toContain(table);
+    expect(RETENTION_TABLE_CATEGORY_MAP).not.toHaveProperty(table);
+    expect(PRODUCTION_STORAGE_METER_TABLES).not.toContain(table);
+  });
+
+  it.each(
+    GOVERNANCE_COST_TABLES,
+  )("%s is in the indefinite-default list and therefore in the reconciler's gate", (table) => {
+    expect(INDEFINITE_DEFAULT_RETENTION_TABLES).toContain(table);
+    expect(RETENTION_TTL_MANAGED_TABLES).toContain(table);
+  });
+
+  // The gate must be a strict superset, not a replacement: widening it must not
+  // have dropped any customer-managed table on the way through.
+  it("the reconciler gate is the customer set plus the indefinite-default set", () => {
+    for (const table of RETENTION_MANAGED_TABLES) {
+      expect(RETENTION_TTL_MANAGED_TABLES).toContain(table);
+    }
+    expect(RETENTION_TTL_MANAGED_TABLES).toHaveLength(
+      RETENTION_MANAGED_TABLES.length +
+        INDEFINITE_DEFAULT_RETENTION_TABLES.length,
+    );
+  });
+
+  it.each(
+    GOVERNANCE_COST_TABLES,
+  )("%s anchors its retention TTL on Day, with the indefinite sentinel", (table) => {
+    const config = TABLE_TTL_CONFIG.find((c) => c.table === table)!;
+    const expr = buildRetentionTTLExpression(config);
+    expect(expr).toBe(
+      "IF(_retention_days > 0, toDateTime(Day) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
+    );
+    // `hasRetentionTTL` matches on this substring, so it is what stops the
+    // reconciler re-issuing MODIFY TTL on every boot.
+    expect(hasRetentionTTL(expr!)).toBe(true);
+  });
+
+  describe("when the migration that installs the column is read", () => {
+    /**
+     * Only the statements the migration actually RUNS. Every comment line —
+     * including the house-style commented-out `down` block, which still names
+     * the old 13-month timer — starts with `--`, and so do goose's own
+     * directives, so dropping them leaves the executed SQL alone. If this
+     * filter ever emptied, the `MODIFY TTL` count below would read 0 and fail
+     * rather than pass vacuously.
+     */
+    const executedSql = (): string =>
+      readFileSync(
+        migrationEndingIn("_governance_cost_rollup_retention_days.sql"),
+        "utf8",
+      )
+        .split("\n")
+        .filter(
+          (line) => line.trim() !== "" && !line.trimStart().startsWith("--"),
+        )
+        .join("\n");
+
+    it.each(
+      GOVERNANCE_COST_TABLES,
+    )("adds _retention_days to %s with DEFAULT 0, the keep-forever sentinel", (table) => {
+      expect(executedSql()).toContain(
+        `ALTER TABLE \${CLICKHOUSE_DATABASE}.${table}\n` +
+          "  ADD COLUMN IF NOT EXISTS `_retention_days` UInt16 DEFAULT 0 CODEC(Delta(2), ZSTD(1))",
+      );
+    });
+
+    it.each(
+      GOVERNANCE_COST_TABLES,
+    )("rewrites %s's TTL to the retention expression in the same migration", (table) => {
+      expect(executedSql()).toContain(
+        `ALTER TABLE \${CLICKHOUSE_DATABASE}.${table}\n` +
+          "  MODIFY TTL IF(_retention_days > 0, toDateTime(Day) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
+      );
+    });
+
+    // The point of the change: after this migration nothing the platform runs
+    // installs a fixed timer on these tables. The phrase may survive in the
+    // commented-out `down` block; it may not survive anywhere that executes.
+    it("leaves no executed statement that reinstalls the 13-month delete", () => {
+      const sql = executedSql();
+      expect(sql.match(/MODIFY TTL/g) ?? []).toHaveLength(
+        GOVERNANCE_COST_TABLES.length,
+      );
+      expect(sql).not.toContain("INTERVAL 13 MONTH");
+    });
   });
 });

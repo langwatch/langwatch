@@ -14,17 +14,32 @@
  * legacy allowlist: the migration is complete and every family is on the builder.
  */
 
+import type { AuthzPermission } from "@langwatch/authz";
+import {
+  builtinRoleGrants,
+  builtinRolePermissions,
+  permissionSatisfiedBy,
+  roleKeyForTeamRole,
+} from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-
-import {
-  EXTERNAL_MEMBER_PERMISSIONS,
-  hasPermissionWithHierarchy,
-  organizationRoleHasPermission,
-  type Permission,
-  teamRoleHasPermission,
-} from "~/server/api/rbac";
 import { allRegisteredRoutes } from "../route-registry";
+
+type Permission = AuthzPermission;
+
+const hasPermissionWithHierarchy = (permissions: string[], requested: string) =>
+  permissionSatisfiedBy({ granted: new Set(permissions), requested });
+const teamRoleHasPermission = (role: TeamUserRole, permission: string) =>
+  builtinRoleGrants({ role: roleKeyForTeamRole(role), permission });
+const organizationRoleHasPermission = (
+  role: OrganizationUserRole,
+  permission: string,
+) =>
+  builtinRoleGrants({
+    role: role === OrganizationUserRole.ADMIN ? "org-admin" : "org-member",
+    permission,
+  });
+const EXTERNAL_MEMBER_PERMISSIONS = [...builtinRolePermissions("lite-member")];
 
 /**
  * The registry is populated as a side effect of the app modules loading, so

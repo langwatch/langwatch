@@ -68,6 +68,7 @@ export function literalKindFor(type: string): LiteralKind | null {
   switch (type) {
     case "str":
     case "image":
+    case "file":
       return "str";
     case "float":
     case "int":
@@ -217,7 +218,8 @@ export function defaultValueLiteralFor(type: string): string {
     case "json_schema":
       return "{}";
     case "image":
-      // images are usually a URL string in code nodes
+    case "file":
+      // images and files are a reference string in code nodes
       return '""';
     default:
       return "None";

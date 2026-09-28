@@ -28,6 +28,38 @@ Feature: Langy asks a real question with selectable options
   # Ask, settle, answer — the turn lifecycle is untouched
   # ===========================================================================
 
+  Rule: A line Langy says with the say tool is drawn where it was said
+
+    # A model that writes its reply once its calls are done puts every line at
+    # the end of the turn, under the cards. The worker's say tool gives a line
+    # a place of its own: a tool part by shape, Langy's own words by meaning.
+    # The manager titles it, the panel draws it as reply prose in the order
+    # the parts carry, live and from the record, and the activity spine leaves
+    # it out. The e2e adapter folds a said line into the words the judge reads.
+    @unit
+    Scenario: A line said with the say tool is drawn where the call happened
+      Given a turn that ran calls, said a line with the say tool, ran more calls and said another
+      When the message renders, live or from the record
+      Then each said line is drawn as reply prose where the call happened, between the cards
+      And no said line is an activity row, a card, or folded into the receipt
+      And the tool answers "Said." and refuses an empty line
+
+    @unit
+    Scenario: A turn whose lines were all said with the say tool is not an empty turn
+      Given a turn that said its lines with the say tool and wrote no reply text
+      When the turn reaches its terminal marker
+      Then no fallback line is appended
+
+    # A bare question's free-text route is the quiet option the ask provides,
+    # so an "Other…" row under it would be a third way out the ask never
+    # offered.
+    @unit
+    Scenario: A bare question offers no Other row
+      Given a bare question with two options, one of them quiet
+      When the card renders open
+      Then there is no "Other…" row under the options
+      And a question that is not bare keeps its "Other…" row
+
   Scenario: A question card ends the turn and waits
     Given Langy's reply ends with a choices card
     When the turn settles
@@ -105,6 +137,133 @@ Feature: Langy asks a real question with selectable options
     Then the card renders as it was — open and awaiting
     When I scrub past my selection
     Then the card renders locked with the choice marked
+
+  # ===========================================================================
+  # Asked mid-task, the card answers the tool
+  # ===========================================================================
+
+  # While Langy changes the customer's code it sometimes reaches a fork that
+  # is the user's to pick: which file owns the setup, which account to use,
+  # whether to open the pull request now. Ending the turn there would throw
+  # away the plan Langy is in the middle of. So the worker's question tool
+  # waits for the answer while the turn is in flight, through the same user
+  # wait the permission card uses (specs/langy/langy-local-permissions.feature).
+  # The card is the same choices card; only the delivery of the answer differs.
+  # Langy decides routine things itself and asks only when two ways forward
+  # differ for the user. See dev/docs/adr/129-langy-local-control.md.
+
+  Rule: A question asked mid-task keeps the turn and returns the answer to the tool
+
+    @unit
+    Scenario: The worker has a question tool
+      When a worker is provisioned
+      Then it has a question tool that takes a question, a header, options with labels and descriptions, and whether several may be picked
+      And its description says to decide routine things alone and to ask only when the ways forward differ for the user
+
+    @integration
+    Scenario: A question asked by the tool renders while the turn is in flight
+      Given Langy is in the middle of a change
+      When Langy asks which file should own the tracing setup
+      Then the choices card renders with the options
+      And the turn stays in flight, with the tool waiting
+
+    # The dashed "Made by Langy" frame is provenance for a view Langy composed
+    # from the project's data. A question is an ask: the reader is deciding,
+    # not judging a chart, so the card is a plain option list under the reply.
+    @integration
+    Scenario: A question is an ask, not a view Langy composed
+      When a question card renders
+      Then it is a plain list of options under the reply, titled by the question
+      And it wears no derived frame and no provenance label
+
+    # When the ask is the whole of what Langy has to say, trusting the model
+    # to write the words before the tool call leaves a bare option list with
+    # nothing above it whenever it skips them. The tool's `bare` flag makes
+    # it structural: the words live in the question field, and the card draws
+    # them as ordinary reply prose above the plain option list, with no title
+    # style and no frame. The prose sits beside the option buttons, so it is
+    # no part of their accessible names.
+    @integration
+    Scenario: A bare question draws its words as prose above the options
+      Given Langy asks with the question tool marked bare, its words in the question field
+      When the card renders
+      Then the question reads as a reply paragraph, markdown and all, in the reply's own typography
+      And the plain option list sits under it, with no title and no frame
+      And each option's accessible name is its label alone
+
+    @unit
+    Scenario: A question renders in a tab that never watched the turn
+      Given a turn this tab adopted, so it reads no live stream
+      When the tool raises the question wait
+      Then the choices card is built from the conversation record alone
+      And it carries the question and its options
+
+    @unit
+    Scenario: A settled question reads settled, with the option that was chosen
+      Given a question wait that was answered somewhere else
+      When the card is read back
+      Then it renders locked on the option the answer names
+      And it offers no way to answer again
+
+    @integration
+    Scenario: Selecting an option returns it to the tool and the turn continues
+      Given an open question card asked by the tool
+      When I select an option
+      Then the tool receives my selection as its result
+      And Langy continues the same turn with the plan it had
+      And the card renders locked with my choice marked
+
+    # A film had the model read the answer and end its turn on a sentence,
+    # leaving the work after the question undone. A skill's wording was not
+    # enough, so the go rides in the tool result: after the answer lines the
+    # worker appends "The user has answered. Continue with the work that
+    # follows this answer in this turn." An expired or empty answer set keeps
+    # the end-your-turn line instead.
+    @integration
+    Scenario: The tool result carries the go
+      Given an open question card asked by the tool
+      When I select an option through the panel's answer path
+      Then the wait the tool polls reads answered, with my question and my selection as the worker reads them
+      And the tool result ends with "The user has answered. Continue with the work that follows this answer in this turn."
+      And a question no one answered carries no such line
+
+    @integration
+    Scenario: A free-text answer reaches the tool as words
+      Given an open question card asked by the tool that allows a free-text answer
+      When I choose Other and type my own
+      Then the tool receives my text as its result
+
+    @integration
+    Scenario: A question no one answers ends the turn in words
+      Given an open question card asked by the tool
+      When the wait passes its budget
+      Then the tool result reads that no answer arrived
+      And Langy ends the turn saying what it is waiting for
+      And the card stays open
+
+    @integration
+    Scenario: A late answer starts the next turn as my message
+      Given a question card whose tool wait already ended the turn
+      When I select an option
+      Then my choice appears as my own message in the conversation
+      And a new turn starts with Langy acting on it
+
+    @integration
+    Scenario: Stopping the turn closes the open question
+      Given an open question card asked by the tool
+      When I stop the turn
+      Then the card renders superseded
+      And the tool wait ends
+
+    # No scenario run forces the fork, so a test that reads it would pass on a
+    # run where Langy had nothing to ask.
+    @e2e @unimplemented
+    Scenario: Langy asks a real fork while changing code and continues after the answer
+      Given my local folder is connected and Langy is instrumenting tracing
+      When Langy reaches a choice between two files that could own the setup
+      Then Langy asks it as a question card, not as prose
+      And after my answer Langy edits the file I picked in the same turn
+      And the judge confirms Langy asked nothing it could have decided alone
 
   # ===========================================================================
   # Staleness is event order, nothing else

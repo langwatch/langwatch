@@ -50,6 +50,8 @@ langwatch test-suite run "Refunds" \
   --wait
 ```
 
+A connected agent is named the same way: `connected:<name>?plan=free`, or `connected:<name>@<environment>?plan=free` to pick the environment.
+
 On the REST API the same values go in `runParameters` on each target, and `parameters` at the run level sets the values every target shares. See [Run from CI](/agent-testing/run-from-ci#compare-two-agents-or-one-agent-on-two-settings) for the request body.
 
 Also check: [Run plans](/agent-testing/run-plans), [Results](/agent-testing/results), [Run parameters](/agent-testing/run-parameters).

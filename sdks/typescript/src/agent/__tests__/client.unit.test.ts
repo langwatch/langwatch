@@ -15,14 +15,16 @@ import { LANGWATCH_SDK_VERSION } from "../../internal/constants";
 import type { Logger } from "../../logger";
 import {
   overrideSharedClientForTests,
-  reconnectDelayMs,
   refusalAdvice,
   resetSharedClient,
   sharedClientForTests,
   shutdownForTests,
+} from "../client";
+import {
+  reconnectDelayMs,
   RECONNECT_BASE_MS,
   RECONNECT_MAX_MS,
-} from "../client";
+} from "../reconnect";
 import { connectAgent, type AgentCall, type AgentHandler } from "../define";
 import { PROTOCOL_VERSION, type AgentParameterValue, type RegisterFrame } from "../protocol";
 import { NoWebSocketError } from "../transport";
@@ -56,7 +58,11 @@ class Connection {
   }
 
   /** Answers the register with one id per agent, `agent_<name>`. */
-  accept(register: RegisterFrame, instanceId = register.instance.id): void {
+  accept(
+    register: RegisterFrame,
+    instanceId = register.instance.id,
+    scope: Record<string, unknown> | undefined = { kind: "shared" },
+  ): void {
     this.send({
       type: "registered",
       agents: register.agents.map((agent) => ({
@@ -65,6 +71,7 @@ class Connection {
         id: `agent_${agent.name}`,
         url: `http://platform/agents/agent_${agent.name}`,
         parameterNotes: [],
+        ...(scope ? { scope } : {}),
       })),
       heartbeatIntervalMs: 10_000,
       instanceId,
@@ -320,7 +327,7 @@ describe("the agent client, given a fake platform", () => {
             type: "object",
             properties: { model: { type: "string", enum: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } },
           },
-          concurrency: 1,
+          concurrency: 10,
           timeoutMs: 30_000,
         },
       ]);
@@ -333,7 +340,8 @@ describe("the agent client, given a fake platform", () => {
 
     /** @scenario "The environment is the explicit option first" */
     /** @scenario "The instance label comes from the option or LANGWATCH_AGENT_INSTANCE_LABEL" */
-    it("names the explicit environment and the label from the variable", async () => {
+    /** @scenario "The agent takes ten calls at once unless told otherwise" */
+    it("names the explicit environment and the label from the variable, and keeps the default concurrency", async () => {
       vi.stubEnv("LANGWATCH_AGENT_ENVIRONMENT", "staging");
       vi.stubEnv("LANGWATCH_AGENT_INSTANCE_LABEL", "green");
       define(async () => "ok", { environment: "production" });
@@ -342,8 +350,47 @@ describe("the agent client, given a fake platform", () => {
       const register = await connection.nextFrame<RegisterFrame>("register");
 
       expect(register.agents[0]?.environment).toBe("production");
-      expect(register.agents[0]?.concurrency).toBe(4);
+      expect(register.agents[0]?.concurrency).toBe(10);
       expect(register.instance.label).toBe("green");
+    });
+  });
+
+  describe("when the registered frame carries a scope", () => {
+    const registeredWith = async (scope: Record<string, unknown> | undefined) => {
+      define(async () => "ok", { name: "support" });
+      const connection = await platform.nextConnection();
+      connection.accept(await connection.nextFrame<RegisterFrame>("register"), undefined, scope);
+      await until(() => sharedClientForTests()?.isRegistered === true);
+    };
+
+    /** @scenario "A personal agent prints who it belongs to and how to share it" */
+    it("prints that a personal agent belongs to the key's owner and names the environment variable", async () => {
+      await registeredWith({ kind: "owner" });
+
+      expect(logs.lines("info", /is online/)).toHaveLength(1);
+      const personal = logs.lines("info", /personal to the owner of this API key/);
+      expect(personal).toHaveLength(1);
+      expect(personal[0]).toContain("only their runs can target it");
+      expect(personal[0]).toContain("LANGWATCH_AGENT_ENVIRONMENT");
+    });
+
+    /** @scenario "The registered frame says whether the agent is personal, host-scoped or shared" */
+    it("prints the machine for a host-scoped agent and nothing extra for a shared one", async () => {
+      await registeredWith({ kind: "host", hostLabel: "build-box-1" });
+      expect(logs.lines("info", /scoped to this machine \(build-box-1\)/)).toHaveLength(1);
+      await resetSharedClient();
+
+      await registeredWith({ kind: "shared" });
+      expect(logs.lines("info", /is online/)).toHaveLength(2);
+      expect(logs.lines("info", /personal to|scoped to this machine/)).toHaveLength(1);
+    });
+
+    /** @scenario "The registered frame says whether the agent is personal, host-scoped or shared" */
+    it("reads a frame from a platform that sends no scope as shared", async () => {
+      await registeredWith(undefined);
+
+      expect(logs.lines("info", /is online/)).toHaveLength(1);
+      expect(logs.lines("info", /personal to|scoped to this machine/)).toHaveLength(0);
     });
   });
 
@@ -508,10 +555,13 @@ describe("the agent client, given a fake platform", () => {
       const gate = new Promise<void>((resolve) => {
         release = resolve;
       });
-      const { connection } = await connectSupport(async () => {
-        await gate;
-        return "first";
-      });
+      const { connection } = await connectSupport(
+        async () => {
+          await gate;
+          return "first";
+        },
+        { concurrency: 1 },
+      );
 
       connection.send(callFrame({ callId: "call_1" }));
       await connection.nextFrame("ack");
@@ -618,6 +668,7 @@ describe("the agent client, given a fake platform", () => {
       const handler = vi.fn(async () => "ok");
       const { connection } = await connectSupport(handler, {
         parameters: gatedParameters(gate) as never,
+        concurrency: 1,
       });
 
       connection.send(callFrame({ callId: "call_1" }));

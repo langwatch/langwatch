@@ -77,7 +77,7 @@ describe("langyRecoveryPolicy", () => {
 
     it("tells the user it is picking up where it left off", () => {
       expect(policy.recoveringMessage).toContain(
-        "picking up where it left off",
+        "Picking up where it left off",
       );
     });
   });

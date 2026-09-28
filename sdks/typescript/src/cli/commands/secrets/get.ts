@@ -8,6 +8,7 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the secret's metadata rather than printing it: the output port
@@ -27,7 +28,7 @@ export const getSecretCommand = async (
   const spinner = createSpinner(`Fetching secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/${id}`, {
+    const response = await langwatchFetch(`${endpoint}/api/secrets/${id}`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 

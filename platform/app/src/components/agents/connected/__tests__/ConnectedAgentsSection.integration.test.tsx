@@ -11,6 +11,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { OFFLINE_AGENT_TEST_COPY } from "~/components/agents/offlineAgentCopy";
 import { ConnectedAgentsSection } from "../ConnectedAgentsSection";
 import type {
   ConnectedAgentInstance,
@@ -50,6 +51,8 @@ function agent(
     status: "online",
     instances: [instance()],
     owner: null,
+    selectable: true,
+    notSelectableReason: null,
     parameters: [],
     config: {
       sdk: { name: "langwatch-python", version: "1.2.3", language: "python" },
@@ -63,6 +66,7 @@ function renderSection(
   handlers: {
     onOpen?: (agent: ConnectedAgentView) => void;
     onDelete?: (agent: ConnectedAgentView) => void;
+    onTest?: (agent: ConnectedAgentView) => void;
   } = {},
 ) {
   return render(
@@ -70,6 +74,7 @@ function renderSection(
       agents={agents}
       onOpen={handlers.onOpen ?? vi.fn()}
       onDelete={handlers.onDelete}
+      onTest={handlers.onTest}
     />,
     { wrapper: Wrapper },
   );
@@ -181,6 +186,42 @@ describe("<ConnectedAgentsSection />", () => {
     });
   });
 
+  describe("given a development agent that belongs to another person", () => {
+    /** @scenario "A card the reader cannot choose says who holds it" */
+    it("carries the owner's name and says only that person can run it", () => {
+      renderSection([
+        agent({
+          environment: "development",
+          owner: { userId: "user_1", name: "Ana" },
+          selectable: false,
+          notSelectableReason: "owned_by_another_person",
+        }),
+      ]);
+
+      const chip = screen.getByTestId("connected-agent-scope-chip");
+      expect(within(chip).getByText("Ana")).toBeInTheDocument();
+      expect(chip.getAttribute("aria-label")).toContain("Ana");
+      expect(chip.getAttribute("tabindex")).toBe("0");
+    });
+  });
+
+  describe("given a development agent that belongs to the reader", () => {
+    /** @scenario "A card the reader can choose carries no refusal" */
+    it("carries the owner's name and no refusal", () => {
+      renderSection([
+        agent({
+          environment: "development",
+          owner: { userId: "user_1", name: "Ana" },
+        }),
+      ]);
+
+      const chip = screen.getByTestId("connected-agent-scope-chip");
+      expect(within(chip).getByText("Ana")).toBeInTheDocument();
+      expect(chip.getAttribute("aria-label")).toBeNull();
+      expect(chip.getAttribute("tabindex")).toBeNull();
+    });
+  });
+
   describe("given a development agent that belongs to a machine", () => {
     /** @scenario "A shared development agent reads the machine that holds it" */
     it("carries a chip with the machine name", () => {
@@ -249,6 +290,48 @@ describe("<ConnectedAgentsSection />", () => {
         expect.objectContaining({ id: "agent_1" }),
       );
       expect(onOpen).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the menu of an offline agent is opened", () => {
+    /** @scenario "Test agent is disabled for an offline connected agent" */
+    it("disables Test agent and says on hover that the agent is offline", async () => {
+      const onTest = vi.fn();
+      renderSection([agent({ status: "offline", instances: [] })], { onTest });
+
+      await userEvent.click(
+        screen.getByRole("button", { name: "Actions for support-agent" }),
+      );
+
+      const test = await screen.findByRole("menuitem", { name: "Test agent" });
+      expect(test).toHaveAttribute("aria-disabled", "true");
+
+      await userEvent.click(test);
+      expect(onTest).not.toHaveBeenCalled();
+
+      await userEvent.hover(test);
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(
+        OFFLINE_AGENT_TEST_COPY,
+      );
+    });
+  });
+
+  describe("when the menu of an online agent is opened", () => {
+    it("offers Test agent and requests the test on click", async () => {
+      const onTest = vi.fn();
+      renderSection([agent()], { onTest });
+
+      await userEvent.click(
+        screen.getByRole("button", { name: "Actions for support-agent" }),
+      );
+
+      const test = await screen.findByRole("menuitem", { name: "Test agent" });
+      expect(test).not.toHaveAttribute("aria-disabled", "true");
+
+      await userEvent.click(test);
+      expect(onTest).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "agent_1" }),
+      );
     });
   });
 });

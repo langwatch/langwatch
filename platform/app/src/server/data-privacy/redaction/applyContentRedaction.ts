@@ -11,6 +11,7 @@ import {
   ESSENTIAL_PII_ENTITIES,
   redactEssentialPiiInText,
 } from "./essentialPii";
+import { reservesTraceAddress } from "./identifierHoldout";
 
 const NATIVE_PII_ENTITY_SET: ReadonlySet<string> = new Set(
   ESSENTIAL_PII_ENTITIES,
@@ -59,6 +60,15 @@ export function nativePiiEntitiesForPolicy(
  * string while the policy stays on, for the attribute names
  * {@link isIdentifierAttributeName} accepts. Custom patterns and the PII pass
  * are out of its reach.
+ *
+ * `shouldTreatAsIdentifier` says this attribute value is an identifier even though its
+ * shape does not say so, which is the case the reserved trace and span names
+ * exist for: a decimal trace id carries no letter, so no shape rule holds it
+ * back. It buys the SAME exemption a hex id gets — the shape-only recognizers
+ * stand down, the self-proving ones still run — rather than turning the
+ * personal-data pass off. A reserved name is a claim about where the value came
+ * from, and the sender writes that name, so it must not be able to keep a card
+ * number out of a check that can prove what it is looking at.
  */
 export function redactStringNative({
   text,
@@ -67,6 +77,7 @@ export function redactStringNative({
   compiledPiiExceptions,
   isAttributeValue = false,
   skipSecretRuleIds,
+  shouldTreatAsIdentifier = false,
 }: {
   text: string;
   policy: ResolvedDataPrivacy;
@@ -74,6 +85,7 @@ export function redactStringNative({
   compiledPiiExceptions?: readonly RegExp[];
   isAttributeValue?: boolean;
   skipSecretRuleIds?: readonly string[];
+  shouldTreatAsIdentifier?: boolean;
 }): { text: string; redactedCount: number } {
   let result = text;
   let redactedCount = 0;
@@ -98,6 +110,7 @@ export function redactStringNative({
       entities: piiEntities === "all" ? undefined : piiEntities,
       exceptPatterns: compiledPiiExceptions,
       isAttributeValue,
+      shouldTreatAsIdentifier,
     });
     result = pii.text;
     redactedCount += pii.redactedCount;
@@ -136,6 +149,23 @@ export function redactStringNative({
  * credential. The value rules above still read those values by shape and by
  * vendor, so key material pasted under such a name is scrubbed anyway.
  *
+ * WHAT IT COSTS, STATED PLAINLY. This reads the NAME and never the value, so
+ * the exemption holds whatever the attribute carries. A credential that only a
+ * shape heuristic can match — no vendor namespace, no armour, no credential
+ * word anywhere near it — is therefore stored verbatim under any key ending
+ * `_id` or `.id`. That residual is bounded by the skip list rather than by
+ * judgement: exactly two rules are turned off, so every other rule still reads
+ * the value.
+ *
+ * It is knowingly not fixed. Requiring an identifier shape here would take the
+ * exemption off `scenario.run_id`, `langwatch.prompt.id`,
+ * `gen_ai.conversation.id`, `metadata.user_id` and the rest of the ingestion
+ * vocabulary, because a record id minted as `prefix_<random body>` is exactly
+ * what the shape rules are tuned to take — which is the defect this hold-out
+ * exists to fix, reintroduced. The reserved trace and span names in
+ * {@link reservesTraceAddress} do gate on the value, because that list is new
+ * and nothing depends on it being name-only.
+ *
  * WHAT IT MUST NOT BECOME. Do not widen this to a namespace, and specifically
  * not to `langwatch.*`: `langwatch.input` and `langwatch.output` are span
  * attributes that carry the chat content itself, so a namespace rule would take
@@ -159,6 +189,29 @@ export function isIdentifierAttributeName(key: string): boolean {
  * A name {@link isIdentifierAttributeName} accepts skips both the deny-list and
  * the shape-only value rules. Every other rule runs as it does on any other
  * attribute.
+ *
+ * An attribute {@link reservesTraceAddress} accepts does exactly one thing,
+ * and it is not that skip: it is treated as identifier-shaped even when its
+ * shape does not say so, which is what the list behind it exists for. A decimal
+ * trace id carries no letter and may be far shorter than the shape rule's
+ * minimum run, so nothing else would hold it back. It takes the VALUE as well
+ * as the name, because the ingestion endpoint forwards caller-written attribute
+ * names verbatim, and a reserved name over an email address is not an address.
+ *
+ * It deliberately does NOT also buy the deny-list and shape-only skip above.
+ * That disjunct was there and was removed: it could never change an outcome,
+ * because the values it admits are pure hex or pure decimal while both
+ * shape-only secret rules require a `_` or `-` in the token, and no reserved
+ * name matches the sensitive-name deny-list. Keeping an unreachable branch —
+ * and a paragraph explaining it — costs more than it protects. The skip on this
+ * path is therefore name-only and older than this list: `metadata.trace_id` is
+ * exempt because it ends in `_id`, not because it is reserved.
+ *
+ * What the reserved list grants is the same exemption an identifier-shaped
+ * value gets, deliberately, and not a stronger one: the self-proving
+ * recognizers still run, so a card number written under a reserved name is
+ * still redacted, and every secret rule still runs, so a key pasted under such
+ * a name is still scrubbed.
  */
 export function redactAttributeNative({
   key,
@@ -173,6 +226,7 @@ export function redactAttributeNative({
   compiledSecretPatterns?: readonly RegExp[];
   compiledPiiExceptions?: readonly RegExp[];
 }): { text: string; redactedCount: number } {
+  const reservesAnAddress = reservesTraceAddress({ key, value });
   const namesAnIdentifier = isIdentifierAttributeName(key);
   if (
     policy.secrets.enabled &&
@@ -188,6 +242,7 @@ export function redactAttributeNative({
     skipSecretRuleIds: namesAnIdentifier
       ? SHAPE_ONLY_SECRET_RULE_IDS
       : undefined,
+    shouldTreatAsIdentifier: reservesAnAddress,
     compiledSecretPatterns,
     compiledPiiExceptions,
     isAttributeValue: true,

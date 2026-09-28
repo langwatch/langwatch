@@ -1,6 +1,8 @@
 import { nanoid } from "nanoid";
 import { afterEach, describe, expect, it } from "vitest";
+import type { Prisma } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { raceOnOneRow } from "~/test-utils/rowLockInterleaving";
 import { PrismaIdentityBackfillRepository } from "../identity-backfill.prisma.repository";
 import { PrismaIdentityUsersRepository } from "../identity-users.prisma.repository";
 
@@ -8,7 +10,9 @@ import { PrismaIdentityUsersRepository } from "../identity-users.prisma.reposito
  * The backfill's legacy reads and the one guarded write, against Postgres:
  * the `User`/`Account` rows read as the pass expects them (business time in
  * milliseconds, accounts in a stable order), and a hash key that is never
- * overwritten once minted.
+ * overwritten once minted, including when the two mints overlap on the row.
+ *
+ * @see specs/identity/identifier-model.feature
  */
 const namespace = `idbackfill-${nanoid(8)}`;
 const USER = `${namespace}-user`;
@@ -126,6 +130,30 @@ describe("PrismaIdentityUsersRepository", () => {
       await users.storeUserHashKeyIfMissing({
         userId: USER,
         userHashKey: "second",
+      });
+
+      const user = await prisma.user.findUnique({ where: { id: USER } });
+      expect(user?.userHashKey).toBe("first");
+    });
+  });
+
+  describe("when the ceremony and a backfill pass mint a key for one user at the same moment", () => {
+    /** @scenario "A user's hash key is minted once, whichever writer arrives first" */
+    it("keeps the first key, because the second write re-reads the row it waited for", async () => {
+      await prisma.user.create({
+        data: { id: USER, email: `${USER}@acme.com` },
+      });
+      const mint = (userHashKey: string) => (tx: Prisma.TransactionClient) =>
+        new PrismaIdentityUsersRepository(tx).storeUserHashKeyIfMissing({
+          userId: USER,
+          userHashKey,
+        });
+
+      await raceOnOneRow({
+        prisma,
+        table: "User",
+        first: mint("first"),
+        second: mint("second"),
       });
 
       const user = await prisma.user.findUnique({ where: { id: USER } });

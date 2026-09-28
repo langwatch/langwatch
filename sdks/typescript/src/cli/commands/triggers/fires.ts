@@ -6,6 +6,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 
@@ -26,7 +27,7 @@ export const triggerFiresCommand = async (
     const limit = options.limit
       ? `?limit=${encodeURIComponent(options.limit)}`
       : "";
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${endpoint}/api/triggers/${encodeURIComponent(id)}/fires${limit}`,
       {
         headers: buildAuthHeaders({ apiKey }),

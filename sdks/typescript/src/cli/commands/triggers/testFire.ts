@@ -6,6 +6,7 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 
@@ -25,7 +26,7 @@ export const testFireTriggerCommand = async (
   const spinner = createSpinner(`Test-firing trigger "${id}"...`).start();
 
   try {
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${endpoint}/api/triggers/${encodeURIComponent(id)}/test-fire`,
       {
         signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),

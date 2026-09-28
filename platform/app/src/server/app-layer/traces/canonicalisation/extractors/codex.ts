@@ -50,6 +50,9 @@
  * - langwatch.output_tokens
  * - langwatch.cache_read_tokens
  * - langwatch.thread.id (the session: thread.id, or turn.id when absent)
+ * - gen_ai.conversation.id (the session, off every log record's
+ *   conversation.id, so a turn is filed under its session even when its
+ *   turn span never lands)
  * - langwatch.principal.email (from user.email)
  * - langwatch.input (from codex.user_prompt prompt)
  */
@@ -410,6 +413,8 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     if (typeof eventName !== "string") return;
     if (!eventName.startsWith(CODEX_EVENT_NAME_PREFIX)) return;
 
+    this.liftConversationId(ctx);
+
     if (eventName === "codex.sse_event") {
       this.liftSseEvent(ctx);
       return;
@@ -424,12 +429,34 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     }
   }
 
+  /**
+   * Every codex log record names its session as `conversation.id`. The turn
+   * span (`session_task.turn`) carries the same id on the span side, but a
+   * turn whose span never lands has only its log records to say which
+   * session it belongs to, and the session fold keys the turn off this very
+   * record. Without this lift the session row moved on to a turn that the
+   * conversation strip and the session replay, which list the traces filed
+   * under the conversation, could not find.
+   *
+   * Lifted straight onto the conversation key the trace row is filed under
+   * (log lifts merge verbatim into the trace attributes; nothing downstream
+   * promotes `langwatch.thread.id` to it), and onto `langwatch.thread.id`
+   * for the metadata view. Read, not taken: the coding-agent pipeline keys a
+   * codex session off the same attribute.
+   */
+  private liftConversationId(ctx: LogExtractorContext): void {
+    const conversationId = asString(ctx.bag.attrs.get("conversation.id"));
+    if (conversationId === null) return;
+    ctx.setAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, conversationId);
+    ctx.setAttr("langwatch.thread.id", conversationId);
+    ctx.recordRule("codex/conversation_id");
+  }
+
   private liftSseEvent(ctx: LogExtractorContext): void {
     const model = asString(ctx.bag.attrs.take("model"));
     const inputTokens = asNumber(ctx.bag.attrs.take("input_token_count"));
     const outputTokens = asNumber(ctx.bag.attrs.take("output_token_count"));
     const cacheReadTokens = asNumber(ctx.bag.attrs.take("cached_token_count"));
-    const threadId = asString(ctx.bag.attrs.take("conversation.id"));
     const principalEmail = asString(ctx.bag.attrs.take("user.email"));
     const reasoningEffort = asString(
       ctx.bag.attrs.take("model_reasoning_effort"),
@@ -458,10 +485,6 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     }
     if (cacheReadTokens !== null) {
       ctx.setAttr("langwatch.cache_read_tokens", String(cacheReadTokens));
-      fired = true;
-    }
-    if (threadId !== null) {
-      ctx.setAttr("langwatch.thread.id", threadId);
       fired = true;
     }
     if (principalEmail !== null) {

@@ -9,9 +9,27 @@
  * when the source is saved rather than when it is pulled — by pull time the
  * admin who typed it is long gone and the only remaining signal is a run that
  * failed for reasons nobody can see.
+ *
+ * The Web API version and the read headers live here too, beside the address
+ * they are sent to. More than one module now reads a Dataverse collection —
+ * the transcript walk and the agent list — and a second copy of either is a
+ * copy that can drift out of agreement with the query shape it belongs to.
  */
 
 export const COPILOT_STUDIO_DATAVERSE_ADAPTER_ID = "copilot_studio_dataverse";
+
+/** Web API version every read in this family is written against. */
+export const DATAVERSE_API_VERSION = "v9.2";
+
+/** The headers every read of an environment carries. */
+export function dataverseHeaders(token: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+    "OData-MaxVersion": "4.0",
+    "OData-Version": "4.0",
+  };
+}
 
 /**
  * The registrable domains Microsoft serves Dataverse environments from, one

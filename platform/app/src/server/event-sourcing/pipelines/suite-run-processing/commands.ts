@@ -1,6 +1,7 @@
 import { defineCommand } from "../../commands/defineCommand";
 import {
   suiteRunItemCompletedEventDataSchema,
+  suiteRunItemRegradedEventDataSchema,
   suiteRunItemStartedEventDataSchema,
   suiteRunStartedEventDataSchema,
 } from "./schemas/events";
@@ -62,4 +63,29 @@ export const CompleteSuiteRunItemCommand = defineCommand({
   }),
   makeJobId: (d) =>
     `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemCompleted`,
+});
+
+/**
+ * Moves a completed item from what it counted as to what it counts as now.
+ * Keyed by the caller's idempotency key (the evaluated event that changed
+ * the verdict), so one verdict change moves the counters once and a later
+ * change moves them again.
+ */
+export const RegradeSuiteRunItemCommand = defineCommand({
+  commandType: "lw.suite_run.regrade_item",
+  eventType: "lw.suite_run.item_regraded",
+  eventVersion: "2026-09-03",
+  aggregateType: "suite_run",
+  schema: suiteRunItemRegradedEventDataSchema,
+  aggregateId: (d) => d.batchRunId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemRegraded:${d.idempotencyKey ?? d.occurredAt}`,
+  spanAttributes: (d) => ({
+    "payload.batchRun.id": d.batchRunId,
+    "payload.scenarioRun.id": d.scenarioRunId,
+    "payload.status": d.status,
+    "payload.previousStatus": d.previousStatus,
+  }),
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemRegraded:${d.idempotencyKey ?? d.occurredAt}`,
 });

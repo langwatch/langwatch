@@ -35,8 +35,8 @@ func TestClassifyBifrostError_ProductionFailuresAreNotTimeouts(t *testing.T) {
 			berr: &bfschemas.BifrostError{
 				Error: &bfschemas.ErrorField{Message: "no keys found that support model: gemini-3.1-pro-preview"},
 				ExtraFields: bfschemas.BifrostErrorExtraFields{
-					Provider:       bfschemas.Vertex,
-					ModelRequested: "gemini-3.1-pro-preview",
+					Provider:               bfschemas.Vertex,
+					OriginalModelRequested: "gemini-3.1-pro-preview",
 				},
 			},
 			want: domain.ErrProviderConfigInvalid,
@@ -303,8 +303,8 @@ func TestClassifyBifrostError_StampsProviderAndModel(t *testing.T) {
 	berr := &bfschemas.BifrostError{
 		Error: &bfschemas.ErrorField{Message: "no keys found that support model: gpt-5.6-sol"},
 		ExtraFields: bfschemas.BifrostErrorExtraFields{
-			Provider:       bfschemas.OpenAI,
-			ModelRequested: "gpt-5.6-sol",
+			Provider:               bfschemas.OpenAI,
+			OriginalModelRequested: "gpt-5.6-sol",
 		},
 	}
 
@@ -345,7 +345,7 @@ func TestClassifyBifrostError_ClampsTheModelTheCallerSupplied(t *testing.T) {
 	long := strings.Repeat("m", 4000)
 	berr := &bfschemas.BifrostError{
 		Error:       &bfschemas.ErrorField{Message: bfNetworkErrorMessage},
-		ExtraFields: bfschemas.BifrostErrorExtraFields{ModelRequested: long},
+		ExtraFields: bfschemas.BifrostErrorExtraFields{OriginalModelRequested: long},
 	}
 
 	var e herr.E
@@ -374,7 +374,7 @@ func TestClassifyBifrostError_ClampedModelStaysValidUTF8(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			berr := &bfschemas.BifrostError{
 				Error:       &bfschemas.ErrorField{Message: bfNetworkErrorMessage},
-				ExtraFields: bfschemas.BifrostErrorExtraFields{ModelRequested: long},
+				ExtraFields: bfschemas.BifrostErrorExtraFields{OriginalModelRequested: long},
 			}
 
 			var e herr.E

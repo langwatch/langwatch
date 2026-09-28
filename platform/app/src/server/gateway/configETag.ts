@@ -48,6 +48,7 @@
  */
 import { createHash } from "node:crypto";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { connectLangWatchProviderSlot } from "./connectManagedModels";
 import { eligibleModelProvidersForVk } from "./scopeResolver";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 
@@ -59,13 +60,22 @@ export async function computeConfigETag({
   virtualKey: VirtualKeyWithScopes;
 }): Promise<string> {
   const providers = await eligibleModelProvidersForVk(prisma, virtualKey);
+  // The LangWatch provider is synthesized at materialisation rather than read
+  // from a row, so the resolver above never sees it. Digested here as well, or
+  // an admin switching managed models on would leave every gateway 304'ing
+  // against a bundle that has no such provider in it.
+  const connectSlot = await connectLangWatchProviderSlot({
+    prisma,
+    organizationId: virtualKey.organizationId,
+    slot: `fallback_${providers.length}`,
+  });
 
   // Order is part of the answer: `providers[]` is the fallback chain, so two
   // identical sets in a different order are two different bundles. The array
   // comes back in dispatch order, and it is digested as it comes.
   const digest = createHash("sha256")
     .update(
-      JSON.stringify(providers, (_key, value) =>
+      JSON.stringify([providers, connectSlot], (_key, value) =>
         typeof value === "bigint" ? value.toString() : value,
       ),
     )

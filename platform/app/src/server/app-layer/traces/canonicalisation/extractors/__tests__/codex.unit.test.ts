@@ -28,6 +28,7 @@ describe("CodexExtractor.applyLog", () => {
         "langwatch.input_tokens": "9700",
         "langwatch.output_tokens": "15",
         "langwatch.cache_read_tokens": "8745",
+        "gen_ai.conversation.id": "conv_abc",
         "langwatch.thread.id": "conv_abc",
         "langwatch.principal.email": "alex@example.com",
       });
@@ -92,6 +93,84 @@ describe("CodexExtractor.applyLog", () => {
 
       expect(ctx.out).toEqual({});
       expect(ctx.recordRule).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a codex record names its conversation", () => {
+    const SESSION_ID = "01a09acb-adc2-7f12-b671-b357653cc057";
+
+    /** @scenario "A codex turn is filed under its session by its log records alone" */
+    it("files the trace under the session off a user_prompt record", () => {
+      const ctx = createLogExtractorContext(SCOPE, {
+        "event.name": "codex.user_prompt",
+        prompt: "just say ping",
+        "conversation.id": SESSION_ID,
+      });
+
+      new CodexExtractor().applyLog(ctx);
+
+      expect(ctx.out).toEqual({
+        "gen_ai.conversation.id": SESSION_ID,
+        "langwatch.thread.id": SESSION_ID,
+        "langwatch.input": "just say ping",
+      });
+      expect(ctx.recordRule).toHaveBeenCalledWith("codex/conversation_id");
+    });
+
+    /** @scenario "A codex turn is filed under its session by its log records alone" */
+    it("files the trace under the session off a conversation_starts record", () => {
+      const ctx = createLogExtractorContext(SCOPE, {
+        "event.name": "codex.conversation_starts",
+        model: "gpt-5.5",
+        "conversation.id": SESSION_ID,
+      });
+
+      new CodexExtractor().applyLog(ctx);
+
+      expect(ctx.out["gen_ai.conversation.id"]).toBe(SESSION_ID);
+      expect(ctx.out["langwatch.thread.id"]).toBe(SESSION_ID);
+    });
+
+    /** @scenario "A codex turn is filed under its session by its log records alone" */
+    it("files the trace under the session off a record this extractor lifts nothing else from", () => {
+      const ctx = createLogExtractorContext(SCOPE, {
+        "event.name": "codex.turn_ttft",
+        ttft_ms: "412",
+        "conversation.id": SESSION_ID,
+      });
+
+      new CodexExtractor().applyLog(ctx);
+
+      expect(ctx.out).toEqual({
+        "gen_ai.conversation.id": SESSION_ID,
+        "langwatch.thread.id": SESSION_ID,
+      });
+    });
+
+    /** @scenario "A codex turn is filed under its session by its log records alone" */
+    it("leaves the conversation id on the record for the session fold to read", () => {
+      const ctx = createLogExtractorContext(SCOPE, {
+        "event.name": "codex.user_prompt",
+        prompt: "just say ping",
+        "conversation.id": SESSION_ID,
+      });
+
+      new CodexExtractor().applyLog(ctx);
+
+      expect(ctx.bag.attrs.get("conversation.id")).toBe(SESSION_ID);
+    });
+
+    /** @scenario "A codex turn is filed under its session by its log records alone" */
+    it("files the trace nowhere when the record names no conversation", () => {
+      const ctx = createLogExtractorContext(SCOPE, {
+        "event.name": "codex.user_prompt",
+        prompt: "just say ping",
+      });
+
+      new CodexExtractor().applyLog(ctx);
+
+      expect(ctx.out).toEqual({ "langwatch.input": "just say ping" });
+      expect(ctx.recordRule).not.toHaveBeenCalledWith("codex/conversation_id");
     });
   });
 

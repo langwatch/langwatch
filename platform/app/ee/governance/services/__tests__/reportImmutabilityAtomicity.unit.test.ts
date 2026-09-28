@@ -24,7 +24,7 @@
 
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 const ORG = "org_1";
 const SOURCE_ID = "src_1";
@@ -54,8 +54,11 @@ const rowWith = (over: Record<string, unknown> = {}) =>
 
 /**
  * A prisma double that records what it was asked, and can be told to answer
- * the pinned `updateMany` with a miss — which is what a cursor written in the
- * gap looks like from inside the transaction.
+ * the pinned write with a miss — which is what a cursor written in the gap
+ * looks like from inside the transaction.
+ *
+ * The pin is SQL, so what is recorded for it is the statement text (with a
+ * `?` where each value is bound) and the bound values in order.
  */
 const fakePrisma = ({
   row,
@@ -64,9 +67,15 @@ const fakePrisma = ({
   row: ReturnType<typeof rowWith>;
   cursorMovedInTheGap?: boolean;
 }) => {
-  const updateMany = vi
+  const pinned: Array<{ sql: string; values: unknown[] }> = [];
+  const executeRaw = vi
     .fn()
-    .mockResolvedValue({ count: cursorMovedInTheGap ? 0 : 1 });
+    .mockImplementation(
+      (strings: TemplateStringsArray, ...values: unknown[]) => {
+        pinned.push({ sql: strings.join("?"), values });
+        return Promise.resolve(cursorMovedInTheGap ? 0 : 1);
+      },
+    );
   const update = vi.fn().mockImplementation(({ data }: { data: unknown }) =>
     Promise.resolve(
       rowWith({
@@ -78,8 +87,8 @@ const fakePrisma = ({
     ingestionSource: {
       findUnique: vi.fn().mockResolvedValue(row),
       update,
-      updateMany,
     },
+    $executeRaw: executeRaw,
     $transaction: vi.fn(
       (run: (tx: unknown) => Promise<unknown>) => run(client) as Promise<never>,
     ),
@@ -87,7 +96,8 @@ const fakePrisma = ({
   return {
     client: client as unknown as PrismaClient,
     update,
-    updateMany,
+    executeRaw,
+    pinned,
     transaction: client.$transaction,
   };
 };
@@ -104,12 +114,12 @@ describe("updateSource, on the path the report guard cleared", () => {
 
   describe("given a report change on a source that has never pulled", () => {
     it("pins the write to the absent cursor the decision was made on", async () => {
-      // `AnyNull`, not `null`: the column is `Json?` and its two writers
-      // disagree about which null they leave behind — a JSON null from the
-      // projection repository, SQL NULL from a source that never ran. Both
-      // read back as JS `null`, so a pin that matched only one of them would
-      // refuse the ordinary case it exists to allow.
-      const { client, updateMany, update } = fakePrisma({ row: rowWith() });
+      // Either null, not one of them: the column is `Json?` and its two
+      // writers disagree about which null they leave behind — a JSON null
+      // from the projection repository, SQL NULL from a source that never
+      // ran. Both read back as JS `null`, so a pin that matched only one of
+      // them would refuse the ordinary case it exists to allow.
+      const { client, pinned, update } = fakePrisma({ row: rowWith() });
 
       await IngestionSourceService.create(client).updateSource({
         id: SOURCE_ID,
@@ -117,21 +127,19 @@ describe("updateSource, on the path the report guard cleared", () => {
         parserConfig: anthropic("cost"),
       });
 
-      expect(updateMany).toHaveBeenCalledWith({
-        where: {
-          id: SOURCE_ID,
-          pollerCursor: { equals: Prisma.AnyNull },
-        },
-        data: { updatedAt: expect.any(Date) },
-      });
+      expect(pinned).toHaveLength(1);
+      expect(pinned[0]?.sql).toMatch(
+        /"pollerCursor" IS NULL OR "pollerCursor" = 'null'::jsonb/,
+      );
+      expect(pinned[0]?.values).toEqual([SOURCE_ID, ORG]);
       expect(update).toHaveBeenCalledOnce();
     });
 
     it("runs the check and the write inside one transaction", async () => {
       // The pin alone would still leave the puller free to write its cursor
-      // between the matching `updateMany` and the `update`. The `updateMany`
-      // is a write, so it holds the row lock for the rest of the transaction
-      // and a pull arriving after it waits rather than interleaves.
+      // between the matching pin and the `update`. The pin is a write, so it
+      // holds the row lock for the rest of the transaction and a pull
+      // arriving after it waits rather than interleaves.
       const { client, transaction } = fakePrisma({ row: rowWith() });
 
       await IngestionSourceService.create(client).updateSource({
@@ -166,7 +174,7 @@ describe("updateSource, on the path the report guard cleared", () => {
       // `hasPollerCursor` reads "{}" as no cursor, so the guard clears the
       // change — and the pin has to name that same value, not null, or the
       // write would refuse itself.
-      const { client, updateMany } = fakePrisma({
+      const { client, pinned } = fakePrisma({
         row: rowWith({ pollerCursor: "{}" }),
       });
 
@@ -176,13 +184,11 @@ describe("updateSource, on the path the report guard cleared", () => {
         parserConfig: anthropic("cost"),
       });
 
-      expect(updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            pollerCursor: { equals: "{}" },
-          }),
-        }),
-      );
+      expect(pinned).toHaveLength(1);
+      expect(pinned[0]?.sql).toMatch(/"pollerCursor" = \?::jsonb/);
+      // The stored value is the JSON string "{}", so the pin names that
+      // string, serialised as the jsonb it compares against.
+      expect(pinned[0]?.values).toEqual([SOURCE_ID, ORG, '"{}"']);
     });
   });
 
@@ -190,7 +196,7 @@ describe("updateSource, on the path the report guard cleared", () => {
     it("renames without pinning anything", async () => {
       // A rename never reaches the guard. Pinning it would fail an edit for
       // the sole reason that a scheduled pull ran while the drawer was open.
-      const { client, updateMany, transaction } = fakePrisma({
+      const { client, executeRaw, transaction } = fakePrisma({
         row: rowWith(),
       });
 
@@ -200,7 +206,7 @@ describe("updateSource, on the path the report guard cleared", () => {
         name: "Anthropic admin (finance)",
       });
 
-      expect(updateMany).not.toHaveBeenCalled();
+      expect(executeRaw).not.toHaveBeenCalled();
       expect(transaction).not.toHaveBeenCalled();
     });
 
@@ -208,7 +214,7 @@ describe("updateSource, on the path the report guard cleared", () => {
       // The common config edit — a rotated key, a moved bucket width. The
       // report is unchanged, so no cursor arriving later can make this write
       // wrong, and it should not be made to fail on one.
-      const { client, updateMany, transaction } = fakePrisma({
+      const { client, executeRaw, transaction } = fakePrisma({
         row: rowWith(),
       });
 
@@ -218,14 +224,14 @@ describe("updateSource, on the path the report guard cleared", () => {
         parserConfig: { ...anthropic("usage"), bucketWidth: "1h" },
       });
 
-      expect(updateMany).not.toHaveBeenCalled();
+      expect(executeRaw).not.toHaveBeenCalled();
       expect(transaction).not.toHaveBeenCalled();
     });
 
     it("does not pin a source whose stored config names no report", async () => {
       // A push-mode source, or an adapter with no report axis: there is no
       // invariant here for a cursor to invalidate.
-      const { client, updateMany } = fakePrisma({
+      const { client, executeRaw } = fakePrisma({
         row: rowWith({ parserConfig: { workspaceId: "w_1" } }),
       });
 
@@ -235,7 +241,7 @@ describe("updateSource, on the path the report guard cleared", () => {
         parserConfig: { workspaceId: "w_2" },
       });
 
-      expect(updateMany).not.toHaveBeenCalled();
+      expect(executeRaw).not.toHaveBeenCalled();
     });
   });
 });

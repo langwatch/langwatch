@@ -22,6 +22,7 @@ export { MonitorService } from "./monitors/monitor.service";
 export {
   createTestApp,
   initializeDefaultApp,
+  initializeMigrationApp,
   initializeWebApp,
   initializeWorkerApp,
 } from "./presets";

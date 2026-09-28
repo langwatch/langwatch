@@ -34,9 +34,10 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// KeyResolver resolves a raw API key into a Bundle via an upstream source.
+// KeyResolver resolves a presented credential into a Bundle via an upstream
+// source.
 type KeyResolver interface {
-	ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle, error)
+	ResolveKey(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error)
 }
 
 // ConfigFetcher retrieves configuration for a virtual key. ifNoneMatch is the
@@ -104,7 +105,12 @@ const tierL1 = "l1"
 // Service is the auth resolver: one in-memory LRU in front of the control
 // plane.
 type Service struct {
-	l1            *lru.Cache[[64]byte, *entry]
+	l1 *lru.Cache[[64]byte, *entry]
+	// licenseRefusals remembers, briefly, that the control plane refused a
+	// license token. Virtual keys never enter it.
+	licenseRefusals   *lru.Cache[[64]byte, licenseRefusal]
+	licenseRefusalTTL time.Duration
+
 	resolver      KeyResolver
 	configFetcher ConfigFetcher
 	changePoller  ChangePoller
@@ -154,6 +160,20 @@ type entry struct {
 	// Empty means we have no token to revalidate with, and the next refresh
 	// goes out unconditional.
 	configETag string
+	// budgetRollAckedFor is the budget boundary whose spend this entry already
+	// carries, set once at construction and never after. It is deliberately not
+	// configFetchedAt: that one is stamped on every refresh outcome, failures
+	// included, so keying the roll on it would let a control plane that could
+	// not be reached count as the re-read and hand the entry back to
+	// conditional revalidation still holding the dead period's spend.
+	//
+	// Only a config the gateway actually received clears a roll, and that
+	// arrives as a new entry through storeL1 rather than a mutation here — so
+	// there is no ack on the refresh path at all. A 304 must not clear one: it
+	// carries no spend, and a 304 taken while the period was still running
+	// would ack a boundary the entry has not reached yet and suppress the roll
+	// when it does.
+	budgetRollAckedFor time.Time
 }
 
 // currentConfigETag reports the ETag of the config this entry is carrying.
@@ -163,15 +183,88 @@ func (e *entry) currentConfigETag() string {
 	return e.configETag
 }
 
-// configStale reports whether the entry's config is older than ttl.
-// ttl <= 0 disables staleness (never stale).
-func (e *entry) configStale(ttl time.Duration) bool {
-	if ttl <= 0 {
-		return false
-	}
+// refreshConfigETag is the If-None-Match a staleness refresh of this entry
+// should send: the carried token normally, and none once the budget period has
+// rolled.
+//
+// Dropping the token there is the whole point of the roll. The token is built
+// from the key's revision and its provider set, and a period ending moves
+// neither, so a conditional refresh of a bundle whose spend figures expired at
+// midnight comes back 304 and leaves those figures in place. Unconditional
+// costs one materialization per key per period.
+func (e *entry) refreshConfigETag() string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.budgetPeriodRolled() {
+		return ""
+	}
+	return e.configETag
+}
+
+// configStale reports whether the entry's config needs refreshing: its budget
+// period has rolled, or it is older than ttl. ttl <= 0 disables the age half
+// only — a rolled period is stale whatever the ttl, because the figures it
+// leaves behind are not merely old, they belong to a period that has ended.
+func (e *entry) configStale(ttl time.Duration) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	rolled := e.budgetPeriodRolled()
+	if rolled && e.configFetchedAt.Before(e.bundle.Config.Budget.ValidUntil) {
+		// First look past the boundary: the figures are known dead, go now.
+		return true
+	}
+	if ttl <= 0 {
+		// No staleness clock configured. A period that ended still has to keep
+		// asking, because with the roll unanswered nothing else will replace
+		// spend belonging to a period that is over.
+		return rolled
+	}
+	// A refresh that failed has stamped configFetchedAt, so the retries of an
+	// unanswered roll are paced by the ordinary clock rather than fired on
+	// every request. They stay unconditional until one of them is answered.
 	return time.Since(e.configFetchedAt) > ttl
+}
+
+// budgetPeriodRolled reports whether this entry's spend figures were read in a
+// budget period that has since ended and the control plane has not answered for
+// the new one yet. Caller holds e.mu.
+//
+// Only a config the gateway actually received clears it, which arrives as a new
+// entry. A failed fetch, and a 304 answering the unconditional refresh this
+// forces, both leave the roll standing so the next attempt goes out
+// unconditional too — offering the token instead would be answered 304 and
+// leave the entry enforcing the dead period's spend, the exact deadlock this is
+// here to break.
+//
+// The permanently-past boundary — a MANUAL budget carrying an old stored
+// instant, a clock skewed forward — is handled at construction rather than
+// here: an entry built from a config read after the boundary starts already
+// acked, so it never asks. See ackedBoundaryAtBuild.
+func (e *entry) budgetPeriodRolled() bool {
+	validUntil := e.bundle.Config.Budget.ValidUntil
+	if validUntil.IsZero() {
+		return false
+	}
+	if time.Now().Before(validUntil) {
+		return false
+	}
+	return !e.budgetRollAckedFor.Equal(validUntil)
+}
+
+// ackedBoundaryAtBuild is the boundary a freshly built entry should count as
+// already answered: one that had passed by the time this config was read, so
+// the spend it carries was materialized after it. Zero otherwise, which leaves
+// the next roll to be detected normally.
+//
+// Without this a boundary that never moves would re-arm on every entry the
+// refresh creates, turning each staleness refresh into a full materialization
+// forever.
+func ackedBoundaryAtBuild(bundle *domain.Bundle, now time.Time) time.Time {
+	validUntil := bundle.Config.Budget.ValidUntil
+	if validUntil.IsZero() || now.Before(validUntil) {
+		return time.Time{}
+	}
+	return validUntil
 }
 
 // tryBeginConfigRefresh claims the per-entry config-refresh slot.
@@ -330,7 +423,8 @@ func classifyRefreshError(err error) refreshErrorClass {
 	if errors.Is(err, domain.ErrInvalidAPIKey) ||
 		errors.Is(err, domain.ErrKeyRevoked) ||
 		errors.Is(err, domain.ErrKeyDisabled) ||
-		errors.Is(err, domain.ErrKeyExpired) {
+		errors.Is(err, domain.ErrKeyExpired) ||
+		isLicenseRefusal(err) {
 		return classAuthRejection
 	}
 	return classTransportFailure
@@ -369,6 +463,12 @@ type Options struct {
 	// or single-process dev environments where stale-window-up-to-15min
 	// is tolerable.
 	ChangePoller ChangePoller
+	// LicenseRefusalTTL is how long a refused license token is answered from
+	// memory before the control plane is asked again. It bounds both the
+	// registry load a bad token can cause and how long a fix (a license
+	// linked, a binding reset) takes to be noticed. Default 30s. Negative
+	// disables.
+	LicenseRefusalTTL time.Duration
 }
 
 // New creates the auth service.
@@ -396,7 +496,15 @@ func New(opts Options) (*Service, error) {
 		opts.ConfigTTL = 0 // disabled
 	}
 
+	if opts.LicenseRefusalTTL == 0 {
+		opts.LicenseRefusalTTL = 30 * time.Second
+	}
+
 	l1, err := lru.New[[64]byte, *entry](opts.LRUSize)
+	if err != nil {
+		return nil, err
+	}
+	licenseRefusals, err := lru.New[[64]byte, licenseRefusal](licenseRefusalLRUSize)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +515,10 @@ func New(opts Options) (*Service, error) {
 	}
 
 	return &Service{
-		l1:               l1,
+		l1:                l1,
+		licenseRefusals:   licenseRefusals,
+		licenseRefusalTTL: opts.LicenseRefusalTTL,
+
 		resolver:         opts.Resolver,
 		configFetcher:    opts.ConfigFetcher,
 		changePoller:     opts.ChangePoller,
@@ -421,69 +532,86 @@ func New(opts Options) (*Service, error) {
 	}, nil
 }
 
-// Resolve returns a Bundle for the raw bearer token.
+// Resolve returns a Bundle for the presented credential.
 // Checks L1, then the upstream resolver, caching what the latter answers.
 //
 // On L1 hit past softExpiresAt but within hardExpiresAt, attempts a
 // foreground refresh; on transport-class failure serves the stale bundle
 // and bumps soft expiry. On auth-class failure evicts and rejects.
-func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, error) {
-	if rawKey == "" {
+func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
+	if key.Token == "" {
 		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	}
 
-	h := hashKey(rawKey)
+	h := hashKey(key)
+	if key.IsLicenseToken() {
+		if err := s.admitLicenseToken(ctx, key, h); err != nil {
+			return nil, err
+		}
+	}
 	s.recordLookup()
 
-	// L1: in-memory
+	lk := lookup{key: key, hash: h}
 	if e, ok := s.l1.Get(h); ok {
-		switch classifyEntry(e) {
-		case entryFresh:
-			// Serve, maybe trigger background refresh on near-expiry.
-			s.recordHit()
-			if e.nearSoftExpiry(s.refreshThreshold) {
-				go s.refreshBackground(rawKey, h) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
-			} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
-				go s.refreshConfigBackground(h, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
-			}
-			return e.bundle, nil
-
-		case entryStale:
-			// Soft-expired but within hard grace. A foreground refresh is
-			// needed before the entry can serve, so it counts as a miss
-			// even when stale-while-error ends up serving the old bundle.
-			s.recordMiss()
-			return s.refreshOrServeStale(ctx, rawKey, h, e)
-
-		case entryKeyExpired:
-			// The key ran out. Fail closed with the key's own error and skip
-			// the control plane: a reachable control plane answers exactly
-			// this, and an unreachable one must not turn a finished key into
-			// a retryable upstream failure that grace keeps serving through.
-			s.recordMiss()
-			s.l1.Remove(h)
-			s.logger.Error("auth_cache_hard_evict",
-				zap.String("vk_id", e.bundle.VirtualKeyID),
-				zap.String("reason", "virtual_key_expired"),
-			)
-			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
-				"message": domain.KeyExpiredMessage,
-			})
-
-		default:
-			// Past hard cap: evict, fall through to fresh resolve.
-			s.recordMiss()
-			s.l1.Remove(h)
-			s.logger.Error("auth_cache_hard_evict",
-				zap.String("vk_id", e.bundle.VirtualKeyID),
-				zap.String("reason", "hard_cap_exceeded_on_lookup"),
-			)
-		}
-	} else {
-		s.recordMiss()
+		return s.resolveCached(ctx, lk, e)
 	}
+	s.recordMiss()
+	return s.resolveFresh(ctx, key, h)
+}
 
-	return s.resolveFresh(ctx, rawKey, h)
+// lookup is one presented credential with its cache hash, computed once per
+// resolve and handed down the paths that need both.
+type lookup struct {
+	key  domain.PresentedKey
+	hash [64]byte
+}
+
+// resolveCached serves an L1 entry according to its age: fresh entries serve
+// at once, stale ones after a foreground refresh, and the rest are evicted.
+func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (*domain.Bundle, error) {
+	switch classifyEntry(e) {
+	case entryFresh:
+		// Serve, maybe trigger background refresh on near-expiry.
+		s.recordHit()
+		if e.nearSoftExpiry(s.refreshThreshold) {
+			go s.refreshBackground(lk.key, lk.hash) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+		} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
+			go s.refreshConfigBackground(lk.hash, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+		}
+		return e.bundle, nil
+
+	case entryStale:
+		// Soft-expired but within hard grace. A foreground refresh is
+		// needed before the entry can serve, so it counts as a miss
+		// even when stale-while-error ends up serving the old bundle.
+		s.recordMiss()
+		return s.refreshOrServeStale(ctx, lk, e)
+
+	case entryKeyExpired:
+		// The key ran out. Fail closed with the key's own error and skip
+		// the control plane: a reachable control plane answers exactly
+		// this, and an unreachable one must not turn a finished key into
+		// a retryable upstream failure that grace keeps serving through.
+		s.recordMiss()
+		s.evictOnLookup(lk.hash, e, "virtual_key_expired")
+		return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
+			"message": domain.KeyExpiredMessage,
+		})
+
+	default:
+		// Past hard cap: evict, then resolve fresh.
+		s.recordMiss()
+		s.evictOnLookup(lk.hash, e, "hard_cap_exceeded_on_lookup")
+		return s.resolveFresh(ctx, lk.key, lk.hash)
+	}
+}
+
+func (s *Service) evictOnLookup(h [64]byte, e *entry, reason string) {
+	s.l1.Remove(h)
+	s.logger.Error("auth_cache_hard_evict",
+		zap.String("vk_id", e.bundle.VirtualKeyID),
+		zap.String("reason", reason),
+	)
 }
 
 // CacheLen reports how many virtual keys L1 is currently holding, so the
@@ -514,9 +642,10 @@ func (s *Service) recordMiss() {
 // resolveFresh calls the upstream resolver and caches the result.
 // Used for cold misses; not on stale-entry refresh paths (those use
 // refreshOrServeStale for the served-stale fallback).
-func (s *Service) resolveFresh(ctx context.Context, rawKey string, h [64]byte) (*domain.Bundle, error) {
-	bundle, err := s.resolver.ResolveKey(ctx, rawKey)
+func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [64]byte) (*domain.Bundle, error) {
+	bundle, err := s.resolver.ResolveKey(ctx, key)
 	if err != nil {
+		s.rememberLicenseRefusal(key, h, err)
 		return nil, err
 	}
 	etag, cfgErr := s.populateConfig(ctx, bundle)
@@ -533,8 +662,9 @@ func (s *Service) resolveFresh(ctx context.Context, rawKey string, h [64]byte) (
 // On success replaces the L1 entry. On transport-class failure bumps the
 // stale entry's soft expiry by SoftBump and serves the stale bundle. On
 // auth-class failure evicts the entry and returns the rejection.
-func (s *Service) refreshOrServeStale(ctx context.Context, rawKey string, h [64]byte, stale *entry) (*domain.Bundle, error) {
-	bundle, err := s.resolver.ResolveKey(ctx, rawKey)
+func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *entry) (*domain.Bundle, error) {
+	h := lk.hash
+	bundle, err := s.resolver.ResolveKey(ctx, lk.key)
 	cls := classifyRefreshError(err)
 
 	staleBundle, _, hardExpiresAt := stale.snapshot()
@@ -678,12 +808,14 @@ func (s *Service) Stop() {
 // config outright rather than revalidating against a token we do not have.
 func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
 	softExpiresAt, hardExpiresAt := entryDeadlines(bundle, s.hardGrace)
+	now := time.Now()
 	s.l1.Add(h, &entry{
-		bundle:          bundle,
-		softExpiresAt:   softExpiresAt,
-		hardExpiresAt:   hardExpiresAt,
-		configFetchedAt: time.Now(),
-		configETag:      configETag,
+		bundle:             bundle,
+		softExpiresAt:      softExpiresAt,
+		hardExpiresAt:      hardExpiresAt,
+		configFetchedAt:    now,
+		configETag:         configETag,
+		budgetRollAckedFor: ackedBoundaryAtBuild(bundle, now),
 	})
 	// Record the bundle's org so the change-feed loop knows which orgs
 	// to subscribe to. LoadOrStore is the first-write-wins shape: if
@@ -904,10 +1036,10 @@ func (s *Service) evictWhere(match func(*domain.Bundle) bool, reason, target str
 // fire-and-forget when the entry has less than RefreshThreshold left
 // before softExpiresAt. Same classification as foreground:
 // AuthRejection evicts; TransportFailure bumps the existing entry.
-func (s *Service) refreshBackground(rawKey string, h [64]byte) {
+func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	bundle, err := s.resolver.ResolveKey(ctx, rawKey)
+	bundle, err := s.resolver.ResolveKey(ctx, key)
 	cls := classifyRefreshError(err)
 
 	switch cls {
@@ -977,6 +1109,10 @@ func (s *Service) bumpEntryAfterTransportFailure(h [64]byte, cause error) {
 // changed, and the conditional request turns a full config materialization
 // into a 304 the control plane answers from the key's revision.
 //
+// The exception is a rolled budget period, where refreshConfigETag drops the
+// token so the fetch cannot come back 304 — nothing the token is built from
+// moves when a period ends, and the spend figures have to move.
+//
 // It bounds the staleness of the key's own expiration date by the same TTL. The
 // date arrives on the config response as well as on the token, so an admin who
 // shortens it is followed within one TTL even while the change feed is
@@ -991,7 +1127,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	defer cancel()
 
 	stale, _, _ := e.snapshot()
-	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.currentConfigETag())
+	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.refreshConfigETag())
 	if err != nil {
 		s.logger.Warn("config_ttl_refresh_failed",
 			zap.String("vk_id", stale.VirtualKeyID),
@@ -1052,7 +1188,15 @@ func (s *Service) loop(ctx context.Context) {
 	}
 }
 
-func hashKey(raw string) [64]byte {
+// hashKey is the cache key of a presented credential. A virtual key hashes as
+// the token alone. A license token hashes together with the install that
+// presented it, so an entry cached for one install cannot be hit by another.
+// The separator cannot occur in either part.
+func hashKey(key domain.PresentedKey) [64]byte {
+	raw := key.Token
+	if key.InstanceID != "" {
+		raw += "\x00" + key.InstanceID
+	}
 	sum := sha256.Sum256([]byte(raw))
 	var dst [64]byte
 	hex.Encode(dst[:], sum[:])

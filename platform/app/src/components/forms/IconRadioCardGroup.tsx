@@ -14,6 +14,8 @@ type IconListItem<T> = {
   title: string;
   value: T;
   icon?: React.ComponentType;
+  /** A second, muted line under the title saying what choosing it means. */
+  description?: string;
 };
 
 interface IconRadioCardGroupProps<T extends string = string> {
@@ -75,11 +77,11 @@ export const IconRadioCardGroup = <T extends string = string>({
         onClick={() => onChange(item.value)}
         cursor="pointer"
         borderWidth="1px"
-        borderColor={isSelected ? "orange.emphasized" : "border.subtle"}
+        borderColor={isSelected ? "orange.emphasized" : "border.emphasized"}
         borderRadius="xl"
         bg={isSelected ? "orange.subtle" : "bg.panel"}
         py="3"
-        px={isSelected ? "5" : "3"}
+        px="4"
         h="auto"
         transition="all 0.2s ease"
         boxShadow={isSelected ? "0 0 0 1px var(--colors-orange-muted)" : "none"}
@@ -97,40 +99,53 @@ export const IconRadioCardGroup = <T extends string = string>({
         tabIndex={isTabbable ? 0 : -1}
         onKeyDown={(e) => handleKeyDown(e, index)}
       >
-        <HStack align="center" justify="space-between" w="full" minW="0">
-          <HStack align="center" gap="2" minW="0" flex="1">
-            {item.icon && (
-              <Icon
-                size="sm"
-                color={isSelected ? "orange.fg" : "fg.muted"}
-                transition="color 0.15s ease"
-                flexShrink={0}
+        <Stack direction="column" gap="1" w="full" minW="0">
+          <HStack align="center" justify="space-between" w="full" minW="0">
+            <HStack align="center" gap="2" minW="0" flex="1">
+              {item.icon && (
+                <Icon
+                  size="sm"
+                  color={isSelected ? "orange.fg" : "fg.muted"}
+                  transition="color 0.15s ease"
+                  flexShrink={0}
+                >
+                  <item.icon />
+                </Icon>
+              )}
+
+              <Text
+                textStyle="sm"
+                fontWeight="medium"
+                color={{ base: "black", _dark: "white" }}
+                truncate
               >
-                <item.icon />
-              </Icon>
-            )}
+                {item.title}
+              </Text>
+            </HStack>
 
-            <Text
-              textStyle="sm"
-              fontWeight="medium"
-              color={{ base: "black", _dark: "white" }}
-              truncate
+            <Circle
+              size="4"
+              borderWidth="1px"
+              borderColor={isSelected ? "orange.solid" : "border.emphasized"}
+              bg={isSelected ? "orange.solid" : "bg.surface"}
+              transition="all 0.15s ease"
+              flexShrink={0}
             >
-              {item.title}
-            </Text>
+              {isSelected && <Circle size="1.5" bg="white" />}
+            </Circle>
           </HStack>
-
-          <Circle
-            size="4"
-            borderWidth="1px"
-            borderColor={isSelected ? "orange.solid" : "border.emphasized"}
-            bg={isSelected ? "orange.solid" : "bg.surface"}
-            transition="all 0.15s ease"
-            flexShrink={0}
-          >
-            {isSelected && <Circle size="1.5" bg="white" />}
-          </Circle>
-        </HStack>
+          {item.description && (
+            <Text
+              textStyle="xs"
+              fontWeight="normal"
+              color="fg.muted"
+              whiteSpace="normal"
+              textAlign="start"
+            >
+              {item.description}
+            </Text>
+          )}
+        </Stack>
       </Button>
     );
   };

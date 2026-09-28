@@ -55,6 +55,11 @@ export const getAgentCommand = async (id: string): Promise<CommandResult | void>
         } else if (agent.hostLabel) {
           console.log(`  ${chalk.gray("Host:")}        ${agent.hostLabel}`);
         }
+        if (agent.selectable === false) {
+          console.log(
+            `  ${chalk.gray("Run:")}         ${chalk.yellow("only its owner can run this agent")}`,
+          );
+        }
         if (agent.lastSeenAt) {
           console.log(`  ${chalk.gray("Last seen:")}   ${new Date(agent.lastSeenAt).toLocaleString()}`);
         }

@@ -9,7 +9,8 @@ import { useVisibleSectionNavItems } from "~/features/navigation/useVisibleSecti
  * + "Organization-scoped" indicator) and renders a thin org-level
  * sub-navigation in the left column. The item list itself lives in
  * `~/features/navigation/sectionNavItems` so every shell renders the
- * same navigation.
+ * same navigation. Grouped entries (`group`) list flat here, in the same
+ * order: only the navigation-v2 sidebar has a grouping affordance.
  *
  * Spec: specs/ai-gateway/governance/governance-home-routing.feature
  */

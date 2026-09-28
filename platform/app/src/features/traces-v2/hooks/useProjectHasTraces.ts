@@ -6,7 +6,9 @@ interface ProjectHasTracesResult {
    * `undefined` while the project context is still loading. Reads off the
    * `firstMessage` flag on the Project model — flipped to `true` by the
    * collector worker / projectMetadata subscriber on first ingest. This is
-   * cheaper and more accurate than probing the trace store.
+   * cheaper and more accurate than probing the trace store. The page keeps
+   * the flag fresh while it is false (`useFirstTraceWatch`); this read never
+   * touches the network itself, so any component may mount it.
    *
    * NB: this is "have they ever sent a trace?" — not "do they have a
    * trace in the current view?". The empty-state journey is meant only

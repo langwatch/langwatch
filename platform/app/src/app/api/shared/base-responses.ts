@@ -98,3 +98,8 @@ export const canonicalUnprocessableResponses: Record<422, RouteResponse> = {
 export const canonicalConflictResponses: Record<409, RouteResponse> = {
   409: canonicalResponse("Conflict"),
 };
+
+/** The canonical 404, for routes that address one resource by id. */
+export const canonicalNotFoundResponses: Record<404, RouteResponse> = {
+  404: canonicalResponse("Not Found"),
+};

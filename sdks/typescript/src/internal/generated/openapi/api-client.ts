@@ -48,7 +48,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"][];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"][];
+                        };
                     };
                 };
                 /** @description Unexpected error */
@@ -99,7 +101,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"][];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"][];
+                        };
                     };
                 };
                 /** @description Unexpected error */
@@ -129,8 +133,8 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        comment?: string;
-                        isThumbsUp?: boolean;
+                        comment: string;
+                        isThumbsUp: boolean;
                         email?: string;
                     };
                 };
@@ -142,7 +146,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"];
+                        };
                     };
                 };
                 /** @description Invalid input */
@@ -188,7 +194,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"];
+                        };
                     };
                 };
                 /** @description Unexpected error */
@@ -256,8 +264,8 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        comment?: string;
-                        isThumbsUp?: boolean;
+                        comment: string;
+                        isThumbsUp: boolean;
                         email?: string;
                     };
                 };
@@ -270,8 +278,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            status?: string;
-                            message?: string;
+                            data: components["schemas"]["Annotation"];
                         };
                     };
                 };
@@ -954,6 +961,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List dashboard widgets
+         * @description Lists every dashboard widget in this project, each with the React source file it renders and the named LangWatchQL queries it may run. Saved workbench charts and builder charts are different kinds and are not listed here.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets"];
+        put?: never;
+        /**
+         * Create a dashboard widget
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a dashboard widget
+         * @description Returns one dashboard widget with its React source and named queries. A widget saved in another project is reported as not found.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a dashboard widget
+         * @description Deletes one dashboard widget. Answers 204 with no body; deleting a widget that is not in this project is reported as not found.
+         */
+        delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a dashboard widget
+         * @description Replaces a dashboard widget's name, its { code, queries } definition, or both. code and queries are rewritten together — the graph blob holds them as one — so a request that offers one without the other, or neither field at all, is refused.
+         */
+        patch: operations["patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a dashboard widget to a dashboard
+         * @description Assigns a dashboard widget to a dashboard. The widget is repositioned to the next free row on that dashboard; its size (colSpan/rowSpan) is preserved.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/query": {
         parameters: {
             query?: never;
@@ -965,11 +1044,15 @@ export interface paths {
         put?: never;
         /**
          * Run a LangWatchQL query
-         * @description Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.
+         * @description Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.
          *
          *     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
          *
-         *     The project is taken from the credential — no project id appears anywhere in the path or the body, and none can be sent to select another one.
+         *     A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A projection may also call the eval functions, which judge a text with a model and are charged for; their key is the text itself. A run that would need more distinct conversations, traces, spans or texts than the published cap answers 422 rather than a partial result, and a run whose texts would exceed the per-query token budget answers 422 before anything is sent.
+         *
+         *     Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+         *
+         *     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.
          *
          *     Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.
          */
@@ -989,11 +1072,47 @@ export interface paths {
         };
         /**
          * Discover the queryable LangWatchQL schema
-         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
+         * @description Lists the LangWatchQL analytics views this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each view's grain, join keys, partition-pruning time column, freshness and a runnable example query. It also lists, under `functions`, every function name a query may call.
          *
-         *     Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
+         *     Under `appFunctions` it lists the app functions a projection may call, each with its signature, the type and encoding of the value it returns, how many distinct keys one run may read, and the permissions it needs.
+         *
+         *     Scoped to the projects the credential can read and their permissions: a column or app function this key cannot read in every one of them is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
+         *
+         *     Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
          */
         get: operations["getApiV1QuerySchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/query/reference": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover both query languages
+         * @description Describes both query languages in one payload: LangWatchQL (SQL over the analytics views) with its schema, limits and endpoints, and the trace filter (a Lucene-flavored string over the trace list) with its syntax, its fields and their static value vocabularies, and the open-ended attribute namespaces.
+         *
+         *     It also carries worked examples in both languages and a table saying which language answers which kind of question. Every example is checked against the real validator and the real translator before it ships, so a published example parses and compiles; whether THIS key can run one is its own `available` flag.
+         *
+         *     Pure: it reads the catalogs and this key's own permissions, never the project's traces, so it answers from memory rather than from the database.
+         *
+         *     It answers `Cache-Control: private, no-store`, because the document is shaped by the calling credential: `available`, the embedded schema and the gated columns all differ between keys, and a cache keyed on the URL or the project would replay one key's document to another. Ask for it again rather than storing it.
+         *
+         *     The values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.
+         *
+         *     An example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission it needs.
+         *
+         *     Any credential for the project may read it. The trace filter half is the traces family's vocabulary, so a key scoped to `traces:view` alone is answered rather than refused; for that key the LangWatchQL half arrives with `lwql.enabled: false` and an empty schema. `GET /api/v1/query/schema` is stricter and refuses that key outright, which is why this document withholds the catalog rather than repeating it.
+         */
+        get: operations["getApiV1QueryReference"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1145,6 +1264,23 @@ export interface paths {
         put?: never;
         /** @description Create a new dataset from an uploaded file (CSV, JSON, JSONL) */
         post: operations["postApiDatasetUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dataset/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field. */
+        post: operations["postApiDatasetAttachments"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1863,6 +1999,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/checkup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run the free checks of a self-hosted install
+         * @description The checkup `langwatch doctor` and the Settings > Checkup page show: one row per check with a pass, fail or not checked verdict. Checks that open a connection or spend money are reported as not checked here and run through `POST /api/checkup/run`. The response also carries the usage report this install would send next. Answers 404 on LangWatch Cloud.
+         */
+        get: operations["getApiCheckup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/checkup/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run the checks that open a connection or spend money
+         * @description Runs the egress and paid checks of a self-hosted install: reaching the connect and gateway hosts, the storage write, the SMTP connection, one model provider call and the pipeline canaries. Name the checks to run, or leave the list out to run them all. The scenario canary launches a real run and needs a run plan id. Answers 404 on LangWatch Cloud.
+         */
+        post: operations["postApiCheckupRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/gateway/v1/virtual-keys": {
         parameters: {
             query?: never;
@@ -1878,7 +2054,7 @@ export interface paths {
         put?: never;
         /**
          * Create virtual key
-         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
+         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app, so a caller that only relays the key (an agent printing a snippet) never holds it. `scopes` defaults to the caller's project, where `virtualKeys:create` is enough; org- and team-scoped keys, or a key for another project, require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
          */
         post: operations["postApiGatewayV1VirtualKeys"];
         delete?: never;
@@ -2323,6 +2499,108 @@ export interface paths {
         head?: never;
         /** @description Update a custom graph's name, definition, or filters */
         patch: operations["patchApiGraphsById"];
+        trace?: never;
+    };
+    "/api/v1/langy/control/connect/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Share a folder over HTTP, for a network that blocks WebSockets. The body is the register frame of the control protocol. Answers with the registered frame and the instance token the poll and frames endpoints are addressed with, or with a refused frame. */
+        post: operations["registerLangyControlSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/connect/poll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Wait for the next frames of a shared folder, then answer with what is waiting or with an empty list. Each poll is also the folder's heartbeat, so a command line that polls reads connected. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        get: operations["pollLangyControlSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/connect/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Post the frames the command line has for the platform: the acknowledgement of a call, its result, a permission the developer has to answer first, and the deregister that ends the share. */
+        post: operations["postLangyControlFrames"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the open requests Langy made for a folder of mine, on every project I can read. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made. */
+        get: operations["listLangyControlRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Approve one request and share the current folder with the conversation that asked. Answers with a Langy session key scoped to that conversation, which is never shown again. A request is single use: a second approval is refused. */
+        post: operations["approveLangyControlRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Refuse one request from the terminal. The card in the chat reads that sharing was cancelled, and Langy's next turn offers the choice again. */
+        post: operations["cancelLangyControlRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/me/usage": {
@@ -3211,7 +3489,7 @@ export interface paths {
         };
         /**
          * Get a project
-         * @description Get a project by ID, including its API key. Requires project:view permission.
+         * @description Get a project by ID without secret keys. Requires project:view permission.
          */
         get: operations["getProject"];
         put?: never;
@@ -3239,7 +3517,8 @@ export interface paths {
         };
         /**
          * Get the project API key
-         * @description Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with. Requires an admin API key holding project:update on this project.
+         * @deprecated
+         * @description Deprecated. Project base keys can be revealed only by a signed-in project administrator in the browser or an approved device flow. Organization API keys are always refused with 403.
          */
         get: operations["getProjectApiKey"];
         put?: never;
@@ -3261,7 +3540,8 @@ export interface paths {
         put?: never;
         /**
          * Regenerate the project API key
-         * @description Issue a new API key for the project and invalidate the previous one immediately. Anything still sending the old key starts failing authentication as soon as this returns, so roll it out before calling this. Requires an admin API key holding project:manage.
+         * @deprecated
+         * @description Deprecated. Project base keys can be rotated only by a signed-in project administrator in the browser. Organization API keys are always refused with 403.
          */
         post: operations["regenerateProjectApiKey"];
         delete?: never;
@@ -3467,6 +3747,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/instant-evals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's runs, newest first. The project comes from the credential, so a run of another project is never listed. Page through them with before, which takes the created time of the oldest run the previous page carried. */
+        get: operations["listInstantEvalRuns"];
+        put?: never;
+        /** @description Start a run. The statement is accepted, its questions are derived from the eval functions it projects, and the judging happens on the queue: the answer is the queued run, and its progress is read back from the run endpoint. A statement the query policy refuses, one that projects no TraceId, one that projects no eval function, and a row limit past what the plan allows are all refused before anything is judged. Instead of a statement you may send a target and your questions, and the statement is written for you and handed back on the run; sending both is refused. */
+        post: operations["createInstantEvalRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instant-evals/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Estimate a run
+         * @description Price a run without starting it. The rows are counted, a sample of their texts is measured, and the cost is worked out from that. Nothing is judged and nothing is charged. Takes the same body a run does, a statement or a target with questions.
+         */
+        post: operations["estimateInstantEvalRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instant-evals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one run: its status, how many rows it found and judged, how many matched in total and per question, what it could not answer, and the tokens, cost and price the judging came to. An id this project does not hold answers 404 instant_eval_not_found. */
+        get: operations["getInstantEvalRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instant-evals/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a run
+         * @description Ask a run to stop. The run stops before its next page, so the pages it already judged keep their judgements and are still readable. A run that has already finished, failed or been cancelled answers 409 instant_eval_already_finished.
+         */
+        post: operations["cancelInstantEvalRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instant-evals/{id}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a run's results
+         * @description Read the run's judgements, one page at a time. Pass the cursor a page answers with to read the page after it; the last page carries no cursor, and no judgement is ever carried by two pages. Narrow the page with questionId, matched and status.
+         */
+        get: operations["listInstantEvalRunResults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instant-evals/{id}/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sample a run
+         * @description Read a few of the run's rows with the text that was judged beside the verdict it received. The text is re-read through the statement's own extraction functions, so nothing is judged again and reading a sample is free.
+         */
+        get: operations["sampleInstantEvalRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/run-plans": {
         parameters: {
             query?: never;
@@ -3549,7 +3944,7 @@ export interface paths {
         /** @description List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family. */
         get: operations["listTestSuites"];
         put?: never;
-        /** @description Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. */
+        /** @description Create a test suite. It starts with no scenario: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. It may declare fields and attach evaluators from the start. */
         post: operations["createTestSuite"];
         delete?: never;
         options?: never;
@@ -3575,8 +3970,8 @@ export interface paths {
         delete: operations["archiveTestSuite"];
         options?: never;
         head?: never;
-        /** @description Rename a test suite. The slug is kept, so links and run history stay where they are. */
-        patch: operations["renameTestSuite"];
+        /** @description Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what changes. The slug is kept on a rename, so links and run history stay where they are. */
+        patch: operations["updateTestSuite"];
         trace?: never;
     };
     "/api/v1/test-suites/{id}/run": {
@@ -3806,6 +4201,32 @@ export interface paths {
         put?: never;
         /** @description Search traces for a project */
         post: operations["postApiTracesSearch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/traces/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover what the trace filter fields hold
+         * @description What the trace filter fields actually hold in THIS project, which the filter language's own reference deliberately does not carry: values are tenant data, they move under you, and reading them all costs about thirty aggregate queries.
+         *
+         *     Two answers from one door. Without `field` you get the discovery payload: every facet this project has, each with its top values and counts, plus the range bounds for the numeric ones. With `field` you get one field's values, paged, filtered by `prefix`.
+         *
+         *     The values are cached and refreshed in the background, so a cold project answers `pending: true` with the payload it has; call again shortly for the computed one.
+         *
+         *     Use it whenever you are unsure how a value is spelled. `GET /api/v1/query/reference` lists the fields and their fixed vocabularies; only this endpoint knows the open ones.
+         */
+        get: operations["getApiTracesFacets"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4302,23 +4723,23 @@ export interface components {
     schemas: {
         Annotation: {
             /** @description The ID of the annotation */
-            id?: string;
+            id: string;
             /** @description The ID of the project */
-            projectId?: string;
+            projectId: string;
             /** @description The ID of the trace */
-            traceId?: string;
+            traceId: string;
             /** @description The comment of the annotation */
-            comment?: string;
+            comment: string | null;
             /** @description The thumbs up status of the annotation */
-            isThumbsUp?: boolean;
+            isThumbsUp: boolean | null;
             /** @description The ID of the user */
-            userId?: string;
+            userId: string | null;
             /** @description The created at of the annotation */
-            createdAt?: string;
+            createdAt: string;
             /** @description The updated at of the annotation */
-            updatedAt?: string;
+            updatedAt: string;
             /** @description The email of the user */
-            email?: string;
+            email: string | null;
         };
         Error: {
             /** Format: int32 */
@@ -5172,6 +5593,17 @@ export interface operations {
                                 id: string;
                                 url: string;
                                 parameterNotes: string[];
+                                scope: {
+                                    /** @constant */
+                                    kind: "shared";
+                                } | {
+                                    /** @constant */
+                                    kind: "owner";
+                                } | {
+                                    /** @constant */
+                                    kind: "host";
+                                    hostLabel: string;
+                                };
                             }[];
                             heartbeatIntervalMs: number;
                             instanceId: string;
@@ -5402,7 +5834,7 @@ export interface operations {
                              * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                              * @enum {string}
                              */
-                            type: "signature" | "code" | "workflow" | "http" | "connected";
+                            type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                             config: {
                                 [key: string]: unknown;
                             } | null;
@@ -5451,6 +5883,13 @@ export interface operations {
                                 inflight: number;
                                 maxConcurrency: number;
                             }[];
+                            /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                            selectable: boolean;
+                            /**
+                             * @description Why the agent cannot be run by this credential. Null when it can.
+                             * @enum {string|null}
+                             */
+                            notSelectableReason: "owned_by_another_person" | null;
                             createdAt: string;
                             updatedAt: string;
                             /** Format: uri */
@@ -5482,7 +5921,7 @@ export interface operations {
                      * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
                      * @enum {string}
                      */
-                    type: "signature" | "code" | "workflow" | "http" | "connected";
+                    type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                     config: {
                         [key: string]: unknown;
                     };
@@ -5504,7 +5943,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -5553,6 +5992,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5587,7 +6033,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -5636,6 +6082,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5663,7 +6116,7 @@ export interface operations {
                      * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
                      * @enum {string}
                      */
-                    type?: "signature" | "code" | "workflow" | "http" | "connected";
+                    type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -5685,7 +6138,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -5734,6 +6187,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5765,7 +6225,7 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                         archivedAt: string | null;
                     };
                 };
@@ -5790,7 +6250,7 @@ export interface operations {
                      * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
                      * @enum {string}
                      */
-                    type?: "signature" | "code" | "workflow" | "http" | "connected";
+                    type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -5812,7 +6272,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -5861,6 +6321,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5914,6 +6381,13 @@ export interface operations {
             };
             /** @description The agent cannot be tested as it is set up */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No process is holding the connected agent right now */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6609,6 +7083,7 @@ export interface operations {
                     };
                     traceIds?: string[];
                     negateFilters?: boolean;
+                    excludeOrigins?: string[];
                     series: {
                         /** @enum {string} */
                         metric: "metadata.trace_id" | "metadata.user_id" | "metadata.thread_id" | "metadata.span_type" | "sentiment.thumbs_up_down" | "performance.completion_time" | "performance.first_token" | "performance.total_cost" | "performance.cost_billed" | "performance.cost_non_billed" | "performance.prompt_tokens" | "performance.completion_tokens" | "performance.cache_read_tokens" | "performance.cache_write_tokens" | "performance.reasoning_tokens" | "performance.total_processed_tokens" | "performance.total_tokens" | "performance.tokens_per_second" | "events.event_type" | "events.event_score" | "events.event_details" | "evaluations.evaluation_score" | "evaluations.evaluation_pass_rate" | "evaluations.evaluation_runs" | "threads.average_duration_per_thread";
@@ -7843,6 +8318,867 @@ export interface operations {
             };
         };
     };
+    getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The project's dashboard widgets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            name: string;
+                            definition: {
+                                version: number;
+                                code: string;
+                                queries: {
+                                    name: string;
+                                    sql: string;
+                                    parameters?: {
+                                        name: string;
+                                        /** @enum {string} */
+                                        type: "string" | "number" | "boolean";
+                                        default?: string | number | boolean;
+                                    }[];
+                                }[];
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                            platformUrl: string;
+                            dashboardId: string | null;
+                            gridColumn: number;
+                            gridRow: number;
+                            colSpan: number;
+                            rowSpan: number;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    code: string;
+                    queries: {
+                        name: string;
+                        sql: string;
+                        parameters?: {
+                            name: string;
+                            /** @enum {string} */
+                            type: "string" | "number" | "boolean";
+                            default?: string | number | boolean;
+                        }[];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The widget was saved */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The dashboard widget */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The widget was deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    code?: string;
+                    queries?: {
+                        name: string;
+                        sql: string;
+                        parameters?: {
+                            name: string;
+                            /** @enum {string} */
+                            type: "string" | "number" | "boolean";
+                            default?: string | number | boolean;
+                        }[];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The updated widget */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    dashboardId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The widget was added to the dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     postApiV1Query: {
         parameters: {
             query?: never;
@@ -7866,7 +9202,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The query ran. Columns, rows, execution statistics, truncation state and diagnostics, scoped to the caller's project. */
+            /** @description The query ran. Columns, rows, execution statistics and diagnostics, scoped to the projects the key can read. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7886,14 +9222,13 @@ export interface operations {
                             bytesRead: number;
                             rowsReturned: number;
                         };
-                        truncated: boolean;
                         followsTimeWindow: boolean;
                         followsGranularity: boolean;
                         granularitySeconds?: number;
                         coarsenedFromSeconds?: number;
                         diagnostics: {
                             /** @enum {string} */
-                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED" | "INSTANT_EVAL_SKIPPED";
                             message: string;
                             meta?: {
                                 [key: string]: unknown;
@@ -8013,7 +9348,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The datasets and columns this key may query, with the permissions that unlock each one. */
+            /** @description The views and columns this key may query, with the permissions that unlock each one. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8021,7 +9356,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         database: string;
-                        datasets: {
+                        views: {
                             name: string;
                             description: string;
                             grain: string;
@@ -8038,6 +9373,229 @@ export interface operations {
                                 available: boolean;
                             }[];
                             exampleSql: string;
+                        }[];
+                        functions: string[];
+                        appFunctions: {
+                            name: string;
+                            signature: string;
+                            description: string;
+                            /** @enum {string} */
+                            kind: "extraction" | "eval";
+                            returns: string;
+                            /** @enum {string} */
+                            encoding: "text" | "json";
+                            /** @enum {string} */
+                            keyKind: "trace" | "thread" | "span" | "text";
+                            cap: number;
+                            gates: ("input" | "output" | "costs")[];
+                            available: boolean;
+                            exampleSql: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1QueryReference: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The LangWatchQL schema and limits, the trace filter's syntax and fields, worked examples in both languages, and which language answers which kind of question. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: string;
+                        lwql: {
+                            enabled: boolean;
+                            schema: {
+                                database: string;
+                                views: {
+                                    name: string;
+                                    description: string;
+                                    grain: string;
+                                    joinKeys: string[];
+                                    timeColumn: string;
+                                    freshness: string;
+                                    columns: {
+                                        name: string;
+                                        type: string;
+                                        description: string;
+                                        /** @enum {string|null} */
+                                        unit: "ms" | "USD" | "tokens" | "tokens/s" | null;
+                                        gates: ("input" | "output" | "costs")[];
+                                        available: boolean;
+                                    }[];
+                                    exampleSql: string;
+                                }[];
+                                functions: string[];
+                                appFunctions: {
+                                    name: string;
+                                    signature: string;
+                                    description: string;
+                                    /** @enum {string} */
+                                    kind: "extraction" | "eval";
+                                    returns: string;
+                                    /** @enum {string} */
+                                    encoding: "text" | "json";
+                                    /** @enum {string} */
+                                    keyKind: "trace" | "thread" | "span" | "text";
+                                    cap: number;
+                                    gates: ("input" | "output" | "costs")[];
+                                    available: boolean;
+                                    exampleSql: string;
+                                }[];
+                            };
+                            limits: {
+                                maxStatementLength: number;
+                                maxRowsReturned: number;
+                                maxResultBytes: number;
+                                maxExecutionTimeSeconds: number;
+                                pagination: string;
+                            };
+                            endpoints: {
+                                /** @enum {string} */
+                                method: "GET" | "POST";
+                                path: string;
+                                description: string;
+                            }[];
+                        };
+                        traceFilter: {
+                            syntax: string;
+                            fields: {
+                                name: string;
+                                label: string;
+                                /** @enum {string} */
+                                valueType: "categorical" | "range" | "text" | "existence";
+                                group: string | null;
+                                facetable: boolean;
+                                knownValues: string[];
+                            }[];
+                            dynamicPrefixes: {
+                                prefix: string;
+                                label: string;
+                                description: string;
+                                aliases: string[];
+                            }[];
+                            endpoints: {
+                                /** @enum {string} */
+                                method: "GET" | "POST";
+                                path: string;
+                                description: string;
+                            }[];
+                        };
+                        examples: {
+                            id: string;
+                            title: string;
+                            /** @enum {string} */
+                            intent: "triage" | "cost" | "latency" | "quality" | "conversations" | "discovery" | "export";
+                            /** @enum {string} */
+                            language: "lwql" | "trace-filter";
+                            tags: string[];
+                            text: string;
+                            parameters: {
+                                name: string;
+                                type: string;
+                                description: string;
+                            }[];
+                            requires: {
+                                gates: ("input" | "output" | "costs")[];
+                                functions: string[];
+                            };
+                            available: boolean;
+                            notes?: string;
+                        }[];
+                        decisionTable: {
+                            when: string;
+                            use: string;
+                            why: string;
                         }[];
                     };
                 };
@@ -8565,7 +10123,7 @@ export interface operations {
                     /** @default [] */
                     columnTypes?: {
                         name: string;
-                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                     }[];
                 };
             };
@@ -8581,6 +10139,134 @@ export interface operations {
         };
         requestBody?: never;
         responses: never;
+    };
+    postApiDatasetAttachments: {
+        parameters: {
+            query: {
+                /** @description The project the file is stored for. */
+                projectId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description The file to store.
+                     */
+                    file: string;
+                    /** @description The dataset that owns the file. Omit it while the dataset is still a draft. */
+                    datasetId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The reference the cell holds, and the file's metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The value to write into the cell, and the address the file is served from. */
+                        url: string;
+                        /** @description The file name the reference carries. */
+                        name: string;
+                        /** @description The media type the file is stored under. */
+                        mediaType: string;
+                        /** @description The size of the stored file, in bytes. */
+                        sizeBytes: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The file is larger than the upload limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The media type is not accepted. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Too many uploads for this project in one minute. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
     };
     postApiDatasetDirectUpload: {
         parameters: {
@@ -8841,7 +10527,7 @@ export interface operations {
                     name?: string;
                     columnTypes?: {
                         name: string;
-                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                     }[];
                 };
             };
@@ -11671,6 +13357,7 @@ export interface operations {
                     };
                     traceIds?: string[];
                     negateFilters?: boolean;
+                    excludeOrigins?: string[];
                     series: {
                         /** @enum {string} */
                         metric: "metadata.trace_id" | "metadata.user_id" | "metadata.thread_id" | "metadata.span_type" | "sentiment.thumbs_up_down" | "performance.completion_time" | "performance.first_token" | "performance.total_cost" | "performance.cost_billed" | "performance.cost_non_billed" | "performance.prompt_tokens" | "performance.completion_tokens" | "performance.cache_read_tokens" | "performance.cache_write_tokens" | "performance.reasoning_tokens" | "performance.total_processed_tokens" | "performance.total_tokens" | "performance.tokens_per_second" | "events.event_type" | "events.event_score" | "events.event_details" | "evaluations.evaluation_score" | "evaluations.evaluation_pass_rate" | "evaluations.evaluation_runs" | "threads.average_duration_per_thread";
@@ -12864,6 +14551,120 @@ export interface operations {
             };
         };
     };
+    getApiCheckup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The checkup report and the usage report preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        ranAt: string;
+                        rows: {
+                            /** @description The check, one of the ids `POST /api/checkup/run` accepts. */
+                            id: string;
+                            name: string;
+                            /** @enum {string} */
+                            group: "install" | "langwatch" | "integrations" | "pipelines";
+                            /**
+                             * @description Free checks run on every call; egress and paid ones only through `POST /api/checkup/run`.
+                             * @enum {string}
+                             */
+                            cost: "free" | "egress" | "paid";
+                            verdict: {
+                                /** @enum {string} */
+                                outcome: "verified" | "refused" | "unchecked";
+                                detail: string;
+                                /** @description Present on a refused verdict: the stable error code. */
+                                code?: string;
+                                fix?: string;
+                                docsPath?: string;
+                            };
+                        }[];
+                        usageReport: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description The install is LangWatch Cloud, or the key's project has no organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postApiCheckupRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description The check ids to run. Omit to run every explicit check. */
+                    checks?: string[];
+                    /** @description The run plan the scenario canary launches. */
+                    scenarioRunPlanId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The rows of the checks that ran. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        ranAt: string;
+                        rows: {
+                            /** @description The check, one of the ids `POST /api/checkup/run` accepts. */
+                            id: string;
+                            name: string;
+                            /** @enum {string} */
+                            group: "install" | "langwatch" | "integrations" | "pipelines";
+                            /**
+                             * @description Free checks run on every call; egress and paid ones only through `POST /api/checkup/run`.
+                             * @enum {string}
+                             */
+                            cost: "free" | "egress" | "paid";
+                            verdict: {
+                                /** @enum {string} */
+                                outcome: "verified" | "refused" | "unchecked";
+                                detail: string;
+                                /** @description Present on a refused verdict: the stable error code. */
+                                code?: string;
+                                fix?: string;
+                                docsPath?: string;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description The install is LangWatch Cloud, or the key's project has no organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     getApiGatewayV1VirtualKeys: {
         parameters: {
             query?: {
@@ -13031,6 +14832,7 @@ export interface operations {
                     name: string;
                     description?: string;
                     principal_user_id?: string | null;
+                    reveal_once?: boolean;
                     scopes?: {
                         /** @enum {string} */
                         scope_type: "organization" | "team" | "project";
@@ -13183,7 +14985,12 @@ export interface operations {
                              */
                             expires_at: string | null;
                         };
-                        secret: string;
+                        /** @description The secret, absent when `reveal_once` was set. */
+                        secret?: string;
+                        /** @description With `reveal_once`: the id that serves the secret once, through the app. */
+                        reveal_id?: string;
+                        /** @description With `reveal_once`: the key's display prefix, safe to show in place of the secret. */
+                        preview?: string;
                     };
                 };
             };
@@ -13227,7 +15034,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Caller lacks virtualKeys:manage at a requested scope */
+            /** @description Caller lacks virtualKeys:create on its own project, or virtualKeys:manage at a scope beyond it */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -17754,6 +19561,512 @@ export interface operations {
             };
         };
     };
+    registerLangyControlSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {number} */
+                    protocol: 1;
+                    /** @enum {string} */
+                    type: "register";
+                    cli: {
+                        name: string;
+                        version: string;
+                    };
+                    instance: {
+                        id: string;
+                        hostname: string;
+                        username: string;
+                        pid: number;
+                        startedAt: string;
+                        /** @default [] */
+                        inFlightCallIds?: string[];
+                    };
+                    workspace: {
+                        root: string;
+                        name: string;
+                        gitRepository?: boolean;
+                        gitBranch?: string;
+                        gitRemote?: string;
+                        gitDirty?: boolean;
+                        os: string;
+                        nodeVersion?: string;
+                        pythonVersion?: string;
+                        ghAuthenticated?: boolean;
+                        packageManager?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The folder is shared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The registered frame, or the refused frame with its reason. */
+                        frame: {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "registered";
+                            instanceId: string;
+                            heartbeatIntervalMs: number;
+                            conversation: {
+                                id: string;
+                                title: string;
+                                url: string;
+                            };
+                            policy: {
+                                skipPermissions: boolean;
+                            };
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "refused";
+                            /** @enum {string} */
+                            code: "api_key_invalid" | "key_type_not_allowed" | "conversation_mismatch" | "workspace_already_connected" | "replica_count_unsupported" | "protocol_invalid";
+                            message: string;
+                        };
+                        /** @description The token the poll and frames endpoints are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted. */
+                        instanceToken?: string;
+                    };
+                };
+            };
+            /** @description The session key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The key is not a Langy session key, or it controls no conversation: a refused frame */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body is not a register frame */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    pollLangyControlSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The frames waiting for the folder, possibly none */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The frames waiting for the folder; empty once the poll wait passes with none. */
+                        frames: ({
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "registered";
+                            instanceId: string;
+                            heartbeatIntervalMs: number;
+                            conversation: {
+                                id: string;
+                                title: string;
+                                url: string;
+                            };
+                            policy: {
+                                skipPermissions: boolean;
+                            };
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "refused";
+                            /** @enum {string} */
+                            code: "api_key_invalid" | "key_type_not_allowed" | "conversation_mismatch" | "workspace_already_connected" | "replica_count_unsupported" | "protocol_invalid";
+                            message: string;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "call";
+                            call: {
+                                callId: string;
+                                conversationId: string;
+                                turnId: string;
+                                deadlineAt: number;
+                            } & ({
+                                /** @constant */
+                                tool: "local_read";
+                                params: {
+                                    path: string;
+                                    offset?: number;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_write";
+                                params: {
+                                    path: string;
+                                    content: string;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_edit";
+                                params: {
+                                    path: string;
+                                    edits: ({
+                                        oldText: string;
+                                        newText: string;
+                                    } | {
+                                        append: string;
+                                    })[];
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_bash";
+                                params: {
+                                    command: string;
+                                    timeout?: number;
+                                    background?: boolean;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_grep";
+                                params: {
+                                    pattern: string;
+                                    path?: string;
+                                    glob?: string;
+                                    ignoreCase?: boolean;
+                                    literal?: boolean;
+                                    context?: number;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_find";
+                                params: {
+                                    pattern: string;
+                                    path?: string;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_ls";
+                                params: {
+                                    path?: string;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_langwatch_env";
+                                params: {
+                                    path?: string;
+                                };
+                            });
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "cancel";
+                            callId: string;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "permission";
+                            callId: string;
+                            /** @enum {string} */
+                            decision: "allow_once" | "allow_pattern" | "deny" | "expired";
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "policy";
+                            skipPermissions: boolean;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "disconnect";
+                            reason: string;
+                        })[];
+                    };
+                };
+            };
+            /** @description The instance token is not known; share the folder again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postLangyControlFrames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Ack, result, permission_required and deregister frames, in order. */
+                    frames: ({
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "register";
+                        cli: {
+                            name: string;
+                            version: string;
+                        };
+                        instance: {
+                            id: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            startedAt: string;
+                            /** @default [] */
+                            inFlightCallIds?: string[];
+                        };
+                        workspace: {
+                            root: string;
+                            name: string;
+                            gitRepository?: boolean;
+                            gitBranch?: string;
+                            gitRemote?: string;
+                            gitDirty?: boolean;
+                            os: string;
+                            nodeVersion?: string;
+                            pythonVersion?: string;
+                            ghAuthenticated?: boolean;
+                            packageManager?: string;
+                        };
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "ack";
+                        callId: string;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "result";
+                        callId: string;
+                        ok: boolean;
+                        text?: string;
+                        output?: {
+                            exitCode: number | null;
+                            stdout: string;
+                            stderr: string;
+                            truncated: boolean;
+                            logPath?: string;
+                            pid?: number;
+                            durationMs: number;
+                        };
+                        error?: {
+                            /** @enum {string} */
+                            code: "path_refused" | "command_refused" | "permission_denied" | "permission_expired" | "cancelled" | "timeout" | "exec_failed" | "not_found" | "key_refused";
+                            message: string;
+                        };
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "permission_required";
+                        callId: string;
+                        summary: string;
+                        pattern: string;
+                        reason: string;
+                        skipOffered: boolean;
+                        segments?: {
+                            command: string;
+                            pattern: string;
+                            readOnly: boolean;
+                        }[];
+                        timeoutSeconds?: number;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "permission_answered";
+                        callId: string;
+                        /** @enum {string} */
+                        decision: "allow_once" | "allow_pattern" | "deny";
+                        patterns?: string[];
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "deregister";
+                    })[];
+                };
+            };
+        };
+        responses: {
+            /** @description The frames were taken */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description How many frames were taken. */
+                        accepted: number;
+                    };
+                };
+            };
+            /** @description The instance token is not known; share the folder again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body is not a list of frames */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listLangyControlRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        requests: {
+                            id: string;
+                            conversationId: string;
+                            conversationTitle: string;
+                            conversationUrl: string;
+                            projectId: string;
+                            projectName: string;
+                            createdAt: string;
+                            expiresAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    approveLangyControlRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The control request id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    workspace: {
+                        root: string;
+                        name: string;
+                        gitRepository?: boolean;
+                        gitBranch?: string;
+                        gitRemote?: string;
+                        gitDirty?: boolean;
+                        os: string;
+                        nodeVersion?: string;
+                        pythonVersion?: string;
+                        ghAuthenticated?: boolean;
+                        packageManager?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sessionKey: string;
+                        endpoint: string;
+                        conversation: {
+                            id: string;
+                            title: string;
+                            url: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    cancelLangyControlRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The control request id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The request that was cancelled. */
+                        id: string;
+                        /**
+                         * @description Always true once the request is gone.
+                         * @constant
+                         */
+                        cancelled: true;
+                    };
+                };
+            };
+        };
+    };
     getApiMeUsage: {
         parameters: {
             query?: {
@@ -17962,7 +20275,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -17987,7 +20300,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -18004,7 +20317,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -18111,7 +20424,7 @@ export interface operations {
                     inputs?: {
                         identifier: string;
                         /** @enum {string} */
-                        type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                        type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                     }[];
                     outputs?: {
                         identifier: string;
@@ -18165,7 +20478,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -18190,7 +20503,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -18207,7 +20520,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -18731,7 +21044,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -18756,7 +21069,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -18773,7 +21086,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -18905,7 +21218,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -18930,7 +21243,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -18947,7 +21260,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -19084,7 +21397,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -19109,7 +21422,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -19126,7 +21439,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -19241,7 +21554,7 @@ export interface operations {
                     inputs?: {
                         identifier: string;
                         /** @enum {string} */
-                        type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                        type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                     }[];
                     outputs?: {
                         identifier: string;
@@ -19298,7 +21611,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -19323,7 +21636,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -19340,7 +21653,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -19549,7 +21862,7 @@ export interface operations {
                         inputs?: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -19586,7 +21899,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -19603,7 +21916,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -19662,7 +21975,7 @@ export interface operations {
                             inputs: {
                                 identifier: string;
                                 /** @enum {string} */
-                                type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                                type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                             }[];
                             outputs: {
                                 identifier: string;
@@ -19687,7 +22000,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -19704,7 +22017,7 @@ export interface operations {
                                         columnTypes: {
                                             id?: string;
                                             name: string;
-                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                         }[];
                                     };
                                 };
@@ -19745,7 +22058,7 @@ export interface operations {
                                 inputs: {
                                     identifier: string;
                                     /** @enum {string} */
-                                    type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                                    type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                                 }[];
                                 outputs: {
                                     identifier: string;
@@ -19782,7 +22095,7 @@ export interface operations {
                                         columnTypes: {
                                             id?: string;
                                             name: string;
-                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                         }[];
                                     };
                                 };
@@ -19799,7 +22112,7 @@ export interface operations {
                                             columnTypes: {
                                                 id?: string;
                                                 name: string;
-                                                type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                                type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                             }[];
                                         };
                                     };
@@ -21799,7 +24112,6 @@ export interface operations {
                         scopeId: string;
                         scopeName: string | null;
                         createdAt: string;
-                        hasLegacyAccessNotice?: boolean;
                     };
                 };
             };
@@ -23437,7 +25749,7 @@ export interface operations {
                         langwatch?: {
                             targetReferenceId: string;
                             /** @enum {string} */
-                            targetType: "prompt" | "http" | "code" | "workflow" | "connected";
+                            targetType: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             targetKey?: string;
                             targetParameters?: {
                                 [key: string]: string | number | boolean;
@@ -23455,6 +25767,14 @@ export interface operations {
                                 hostname: string;
                                 label: string | null;
                             };
+                            /** @enum {string} */
+                            callerKind?: "simulated" | "human";
+                            caller?: {
+                                voice: string;
+                                interruptProbability: number;
+                                effects: string;
+                            };
+                            isCutAtLimit?: boolean;
                         };
                     } & {
                         [key: string]: unknown;
@@ -23470,7 +25790,7 @@ export interface operations {
                     /** @default default */
                     scenarioSetId?: string;
                     /** @enum {string} */
-                    status: "SUCCESS" | "ERROR" | "CANCELLED" | "IN_PROGRESS" | "PENDING" | "FAILED" | "STALLED" | "QUEUED" | "RUNNING";
+                    status: "SUCCESS" | "ERROR" | "CANCELLED" | "IN_PROGRESS" | "PENDING" | "FAILED" | "STALLED" | "QUEUED" | "RUNNING" | "PENDING_EVALUATION";
                     results?: {
                         /** @enum {string} */
                         verdict: "success" | "failure" | "inconclusive";
@@ -23478,6 +25798,24 @@ export interface operations {
                         metCriteria: string[];
                         unmetCriteria: string[];
                         error?: string;
+                        evaluations?: {
+                            evaluatorId: string;
+                            name: string;
+                            /** @enum {string} */
+                            status: "passed" | "failed" | "scored" | "skipped" | "error";
+                            required: boolean;
+                            passed?: boolean;
+                            score?: number;
+                            label?: string;
+                            details?: string;
+                            cost?: {
+                                currency: string;
+                                amount: number;
+                            };
+                            inputs?: {
+                                [key: string]: string;
+                            };
+                        }[];
                     } | null;
                 } | {
                     /** @constant */
@@ -24188,6 +26526,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -24280,6 +26622,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -24316,6 +26662,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -24414,6 +26764,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -24518,6 +26872,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -24554,6 +26912,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -24743,6 +27105,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -24779,6 +27145,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -25004,6 +27374,10 @@ export interface operations {
                             judgeModel: string | null;
                             maxTurns: number | null;
                             minTurns: number | null;
+                            /** @description The field values as this version saved them. Absent on servers that predate suite fields. */
+                            fields?: {
+                                [key: string]: string | number | boolean;
+                            };
                         };
                     };
                 };
@@ -25344,18 +27718,6 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The project's API key */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @description Send as X-Auth-Token, Bearer, or Basic */
-                        apiKey: string;
-                    };
-                };
-            };
             /** @description Invalid or missing API key token */
             401: {
                 headers: {
@@ -25363,15 +27725,8 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Insufficient permissions for this operation */
+            /** @description A signed-in project administrator is required; API-key principals cannot reveal base keys */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No project with that id in this organization */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -25391,18 +27746,6 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The new API key. The previous one no longer authenticates. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @description Send as X-Auth-Token, Bearer, or Basic */
-                        apiKey: string;
-                    };
-                };
-            };
             /** @description Invalid or missing API key token */
             401: {
                 headers: {
@@ -25410,15 +27753,8 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Insufficient permissions for this operation */
+            /** @description A signed-in project administrator is required; API-key principals cannot rotate base keys */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No project with that id in this organization */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -25889,6 +28225,7 @@ export interface operations {
                             scenarioRunId: string;
                             name: string | null;
                             description: string | null;
+                            /** @description Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final. */
                             status: string;
                             results: {
                                 verdict?: string | null;
@@ -25896,6 +28233,25 @@ export interface operations {
                                 metCriteria?: string[];
                                 unmetCriteria?: string[];
                                 error?: string | null;
+                                /** @description One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators. */
+                                evaluations?: {
+                                    evaluatorId: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    status: "passed" | "failed" | "scored" | "skipped" | "error";
+                                    required: boolean;
+                                    passed?: boolean;
+                                    score?: number;
+                                    label?: string;
+                                    details?: string;
+                                    cost?: {
+                                        currency: string;
+                                        amount: number;
+                                    };
+                                    inputs?: {
+                                        [key: string]: string;
+                                    };
+                                }[];
                             } | null;
                             messages: {
                                 role: string;
@@ -25992,6 +28348,7 @@ export interface operations {
                         scenarioRunId: string;
                         name: string | null;
                         description: string | null;
+                        /** @description Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final. */
                         status: string;
                         results: {
                             verdict?: string | null;
@@ -25999,6 +28356,25 @@ export interface operations {
                             metCriteria?: string[];
                             unmetCriteria?: string[];
                             error?: string | null;
+                            /** @description One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators. */
+                            evaluations?: {
+                                evaluatorId: string;
+                                name: string;
+                                /** @enum {string} */
+                                status: "passed" | "failed" | "scored" | "skipped" | "error";
+                                required: boolean;
+                                passed?: boolean;
+                                score?: number;
+                                label?: string;
+                                details?: string;
+                                cost?: {
+                                    currency: string;
+                                    amount: number;
+                                };
+                                inputs?: {
+                                    [key: string]: string;
+                                };
+                            }[];
                         } | null;
                         messages: {
                             role: string;
@@ -26329,7 +28705,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -26438,7 +28814,7 @@ export interface operations {
                          * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                         /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -26492,7 +28868,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -26608,7 +28984,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -26812,7 +29188,7 @@ export interface operations {
                          * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                         /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -26864,7 +29240,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -26994,7 +29370,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -27096,7 +29472,7 @@ export interface operations {
                          * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                         /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -27143,7 +29519,7 @@ export interface operations {
                                  * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                                 /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -27220,6 +29596,707 @@ export interface operations {
             };
         };
     };
+    listInstantEvalRuns: {
+        parameters: {
+            query?: {
+                /** @description Runs to list, at most one hundred. */
+                limit?: number;
+                /** @description List runs accepted strictly before this instant, as an ISO 8601 timestamp. Half of the list's cursor: pass `beforeId` with it. */
+                before?: string;
+                /** @description The id of the last run of the previous page. Two runs can share an instant, so this is what keeps a page from skipping the others written in the same millisecond. */
+                beforeId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The project's runs, newest first. */
+                        runs: {
+                            /** @description The run id. */
+                            id: string;
+                            /** @description What the run was called, if anything. */
+                            name: string | null;
+                            /** @description The statement, exactly as submitted. */
+                            sql: string;
+                            /** @description The values the statement's parameters were filled with. */
+                            parameters: {
+                                [key: string]: (string | number | boolean | null) | string[];
+                            };
+                            /** @description One entry per eval function the statement projects, derived from it when the run was accepted. */
+                            questions: {
+                                /** @description The statement's own output column, which is the name this question is addressed by everywhere else. */
+                                id: string;
+                                /** @description The eval function that asked it. */
+                                function: string;
+                                /**
+                                 * @description What kind of answer the question takes.
+                                 * @enum {string}
+                                 */
+                                kind: "boolean" | "score" | "category";
+                                /** @description Which part of the verdict the statement's column carries. */
+                                reads: string;
+                                /** @description Where a boolean question's probability becomes a pass. Null for a question that is not a boolean. */
+                                threshold: number | null;
+                            }[];
+                            /** @description Rows this run may judge. */
+                            limit: number;
+                            /**
+                             * @description Where the run is in its life.
+                             * @enum {string}
+                             */
+                            status: "queued" | "planning" | "running" | "finished" | "failed" | "cancelled";
+                            /** @description Rows the run found, bounded by its limit. Null until it has looked. */
+                            total: number | null;
+                            /** @description Rows judged so far. */
+                            progress: number;
+                            /** @description Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count. */
+                            matched: number | null;
+                            /** @description Per question: matches for a boolean question, judged rows for a score or a category one. */
+                            matchedByQuestion: {
+                                [key: string]: number;
+                            };
+                            /** @description Rows the judge could not answer. */
+                            failed: number;
+                            /** @description Rows the judge declined to answer. */
+                            skipped: number;
+                            /** @description Input tokens the judge billed for. */
+                            tokens: number;
+                            /** @description What the judging costs you, in United States dollars. */
+                            priceUsd: number;
+                            /** @description The code of the failure that ended the run, when one did. */
+                            error: string | null;
+                            /** @description When the run was accepted. */
+                            createdAt: string;
+                            /** @description When the run was last written to. */
+                            updatedAt: string;
+                            /** @description When the run began reading rows. */
+                            startedAt: string | null;
+                            /** @description When the run ended. */
+                            finishedAt: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    createInstantEvalRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. Send this or target, never both. */
+                    sql?: string;
+                    /** @description Values for the parameters the statement declares. */
+                    parameters?: {
+                        [key: string]: string | number | boolean | null;
+                    };
+                    /**
+                     * @description What one judged row is, in place of a statement: a trace, a conversation, or one model call. The statement is written for you from this and the questions, and handed back on the run so you can edit it and resubmit.
+                     * @enum {string}
+                     */
+                    target?: "traces" | "threads" | "llm_spans";
+                    /** @description With target: a trace filter, in the language the trace explorer's search bar speaks, narrowing which rows are judged. */
+                    filter?: string;
+                    /**
+                     * Format: date-time
+                     * @description With target: the oldest instant to judge, as an ISO 8601 timestamp. Defaults to seven days ago.
+                     */
+                    start?: string;
+                    /**
+                     * Format: date-time
+                     * @description With target: the newest instant to judge. Defaults to now.
+                     */
+                    end?: string;
+                    /** @description With target: what to ask of each row. One classification asks them all per row, and the question text is part of what that classification is priced on; the estimate endpoint prices the exact set. */
+                    questions?: {
+                        /** @description What to call this question. It becomes the statement's output column and the name every judgement is filed under. Defaults to q1, q2 and so on. */
+                        id?: string;
+                        /**
+                         * @description What kind of answer you want: a yes or no, a rating on a scale, or one of a list of options.
+                         * @default boolean
+                         * @enum {string}
+                         */
+                        kind?: "boolean" | "score" | "category";
+                        /** @description The question, in your own words, as you would write it for a human reader. */
+                        instructions: string;
+                        /** @description For a yes or no question: what counts as yes, then what counts as no. Cannot be combined with a threshold. */
+                        criteria?: string[];
+                        /** @description For a yes or no question: the probability at or above which the answer counts as yes. Without one the column carries the probability itself and a run draws the line at an even chance. */
+                        threshold?: number;
+                        /** @description For a rating: the two ends of the scale. */
+                        range?: {
+                            /** @description The lowest level of the scale. */
+                            min: number;
+                            /** @description The highest level of the scale. */
+                            max: number;
+                        };
+                        /** @description For a choice: the options to pick between. */
+                        options?: {
+                            /** @description What the column holds when this option is the answer. */
+                            name: string;
+                            /** @description What this option means, in your own words. */
+                            description: string;
+                        }[];
+                    }[];
+                    /** @description What to call the run. Yours to choose. */
+                    name?: string;
+                    /** @description Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap. */
+                    limit?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run id. */
+                        id: string;
+                        /** @description What the run was called, if anything. */
+                        name: string | null;
+                        /** @description The statement, exactly as submitted. */
+                        sql: string;
+                        /** @description The values the statement's parameters were filled with. */
+                        parameters: {
+                            [key: string]: (string | number | boolean | null) | string[];
+                        };
+                        /** @description One entry per eval function the statement projects, derived from it when the run was accepted. */
+                        questions: {
+                            /** @description The statement's own output column, which is the name this question is addressed by everywhere else. */
+                            id: string;
+                            /** @description The eval function that asked it. */
+                            function: string;
+                            /**
+                             * @description What kind of answer the question takes.
+                             * @enum {string}
+                             */
+                            kind: "boolean" | "score" | "category";
+                            /** @description Which part of the verdict the statement's column carries. */
+                            reads: string;
+                            /** @description Where a boolean question's probability becomes a pass. Null for a question that is not a boolean. */
+                            threshold: number | null;
+                        }[];
+                        /** @description Rows this run may judge. */
+                        limit: number;
+                        /**
+                         * @description Where the run is in its life.
+                         * @enum {string}
+                         */
+                        status: "queued" | "planning" | "running" | "finished" | "failed" | "cancelled";
+                        /** @description Rows the run found, bounded by its limit. Null until it has looked. */
+                        total: number | null;
+                        /** @description Rows judged so far. */
+                        progress: number;
+                        /** @description Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count. */
+                        matched: number | null;
+                        /** @description Per question: matches for a boolean question, judged rows for a score or a category one. */
+                        matchedByQuestion: {
+                            [key: string]: number;
+                        };
+                        /** @description Rows the judge could not answer. */
+                        failed: number;
+                        /** @description Rows the judge declined to answer. */
+                        skipped: number;
+                        /** @description Input tokens the judge billed for. */
+                        tokens: number;
+                        /** @description What the judging costs you, in United States dollars. */
+                        priceUsd: number;
+                        /** @description The code of the failure that ended the run, when one did. */
+                        error: string | null;
+                        /** @description When the run was accepted. */
+                        createdAt: string;
+                        /** @description When the run was last written to. */
+                        updatedAt: string;
+                        /** @description When the run began reading rows. */
+                        startedAt: string | null;
+                        /** @description When the run ended. */
+                        finishedAt: string | null;
+                    };
+                };
+            };
+        };
+    };
+    estimateInstantEvalRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. Send this or target, never both. */
+                    sql?: string;
+                    /** @description Values for the parameters the statement declares. */
+                    parameters?: {
+                        [key: string]: string | number | boolean | null;
+                    };
+                    /**
+                     * @description What one judged row is, in place of a statement: a trace, a conversation, or one model call. The statement is written for you from this and the questions, and handed back on the run so you can edit it and resubmit.
+                     * @enum {string}
+                     */
+                    target?: "traces" | "threads" | "llm_spans";
+                    /** @description With target: a trace filter, in the language the trace explorer's search bar speaks, narrowing which rows are judged. */
+                    filter?: string;
+                    /**
+                     * Format: date-time
+                     * @description With target: the oldest instant to judge, as an ISO 8601 timestamp. Defaults to seven days ago.
+                     */
+                    start?: string;
+                    /**
+                     * Format: date-time
+                     * @description With target: the newest instant to judge. Defaults to now.
+                     */
+                    end?: string;
+                    /** @description With target: what to ask of each row. One classification asks them all per row, and the question text is part of what that classification is priced on; the estimate endpoint prices the exact set. */
+                    questions?: {
+                        /** @description What to call this question. It becomes the statement's output column and the name every judgement is filed under. Defaults to q1, q2 and so on. */
+                        id?: string;
+                        /**
+                         * @description What kind of answer you want: a yes or no, a rating on a scale, or one of a list of options.
+                         * @default boolean
+                         * @enum {string}
+                         */
+                        kind?: "boolean" | "score" | "category";
+                        /** @description The question, in your own words, as you would write it for a human reader. */
+                        instructions: string;
+                        /** @description For a yes or no question: what counts as yes, then what counts as no. Cannot be combined with a threshold. */
+                        criteria?: string[];
+                        /** @description For a yes or no question: the probability at or above which the answer counts as yes. Without one the column carries the probability itself and a run draws the line at an even chance. */
+                        threshold?: number;
+                        /** @description For a rating: the two ends of the scale. */
+                        range?: {
+                            /** @description The lowest level of the scale. */
+                            min: number;
+                            /** @description The highest level of the scale. */
+                            max: number;
+                        };
+                        /** @description For a choice: the options to pick between. */
+                        options?: {
+                            /** @description What the column holds when this option is the answer. */
+                            name: string;
+                            /** @description What this option means, in your own words. */
+                            description: string;
+                        }[];
+                    }[];
+                    /** @description What to call the run. Yours to choose. */
+                    name?: string;
+                    /** @description Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap. */
+                    limit?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Rows the statement matches, bounded by the run's limit. */
+                        rows: number;
+                        /** @description Whether the statement matches more rows than the run may judge. */
+                        isRowsCapped: boolean;
+                        /** @description Input tokens one judged row sends, measured from a sample. */
+                        avgTokens: number;
+                        /** @description Input tokens the whole run would send. */
+                        totalTokens: number;
+                        /** @description Classifications the run would make, one per judged row. */
+                        requests: number;
+                        /** @description What the run would cost you, in United States dollars. */
+                        priceUsd: number;
+                        /** @description What is left of the free Instant Evals budget, in United States dollars. Only present for an organization without a paid plan. */
+                        freeBudgetRemainingUsd?: number;
+                    };
+                };
+            };
+        };
+    };
+    getInstantEvalRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run id. */
+                        id: string;
+                        /** @description What the run was called, if anything. */
+                        name: string | null;
+                        /** @description The statement, exactly as submitted. */
+                        sql: string;
+                        /** @description The values the statement's parameters were filled with. */
+                        parameters: {
+                            [key: string]: (string | number | boolean | null) | string[];
+                        };
+                        /** @description One entry per eval function the statement projects, derived from it when the run was accepted. */
+                        questions: {
+                            /** @description The statement's own output column, which is the name this question is addressed by everywhere else. */
+                            id: string;
+                            /** @description The eval function that asked it. */
+                            function: string;
+                            /**
+                             * @description What kind of answer the question takes.
+                             * @enum {string}
+                             */
+                            kind: "boolean" | "score" | "category";
+                            /** @description Which part of the verdict the statement's column carries. */
+                            reads: string;
+                            /** @description Where a boolean question's probability becomes a pass. Null for a question that is not a boolean. */
+                            threshold: number | null;
+                        }[];
+                        /** @description Rows this run may judge. */
+                        limit: number;
+                        /**
+                         * @description Where the run is in its life.
+                         * @enum {string}
+                         */
+                        status: "queued" | "planning" | "running" | "finished" | "failed" | "cancelled";
+                        /** @description Rows the run found, bounded by its limit. Null until it has looked. */
+                        total: number | null;
+                        /** @description Rows judged so far. */
+                        progress: number;
+                        /** @description Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count. */
+                        matched: number | null;
+                        /** @description Per question: matches for a boolean question, judged rows for a score or a category one. */
+                        matchedByQuestion: {
+                            [key: string]: number;
+                        };
+                        /** @description Rows the judge could not answer. */
+                        failed: number;
+                        /** @description Rows the judge declined to answer. */
+                        skipped: number;
+                        /** @description Input tokens the judge billed for. */
+                        tokens: number;
+                        /** @description What the judging costs you, in United States dollars. */
+                        priceUsd: number;
+                        /** @description The code of the failure that ended the run, when one did. */
+                        error: string | null;
+                        /** @description When the run was accepted. */
+                        createdAt: string;
+                        /** @description When the run was last written to. */
+                        updatedAt: string;
+                        /** @description When the run began reading rows. */
+                        startedAt: string | null;
+                        /** @description When the run ended. */
+                        finishedAt: string | null;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    cancelInstantEvalRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run id. */
+                        id: string;
+                        /** @description What the run was called, if anything. */
+                        name: string | null;
+                        /** @description The statement, exactly as submitted. */
+                        sql: string;
+                        /** @description The values the statement's parameters were filled with. */
+                        parameters: {
+                            [key: string]: (string | number | boolean | null) | string[];
+                        };
+                        /** @description One entry per eval function the statement projects, derived from it when the run was accepted. */
+                        questions: {
+                            /** @description The statement's own output column, which is the name this question is addressed by everywhere else. */
+                            id: string;
+                            /** @description The eval function that asked it. */
+                            function: string;
+                            /**
+                             * @description What kind of answer the question takes.
+                             * @enum {string}
+                             */
+                            kind: "boolean" | "score" | "category";
+                            /** @description Which part of the verdict the statement's column carries. */
+                            reads: string;
+                            /** @description Where a boolean question's probability becomes a pass. Null for a question that is not a boolean. */
+                            threshold: number | null;
+                        }[];
+                        /** @description Rows this run may judge. */
+                        limit: number;
+                        /**
+                         * @description Where the run is in its life.
+                         * @enum {string}
+                         */
+                        status: "queued" | "planning" | "running" | "finished" | "failed" | "cancelled";
+                        /** @description Rows the run found, bounded by its limit. Null until it has looked. */
+                        total: number | null;
+                        /** @description Rows judged so far. */
+                        progress: number;
+                        /** @description Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count. */
+                        matched: number | null;
+                        /** @description Per question: matches for a boolean question, judged rows for a score or a category one. */
+                        matchedByQuestion: {
+                            [key: string]: number;
+                        };
+                        /** @description Rows the judge could not answer. */
+                        failed: number;
+                        /** @description Rows the judge declined to answer. */
+                        skipped: number;
+                        /** @description Input tokens the judge billed for. */
+                        tokens: number;
+                        /** @description What the judging costs you, in United States dollars. */
+                        priceUsd: number;
+                        /** @description The code of the failure that ended the run, when one did. */
+                        error: string | null;
+                        /** @description When the run was accepted. */
+                        createdAt: string;
+                        /** @description When the run was last written to. */
+                        updatedAt: string;
+                        /** @description When the run began reading rows. */
+                        startedAt: string | null;
+                        /** @description When the run ended. */
+                        finishedAt: string | null;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    listInstantEvalRunResults: {
+        parameters: {
+            query?: {
+                /** @description Only this question's judgements. */
+                questionId?: string;
+                /** @description Only judgements that matched, or only those that did not. Omit for both. */
+                matched?: "true" | "1" | "yes" | "false" | "0" | "no";
+                /** @description Only judgements in this state. */
+                status?: "judged" | "skipped" | "failed";
+                /** @description Judgements per page, at most one thousand. */
+                limit?: number;
+                /** @description The cursor the previous page answered with. */
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The run id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description One page of the run's judgements. */
+                        judgments: {
+                            /** @description The trace the judgement is about. */
+                            traceId: string;
+                            /** @description The question it answers, named by its output column. */
+                            questionId: string;
+                            /** @description The conversation the trace belongs to. */
+                            threadId: string;
+                            /** @description The span the judged text was read from. */
+                            spanId: string;
+                            /** @description What kind of question was asked. */
+                            kind: string;
+                            /**
+                             * @description Whether the judge answered, declined, or could not answer.
+                             * @enum {string}
+                             */
+                            status: "judged" | "skipped" | "failed";
+                            /** @description Whether a boolean question passed its threshold. */
+                            passed: boolean | null;
+                            /** @description A score question's answer. */
+                            score: number | null;
+                            /** @description A category question's answer. */
+                            label: string | null;
+                            /** @description How likely the judge found a boolean question's answer to be true. */
+                            probability: number | null;
+                            /** @description The full distribution behind a category answer. */
+                            probabilities: {
+                                [key: string]: number;
+                            } | null;
+                            /** @description Why the judge could not answer, when it could not. */
+                            error: string | null;
+                            /** @description When the judgement was made. */
+                            occurredAt: string;
+                        }[];
+                        /** @description Pass as cursor to read the page after this one. Absent on the last page. */
+                        nextCursor?: string;
+                    };
+                };
+            };
+        };
+    };
+    sampleInstantEvalRun: {
+        parameters: {
+            query?: {
+                /** @description Rows to re-read, at most twenty five. */
+                n?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The run id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The statement's own rows, with each judged column holding the text that was judged rather than the verdict. */
+                        rows: {
+                            [key: string]: unknown;
+                        }[];
+                        /** @description The verdicts those rows received. */
+                        judgments: {
+                            /** @description The trace the judgement is about. */
+                            traceId: string;
+                            /** @description The question it answers, named by its output column. */
+                            questionId: string;
+                            /** @description The conversation the trace belongs to. */
+                            threadId: string;
+                            /** @description The span the judged text was read from. */
+                            spanId: string;
+                            /** @description What kind of question was asked. */
+                            kind: string;
+                            /**
+                             * @description Whether the judge answered, declined, or could not answer.
+                             * @enum {string}
+                             */
+                            status: "judged" | "skipped" | "failed";
+                            /** @description Whether a boolean question passed its threshold. */
+                            passed: boolean | null;
+                            /** @description A score question's answer. */
+                            score: number | null;
+                            /** @description A category question's answer. */
+                            label: string | null;
+                            /** @description How likely the judge found a boolean question's answer to be true. */
+                            probability: number | null;
+                            /** @description The full distribution behind a category answer. */
+                            probabilities: {
+                                [key: string]: number;
+                            } | null;
+                            /** @description Why the judge could not answer, when it could not. */
+                            error: string | null;
+                            /** @description When the judgement was made. */
+                            occurredAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
     listRunPlans: {
         parameters: {
             query?: {
@@ -27269,7 +30346,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -27285,6 +30362,26 @@ export interface operations {
                         judgeModel: string | null;
                         /** @description The labels the plan carries. */
                         labels: string[];
+                        /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            id: string;
+                            evaluatorId: string;
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the plan was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the plan was created. */
@@ -27337,7 +30434,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -27353,6 +30450,26 @@ export interface operations {
                         judgeModel?: string | null;
                         /** @description The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time. */
                         scenarioIds?: string[];
+                        /** @description The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Leave it out to keep what the plan already holds. */
+                        evaluators?: {
+                            id: string;
+                            evaluatorId: string;
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                     };
                     /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
                     idempotencyKey?: string;
@@ -27400,7 +30517,7 @@ export interface operations {
                                  * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                                 /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -27476,7 +30593,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -27492,6 +30609,26 @@ export interface operations {
                         judgeModel: string | null;
                         /** @description The labels the plan carries. */
                         labels: string[];
+                        /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            id: string;
+                            evaluatorId: string;
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the plan was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the plan was created. */
@@ -27598,7 +30735,7 @@ export interface operations {
                                  * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                                 /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -27654,6 +30791,32 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            id: string;
+                            evaluatorId: string;
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -27682,6 +30845,32 @@ export interface operations {
                 "application/json": {
                     /** @description The test suite name, as it reads in the platform. */
                     name: string;
+                    /** @description The fields the test suite declares, in the order the platform shows them. Up to 30. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean. */
+                    fields?: {
+                        identifier: string;
+                        /** @enum {string} */
+                        type: "text" | "number" | "boolean";
+                    }[];
+                    /** @description The evaluators that run after every scenario run. Up to 20. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates. */
+                    evaluators?: {
+                        id: string;
+                        evaluatorId: string;
+                        required: boolean;
+                        /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                        mappings: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                /** @enum {string} */
+                                sourceId: "conversation" | "scenario" | "trace";
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                    }[];
                 };
             };
         };
@@ -27703,6 +30892,32 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            id: string;
+                            evaluatorId: string;
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -27748,6 +30963,32 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            id: string;
+                            evaluatorId: string;
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -27802,7 +31043,7 @@ export interface operations {
             };
         };
     };
-    renameTestSuite: {
+    updateTestSuite: {
         parameters: {
             query?: never;
             header?: never;
@@ -27815,8 +31056,34 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description The test suite name, as it reads in the platform. */
-                    name: string;
+                    /** @description The new name. The slug is kept. */
+                    name?: string;
+                    /** @description The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use. */
+                    fields?: {
+                        identifier: string;
+                        /** @enum {string} */
+                        type: "text" | "number" | "boolean";
+                    }[];
+                    /** @description The full list of evaluators attached to the suite. An evaluator the project does not hold answers 422 suite_evaluator_not_found; a mapping the run cannot read answers 422 suite_evaluator_mapping_invalid. */
+                    evaluators?: {
+                        id: string;
+                        evaluatorId: string;
+                        required: boolean;
+                        /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                        mappings: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                /** @enum {string} */
+                                sourceId: "conversation" | "scenario" | "trace";
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                    }[];
                 };
             };
         };
@@ -27838,6 +31105,32 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            id: string;
+                            evaluatorId: string;
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -27873,7 +31166,7 @@ export interface operations {
                          * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                         /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -27935,7 +31228,7 @@ export interface operations {
                                  * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                                 /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -28476,6 +31769,7 @@ export interface operations {
                     };
                     traceIds?: string[];
                     negateFilters?: boolean;
+                    excludeOrigins?: string[];
                     /** @description Removed. Offset pagination is no longer supported and any value other than 0 is rejected. Page with the scrollId returned by the previous response instead. The field remains on the schema so that sending it produces an explanatory error rather than being silently discarded. */
                     pageOffset?: number;
                     pageSize?: number;
@@ -28494,6 +31788,8 @@ export interface operations {
                     /** @description When true, fetches full span data for each trace. Useful for bulk export. Default false. */
                     includeSpans?: boolean;
                     llmMode?: boolean;
+                    /** @description A trace filter string in the same language the Trace Explorer's search bar speaks — `status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, `evaluatorVerdict:fail`, a quoted phrase for free text. It is combined with `filters`, `query` and `traceIds` rather than replacing any of them, so every condition you send must hold. `GET /api/v1/query/reference` lists every field and the syntax; `GET /api/traces/facets` says what values a field actually holds. A malformed filter, or one naming a field the language does not have, is a 422 that names the field. */
+                    filter?: string;
                     /**
                      * @description Which timestamp the startDate/endDate window filters on. 'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can occur long before it gains a later evaluation or annotation.
                      * @default occurred
@@ -28573,6 +31869,131 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiTracesFacets: {
+        parameters: {
+            query?: {
+                field?: string;
+                prefix?: string;
+                limit?: number;
+                offset?: number;
+                startDate?: string;
+                endDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Without `field`, every facet the project has with its top values and whether the payload is still being computed. With `field`, that field's values and counts plus the distinct total and whether more remain. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        facets: ({
+                            key: string;
+                            /** @enum {string} */
+                            kind: "categorical" | "range" | "dynamic_keys";
+                            label: string;
+                            group: string;
+                        } & {
+                            [key: string]: unknown;
+                        })[];
+                        /** @description True when the payload is still being computed and what you have is the last committed one, possibly empty. Call again shortly. */
+                        pending: boolean;
+                    } | {
+                        values: {
+                            value: string;
+                            label?: string;
+                            count: number;
+                        }[];
+                        /** @description Distinct values the field holds in the window, before paging. */
+                        total: number;
+                        hasMore: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The field is an attribute key and this project hides captured input or output, so its values are not listed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        error: "trace_attribute_values_withheld";
+                        message: string;
+                        trace?: string;
+                    };
+                };
+            };
+            /** @description The query did not name a facet with values to list. `fields` names the offending parameter and each reason carries what was received and what exists. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        error: "validation_error";
+                        message: string;
+                        /** @constant */
+                        target: "query";
+                        fields: string[];
+                        reasons: {
+                            code: string;
+                            meta?: {
+                                field?: string;
+                                type?: string;
+                                message?: string;
+                                received?: string;
+                                expected?: string[];
+                            };
+                        }[];
+                        trace?: string;
                     };
                 };
             };
@@ -32449,6 +35870,12 @@ export interface operations {
                                 cache_read_input_tokens: number;
                                 cache_creation_input_tokens: number;
                                 reasoning_tokens: number;
+                                /** @description Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it. */
+                                input_image_tokens: number;
+                                /** @description Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
+                                output_image_tokens: number;
+                                /** @description Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum. */
+                                image_count: number;
                             };
                             cost: {
                                 /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
@@ -32594,6 +36021,12 @@ export interface operations {
                                     cache_read_input_tokens: number;
                                     cache_creation_input_tokens: number;
                                     reasoning_tokens: number;
+                                    /** @description Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it. */
+                                    input_image_tokens: number;
+                                    /** @description Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
+                                    output_image_tokens: number;
+                                    /** @description Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum. */
+                                    image_count: number;
                                 } | null;
                                 cost: {
                                     /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
@@ -32744,6 +36177,12 @@ export interface operations {
                                 cache_read_input_tokens: number;
                                 cache_creation_input_tokens: number;
                                 reasoning_tokens: number;
+                                /** @description Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it. */
+                                input_image_tokens: number;
+                                /** @description Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
+                                output_image_tokens: number;
+                                /** @description Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum. */
+                                image_count: number;
                             };
                             caps: {
                                 budget_id: string;

@@ -1,7 +1,15 @@
-import type { IdentityGuards, MfaGuards } from "@langwatch/identity-server";
+import type {
+  IdentityGuards,
+  LinkProposalGuards,
+  MfaGuards,
+} from "@langwatch/identity-server";
 import { definePipeline } from "../..";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import { AttachIdentifierCommand } from "./commands/attachIdentifier.command";
+import {
+  ConfirmLinkCommand,
+  RejectLinkCommand,
+} from "./commands/decideLink.command";
 import { DetachIdentifierCommand } from "./commands/detachIdentifier.command";
 import { EraseUserCommand } from "./commands/eraseUser.command";
 import { MarkPrimaryCommand } from "./commands/markPrimary.command";
@@ -41,6 +49,9 @@ export interface IdentityPipelineDeps {
   mfaProjectionStore: StateProjectionStore<MfaFoldState>;
   /** The two-step verification guards, over the same person's state. */
   mfaGuards: MfaGuards;
+  /** The guards over deciding a waiting sign-in (D05). Their own class
+   *  because they read the proposal log, which the heads do not carry. */
+  linkProposalGuards: LinkProposalGuards;
 }
 
 /**
@@ -111,6 +122,16 @@ export function createIdentityPipeline(deps: IdentityPipelineDeps) {
       "proposeLink",
       ProposeLinkCommand,
       new ProposeLinkCommand(deps.identityGuards),
+    )
+    .withCommandInstance(
+      "confirmLink",
+      ConfirmLinkCommand,
+      new ConfirmLinkCommand(deps.linkProposalGuards),
+    )
+    .withCommandInstance(
+      "rejectLink",
+      RejectLinkCommand,
+      new RejectLinkCommand(deps.linkProposalGuards),
     )
     .withProjection(
       "mfaEnrollmentState",
