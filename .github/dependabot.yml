@@ -122,8 +122,10 @@ updates:
           - "minor"
           - "patch"
 
+  # The root pyproject.toml is a uv workspace (sdks/python, packages/ksuid-python)
+  # with one lock at the root, so members must NOT also be listed individually.
   - package-ecosystem: "uv"
-    directory: "/sdks/python"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -154,7 +156,7 @@ updates:
   # alerts, two of them critical, with zero dependabot PRs raised in the
   # project's history. A lock that never moves also drifts far enough that a
   # single security bump stops resolving cleanly, which is how the backlog
-  # became self-sustaining. Same shape as /sdks/python above.
+  # became self-sustaining. Same shape as the workspace root entry above.
   #
   # Deliberately NOT covering /mcp/typescript. Its uv.lock exists only to
   # typecheck Python fixture files under tests/fixtures/ for the MCP server's
