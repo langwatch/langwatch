@@ -3,6 +3,7 @@ package visualdiff
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -52,6 +53,15 @@ type Options struct {
 	// DevUI captures both sides from their Vite dev servers instead of a
 	// production build of each side's UI (ui_build.go).
 	DevUI bool
+	// PinMain renders BaseRef at its pinned commit (pin.go); RebaseMain moves the pin.
+	PinMain    bool
+	RebaseMain bool
+	// Force runs despite the machine conditions a run refuses (conditions.go);
+	// MaxLoad is the 1-minute load average above which it refuses.
+	Force   bool
+	MaxLoad float64
+	// Pages is how many pages each side captures on at once; zero is half the CPUs.
+	Pages int
 }
 
 // Streams are where a run writes: the summary on Out, everything a person
@@ -94,6 +104,9 @@ type Deps struct {
 	// BuildUI builds one side's UI for production (BuildUIDist). Only the
 	// real runner gets it by default, so a test's fake capture never builds.
 	BuildUI func(ctx context.Context, request UIBuildRequest) (UIBuild, error)
+	// Conditions reads the machine a run refuses to start on (conditions.go).
+	// Only the real runner gets it by default, so a test never reads the load.
+	Conditions func(ctx context.Context, options Options) Conditions
 }
 
 // Request is everything Execute needs: what to run, what to render, and what
@@ -194,6 +207,9 @@ func (deps *Deps) fillPreflight() {
 		if deps.BuildUI == nil {
 			deps.BuildUI = BuildUIDist
 		}
+		if deps.Conditions == nil {
+			deps.Conditions = ReadConditions
+		}
 	}
 }
 
@@ -219,6 +235,9 @@ func (options *Options) fill(now func() time.Time) {
 	if options.BootTimeout == 0 {
 		options.BootTimeout = 20 * time.Minute
 	}
+	if options.MaxLoad == 0 {
+		options.MaxLoad = DefaultMaxLoad
+	}
 	if options.TraceCount == 0 {
 		options.TraceCount = 6
 	}
@@ -238,13 +257,25 @@ func (options *Options) fill(now func() time.Time) {
 func Execute(ctx context.Context, request Request, streams Streams) (Result, error) {
 	request.Deps.fill()
 	request.Options.fill(request.Deps.Now)
-	options, config, deps := request.Options, request.Config, request.Deps
+	if err := refuse(ctx, &request, streams.Err); err != nil {
+		return Result{}, err
+	}
 
 	finish, err := startRun(ctx, request, &streams)
 	defer finish()
 	if err != nil {
 		return Result{}, err
 	}
+	clock := &phaseClock{stderr: streams.Err}
+	defer func() {
+		if err := appendPhases(request.Options.RunDir, clock); err != nil {
+			fmt.Fprintf(streams.Err, "phases: %v\n", err)
+		}
+	}()
+	if request.Options.PinMain {
+		request.Options.BaseRef = pinMain(ctx, request, streams.Err)
+	}
+	options, config, deps := request.Options, request.Config, request.Deps
 	plan := buildPlan(options, config)
 	result := Result{Plan: plan, Coverage: runCoverage(ctx, request, streams.Err)}
 	baselines, err := planBaselines(ctx, baselineInputs{options: options, config: config, deps: deps, done: request.Done}, streams.Err)
@@ -260,6 +291,7 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 		writeBaselinePlan(streams.Out, options.Editions, baselines)
 		return result, nil
 	}
+	writeBaselinePlan(streams.Err, options.Editions, baselines)
 	request.Done.writeSkips(streams.Err, config, options.Editions)
 	if err := prepareInfra(ctx, portInfraInputs{plan: &plan, deps: deps, stderr: streams.Err}, options); err != nil {
 		return result, err
@@ -272,13 +304,18 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 		return result, err
 	}
 	result.Plan = plan
-	run := &session{request: request, streams: streams, plan: plan, runID: plan.RunID, stagger: staggers(plan, options)}
+	run := &session{
+		request: request, streams: streams, plan: plan, runID: plan.RunID, phases: clock,
+		stagger: staggers(plan, options) && !anyPartial(baselines),
+	}
 	// Registered first, so it runs last: the lanes (or the haven stacks) are
 	// stopped, and only then are the worktrees removed.
 	defer func() {
+		started := time.Now()
 		if err := run.teardown(context.WithoutCancel(ctx)); err != nil {
 			fmt.Fprintln(streams.Err, err)
 		}
+		clock.since("teardown", started)
 	}()
 	defer run.stopAll()
 
@@ -313,6 +350,16 @@ func planBaselines(ctx context.Context, inputs baselineInputs, stderr io.Writer)
 		return map[Edition]Baseline{}, nil
 	}
 	return baselines, nil
+}
+
+// anyPartial reports an edition whose baseline this run tops up.
+func anyPartial(baselines map[Edition]Baseline) bool {
+	for _, baseline := range baselines {
+		if baseline.Partial() {
+			return true
+		}
+	}
+	return false
 }
 
 func hasEdition(editions []Edition, wanted Edition) bool {
@@ -412,6 +459,9 @@ type session struct {
 	// staticDirs are the built UIs by stack name; a live side without one is
 	// captured from its dev server.
 	staticDirs map[string]string
+	// phases times the run (phases.go); upAt is when each stack's haven up ran.
+	phases *phaseClock
+	upAt   map[string]time.Time
 }
 
 func (run *session) stopAll() {
@@ -511,10 +561,12 @@ func (run *session) seed(ctx context.Context) error {
 		run.sideFixtures = ReadSeededMarker(recorded)
 		return nil
 	}
+	started := time.Now()
 	fixtures, err := run.seedStacks(ctx, options, deps)
 	if err != nil {
 		return err
 	}
+	run.phases.since("seed", started)
 	run.sideFixtures = fixtures
 	if err := os.MkdirAll(options.RunDir, 0o750); err != nil {
 		return err
@@ -604,6 +656,9 @@ func (run *session) captureEdition(ctx context.Context, pass editionPass) ([]Row
 			return nil, err
 		}
 	}
+	if pass.baseline.Partial() {
+		pass.baseline = run.fillBaseline(ctx, pass.edition, pass.baseline)
+	}
 	stream, err := run.capture(ctx, pass.edition, pass.baseline)
 	if err != nil {
 		return nil, err
@@ -618,12 +673,8 @@ func (run *session) cacheBaseline(baseline Baseline, stream RunnerStream) {
 	if baseline.Cached || baseline.Dir == "" {
 		return
 	}
-	if run.request.Deps.BuildUI != nil && !run.request.Options.DevUI && run.staticDirs[run.plan.Base.Name] == "" {
-		fmt.Fprintln(run.streams.Err, "baseline: not cached, the base was captured from its dev server, not its build")
-		return
-	}
-	if unloaded := UnloadedBaseCaptures(stream.Captures); unloaded > 0 {
-		fmt.Fprintf(run.streams.Err, "baseline: not cached, %d base capture(s) did not load their own modules\n", unloaded)
+	if err := run.cacheRefusal(stream.Captures); err != nil {
+		fmt.Fprintf(run.streams.Err, "baseline: not cached, %v\n", err)
 		return
 	}
 	if err := SaveBaseline(baseline, stream.Captures); err != nil {
@@ -631,6 +682,25 @@ func (run *session) cacheBaseline(baseline Baseline, stream RunnerStream) {
 		return
 	}
 	fmt.Fprintf(run.streams.Err, "baseline: cached %s for the next run\n", baseline.Dir)
+}
+
+// cacheRefusal says why base captures must not enter a baseline, or nil.
+func (run *session) cacheRefusal(captures []Capture) error {
+	if run.request.Deps.BuildUI != nil && !run.request.Options.DevUI && run.staticDirs[run.plan.Base.Name] == "" {
+		return errors.New("the base was captured from its dev server, not its build")
+	}
+	if unloaded := UnloadedBaseCaptures(captures); unloaded > 0 {
+		return fmt.Errorf("%d base capture(s) did not load their own modules", unloaded)
+	}
+	return nil
+}
+
+// concurrency is the pages each side captures on: -pages when resolved, else the configuration's.
+func (run *session) concurrency(config *Config) Concurrency {
+	if pages := run.request.Options.Pages; pages > 0 {
+		return Concurrency{Routes: pages, Flows: pages}
+	}
+	return config.Concurrency
 }
 
 // capture drives the runner over both sides for one edition: the base from
@@ -658,7 +728,7 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 		FailFast:    options.FailFast,
 		FrozenTime:  deps.Now().UnixMilli(),
 		Fixtures:    config.Fixtures,
-		Concurrency: config.Concurrency,
+		Concurrency: run.concurrency(config),
 		Edition:     edition,
 		Stacks:      run.editionStacks(),
 	}
@@ -672,10 +742,13 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 		arrived = run.forwardBase(ctx, pending)
 	}
 	findingsPath := filepath.Join(options.RunDir, FindingsFile)
+	started := time.Now()
 	stream, err := runWithFindings(ctx, findingsRunInputs{
 		Deps: deps, Plan: runnerPlan, Options: CaptureOptions{Root: options.Root, Stderr: run.streams.Err},
 		FindingsPath: findingsPath, CatalogueRoot: options.Root, Edition: edition,
 	})
+	run.phases.recordRunnerPhases(string(edition), stream.Phases)
+	run.phases.since(string(edition)+" runner", started)
 	if err != nil {
 		return stream, fmt.Errorf("capture %s: %w", edition, err)
 	}

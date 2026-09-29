@@ -104,12 +104,21 @@ export interface DiffMessage {
   file: string;
 }
 
+/** PhaseMessage is how long one side spent in one phase of its capture. */
+export interface PhaseMessage {
+  type: "phase";
+  side: string;
+  name: "capture" | "recapture" | "flows";
+  millis: number;
+}
+
 export type Message =
   | CaptureMessage
   | DiffMessage
   | { type: "ready" }
   | { type: "done" }
   | { type: "log"; message: string }
+  | PhaseMessage
   | { type: "error"; message: string };
 
 /** emit writes one protocol message. Never call console.log elsewhere. */

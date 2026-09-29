@@ -1,11 +1,8 @@
 package visualdiff
 
 import (
-	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -87,45 +84,14 @@ func isWorktree(dir string) bool {
 	return err == nil
 }
 
-// PrepareKey is what a prepare's output depends on: the layout, the commands
-// and the commit's whole tree. The same key means the worktree already holds
-// exactly what the commands would write.
-func PrepareKey(layout Layout, tree string, commands []commandSpec) string {
+// PrepareKey is what a step's output depends on: the layout, the commands and
+// a digest of their inputs (reuse.go). The same key means the worktree
+// already holds exactly what the commands would write.
+func PrepareKey(layout Layout, inputs string, commands []commandSpec) string {
 	digest := sha256.New()
-	fmt.Fprintf(digest, "layout=%s\ntree=%s\n", layout, tree)
+	fmt.Fprintf(digest, "layout=%s\ninputs=%s\n", layout, inputs)
 	for _, command := range commands {
 		fmt.Fprintf(digest, "%s %s\n", command.name, strings.Join(command.args, " "))
 	}
 	return hex.EncodeToString(digest.Sum(nil))
-}
-
-// preparedKey is the key a persistent worktree's last finished prepare recorded.
-func preparedKey(dir string) string {
-	recorded, err := os.ReadFile(dir + worktreePreparedSuffix) // #nosec G304 -- a file under the tool's own .visualdiff directory.
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(recorded))
-}
-
-// recordPrepared stores a finished prepare's key, or forgets it with "" so a
-// prepare that fails half-way is never read as done.
-func recordPrepared(dir, key string) error {
-	if key == "" {
-		if err := os.Remove(dir + worktreePreparedSuffix); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-		return nil
-	}
-	return os.WriteFile(dir+worktreePreparedSuffix, []byte(key+"\n"), 0o600)
-}
-
-// resolveTree names the tree a commit checks out, the input a prepare depends on.
-func resolveTree(ctx context.Context, target gitRef) (string, error) {
-	var out bytes.Buffer
-	spec := commandSpec{name: "git", args: []string{"rev-parse", "--verify", target.ref + "^{tree}"}, dir: target.root}
-	if err := target.run(ctx, spec, &out); err != nil {
-		return "", fmt.Errorf("resolve the tree of %s: %w", target.ref, err)
-	}
-	return strings.TrimSpace(out.String()), nil
 }

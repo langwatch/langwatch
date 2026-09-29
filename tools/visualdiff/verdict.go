@@ -43,6 +43,7 @@ type FlowVerdict struct {
 	Proof []string
 	// FirstFailure is the first failing row's step, expect, side and signature, or "".
 	FirstFailure string
+	failed       Row
 }
 
 // JudgeFlows decides every flow's verdict from its rows, in flow then edition order.
@@ -79,13 +80,13 @@ func judgeFlow(edition Edition, flow string, rows []Row) FlowVerdict {
 		firstRow(rows, Row.Finding)
 	switch {
 	case broken != nil:
-		verdict.Verdict, verdict.FirstFailure = VerdictBroken, failureLine(*broken, "candidate")
+		verdict.Verdict, verdict.FirstFailure, verdict.failed = VerdictBroken, failureLine(*broken, "candidate"), *broken
 	case brokenBoth != nil:
-		verdict.Verdict, verdict.FirstFailure = VerdictBrokenBoth, failureLine(*brokenBoth, "both")
+		verdict.Verdict, verdict.FirstFailure, verdict.failed = VerdictBrokenBoth, failureLine(*brokenBoth, "both"), *brokenBoth
 	case len(verdict.Proof) == 0:
 		verdict.Verdict = VerdictUnproven
 	case other != nil:
-		verdict.Verdict, verdict.FirstFailure = VerdictLayoutOnly, failureLine(*other, "candidate")
+		verdict.Verdict, verdict.FirstFailure, verdict.failed = VerdictLayoutOnly, failureLine(*other, "candidate"), *other
 	default:
 		verdict.Verdict = VerdictWorks
 	}
@@ -133,7 +134,7 @@ func failureLine(row Row, side string) string {
 // then a count of the routes that only rendered alike (never "works").
 func RenderVerdict(rows []Row) string {
 	var out strings.Builder
-	out.WriteString("# visualdiff verdict\n\nflows (works = every expect held on both sides; open PNGs only for broken rows):\n")
+	out.WriteString("# visualdiff verdict\n\nflows (works = every expect held on both sides; each finding names its failure, console errors and PNGs):\n")
 	for _, verdict := range JudgeFlows(rows) {
 		fmt.Fprintf(&out, "- [%s] %s: %s", verdict.Edition, verdict.Flow, verdict.Verdict)
 		if len(verdict.Proof) > 0 {
@@ -142,6 +143,7 @@ func RenderVerdict(rows []Row) string {
 		out.WriteString("\n")
 		if verdict.FirstFailure != "" {
 			fmt.Fprintf(&out, "  first failure: %s\n", verdict.FirstFailure)
+			out.WriteString(evidence(verdict.failed))
 		}
 	}
 	alike := 0
@@ -156,9 +158,57 @@ func RenderVerdict(rows []Row) string {
 			continue
 		}
 		fmt.Fprintf(&out, "- [%s] %s: %s · %s\n", row.Edition, row.Key, row.Class, head(row.Why))
+		out.WriteString(evidence(row))
 	}
 	fmt.Fprintf(&out, "\n%d routes rendered alike (rendering only, not proof they work)\n", alike)
 	return out.String()
+}
+
+// evidence is a finding's first failure, console errors and PNG paths, so no
+// one opens an image or a log to learn what went wrong.
+func evidence(row Row) string {
+	var out strings.Builder
+	if failure := firstFailure(row); failure != "" {
+		fmt.Fprintf(&out, "  failure: %s\n", failure)
+	}
+	if row.Candidate != nil && len(row.Candidate.ConsoleErrors) > 0 {
+		fmt.Fprintf(&out, "  console: %s\n", strings.Join(headAll(row.Candidate.ConsoleErrors, 3), " | "))
+	}
+	var pngs []string
+	if row.Base != nil && row.Base.Screenshot != "" {
+		pngs = append(pngs, "base "+row.Base.Screenshot)
+	}
+	if row.Candidate != nil && row.Candidate.Screenshot != "" {
+		pngs = append(pngs, "candidate "+row.Candidate.Screenshot)
+	}
+	if row.DiffFile != "" {
+		pngs = append(pngs, "diff "+row.DiffFile)
+	}
+	if len(pngs) > 0 {
+		fmt.Fprintf(&out, "  pngs: %s\n", strings.Join(pngs, " · "))
+	}
+	return out.String()
+}
+
+// firstFailure is the candidate's step error, else its first failed request.
+func firstFailure(row Row) string {
+	switch {
+	case row.Candidate == nil:
+		return ""
+	case row.Candidate.Error != "":
+		return head(row.Candidate.Error)
+	case len(row.Candidate.FailedRequests) > 0:
+		return head(row.Candidate.FailedRequests[0])
+	}
+	return ""
+}
+
+func headAll(lines []string, limit int) []string {
+	out := make([]string, 0, min(len(lines), limit))
+	for _, line := range lines[:min(len(lines), limit)] {
+		out = append(out, head(line))
+	}
+	return out
 }
 
 // WriteVerdictFile writes verdict.md into the run directory.

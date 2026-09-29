@@ -17,6 +17,8 @@ type cachingFake struct {
 	haven    fakeHavenRunner
 	mutex    sync.Mutex
 	commands []string
+	// lock is the pnpm-lock.yaml blob `git ls-tree` reports.
+	lock string
 }
 
 const testBaseCommit = "0123456789abcdef0123456789abcdef01234567"
@@ -29,6 +31,9 @@ func (fake *cachingFake) run(ctx context.Context, spec commandSpec, log io.Write
 	switch {
 	case spec.name == "git" && len(spec.args) > 0 && spec.args[0] == "rev-parse":
 		_, err := io.WriteString(log, testBaseCommit+"\n")
+		return err
+	case spec.name == "git" && len(spec.args) > 0 && spec.args[0] == "ls-tree":
+		_, err := io.WriteString(log, "100644 blob "+fake.lock+"1\tpnpm-lock.yaml\n040000 tree cafe\tmodules\n")
 		return err
 	case spec.name == "haven" && strings.HasPrefix(strings.Join(spec.args, " "), "db url"):
 		_, err := io.WriteString(log, "postgres    postgresql://stack/"+slugFromEnv(spec.env)+"\n")

@@ -34,13 +34,20 @@ func TestAFlowWhoseExpectsHoldWorksAndKeepsItsProof(t *testing.T) {
 	}
 }
 
-// @scenario "verdict.md names each flow's verdict and its first failure"
+// @scenario "verdict.md names each finding's class, first failure, console errors and PNGs"
 func TestVerdictNamesTheFirstFailure(t *testing.T) {
 	failing := `expect text "VD Automation": not visible after 10000ms`
 	rows := []Row{
 		flowRow(100, ClassBroken, `text "VD Automation"`, "", failing),
 		{Edition: EditionEnterprise, Kind: "route", Key: "/a", Class: ClassNoise},
-		{Edition: EditionEnterprise, Kind: "route", Key: "/b", Class: ClassBlank, Why: "blank page"},
+		{
+			Edition: EditionEnterprise, Kind: "route", Key: "/b", Class: ClassBlank, Why: "blank page", DiffFile: "/run/diff/b.png",
+			Base: &Capture{Screenshot: "/run/base/b.png"},
+			Candidate: &Capture{
+				Screenshot: "/run/candidate/b.png", FailedRequests: []string{"GET /api/b 500"},
+				ConsoleErrors: []string{"ChunkLoadError: b"},
+			},
+		},
 	}
 
 	verdict := RenderVerdict(rows)
@@ -50,6 +57,9 @@ func TestVerdictNamesTheFirstFailure(t *testing.T) {
 		`first failure: step 100 expect: after · expect text "VD Automation" · side candidate`,
 		"console TypeError",
 		"/b: blank",
+		"  failure: GET /api/b 500",
+		"  console: ChunkLoadError: b",
+		"  pngs: base /run/base/b.png · candidate /run/candidate/b.png · diff /run/diff/b.png",
 		"1 routes rendered alike",
 	} {
 		mustContain(t, verdict, want)

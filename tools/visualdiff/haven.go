@@ -104,7 +104,13 @@ func (run *session) awaitStack(ctx context.Context, stack *Stack) error {
 	if err := run.havenWaitReady(ctx, stack); err != nil {
 		return err
 	}
-	return run.waitForAPI(ctx, *stack)
+	if err := run.waitForAPI(ctx, *stack); err != nil {
+		return err
+	}
+	if started, ok := run.upAt[stack.HavenSlug]; ok {
+		run.phases.since(stack.Name+" boot", started)
+	}
+	return nil
 }
 
 // baseArrival is a staggered base once it is ready and seeded, or why it never was.
@@ -295,19 +301,10 @@ func (run *session) havenPrepare(ctx context.Context, stack Stack) error {
 				"A gateway failure on this stack is therefore NOT evidence of a missing credential.\n",
 			stack.Name, strings.Join(substituted, ", "), MinGatewaySecretLength)
 	}
-	commands := HavenPrepareCommands(stack.Layout)
-	key, cached := run.preparedAlready(ctx, stack, commands)
-	if cached {
-		fmt.Fprintf(run.streams.Err, "%s: prepare: cached, the worktree already holds this tree's install and generated files\n", stack.Name)
-		return nil
+	if cleared := clearEnsureBuiltLocks(stack.Dir); len(cleared) > 0 {
+		fmt.Fprintf(run.streams.Err, "%s: prepare: removed stale ensure-built locks in %s\n", stack.Name, strings.Join(cleared, ", "))
 	}
-	if err := run.runPrepare(ctx, stack, commands); err != nil {
-		return err
-	}
-	if key == "" {
-		return nil
-	}
-	return recordPrepared(stack.Dir, key)
+	return run.runPrepare(ctx, stack, HavenPrepareCommands(stack.Layout))
 }
 
 // pinMonolithDotenv writes what a monolith base's app must read from its own
@@ -325,35 +322,30 @@ func pinMonolithDotenv(stack Stack) error {
 	return nil
 }
 
-// preparedAlready reports a persistent worktree whose last finished prepare
-// had this key, and the key to record once this prepare finishes.
-func (run *session) preparedAlready(ctx context.Context, stack Stack, commands []commandSpec) (string, bool) {
-	if !stack.Persistent {
-		return "", false
-	}
-	tree, err := resolveTree(ctx, gitRef{run: run.request.Deps.Run, root: stack.Dir, ref: "HEAD"})
-	if err != nil || tree == "" {
-		return "", false
-	}
-	key := PrepareKey(stack.Layout, tree, commands)
-	if preparedKey(stack.Dir) == key {
-		return key, true
-	}
-	if err := recordPrepared(stack.Dir, ""); err != nil {
-		fmt.Fprintf(run.streams.Err, "%s: prepare: could not clear the old key: %v\n", stack.Name, err)
-	}
-	return key, false
-}
-
-// runPrepare runs each prepare command in the worktree, logging its exit.
+// runPrepare runs each prepare command in the worktree, logging its exit,
+// and skips one whose inputs a persistent worktree already prepared (reuse.go).
 func (run *session) runPrepare(ctx context.Context, stack Stack, commands []commandSpec) error {
-	for _, spec := range commands {
+	for index, spec := range commands {
 		spec.dir = stack.Dir
-		fmt.Fprintf(run.streams.Err, "%s: prepare: %s %s\n", stack.Name, spec.name, strings.Join(spec.args, " "))
+		line := spec.name + " " + strings.Join(spec.args, " ")
+		key := stepKey(ctx, run.request.Deps.Run, stack, spec)
+		if prepared(stack, index, spec, key) {
+			fmt.Fprintf(run.streams.Err, "%s: prepare: %s cached, its inputs are unchanged\n", stack.Name, line)
+			continue
+		}
+		if err := writeStepKey(stack.Dir, index, ""); err != nil {
+			return err
+		}
+		fmt.Fprintf(run.streams.Err, "%s: prepare: %s\n", stack.Name, line)
+		started := time.Now()
 		err := run.request.Deps.Run(ctx, spec, run.streams.Err)
-		fmt.Fprintf(run.streams.Err, "%s: prepare: %s %s exit=%s\n", stack.Name, spec.name, strings.Join(spec.args, " "), exitStatus(err))
+		run.phases.since(stack.Name+" "+prepareStepName(spec), started)
+		fmt.Fprintf(run.streams.Err, "%s: prepare: %s exit=%s\n", stack.Name, line, exitStatus(err))
 		if err != nil {
-			return fmt.Errorf("prepare %s (%s %s): %w", stack.Name, spec.name, strings.Join(spec.args, " "), err)
+			return fmt.Errorf("prepare %s (%s): %w", stack.Name, line, err)
+		}
+		if err := writeStepKey(stack.Dir, index, key); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -386,6 +378,10 @@ func (run *session) havenUp(ctx context.Context, stack Stack) error {
 		run.logOffsets = map[string]int64{}
 	}
 	run.logOffsets[stack.HavenSlug] = logSize(stack.HavenSlug)
+	if run.upAt == nil {
+		run.upAt = map[string]time.Time{}
+	}
+	run.upAt[stack.HavenSlug] = time.Now()
 	fmt.Fprintf(run.streams.Err, "%s: haven up --agent --detach (stack %s)\n", stack.Name, stack.HavenSlug)
 	spec := commandSpec{name: havenrun.Command, args: havenrun.UpArgs(), dir: stack.Dir, env: havenEnv(run.request.Deps.Environ(), stack.HavenSlug)}
 	if err := run.request.Deps.Run(ctx, spec, run.streams.Err); err != nil {

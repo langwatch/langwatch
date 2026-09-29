@@ -96,16 +96,26 @@ base will be replayed from a baseline or rendered live. It starts nothing.
 
 ## Baselines, editions and failing fast
 
+**Main is pinned.** Without `-base`, the base is `origin/main` at a commit
+recorded in `.visualdiff/baselines/main-pin.json`. Each run prints the pin
+and why it did or did not move; it moves when there is no pin yet, when the
+pinned commit is gone, on `-rebase-main`, and once `git diff --shortstat
+pin origin/main` counts 2000 changed lines or more. Naming `-base` renders
+that ref as it is, unpinned.
+
 **Baselines.** Booting the base is most of a run's cost, and the base does
 not move while you fix your branch. Each live base pass is cached under
 `.visualdiff/baselines/<commit>-<edition>-<hash>/` (captures plus
 screenshots). The hash covers what changes a capture: the viewport, the
 settle and fixtures configuration and the runner sources that capture,
 settle and diff (`captureSources` in baseline.go). Its `meta.json` lists the
-routes and flow steps it recorded; a plan it does not cover renders the base
-live and replaces it. A run whose
-every edition has a baseline never checks out or boots the base at all: only
-the candidate stack comes up. `-refresh-baseline` re-renders and replaces
+routes and flow steps it recorded. A run prints, per edition, `main: <edition>
+cached (N) / live (M, why)`. A run whose every edition's baseline holds every
+route and flow step it asks for never checks out or boots the base: only the
+candidate stack comes up. When a baseline lacks some (a new route, a new flow,
+a flow whose steps or expects changed), the base boots, renders only those
+alone before the diff, and adds them to the baseline (baseline_fill.go); the
+diff then replays the base from it. `-refresh-baseline` re-renders and replaces
 it; `-no-baseline` neither reads nor writes one.
 
 **Editions.** Both refs seed the same signed local-dev enterprise licence onto
@@ -196,6 +206,17 @@ stack:
    monolith layout's own `start:prepare:files` (`platform/app`'s, on
    `origin/main`) already builds the SDK and the MCP server inline, and
    `ensure-built.mjs` does not exist there at all.
+
+On a persistent worktree a step whose inputs are unchanged since it last
+finished there is skipped (reuse.go): the install when the lockfile, the
+workspace file, `.npmrc`, `.pnpmfile.cjs` and `patches` are unchanged and
+`node_modules` is there; the generated files, and the UI build, when the code
+inputs are unchanged (every top-level entry but Go, docs, specs, tools and
+infrastructure, plus `services/langevals/ts-integration` and
+`services/langyworker`). Inputs are git object ids, never mtimes.
+`ensure-built.mjs` checks itself and runs every time, after the run removes
+any `.ensure-built.lock` a killed prepare left: that script waits 180s on a
+stale lock, which cost runs 20260929-161501 and -164614 over three minutes each.
 
 Every step's name and exit status go to the run log as it runs; nothing here
 ever logs a byte of `.env`'s contents. See
@@ -345,6 +366,24 @@ push cancels the one still going. It follows `apidiff.yml` and `e2e-ci.yml`:
 Findings are for review and never fail the job; exit 2 does, and prints the
 end of every stack log into the step's output.
 
+## Refusing a slow machine, and where the time goes
+
+A run refuses to start, before it creates its directory, on battery, above
+`-max-load` (a 1-minute load average of 20 by default), or while another live
+or kept run's `visualdiff-*` stack is up; `-force` runs anyway. Each side
+captures on `-pages` pages: half the CPUs by default, and never more than the
+CPUs the load leaves free.
+
+Every phase's wall time goes to run.log as `phase: <name> <duration>` and to
+the end of summary.txt: each side's install, prepare, ui build and boot, the
+seed, each edition's runner and, from the runner, each side's capture,
+recapture and flows, the main top-up, and teardown.
+
+Run 17 recaptured 138 screens alone, every one held back as blank (none for a
+module failure) while its API answered in up to eleven seconds (2062 late
+requests, against 17 in run 16). That was load, not an eager settle: the
+refusal above covers it.
+
 ## Capturing under concurrency
 
 A cold Vite dev server fed four pages at once drops module requests
@@ -376,9 +415,10 @@ never cached. `-dev-ui` keeps both sides on their dev servers. Dev-only chrome
 Every run first collects what dead runs left behind (`visualdiff gc` does
 the same on its own): a run directory whose `pid` names no live process
 loses its haven stacks (and with them their databases) and its own worktrees
-(never the persistent `.visualdiff/worktrees`). A run never deletes an earlier
-run's directory; only `visualdiff gc` does, for runs older than `-older-than`
-(a week by default).
+(never the persistent `.visualdiff/worktrees`). A run keeps its own directory
+and the previous run's, and deletes every older run directory; a kept or live
+run, and a directory not named as a run time, are left alone. `visualdiff gc`
+by hand removes run directories older than `-older-than` (a week by default).
 Registered `visualdiff-*` stacks no run owns are destroyed, then `git
 worktree prune` runs. A `-keep` run is left alone unless `gc -kept`.
 

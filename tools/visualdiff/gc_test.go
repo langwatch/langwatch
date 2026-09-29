@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -31,33 +30,49 @@ func TestGCLeavesALiveRunAKeptRunAndTheCurrentRun(t *testing.T) {
 	}
 }
 
-// @scenario "A run never deletes an earlier run's report"
-func TestARunNeverDeletesAnEarlierRunsReport(t *testing.T) {
+// @scenario "A run keeps its own directory and the previous run's, and deletes the rest"
+func TestARunKeepsOnlyThePreviousRunsDirectory(t *testing.T) {
 	root := t.TempDir()
-	for _, name := range []string{"20260926-111129", "20260926-134222"} {
+	current := filepath.Join(root, ".visualdiff", "20260929-120000")
+	for _, name := range []string{"20260926-111129", "20260927-134222", "20260928-090000", "20260929-120000", "handmade"} {
 		if err := os.MkdirAll(filepath.Join(root, ".visualdiff", name, "candidate"), 0o750); err != nil {
 			t.Fatal(err)
 		}
-		dead := strconv.Itoa(99999999)
-		if err := os.WriteFile(filepath.Join(root, ".visualdiff", name, RunPIDFile), []byte(dead), 0o600); err != nil {
-			t.Fatal(err)
-		}
+	}
+	if err := os.WriteFile(filepath.Join(root, ".visualdiff", "20260926-111129", RunKeepFile), nil, 0o600); err != nil {
+		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(root, ".visualdiff", BaselinesDir, "key"), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	states, err := ScanRuns(root, func(int) bool { return false })
-	if err != nil || len(states) != 2 {
+	if err != nil || len(states) != 5 {
 		t.Fatalf("the baseline cache is not a run: %+v %v", states, err)
 	}
 
-	plan := SelectGarbage(states, GCSelection{})
+	plan := SelectGarbage(states, GCSelection{Current: current, KeepRuns: RetainedRuns})
 
-	if len(plan.Runs) != 2 || plan.Runs[0].RemoveDir || plan.Runs[1].RemoveDir {
-		t.Fatalf("a run's own gc pass keeps every report: %+v", plan.Runs)
+	removed := map[string]bool{}
+	for _, run := range plan.Runs {
+		removed[run.State.Name] = run.RemoveDir
+		if len(run.State.Worktrees) != 1 {
+			t.Errorf("a dead run still loses its worktree: %+v", run.State)
+		}
 	}
-	if len(plan.Runs[0].State.Worktrees) != 1 {
-		t.Fatalf("a dead run still loses its worktree: %+v", plan.Runs[0].State)
+	if _, collected := removed["20260929-120000"]; collected {
+		t.Error("the current run collected itself")
+	}
+	if removed["20260928-090000"] {
+		t.Error("the previous run's directory was removed")
+	}
+	if !removed["20260927-134222"] {
+		t.Error("a run older than the previous one kept its directory")
+	}
+	if _, collected := removed["20260926-111129"]; collected {
+		t.Error("a kept run was collected")
+	}
+	if removed["handmade"] {
+		t.Error("a directory not named as a run was removed")
 	}
 }
 

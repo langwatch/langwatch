@@ -49,21 +49,8 @@ type BaselineMeta struct {
 // Covers reports whether a baseline holds every route the plan renders and
 // every flow it runs, each flow with the same steps.
 func (meta BaselineMeta) Covers(routes []string, flows map[string]string) bool {
-	held := map[string]bool{}
-	for _, route := range meta.Routes {
-		held[route] = true
-	}
-	for _, route := range routes {
-		if !held[route] {
-			return false
-		}
-	}
-	for id, steps := range flows {
-		if meta.Flows[id] != steps {
-			return false
-		}
-	}
-	return true
+	missingRoutes, missingFlows := meta.Missing(routes, flows)
+	return len(missingRoutes)+len(missingFlows) == 0
 }
 
 // flowHashes names each flow's steps by a hash, so a flow edited since the
@@ -93,6 +80,17 @@ type Baseline struct {
 	Dir    string
 	Meta   BaselineMeta
 	Cached bool
+	// MissingRoutes and MissingFlows are what a present slot lacks: only those
+	// render on the base, and are added to the slot (baseline_fill.go).
+	MissingRoutes []string
+	MissingFlows  []string
+	// Why says why anything renders live.
+	Why string
+}
+
+// Partial reports a present slot this run tops up rather than replaces.
+func (baseline Baseline) Partial() bool {
+	return !baseline.Cached && len(baseline.MissingRoutes)+len(baseline.MissingFlows) > 0
 }
 
 // Present reports whether the slot holds a complete baseline.
@@ -253,11 +251,87 @@ func resolveBaselines(ctx context.Context, inputs baselineInputs) (map[Edition]B
 				Routes: config.Routes, Flows: wanted,
 			},
 		}
-		baseline.Cached = !options.RefreshBaseline && baseline.Present() &&
-			readBaselineMeta(baseline.Dir).Covers(config.Routes, wanted)
-		baselines[edition] = baseline
+		baselines[edition] = coverBaseline(baseline, options.RefreshBaseline)
 	}
 	return baselines, nil
+}
+
+// coverBaseline decides what a slot answers: everything (Cached), a part (the
+// Missing lists), or nothing, and why anything renders live.
+func coverBaseline(baseline Baseline, refresh bool) Baseline {
+	switch {
+	case refresh:
+		baseline.Why = "-refresh-baseline"
+		return baseline
+	case !baseline.Present():
+		baseline.Why = "no baseline for " + shortCommit(baseline.Meta.BaseCommit) + " yet"
+		return baseline
+	}
+	held := readBaselineMeta(baseline.Dir)
+	baseline.MissingRoutes, baseline.MissingFlows = held.Missing(baseline.Meta.Routes, baseline.Meta.Flows)
+	baseline.Cached = !baseline.Partial()
+	if !baseline.Cached {
+		baseline.Why = missingWhy(baseline, held)
+	}
+	return baseline
+}
+
+// Missing lists the routes a baseline does not hold and the flows it holds
+// with other steps or not at all.
+func (meta BaselineMeta) Missing(routes []string, flows map[string]string) ([]string, []string) {
+	held := map[string]bool{}
+	for _, route := range meta.Routes {
+		held[route] = true
+	}
+	var missingRoutes, missingFlows []string
+	for _, route := range routes {
+		if !held[route] {
+			missingRoutes = append(missingRoutes, route)
+		}
+	}
+	for id, steps := range flows {
+		if meta.Flows[id] != steps {
+			missingFlows = append(missingFlows, id)
+		}
+	}
+	sort.Strings(missingFlows)
+	return missingRoutes, missingFlows
+}
+
+// missingWhy names what a partial slot lacks: new routes, new flows, changed flows.
+func missingWhy(baseline Baseline, held BaselineMeta) string {
+	var added, changed []string
+	for _, id := range baseline.MissingFlows {
+		if _, ok := held.Flows[id]; ok {
+			changed = append(changed, id)
+		} else {
+			added = append(added, id)
+		}
+	}
+	var parts []string
+	if len(baseline.MissingRoutes) > 0 {
+		parts = append(parts, fmt.Sprintf("%d new route(s)", len(baseline.MissingRoutes)))
+	}
+	if len(added) > 0 {
+		parts = append(parts, "new flow(s) "+strings.Join(added, ","))
+	}
+	if len(changed) > 0 {
+		parts = append(parts, "changed flow(s) "+strings.Join(changed, ","))
+	}
+	return strings.Join(parts, "; ")
+}
+
+// Counts are how many of the wanted routes and flows replay, and how many render live.
+func (baseline Baseline) Counts() (int, int) {
+	wanted := len(baseline.Meta.Routes) + len(baseline.Meta.Flows)
+	if baseline.Cached {
+		return wanted, 0
+	}
+	if baseline.Partial() {
+		live := len(baseline.MissingRoutes) + len(baseline.MissingFlows)
+		return wanted - live, live
+	}
+	return 0, wanted
 }
 
 // needsLiveBase reports whether any edition has no baseline to replay.
@@ -270,19 +344,21 @@ func needsLiveBase(editions []Edition, baselines map[Edition]Baseline) bool {
 	return false
 }
 
-// writeBaselinePlan tells a dry run, per edition, whether the base will be
-// replayed or rendered.
-func writeBaselinePlan(stdout io.Writer, editions []Edition, baselines map[Edition]Baseline) {
+// writeBaselinePlan says, per edition, what of main replays and what renders
+// live and why: "main: cached (N) / live (M, why)".
+func writeBaselinePlan(out io.Writer, editions []Edition, baselines map[Edition]Baseline) {
 	for _, edition := range editions {
 		baseline, ok := baselines[edition]
-		switch {
-		case !ok:
-			fmt.Fprintf(stdout, "  %-10s base rendered live, not cached (-no-baseline)\n", edition)
-		case baseline.Cached:
-			fmt.Fprintf(stdout, "  %-10s base replayed from %s\n", edition, baseline.Dir)
-		default:
-			fmt.Fprintf(stdout, "  %-10s base rendered live, then cached at %s\n", edition, baseline.Dir)
+		if !ok {
+			fmt.Fprintf(out, "main: %s rendered live, not cached (-no-baseline)\n", edition)
+			continue
 		}
+		cached, live := baseline.Counts()
+		if live == 0 {
+			fmt.Fprintf(out, "main: %s cached (%d) / live (0), replayed from %s\n", edition, cached, baseline.Dir)
+			continue
+		}
+		fmt.Fprintf(out, "main: %s cached (%d) / live (%d, %s), cached at %s after\n", edition, cached, live, baseline.Why, baseline.Dir)
 	}
 }
 

@@ -19,6 +19,7 @@ const usage = `visualdiff — render every route and every flow on two refs and 
                  [-dry-run] [-keep] [-agent] [-no-haven]
                  [-editions enterprise,free] [-no-baseline] [-refresh-baseline]
                  [-no-fail-fast] [-resume RUNID] [-no-publish] [-include-done]
+                 [-rebase-main] [-force] [-max-load N] [-pages N]
 
   visualdiff recapture -run RUNID [-routes a,b] [-flows x,y] [-edition E] [-root DIR]
   visualdiff done -run RUNID (-route PATH | -flow ID) [-edition E] -note WHY [-force]
@@ -47,9 +48,17 @@ intended-restore and noise are reported and never fail it.
 
 Every screen is captured once per edition - enterprise (the seeded license)
 by default, and free (no license) with -editions enterprise,free - on the
-same stacks. The base's captures are cached
+same stacks. Without -base, the base is origin/main pinned at a commit kept
+in .visualdiff/baselines/main-pin.json; the pin moves once main has changed
+2000 lines since it, or on -rebase-main. The base's captures are cached
 under .visualdiff/baselines per base commit, edition and capture settings:
-a later run against the same base replays them and never boots the base.
+a later run replays them and never boots the base, and a run that adds or
+changes routes or flows renders only those on the base and adds them.
+
+A run refuses to start on battery, above -max-load, or beside another live
+or kept visualdiff stack; -force runs anyway. Each side captures on -pages
+pages, half the CPUs by default and fewer when the load leaves less free.
+A run keeps its own directory and the previous run's, and deletes older ones.
 The candidate is captured first, and a candidate whose shell does not render
 stops the run within its first three routes (-no-fail-fast to carry on).
 -resume RUNID continues a -keep run after a fix: its prepared worktrees and
@@ -77,7 +86,8 @@ with any class but noise, copy or intended-restore is refused without -force.
 
 coverage prints the same coverage verdict without booting anything. gc,
 which every run also does first, removes what dead runs left behind: their
-worktrees, haven stacks and databases, and every orphan visualdiff-* stack.
+worktrees, haven stacks and databases, and every orphan visualdiff-* stack;
+by hand, it removes run directories older than -older-than.
 A -keep run is left alone unless -kept is given.
 
 Exit status: 0 no findings, 1 findings, 2 the run could not be completed.
@@ -198,6 +208,10 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	noPublish, devUI, includeDone := flags.Bool("no-publish", false, "do not show the run's screens on the branch's pull request"),
 		flags.Bool("dev-ui", false, "capture both sides from their Vite dev servers instead of a production build of each UI"),
 		flags.Bool("include-done", false, "capture the sections the done ledger holds too")
+	rebaseMain := flags.Bool("rebase-main", false, "move the base's pin to -base as it is now, whatever it changed")
+	force := flags.Bool("force", false, "run on battery, under load or beside another visualdiff stack")
+	maxLoad := flags.Float64("max-load", DefaultMaxLoad, "refuse to start above this 1-minute load average")
+	pages := flags.Int("pages", 0, "pages each side captures on at once (default half the CPUs, fewer under load)")
 	if err := flags.Parse(args); err != nil {
 		return nil, errFlagsReported
 	}
@@ -226,6 +240,7 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 		},
 		Editions: editions, Baseline: !*noBaseline, RefreshBaseline: *refreshBaseline,
 		FailFast: !*noFailFast, NoPublish: *noPublish, DevUI: *devUI,
+		PinMain: !isFlagSet(flags, "base"), RebaseMain: *rebaseMain, Force: *force, MaxLoad: *maxLoad, Pages: *pages,
 	}
 	resumeRun(&options, *resume)
 	return &runFlags{options: options, config: config, includeDone: *includeDone}, nil

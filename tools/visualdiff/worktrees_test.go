@@ -54,6 +54,16 @@ func TestEachSideReusesOneWorktreeBetweenRuns(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(PersistentWorktree(options.Root, side), ".git"), []byte("gitdir: x"), 0o600); err != nil {
 			t.Fatal(err)
 		}
+		if err := os.MkdirAll(filepath.Join(PersistentWorktree(options.Root, side), "node_modules"), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(PersistentWorktree(options.Root, side), "node_modules", ".modules.yaml"), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	lock := filepath.Join(PersistentWorktree(options.Root, "candidate"), "sdks", "typescript", "node_modules", ".ensure-built.lock")
+	if err := os.MkdirAll(lock, 0o750); err != nil {
+		t.Fatal(err)
 	}
 	fake.commands = nil
 	execute(filepath.Join(options.Root, ".visualdiff", "run2"))
@@ -64,7 +74,24 @@ func TestEachSideReusesOneWorktreeBetweenRuns(t *testing.T) {
 		t.Errorf("the second run added a worktree again: %v", got)
 	}
 	if got := fake.matching("pnpm install"); len(got) != 0 {
-		t.Errorf("an unchanged tree was prepared again: %v", got)
+		t.Errorf("an unchanged lockfile was installed again: %v", got)
+	}
+	if got := fake.matching("start:prepare:files"); len(got) != 0 {
+		t.Errorf("unchanged code had its generated files written again: %v", got)
+	}
+	if got := fake.matching("ensure-built.mjs"); len(got) != 2 {
+		t.Errorf("ensure-built, which checks itself, runs every time: %v", got)
+	}
+	if dirExists(lock) {
+		t.Error("a stale ensure-built lock was left for the build to wait 180s on")
+	}
+
+	fake.commands, fake.lock = nil, "changed"
+	fake.haven.readyStacks["visualdiff-run3-base"] = "https://app.visualdiff-run3-base.langwatch.localhost"
+	fake.haven.readyStacks["visualdiff-run3-candidate"] = "https://app.visualdiff-run3-candidate.langwatch.localhost"
+	execute(filepath.Join(options.Root, ".visualdiff", "run3"))
+	if got := fake.matching("pnpm install"); len(got) != 2 {
+		t.Errorf("a changed lockfile must install again on both sides: %v", got)
 	}
 
 	states, err := ScanRuns(options.Root, func(int) bool { return false })

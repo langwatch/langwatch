@@ -77,6 +77,10 @@ for (const target of selected) {
   // lock to go, not for the entry: tsup writes the JS entry seconds before the
   // declarations, and a dependant compiled in that gap sees an untyped module.
   const lock = join(dir, "node_modules", ".ensure-built.lock");
+  // A lock older than ten minutes outlived a killed build; nothing still holds it.
+  if (existsSync(lock) && Date.now() - statSync(lock).mtimeMs > 600_000) {
+    rmSync(lock, { recursive: true, force: true });
+  }
   try {
     mkdirSync(lock, { recursive: false });
   } catch {

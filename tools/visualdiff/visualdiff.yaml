@@ -15,8 +15,8 @@ settle:
   quietMillis: 500
   deadlineMillis: 8000
 
-# Pages each side opens in one signed-in session, the larger of the two. Routes
-# spread over them, and flows use every one of them (see flows below).
+# Pages each side opens in one signed-in session, the larger of the two, used
+# only when the machine cannot be read: -pages (half the CPUs) decides it.
 concurrency:
   routes: 6
   flows: 6
