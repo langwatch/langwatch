@@ -213,7 +213,7 @@ export class LangyLocalWorkerService {
 
   async #ownCall(input: LangyKeyCaller & { callId: string }) {
     const caller = await this.#callers.getLocalCaller(input);
-    const lookup = await this.#runtime.dispatcher.read(input.callId);
+    const lookup = await this.#runtime.dispatcher.getCall(input.callId);
     if (lookup.kind === "miss" || lookup.call.projectId !== caller.projectId) {
       throw new LangyLocalRecordNotFoundError();
     }

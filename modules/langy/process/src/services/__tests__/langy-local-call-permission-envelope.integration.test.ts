@@ -77,7 +77,7 @@ describe("given a call waiting on a permission card", () => {
 
     /** @scenario "A call waiting on a permission card keeps its envelope" */
     it("still holds the call, and gives the command its whole limit again", async () => {
-      const waiting = await dispatcher.read(callId);
+      const waiting = await dispatcher.getCall(callId);
       expect(waiting).toMatchObject({ kind: "hit", call: { state: "awaiting_permission" } });
       const polled = await dispatcher.poll({ callId, holdMs: 0 });
       expect(polled).toMatchObject({ outcome: "polled", answer: { state: "awaiting_permission" } });
@@ -88,7 +88,7 @@ describe("given a call waiting on a permission card", () => {
         decision: "allow_once",
       });
 
-      const running = await dispatcher.read(callId);
+      const running = await dispatcher.getCall(callId);
       expect(running).toMatchObject({
         kind: "hit",
         call: { state: "running", deadlineAt: clock.now + COMMAND_TIMEOUT_MS },

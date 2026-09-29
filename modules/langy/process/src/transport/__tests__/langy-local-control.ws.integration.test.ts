@@ -749,7 +749,9 @@ describe("given a folder shared with the conversation", () => {
         hostname: "rogerio-mbp",
         status: "pending",
       });
-      expect(stateOf(await podA.runtime.dispatcher.read(call.callId))).toBe("awaiting_permission");
+      expect(stateOf(await podA.runtime.dispatcher.getCall(call.callId))).toBe(
+        "awaiting_permission",
+      );
     });
 
     /** @scenario "The session grant button names every pattern the click covers" */
@@ -1203,7 +1205,7 @@ describe("given a command line that reconnects while a command still runs", () =
         text: "4 migrations applied",
       });
       await expect
-        .poll(async () => stateOf(await podA.runtime.dispatcher.read(call.callId)), {
+        .poll(async () => stateOf(await podA.runtime.dispatcher.getCall(call.callId)), {
           timeout: 5_000,
         })
         .toBe("done");
@@ -1216,7 +1218,7 @@ describe("given a command line that reconnects while a command still runs", () =
         text: "sent again after the reconnect",
       });
       await new Promise((resolve) => setTimeout(resolve, 300));
-      expect(await podA.runtime.dispatcher.read(call.callId)).toMatchObject({
+      expect(await podA.runtime.dispatcher.getCall(call.callId)).toMatchObject({
         kind: "hit",
         call: { state: "done", ok: true, text: "4 migrations applied" },
       });
@@ -1279,7 +1281,7 @@ describe("given a folder replaced by a newer one", () => {
           text: "written on the machine that was replaced",
         },
       );
-      expect(stateOf(await podA.runtime.dispatcher.read(call.callId))).not.toBe("done");
+      expect(stateOf(await podA.runtime.dispatcher.getCall(call.callId))).not.toBe("done");
 
       // The folder the panel shows still answers it.
       fresh.cli.send({
@@ -1289,7 +1291,7 @@ describe("given a folder replaced by a newer one", () => {
         text: "written",
       });
       await expect
-        .poll(async () => stateOf(await podA.runtime.dispatcher.read(call.callId)), {
+        .poll(async () => stateOf(await podA.runtime.dispatcher.getCall(call.callId)), {
           timeout: 5_000,
         })
         .toBe("done");

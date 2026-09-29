@@ -90,7 +90,7 @@ describe("given a folder connected to the conversation", () => {
       expect(nudges).toContainEqual({ call: call.callId });
 
       await dispatcher.ack(call.callId);
-      expect(stateOf(await dispatcher.read(call.callId))).toBe("running");
+      expect(stateOf(await dispatcher.getCall(call.callId))).toBe("running");
 
       await dispatcher.result({
         callId: call.callId,
@@ -184,7 +184,7 @@ describe("given a folder connected to the conversation", () => {
         callId: call.callId,
         waitId: "lwait_1",
       });
-      expect(stateOf(await dispatcher.read(call.callId))).toBe("awaiting_permission");
+      expect(stateOf(await dispatcher.getCall(call.callId))).toBe("awaiting_permission");
 
       await dispatcher.sendPermission({
         conversationId,
@@ -193,7 +193,7 @@ describe("given a folder connected to the conversation", () => {
       });
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect(stateOf(await dispatcher.read(call.callId))).toBe("running");
+      expect(stateOf(await dispatcher.getCall(call.callId))).toBe("running");
       expect(nudges).toContainEqual({
         permission: { callId: call.callId, decision: "allow_once" },
       });

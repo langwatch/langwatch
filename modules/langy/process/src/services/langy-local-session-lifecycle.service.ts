@@ -178,7 +178,7 @@ export class LocalControlLifecycleService {
     }
 
     if ("call" in parsed) {
-      const lookup = await this.deps.dispatcher.read(parsed.call);
+      const lookup = await this.deps.dispatcher.getCall(parsed.call);
       if (lookup.kind === "miss" || lookup.call.conversationId !== session.conversationId) {
         return;
       }

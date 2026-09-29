@@ -141,7 +141,7 @@ export class LocalCallDispatcherService {
     const until = this.now() + holdMs;
     const beat = this.beater();
     const look = async (): Promise<LocalCallLookup> => {
-      const lookup = await this.read(callId);
+      const lookup = await this.getCall(callId);
       if (lookup.kind === "hit" && lookup.call.state !== "done") await beat(lookup.call);
       return lookup;
     };
@@ -230,7 +230,7 @@ export class LocalCallDispatcherService {
 
   /** The command line started the call. */
   async ack(callId: string): Promise<void> {
-    const lookup = await this.read(callId);
+    const lookup = await this.getCall(callId);
     if (lookup.kind === "miss" || lookup.call.state !== "pending") {
       return;
     }
@@ -245,7 +245,7 @@ export class LocalCallDispatcherService {
    * budget, not the command's own deadline.
    */
   async awaitPermission({ callId, waitId }: { callId: string; waitId: string }): Promise<void> {
-    const lookup = await this.read(callId);
+    const lookup = await this.getCall(callId);
     if (lookup.kind === "miss" || lookup.call.state === "done") {
       return;
     }
@@ -270,7 +270,7 @@ export class LocalCallDispatcherService {
     callId: string;
     decision: "allow_once" | "allow_pattern" | "deny" | "expired";
   }): Promise<void> {
-    const lookup = await this.read(callId);
+    const lookup = await this.getCall(callId);
     if (lookup.kind === "hit" && lookup.call.state === "awaiting_permission") {
       const { call } = lookup;
       // The command starts now, so its time limit starts now. Counting the
@@ -301,7 +301,7 @@ export class LocalCallDispatcherService {
     callId: string;
     frame: Pick<ResultFrame, "ok" | "text" | "output" | "error">;
   }): Promise<void> {
-    const lookup = await this.read(callId);
+    const lookup = await this.getCall(callId);
     if (lookup.kind === "miss" || lookup.call.state === "done") {
       return;
     }
@@ -330,7 +330,7 @@ export class LocalCallDispatcherService {
     code?: "cancelled" | "timeout" | "permission_expired" | "exec_failed";
     message?: string;
   }): Promise<void> {
-    const lookup = await this.read(callId);
+    const lookup = await this.getCall(callId);
     if (lookup.kind === "miss" || lookup.call.state === "done") {
       return;
     }
@@ -397,7 +397,7 @@ export class LocalCallDispatcherService {
    * longer decodes is corruption rather than absence, so it raises under a code
    * that tells the person at the command line to ask for the change again.
    */
-  async read(callId: string): Promise<LocalCallLookup> {
+  async getCall(callId: string): Promise<LocalCallLookup> {
     const raw = await this.store.tryGet(callKey(callId));
     if (!raw) {
       return { kind: "miss" };
@@ -423,7 +423,7 @@ export class LocalCallDispatcherService {
    */
   private async readSkippingUnreadable(callId: string): Promise<LocalCallLookup> {
     try {
-      return await this.read(callId);
+      return await this.getCall(callId);
     } catch (error) {
       if (!(error instanceof LangyLocalRecordUnreadableError)) {
         throw error;
