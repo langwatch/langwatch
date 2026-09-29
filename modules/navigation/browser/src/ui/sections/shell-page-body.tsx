@@ -20,7 +20,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { type NavigationTeam, useNavigationHost } from "../../model/navigation-host.ts";
 import { planManagementHref } from "../../model/plan-management-href.ts";
-import { isSettingsShellRoute } from "../../model/products.ts";
+import { isPathUnder } from "../../model/products.ts";
 import { isResolverAddress } from "../../model/resolve-shell-route.ts";
 import { AdminViewingAsBanner } from "../blocks/admin-viewing-as-banner.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
@@ -81,17 +81,23 @@ function readerMayOpenThePage({
 }
 
 /**
- * The settings detour is read at a measure, centred in the width left beside
- * the menu — a settings form flush against the sidebar is what this stops.
+ * Settings pages are read at a measure, as main's SettingsLayout framed them;
+ * authentication's section rail takes the full width, as main's fullBleed did.
+ * Ops tools other than the backoffice draw their own frame and get none here.
  */
 function PageMeasure({ pathname, children }: { pathname: string; children: ReactNode }) {
-  if (!isSettingsShellRoute(pathname)) return <>{children}</>;
+  const isMeasured =
+    isPathUnder({ pathname, base: "/settings" }) ||
+    isPathUnder({ pathname, base: "/ops/backoffice" });
+  if (!isMeasured) return <>{children}</>;
+  const isFullBleed = isPathUnder({ pathname, base: "/settings/authentication" });
   return (
     <Container
-      maxWidth="1280px"
+      maxWidth={isFullBleed ? "full" : "1280px"}
       padding={4}
       paddingBottom={16}
       height="full"
+      minHeight={0}
       overflowY="auto"
       flex={1}
     >
