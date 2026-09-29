@@ -48,7 +48,8 @@ describe("given a ledger holding confirmed judgement rows", () => {
       expect(sql).toContain("Status = 'confirmed'");
       expect(sql).not.toContain("OccurredAt");
       expect(queries[0]!.query_params).toEqual({
-        tenantIds: ["project-1", "project-2"],
+        tenant0: "project-1",
+        tenant1: "project-2",
         requestType: "instant_eval",
       });
       expect(resolvedFor).toEqual(["project-1"]);

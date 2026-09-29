@@ -46,11 +46,12 @@ describe("the metered lane per day across an organization's projects", () => {
       });
 
       const sql = queries[0]?.query ?? "";
-      expect(sql).toContain("WHERE TenantId IN {tenantIds:Array(String)}");
+      expect(sql).toContain("WHERE TenantId IN ({tenant0:String}, {tenant1:String})");
       expect(sql).toContain("argMax(Status, EventTimestamp)");
       expect(sql).toContain("GROUP BY Day");
       expect(queries[0]?.query_params).toEqual({
-        tenantIds: ["project-1", "project-2"],
+        tenant0: "project-1",
+        tenant1: "project-2",
         fromMs: Date.UTC(2026, 8, 1),
         toMs: Date.UTC(2026, 8, 3),
       });

@@ -74,8 +74,16 @@ const CHARGED_STATUSES = "('confirmed', 'failed')";
 const METERED_READ_MAX_EXECUTION_SECONDS = 20;
 const DAY_MS = 86_400_000;
 
+/** The `TenantId IN (...)` list and its params: the guard wants one bound String per tenant. */
+function tenantSet({ tenantIds }: { tenantIds: readonly string[] }) {
+  return {
+    placeholders: tenantIds.map((_, index) => `{tenant${index}:String}`).join(", "),
+    params: Object.fromEntries(tenantIds.map((id, index) => [`tenant${index}`, id])),
+  };
+}
+
 /** Main's governance metered-lane read: each request at its latest version, summed per day. */
-const SPEND_DAYS_QUERY = `
+const spendDaysQuery = ({ placeholders }: { placeholders: string }) => `
   SELECT
     toDate(RequestOccurredAt, 'UTC') AS Day,
     toString(sumIf(RequestCostNanoUSD, RequestStatus IN ${CHARGED_STATUSES})) AS AmountNanoUsd,
@@ -101,7 +109,7 @@ const SPEND_DAYS_QUERY = `
       argMax(TokensCacheWrite, EventTimestamp) AS RequestTokensCacheWrite,
       argMax(TokensReasoning, EventTimestamp)  AS RequestTokensReasoning
     FROM ${TABLE}
-    WHERE TenantId IN {tenantIds:Array(String)}
+    WHERE TenantId IN (${placeholders})
     GROUP BY TenantId, GatewayRequestId
     HAVING RequestOccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
       AND RequestOccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
@@ -383,6 +391,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
   }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
     if (tenantIds.length === 0) return { rows: [], nextCursor: null };
     const client = await this.resolveClient(tenantIds[0]!);
+    const tenant = tenantSet({ tenantIds });
     const decoded = cursor ? spendCursors.decodeSpendEventsCursor(cursor) : null;
 
     const { clauses, params: filterParams } =
@@ -393,7 +402,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
         filters,
       });
     const params: Record<string, unknown> = {
-      tenantIds,
+      ...tenant.params,
       limit,
       ...filterParams,
     };
@@ -402,13 +411,14 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       query: `
         SELECT ${SPEND_ROW_COLUMNS}, EventTimestamp
         FROM ${TABLE} FINAL
-        WHERE TenantId IN {tenantIds:Array(String)}
+        WHERE TenantId IN (${tenant.placeholders})
           ${clauses.join("\n          ")}
         ORDER BY EventTimestamp ASC, GatewayRequestId ASC
         LIMIT {limit:UInt32}
       `,
       query_params: params,
       format: "JSONEachRow",
+      tenantIds,
     });
     const raw = (await result.json()) as Record<string, unknown>[];
     const rows = raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));
@@ -465,8 +475,9 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     }
     if (tenantIds.length === 0) return { rows: [], nextCursor: null };
     const client = await this.resolveClient(tenantIds[0]!);
+    const tenant = tenantSet({ tenantIds });
 
-    const params: Record<string, unknown> = { tenantIds, fromMs, toMs, limit };
+    const params: Record<string, unknown> = { ...tenant.params, fromMs, toMs, limit };
     const dimensions = ClickHouseGatewaySpendEventsRepository.summaryDimensions({
       groupBy,
       bucket,
@@ -507,7 +518,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
           sumIf(ImageCount, Status IN ('confirmed', 'failed')) AS ImageCount,
           sumIf(CostNanoUSD, Status IN ('confirmed', 'failed')) AS CostNanoUSD
         FROM ${TABLE} FINAL
-        WHERE TenantId IN {tenantIds:Array(String)}
+        WHERE TenantId IN (${tenant.placeholders})
           AND Status != '${SPEND_STATUS_IN_FLIGHT}'
           AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
           AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
@@ -518,6 +529,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       `,
       query_params: params,
       format: "JSONEachRow",
+      tenantIds,
       // LIMIT bounds rows returned, not rows aggregated: every page rebuilds
       // the whole group set under FINAL before discarding all but one page,
       // so the walk gets a deadline instead of running as long as the group
@@ -557,6 +569,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
   }): Promise<number> {
     if (tenantIds.length === 0) return 0;
     const client = await this.resolveClient(tenantIds[0]!);
+    const tenant = tenantSet({ tenantIds });
     const clauses: string[] = [];
     if (fromMs !== undefined) {
       clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
@@ -568,18 +581,19 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       query: `
         SELECT sum(CostNanoUSD) AS CostNanoUSD
         FROM ${TABLE} FINAL
-        WHERE TenantId IN {tenantIds:Array(String)}
+        WHERE TenantId IN (${tenant.placeholders})
           AND RequestType = {requestType:String}
           AND Status = 'confirmed'
           ${clauses.join("\n          ")}
       `,
       query_params: {
-        tenantIds,
+        ...tenant.params,
         requestType,
         ...(fromMs === undefined ? {} : { fromMs }),
         ...(toMs === undefined ? {} : { toMs }),
       },
       format: "JSONEachRow",
+      tenantIds,
     });
     const rows = (await result.json()) as Record<string, unknown>[];
     return parseSummedNanoUsd(rows[0]?.CostNanoUSD ?? 0);
@@ -597,10 +611,12 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     const [firstTenantId] = tenantIds;
     if (firstTenantId === undefined) return [];
     const client = await this.resolveClient(firstTenantId);
+    const tenant = tenantSet({ tenantIds });
     const result = await client.query({
-      query: SPEND_DAYS_QUERY,
+      query: spendDaysQuery({ placeholders: tenant.placeholders }),
+      tenantIds,
       query_params: {
-        tenantIds: [...tenantIds],
+        ...tenant.params,
         fromMs: utcDayStartMs(fromDay),
         toMs: utcDayStartMs(toDay) + DAY_MS,
       },
@@ -656,6 +672,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     };
     if (tenantIds.length === 0) return empty;
     const client = await this.resolveClient(tenantIds[0]!);
+    const tenant = tenantSet({ tenantIds });
     const vkClause = virtualKeyId !== undefined ? "AND VirtualKeyId = {virtualKeyId:String}" : "";
     const result = await client.query({
       query: `
@@ -671,20 +688,21 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
           sum(TokensOutputImage) AS TokensOutputImage,
           sum(ImageCount) AS ImageCount
         FROM ${TABLE} FINAL
-        WHERE TenantId IN {tenantIds:Array(String)}
+        WHERE TenantId IN (${tenant.placeholders})
           AND EndUserId = {endUserId:String}
           AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
           AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
           ${vkClause}
       `,
       query_params: {
-        tenantIds,
+        ...tenant.params,
         endUserId,
         fromMs,
         toMs,
         ...(virtualKeyId !== undefined ? { virtualKeyId } : {}),
       },
       format: "JSONEachRow",
+      tenantIds,
     });
     const raw = (await result.json()) as Record<string, unknown>[];
     const row = raw[0];
