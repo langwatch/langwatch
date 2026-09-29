@@ -126,6 +126,23 @@ Feature: Enterprise licensing lifecycle
       When licensing reads the organization's contract budget
       Then it answers none
 
+  Rule: Licensing owns the licence signing key
+
+    Every licence LangWatch signs is signed by licensing with LANGWATCH_LICENSE_PRIVATE_KEY:
+    the registry's issue, renew and seat changes, and a Stripe purchase billing asks it to sign.
+
+    @unit
+    Scenario: Licensing signs a purchased licence with its own key
+      Given the deployment holds the licence signing key
+      When billing asks licensing to sign a purchased licence
+      Then the licence verifies against LangWatch's public key
+
+    @unit
+    Scenario: A deployment without the licence signing key refuses to sign by name
+      Given the deployment holds no licence signing key
+      When a peer asks licensing to sign a licence
+      Then it is refused as license_signing_not_configured
+
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber

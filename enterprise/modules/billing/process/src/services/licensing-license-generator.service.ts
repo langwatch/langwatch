@@ -5,23 +5,16 @@ import { type GeneratedLicense, LicenseGenerator } from "./license-purchase.serv
 /** The tier main minted every Stripe licence purchase on. */
 const PURCHASED_LICENSE_PLAN = "GROWTH";
 
-/**
- * Main's `generateLicenseKey` for a purchase, through licensing's own signer. The signing
- * key is resolved at the boot seam and held here; the purchase flow never sees it.
- */
+/** Main's `generateLicenseKey` for a purchase, signed by licensing with its own key. */
 export class LicensingLicenseGeneratorService extends LicenseGenerator {
-  private constructor(
-    private readonly licensing: Pick<LicensingApi, "generateLicenseKey">,
-    private readonly privateKey: string,
-  ) {
+  private constructor(private readonly licensing: Pick<LicensingApi, "generateLicenseKey">) {
     super();
   }
 
   static create(options: {
     licensing: Pick<LicensingApi, "generateLicenseKey">;
-    privateKey: string;
   }): LicensingLicenseGeneratorService {
-    return new LicensingLicenseGeneratorService(options.licensing, options.privateKey);
+    return new LicensingLicenseGeneratorService(options.licensing);
   }
 
   async generate(input: {
@@ -32,7 +25,6 @@ export class LicensingLicenseGeneratorService extends LicenseGenerator {
     const { licenseKey, licenseData } = await this.licensing.generateLicenseKey({
       ...input,
       planType: PURCHASED_LICENSE_PLAN,
-      privateKey: this.privateKey,
     });
     return {
       licenseKey,

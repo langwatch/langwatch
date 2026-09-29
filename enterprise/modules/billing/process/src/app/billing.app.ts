@@ -210,7 +210,6 @@ export class BillingApp
   static readonly secrets = {
     stripeSecretKey: billingSecrets.stripeSecretKey,
     stripeWebhookSecret: billingSecrets.stripeWebhookSecret,
-    licensePrivateKey: billingSecrets.licensePrivateKey,
     internalSlackPlanLimitWebhook: billingSecrets.internalSlackPlanLimitWebhook,
     internalSlackSubscriptionsWebhook: billingSecrets.internalSlackSubscriptionsWebhook,
     internalSlackSelfHostedWebhook: billingSecrets.internalSlackSelfHostedWebhook,
@@ -223,23 +222,17 @@ export class BillingApp
       StripeWebhookSignatureService.create(secret),
     );
     const notices = await BillingApp.#composeNotices(setup);
-    const licensePurchase = await setup.secrets.into(
-      BillingApp.secrets.licensePrivateKey,
-      (privateKey) =>
-        privateKey
-          ? LicensePurchaseService.create({
-              generateLicense: LicensingLicenseGeneratorService.create({
-                licensing: setup.dependencies.licensing,
-                privateKey,
-              }),
-              delivery: LicensePurchaseDeliveryService.create({
-                licensing: setup.dependencies.licensing,
-                mail: licenseEmailChannels.ses.create(setup.members.mail),
-                notices,
-              }),
-            })
-          : void 0,
-    );
+    // Licensing holds the signing key and refuses a purchase it cannot sign.
+    const licensePurchase = LicensePurchaseService.create({
+      generateLicense: LicensingLicenseGeneratorService.create({
+        licensing: setup.dependencies.licensing,
+      }),
+      delivery: LicensePurchaseDeliveryService.create({
+        licensing: setup.dependencies.licensing,
+        mail: licenseEmailChannels.ses.create(setup.members.mail),
+        notices,
+      }),
+    });
     return setup.secrets.into(BillingApp.secrets.stripeSecretKey, (stripeSecretKey) =>
       BillingApp.assemble({
         members: setup.members,

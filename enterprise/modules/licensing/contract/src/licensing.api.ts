@@ -41,7 +41,7 @@ import type {
   LicenseSyncBody,
 } from "./license-sync.ts";
 import type {
-  GenerateLicenseInput,
+  GenerateLicenseKeyInput,
   GenerateLicenseOutput,
   StoreLicenseInput,
 } from "./license.commands.ts";
@@ -91,10 +91,10 @@ export interface LicensingApi {
    */
   issueLicense(input: IssueLicenseInput): Promise<SignedIssuedLicense>;
   /**
-   * Signs a license with the key the caller holds, as main's `generateLicenseKey`
-   * did for a Stripe licence purchase. Records nothing: the caller records it.
+   * Signs a license with licensing's own key, as main's `generateLicenseKey` did for a
+   * Stripe licence purchase. Records nothing: the caller records it.
    */
-  generateLicenseKey(input: GenerateLicenseInput): Promise<GenerateLicenseOutput>;
+  generateLicenseKey(input: GenerateLicenseKeyInput): Promise<GenerateLicenseOutput>;
   /** Records a license another flow already signed: the purchase, the script. */
   recordIssuedLicense(input: {
     licenseKey: string;

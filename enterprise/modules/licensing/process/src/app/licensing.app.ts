@@ -49,7 +49,8 @@ import {
   type SeatChangeResult,
   type SignedIssuedLicense,
   type StoreLicenseResult,
-  type GenerateLicenseInput,
+  type GenerateLicenseKeyInput,
+  LicenseSigningNotConfiguredError,
   type GenerateLicenseOutput,
 } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
@@ -211,8 +212,14 @@ export class LicensingApp implements LicensingApiContract {
     organizations: OrganizationApi,
   };
   static readonly config = licensingConfig;
-  /** `LANGWATCH_LICENSE_KEY` has one owner: SSO's gate asks this module, never the secret. */
-  static readonly secrets = { instanceLicenseKey: licensingSecrets.instanceLicenseKey } as const;
+  /**
+   * Each secret has one owner: SSO's gate asks this module for `LANGWATCH_LICENSE_KEY`, and
+   * every licence LangWatch issues is signed here with `LANGWATCH_LICENSE_PRIVATE_KEY`.
+   */
+  static readonly secrets = {
+    instanceLicenseKey: licensingSecrets.instanceLicenseKey,
+    licensePrivateKey: licensingSecrets.licensePrivateKey,
+  } as const;
   /** `isSaas` and `serviceVersion` are the process's own facts, drilled in. */
   static readonly reads = [
     ...reads("prisma", "logger", "encryption", "rateLimiter"),
@@ -237,6 +244,7 @@ export class LicensingApp implements LicensingApiContract {
   readonly #identity: InstanceIdentityService;
   readonly #refresh: LicenseRefreshService;
   readonly #isSaas: boolean;
+  readonly #signingKey: string | undefined;
 
   private constructor({
     service,
@@ -246,6 +254,7 @@ export class LicensingApp implements LicensingApiContract {
     install,
     isSaas,
     generation,
+    signingKey,
   }: {
     generation: LicenseGenerationService;
     service: LicenseService;
@@ -254,8 +263,10 @@ export class LicensingApp implements LicensingApiContract {
     registry: LicenseRegistryParts;
     install: ConnectInstallParts;
     isSaas: boolean;
+    signingKey: string | undefined;
   }) {
     this.#isSaas = isSaas;
+    this.#signingKey = signingKey;
     this.#service = service;
     this.#entitlements = entitlements;
     this.#runtime = runtime;
@@ -279,12 +290,19 @@ export class LicensingApp implements LicensingApiContract {
       LicensingApp.secrets.instanceLicenseKey,
       (value) => value,
     );
-    return LicensingApp.#assemble(setup, instanceLicenseKey);
+    const licensePrivateKey = await setup.secrets.into(
+      LicensingApp.secrets.licensePrivateKey,
+      (value) => value,
+    );
+    return LicensingApp.#assemble(setup, { instanceLicenseKey, licensePrivateKey });
   }
 
   static #assemble(
     { members, config, resources, dependencies }: LicensingSetup,
-    instanceLicenseKey: string | undefined,
+    {
+      instanceLicenseKey,
+      licensePrivateKey,
+    }: { instanceLicenseKey: string | undefined; licensePrivateKey: string | undefined },
   ): LicensingApp {
     const cryptography = NodeLicenseCryptographyService.create({ publicKey: config.publicKey });
     // Derived from the closed prisma member: the licence rows are read and written
@@ -305,6 +323,7 @@ export class LicensingApp implements LicensingApiContract {
               gateway: dependencies.gateway,
               encryption: members.encryption,
               rateLimiter: members.rateLimiter,
+              signingKey: licensePrivateKey,
             }),
             hosted: {
               ...partial.unavailableHostedServices(),
@@ -371,6 +390,7 @@ export class LicensingApp implements LicensingApiContract {
         logger: logger ?? members.logger,
       }),
       isSaas: members.isSaas,
+      signingKey: licensePrivateKey,
     });
     // Hosted spend a gateway reported but the buffer has not written yet is written at shutdown.
     resources.own("hosted-service spend buffer", () => app.flushHostedSpend());
@@ -466,8 +486,11 @@ export class LicensingApp implements LicensingApiContract {
     });
   }
 
-  async generateLicenseKey(input: GenerateLicenseInput): Promise<GenerateLicenseOutput> {
-    return this.#generation.generate(input);
+  /** Signs with licensing's own key; a deployment without one refuses by name. */
+  async generateLicenseKey(input: GenerateLicenseKeyInput): Promise<GenerateLicenseOutput> {
+    const privateKey = this.#signingKey;
+    if (!privateKey || privateKey.trim() === "") throw new LicenseSigningNotConfiguredError();
+    return this.#generation.generate({ ...input, privateKey });
   }
 
   recordIssuedLicense(input: {
@@ -862,7 +885,7 @@ type LicenseRegistryDatabase = IssuedLicenseDatabase & ActivationCodeDatabase;
 /**
  * The licence registry derived from the process's own stores, as main's
  * `registry/composition.ts` built it on every deployment. Seat billing answers
- * `not_onboarded`, and issuing has no signing key, until both have one owner.
+ * `not_onboarded` (invoiced by hand) until its shape is ruled.
  */
 function licenseRegistryOverPrisma({
   database,
@@ -870,6 +893,7 @@ function licenseRegistryOverPrisma({
   gateway,
   encryption,
   rateLimiter,
+  signingKey,
 }: {
   database: LicenseRegistryDatabase;
   organizations: Pick<
@@ -886,6 +910,7 @@ function licenseRegistryOverPrisma({
   >;
   encryption: Encryption;
   rateLimiter: RateLimiter;
+  signingKey: string | undefined;
 }): LicenseRegistryInfrastructure {
   const systemActorId = SYSTEM_ACTORS.connectLicense;
   const allowed = async (key: string, limit: { requests: number; seconds: number }) =>
@@ -919,8 +944,7 @@ function licenseRegistryOverPrisma({
       allow: ({ licenseRowId }) => allowed(`license_sync:${licenseRowId}`, LICENSE_SYNCS_LIMIT),
     },
     cipher: encryption,
-    // Billing holds LANGWATCH_LICENSE_PRIVATE_KEY today; issuing refuses until one owner does.
-    signingKey: () => void 0,
+    signingKey: () => signingKey,
     systemActorId,
   };
 }

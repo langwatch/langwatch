@@ -1,6 +1,6 @@
 /**
- * The live pieces of main's licence purchase: licensing signs with the key the
- * process resolved, and the licence is recorded, mailed and announced.
+ * The live pieces of main's licence purchase: licensing signs with its own key,
+ * and the licence is recorded, mailed and announced.
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { LicensePurchaseNotificationPayload } from "@langwatch/enterprise-billing-contract";
@@ -12,7 +12,7 @@ import { LicensePurchaseDeliveryService } from "../license-purchase-delivery.ser
 import { LicensingLicenseGeneratorService } from "../licensing-license-generator.service.ts";
 
 describe("the licence a purchase generates", () => {
-  it("is signed by licensing on main's GROWTH tier with the key the process resolved", async () => {
+  it("is signed by licensing on main's GROWTH tier, handing it no key", async () => {
     const asked: unknown[] = [];
     const licensing = createApiFixture<Pick<LicensingApi, "generateLicenseKey">>({
       generateLicenseKey: async (input) => {
@@ -38,10 +38,11 @@ describe("the licence a purchase generates", () => {
       },
     });
 
-    const generated = await LicensingLicenseGeneratorService.create({
-      licensing,
-      privateKey: "resolved-key",
-    }).generate({ organizationName: "Acme", email: "buyer@acme.example", maxMembers: 4 });
+    const generated = await LicensingLicenseGeneratorService.create({ licensing }).generate({
+      organizationName: "Acme",
+      email: "buyer@acme.example",
+      maxMembers: 4,
+    });
 
     expect(asked).toEqual([
       {
@@ -49,7 +50,6 @@ describe("the licence a purchase generates", () => {
         email: "buyer@acme.example",
         maxMembers: 4,
         planType: "GROWTH",
-        privateKey: "resolved-key",
       },
     ]);
     expect(generated).toEqual({

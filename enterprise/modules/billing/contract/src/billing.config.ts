@@ -30,13 +30,11 @@ export type BillingServerConfig = ConfigOf<typeof billingConfig>;
 
 /**
  * Both credentials required together; half a config looks like an outage.
- * The private key signs an issued licence key; absent means a licence
- * checkout cannot be fulfilled.
+ * The licence signing key is licensing's own (`licensingSecrets`).
  */
 export const billingSecrets = {
   stripeSecretKey: Secret.load("STRIPE_SECRET_KEY", { optional: true }),
   stripeWebhookSecret: Secret.load("STRIPE_WEBHOOK_SECRET", { optional: true }),
-  licensePrivateKey: Secret.load("LANGWATCH_LICENSE_PRIVATE_KEY", { optional: true }),
   /** Slack incoming webhooks are credentials (ADR-132); the sign-ups one is a shared handle. */
   internalSlackPlanLimitWebhook: Secret.load("SLACK_PLAN_LIMIT_CHANNEL", { optional: true }),
   internalSlackSubscriptionsWebhook: Secret.load("SLACK_CHANNEL_SUBSCRIPTIONS", { optional: true }),
