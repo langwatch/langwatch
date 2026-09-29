@@ -19,7 +19,9 @@ const readPlan = (argv: string[]): Plan => {
   if (index === -1 || argv[index + 1] === undefined) {
     throw new Error("usage: capture --plan <plan.json>");
   }
-  return JSON.parse(readFileSync(argv[index + 1] as string, "utf8")) as Plan;
+  const plan = JSON.parse(readFileSync(argv[index + 1] as string, "utf8")) as Plan;
+  // Go encodes an empty slice as null.
+  return { ...plan, routes: plan.routes ?? [], flows: plan.flows ?? [] };
 };
 
 /** openPages launches a side, signs its first page in, and opens the rest in the same session. */
