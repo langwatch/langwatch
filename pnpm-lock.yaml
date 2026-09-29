@@ -15082,6 +15082,9 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/contract
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
