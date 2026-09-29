@@ -402,7 +402,7 @@ function GraphsLoadFailed({
     >
       <Text textStyle="sm">
         {explanation.isRegistered
-          ? explanation.description
+          ? explanation.description || explanation.title
           : `Your custom graphs couldn't be loaded right now.`}
       </Text>
       <Button size="xs" variant="outline" onClick={onRetry}>
@@ -755,7 +755,7 @@ function TraceQuerySubject({
           canBatch={canBatch}
           showFiringRate={purpose === "automation"}
           requireQuery={purpose === "automation"}
-          setupComplete={configComplete}
+          isSetupComplete={configComplete}
           capAdvice={capAdvice}
         />
       ) : null}
@@ -865,7 +865,7 @@ function TracePreview({
   canBatch,
   showFiringRate,
   requireQuery,
-  setupComplete,
+  isSetupComplete,
   capAdvice,
 }: {
   trimmed: string;
@@ -885,12 +885,12 @@ function TracePreview({
    *  once it is — the same rule the Name field follows — so a fresh drawer
    *  reads as empty rather than broken, and a draft that can't save has the
    *  reason pointed at. */
-  setupComplete: boolean;
+  isSetupComplete: boolean;
   /** Set when the estimate outruns the plan's daily ceiling, null otherwise. */
   capAdvice: DailyCapAdvice | null;
 }) {
   if (trimmed.length === 0) {
-    const isFlagged = requireQuery && setupComplete;
+    const isFlagged = requireQuery && isSetupComplete;
     return (
       <Text textStyle="xs" color={isFlagged ? "orange.fg" : "fg.muted"}>
         {isFlagged

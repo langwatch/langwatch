@@ -289,8 +289,17 @@ export interface QueryCheck {
 /** Legacy aliases the translator still accepts beside `DYNAMIC_PREFIXES`. */
 const LEGACY_FIELD_PREFIXES = ["attribute.", "event.", "eval."];
 
+/** Fields the translator reads that `SEARCH_FIELDS` does not list. Kept here
+ *  so the browser does not bundle the SQL registry; a unit test checks every
+ *  translator field against this check. */
+const TRANSLATOR_ONLY_FIELDS = new Set(["trace", "evaluatorPassed"]);
+
 function isKnownField(field: string): boolean {
-  if (Object.hasOwn(SEARCH_FIELDS, field) || SCENARIO_FIELDS.has(field)) {
+  if (
+    Object.hasOwn(SEARCH_FIELDS, field) ||
+    SCENARIO_FIELDS.has(field) ||
+    TRANSLATOR_ONLY_FIELDS.has(field)
+  ) {
     return true;
   }
   return [

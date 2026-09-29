@@ -8,6 +8,7 @@ interface Props {
   id: string;
 }
 
+/** The highlighted layout's preview: its wireframe, what it shows, and whether it is the default or locked. */
 export function TemplateLayoutDetail({ row, id }: Props) {
   const { option, isLocked, isDefault } = row;
   const { Wireframe } = option;

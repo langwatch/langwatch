@@ -98,6 +98,17 @@ describe("draftReducer", () => {
       });
       expect(next.action).toBe(TriggerAction.SEND_EMAIL);
     });
+    it("keeps a webhook when switching to customGraph", () => {
+      const withWebhook: AutomationDraft = {
+        ...SAMPLE,
+        action: TriggerAction.SEND_WEBHOOK,
+      };
+      const next = reducer(withWebhook, {
+        type: "SET_SOURCE",
+        value: "customGraph",
+      });
+      expect(next.action).toBe(TriggerAction.SEND_WEBHOOK);
+    });
     it("resets a persist action when switching to customGraph", () => {
       const withDataset: AutomationDraft = {
         ...SAMPLE,

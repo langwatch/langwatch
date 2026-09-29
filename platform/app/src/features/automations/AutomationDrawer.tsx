@@ -40,7 +40,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -72,6 +71,7 @@ import {
   type TriggerFilterValue,
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
+import { DiscardChangesDialog } from "./components/DiscardChangesDialog";
 import { MainSectionList } from "./components/MainSectionList";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
 import { AutomationWizard } from "./components/wizard/AutomationWizard";
@@ -111,6 +111,7 @@ import {
   consumeDraftKeptOnSubFlowReturn,
   isInAutomationFlow,
 } from "./state/subFlow";
+import { useDiscardGuard } from "./state/useDiscardGuard";
 
 /**
  * Headlines naming the template the server rejected.
@@ -352,7 +353,6 @@ export function AutomationDrawer({
   // Serialized because drafts are plain JSON-able objects and we only care
   // about value equality, not reference identity.
   const baselineRef = useRef<string | null>(null);
-  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
 
   // Gate hydration to the FIRST successful read per automationId. tRPC's
   // background refetch (window-focus, query invalidation) would otherwise
@@ -1201,13 +1201,12 @@ export function AutomationDrawer({
   // the single-pane composer, so it always shows Save.
   const showStepNavigation = !isReport && step !== "review";
 
-  const requestClose = useCallback(() => {
-    if (isDirty) {
-      setConfirmDiscardOpen(true);
-      return;
-    }
-    closeDrawer();
-  }, [isDirty, closeDrawer]);
+  const discardGuard = useDiscardGuard({
+    isDirty,
+    onClose: closeDrawer,
+    onCreateNew: () => openDrawer("automation", {}),
+  });
+  const requestClose = () => discardGuard.request("close");
 
   return (
     <>
@@ -1271,7 +1270,7 @@ export function AutomationDrawer({
                     subjectLocked={subjectLocked}
                     graphName={graphName}
                     seriesLabel={seriesLabel}
-                    onCreateNew={() => openDrawer("automation", {})}
+                    onCreateNew={() => discardGuard.request("createNew")}
                   />
                 )}
               </Box>
@@ -1352,46 +1351,12 @@ export function AutomationDrawer({
         onDone={() => setSection(null)}
       />
 
-      <Dialog.Root
-        open={confirmDiscardOpen}
-        onOpenChange={({ open }) => {
-          if (!open) setConfirmDiscardOpen(false);
-        }}
-        size="sm"
-      >
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Discard unsaved changes?</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <Text color="fg.muted" textStyle="sm">
-              This {labels.noun} has changes you haven't saved yet. Close the
-              drawer and discard them?
-            </Text>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <HStack gap={2}>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setConfirmDiscardOpen(false)}
-              >
-                Keep editing
-              </Button>
-              <Button
-                colorPalette="red"
-                size="sm"
-                onClick={() => {
-                  setConfirmDiscardOpen(false);
-                  closeDrawer();
-                }}
-              >
-                Discard
-              </Button>
-            </HStack>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+      <DiscardChangesDialog
+        pendingTarget={discardGuard.pendingTarget}
+        noun={labels.noun}
+        onKeepEditing={discardGuard.keepEditing}
+        onDiscard={discardGuard.discard}
+      />
     </>
   );
 }

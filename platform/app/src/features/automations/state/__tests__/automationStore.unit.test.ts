@@ -31,6 +31,22 @@ describe("automationStore", () => {
       });
     });
 
+    describe("when a condition row on the watch step is invalid", () => {
+      it("stays on watch until the row is fixed", () => {
+        const { setStep, setHasInvalidConditionRows } =
+          useAutomationStore.getState();
+        setHasInvalidConditionRows(true);
+        setStep("delivery");
+
+        expect(useAutomationStore.getState().step).toBe("watch");
+        expect(useAutomationStore.getState().furthestStep).toBe("watch");
+
+        setHasInvalidConditionRows(false);
+        setStep("delivery");
+        expect(useAutomationStore.getState().step).toBe("delivery");
+      });
+    });
+
     describe("when dispatch is called", () => {
       it("runs the reducer", () => {
         useAutomationStore

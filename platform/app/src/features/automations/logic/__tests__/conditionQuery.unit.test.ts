@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { KNOWN_FIELDS } from "~/server/app-layer/traces/filter-to-clickhouse/build-handlers";
 import {
   type Condition,
   checkQuery,
@@ -226,6 +227,15 @@ describe("checkQuery", () => {
 
   it("warns on an unknown field", () => {
     expect(checkQuery("stauts:error").warnings[0]).toMatch(/Unknown field/);
+  });
+
+  it("knows every field the translator reads, trace and evaluatorPassed included", () => {
+    const unknown = KNOWN_FIELDS.filter((field) =>
+      checkQuery(`${field}:x`).warnings.some((warning) =>
+        warning.startsWith("Unknown field"),
+      ),
+    );
+    expect(unknown).toEqual([]);
   });
 
   it("accepts known fields, attribute prefixes and wildcards", () => {

@@ -373,6 +373,26 @@ describe("AutomationDrawer", () => {
       });
     });
 
+    describe("when a condition row's attribute key is invalid", () => {
+      it("keeps the wizard on Watch after Continue", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(await screen.findByRole("button", { name: "Code" }));
+        fireEvent.change(await screen.findByPlaceholderText(/status:error/i), {
+          target: { value: "trace.attribute.user_id:premium" },
+        });
+        await user.click(screen.getByRole("button", { name: "Builder" }));
+        fireEvent.change(await screen.findByDisplayValue("user_id"), {
+          target: { value: "user id" },
+        });
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+
+        expect(useAutomationStore.getState().step).toBe("watch");
+        expect(screen.getByDisplayValue("user id")).toBeInTheDocument();
+      });
+    });
+
     describe("when the author fills in every step for a trace filter", () => {
       /** @scenario "Creating an automation that watches a trace filter" */
       it("shows the whole automation on the review step and saves one that acts on matching traces", async () => {
@@ -693,6 +713,38 @@ describe("AutomationDrawer", () => {
         // And discarding still closes it, so the guard is a prompt, not a trap.
         await user.click(screen.getByRole("button", { name: "Discard" }));
         expect(mockCloseDrawer).toHaveBeenCalled();
+      });
+
+      it("asks before discarding unsaved edits, then starts the new automation", async () => {
+        const user = userEvent.setup();
+        mockTriggerRow = savedRow();
+        renderDrawer({ automationId: "trigger-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "Saved automation",
+          );
+        });
+        useAutomationStore
+          .getState()
+          .dispatch({ type: "SET_NAME", value: "Renamed automation" });
+
+        await user.click(
+          await screen.findByRole("button", {
+            name: "Edit what this automation watches",
+          }),
+        );
+        await user.click(
+          await screen.findByRole("button", { name: "New automation" }),
+        );
+
+        expect(
+          await screen.findByText("Discard unsaved changes?"),
+        ).toBeInTheDocument();
+        expect(mockOpenDrawer).not.toHaveBeenCalled();
+
+        await user.click(screen.getByRole("button", { name: "Discard" }));
+        expect(mockOpenDrawer).toHaveBeenCalledWith("automation", {});
+        expect(mockCloseDrawer).not.toHaveBeenCalled();
       });
 
       it("hydrates the next automation when the drawer moves straight from one to another", async () => {

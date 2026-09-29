@@ -172,6 +172,14 @@ export const INITIAL_DRAFT: AutomationDraft = {
   slices: initialSlices(),
 };
 
+/** The deliveries a graph alert can dispatch; the rest are trace-only. */
+const GRAPH_ALERT_ACTIONS: ReadonlySet<TriggerAction | null> =
+  new Set<TriggerAction | null>([
+    "SEND_EMAIL",
+    "SEND_SLACK_MESSAGE",
+    "SEND_WEBHOOK",
+  ]);
+
 export function reducer(
   state: AutomationDraft,
   action: DraftAction,
@@ -189,7 +197,7 @@ export function reducer(
     case "SET_SOURCE":
       // Switching source clears the conditions tied to the other source so
       // we never persist stale filters next to a customGraphId or vice versa.
-      // Graph alerts only support notify actions (email / Slack) — a
+      // Graph alerts only support notify actions (email, Slack, webhook): a
       // previously picked persist action would be rejected at save time, so
       // switching to customGraph resets it and the user re-picks.
       if (action.value === "customGraph") {
@@ -198,11 +206,7 @@ export function reducer(
           source: "customGraph",
           filters: {},
           filterQuery: null,
-          action:
-            state.action === "SEND_EMAIL" ||
-            state.action === "SEND_SLACK_MESSAGE"
-              ? state.action
-              : null,
+          action: GRAPH_ALERT_ACTIONS.has(state.action) ? state.action : null,
         };
       }
       if (action.value === "report") {

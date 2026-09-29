@@ -732,9 +732,9 @@ function CustomGraphForm({
       {
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
-          // Every picker that offers "which graph?" — the alert drawer's graph
-          // select among them — reads the full list. Without this the graph
-          // just created is absent from it until a page reload.
+          // Every picker that offers "which graph?" (the automation drawer's
+          // graph select among them) reads the full list. Without this the
+          // graph just created is absent from it until a page reload.
           void trpc.graphs.getAll.invalidate();
           // Navigate back to the same page we came from
           const dashboardUrl = dashboardId

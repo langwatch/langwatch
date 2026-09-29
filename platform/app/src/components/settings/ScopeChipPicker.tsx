@@ -112,6 +112,10 @@ function describeSingleScope({
       return `Every project in the organization inherits this ${subjectNoun}.`;
     case "DEPARTMENT":
       return `Every member of this department can use this ${subjectNoun}.`;
+    default: {
+      const exhaustive: never = scopeType;
+      return exhaustive;
+    }
   }
 }
 

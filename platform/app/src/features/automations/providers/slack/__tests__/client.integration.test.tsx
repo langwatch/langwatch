@@ -475,9 +475,12 @@ describe("SlackConfigForm connection", () => {
       renderForm();
 
       expect(screen.getByText(/no slack connections yet/i)).toBeInTheDocument();
-      expect(
-        screen.getByRole("link", { name: /manage slack connections/i }),
-      ).toHaveAttribute("href", "/settings/integrations");
+      const manage = screen.getByRole("link", {
+        name: /manage slack connections/i,
+      });
+      expect(manage).toHaveAttribute("href", "/settings/integrations");
+      // A new tab, so the unsaved automation draft survives the visit.
+      expect(manage).toHaveAttribute("target", "_blank");
       expect(screen.queryByPlaceholderText(/xoxb-/i)).not.toBeInTheDocument();
     });
   });

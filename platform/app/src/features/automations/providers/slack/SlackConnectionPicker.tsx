@@ -149,7 +149,7 @@ function ConnectionFieldLabel() {
   return (
     <HStack justify="space-between" width="full">
       <Field.Label>Slack connection</Field.Label>
-      <Link href="/settings/integrations" textStyle="xs">
+      <Link href="/settings/integrations" textStyle="xs" isExternal>
         Manage Slack connections
       </Link>
     </HStack>

@@ -34,6 +34,7 @@ function nextIdFor({
   return undefined;
 }
 
+/** The Slack layouts as a listbox: arrow keys move the highlight; Enter, Space or a click applies. */
 export function TemplateLayoutList({
   rows,
   highlightedId,

@@ -121,9 +121,9 @@ function ReportsContent() {
       {
         onSuccess: () => {
           // Invalidate EVERY graphs.getAll key, not just this dashboard's.
-          // The alert composer reads the list keyed by {projectId} alone, so
-          // refetching only the {projectId, dashboardId} query left a deleted
-          // graph on offer there until a full page reload.
+          // The automation composer reads the list keyed by {projectId}
+          // alone, so refetching only the {projectId, dashboardId} query left
+          // a deleted graph on offer there until a full page reload.
           void queryClient.graphs.getAll.invalidate();
         },
         onError: () => {

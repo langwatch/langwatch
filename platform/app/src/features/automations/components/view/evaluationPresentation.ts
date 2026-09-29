@@ -68,6 +68,7 @@ const SKIP_EXPLANATION: Record<string, string> = {
   inactive: "This automation is paused, so nothing is being checked.",
 };
 
+/** One recorded evaluation as reader copy: what happened, what was observed, and why. */
 export function describeEvaluation(
   evaluation: RecordedEvaluation,
 ): EvaluationPresentation {

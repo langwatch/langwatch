@@ -53,7 +53,9 @@ export interface AutomationStore {
   /** Open or close a secondary drawer. */
   setSection: (section: Section) => void;
   /** Show a wizard step. Reaching a later step never un-reaches an earlier
-   *  one, so stepping back leaves every step clickable. */
+   *  one, so stepping back leaves every step clickable. Watch cannot be left
+   *  while a condition row is invalid: leaving unmounts the builder, which
+   *  clears the flag, and Save would then store a wider automation. */
   setStep: (step: WizardStep) => void;
   /** Prepend a test-fire attempt; cap at `MAX_TEST_HISTORY`. */
   pushTestAttempt: (attempt: TestFireAttempt) => void;
@@ -85,13 +87,16 @@ export const useAutomationStore = create<AutomationStore>((set) => ({
     set({ hasInvalidConditionRows: isInvalid }),
   setSection: (section) => set({ section }),
   setStep: (step) =>
-    set((state) => ({
-      step,
-      furthestStep:
-        stepIndex(step) > stepIndex(state.furthestStep)
-          ? step
-          : state.furthestStep,
-    })),
+    set((state) => {
+      if (state.step === "watch" && state.hasInvalidConditionRows) return {};
+      return {
+        step,
+        furthestStep:
+          stepIndex(step) > stepIndex(state.furthestStep)
+            ? step
+            : state.furthestStep,
+      };
+    }),
   pushTestAttempt: (attempt) =>
     set((state) => ({
       testHistory: [attempt, ...state.testHistory].slice(0, MAX_TEST_HISTORY),

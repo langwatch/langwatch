@@ -14,6 +14,7 @@ export interface WatchSummary {
   detail: string | null;
 }
 
+/** Names what an automation watches: a graph by name, or a trace filter with its query. */
 export function watchSummary({
   isWatchingGraph,
   graphName,
