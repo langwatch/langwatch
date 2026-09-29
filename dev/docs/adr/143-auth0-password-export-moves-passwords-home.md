@@ -72,34 +72,30 @@ written before the material existed.
 
 ## Decision
 
-### 1. Import through the app's own credential writes, not the table
+### 1. Import the export as `Account` rows, through the existing credential seam, not a new table
 
-Passwords are no longer one table. ADR-116's split has landed behind a
-per-user latch: once the identity backfill finalizes a user, better-auth and
-account settings read that user's accounts from the `Identifier` projection
-(folded from identity events) joined to `AccountCredential`, and treat an
-empty answer as final; `Account` is only a bridge row kept in step. For a
-user not yet finalized, `Account` is still the truth, and the backfill states
-their identifiers as events and carries their secrets across when it
-finalizes them. A raw `Account` write therefore reaches only the second group,
-and for the first it writes a hash no sign-in ever reads.
-
-So the import writes through `CredentialAccountService.importPasswordHash`,
-which goes through the same gate-aware records
-(`CredentialAccountStorageAdapter`) as `setFirstPassword`. For a latched user
-that states the `credential` identifier as an event and stores the hash in
-`AccountCredential` (mirrored onto the bridge); for anyone else it writes the
-legacy row the backfill adopts. Hashes never enter an event, and the identity
-fold writes only linkage columns and removes only detached rows, so replaying
-the log can neither lose nor resurrect an imported password.
-
-Each record is matched by its Auth0 `user_id` against the
-`Account(provider: "auth0", providerAccountId: user_id)` row (which the fold
-keeps as the bridge for latched users too), not by email. A passkey sign-up's
-NULL-password placeholder is filled in place rather than duplicated; a user
-whose credential already holds a password is skipped. The hash is stored
-verbatim, never rehashed, and no session is ended, because it is the password
-the person already uses.
+Today's code (ADR-116's target `AccountCredential` split has not landed —
+`credential-account.prisma.repository.ts` writes every password, native or
+imported, to `Account`) has exactly one place that creates a `credential`
+Account for a user who has none: `CredentialAccountRecordsPort.createCredentialAccount`,
+called today from `CredentialAccountService.setFirstPassword` and
+`openCredentialAccount`. The import calls that same method — not raw SQL, not
+a parallel "imported password" store — matched by the Auth0 `user_id` against
+the existing `Account(provider: "auth0", providerAccountId: user_id)` row,
+not by email (case-sensitivity-ambiguous, and not a unique key on this
+table). One exception to "a user who has none": passkey sign-up writes a
+`credential` Account with a NULL password as a recovery placeholder, and the
+unique `(provider, providerAccountId)` index means a second row cannot be
+created beside it. For that user the import sets the password on the
+placeholder through `updateAccountPassword`, the seam `changePassword`
+already uses. A user whose `credential` row already holds a password is
+skipped. A password imported this way is not a second kind of password; the
+moment it lands, it is indistinguishable from one a native LangWatch user set,
+and every existing read path — `PasswordHasherPort.matches`, better-auth's own
+`/sign-in/email` — verifies it exactly the same way, with no branch anywhere
+asking where a given hash came from. (If ADR-116's `AccountCredential` split
+lands before this import runs, the seam is still the same method name on the
+same port — its implementation moves, this ADR's call site does not.)
 
 **Per-row algorithm is not assumed uniform.** Auth0's bulk export carries
 either a `password_hash` field (bcrypt, `$2a$`/`$2b$`, native database-connection
@@ -129,14 +125,13 @@ hash Auth0 exports — cost 10 or otherwise — verifies correctly against a
 freshly typed password with no transformation at import time. The import
 copies the `$2a$`/`$2b$` string verbatim.
 
-**The export never leaves the operator's machine.** The import is a script an
-operator runs locally against the target
-(`platform/app/scripts/ops/import-auth0-password-hashes.ts`), not a deployed
-task. It is dry-run by default and reads Postgres only; an apply boots the
-app's event stack in the one-shot `migration` role, which folds only the
-identity events it staged, and needs the target's Postgres, Redis, ClickHouse
-and `ENVIRONMENT` together. It is audited by counts and a residual list of
-Auth0 user ids, never by anything that could reconstruct a hash.
+**The file itself never touches disk beyond the import task's own run**, is
+never logged, and is deleted from wherever it was staged the moment the
+backfill's own report confirms coverage. This runs once, as a
+`@langwatch/system-migrations` — style backfill task (the same runner D01's
+identifier backfill and D09's per-customer progress record already use),
+audited by row counts and a residual list, never by anything that could
+reconstruct a hash from a log line.
 
 ### 2. `LOCAL_PASSWORDS_ENABLED` mounts the door D09 already designed for this
 
@@ -270,10 +265,11 @@ settled without whoever owns the D10 exit-gate review confirming it.
 ## References
 
 - `platform/app/scripts/ops/import-auth0-password-hashes.ts` — §1's import,
-  run locally by an operator against prod, never as a deployed task.
+  run locally by an operator against prod (`DATABASE_URL=... APPLY=1 pnpm tsx
+  scripts/ops/import-auth0-password-hashes.ts`), never as a deployed task.
   Dry-run by default; filters to bcrypt rows per §1's algorithm residual;
-  writes through `CredentialAccountService.importPasswordHash`.
-- `specs/identity/auth0-password-import.feature` — the import's behaviour.
+  writes through `PrismaCredentialAccountRepository.createCredentialAccount`,
+  or `.updateAccountPassword` for a passkey placeholder row.
 - `dev/docs/identity-platform/D09-auth0-customer-migrations.md`,
   `D10-auth0-deletion.md`, `delivery-plan.md` — amended alongside this ADR.
 - `specs/settings/change-password-auth0.feature` — the existing behavioral

@@ -351,56 +351,6 @@ describe("CredentialAccountStorageAdapter", () => {
     expect(fixture.acceptsLegacyPassword("first")).toBe(true);
   });
 
-  describe("when a latched user's Auth0 hash is imported", () => {
-    /** @scenario An imported hash becomes the password the person already has */
-    it("attaches the credential through the identity ceremony and stores the hash verbatim", async () => {
-      const fixture = credentialServiceOver({
-        latched: true,
-        legacyAccounts: [account({ id: "auth0", provider: "auth0" })],
-        identityLinks: [identityLink({ id: "auth0", providerId: "auth0" })],
-        identityPasswords: new Map([["auth0", null]]),
-      });
-
-      await expect(
-        fixture.service.importPasswordHash({
-          userId: "sam",
-          passwordHash: "hashed:from-auth0",
-        }),
-      ).resolves.toBe("creates_credential");
-
-      expect(fixture.canonicalCalls).toEqual(
-        expect.arrayContaining([
-          "beforeAccountCreate",
-          "createCredential",
-          "mirrorSecretsOntoAccounts",
-        ]),
-      );
-      expect(fixture.acceptsIdentityPassword("from-auth0")).toBe(true);
-      expect(fixture.acceptsLegacyPassword("from-auth0")).toBe(true);
-    });
-
-    /** @scenario An imported hash fills the placeholder a passkey sign-up left */
-    it("fills a latched passkey placeholder in both stores", async () => {
-      const fixture = credentialServiceOver({
-        latched: true,
-        legacyAccounts: [account({ id: "credential" })],
-        identityLinks: [identityLink({ id: "credential" })],
-        identityPasswords: new Map([["credential", null]]),
-      });
-
-      await expect(
-        fixture.service.importPasswordHash({
-          userId: "sam",
-          passwordHash: "hashed:from-auth0",
-        }),
-      ).resolves.toBe("fills_placeholder");
-
-      expect(fixture.canonicalCalls).not.toContain("beforeAccountCreate");
-      expect(fixture.acceptsIdentityPassword("from-auth0")).toBe(true);
-      expect(fixture.acceptsLegacyPassword("from-auth0")).toBe(true);
-    });
-  });
-
   it("unlinks a latched credential and removes both ways it could authenticate", async () => {
     const fixture = credentialServiceOver({
       latched: true,

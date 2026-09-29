@@ -1,7 +1,6 @@
 /**
  * One-time import of Auth0's password-hash export for the database-connection
- * (email+password, `auth0|...`) cohort — ADR-143,
- * specs/identity/auth0-password-import.feature.
+ * (email+password, `auth0|...`) cohort — ADR-143.
  *
  * Every write goes through `CredentialAccountService.importPasswordHash`, the
  * same gate-aware records the app's own `setFirstPassword` writes through. For
