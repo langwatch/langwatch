@@ -9,7 +9,8 @@ import {
  * An account's own credentials: opening one, listing and unlinking the ways
  * in, and setting or changing a password.
  *
- * Spec: specs/identity/passkeys.feature, specs/identity/identity-service-layering.feature
+ * Spec: specs/identity/passkeys.feature, specs/identity/identity-service-layering.feature,
+ * specs/identity/auth0-password-import.feature
  *
  * These rules were spread over the user router, the users module and the
  * sign-up verification runtime, and each of them was tested by mocking a
@@ -120,6 +121,11 @@ const credentialAccountsOver = ({
     findFederatedPasswordAccountId: async ({ userId }) =>
       rows.find((row) => row.userId === userId && row.provider === "auth0")
         ?.providerAccountId ?? null,
+    findUserIdByFederatedPasswordAccountId: async ({ federatedUserId }) =>
+      rows.find(
+        (row) =>
+          row.provider === "auth0" && row.providerAccountId === federatedUserId,
+      )?.userId ?? null,
     deleteLinkedAccount: async ({ userId, accountId }) => {
       const owned = rows.filter((row) => row.userId === userId);
       if (owned.length <= 1) return "would_strand_user";
@@ -448,6 +454,111 @@ describe("CredentialAccountService", () => {
 
       expect(rows[0]?.password).toBe("hashed:old");
       expect(revokedFor).toEqual([]);
+    });
+  });
+
+  describe("when a password hash is imported from the identity provider", () => {
+    const AUTH0_HASH = "$2b$10$auth0-held-hash";
+
+    /** @scenario An imported hash becomes the password the person already has */
+    it("stores the hash as given rather than hashing it again", async () => {
+      const { service, rows } = credentialAccountsOver({
+        accounts: [accountRow({ id: "abc", provider: "auth0" })],
+      });
+
+      await expect(
+        service.importPasswordHash({ userId: "sam", passwordHash: AUTH0_HASH }),
+      ).resolves.toBe("creates_credential");
+
+      expect(rows).toContainEqual(
+        expect.objectContaining({
+          userId: "sam",
+          provider: "credential",
+          password: AUTH0_HASH,
+        }),
+      );
+    });
+
+    /** @scenario An imported hash fills the placeholder a passkey sign-up left */
+    it("fills the empty credential row instead of creating a second one", async () => {
+      const { service, rows } = credentialAccountsOver({
+        accounts: [accountRow({ id: "placeholder" })],
+      });
+
+      await expect(
+        service.importPasswordHash({ userId: "sam", passwordHash: AUTH0_HASH }),
+      ).resolves.toBe("fills_placeholder");
+
+      expect(rows).toEqual([
+        expect.objectContaining({ id: "placeholder", password: AUTH0_HASH }),
+      ]);
+    });
+
+    /** @scenario An import never overwrites a password held here */
+    it("skips an account that already has a password, and writes nothing", async () => {
+      const { service, rows } = credentialAccountsOver({
+        accounts: [accountRow({ id: "acc-1", password: "hashed:mine" })],
+      });
+
+      await expect(
+        service.importPasswordHash({ userId: "sam", passwordHash: AUTH0_HASH }),
+      ).resolves.toBe("already_has_password");
+
+      expect(rows[0]?.password).toBe("hashed:mine");
+    });
+
+    /** @scenario An import signs nobody out */
+    it("ends no session", async () => {
+      const { service, revokedFor } = credentialAccountsOver();
+
+      await service.importPasswordHash({
+        userId: "sam",
+        passwordHash: AUTH0_HASH,
+      });
+
+      expect(revokedFor).toEqual([]);
+    });
+
+    /** @scenario A dry run says what an import would do and writes nothing */
+    it("plans the import without writing", async () => {
+      const { service, rows } = credentialAccountsOver();
+
+      await expect(service.planPasswordImport({ userId: "sam" })).resolves.toBe(
+        "creates_credential",
+      );
+
+      expect(rows).toEqual([]);
+    });
+
+    /** @scenario An import finds the person by their Auth0 id */
+    it("finds the person by their database-connection id, and nobody for an unknown one", async () => {
+      const { service } = credentialAccountsOver({
+        accounts: [accountRow({ id: "abc", provider: "auth0" })],
+      });
+
+      await expect(
+        service.findUserIdForFederatedPasswordAccount({
+          federatedUserId: "auth0|abc",
+        }),
+      ).resolves.toBe("sam");
+      await expect(
+        service.findUserIdForFederatedPasswordAccount({
+          federatedUserId: "auth0|nobody",
+        }),
+      ).resolves.toBeNull();
+    });
+
+    it("finds nobody for a social identity brokered through Auth0", async () => {
+      const { service } = credentialAccountsOver({
+        accounts: [accountRow({ id: "abc", provider: "auth0" })],
+      });
+
+      // The fake would match it; the service must refuse before asking.
+      await expect(
+        service.findUserIdForFederatedPasswordAccount({
+          federatedUserId: "google-oauth2|abc",
+        }),
+      ).resolves.toBeNull();
     });
   });
 

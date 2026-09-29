@@ -51,6 +51,12 @@ export type UnlinkResult = Exclude<UnlinkAttempt, "would_strand_user">;
 /** What became of setting a FIRST password. */
 export type SetPasswordResult = "set" | "already_has_password";
 
+/** What importing a password hash would do, or did (ADR-143). */
+export type PasswordImportOutcome =
+  | "creates_credential"
+  | "fills_placeholder"
+  | "already_has_password";
+
 /** What became of changing a password held here. */
 export type ChangePasswordResult =
   | "changed"
@@ -93,6 +99,10 @@ export interface CredentialAccountRecordsPort {
    */
   findFederatedPasswordAccountId(args: {
     userId: string;
+  }): Promise<string | null>;
+  /** The reverse: whose account a database-connection id (`auth0|<id>`) is. */
+  findUserIdByFederatedPasswordAccountId(args: {
+    federatedUserId: string;
   }): Promise<string | null>;
   /**
    * Removes one linked account, deciding INSIDE its own transaction whether
@@ -219,6 +229,17 @@ export interface CredentialAccountServiceDeps {
  * own; everything else is answered as an outcome the boundary turns into the
  * response its transport speaks.
  */
+/**
+ * Whether a first password may be written, and where: never over one, into
+ * a passkey sign-up's empty placeholder, or as a new credential row.
+ */
+function firstPasswordWriteFor(
+  account: CredentialAccountRow | null,
+): PasswordImportOutcome {
+  if (account?.passwordHash) return "already_has_password";
+  return account ? "fills_placeholder" : "creates_credential";
+}
+
 export class CredentialAccountService {
   constructor(private readonly deps: CredentialAccountServiceDeps) {}
 
@@ -411,21 +432,79 @@ export class CredentialAccountService {
     keepSessionId: string | null;
   }): Promise<SetPasswordResult> {
     const account = await this.deps.records.findCredentialAccount({ userId });
-    if (account?.passwordHash) return "already_has_password";
+    if (firstPasswordWriteFor(account) === "already_has_password") {
+      return "already_has_password";
+    }
 
     const passwordHash = await this.deps.passwords.hash({ password });
+    await this.writeFirstPassword({ userId, account, passwordHash });
+    await this.revokeOtherSessions({ userId, keepSessionId });
+    return "set";
+  }
+
+  /**
+   * Whose account an identity provider's database-connection id names. Only
+   * `auth0|` ids: a social identity brokered through Auth0 has no password.
+   */
+  async findUserIdForFederatedPasswordAccount({
+    federatedUserId,
+  }: {
+    federatedUserId: string;
+  }): Promise<string | null> {
+    if (!federatedUserId.startsWith("auth0|")) return null;
+    return await this.deps.records.findUserIdByFederatedPasswordAccountId({
+      federatedUserId,
+    });
+  }
+
+  /** What {@link importPasswordHash} would do for this user, writing nothing. */
+  async planPasswordImport({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<PasswordImportOutcome> {
+    const account = await this.deps.records.findCredentialAccount({ userId });
+    return firstPasswordWriteFor(account);
+  }
+
+  /**
+   * Adopts a hash the identity provider already holds for this person
+   * (ADR-143), through the same writes {@link setFirstPassword} makes. No
+   * session is ended: it is the password they already sign in with.
+   */
+  async importPasswordHash({
+    userId,
+    passwordHash,
+  }: {
+    userId: string;
+    passwordHash: string;
+  }): Promise<PasswordImportOutcome> {
+    const account = await this.deps.records.findCredentialAccount({ userId });
+    const outcome = firstPasswordWriteFor(account);
+    if (outcome !== "already_has_password") {
+      await this.writeFirstPassword({ userId, account, passwordHash });
+    }
+    return outcome;
+  }
+
+  private async writeFirstPassword({
+    userId,
+    account,
+    passwordHash,
+  }: {
+    userId: string;
+    account: CredentialAccountRow | null;
+    passwordHash: string;
+  }): Promise<void> {
     if (account) {
       await this.deps.records.updateAccountPassword({
         userId,
         accountId: account.id,
         passwordHash,
       });
-    } else {
-      await this.deps.records.createCredentialAccount({ userId, passwordHash });
+      return;
     }
-
-    await this.revokeOtherSessions({ userId, keepSessionId });
-    return "set";
+    await this.deps.records.createCredentialAccount({ userId, passwordHash });
   }
 
   /**

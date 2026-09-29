@@ -174,6 +174,12 @@ export class CredentialAccountStorageAdapter
     return this.deps.legacy.findFederatedPasswordAccountId(args);
   }
 
+  findUserIdByFederatedPasswordAccountId(args: {
+    federatedUserId: string;
+  }): Promise<string | null> {
+    return this.deps.legacy.findUserIdByFederatedPasswordAccountId(args);
+  }
+
   findSecureAccountFacts(args: {
     userId: string;
   }): Promise<SecureAccountFacts> {
