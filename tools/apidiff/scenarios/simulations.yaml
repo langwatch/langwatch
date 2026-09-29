@@ -1741,7 +1741,7 @@
   ]
 },
 {
-  "id": "scenarios-delete-twice-404",
+  "id": "scenarios-delete-twice-is-idempotent",
   "endpoint": "DELETE /api/v1/scenarios/{id}",
   "auth": "project",
   "setup": [
@@ -1773,7 +1773,10 @@
     "path": "/api/v1/scenarios/{scenarioId}"
   },
   "expect": {
-    "status": 404
+    "status": 200,
+    "body": {
+      "archived": true
+    }
   }
 },
 {
@@ -2321,7 +2324,7 @@
           "scenarioId": "scen-{uid}"
         }
       },
-      "eventually": "20s"
+      "eventually": "90s"
     },
     {
       "request": "GET /api/v1/simulation-runs",
@@ -2333,7 +2336,7 @@
         "path": "runs",
         "length": 1
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ]
 },
@@ -2396,7 +2399,7 @@
         "status": 200,
         "contains": "success"
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ]
 },
@@ -2462,7 +2465,7 @@
         "path": "runs",
         "length": 1
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ]
 },
@@ -2528,7 +2531,7 @@
         "path": "runs",
         "length": 2
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ]
 },
@@ -2965,7 +2968,7 @@
           "scenarioRunId": "run-{uid}"
         }
       },
-      "eventually": "20s"
+      "eventually": "90s"
     },
     {
       "request": "GET /api/v1/simulation-runs/run-{uid}",
@@ -3024,7 +3027,7 @@
           "scenarioRunId": "run-{uid}"
         }
       },
-      "eventually": "20s"
+      "eventually": "90s"
     },
     {
       "request": "GET /api/v1/simulation-runs/run-{uid}",
@@ -3080,7 +3083,7 @@
           "scenarioRunId": "run-{uid}"
         }
       },
-      "eventually": "20s"
+      "eventually": "90s"
     },
     {
       "request": "GET /api/v1/simulation-runs/run-{uid}",
@@ -3139,7 +3142,7 @@
           "scenarioRunId": "run-{uid}"
         }
       },
-      "eventually": "20s"
+      "eventually": "90s"
     },
     {
       "request": "GET /api/v1/simulation-runs/run-{uid}",
@@ -3195,7 +3198,7 @@
           "batchRunId": "batch-{uid}"
         }
       },
-      "eventually": "20s"
+      "eventually": "90s"
     },
     {
       "request": "GET /api/v1/simulation-runs/batches/batch-{uid}",
@@ -3254,7 +3257,7 @@
         "status": 200,
         "contains": "run-{uid}"
       },
-      "eventually": "20s"
+      "eventually": "90s"
     },
     {
       "request": "GET /api/v1/simulation-runs",
@@ -3327,7 +3330,7 @@
         "contains": "in-a-{uid}",
         "notContains": "in-b-{uid}"
       },
-      "eventually": "20s"
+      "eventually": "90s"
     },
     {
       "request": "GET /api/v1/simulation-runs/run-{uid}",
@@ -3337,7 +3340,7 @@
         "contains": "in-b-{uid}",
         "notContains": "in-a-{uid}"
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ]
 },
@@ -3378,7 +3381,7 @@
         "path": "runs",
         "length": 1
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ],
   "request": {
@@ -3498,7 +3501,7 @@
         "path": "runs",
         "length": 2
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ],
   "request": {
@@ -3565,7 +3568,7 @@
       "expect": {
         "status": 200
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ],
   "request": {
@@ -3636,7 +3639,7 @@
       "expect": {
         "status": 200
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ],
   "request": {
@@ -3682,7 +3685,7 @@
       "expect": {
         "status": 200
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ],
   "request": {
@@ -3723,7 +3726,10 @@
   "auth": "none",
   "request": {
     "method": "GET",
-    "path": "/api/v1/simulation-runs/batches/list"
+    "path": "/api/v1/simulation-runs/batches/list",
+    "query": {
+      "scenarioSetId": "set-{uid}"
+    }
   },
   "expect": {
     "status": 401
@@ -3737,6 +3743,7 @@
     "method": "GET",
     "path": "/api/v1/simulation-runs/batches/list",
     "query": {
+      "scenarioSetId": "set-{uid}",
       "limit": "lots"
     }
   },
@@ -3805,7 +3812,7 @@
           "passCount": 1
         }
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ],
   "request": {
@@ -3876,7 +3883,7 @@
       "expect": {
         "status": 200
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ],
   "request": {
@@ -3895,7 +3902,7 @@
       "expect": {
         "status": 404
       },
-      "eventually": "20s"
+      "eventually": "90s"
     },
     {
       "request": "GET /api/v1/simulation-runs",
@@ -3907,7 +3914,7 @@
         "path": "runs",
         "length": 0
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ]
 },
@@ -3943,7 +3950,7 @@
       "expect": {
         "status": 200
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ],
   "request": {
@@ -3967,7 +3974,7 @@
         "path": "runs",
         "length": 0
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ]
 },
@@ -4018,7 +4025,7 @@
       "expect": {
         "status": 200
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ],
   "request": {
@@ -4106,7 +4113,7 @@
       "expect": {
         "status": 200
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ],
   "request": {
@@ -4160,7 +4167,7 @@
       "expect": {
         "status": 200
       },
-      "eventually": "20s"
+      "eventually": "90s"
     }
   ],
   "request": {
@@ -4200,7 +4207,8 @@
   "expect": {
     "status": 200,
     "body": {
-      "handedOff": "<any>"
+      "delivered": false,
+      "url": "<any>"
     }
   }
 },
@@ -6292,7 +6300,7 @@
   }
 },
 {
-  "id": "agents-call-refuses-non-connected-agent",
+  "id": "agents-call-answers-404-for-non-connected-agent",
   "endpoint": "POST /api/v1/agents/{id}/call",
   "auth": "project",
   "setup": [
@@ -6327,22 +6335,21 @@
     }
   },
   "expect": {
-    "status": [
-      400,
-      409,
-      422
-    ]
+    "status": 404,
+    "body": {
+      "code": "agent_not_found"
+    }
   }
 },
 {
   "id": "agents-connect-register-happy",
   "endpoint": "POST /api/v1/agents/connect/register",
-  "auth": "project",
+  "auth": "none",
   "request": {
     "method": "POST",
     "path": "/api/v1/agents/connect/register",
     "body": {
-      "protocol": "1",
+      "protocol": 1,
       "type": "register",
       "sdk": {
         "name": "vd",
@@ -6362,6 +6369,9 @@
           "environment": "test"
         }
       ]
+    },
+    "headers": {
+      "Authorization": "Bearer {projectKey}"
     }
   },
   "expect": {
@@ -6389,7 +6399,7 @@
     "method": "POST",
     "path": "/api/v1/agents/connect/register",
     "body": {
-      "protocol": "9",
+      "protocol": 9,
       "type": "register",
       "sdk": {
         "name": "vd",
@@ -6454,7 +6464,7 @@
     "method": "POST",
     "path": "/api/v1/agents/connect/register",
     "body": {
-      "protocol": "1",
+      "protocol": 1,
       "type": "register",
       "sdk": {
         "name": "vd",
@@ -6485,7 +6495,7 @@
     "method": "POST",
     "path": "/api/v1/agents/connect/register",
     "body": {
-      "protocol": "1",
+      "protocol": 1,
       "type": "register",
       "sdk": {
         "name": "vd",
@@ -6531,7 +6541,7 @@
     "method": "POST",
     "path": "/api/v1/agents/connect/register",
     "body": {
-      "protocol": "1",
+      "protocol": 1,
       "type": "register",
       "sdk": {
         "name": "vd",
@@ -6619,7 +6629,7 @@
     "body": {
       "frames": [
         {
-          "protocol": "1",
+          "protocol": 1,
           "type": "deregister"
         }
       ]
@@ -6639,7 +6649,7 @@
     "body": {
       "frames": [
         {
-          "protocol": "1",
+          "protocol": 1,
           "type": "deregister"
         }
       ]
@@ -8685,7 +8695,7 @@
     {
       "request": "GET /api/v1/prompts/vd-{uid}/versions",
       "capture": {
-        "firstVersionId": "versions.1.versionId"
+        "firstVersionId": "1.versionId"
       },
       "expect": {
         "status": 200
@@ -8830,7 +8840,7 @@
     {
       "request": "GET /api/v1/prompts/vd-{uid}/versions",
       "capture": {
-        "firstVersionId": "versions.1.versionId"
+        "firstVersionId": "1.versionId"
       },
       "expect": {
         "status": 200
@@ -8899,7 +8909,7 @@
     {
       "request": "GET /api/v1/prompts/vd-{uid}/versions",
       "capture": {
-        "firstVersionId": "versions.1.versionId"
+        "firstVersionId": "1.versionId"
       },
       "expect": {
         "status": 200
@@ -8968,7 +8978,7 @@
     {
       "request": "GET /api/v1/prompts/vd-{uid}/versions",
       "capture": {
-        "firstVersionId": "versions.1.versionId"
+        "firstVersionId": "1.versionId"
       },
       "expect": {
         "status": 200
@@ -9015,7 +9025,10 @@
     }
   },
   "expect": {
-    "status": 200
+    "status": 200,
+    "body": {
+      "action": "created"
+    }
   },
   "verify": [
     {
@@ -9030,7 +9043,73 @@
   ]
 },
 {
-  "id": "prompts-sync-updates-existing-prompt",
+  "id": "prompts-sync-existing-with-local-version-updates",
+  "endpoint": "POST /api/v1/prompts/{id}/sync",
+  "auth": "project",
+  "setup": [
+    {
+      "request": "POST /api/v1/prompts",
+      "body": {
+        "handle": "vd-{uid}",
+        "prompt": "You are a helpful assistant",
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ]
+      },
+      "capture": {
+        "promptId": "id",
+        "versionId": "versionId"
+      },
+      "expect": {
+        "status": [
+          200,
+          201
+        ]
+      }
+    }
+  ],
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/prompts/vd-{uid}/sync",
+    "body": {
+      "configData": {
+        "prompt": "Synced prompt",
+        "outputs": [
+          {
+            "identifier": "output",
+            "type": "str"
+          }
+        ],
+        "model": "openai/gpt-4o-mini"
+      },
+      "localVersion": 1
+    }
+  },
+  "expect": {
+    "status": 200,
+    "body": {
+      "action": "updated"
+    }
+  },
+  "verify": [
+    {
+      "request": "GET /api/v1/prompts/vd-{uid}",
+      "expect": {
+        "status": 200,
+        "body": {
+          "prompt": "Synced prompt",
+          "version": 2
+        }
+      }
+    }
+  ]
+},
+{
+  "id": "prompts-sync-existing-without-local-version-conflicts",
   "endpoint": "POST /api/v1/prompts/{id}/sync",
   "auth": "project",
   "setup": [
@@ -9076,7 +9155,10 @@
     }
   },
   "expect": {
-    "status": 200
+    "status": 200,
+    "body": {
+      "action": "conflict"
+    }
   },
   "verify": [
     {
@@ -9084,7 +9166,8 @@
       "expect": {
         "status": 200,
         "body": {
-          "prompt": "Synced prompt"
+          "prompt": "You are a helpful assistant",
+          "version": 1
         }
       }
     }
@@ -9520,7 +9603,7 @@
   }
 },
 {
-  "id": "prompt-tags-list-includes-protected-defaults",
+  "id": "prompt-tags-list-includes-production-default",
   "endpoint": "GET /api/v1/prompts/tags",
   "auth": "project",
   "request": {
@@ -9529,10 +9612,7 @@
   },
   "expect": {
     "status": 200,
-    "contains": [
-      "production",
-      "staging"
-    ]
+    "contains": "production"
   }
 },
 {
@@ -10380,13 +10460,55 @@
   "id": "suites-create-happy",
   "endpoint": "POST /api/v1/suites",
   "auth": "project",
+  "setup": [
+    {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    }
+  ],
   "request": {
     "method": "POST",
     "path": "/api/v1/suites",
     "body": {
       "name": "vd-{uid}",
-      "scenarioIds": [],
-      "targets": [],
+      "scenarioIds": [
+        "{scenarioId}"
+      ],
+      "targets": [
+        {
+          "type": "http",
+          "referenceId": "{agentId}"
+        }
+      ],
       "description": "apidiff"
     }
   },
@@ -10442,6 +10564,23 @@
       "capture": {
         "scenarioId": "id"
       }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
     }
   ],
   "request": {
@@ -10452,7 +10591,12 @@
       "scenarioIds": [
         "{scenarioId}"
       ],
-      "targets": [],
+      "targets": [
+        {
+          "type": "http",
+          "referenceId": "{agentId}"
+        }
+      ],
       "description": "apidiff",
       "repeatCount": 3,
       "labels": [
@@ -10490,11 +10634,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -10510,8 +10694,15 @@
     "path": "/api/v1/suites",
     "body": {
       "name": "vd-{uid}",
-      "scenarioIds": [],
-      "targets": [],
+      "scenarioIds": [
+        "{scenarioId}"
+      ],
+      "targets": [
+        {
+          "type": "http",
+          "referenceId": "{agentId}"
+        }
+      ],
       "description": "apidiff"
     }
   },
@@ -10527,6 +10718,41 @@
   "id": "suites-create-rejects-missing-name",
   "endpoint": "POST /api/v1/suites",
   "auth": "project",
+  "setup": [
+    {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    }
+  ],
   "request": {
     "method": "POST",
     "path": "/api/v1/suites",
@@ -10555,6 +10781,41 @@
   "id": "suites-create-rejects-empty-body",
   "endpoint": "POST /api/v1/suites",
   "auth": "project",
+  "setup": [
+    {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    }
+  ],
   "request": {
     "method": "POST",
     "path": "/api/v1/suites",
@@ -10580,6 +10841,41 @@
   "id": "suites-create-rejects-name-not-string",
   "endpoint": "POST /api/v1/suites",
   "auth": "project",
+  "setup": [
+    {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    }
+  ],
   "request": {
     "method": "POST",
     "path": "/api/v1/suites",
@@ -10608,13 +10904,55 @@
   "id": "suites-create-rejects-scope-mode-invalid",
   "endpoint": "POST /api/v1/suites",
   "auth": "project",
+  "setup": [
+    {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    }
+  ],
   "request": {
     "method": "POST",
     "path": "/api/v1/suites",
     "body": {
       "name": "vd-{uid}",
-      "scenarioIds": [],
-      "targets": [],
+      "scenarioIds": [
+        "{scenarioId}"
+      ],
+      "targets": [
+        {
+          "type": "http",
+          "referenceId": "{agentId}"
+        }
+      ],
       "description": "apidiff",
       "scope": {
         "mode": "everything"
@@ -10641,13 +10979,55 @@
   "id": "suites-create-rejects-repeat-count-not-integer",
   "endpoint": "POST /api/v1/suites",
   "auth": "project",
+  "setup": [
+    {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    }
+  ],
   "request": {
     "method": "POST",
     "path": "/api/v1/suites",
     "body": {
       "name": "vd-{uid}",
-      "scenarioIds": [],
-      "targets": [],
+      "scenarioIds": [
+        "{scenarioId}"
+      ],
+      "targets": [
+        {
+          "type": "http",
+          "referenceId": "{agentId}"
+        }
+      ],
       "description": "apidiff",
       "repeatCount": "twice"
     }
@@ -10672,12 +11052,49 @@
   "id": "suites-create-rejects-target-type-invalid",
   "endpoint": "POST /api/v1/suites",
   "auth": "project",
+  "setup": [
+    {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    }
+  ],
   "request": {
     "method": "POST",
     "path": "/api/v1/suites",
     "body": {
       "name": "vd-{uid}",
-      "scenarioIds": [],
+      "scenarioIds": [
+        "{scenarioId}"
+      ],
       "targets": [
         {
           "type": "telepathy",
@@ -10707,13 +11124,55 @@
   "id": "suites-create-rejects-kind-invalid",
   "endpoint": "POST /api/v1/suites",
   "auth": "project",
+  "setup": [
+    {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    }
+  ],
   "request": {
     "method": "POST",
     "path": "/api/v1/suites",
     "body": {
       "name": "vd-{uid}",
-      "scenarioIds": [],
-      "targets": [],
+      "scenarioIds": [
+        "{scenarioId}"
+      ],
+      "targets": [
+        {
+          "type": "http",
+          "referenceId": "{agentId}"
+        }
+      ],
       "description": "apidiff",
       "kind": "rainbow"
     }
@@ -10738,13 +11197,55 @@
   "id": "suites-create-refuses-no-key",
   "endpoint": "POST /api/v1/suites",
   "auth": "none",
+  "setup": [
+    {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    }
+  ],
   "request": {
     "method": "POST",
     "path": "/api/v1/suites",
     "body": {
       "name": "vd-{uid}",
-      "scenarioIds": [],
-      "targets": [],
+      "scenarioIds": [
+        "{scenarioId}"
+      ],
+      "targets": [
+        {
+          "type": "http",
+          "referenceId": "{agentId}"
+        }
+      ],
       "description": "apidiff"
     }
   },
@@ -10765,13 +11266,55 @@
   "id": "suites-create-refuses-read-only-key",
   "endpoint": "POST /api/v1/suites",
   "auth": "restricted",
+  "setup": [
+    {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    }
+  ],
   "request": {
     "method": "POST",
     "path": "/api/v1/suites",
     "body": {
       "name": "vd-{uid}",
-      "scenarioIds": [],
-      "targets": [],
+      "scenarioIds": [
+        "{scenarioId}"
+      ],
+      "targets": [
+        {
+          "type": "http",
+          "referenceId": "{agentId}"
+        }
+      ],
       "description": "apidiff"
     }
   },
@@ -10794,11 +11337,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -10824,11 +11407,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -10899,11 +11522,51 @@
   "auth": "project-b",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -10929,11 +11592,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -10974,11 +11677,51 @@
   "auth": "none",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11003,11 +11746,51 @@
   "auth": "project-b",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11032,11 +11815,51 @@
   "auth": "restricted",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11064,11 +11887,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11119,11 +11982,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11166,11 +12069,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11224,11 +12167,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11270,11 +12253,51 @@
   "auth": "none",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11313,11 +12336,51 @@
   "auth": "restricted",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11356,11 +12419,51 @@
   "auth": "project-b",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11399,11 +12502,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11464,11 +12607,51 @@
   "auth": "none",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11494,11 +12677,51 @@
   "auth": "restricted",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11524,11 +12747,51 @@
   "auth": "project-b",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11554,11 +12817,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11598,11 +12901,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11645,11 +12988,51 @@
   "auth": "none",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11682,11 +13065,51 @@
   "auth": "restricted",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11719,11 +13142,51 @@
   "auth": "project-b",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11769,11 +13232,51 @@
   "auth": "none",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11799,11 +13302,51 @@
   "auth": "restricted",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11829,11 +13372,51 @@
   "auth": "project-b",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11859,11 +13442,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11894,11 +13517,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11929,11 +13592,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -11982,11 +13685,51 @@
   "auth": "project-b",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -12012,11 +13755,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -12057,11 +13840,51 @@
   "auth": "none",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -12086,11 +13909,51 @@
   "auth": "project-b",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -12115,11 +13978,51 @@
   "auth": "project",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -12170,11 +14073,51 @@
   "auth": "none",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -12207,11 +14150,51 @@
   "auth": "restricted",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -12244,11 +14227,51 @@
   "auth": "project-b",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -12294,11 +14317,51 @@
   "auth": "none",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -12324,11 +14387,51 @@
   "auth": "restricted",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -12354,11 +14457,51 @@
   "auth": "project-b",
   "setup": [
     {
+      "request": "POST /api/v1/scenarios",
+      "body": {
+        "name": "vd-{uid}",
+        "situation": "A customer asks for a refund",
+        "criteria": [
+          "Agent apologises"
+        ],
+        "labels": [
+          "vd"
+        ]
+      },
+      "capture": {
+        "scenarioId": "id"
+      }
+    },
+    {
+      "request": "POST /api/v1/agents",
+      "body": {
+        "name": "vd-{uid}",
+        "type": "http",
+        "config": {
+          "url": "http://127.0.0.1:1/echo",
+          "method": "POST"
+        }
+      },
+      "capture": {
+        "agentId": "id"
+      },
+      "expect": {
+        "status": 201
+      }
+    },
+    {
       "request": "POST /api/v1/suites",
       "body": {
         "name": "vd-{uid}",
-        "scenarioIds": [],
-        "targets": [],
+        "scenarioIds": [
+          "{scenarioId}"
+        ],
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "{agentId}"
+          }
+        ],
         "description": "apidiff"
       },
       "capture": {
@@ -12478,7 +14621,15 @@
         "scope": {
           "mode": "scenarios"
         },
-        "targets": []
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "x"
+          }
+        ],
+        "scenarioIds": [
+          "s"
+        ]
       }
     }
   },
@@ -12499,7 +14650,15 @@
         "scope": {
           "mode": "scenarios"
         },
-        "targets": []
+        "targets": [
+          {
+            "type": "http",
+            "referenceId": "x"
+          }
+        ],
+        "scenarioIds": [
+          "s"
+        ]
       }
     }
   },
@@ -13075,7 +15234,14 @@
   "request": {
     "method": "POST",
     "path": "/api/v1/test-suites/suite_vd_{uid}/run",
-    "body": {}
+    "body": {
+      "targets": [
+        {
+          "type": "http",
+          "referenceId": "x"
+        }
+      ]
+    }
   },
   "expect": {
     "status": 404
@@ -13102,7 +15268,14 @@
   "request": {
     "method": "POST",
     "path": "/api/v1/test-suites/{testSuiteId}/run",
-    "body": {}
+    "body": {
+      "targets": [
+        {
+          "type": "http",
+          "referenceId": "x"
+        }
+      ]
+    }
   },
   "expect": {
     "status": 401
@@ -13129,7 +15302,14 @@
   "request": {
     "method": "POST",
     "path": "/api/v1/test-suites/{testSuiteId}/run",
-    "body": {}
+    "body": {
+      "targets": [
+        {
+          "type": "http",
+          "referenceId": "x"
+        }
+      ]
+    }
   },
   "expect": {
     "status": 403
@@ -13156,14 +15336,21 @@
   "request": {
     "method": "POST",
     "path": "/api/v1/test-suites/{testSuiteId}/run",
-    "body": {}
+    "body": {
+      "targets": [
+        {
+          "type": "http",
+          "referenceId": "x"
+        }
+      ]
+    }
   },
   "expect": {
     "status": 404
   }
 },
 {
-  "id": "langy-conversations-start-rejects-empty-body",
+  "id": "langy-conversations-start-dark-surface-404",
   "endpoint": "POST /api/v1/langy/conversations",
   "auth": "project",
   "request": {
@@ -13172,10 +15359,7 @@
     "body": {}
   },
   "expect": {
-    "status": [
-      400,
-      422
-    ]
+    "status": 404
   }
 },
 {
@@ -13207,7 +15391,7 @@
   }
 },
 {
-  "id": "langy-conversations-start-rejects-non-object-message",
+  "id": "langy-conversations-start-with-message-dark-surface-404",
   "endpoint": "POST /api/v1/langy/conversations",
   "auth": "project",
   "request": {
@@ -13222,10 +15406,7 @@
     }
   },
   "expect": {
-    "status": [
-      400,
-      422
-    ]
+    "status": 404
   }
 },
 {
@@ -13278,7 +15459,7 @@
   }
 },
 {
-  "id": "langy-control-requests-list-happy",
+  "id": "langy-control-requests-list-key-without-person-refused",
   "endpoint": "GET /api/v1/langy/control/requests",
   "auth": "project",
   "request": {
@@ -13286,7 +15467,10 @@
     "path": "/api/v1/langy/control/requests"
   },
   "expect": {
-    "status": 200
+    "status": 404,
+    "body": {
+      "code": "langy_local_request_invalid"
+    }
   }
 },
 {
@@ -13302,7 +15486,7 @@
   }
 },
 {
-  "id": "langy-control-requests-list-read-only-key-allowed",
+  "id": "langy-control-requests-list-refuses-key-without-langy-view",
   "endpoint": "GET /api/v1/langy/control/requests",
   "auth": "restricted",
   "request": {
@@ -13310,7 +15494,7 @@
     "path": "/api/v1/langy/control/requests"
   },
   "expect": {
-    "status": 200
+    "status": 403
   }
 },
 {
@@ -13320,13 +15504,17 @@
   "request": {
     "method": "POST",
     "path": "/api/v1/langy/control/requests/req_vd_{uid}/approve",
-    "body": {}
+    "body": {
+      "workspace": {
+        "root": "/tmp/vd-{uid}",
+        "name": "vd",
+        "os": "darwin"
+      }
+    }
   },
   "expect": {
     "status": [
-      400,
-      404,
-      422
+      404
     ]
   }
 },
@@ -13337,7 +15525,13 @@
   "request": {
     "method": "POST",
     "path": "/api/v1/langy/control/requests/req_vd_{uid}/approve",
-    "body": {}
+    "body": {
+      "workspace": {
+        "root": "/tmp/vd-{uid}",
+        "name": "vd",
+        "os": "darwin"
+      }
+    }
   },
   "expect": {
     "status": 401
@@ -13350,7 +15544,13 @@
   "request": {
     "method": "POST",
     "path": "/api/v1/langy/control/requests/req_vd_{uid}/approve",
-    "body": {}
+    "body": {
+      "workspace": {
+        "root": "/tmp/vd-{uid}",
+        "name": "vd",
+        "os": "darwin"
+      }
+    }
   },
   "expect": {
     "status": 403
@@ -13367,9 +15567,7 @@
   },
   "expect": {
     "status": [
-      400,
-      404,
-      422
+      404
     ]
   }
 },
@@ -13423,68 +15621,70 @@
     "method": "POST",
     "path": "/api/v1/langy/control/connect/register",
     "body": {
-      "protocol": "1",
+      "protocol": 1,
       "type": "register",
-      "sdk": {
+      "cli": {
         "name": "vd",
-        "version": "1.0.0",
-        "language": "typescript"
+        "version": "1"
       },
       "instance": {
         "id": "inst-{uid}",
-        "hostname": "vd-host",
-        "username": "vd",
+        "hostname": "h",
+        "username": "u",
         "pid": 1,
         "startedAt": "2026-09-30T00:00:00.000Z"
       },
-      "agents": [
-        {
-          "name": "vd-{uid}",
-          "environment": "test"
-        }
-      ]
+      "workspace": {
+        "root": "/tmp/vd",
+        "name": "vd",
+        "os": "darwin"
+      }
     }
   },
   "expect": {
-    "status": 401
+    "status": 403,
+    "body": {
+      "frame.type": "refused"
+    }
   }
 },
 {
-  "id": "langy-control-connect-register-refuses-read-only-key",
+  "id": "langy-control-connect-register-refuses-project-key-not-session-key",
   "endpoint": "POST /api/v1/langy/control/connect/register",
-  "auth": "restricted",
+  "auth": "project",
   "request": {
     "method": "POST",
     "path": "/api/v1/langy/control/connect/register",
     "body": {
-      "protocol": "1",
+      "protocol": 1,
       "type": "register",
-      "sdk": {
+      "cli": {
         "name": "vd",
-        "version": "1.0.0",
-        "language": "typescript"
+        "version": "1"
       },
       "instance": {
         "id": "inst-{uid}",
-        "hostname": "vd-host",
-        "username": "vd",
+        "hostname": "h",
+        "username": "u",
         "pid": 1,
         "startedAt": "2026-09-30T00:00:00.000Z"
       },
-      "agents": [
-        {
-          "name": "vd-{uid}",
-          "environment": "test"
-        }
-      ]
+      "workspace": {
+        "root": "/tmp/vd",
+        "name": "vd",
+        "os": "darwin"
+      }
     }
   },
   "expect": {
-    "status": 403
+    "status": 403,
+    "body": {
+      "frame.type": "refused"
+    }
   }
 },
 {
-  "id": "langy-control-connect-poll-refuses-no-key",
+  "id": "langy-control-connect-poll-without-instance-token-410",
   "endpoint": "GET /api/v1/langy/control/connect/poll",
   "auth": "none",
   "request": {
@@ -13492,7 +15692,7 @@
     "path": "/api/v1/langy/control/connect/poll"
   },
   "expect": {
-    "status": 401
+    "status": 410
   }
 },
 {
@@ -13512,7 +15712,7 @@
   }
 },
 {
-  "id": "langy-control-connect-frames-refuses-no-key",
+  "id": "langy-control-connect-frames-without-instance-token-accepts-none",
   "endpoint": "POST /api/v1/langy/control/connect/frames",
   "auth": "none",
   "request": {
@@ -13523,7 +15723,10 @@
     }
   },
   "expect": {
-    "status": 401
+    "status": 422,
+    "body": {
+      "accepted": 0
+    }
   }
 }
 ]

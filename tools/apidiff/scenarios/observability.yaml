@@ -1052,7 +1052,7 @@
 - id: analytics-timeseries-counts-ingested-trace
   endpoint: POST /api/analytics/timeseries
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/analytics/timeseries", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "series": [{"metric": "metadata.trace_id", "aggregation": "cardinality"}], "timeZone": "UTC", "timeScale": "full", "filters": {"metadata.user_id": ["vd-user-{uid}"]}}}
   expect: {"status": 200, "contains": "currentPeriod"}
@@ -1062,7 +1062,7 @@
 - id: analytics-timeseries-other-user-filter-is-empty
   endpoint: POST /api/analytics/timeseries
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/analytics/timeseries", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "series": [{"metric": "metadata.trace_id", "aggregation": "cardinality"}], "timeZone": "UTC", "timeScale": "full", "filters": {"metadata.user_id": ["vd-nobody-{uid}"]}}}
   expect: {"status": 200, "notContains": "vd-user-{uid}"}
@@ -1133,7 +1133,7 @@
   endpoint: POST /api/analytics/timeseries
   auth: project-b
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/analytics/timeseries", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "series": [{"metric": "metadata.trace_id", "aggregation": "cardinality"}], "timeZone": "UTC", "timeScale": "full", "filters": {"metadata.user_id": ["vd-user-{uid}"]}}}
   expect: {"status": 200}
@@ -1146,7 +1146,7 @@
 - id: analytics-legacy-counts-ingested-trace
   endpoint: POST /api/analytics
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/analytics", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "series": [{"metric": "metadata.trace_id", "aggregation": "cardinality"}], "timeZone": "UTC", "timeScale": "full", "filters": {"metadata.user_id": ["vd-user-{uid}"]}}}
   expect: {"status": 200, "contains": "currentPeriod"}
@@ -1156,7 +1156,7 @@
 - id: analytics-legacy-other-user-filter-is-empty
   endpoint: POST /api/analytics
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/analytics", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "series": [{"metric": "metadata.trace_id", "aggregation": "cardinality"}], "timeZone": "UTC", "timeScale": "full", "filters": {"metadata.user_id": ["vd-nobody-{uid}"]}}}
   expect: {"status": 200, "notContains": "vd-user-{uid}"}
@@ -1227,7 +1227,7 @@
   endpoint: POST /api/analytics
   auth: project-b
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/analytics", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "series": [{"metric": "metadata.trace_id", "aggregation": "cardinality"}], "timeZone": "UTC", "timeScale": "full", "filters": {"metadata.user_id": ["vd-user-{uid}"]}}}
   expect: {"status": 200}
@@ -1237,7 +1237,7 @@
 - id: events-track-thumbs-up
   endpoint: POST /api/events/track
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/events/track", "body": {"trace_id": "vdt{uid}", "event_type": "thumbs_up_down", "metrics": {"vote": 1}, "event_details": {"feedback": "vd-fb-{uid}"}}}
   expect: {"status": 200, "body": {"message": "Event tracked"}}
@@ -1247,7 +1247,7 @@
 - id: events-track-custom-event
   endpoint: POST /api/events/track
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/events/track", "body": {"trace_id": "vdt{uid}", "event_type": "add_to_cart-{uid}", "metrics": {"amount": 3}}}
   expect: {"status": 200, "body": {"message": "Event tracked"}}
@@ -1257,7 +1257,7 @@
 - id: events-track-idempotent-event-id
   endpoint: POST /api/events/track
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
     - {"request": "POST /api/events/track", "body": {"trace_id": "vdt{uid}", "event_type": "thumbs_up_down", "metrics": {"vote": 1}, "event_details": {"feedback": "vd-fb-{uid}"}, "event_id": "vd-ev-{uid}"}}
   request: {"path": "/api/events/track", "body": {"trace_id": "vdt{uid}", "event_type": "thumbs_up_down", "metrics": {"vote": 1}, "event_details": {"feedback": "vd-fb-{uid}"}, "event_id": "vd-ev-{uid}"}}
@@ -1266,7 +1266,7 @@
 - id: events-track-selected-text
   endpoint: POST /api/events/track
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/events/track", "body": {"trace_id": "vdt{uid}", "event_type": "selected_text", "metrics": {"text_length": 5}, "event_details": {"selected_text": "hello"}}}
   expect: {"status": 200}
@@ -1317,31 +1317,29 @@
 
 - id: collector-ingests-trace
   endpoint: POST /api/collector
-  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
   expect: {"status": 200}
   verify:
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200, "contains": "vd answer {uid}"}}
 
 - id: collector-ingests-trace-without-id
   endpoint: POST /api/collector
-  request: {"path": "/api/collector", "body": {"spans": [{"type": "llm", "span_id": "vds2{uid}", "trace_id": "vdt2{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}]}}
+  request: {"path": "/api/collector", "body": {"spans": [{"type": "llm", "span_id": "vds2{uid}", "trace_id": "vdt2{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}]}}
   expect: {"status": 200}
   verify:
     - {"request": "GET /api/traces/vdt2{uid}", "eventually": "60s", "expect": {"status": 200}}
 
 - id: collector-ingested-metadata-is-searchable
   endpoint: POST /api/collector
-  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
   expect: {"status": 200}
   verify:
     - {"request": "POST /api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}}, "eventually": "60s", "expect": {"status": 200, "path": "traces", "length": 1}}
 
-- id: collector-rejects-missing-spans
+- id: collector-accepts-missing-spans
   endpoint: POST /api/collector
   request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}"}}
-  expect: {"status": 400}
-  verify:
-    - {"request": "GET /api/traces/vdt{uid}", "expect": {"status": 404}}
+  expect: {"status": 200}
 
 - id: collector-rejects-non-array-spans
   endpoint: POST /api/collector
@@ -1360,12 +1358,12 @@
 
 - id: collector-rejects-mismatched-trace-ids
   endpoint: POST /api/collector
-  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "other-{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}]}}
+  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "other-{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}]}}
   expect: {"status": 400}
 
 - id: collector-rejects-unknown-span-type
   endpoint: POST /api/collector
-  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "nonsense", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}]}}
+  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "nonsense", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}]}}
   expect: {"status": 400}
 
 - id: collector-rejects-span-without-timestamps
@@ -1376,7 +1374,7 @@
 - id: collector-refuses-no-key
   endpoint: POST /api/collector
   auth: none
-  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
   expect: {"status": 401}
   verify:
     - {"request": "GET /api/traces/vdt{uid}", "expect": {"status": 404}}
@@ -1384,13 +1382,13 @@
 - id: collector-refuses-wrong-token
   endpoint: POST /api/collector
   auth: none
-  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}, "headers": {"X-Auth-Token": "sk-lw-not-a-key-{uid}"}}
+  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}, "headers": {"X-Auth-Token": "sk-lw-not-a-key-{uid}"}}
   expect: {"status": 401}
 
 - id: collector-refuses-read-only-key
   endpoint: POST /api/collector
   auth: restricted
-  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
   expect: {"status": 403}
   verify:
     - {"request": "GET /api/traces/vdt{uid}", "expect": {"status": 404}}
@@ -1398,7 +1396,7 @@
 - id: collector-writes-to-the-key-project
   endpoint: POST /api/collector
   auth: project-b
-  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+  request: {"path": "/api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
   expect: {"status": 200}
   verify:
     - {"request": "GET /api/traces/vdt{uid}", "expect": {"status": 404}}
@@ -1407,7 +1405,7 @@
 
 - id: otel-traces-happy
   endpoint: POST /api/otel/v1/traces
-  request: {"path": "/api/otel/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "b7e4a1c0b7e4a1c0b7e4a1c0b7e4a1c0", "spanId": "b7e4a1c0b7e4a1c0", "name": "vd-otlp-{uid}", "kind": 1, "startTimeUnixNano": "1790721559902000000", "endTimeUnixNano": "1790721560402000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}}
+  request: {"path": "/api/otel/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "b7e4a1c0b7e4a1c0b7e4a1c0b7e4a1c0", "spanId": "b7e4a1c0b7e4a1c0", "name": "vd-otlp-{uid}", "kind": 1, "startTimeUnixNano": "1790723307541000000", "endTimeUnixNano": "1790723308041000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}}
   expect: {"status": 200}
   verify:
     - {"request": "GET /api/traces/b7e4a1c0b7e4a1c0b7e4a1c0b7e4a1c0", "eventually": "60s", "expect": {"status": 200}}
@@ -1417,27 +1415,22 @@
   request: {"path": "/api/otel/v1/traces", "body": {"resourceSpans": []}}
   expect: {"status": 200}
 
-- id: otel-traces-rejects-garbage-structure
-  endpoint: POST /api/otel/v1/traces
-  request: {"path": "/api/otel/v1/traces", "body": {"resourceSpans": "nope"}}
-  expect: {"status": [400, 422]}
-
 - id: otel-traces-refuses-no-key
   endpoint: POST /api/otel/v1/traces
   auth: none
-  request: {"path": "/api/otel/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "b7e4a1c0b7e4a1c0b7e4a1c0b7e4a1c0", "spanId": "b7e4a1c0b7e4a1c0", "name": "vd-otlp-{uid}", "kind": 1, "startTimeUnixNano": "1790721559902000000", "endTimeUnixNano": "1790721560402000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}}
+  request: {"path": "/api/otel/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "b7e4a1c0b7e4a1c0b7e4a1c0b7e4a1c0", "spanId": "b7e4a1c0b7e4a1c0", "name": "vd-otlp-{uid}", "kind": 1, "startTimeUnixNano": "1790723307541000000", "endTimeUnixNano": "1790723308041000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}}
   expect: {"status": 401}
 
 - id: otel-traces-refuses-wrong-token
   endpoint: POST /api/otel/v1/traces
   auth: none
-  request: {"path": "/api/otel/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "b7e4a1c0b7e4a1c0b7e4a1c0b7e4a1c0", "spanId": "b7e4a1c0b7e4a1c0", "name": "vd-otlp-{uid}", "kind": 1, "startTimeUnixNano": "1790721559902000000", "endTimeUnixNano": "1790721560402000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}, "headers": {"X-Auth-Token": "sk-lw-not-a-key-{uid}"}}
+  request: {"path": "/api/otel/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "b7e4a1c0b7e4a1c0b7e4a1c0b7e4a1c0", "spanId": "b7e4a1c0b7e4a1c0", "name": "vd-otlp-{uid}", "kind": 1, "startTimeUnixNano": "1790723307541000000", "endTimeUnixNano": "1790723308041000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}, "headers": {"X-Auth-Token": "sk-lw-not-a-key-{uid}"}}
   expect: {"status": 401}
 
 - id: otel-traces-refuses-read-only-key
   endpoint: POST /api/otel/v1/traces
   auth: restricted
-  request: {"path": "/api/otel/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "b7e4a1c0b7e4a1c0b7e4a1c0b7e4a1c0", "spanId": "b7e4a1c0b7e4a1c0", "name": "vd-otlp-{uid}", "kind": 1, "startTimeUnixNano": "1790721559902000000", "endTimeUnixNano": "1790721560402000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}}
+  request: {"path": "/api/otel/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "b7e4a1c0b7e4a1c0b7e4a1c0b7e4a1c0", "spanId": "b7e4a1c0b7e4a1c0", "name": "vd-otlp-{uid}", "kind": 1, "startTimeUnixNano": "1790723307541000000", "endTimeUnixNano": "1790723308041000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}}
   expect: {"status": 403}
 
 - id: otel-logs-empty-export
@@ -1457,11 +1450,6 @@
   request: {"path": "/api/otel/v1/logs", "body": {"resourceLogs": []}}
   expect: {"status": 403}
 
-- id: otel-logs-rejects-garbage-structure
-  endpoint: POST /api/otel/v1/logs
-  request: {"path": "/api/otel/v1/logs", "body": {"resourceLogs": "nope"}}
-  expect: {"status": [400, 422]}
-
 - id: otel-metrics-empty-export
   endpoint: POST /api/otel/v1/metrics
   request: {"path": "/api/otel/v1/metrics", "body": {"resourceMetrics": []}}
@@ -1479,23 +1467,18 @@
   request: {"path": "/api/otel/v1/metrics", "body": {"resourceMetrics": []}}
   expect: {"status": 403}
 
-- id: otel-metrics-rejects-garbage-structure
-  endpoint: POST /api/otel/v1/metrics
-  request: {"path": "/api/otel/v1/metrics", "body": {"resourceMetrics": "nope"}}
-  expect: {"status": [400, 422]}
-
 # ---- rum ----
 
 - id: rum-accepts-browser-spans
   endpoint: POST /api/rum/v1/traces
   auth: none
-  request: {"path": "/api/rum/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "c3d4a1c0c3d4a1c0c3d4a1c0c3d4a1c0", "spanId": "c3d4a1c0c3d4a1c0", "name": "vd-rum-{uid}", "kind": 1, "startTimeUnixNano": "1790721559902000000", "endTimeUnixNano": "1790721560402000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}}
+  request: {"path": "/api/rum/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "c3d4a1c0c3d4a1c0c3d4a1c0c3d4a1c0", "spanId": "c3d4a1c0c3d4a1c0", "name": "vd-rum-{uid}", "kind": 1, "startTimeUnixNano": "1790723307541000000", "endTimeUnixNano": "1790723308041000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}}
   expect: {"status": 202}
 
 - id: rum-accepts-with-session-header
   endpoint: POST /api/rum/v1/traces
   auth: none
-  request: {"path": "/api/rum/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "c3d4a1c0c3d4a1c0c3d4a1c0c3d4a1c1", "spanId": "c3d4a1c0c3d4a1c1", "name": "vd-rum-{uid}", "kind": 1, "startTimeUnixNano": "1790721559902000000", "endTimeUnixNano": "1790721560402000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}, "headers": {"x-langwatch-rum-session": "vd-session-{uid}"}}
+  request: {"path": "/api/rum/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "c3d4a1c0c3d4a1c0c3d4a1c0c3d4a1c1", "spanId": "c3d4a1c0c3d4a1c1", "name": "vd-rum-{uid}", "kind": 1, "startTimeUnixNano": "1790723307541000000", "endTimeUnixNano": "1790723308041000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}, "headers": {"x-langwatch-rum-session": "vd-session-{uid}"}}
   expect: {"status": 202}
 
 - id: rum-rejects-empty-resource-spans
@@ -1539,7 +1522,7 @@
 - id: traces-get-happy
   endpoint: GET /api/traces/{traceId}
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}"}
   expect: {"status": 200, "contains": "vd answer {uid}"}
@@ -1547,7 +1530,7 @@
 - id: traces-get-digest-format
   endpoint: GET /api/traces/{traceId}
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}", "query": {"format": "digest"}}
   expect: {"status": 200, "contains": "formatted_trace"}
@@ -1555,7 +1538,7 @@
 - id: traces-get-llm-mode-is-digest
   endpoint: GET /api/traces/{traceId}
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}", "query": {"llmMode": "true"}}
   expect: {"status": 200, "contains": "formatted_trace"}
@@ -1563,7 +1546,7 @@
 - id: traces-get-json-format-has-spans
   endpoint: GET /api/traces/{traceId}
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}", "query": {"format": "json"}}
   expect: {"status": 200, "contains": "spans"}
@@ -1583,7 +1566,7 @@
   endpoint: GET /api/traces/{traceId}
   auth: restricted
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}"}
   expect: {"status": 200, "contains": "vd answer {uid}"}
@@ -1592,7 +1575,7 @@
   endpoint: GET /api/traces/{traceId}
   auth: project-b
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}"}
   expect: {"status": 404}
@@ -1600,7 +1583,7 @@
 - id: trace-legacy-get-happy
   endpoint: GET /api/trace/{id}
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/vdt{uid}"}
   expect: {"status": 200, "contains": "vd answer {uid}"}
@@ -1608,7 +1591,7 @@
 - id: trace-legacy-get-digest-format
   endpoint: GET /api/trace/{id}
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/vdt{uid}", "query": {"format": "digest"}}
   expect: {"status": 200, "contains": "formatted_trace"}
@@ -1616,7 +1599,7 @@
 - id: trace-legacy-get-llm-mode-is-digest
   endpoint: GET /api/trace/{id}
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/vdt{uid}", "query": {"llmMode": "true"}}
   expect: {"status": 200, "contains": "formatted_trace"}
@@ -1624,7 +1607,7 @@
 - id: trace-legacy-get-json-format-has-spans
   endpoint: GET /api/trace/{id}
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/vdt{uid}", "query": {"format": "json"}}
   expect: {"status": 200, "contains": "spans"}
@@ -1644,7 +1627,7 @@
   endpoint: GET /api/trace/{id}
   auth: restricted
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/vdt{uid}"}
   expect: {"status": 200, "contains": "vd answer {uid}"}
@@ -1653,7 +1636,7 @@
   endpoint: GET /api/trace/{id}
   auth: project-b
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/vdt{uid}"}
   expect: {"status": 404}
@@ -1661,7 +1644,7 @@
 - id: traces-transcript-happy
   endpoint: GET /api/traces/{traceId}/transcript
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}/transcript"}
   expect: {"status": 200}
@@ -1681,7 +1664,7 @@
   endpoint: GET /api/traces/{traceId}/transcript
   auth: restricted
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}/transcript"}
   expect: {"status": 200}
@@ -1690,7 +1673,7 @@
   endpoint: GET /api/traces/{traceId}/transcript
   auth: project-b
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}/transcript"}
   expect: {"status": 404}
@@ -1752,7 +1735,7 @@
 - id: traces-search-finds-ingested-trace
   endpoint: POST /api/traces/search
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}}}
   expect: {"status": 200, "path": "traces", "length": 1, "contains": "vdt{uid}"}
@@ -1760,7 +1743,7 @@
 - id: traces-search-other-user-is-empty
   endpoint: POST /api/traces/search
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-nobody-{uid}"]}}}
   expect: {"status": 200, "path": "traces", "length": 0}
@@ -1768,7 +1751,7 @@
 - id: traces-search-digest-format
   endpoint: POST /api/traces/search
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}, "format": "digest"}}
   expect: {"status": 200, "contains": "formatted_trace"}
@@ -1776,7 +1759,7 @@
 - id: traces-search-include-spans
   endpoint: POST /api/traces/search
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}, "includeSpans": true}}
   expect: {"status": 200, "contains": "spans", "path": "traces", "length": 1}
@@ -1784,7 +1767,7 @@
 - id: traces-search-filter-dsl
   endpoint: POST /api/traces/search
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}, "filter": "status:ok"}}
   expect: {"status": 200, "path": "traces"}
@@ -1792,9 +1775,9 @@
 - id: traces-search-page-size-limits-page
   endpoint: POST /api/traces/search
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdu{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdu{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdu{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdu{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdu{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}, "pageSize": 1}}
   expect: {"status": 200, "path": "traces", "length": 1}
@@ -1802,7 +1785,7 @@
 - id: traces-search-trace-ids-filter
   endpoint: POST /api/traces/search
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "traceIds": ["vdt{uid}"]}}
   expect: {"status": 200, "path": "traces", "length": 1}
@@ -1857,7 +1840,7 @@
   endpoint: POST /api/traces/search
   auth: restricted
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
     - {"request": "POST /api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}}, "eventually": "60s", "expect": {"status": 200, "path": "traces", "length": 1}}
   request: {"path": "/api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}}}
@@ -1867,7 +1850,7 @@
   endpoint: POST /api/traces/search
   auth: project-b
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
     - {"request": "POST /api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}}, "eventually": "60s", "expect": {"status": 200, "path": "traces", "length": 1}}
   request: {"path": "/api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}}}
@@ -1876,7 +1859,7 @@
 - id: trace-legacy-search-finds-ingested-trace
   endpoint: POST /api/trace/search
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}}}
   expect: {"status": 200, "path": "traces", "length": 1, "contains": "vdt{uid}"}
@@ -1884,7 +1867,7 @@
 - id: trace-legacy-search-digest-format
   endpoint: POST /api/trace/search
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}, "format": "digest"}}
   expect: {"status": 200, "contains": "formatted_trace"}
@@ -1892,7 +1875,7 @@
 - id: trace-legacy-search-llm-mode
   endpoint: POST /api/trace/search
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}, "llmMode": true}}
   expect: {"status": 200, "path": "traces", "length": 1}
@@ -1900,7 +1883,7 @@
 - id: trace-legacy-search-other-user-is-empty
   endpoint: POST /api/trace/search
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-nobody-{uid}"]}}}
   expect: {"status": 200, "path": "traces", "length": 0}
@@ -1935,7 +1918,7 @@
   endpoint: POST /api/trace/search
   auth: restricted
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
     - {"request": "POST /api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}}, "eventually": "60s", "expect": {"status": 200, "path": "traces", "length": 1}}
   request: {"path": "/api/trace/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}}}
@@ -1945,7 +1928,7 @@
   endpoint: POST /api/trace/search
   auth: project-b
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
     - {"request": "POST /api/traces/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}}, "eventually": "60s", "expect": {"status": 200, "path": "traces", "length": 1}}
   request: {"path": "/api/trace/search", "body": {"startDate": 1700000000000, "endDate": 4102444800000, "filters": {"metadata.user_id": ["vd-user-{uid}"]}}}
@@ -1956,27 +1939,27 @@
 - id: traces-metadata-adds-key
   endpoint: PATCH /api/traces/{traceId}/metadata
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}/metadata", "body": {"metadata": {"vd_key": "vd-val-{uid}"}}}
   expect: {"status": 200, "body": {"traceId": "vdt{uid}"}}
   verify:
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200, "contains": "vd-val-{uid}"}}
 
-- id: traces-metadata-updates-reserved-user
+- id: traces-metadata-sets-unset-reserved-customer
   endpoint: PATCH /api/traces/{traceId}/metadata
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
-  request: {"path": "/api/traces/vdt{uid}/metadata", "body": {"metadata": {"user_id": "vd-new-user-{uid}"}}}
+  request: {"path": "/api/traces/vdt{uid}/metadata", "body": {"metadata": {"customer_id": "vd-cust-{uid}"}}}
   expect: {"status": 200}
   verify:
-    - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200, "contains": "vd-new-user-{uid}"}}
+    - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200, "contains": "vd-cust-{uid}"}}
 
 - id: traces-metadata-labels-replace
   endpoint: PATCH /api/traces/{traceId}/metadata
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}/metadata", "body": {"metadata": {"labels": ["vd-new-label-{uid}"]}}}
   expect: {"status": 200}
@@ -1986,7 +1969,7 @@
 - id: traces-metadata-rejects-empty-object
   endpoint: PATCH /api/traces/{traceId}/metadata
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}/metadata", "body": {"metadata": {}}}
   expect: {"status": [400, 422]}
@@ -1994,7 +1977,7 @@
 - id: traces-metadata-rejects-missing-metadata
   endpoint: PATCH /api/traces/{traceId}/metadata
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}/metadata", "body": {}}
   expect: {"status": [400, 422]}
@@ -2002,7 +1985,7 @@
 - id: traces-metadata-rejects-oversized-value
   endpoint: PATCH /api/traces/{traceId}/metadata
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}/metadata", "body": {"metadata": {"vd_key": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}}}
   expect: {"status": [400, 422]}
@@ -2010,7 +1993,7 @@
 - id: traces-metadata-rejects-null-value
   endpoint: PATCH /api/traces/{traceId}/metadata
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}/metadata", "body": {"metadata": {"vd_key": null}}}
   expect: {"status": [400, 422]}
@@ -2019,7 +2002,7 @@
   endpoint: PATCH /api/traces/{traceId}/metadata
   auth: none
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}/metadata", "body": {"metadata": {"vd_key": "x-{uid}"}}}
   expect: {"status": 401}
@@ -2030,7 +2013,7 @@
   endpoint: PATCH /api/traces/{traceId}/metadata
   auth: restricted
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}/metadata", "body": {"metadata": {"vd_key": "x-{uid}"}}}
   expect: {"status": 403}
@@ -2041,7 +2024,7 @@
   endpoint: PATCH /api/traces/{traceId}/metadata
   auth: project-b
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/traces/vdt{uid}/metadata", "body": {"metadata": {"vd_key": "x-{uid}"}}}
   expect: {"status": [200, 404]}
@@ -2053,7 +2036,7 @@
 - id: trace-share-happy
   endpoint: POST /api/trace/{id}/share
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/vdt{uid}/share"}
   expect: {"status": 200, "body": {"status": "success"}, "contains": "/share/"}
@@ -2081,7 +2064,7 @@
   endpoint: POST /api/trace/{id}/share
   auth: restricted
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/vdt{uid}/share"}
   expect: {"status": 403}
@@ -2089,7 +2072,7 @@
 - id: trace-unshare-happy
   endpoint: POST /api/trace/{id}/unshare
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/vdt{uid}/unshare"}
   expect: {"status": 200, "body": {"status": "success"}}
@@ -2117,7 +2100,7 @@
   endpoint: POST /api/trace/{id}/unshare
   auth: restricted
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/vdt{uid}/unshare"}
   expect: {"status": 403}
@@ -2125,7 +2108,7 @@
 - id: trace-share-twice-succeeds
   endpoint: POST /api/trace/{id}/share
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
     - {"request": "POST /api/trace/vdt{uid}/share"}
   request: {"path": "/api/trace/vdt{uid}/share"}
@@ -2134,7 +2117,7 @@
 - id: trace-share-after-unshare-succeeds
   endpoint: POST /api/trace/{id}/share
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
     - {"request": "POST /api/trace/vdt{uid}/share"}
     - {"request": "POST /api/trace/vdt{uid}/unshare"}
@@ -2144,7 +2127,7 @@
 - id: trace-unshare-without-share-succeeds
   endpoint: POST /api/trace/{id}/unshare
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
   request: {"path": "/api/trace/vdt{uid}/unshare"}
   expect: {"status": 200}
@@ -2152,7 +2135,7 @@
 - id: trace-unshare-twice-succeeds
   endpoint: POST /api/trace/{id}/unshare
   setup:
-    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790721559902, "finished_at": 1790721560402}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
     - {"request": "POST /api/trace/vdt{uid}/share"}
     - {"request": "POST /api/trace/vdt{uid}/unshare"}
@@ -2164,12 +2147,12 @@
 - id: export-traces-refuses-no-session
   endpoint: POST /api/export/traces/download
   auth: none
-  request: {"path": "/api/export/traces/download", "body": {"projectId": "{projectId}", "mode": "summary", "format": "csv"}}
+  request: {"path": "/api/export/traces/download", "body": {"projectId": "{projectId}", "mode": "summary", "format": "csv", "startDate": 1700000000000, "endDate": 4102444800000}}
   expect: {"status": [401, 403]}
 
 - id: export-traces-refuses-api-key
   endpoint: POST /api/export/traces/download
-  request: {"path": "/api/export/traces/download", "body": {"projectId": "{projectId}", "mode": "summary", "format": "csv"}}
+  request: {"path": "/api/export/traces/download", "body": {"projectId": "{projectId}", "mode": "summary", "format": "csv", "startDate": 1700000000000, "endDate": 4102444800000}}
   expect: {"status": [401, 403]}
 
 - id: export-traces-rejects-empty-body
@@ -2181,5 +2164,5 @@
 - id: export-traces-rejects-unknown-format
   endpoint: POST /api/export/traces/download
   auth: none
-  request: {"path": "/api/export/traces/download", "body": {"projectId": "{projectId}", "mode": "summary", "format": "xlsx"}}
+  request: {"path": "/api/export/traces/download", "body": {"projectId": "{projectId}", "mode": "summary", "format": "xlsx", "startDate": 1700000000000, "endDate": 4102444800000}}
   expect: {"status": [400, 422]}

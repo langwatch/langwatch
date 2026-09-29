@@ -1,0 +1,350 @@
+# Coding-assistant and GitHub scenarios (builder C). Modules: coding-agent, github.
+# Sessions are ingested through POST /api/otel/v1/logs, the receiver `langwatch ingest`
+# posts to; timestamps are fixed at generation time (2026-09-30). A session id carries the
+# scenario's {uid}. Not covered: a pull request linked to a session, and a valid GitHub
+# signature or signed install state, which need a real GitHub App the stacks do not have.
+
+- id: coding-events-happy-lists-prompt-and-model-call
+  endpoint: GET /api/coding-agent/sessions/{sessionId}/events
+  setup:
+    - {"request": "POST /api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}, "expect": {"status": 200}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "eventually": "60s", "expect": {"status": 200, "path": "events", "length": 2}}
+  request: {"path": "/api/coding-agent/sessions/vd-sess-{uid}/events"}
+  expect: {"status": 200, "path": "events", "length": 2}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "query": {"kinds": "model_call,user_prompt"}, "expect": {"status": 200, "path": "events", "length": 2}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "expect": {"status": 200, "contains": "model_call"}}
+
+- id: coding-events-filter-by-kind-model-call
+  endpoint: GET /api/coding-agent/sessions/{sessionId}/events
+  setup:
+    - {"request": "POST /api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}, "expect": {"status": 200}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "eventually": "60s", "expect": {"status": 200, "path": "events", "length": 2}}
+  request: {"path": "/api/coding-agent/sessions/vd-sess-{uid}/events", "query": {"kinds": "model_call"}}
+  expect: {"status": 200, "path": "events", "length": 1, "contains": "model_call", "notContains": "user_prompt"}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "query": {"kinds": "user_prompt"}, "expect": {"status": 200, "path": "events", "length": 1, "notContains": "model_call"}}
+
+- id: coding-events-filter-by-kind-user-prompt
+  endpoint: GET /api/coding-agent/sessions/{sessionId}/events
+  setup:
+    - {"request": "POST /api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}, "expect": {"status": 200}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "eventually": "60s", "expect": {"status": 200, "path": "events", "length": 2}}
+  request: {"path": "/api/coding-agent/sessions/vd-sess-{uid}/events", "query": {"kinds": "user_prompt"}}
+  expect: {"status": 200, "path": "events", "length": 1, "contains": "user_prompt"}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "query": {"kinds": "compaction"}, "expect": {"status": 200, "path": "events", "length": 0}}
+
+- id: coding-events-pagination-follows-cursor
+  endpoint: GET /api/coding-agent/sessions/{sessionId}/events
+  setup:
+    - {"request": "POST /api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}, "expect": {"status": 200}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "eventually": "60s", "expect": {"status": 200, "path": "events", "length": 2}}
+  request: {"path": "/api/coding-agent/sessions/vd-sess-{uid}/events", "query": {"limit": 1}}
+  expect: {"status": 200, "path": "events", "length": 1, "body": {"nextCursor": "<any>"}}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "query": {"limit": 1}, "capture": {"cursor": "nextCursor"}, "expect": {"status": 200}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "query": {"limit": 1, "cursor": "{cursor}"}, "expect": {"status": 200, "path": "events", "length": 1}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "query": {"limit": 500}, "expect": {"status": 200, "path": "events", "length": 2}}
+
+- id: coding-events-unknown-session-is-empty
+  endpoint: GET /api/coding-agent/sessions/{sessionId}/events
+  request: {"path": "/api/coding-agent/sessions/vd-none-{uid}/events"}
+  expect: {"status": 200, "path": "events", "length": 0}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-none-{uid}/events", "expect": {"status": 200, "body": {"nextCursor": null}}}
+
+- id: coding-events-other-project-sees-nothing
+  endpoint: GET /api/coding-agent/sessions/{sessionId}/events
+  auth: project-b
+  setup:
+    - {"request": "POST /api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}, "expect": {"status": 200}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "eventually": "60s", "expect": {"status": 200, "path": "events", "length": 2}}
+  request: {"path": "/api/coding-agent/sessions/vd-sess-{uid}/events"}
+  expect: {"status": 200, "path": "events", "length": 0}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "auth": "project", "expect": {"status": 200, "path": "events", "length": 2}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "auth": "project-b", "expect": {"status": 200, "path": "events", "length": 0}}
+
+- id: coding-events-rejects-zero-limit
+  endpoint: GET /api/coding-agent/sessions/{sessionId}/events
+  request: {"path": "/api/coding-agent/sessions/vd-sess-{uid}/events", "query": {"limit": 0}}
+  expect: {"status": [400, 422]}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "expect": {"status": 200}}
+
+- id: coding-events-rejects-oversized-limit
+  endpoint: GET /api/coding-agent/sessions/{sessionId}/events
+  request: {"path": "/api/coding-agent/sessions/vd-sess-{uid}/events", "query": {"limit": 1000000}}
+  expect: {"status": [400, 422]}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "expect": {"status": 200}}
+
+- id: coding-events-rejects-garbage-cursor
+  endpoint: GET /api/coding-agent/sessions/{sessionId}/events
+  setup:
+    - {"request": "POST /api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}, "expect": {"status": 200}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "eventually": "60s", "expect": {"status": 200, "path": "events", "length": 2}}
+  request: {"path": "/api/coding-agent/sessions/vd-sess-{uid}/events", "query": {"cursor": "not-a-cursor-{uid}"}}
+  expect: {"status": [400, 422]}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "expect": {"status": 200, "path": "events", "length": 2}}
+
+- id: coding-events-refuses-no-key
+  endpoint: GET /api/coding-agent/sessions/{sessionId}/events
+  auth: none
+  setup:
+    - {"request": "POST /api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}, "expect": {"status": 200}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "eventually": "60s", "expect": {"status": 200, "path": "events", "length": 2}}
+  request: {"path": "/api/coding-agent/sessions/vd-sess-{uid}/events"}
+  expect: {"status": 401}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "expect": {"status": 200, "path": "events", "length": 2}}
+
+- id: coding-events-refuses-restricted-key
+  endpoint: GET /api/coding-agent/sessions/{sessionId}/events
+  auth: restricted
+  setup:
+    - {"request": "POST /api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}, "expect": {"status": 200}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "eventually": "60s", "expect": {"status": 200, "path": "events", "length": 2}}
+  request: {"path": "/api/coding-agent/sessions/vd-sess-{uid}/events"}
+  expect: {"status": [401, 403]}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "expect": {"status": 200, "path": "events", "length": 2}}
+
+- id: coding-ingest-context-and-model-call-become-a-session
+  endpoint: POST /api/otel/v1/logs
+  request: {"path": "/api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}}
+  expect: {"status": 200}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "eventually": "60s", "expect": {"status": 200, "path": "events", "length": 2}}
+
+- id: coding-ingest-without-context-still-records-events
+  endpoint: POST /api/otel/v1/logs
+  request: {"path": "/api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}]}]}}
+  expect: {"status": 200}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "eventually": "60s", "expect": {"status": 200, "path": "events", "length": 2}}
+
+- id: coding-ingest-is-idempotent-on-repeat
+  endpoint: POST /api/otel/v1/logs
+  setup:
+    - {"request": "POST /api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}, "expect": {"status": 200}}
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "eventually": "60s", "expect": {"status": 200, "path": "events", "length": 2}}
+  request: {"path": "/api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}}
+  expect: {"status": 200}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "expect": {"status": 200, "path": "events", "length": 2}}
+
+- id: coding-ingest-refuses-no-key
+  endpoint: POST /api/otel/v1/logs
+  auth: none
+  request: {"path": "/api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}}
+  expect: {"status": 401}
+  verify:
+    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "expect": {"status": 200, "path": "events", "length": 0}}
+
+- id: coding-pr-usage-refuses-shared-project-key
+  endpoint: GET /api/coding-agent/pull-request-usage
+  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
+  expect: {"status": 400, "contains": "personal"}
+
+- id: coding-pr-usage-refuses-no-key
+  endpoint: GET /api/coding-agent/pull-request-usage
+  auth: none
+  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
+  expect: {"status": 401}
+
+- id: coding-pr-usage-rejects-missing-repository
+  endpoint: GET /api/coding-agent/pull-request-usage
+  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"pullRequest": 1}}
+  expect: {"status": [400, 422]}
+
+- id: coding-pr-usage-rejects-repository-without-owner
+  endpoint: GET /api/coding-agent/pull-request-usage
+  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-repo", "pullRequest": 1}}
+  expect: {"status": [400, 422]}
+
+- id: coding-pr-usage-rejects-zero-pull-request
+  endpoint: GET /api/coding-agent/pull-request-usage
+  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 0}}
+  expect: {"status": [400, 422]}
+
+- id: coding-pr-usage-rejects-missing-pull-request
+  endpoint: GET /api/coding-agent/pull-request-usage
+  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo"}}
+  expect: {"status": [400, 422]}
+
+- id: coding-pr-usage-refuses-restricted-key
+  endpoint: GET /api/coding-agent/pull-request-usage
+  auth: restricted
+  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
+  expect: {"status": [400, 401, 403]}
+
+- id: coding-pr-usage-v1-unmapped-pull-request-is-not-found
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
+  auth: org
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo-{uid}", "pullRequest": 7}}
+  expect: {"status": 404}
+
+- id: coding-pr-usage-v1-unmapped-host-is-not-found
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
+  auth: org
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1, "host": "ghe-{uid}.example.com"}}
+  expect: {"status": 404}
+
+- id: coding-pr-usage-v1-refuses-no-key
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
+  auth: none
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
+  expect: {"status": 401}
+
+- id: coding-pr-usage-v1-refuses-project-key
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
+  auth: project
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
+  expect: {"status": [401, 403]}
+
+- id: coding-pr-usage-v1-rejects-bad-repository
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
+  auth: org
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "no-slash", "pullRequest": 1}}
+  expect: {"status": [400, 422]}
+
+- id: coding-pr-usage-v1-rejects-missing-pull-request
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
+  auth: org
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo"}}
+  expect: {"status": [400, 422]}
+
+- id: coding-pr-usage-v1-rejects-negative-pull-request
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
+  auth: org
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": -3}}
+  expect: {"status": [400, 422]}
+
+- id: github-install-refuses-no-session
+  endpoint: GET /api/github/install
+  auth: none
+  request: {"path": "/api/github/install", "query": {"organizationId": "{orgId}"}}
+  expect: {"status": [401, 403]}
+
+- id: github-install-rejects-missing-organization
+  endpoint: GET /api/github/install
+  auth: session
+  request: {"path": "/api/github/install"}
+  expect: {"status": [400, 403, 422]}
+
+- id: github-install-unknown-organization-is-refused
+  endpoint: GET /api/github/install
+  auth: session
+  request: {"path": "/api/github/install", "query": {"organizationId": "org-vd-{uid}"}}
+  expect: {"status": [403, 404]}
+
+- id: github-install-organization-manager-starts-or-is-unavailable
+  endpoint: GET /api/github/install
+  auth: session
+  request: {"path": "/api/github/install", "query": {"organizationId": "{orgId}"}}
+  expect: {"status": [302, 503]}
+
+- id: github-install-refuses-restricted-key
+  endpoint: GET /api/github/install
+  auth: restricted
+  request: {"path": "/api/github/install", "query": {"organizationId": "{orgId}"}}
+  expect: {"status": [401, 403]}
+
+- id: github-setup-without-state-is-bad-request
+  endpoint: GET /api/github/setup
+  auth: none
+  request: {"path": "/api/github/setup"}
+  expect: {"status": 400}
+
+- id: github-setup-with-garbage-state-is-bad-request
+  endpoint: GET /api/github/setup
+  auth: none
+  request: {"path": "/api/github/setup", "query": {"state": "not-signed-{uid}", "installation_id": "1"}}
+  expect: {"status": 400}
+
+- id: github-setup-with-state-only-is-bad-request
+  endpoint: GET /api/github/setup
+  auth: none
+  request: {"path": "/api/github/setup", "query": {"state": "not-signed-{uid}"}}
+  expect: {"status": 400}
+
+- id: github-setup-with-installation-only-is-bad-request
+  endpoint: GET /api/github/setup
+  auth: none
+  request: {"path": "/api/github/setup", "query": {"installation_id": "123"}}
+  expect: {"status": 400}
+
+- id: github-legacy-setup-without-state-is-bad-request
+  endpoint: GET /api/github-langy/setup
+  auth: none
+  request: {"path": "/api/github-langy/setup"}
+  expect: {"status": 400}
+
+- id: github-legacy-setup-with-garbage-state-is-bad-request
+  endpoint: GET /api/github-langy/setup
+  auth: none
+  request: {"path": "/api/github-langy/setup", "query": {"state": "not-signed-{uid}", "installation_id": "1"}}
+  expect: {"status": 400}
+
+- id: github-legacy-setup-with-state-only-is-bad-request
+  endpoint: GET /api/github-langy/setup
+  auth: none
+  request: {"path": "/api/github-langy/setup", "query": {"state": "not-signed-{uid}"}}
+  expect: {"status": 400}
+
+- id: github-legacy-setup-with-installation-only-is-bad-request
+  endpoint: GET /api/github-langy/setup
+  auth: none
+  request: {"path": "/api/github-langy/setup", "query": {"installation_id": "123"}}
+  expect: {"status": 400}
+
+- id: github-webhook-without-signature-is-refused
+  endpoint: POST /api/github/webhook
+  auth: none
+  request: {"path": "/api/github/webhook", "body": {"zen": "vd-{uid}", "hook_id": 1}}
+  expect: {"status": [401, 404]}
+
+- id: github-webhook-with-wrong-signature-is-refused
+  endpoint: POST /api/github/webhook
+  auth: none
+  request: {"path": "/api/github/webhook", "body": {"zen": "vd-{uid}", "hook_id": 1}, "headers": {"X-Hub-Signature-256": "sha256=0000000000000000000000000000000000000000000000000000000000000000", "X-GitHub-Event": "ping", "X-GitHub-Delivery": "vd-{uid}"}}
+  expect: {"status": [401, 404]}
+
+- id: github-webhook-with-malformed-signature-is-refused
+  endpoint: POST /api/github/webhook
+  auth: none
+  request: {"path": "/api/github/webhook", "body": {"zen": "vd-{uid}", "hook_id": 1}, "headers": {"X-Hub-Signature-256": "not-a-signature", "X-GitHub-Event": "ping"}}
+  expect: {"status": [401, 404]}
+
+- id: github-webhook-with-invalid-json-is-refused
+  endpoint: POST /api/github/webhook
+  auth: none
+  request: {"path": "/api/github/webhook", "body": "vd not json {uid}", "headers": {"X-Hub-Signature-256": "sha256=00", "X-GitHub-Event": "ping"}}
+  expect: {"status": [400, 401, 404]}
+
+- id: github-legacy-webhook-without-signature-is-refused
+  endpoint: POST /api/github-langy/webhook
+  auth: none
+  request: {"path": "/api/github-langy/webhook", "body": {"zen": "vd-{uid}", "hook_id": 1}}
+  expect: {"status": [401, 404]}
+
+- id: github-legacy-webhook-with-wrong-signature-is-refused
+  endpoint: POST /api/github-langy/webhook
+  auth: none
+  request: {"path": "/api/github-langy/webhook", "body": {"zen": "vd-{uid}", "hook_id": 1}, "headers": {"X-Hub-Signature-256": "sha256=0000000000000000000000000000000000000000000000000000000000000000", "X-GitHub-Event": "ping", "X-GitHub-Delivery": "vd-{uid}"}}
+  expect: {"status": [401, 404]}
+
+- id: github-legacy-webhook-with-malformed-signature-is-refused
+  endpoint: POST /api/github-langy/webhook
+  auth: none
+  request: {"path": "/api/github-langy/webhook", "body": {"zen": "vd-{uid}", "hook_id": 1}, "headers": {"X-Hub-Signature-256": "not-a-signature", "X-GitHub-Event": "ping"}}
+  expect: {"status": [401, 404]}
+
+- id: github-legacy-webhook-with-invalid-json-is-refused
+  endpoint: POST /api/github-langy/webhook
+  auth: none
+  request: {"path": "/api/github-langy/webhook", "body": "vd not json {uid}", "headers": {"X-Hub-Signature-256": "sha256=00", "X-GitHub-Event": "ping"}}
+  expect: {"status": [400, 401, 404]}

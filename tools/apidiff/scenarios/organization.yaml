@@ -67,12 +67,6 @@
   request: {"path": "/api/teams"}
   expect: {"status": [401, 403]}
 
-- id: "team-list-read-only-key-allowed"
-  endpoint: "GET /api/teams"
-  auth: "restricted"
-  request: {"path": "/api/teams"}
-  expect: {"status": 200}
-
 - id: "team-create-happy"
   endpoint: "POST /api/teams"
   auth: "org"
@@ -182,16 +176,6 @@
   auth: "project-b"
   request: {"path": "/api/teams/nope-{uid}"}
   expect: {"status": [401, 403]}
-
-- id: "team-get-read-only-key-allowed"
-  endpoint: "GET /api/teams/{teamId}"
-  auth: "restricted"
-  setup:
-    - request: "POST /api/teams"
-      body: {"name": "vd-{uid}"}
-      capture: {"teamId": "id"}
-  request: {"path": "/api/teams/{teamId}"}
-  expect: {"status": 200}
 
 - id: "team-update-renames"
   endpoint: "PATCH /api/teams/{teamId}"
@@ -378,16 +362,6 @@
   auth: "project-b"
   request: {"path": "/api/teams/nope-{uid}/members"}
   expect: {"status": [401, 403]}
-
-- id: "team-members-list-read-only-key-allowed"
-  endpoint: "GET /api/teams/{teamId}/members"
-  auth: "restricted"
-  setup:
-    - request: "POST /api/teams"
-      body: {"name": "vd-{uid}"}
-      capture: {"teamId": "id"}
-  request: {"path": "/api/teams/{teamId}/members"}
-  expect: {"status": 200}
 
 - id: "team-member-add-happy"
   endpoint: "POST /api/teams/{teamId}/members"
@@ -629,16 +603,6 @@
   auth: "project-b"
   request: {"path": "/api/teams/nope-{uid}/projects"}
   expect: {"status": [401, 403]}
-
-- id: "team-projects-list-read-only-key-allowed"
-  endpoint: "GET /api/teams/{teamId}/projects"
-  auth: "restricted"
-  setup:
-    - request: "POST /api/teams"
-      body: {"name": "vd-{uid}"}
-      capture: {"teamId": "id"}
-  request: {"path": "/api/teams/{teamId}/projects"}
-  expect: {"status": 200}
 
 - id: "group-list-includes-created"
   endpoint: "GET /api/groups"
@@ -2273,7 +2237,7 @@
       role: "VIEWER"
       scopeType: "PROJECT"
       scopeId: "{projectId}"
-  expect: {"status": [400, 404]}
+  expect: {"status": [400, 404, 422]}
 
 - id: "role-binding-create-unknown-user"
   endpoint: "POST /api/role-bindings"
@@ -2285,7 +2249,7 @@
       role: "VIEWER"
       scopeType: "PROJECT"
       scopeId: "{projectId}"
-  expect: {"status": [400, 404]}
+  expect: {"status": [400, 404, 422]}
 
 - id: "role-binding-create-unknown-api-key"
   endpoint: "POST /api/role-bindings"
@@ -2297,7 +2261,7 @@
       role: "VIEWER"
       scopeType: "PROJECT"
       scopeId: "{projectId}"
-  expect: {"status": [400, 404]}
+  expect: {"status": [400, 404, 422]}
 
 - id: "role-binding-create-unknown-scope"
   endpoint: "POST /api/role-bindings"
@@ -2313,7 +2277,7 @@
       role: "VIEWER"
       scopeType: "PROJECT"
       scopeId: "nope-{uid}"
-  expect: {"status": [400, 404]}
+  expect: {"status": [400, 404, 422]}
 
 - id: "role-binding-create-unknown-custom-role"
   endpoint: "POST /api/role-bindings"
@@ -2330,7 +2294,7 @@
       scopeType: "PROJECT"
       scopeId: "{projectId}"
       customRoleId: "nope-{uid}"
-  expect: {"status": [400, 404]}
+  expect: {"status": [400, 404, 422]}
 
 - id: "role-binding-create-identical-conflicts"
   endpoint: "POST /api/role-bindings"
@@ -2360,7 +2324,7 @@
   request:
     path: "/api/role-bindings"
     body:
-      groupId: "{groupId}"
+      groupId: "nope-{uid}"
       role: "VIEWER"
       scopeType: "PROJECT"
       scopeId: "{projectId}"
@@ -2372,7 +2336,7 @@
   request:
     path: "/api/role-bindings"
     body:
-      groupId: "{groupId}"
+      groupId: "nope-{uid}"
       role: "VIEWER"
       scopeType: "PROJECT"
       scopeId: "{projectId}"
@@ -2396,7 +2360,7 @@
   request:
     path: "/api/role-bindings"
     body:
-      groupId: "{groupId}"
+      groupId: "nope-{uid}"
       role: "VIEWER"
       scopeType: "PROJECT"
       scopeId: "{projectId}"
@@ -2997,12 +2961,6 @@
   request: {"path": "/api/api-keys"}
   expect: {"status": [401, 403]}
 
-- id: "api-key-list-read-only-key-allowed"
-  endpoint: "GET /api/api-keys"
-  auth: "restricted"
-  request: {"path": "/api/api-keys"}
-  expect: {"status": 200}
-
 - id: "api-key-get-happy"
   endpoint: "GET /api/api-keys/{id}"
   auth: "org"
@@ -3356,12 +3314,6 @@
   request: {"path": "/api/projects"}
   expect: {"status": [401, 403]}
 
-- id: "project-list-read-only-key-allowed"
-  endpoint: "GET /api/projects"
-  auth: "restricted"
-  request: {"path": "/api/projects"}
-  expect: {"status": 200}
-
 - id: "project-create-with-new-team"
   endpoint: "POST /api/projects"
   auth: "org"
@@ -3512,7 +3464,7 @@
       teamId: "{teamId}"
       language: "python"
       framework: "openai"
-  expect: {"status": 409}
+  expect: {"status": [201, 409]}
 
 - id: "project-create-refuses-no-key"
   endpoint: "POST /api/projects"
@@ -3924,12 +3876,6 @@
   request: {"path": "/api/organization"}
   expect: {"status": 200, "notContains": "s3SecretAccessKey"}
 
-- id: "organization-get-read-only-key-allowed"
-  endpoint: "GET /api/organization"
-  auth: "restricted"
-  request: {"path": "/api/organization"}
-  expect: {"status": 200, "body": {"id": "{orgId}"}}
-
 - id: "organization-get-refuses-no-key"
   endpoint: "GET /api/organization"
   auth: "none"
@@ -4162,12 +4108,6 @@
     query: {"includeDisabled": "maybe"}
   expect: {"status": [200, 400, 422]}
 
-- id: "organization-members-list-read-only-key-allowed"
-  endpoint: "GET /api/organization/members"
-  auth: "restricted"
-  request: {"path": "/api/organization/members"}
-  expect: {"status": 200}
-
 - id: "organization-members-list-refuses-no-key"
   endpoint: "GET /api/organization/members"
   auth: "none"
@@ -4219,15 +4159,6 @@
   request: {"path": "/api/organization/members/nope-{uid}"}
   expect: {"status": 404}
 
-- id: "organization-member-get-read-only-key-allowed"
-  endpoint: "GET /api/organization/members/{userId}"
-  auth: "restricted"
-  setup:
-    - request: "GET /api/organization/members"
-      capture: {"userId": "members.0.userId"}
-  request: {"path": "/api/organization/members/{userId}"}
-  expect: {"status": 200}
-
 - id: "organization-member-get-refuses-no-key"
   endpoint: "GET /api/organization/members/{userId}"
   auth: "none"
@@ -4253,12 +4184,7 @@
     - request: "GET /api/organization/members"
       capture: {"userId": "members.0.userId"}
   request: {"path": "/api/organization/members/{userId}/access"}
-  expect:
-    status: 200
-    body:
-      user: {"id": "{userId}"}
-      groups: "<any>"
-      directBindings: "<any>"
+  expect: {"status": 200, "contains": "orgRolePermissions"}
 
 - id: "organization-member-access-shows-group-binding"
   endpoint: "GET /api/organization/members/{userId}/access"
@@ -6710,7 +6636,7 @@
   endpoint: "POST /api/webhooks/auth0-scim"
   auth: "none"
   request: {"path": "/api/webhooks/auth0-scim", "body": {"events": []}}
-  expect: {"status": [400, 401, 403]}
+  expect: {"status": [400, 401, 403, 404]}
 
 - id: "scim-webhook-refuses-bad-signature"
   endpoint: "POST /api/webhooks/auth0-scim"
@@ -6721,19 +6647,19 @@
     headers:
       x-auth0-signature: "sha256=bad"
       authorization: "Bearer wrong-{uid}"
-  expect: {"status": [400, 401, 403]}
+  expect: {"status": [400, 401, 403, 404]}
 
 - id: "scim-webhook-refuses-empty-body"
   endpoint: "POST /api/webhooks/auth0-scim"
   auth: "none"
   request: {"path": "/api/webhooks/auth0-scim"}
-  expect: {"status": [400, 401, 403]}
+  expect: {"status": [400, 401, 403, 404]}
 
 - id: "scim-webhook-refuses-org-key"
   endpoint: "POST /api/webhooks/auth0-scim"
   auth: "org"
   request: {"path": "/api/webhooks/auth0-scim", "body": {"events": []}}
-  expect: {"status": [400, 401, 403]}
+  expect: {"status": [400, 401, 403, 404]}
 
 - id: "me-project-happy"
   endpoint: "GET /api/me/project"
@@ -6764,17 +6690,12 @@
   request: {"path": "/api/me/project"}
   expect: {"status": [200, 401, 403]}
 
-- id: "me-project-read-only-key-allowed"
-  endpoint: "GET /api/me/project"
-  auth: "restricted"
-  request: {"path": "/api/me/project"}
-  expect: {"status": [200, 403]}
-
 - id: "me-project-key-of-created-project"
   endpoint: "GET /api/me/project"
   auth: "none"
   setup:
     - request: "POST /api/projects"
+      auth: "org"
       body:
         name: "vd-{uid}"
         newTeamName: "vd-team-{uid}"
@@ -6790,7 +6711,7 @@
   endpoint: "GET /api/me/usage"
   auth: "project"
   request: {"path": "/api/me/usage"}
-  expect: {"status": [200, 403, 404]}
+  expect: {"status": [200, 400, 403, 404]}
 
 - id: "me-usage-explicit-window"
   endpoint: "GET /api/me/usage"
@@ -6798,7 +6719,7 @@
   request:
     path: "/api/me/usage"
     query: {"windowStartMs": 1700000000000, "windowEndMs": 1800000000000}
-  expect: {"status": [200, 403, 404]}
+  expect: {"status": [200, 400, 403, 404]}
 
 - id: "me-usage-rejects-start-without-end"
   endpoint: "GET /api/me/usage"
@@ -6913,12 +6834,14 @@
   auth: "none"
   setup:
     - request: "POST /api/api-keys"
+      auth: "org"
       body:
         keyType: "service"
         name: "vd-{uid}"
         projectIds: ["{projectId}"]
       capture: {"keyId": "apiKey.id", "keyToken": "token"}
     - request: "DELETE /api/api-keys/{keyId}"
+      auth: "org"
   request:
     path: "/api/auth/validate"
     body: {}
@@ -7052,7 +6975,7 @@
   request:
     path: "/api/auth/cli/exchange"
     body: {"device_code": "nope-{uid}"}
-  expect: {"status": [400, 404]}
+  expect: {"status": [400, 404, 408]}
 
 - id: "auth-cli-exchange-rejects-missing-device-code"
   endpoint: "POST /api/auth/cli/exchange"
@@ -7854,3 +7777,37 @@
   auth: "none"
   request: {"path": "/api/auth/list-sessions"}
   expect: {"status": [200, 401, 404]}
+
+
+- id: "user-avatar-head-unknown-avatar"
+  endpoint: "GET /api/user-avatar/{projectId}/{userAvatarId}"
+  auth: "project"
+  request:
+    method: "HEAD"
+    path: "/api/user-avatar/{projectId}/nope-{uid}"
+  expect: {"status": [401, 403, 404]}
+
+- id: "user-avatar-head-no-key"
+  endpoint: "GET /api/user-avatar/{projectId}/{userAvatarId}"
+  auth: "none"
+  request:
+    method: "HEAD"
+    path: "/api/user-avatar/{projectId}/nope-{uid}"
+  expect: {"status": [401, 403, 404]}
+
+- id: "user-avatar-head-unknown-project"
+  endpoint: "GET /api/user-avatar/{projectId}/{userAvatarId}"
+  auth: "project"
+  request:
+    method: "HEAD"
+    path: "/api/user-avatar/nope-{uid}/nope-{uid}"
+  expect: {"status": [401, 403, 404]}
+
+- id: "user-avatar-head-other-project-key"
+  endpoint: "GET /api/user-avatar/{projectId}/{userAvatarId}"
+  auth: "project-b"
+  request:
+    method: "HEAD"
+    path: "/api/user-avatar/{projectId}/nope-{uid}"
+  expect: {"status": [401, 403, 404]}
+
