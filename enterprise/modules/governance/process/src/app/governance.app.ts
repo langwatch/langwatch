@@ -239,6 +239,7 @@ import { GovernanceMcpToolsService } from "../services/governance-mcp-tools.serv
 import { GovernancePeopleScreenService } from "../services/governance-people-screen.service.ts";
 import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
 import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
+import { GovernanceTraceFactsService } from "../services/governance-trace-facts.service.ts";
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
@@ -330,6 +331,8 @@ export interface GovernanceAppDependencies {
     | "findModelSpend"
     | "hasTraceWithAttribute"
     | "findTraceCountsByAttribute"
+    | "compileLangWatchQLTraceFilter"
+    | "listTraceSummaries"
   >;
   apiKeys: Pick<
     ApiKeyApi,
@@ -684,6 +687,13 @@ export class GovernanceApp implements GovernanceRestApi {
     const anomalyDiagnostics = {
       warn: (message: string, context: Record<string, unknown>) => logger.warn(context, message),
     };
+    this.traceFacts = GovernanceTraceFactsService.create({
+      kpis: repositories.anomalySpend,
+      ocsf: repositories.ocsfEvents,
+      traces: dependencies.traces,
+      projects: dependencies.projects,
+      diagnostics: anomalyDiagnostics,
+    });
     this.spendSpikes = SpendSpikeAnomalyEvaluatorService.create({
       repository: repositories.spendSpikeAnomalies,
       spend: repositories.anomalySpend,
@@ -870,6 +880,7 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly ocsfExport: DefaultGovernanceOcsfExportService;
   private readonly quarantineFill: QuarantineFillEvaluatorService;
   private readonly spendSpikes: SpendSpikeAnomalyEvaluatorService;
+  private readonly traceFacts: GovernanceTraceFactsService;
   private readonly erasureSuppression: ErasureSuppressionService;
   private readonly suppressionSnapshot: SuppressionSnapshotService;
   private readonly identityMatches: IdentityMatchService;
@@ -930,6 +941,11 @@ export class GovernanceApp implements GovernanceRestApi {
 
   connectIngestionPull(commands: EventingSenders): void {
     this.ingestionPullCommands = commands;
+  }
+
+  /** Main's `governanceKpisSync` + `governanceOcsfEventsSync`, pulled: the window's governance traces. */
+  pullGovernanceTraceFacts(window: { fromMs: number; toMs: number }): Promise<{ written: number }> {
+    return this.traceFacts.pull(window);
   }
 
   /** Main's `spendSpikeAnomalyWorker` tick: every active spend_spike rule against `governance_kpis`. */

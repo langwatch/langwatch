@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   GOVERNANCE_ATTR,
+  GOVERNANCE_ORIGIN_KIND_VALUE,
   isGovernanceOriginTrace,
 } from "@langwatch/enterprise-governance-contract";
+import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 import {
   type GovernanceDiagnosticsSink,
@@ -19,6 +22,11 @@ import { ocsfActorFields } from "../rules/ocsf-pull-event-mapping.rules.ts";
 
 const HOUR_MS = 60 * 60 * 1_000;
 
+/** Governance-origin traces, in the trace query language the list read compiles. */
+const GOVERNANCE_ORIGIN_FILTER = `trace.attribute.${GOVERNANCE_ATTR.ORIGIN_KIND}:${GOVERNANCE_ORIGIN_KIND_VALUE}`;
+
+const SUMMARY_PAGE_SIZE = 500;
+
 type GovernanceTraceRows =
   | { kind: "rows"; kpi: GovernanceKpiContribution; ocsf: GovernanceOcsfEvent }
   | { kind: "skipped"; reason: "not_governance" | "missing_source_id" | "no_occurred_at" };
@@ -29,18 +37,62 @@ type GovernanceTraceRows =
  * A failed write throws so the caller re-drives it. @see specs/ai-gateway/governance/folds.feature
  */
 export class GovernanceTraceFactsService {
-  private constructor(
-    private readonly kpis: GovernanceKpiContributionWriter,
-    private readonly ocsf: GovernanceOcsfEventWriter,
-    private readonly diagnostics: GovernanceDiagnosticsSink,
-  ) {}
+  private readonly kpis: GovernanceKpiContributionWriter;
+  private readonly ocsf: GovernanceOcsfEventWriter;
+  private readonly traces: Pick<TraceApi, "compileLangWatchQLTraceFilter" | "listTraceSummaries">;
+  private readonly projects: Pick<ProjectApi, "findInternalIds">;
+  private readonly diagnostics: GovernanceDiagnosticsSink;
+
+  private constructor(options: {
+    kpis: GovernanceKpiContributionWriter;
+    ocsf: GovernanceOcsfEventWriter;
+    traces: Pick<TraceApi, "compileLangWatchQLTraceFilter" | "listTraceSummaries">;
+    projects: Pick<ProjectApi, "findInternalIds">;
+    diagnostics: GovernanceDiagnosticsSink;
+  }) {
+    this.kpis = options.kpis;
+    this.ocsf = options.ocsf;
+    this.traces = options.traces;
+    this.projects = options.projects;
+    this.diagnostics = options.diagnostics;
+  }
 
   static create(options: {
     kpis: GovernanceKpiContributionWriter;
     ocsf: GovernanceOcsfEventWriter;
+    traces: Pick<TraceApi, "compileLangWatchQLTraceFilter" | "listTraceSummaries">;
+    projects: Pick<ProjectApi, "findInternalIds">;
     diagnostics: GovernanceDiagnosticsSink;
   }): GovernanceTraceFactsService {
-    return new GovernanceTraceFactsService(options.kpis, options.ocsf, options.diagnostics);
+    return new GovernanceTraceFactsService(options);
+  }
+
+  /** Every governance tenant's governance-origin traces last updated in the window; a failed read or write throws. */
+  async pull({ fromMs, toMs }: { fromMs: number; toMs: number }): Promise<{ written: number }> {
+    const filter = this.traces.compileLangWatchQLTraceFilter({ filter: GOVERNANCE_ORIGIN_FILTER });
+    if (filter.kind !== "compiled") {
+      throw new Error(`The governance-origin trace filter did not compile: ${filter.kind}`);
+    }
+    const filterWhere = { sql: filter.sql, params: { ...filter.parameters } };
+    const tenants = await this.projects.findInternalIds({ kind: PROJECT_KIND.INTERNAL_GOVERNANCE });
+    let written = 0;
+    for (const tenantId of tenants) {
+      let scrollId: string | undefined;
+      do {
+        const page = await this.traces.listTraceSummaries({
+          query: {
+            projectId: tenantId,
+            startDate: fromMs,
+            endDate: toMs,
+            pageSize: SUMMARY_PAGE_SIZE,
+          },
+          options: { dateField: "updated", scrollId: scrollId ?? null, filterWhere },
+        });
+        written += (await this.record({ tenantId, summaries: page.summaries })).written;
+        scrollId = page.scrollId;
+      } while (scrollId);
+    }
+    return { written };
   }
 
   async record({

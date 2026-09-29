@@ -202,12 +202,19 @@ Feature: Enterprise governance package boundary
       Then the recording fails rather than dropping the trace, as main's swallowed write did
       And recording the trace again leaves one KPI row and one OCSF row
 
-    @unimplemented
+    @unit
     Scenario: A governance trace summary read that fails is re-driven without duplicate rows
       Given governance pulls governance-origin trace summaries on a schedule
       When the trace read fails
       Then the pass fails and the same traces are read again by a later pass
       And each trace still leaves one KPI row and one OCSF row
+
+    @unit
+    Scenario: Governance pulls each minute's updated traces with an overlap behind the last pass
+      Given the worker hosts the governance activity monitor
+      When its one-minute schedule wakes
+      Then one pass reads governance-origin trace summaries updated since five minutes before the last wake
+      And the window ends at the wake's own schedule time, never at a read's result
 
     @unit
     Scenario: A spend spike fires once the spend has landed

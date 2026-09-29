@@ -61,7 +61,13 @@ import type {
   TraceQueryClassificationInput,
   TraceQueryFieldCatalogueInput,
 } from "./trace-query.contract.ts";
-import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
+import type {
+  TraceLegacyListInput,
+  TraceSummaryListOptions,
+  TraceSummaryListQuery,
+  TraceSummaryPage,
+  TracesForProjectResult,
+} from "./trace-read.contract.ts";
 import type { TraceRecord } from "./trace-record.ts";
 import type {
   TraceFacetsAnswer,
@@ -208,6 +214,14 @@ export interface TraceApi extends TraceOtlpIngestApi {
       filterWhere?: { sql: string; params: Record<string, unknown> };
     };
   }): Promise<TracesForProjectResult>;
+  /**
+   * The project's latest trace summaries on the `dateField` axis, paged by `scrollId`:
+   * no content, spans, evaluations or protections, for a system reader.
+   */
+  listTraceSummaries(input: {
+    query: TraceSummaryListQuery;
+    options?: TraceSummaryListOptions;
+  }): Promise<TraceSummaryPage>;
   findTrace(input: {
     projectId: string;
     traceId: string;

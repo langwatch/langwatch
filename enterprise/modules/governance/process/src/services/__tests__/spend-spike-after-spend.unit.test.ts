@@ -1,9 +1,12 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   AnomalyAlertDispatchRecord,
   AnomalyRule,
   SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceTraceSummary } from "../../app/governance.members.ts";
@@ -118,6 +121,8 @@ describe("given a spend_spike rule over the governance tenant", () => {
     await GovernanceTraceFactsService.create({
       kpis: spend,
       ocsf: MemoryOcsfEventsRepository.create(),
+      traces: createApiFixture<TraceApi>({}),
+      projects: createApiFixture<ProjectApi>({}),
       diagnostics: { warn: () => {} },
     }).record({ tenantId: "governance-project", summaries: traces });
 

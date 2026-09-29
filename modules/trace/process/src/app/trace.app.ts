@@ -86,6 +86,9 @@ import {
   type TraceAnnotationMarker,
   type TraceSuggestionTarget,
   type TraceSummaryData,
+  type TraceSummaryListOptions,
+  type TraceSummaryListQuery,
+  type TraceSummaryPage,
   type TraceByIdInput,
   type TraceRecord,
   type TraceFullReadInput,
@@ -1055,6 +1058,19 @@ export class TraceApp implements TraceApi, CollectorApp {
         ...input.query,
         ...(pageSize === undefined ? {} : { pageSize }),
       },
+    });
+  }
+  async listTraceSummaries(input: {
+    query: TraceSummaryListQuery;
+    options?: TraceSummaryListOptions;
+  }): Promise<TraceSummaryPage> {
+    const pageSize =
+      input.query.pageSize === undefined
+        ? undefined
+        : await this.#readBounds.clampPageSize(input.query.projectId, input.query.pageSize);
+    return this.#contentReader.listTraceSummaries({
+      ...input,
+      query: { ...input.query, ...(pageSize === undefined ? {} : { pageSize }) },
     });
   }
   findTrace(input: TraceFindTraceInput): Promise<Trace | undefined> {

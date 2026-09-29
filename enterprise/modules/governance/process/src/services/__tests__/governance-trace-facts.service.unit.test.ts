@@ -1,3 +1,5 @@
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { TraceApi, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -21,6 +23,45 @@ const summary: GovernanceTraceSummary = {
     "langwatch.ingestion_source.id": "source-1",
     "langwatch.ingestion_source.source_type": "otel_generic",
   },
+};
+
+/** The rest of a summary the list read answers, which the rows never read. */
+const fullSummary: TraceSummaryData = {
+  ...summary,
+  spanCount: 1,
+  totalDurationMs: 100,
+  computedIOSchemaVersion: "1",
+  computedInput: null,
+  computedOutput: null,
+  timeToFirstTokenMs: null,
+  timeToLastTokenMs: null,
+  tokensPerSecond: null,
+  containsErrorStatus: false,
+  containsOKStatus: true,
+  errorMessage: null,
+  nonBilledCost: null,
+  tokensEstimated: false,
+  outputFromRootSpan: false,
+  outputSpanEndTimeMs: 0,
+  blockedByGuardrail: false,
+  rootSpanType: null,
+  containsAi: true,
+  containsPrompt: false,
+  selectedPromptId: null,
+  selectedPromptSpanId: null,
+  selectedPromptStartTimeMs: null,
+  lastUsedPromptId: null,
+  lastUsedPromptVersionNumber: null,
+  lastUsedPromptVersionId: null,
+  lastUsedPromptSpanId: null,
+  lastUsedPromptStartTimeMs: null,
+  topicId: null,
+  subTopicId: null,
+  annotationIds: [],
+  traceName: "",
+  createdAt: 1,
+  updatedAt: 2,
+  LastEventOccurredAt: 1,
 };
 
 function withAttributes(attributes: Record<string, string>): GovernanceTraceSummary {
@@ -48,14 +89,46 @@ class ReplacingOcsf implements GovernanceOcsfEventWriter {
   }
 }
 
-function setup() {
+type SummaryPages = Record<string, { summaries: GovernanceTraceSummary[]; scrollId?: string }[]>;
+
+/** Answers each tenant's pages in order, the way the list read's scroll cursor does. */
+function traceReads(pages: SummaryPages) {
+  const listTraceSummaries = vi.fn<TraceApi["listTraceSummaries"]>(async ({ query }) => {
+    const page = pages[query.projectId]?.shift() ?? { summaries: [] };
+    return {
+      ...page,
+      summaries: page.summaries.map((summary): TraceSummaryData => ({
+        ...fullSummary,
+        ...summary,
+      })),
+    };
+  });
+  const compileLangWatchQLTraceFilter = vi.fn<TraceApi["compileLangWatchQLTraceFilter"]>(() => ({
+    kind: "compiled",
+    sql: "Attributes[{attrKey_0:String}] = {attrValue_1:String}",
+    parameters: { attrKey_0: "langwatch.origin.kind", attrValue_1: "ingestion_source" },
+  }));
+  return { listTraceSummaries, compileLangWatchQLTraceFilter };
+}
+
+function setup(pages: SummaryPages = {}) {
   const kpis = new ReplacingKpis();
   const ocsf = new ReplacingOcsf();
   const warn = vi.fn();
-  const service = GovernanceTraceFactsService.create({ kpis, ocsf, diagnostics: { warn } });
+  const traces = traceReads(pages);
+  const projects: Pick<ProjectApi, "findInternalIds"> = {
+    findInternalIds: async () => Object.keys(pages),
+  };
+  const service = GovernanceTraceFactsService.create({
+    kpis,
+    ocsf,
+    traces,
+    projects,
+    diagnostics: { warn },
+  });
   const record = (summaries: GovernanceTraceSummary[]) =>
     service.record({ tenantId: "project-1", summaries });
-  return { kpis, ocsf, warn, record };
+  return { kpis, ocsf, warn, record, traces, service };
 }
 
 describe("GovernanceTraceFactsService", () => {
@@ -136,5 +209,63 @@ describe("GovernanceTraceFactsService", () => {
     await record([summary]);
     expect(kpis.rows.size).toBe(1);
     expect(ocsf.rows.size).toBe(1);
+  });
+
+  describe("when a pass pulls a window", () => {
+    it("lists every governance tenant's governance-origin summaries on the updated axis, page by page", async () => {
+      const { kpis, ocsf, traces, service } = setup({
+        "tenant-a": [
+          { summaries: [summary], scrollId: "next" },
+          { summaries: [{ ...summary, traceId: "trace-2" }] },
+        ],
+        "tenant-b": [{ summaries: [summary] }],
+      });
+
+      await expect(service.pull({ fromMs: 1_000, toMs: 2_000 })).resolves.toEqual({ written: 3 });
+
+      expect(traces.compileLangWatchQLTraceFilter).toHaveBeenCalledOnce();
+      expect(traces.compileLangWatchQLTraceFilter).toHaveBeenCalledWith({
+        filter: "trace.attribute.langwatch.origin.kind:ingestion_source",
+      });
+      expect(traces.listTraceSummaries.mock.calls.map(([input]) => input)).toEqual([
+        expect.objectContaining({
+          query: expect.objectContaining({
+            projectId: "tenant-a",
+            startDate: 1_000,
+            endDate: 2_000,
+          }),
+          options: expect.objectContaining({ dateField: "updated", scrollId: null }),
+        }),
+        expect.objectContaining({ options: expect.objectContaining({ scrollId: "next" }) }),
+        expect.objectContaining({ query: expect.objectContaining({ projectId: "tenant-b" }) }),
+      ]);
+      expect(kpis.rows.size).toBe(3);
+      expect(ocsf.rows.size).toBe(3);
+    });
+
+    /** @scenario "A governance trace summary read that fails is re-driven without duplicate rows" */
+    it("fails the pass when the read fails, and the re-driven window leaves one row of each", async () => {
+      const { kpis, ocsf, traces, service } = setup({
+        "tenant-a": [{ summaries: [summary] }, { summaries: [summary] }],
+      });
+      traces.listTraceSummaries.mockRejectedValueOnce(new Error("clickhouse unavailable"));
+
+      await expect(service.pull({ fromMs: 1_000, toMs: 2_000 })).rejects.toThrow(
+        "clickhouse unavailable",
+      );
+      await service.pull({ fromMs: 1_000, toMs: 2_000 });
+      await service.pull({ fromMs: 1_000, toMs: 2_000 });
+
+      expect(kpis.rows.size).toBe(1);
+      expect(ocsf.rows.size).toBe(1);
+    });
+
+    it("refuses to pull when the origin filter does not compile, rather than reading every trace", async () => {
+      const { traces, service } = setup({ "tenant-a": [{ summaries: [summary] }] });
+      traces.compileLangWatchQLTraceFilter.mockReturnValueOnce({ kind: "empty" });
+
+      await expect(service.pull({ fromMs: 1_000, toMs: 2_000 })).rejects.toThrow(/did not compile/);
+      expect(traces.listTraceSummaries).not.toHaveBeenCalled();
+    });
   });
 });

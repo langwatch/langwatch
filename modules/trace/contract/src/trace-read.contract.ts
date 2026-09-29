@@ -10,6 +10,8 @@ import type {
   SpanTimestamps,
   Trace,
 } from "./trace-format.schemas.ts";
+import type { TraceDateField } from "./trace-legacy-read.types.ts";
+import type { TraceSummaryData } from "./trace-projection.ts";
 
 /**
  * The results the legacy trace read answers with. They are the contract between that read and
@@ -44,6 +46,26 @@ export interface TracesForProjectResult {
    * it was pinned to, which is at or before the requested `endDate`. A scroll reads each trace
    * as of its start so mid-scroll writes cannot move rows out from under the cursor.
    */
+  updatedThrough?: number;
+}
+
+/** The window and page size a summaries-only list read takes: the list read's own query. */
+export type TraceSummaryListQuery = Pick<
+  TraceLegacyListInput,
+  "projectId" | "startDate" | "endDate" | "pageSize"
+>;
+
+/** The list read's axis, keyset cursor and compiled filter, for a summaries-only read. */
+export interface TraceSummaryListOptions {
+  dateField?: TraceDateField;
+  scrollId?: string | null;
+  filterWhere?: { sql: string; params: Record<string, unknown> };
+}
+
+/** One keyset page of latest trace summaries; `updatedThrough` as on the list read. */
+export interface TraceSummaryPage {
+  summaries: TraceSummaryData[];
+  scrollId?: string;
   updatedThrough?: number;
 }
 

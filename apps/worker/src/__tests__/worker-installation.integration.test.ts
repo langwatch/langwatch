@@ -190,6 +190,7 @@ describe("the worker process installation", () => {
       );
       expect(schedules).not.toEqual([]);
       expect(schedules).toContain("spendSpikeEvaluation");
+      expect(schedules).toContain("governanceTraceFacts");
     } finally {
       await runtime.stop();
     }
