@@ -347,10 +347,7 @@
           "name": "analytics.traces",
           "description": "One row per trace, with its timing, token, cost and error rollups.",
           "grain": "one row per (TenantId, TraceId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "TraceId"
-          ],
+          "joinKeys": ["TenantId", "TraceId"],
           "timeColumn": "OccurredAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -463,9 +460,7 @@
               "type": "Nullable(Float64)",
               "description": "Billed cost of the trace, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -577,9 +572,7 @@
               "type": "Nullable(String)",
               "description": "The trace's captured input.",
               "unit": null,
-              "gates": [
-                "input"
-              ],
+              "gates": ["input"],
               "available": true
             },
             {
@@ -587,9 +580,7 @@
               "type": "Nullable(String)",
               "description": "The trace's captured output.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             }
           ],
@@ -599,11 +590,7 @@
           "name": "analytics.spans",
           "description": "One row per span, with its timing, status and attributes.",
           "grain": "one row per (TenantId, TraceId, SpanId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "TraceId",
-            "SpanId"
-          ],
+          "joinKeys": ["TenantId", "TraceId", "SpanId"],
           "timeColumn": "StartTime",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -716,9 +703,7 @@
               "type": "Nullable(Float64)",
               "description": "Billed cost attributed to the span, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -726,9 +711,7 @@
               "type": "Nullable(Float64)",
               "description": "Cost attributed to the span that is not billed, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -752,9 +735,7 @@
               "type": "String",
               "description": "The span's captured input, in LangWatch's canonical attribute. Empty when the span recorded none.",
               "unit": null,
-              "gates": [
-                "input"
-              ],
+              "gates": ["input"],
               "available": true
             },
             {
@@ -762,9 +743,7 @@
               "type": "String",
               "description": "The span's captured output, in LangWatch's canonical attribute. Empty when the span recorded none.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             }
           ],
@@ -774,10 +753,7 @@
           "name": "analytics.evaluations",
           "description": "One row per evaluation run, with its score and outcome.",
           "grain": "one row per (TenantId, EvaluationId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "TraceId"
-          ],
+          "joinKeys": ["TenantId", "TraceId"],
           "timeColumn": "ScheduledAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -874,10 +850,7 @@
               "type": "Nullable(String)",
               "description": "The evaluator's explanation of its result.",
               "unit": null,
-              "gates": [
-                "input",
-                "output"
-              ],
+              "gates": ["input", "output"],
               "available": true
             },
             {
@@ -925,9 +898,7 @@
               "type": "Nullable(String)",
               "description": "The payload the evaluator was given.",
               "unit": null,
-              "gates": [
-                "input"
-              ],
+              "gates": ["input"],
               "available": true
             }
           ],
@@ -937,10 +908,7 @@
           "name": "analytics.simulations",
           "description": "One row per simulation run, with its verdict and criteria.",
           "grain": "one row per (TenantId, ScenarioRunId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "ScenarioRunId"
-          ],
+          "joinKeys": ["TenantId", "ScenarioRunId"],
           "timeColumn": "StartedAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -1085,10 +1053,7 @@
               "type": "Array(String)",
               "description": "What was said in the simulated conversation, in message order.",
               "unit": null,
-              "gates": [
-                "input",
-                "output"
-              ],
+              "gates": ["input", "output"],
               "available": true
             },
             {
@@ -1104,9 +1069,7 @@
               "type": "Nullable(String)",
               "description": "The judge's reasoning about the conversation.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             }
           ],
@@ -1116,10 +1079,7 @@
           "name": "analytics.trace_metrics",
           "description": "One row per trace, time-sorted, carrying its metrics and the user, conversation, customer and origin dimensions. Count traces with uniqExact(TraceId).",
           "grain": "one row per (TenantId, OccurredAt, TraceId), latest version only; one row per trace wherever OccurredAt held still",
-          "joinKeys": [
-            "TenantId",
-            "TraceId"
-          ],
+          "joinKeys": ["TenantId", "TraceId"],
           "timeColumn": "OccurredAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -1232,9 +1192,7 @@
               "type": "Nullable(Float64)",
               "description": "Billed cost of the trace, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -1242,9 +1200,7 @@
               "type": "Nullable(Float64)",
               "description": "Cost of the trace that is not billed, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -1326,10 +1282,7 @@
           "name": "analytics.trace_metrics_by_minute",
           "description": "Trace and span metrics summed per minute. Every measure is a sum: divide by TraceCount for a per-trace average.",
           "grain": "one row per (TenantId, BucketStart), every measure summed",
-          "joinKeys": [
-            "TenantId",
-            "BucketStart"
-          ],
+          "joinKeys": ["TenantId", "BucketStart"],
           "timeColumn": "BucketStart",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -1378,9 +1331,7 @@
               "type": "Float64",
               "description": "Total cost of the bucket's spans, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -1388,9 +1339,7 @@
               "type": "Float64",
               "description": "Cost of the bucket's spans that is not billed, in USD. Billed cost is the difference from CostSum.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -1448,12 +1397,7 @@
           "name": "analytics.model_usage_by_minute",
           "description": "Span metrics summed per minute, per model and span type: span counts, costs and tokens.",
           "grain": "one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed",
-          "joinKeys": [
-            "TenantId",
-            "BucketStart",
-            "Model",
-            "SpanType"
-          ],
+          "joinKeys": ["TenantId", "BucketStart", "Model", "SpanType"],
           "timeColumn": "BucketStart",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -1502,9 +1446,7 @@
               "type": "Float64",
               "description": "Total cost of the bucket's spans, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -1512,9 +1454,7 @@
               "type": "Float64",
               "description": "Cost of the bucket's spans that is not billed, in USD. Billed cost is the difference from CostSum.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -1564,10 +1504,7 @@
           "name": "analytics.evaluation_metrics",
           "description": "One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited.",
           "grain": "one row per (TenantId, EvaluationId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "TraceId"
-          ],
+          "joinKeys": ["TenantId", "TraceId"],
           "timeColumn": "OccurredAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -1720,9 +1657,7 @@
               "type": "Nullable(Float64)",
               "description": "Billed cost of running the evaluator, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -1730,9 +1665,7 @@
               "type": "Nullable(Float64)",
               "description": "Cost of running the evaluator that is not billed, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -1750,12 +1683,7 @@
           "name": "analytics.evaluation_metrics_by_minute",
           "description": "Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount.",
           "grain": "one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed",
-          "joinKeys": [
-            "TenantId",
-            "BucketStart",
-            "EvaluatorType",
-            "Status"
-          ],
+          "joinKeys": ["TenantId", "BucketStart", "EvaluatorType", "Status"],
           "timeColumn": "BucketStart",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -1860,9 +1788,7 @@
               "type": "Float64",
               "description": "Total cost of the bucket's evaluations, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -1870,9 +1796,7 @@
               "type": "Float64",
               "description": "Cost of the bucket's evaluations that is not billed, in USD. Billed cost is the difference from CostSum.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             }
           ],
@@ -1882,10 +1806,7 @@
           "name": "analytics.coding_sessions",
           "description": "One row per coding-agent session, with its shape, economics, git context and outcome. Deduplicated by session.",
           "grain": "one row per (TenantId, SessionId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "SessionId"
-          ],
+          "joinKeys": ["TenantId", "SessionId"],
           "timeColumn": "StartedAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -2030,9 +1951,7 @@
               "type": "String",
               "description": "The conversation title generated for the session.",
               "unit": null,
-              "gates": [
-                "input"
-              ],
+              "gates": ["input"],
               "available": true
             },
             {
@@ -2224,9 +2143,7 @@
               "type": "Float64",
               "description": "Computed cost of the session, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -2234,9 +2151,7 @@
               "type": "Float64",
               "description": "Cost the agent reported for itself, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -2598,10 +2513,7 @@
           "name": "analytics.coding_session_events",
           "description": "One row per coding-agent session event: model calls, compactions, rate limits, tool runs and more, in event order.",
           "grain": "one row per (TenantId, SessionId, TimeUnixMs, RecordId)",
-          "joinKeys": [
-            "TenantId",
-            "SessionId"
-          ],
+          "joinKeys": ["TenantId", "SessionId"],
           "timeColumn": "TimeUnixMs",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -2762,9 +2674,7 @@
               "type": "Float64",
               "description": "Cost of a model call, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -2974,13 +2884,7 @@
           "name": "analytics.coding_tool_results",
           "description": "One row per coding-agent tool call, with the text it printed back to the agent.",
           "grain": "one row per (TenantId, TraceId, SpanId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "TraceId",
-            "SpanId",
-            "SessionId",
-            "ToolUseId"
-          ],
+          "joinKeys": ["TenantId", "TraceId", "SpanId", "SessionId", "ToolUseId"],
           "timeColumn": "StartTime",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -3053,9 +2957,7 @@
               "type": "String",
               "description": "What the tool call printed back to the agent. Empty when no request body was captured for this trace.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -3073,10 +2975,7 @@
           "name": "analytics.judgments",
           "description": "One row per Instant Eval run, trace and question, with the verdict the judge gave.",
           "grain": "one row per (TenantId, RunId, TraceId, SpanId, QuestionId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "TraceId"
-          ],
+          "joinKeys": ["TenantId", "TraceId"],
           "timeColumn": "CreatedAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -3215,11 +3114,7 @@
           "name": "analytics.automation_events",
           "description": "Audit log of automation trigger executions and actions",
           "grain": "one row per EventId",
-          "joinKeys": [
-            "TenantId",
-            "EventId",
-            "TraceId"
-          ],
+          "joinKeys": ["TenantId", "EventId", "TraceId"],
           "timeColumn": "OccurredAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -3302,11 +3197,7 @@
           "name": "analytics.billing_events",
           "description": "Billing events for customer invoice generation",
           "grain": "one row per DeduplicationKeyHash",
-          "joinKeys": [
-            "TenantId",
-            "OrganizationId",
-            "EventId"
-          ],
+          "joinKeys": ["TenantId", "OrganizationId", "EventId"],
           "timeColumn": "EventTimestamp",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -3389,11 +3280,7 @@
           "name": "analytics.coding_trace_sessions",
           "description": "Correlates a trace to the coding-agent session it belongs to.",
           "grain": "one row per (TenantId, TraceId)",
-          "joinKeys": [
-            "TenantId",
-            "TraceId",
-            "SessionId"
-          ],
+          "joinKeys": ["TenantId", "TraceId", "SessionId"],
           "timeColumn": "OccurredAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -3452,12 +3339,7 @@
           "name": "analytics.dspy_optimizer_steps",
           "description": "DSPy optimizer steps with prompts, examples, and LLM call details",
           "grain": "one row per (ExperimentId, RunId, StepIndex)",
-          "joinKeys": [
-            "TenantId",
-            "ExperimentId",
-            "RunId",
-            "WorkflowVersionId"
-          ],
+          "joinKeys": ["TenantId", "ExperimentId", "RunId", "WorkflowVersionId"],
           "timeColumn": "CreatedAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -3498,9 +3380,7 @@
               "type": "String",
               "description": "StepIndex",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -3540,9 +3420,7 @@
               "type": "String",
               "description": "OptimizerParameters",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -3550,9 +3428,7 @@
               "type": "String",
               "description": "Predictors",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -3560,9 +3436,7 @@
               "type": "String",
               "description": "Examples",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -3570,9 +3444,7 @@
               "type": "String",
               "description": "LlmCalls",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -3596,9 +3468,7 @@
               "type": "Float64",
               "description": "LlmCallsTotalCost",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -3648,13 +3518,7 @@
           "name": "analytics.experiment_items",
           "description": "Individual item results within an experiment run with evaluations",
           "grain": "one row per (RunId, ProjectionId)",
-          "joinKeys": [
-            "TenantId",
-            "ProjectionId",
-            "RunId",
-            "ExperimentId",
-            "TraceId"
-          ],
+          "joinKeys": ["TenantId", "ProjectionId", "RunId", "ExperimentId", "TraceId"],
           "timeColumn": "OccurredAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -3719,9 +3583,7 @@
               "type": "String",
               "description": "DatasetEntry",
               "unit": null,
-              "gates": [
-                "input"
-              ],
+              "gates": ["input"],
               "available": true
             },
             {
@@ -3729,9 +3591,7 @@
               "type": "Nullable(String)",
               "description": "Predicted",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -3739,9 +3599,7 @@
               "type": "Nullable(Float64)",
               "description": "TargetCost",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -3757,9 +3615,7 @@
               "type": "Nullable(String)",
               "description": "TargetError",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -3767,9 +3623,7 @@
               "type": "Nullable(String)",
               "description": "TargetDomainError",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -3833,9 +3687,7 @@
               "type": "Nullable(String)",
               "description": "EvaluationDetails",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -3843,9 +3695,7 @@
               "type": "Nullable(Float64)",
               "description": "EvaluationCost",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -3853,9 +3703,7 @@
               "type": "Nullable(String)",
               "description": "EvaluationInputs",
               "unit": null,
-              "gates": [
-                "input"
-              ],
+              "gates": ["input"],
               "available": true
             },
             {
@@ -3913,13 +3761,7 @@
           "name": "analytics.experiment_run_results",
           "description": "Experiment run results: completion counts, cost, and aggregate scores",
           "grain": "one row per (RunId, ExperimentId)",
-          "joinKeys": [
-            "TenantId",
-            "ProjectionId",
-            "RunId",
-            "ExperimentId",
-            "WorkflowVersionId"
-          ],
+          "joinKeys": ["TenantId", "ProjectionId", "RunId", "ExperimentId", "WorkflowVersionId"],
           "timeColumn": "StartedAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -4008,9 +3850,7 @@
               "type": "Nullable(Float64)",
               "description": "TotalCost",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -4042,9 +3882,7 @@
               "type": "String",
               "description": "Targets",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -4158,13 +3996,7 @@
           "name": "analytics.gateway_budget_ledger",
           "description": "Budget ledger entries per request with token counts and spend",
           "grain": "one row per (BudgetId, GatewayRequestId)",
-          "joinKeys": [
-            "TenantId",
-            "BudgetId",
-            "ScopeId",
-            "VirtualKeyId",
-            "GatewayRequestId"
-          ],
+          "joinKeys": ["TenantId", "BudgetId", "ScopeId", "VirtualKeyId", "GatewayRequestId"],
           "timeColumn": "OccurredAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -4237,9 +4069,7 @@
               "type": "Decimal(18, 6)",
               "description": "AmountUSD",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -4343,9 +4173,7 @@
               "type": "Int64",
               "description": "AmountNanoUSD",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             }
           ],
@@ -4355,14 +4183,7 @@
           "name": "analytics.gateway_budget_totals",
           "description": "Per-scope budget totals, merged from the aggregating rollup: spend, token counts and request count per budget window.",
           "grain": "one row per (TenantId, Scope, ScopeId, Window, PeriodStart, BudgetId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "Scope",
-            "ScopeId",
-            "Window",
-            "PeriodStart",
-            "BudgetId"
-          ],
+          "joinKeys": ["TenantId", "Scope", "ScopeId", "Window", "PeriodStart", "BudgetId"],
           "timeColumn": "PeriodStart",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -4419,9 +4240,7 @@
               "type": "Decimal(38, 6)",
               "description": "SpendUSD",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -4477,9 +4296,7 @@
               "type": "Int64",
               "description": "SpendNanoUSD",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             }
           ],
@@ -4489,13 +4306,7 @@
           "name": "analytics.gateway_request_spend",
           "description": "Individual API request spend and reconciliation details",
           "grain": "one row per GatewayRequestId",
-          "joinKeys": [
-            "TenantId",
-            "GatewayRequestId",
-            "OrganizationId",
-            "VirtualKeyId",
-            "TraceId"
-          ],
+          "joinKeys": ["TenantId", "GatewayRequestId", "OrganizationId", "VirtualKeyId", "TraceId"],
           "timeColumn": "OccurredAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -4664,9 +4475,7 @@
               "type": "Int64",
               "description": "CostNanoUSD",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -4690,9 +4499,7 @@
               "type": "String",
               "description": "Metadata",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -4764,9 +4571,7 @@
               "type": "Map(String, String)",
               "description": "MetadataMap",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -4840,12 +4645,7 @@
           "name": "analytics.governance_cost_restatements",
           "description": "Index of cost-rollup restatements, keyed by the org's internal_governance project; visible only to a caller whose project set includes it.",
           "grain": "one row per (TenantId, RestatementKey)",
-          "joinKeys": [
-            "TenantId",
-            "IngestionSourceId",
-            "AgentId",
-            "RawActorId"
-          ],
+          "joinKeys": ["TenantId", "IngestionSourceId", "AgentId", "RawActorId"],
           "timeColumn": "Day",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -4878,9 +4678,7 @@
               "type": "LowCardinality(String)",
               "description": "CostSource",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -4954,13 +4752,7 @@
           "name": "analytics.governance_daily_cost_rollup",
           "description": "Daily cost rollups per tenant, provider and model, keyed by the org's internal_governance project; visible only to a caller whose project set includes it.",
           "grain": "one row per (TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId)",
-          "joinKeys": [
-            "TenantId",
-            "IngestionSourceId",
-            "AgentId",
-            "RawActorId",
-            "OrganizationId"
-          ],
+          "joinKeys": ["TenantId", "IngestionSourceId", "AgentId", "RawActorId", "OrganizationId"],
           "timeColumn": "Day",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -4985,9 +4777,7 @@
               "type": "LowCardinality(String)",
               "description": "CostSource",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -5059,9 +4849,7 @@
               "type": "Nullable(Int64)",
               "description": "AmountNanoUsd",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -5069,9 +4857,7 @@
               "type": "Int64",
               "description": "AmountNanoMinor",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -5127,9 +4913,7 @@
               "type": "Nullable(Int64)",
               "description": "PreviousAmountNanoUsd",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -5137,9 +4921,7 @@
               "type": "String",
               "description": "PulledItemsJson",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -5213,11 +4995,7 @@
           "name": "analytics.governance_hourly_kpis",
           "description": "Hourly spend and token KPIs per source, keyed by the org's internal_governance project; visible only to a caller whose project set includes it.",
           "grain": "one row per (TenantId, SourceId, HourBucket, TraceId)",
-          "joinKeys": [
-            "TenantId",
-            "SourceId",
-            "TraceId"
-          ],
+          "joinKeys": ["TenantId", "SourceId", "TraceId"],
           "timeColumn": "HourBucket",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -5266,9 +5044,7 @@
               "type": "Float64",
               "description": "SpendUsd",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -5310,12 +5086,7 @@
           "name": "analytics.governance_security_events",
           "description": "Raw OCSF-shaped security events, keyed by the org's internal_governance project; visible only to a caller whose project set includes it.",
           "grain": "one row per (TenantId, EventId)",
-          "joinKeys": [
-            "TenantId",
-            "EventId",
-            "TraceId",
-            "SourceId"
-          ],
+          "joinKeys": ["TenantId", "EventId", "TraceId", "SourceId"],
           "timeColumn": "EventTime",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -5428,9 +5199,7 @@
               "type": "String",
               "description": "ActorEmail",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -5470,9 +5239,7 @@
               "type": "String",
               "description": "RawOcsfJson",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -5498,9 +5265,7 @@
           "name": "analytics.langy_conversation_messages",
           "description": "Langy conversation turns, one row per message.",
           "grain": "one row per (TenantId, ConversationId, MessageId)",
-          "joinKeys": [
-            "TenantId"
-          ],
+          "joinKeys": ["TenantId"],
           "timeColumn": "CreatedAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -5541,9 +5306,7 @@
               "type": "String",
               "description": "Parts",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -5569,11 +5332,7 @@
           "name": "analytics.langy_usage_events",
           "description": "Langy usage telemetry: tool calls, outcomes and durations.",
           "grain": "one row per (TenantId, OccurredAt, EventId)",
-          "joinKeys": [
-            "TenantId",
-            "EventId",
-            "AggregateId"
-          ],
+          "joinKeys": ["TenantId", "EventId", "AggregateId"],
           "timeColumn": "OccurredAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -5720,11 +5479,7 @@
           "name": "analytics.legacy_event_log",
           "description": "Legacy append-only event log, superseded by the canonical fact tables",
           "grain": "one row per (AggregateType, AggregateId, IdempotencyKey)",
-          "joinKeys": [
-            "TenantId",
-            "AggregateId",
-            "EventId"
-          ],
+          "joinKeys": ["TenantId", "AggregateId", "EventId"],
           "timeColumn": "EventOccurredAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -5805,9 +5560,7 @@
               "type": "String",
               "description": "EventPayload",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -5815,9 +5568,7 @@
               "type": "String",
               "description": "ProcessingTraceparent",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -5851,12 +5602,7 @@
           "name": "analytics.legacy_log_records",
           "description": "Pre-canonical OpenTelemetry log record storage, superseded by log_records; retained for rolling-deployment reads and draining under its own TTL.",
           "grain": "one row per (TraceId, SpanId, ProjectionId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "ProjectionId",
-            "TraceId",
-            "SpanId"
-          ],
+          "joinKeys": ["TenantId", "ProjectionId", "TraceId", "SpanId"],
           "timeColumn": "TimeUnixMs",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -5921,9 +5667,7 @@
               "type": "String",
               "description": "Body",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -5997,12 +5741,7 @@
           "name": "analytics.legacy_metric_records",
           "description": "Pre-canonical OpenTelemetry metric record storage, superseded by the metric_data_points family; retained for rolling-deployment reads and draining under its own TTL.",
           "grain": "one row per (TraceId, SpanId, MetricName, ProjectionId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "ProjectionId",
-            "TraceId",
-            "SpanId"
-          ],
+          "joinKeys": ["TenantId", "ProjectionId", "TraceId", "SpanId"],
           "timeColumn": "TimeUnixMs",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -6133,11 +5872,7 @@
           "name": "analytics.log_ingestion_usage",
           "description": "Per-tenant log ingestion usage estimates.",
           "grain": "one row per (OrganizationId, RecordId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "OrganizationId",
-            "RecordId"
-          ],
+          "joinKeys": ["TenantId", "OrganizationId", "RecordId"],
           "timeColumn": "AcceptedAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -6220,11 +5955,7 @@
           "name": "analytics.logs",
           "description": "Canonical OpenTelemetry log records: requests, responses and provider events, correlated to their trace and span.",
           "grain": "one row per (TenantId, TraceId, TimeUnixMs, RecordId)",
-          "joinKeys": [
-            "TenantId",
-            "TraceId",
-            "SpanId"
-          ],
+          "joinKeys": ["TenantId", "TraceId", "SpanId"],
           "timeColumn": "TimeUnixMs",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -6257,9 +5988,7 @@
               "type": "String",
               "description": "ResourceAttributesJson",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6267,9 +5996,7 @@
               "type": "String",
               "description": "ResourceAttributesFlatJson",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6277,9 +6004,7 @@
               "type": "Array(String)",
               "description": "ResourceAttributeKeys",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6319,9 +6044,7 @@
               "type": "String",
               "description": "ScopeAttributesJson",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6329,9 +6052,7 @@
               "type": "Array(String)",
               "description": "ScopeAttributeKeys",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6419,10 +6140,7 @@
               "type": "String",
               "description": "BodyJson",
               "unit": null,
-              "gates": [
-                "input",
-                "output"
-              ],
+              "gates": ["input", "output"],
               "available": true
             },
             {
@@ -6430,10 +6148,7 @@
               "type": "Nullable(String)",
               "description": "BodyText",
               "unit": null,
-              "gates": [
-                "input",
-                "output"
-              ],
+              "gates": ["input", "output"],
               "available": true
             },
             {
@@ -6441,10 +6156,7 @@
               "type": "String",
               "description": "AttributesJson",
               "unit": null,
-              "gates": [
-                "input",
-                "output"
-              ],
+              "gates": ["input", "output"],
               "available": true
             },
             {
@@ -6452,10 +6164,7 @@
               "type": "String",
               "description": "AttributesFlatJson",
               "unit": null,
-              "gates": [
-                "input",
-                "output"
-              ],
+              "gates": ["input", "output"],
               "available": true
             },
             {
@@ -6463,9 +6172,7 @@
               "type": "Array(String)",
               "description": "AttributeKeys",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6513,9 +6220,7 @@
               "type": "String",
               "description": "ProviderEventSequence",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6547,10 +6252,7 @@
               "type": "String",
               "description": "CanonicalPayload",
               "unit": null,
-              "gates": [
-                "input",
-                "output"
-              ],
+              "gates": ["input", "output"],
               "available": true
             },
             {
@@ -6632,12 +6334,7 @@
           "name": "analytics.metric_ingestion_usage",
           "description": "Per-tenant metric ingestion usage estimates",
           "grain": "one row per (OrganizationId, PointId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "OrganizationId",
-            "PointId",
-            "SeriesId"
-          ],
+          "joinKeys": ["TenantId", "OrganizationId", "PointId", "SeriesId"],
           "timeColumn": "AcceptedAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -6728,11 +6425,7 @@
           "name": "analytics.metric_points",
           "description": "Individual metric data points with gauges, sums, histograms, and summaries",
           "grain": "one row per (SeriesId, TimeUnixMs, PointId)",
-          "joinKeys": [
-            "TenantId",
-            "PointId",
-            "SeriesId"
-          ],
+          "joinKeys": ["TenantId", "PointId", "SeriesId"],
           "timeColumn": "TimeUnixMs",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -6773,9 +6466,7 @@
               "type": "String",
               "description": "ResourceAttributesJson",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6783,9 +6474,7 @@
               "type": "Array(String)",
               "description": "ResourceAttributeKeys",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6817,9 +6506,7 @@
               "type": "String",
               "description": "ScopeAttributesJson",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6827,9 +6514,7 @@
               "type": "Array(String)",
               "description": "ScopeAttributeKeys",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6845,9 +6530,7 @@
               "type": "String",
               "description": "MetricDescription",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6887,9 +6570,7 @@
               "type": "String",
               "description": "PointAttributesJson",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -6897,9 +6578,7 @@
               "type": "Array(String)",
               "description": "PointAttributeKeys",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -7067,9 +6746,7 @@
               "type": "String",
               "description": "SummaryQuantilesJson",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -7077,10 +6754,7 @@
               "type": "String",
               "description": "CanonicalPayload",
               "unit": null,
-              "gates": [
-                "input",
-                "output"
-              ],
+              "gates": ["input", "output"],
               "available": true
             },
             {
@@ -7138,10 +6812,7 @@
           "name": "analytics.metric_rollups",
           "description": "Time-bucketed rollups of a metric series: per-bucket min, max, sum, count and histogram buckets.",
           "grain": "one row per (SeriesId, BucketStart)",
-          "joinKeys": [
-            "TenantId",
-            "SeriesId"
-          ],
+          "joinKeys": ["TenantId", "SeriesId"],
           "timeColumn": "BucketStart",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -7384,10 +7055,7 @@
           "name": "analytics.metric_series_definitions",
           "description": "Metric series definitions from OpenTelemetry: name, unit, attributes, kind",
           "grain": "one row per SeriesId",
-          "joinKeys": [
-            "TenantId",
-            "SeriesId"
-          ],
+          "joinKeys": ["TenantId", "SeriesId"],
           "timeColumn": "LastSeenAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -7420,9 +7088,7 @@
               "type": "String",
               "description": "ResourceAttributesJson",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -7430,9 +7096,7 @@
               "type": "Array(String)",
               "description": "ResourceAttributeKeys",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -7464,9 +7128,7 @@
               "type": "String",
               "description": "ScopeAttributesJson",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -7474,9 +7136,7 @@
               "type": "Array(String)",
               "description": "ScopeAttributeKeys",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -7492,9 +7152,7 @@
               "type": "String",
               "description": "MetricDescription",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -7534,9 +7192,7 @@
               "type": "String",
               "description": "PointAttributesJson",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -7544,9 +7200,7 @@
               "type": "Array(String)",
               "description": "PointAttributeKeys",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -7580,9 +7234,7 @@
           "name": "analytics.objects",
           "description": "Stored file objects: what was captured, its size and hash.",
           "grain": "one row per id",
-          "joinKeys": [
-            "TenantId"
-          ],
+          "joinKeys": ["TenantId"],
           "timeColumn": "created_at",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -7681,11 +7333,7 @@
           "name": "analytics.session_metrics",
           "description": "Per-session time-series metrics with aggregate statistics",
           "grain": "one row per (SessionId, SeriesId)",
-          "joinKeys": [
-            "TenantId",
-            "SessionId",
-            "SeriesId"
-          ],
+          "joinKeys": ["TenantId", "SessionId", "SeriesId"],
           "timeColumn": "AsOf",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -7792,11 +7440,7 @@
           "name": "analytics.simulation_metric_rollups",
           "description": "Per-trace simulation cost and latency, merged from the aggregating rollup: total cost and per-role cost and latency maps.",
           "grain": "one row per (TenantId, ScenarioRunId, TraceId), latest version only",
-          "joinKeys": [
-            "TenantId",
-            "ScenarioRunId",
-            "TraceId"
-          ],
+          "joinKeys": ["TenantId", "ScenarioRunId", "TraceId"],
           "timeColumn": "PartitionMonth",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -7829,9 +7473,7 @@
               "type": "Float64",
               "description": "TotalCost",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -7839,9 +7481,7 @@
               "type": "Map(String, Float64)",
               "description": "RoleCosts",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -7875,12 +7515,7 @@
           "name": "analytics.simulation_trace_metrics",
           "description": "Cost and latency metrics per simulated trace",
           "grain": "one row per (ScenarioRunId, TraceId)",
-          "joinKeys": [
-            "TenantId",
-            "ScenarioRunId",
-            "TraceId",
-            "EventId"
-          ],
+          "joinKeys": ["TenantId", "ScenarioRunId", "TraceId", "EventId"],
           "timeColumn": "OccurredAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -7913,9 +7548,7 @@
               "type": "Float64",
               "description": "TotalCost",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -7923,9 +7556,7 @@
               "type": "Map(String, Float64)",
               "description": "RoleCosts",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -7959,10 +7590,7 @@
           "name": "analytics.test_suite_runs",
           "description": "Test suite execution results with completion and pass counts",
           "grain": "one row per (ScenarioSetId, BatchRunId)",
-          "joinKeys": [
-            "TenantId",
-            "ProjectionId"
-          ],
+          "joinKeys": ["TenantId", "ProjectionId"],
           "timeColumn": "StartedAt",
           "freshness": "seconds behind ingestion",
           "columns": [
@@ -8157,13 +7785,7 @@
           "name": "analytics.agents",
           "description": "Rows of the Agent table, one row per AgentId.",
           "grain": "one row per AgentId",
-          "joinKeys": [
-            "TenantId",
-            "AgentId",
-            "WorkflowId",
-            "CopiedFromAgentId",
-            "OwnerUserId"
-          ],
+          "joinKeys": ["TenantId", "AgentId", "WorkflowId", "CopiedFromAgentId", "OwnerUserId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -8204,9 +7826,7 @@
               "type": "String",
               "description": "Config",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -8230,9 +7850,7 @@
               "type": "Nullable(String)",
               "description": "Environment",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -8290,13 +7908,7 @@
           "name": "analytics.ai_tool_entries",
           "description": "Org-scoped catalog of AI tools surfaced on the personal home portal (/me) and managed by org admins at /governance/tool-catalog.",
           "grain": "one row per (TenantId, AiToolEntryId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "AiToolEntryId",
-            "ScopeId",
-            "CreatedById",
-            "UpdatedById"
-          ],
+          "joinKeys": ["TenantId", "AiToolEntryId", "ScopeId", "CreatedById", "UpdatedById"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -8361,9 +7973,7 @@
               "type": "Nullable(String)",
               "description": "Icon source - single column, prefix-discriminated: \"preset:claude_code\" / \"preset:codex\" /...",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -8387,9 +7997,7 @@
               "type": "String",
               "description": "Per-type config JSON.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -8439,12 +8047,7 @@
           "name": "analytics.ai_tool_entry_departments",
           "description": "Per-department scope binding for AiToolEntry.",
           "grain": "one row per (TenantId, AiToolEntryDepartmentId); a row reached through its parent appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "AiToolEntryDepartmentId",
-            "EntryId",
-            "DepartmentId"
-          ],
+          "joinKeys": ["TenantId", "AiToolEntryDepartmentId", "EntryId", "DepartmentId"],
           "timeColumn": null,
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -8487,11 +8090,7 @@
           "name": "analytics.ai_tool_entry_teams",
           "description": "Per-team scope binding for AiToolEntry.",
           "grain": "one row per (TenantId, AiToolEntryTeamId); a team-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "AiToolEntryTeamId",
-            "EntryId"
-          ],
+          "joinKeys": ["TenantId", "AiToolEntryTeamId", "EntryId"],
           "timeColumn": null,
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -8526,10 +8125,7 @@
           "name": "analytics.analytics",
           "description": "Rows of the Analytics table, one row per AnalyticsId.",
           "grain": "one row per AnalyticsId",
-          "joinKeys": [
-            "TenantId",
-            "AnalyticsId"
-          ],
+          "joinKeys": ["TenantId", "AnalyticsId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -8554,9 +8150,7 @@
               "type": "Nullable(String)",
               "description": "The recorded analytics payload, as stored JSON.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -8572,9 +8166,7 @@
               "type": "Nullable(String)",
               "description": "StringValue",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -8698,11 +8290,7 @@
           "name": "analytics.annotation_queue_scores",
           "description": "Rows of the AnnotationQueueScores table, one row per (TenantId, AnnotationQueueId, AnnotationScoreId); a row reached through its parent appears once per project.",
           "grain": "one row per (TenantId, AnnotationQueueId, AnnotationScoreId); a row reached through its parent appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "AnnotationQueueId",
-            "AnnotationScoreId"
-          ],
+          "joinKeys": ["TenantId", "AnnotationQueueId", "AnnotationScoreId"],
           "timeColumn": null,
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -8737,10 +8325,7 @@
           "name": "analytics.annotation_queues",
           "description": "Rows of the AnnotationQueue table, one row per AnnotationQueueId.",
           "grain": "one row per AnnotationQueueId",
-          "joinKeys": [
-            "TenantId",
-            "AnnotationQueueId"
-          ],
+          "joinKeys": ["TenantId", "AnnotationQueueId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -8781,9 +8366,7 @@
               "type": "Nullable(String)",
               "description": "Description",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -8809,10 +8392,7 @@
           "name": "analytics.annotation_scores",
           "description": "Rows of the AnnotationScore table, one row per AnnotationScoreId.",
           "grain": "one row per AnnotationScoreId",
-          "joinKeys": [
-            "TenantId",
-            "AnnotationScoreId"
-          ],
+          "joinKeys": ["TenantId", "AnnotationScoreId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -8869,9 +8449,7 @@
               "type": "Nullable(String)",
               "description": "Description",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -8895,9 +8473,7 @@
               "type": "Nullable(String)",
               "description": "Options",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -8905,9 +8481,7 @@
               "type": "Nullable(String)",
               "description": "DefaultValue",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -8925,13 +8499,7 @@
           "name": "analytics.annotations",
           "description": "One row per human annotation of a trace, with the reviewer's thumbs verdict.",
           "grain": "one row per AnnotationId",
-          "joinKeys": [
-            "TenantId",
-            "AnnotationId",
-            "TraceId",
-            "UserId",
-            "AnchorId"
-          ],
+          "joinKeys": ["TenantId", "AnnotationId", "TraceId", "UserId", "AnchorId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -8964,9 +8532,7 @@
               "type": "Nullable(String)",
               "description": "Comment",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9006,9 +8572,7 @@
               "type": "Nullable(String)",
               "description": "ScoreOptions",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9016,9 +8580,7 @@
               "type": "Nullable(String)",
               "description": "ExpectedOutput",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9042,9 +8604,7 @@
               "type": "Nullable(String)",
               "description": "AnchorPath",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             }
           ],
@@ -9054,11 +8614,7 @@
           "name": "analytics.anomaly_alerts",
           "description": "Persisted anomaly detection.",
           "grain": "one row per (TenantId, AnomalyAlertId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "AnomalyAlertId",
-            "RuleId"
-          ],
+          "joinKeys": ["TenantId", "AnomalyAlertId", "RuleId"],
           "timeColumn": "TriggerWindowStart",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -9091,9 +8647,7 @@
               "type": "String",
               "description": "Denormalised from rule for fast WHERE filtering on the dashboard query (no join needed for the common path).",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9133,9 +8687,7 @@
               "type": "Nullable(Decimal(18, 6))",
               "description": "Numeric trigger context.",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -9151,9 +8703,7 @@
               "type": "String",
               "description": "Per-rule-type extra context:.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9161,9 +8711,7 @@
               "type": "String",
               "description": "'open' | 'acknowledged' | 'resolved'.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9205,12 +8753,7 @@
           "name": "analytics.anomaly_rules",
           "description": "Admin-defined anomaly detection rule.",
           "grain": "one row per (TenantId, AnomalyRuleId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "AnomalyRuleId",
-            "ScopeId",
-            "CreatedById"
-          ],
+          "joinKeys": ["TenantId", "AnomalyRuleId", "ScopeId", "CreatedById"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -9259,9 +8802,7 @@
               "type": "Nullable(String)",
               "description": "Description",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9269,9 +8810,7 @@
               "type": "String",
               "description": "'critical' | 'warning' | 'info'.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9287,9 +8826,7 @@
               "type": "String",
               "description": "Per-rule-type threshold shape.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9297,9 +8834,7 @@
               "type": "String",
               "description": "Alert routing per destination.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9349,12 +8884,7 @@
           "name": "analytics.batch_evaluations",
           "description": "One row per offline batch evaluation of a dataset row, with its score, outcome and cost.",
           "grain": "one row per BatchEvaluationId",
-          "joinKeys": [
-            "TenantId",
-            "BatchEvaluationId",
-            "ExperimentId",
-            "DatasetId"
-          ],
+          "joinKeys": ["TenantId", "BatchEvaluationId", "ExperimentId", "DatasetId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -9387,9 +8917,7 @@
               "type": "String",
               "description": "Data",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9429,10 +8957,7 @@
               "type": "String",
               "description": "Details",
               "unit": null,
-              "gates": [
-                "input",
-                "output"
-              ],
+              "gates": ["input", "output"],
               "available": true
             },
             {
@@ -9440,9 +8965,7 @@
               "type": "Float64",
               "description": "Billed cost of running the evaluation, in USD.",
               "unit": "USD",
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -9466,9 +8989,7 @@
               "type": "String",
               "description": "Name of the evaluator that produced this result.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9494,11 +9015,7 @@
           "name": "analytics.costs",
           "description": "Rows of the Cost table, one row per CostId.",
           "grain": "one row per CostId",
-          "joinKeys": [
-            "TenantId",
-            "CostId",
-            "ReferenceId"
-          ],
+          "joinKeys": ["TenantId", "CostId", "ReferenceId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -9515,9 +9032,7 @@
               "type": "String",
               "description": "CostId",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -9533,9 +9048,7 @@
               "type": "Nullable(String)",
               "description": "CostName",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -9567,9 +9080,7 @@
               "type": "String",
               "description": "Currency",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9593,9 +9104,7 @@
               "type": "Nullable(String)",
               "description": "ExtraInfo",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             }
           ],
@@ -9605,11 +9114,7 @@
           "name": "analytics.custom_graphs",
           "description": "Rows of the CustomGraph table, one row per CustomGraphId.",
           "grain": "one row per CustomGraphId",
-          "joinKeys": [
-            "TenantId",
-            "CustomGraphId",
-            "DashboardId"
-          ],
+          "joinKeys": ["TenantId", "CustomGraphId", "DashboardId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -9642,9 +9147,7 @@
               "type": "String",
               "description": "The chart's definition, in the shape its `kind` names.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9652,9 +9155,7 @@
               "type": "Nullable(String)",
               "description": "Filters",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9728,12 +9229,7 @@
           "name": "analytics.custom_llm_model_costs",
           "description": "Rows of the CustomLLMModelCost table, one row per CustomLLMModelCostId.",
           "grain": "one row per CustomLLMModelCostId",
-          "joinKeys": [
-            "TenantId",
-            "CustomLLMModelCostId",
-            "OrganizationId",
-            "ScopeId"
-          ],
+          "joinKeys": ["TenantId", "CustomLLMModelCostId", "OrganizationId", "ScopeId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -9750,9 +9246,7 @@
               "type": "String",
               "description": "CustomLLMModelCostId",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -9792,9 +9286,7 @@
               "type": "String",
               "description": "Regex",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9820,10 +9312,7 @@
           "name": "analytics.dashboards",
           "description": "Rows of the Dashboard table, one row per DashboardId.",
           "grain": "one row per DashboardId",
-          "joinKeys": [
-            "TenantId",
-            "DashboardId"
-          ],
+          "joinKeys": ["TenantId", "DashboardId", "CreatedById"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -9860,6 +9349,30 @@
               "available": true
             },
             {
+              "name": "Description",
+              "type": "Nullable(String)",
+              "description": "Free text under the board's name; null until a member writes one.",
+              "unit": null,
+              "gates": ["output"],
+              "available": true
+            },
+            {
+              "name": "Visibility",
+              "type": "String",
+              "description": "Who may see the board: \"only_me\", \"team\" or \"organisation\" (the default, which is what every board created before the column existed keeps).",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "The member who created it; null for boards that predate the column.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
               "name": "CreatedAt",
               "type": "DateTime64(3)",
               "description": "CreatedAt",
@@ -9882,11 +9395,7 @@
           "name": "analytics.data_privacy_policies",
           "description": "Rows of the DataPrivacyPolicy table, one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "DataPrivacyPolicyId",
-            "ScopeId"
-          ],
+          "joinKeys": ["TenantId", "DataPrivacyPolicyId", "ScopeId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -9935,9 +9444,7 @@
               "type": "String",
               "description": "Config",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -9963,11 +9470,7 @@
           "name": "analytics.dataset_records",
           "description": "Rows of the DatasetRecord table, one row per DatasetRecordId.",
           "grain": "one row per DatasetRecordId",
-          "joinKeys": [
-            "TenantId",
-            "DatasetRecordId",
-            "DatasetId"
-          ],
+          "joinKeys": ["TenantId", "DatasetRecordId", "DatasetId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -10000,9 +9503,7 @@
               "type": "String",
               "description": "Entry",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10028,11 +9529,7 @@
           "name": "analytics.datasets",
           "description": "Rows of the Dataset table, one row per DatasetId.",
           "grain": "one row per DatasetId",
-          "joinKeys": [
-            "TenantId",
-            "DatasetId",
-            "SourceStoredObjectId"
-          ],
+          "joinKeys": ["TenantId", "DatasetId", "SourceStoredObjectId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -10073,9 +9570,7 @@
               "type": "String",
               "description": "ColumnTypes",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10107,9 +9602,7 @@
               "type": "Nullable(String)",
               "description": "Mapping",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10133,9 +9626,7 @@
               "type": "String",
               "description": "ContentLayout",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10151,9 +9642,7 @@
               "type": "Nullable(String)",
               "description": "StatusError",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10169,9 +9658,7 @@
               "type": "Nullable(String)",
               "description": "UploadFilename",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10203,9 +9690,7 @@
               "type": "Nullable(String)",
               "description": "ChunkOffsets",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             }
           ],
@@ -10215,12 +9700,7 @@
           "name": "analytics.department_membership_histories",
           "description": "One dated person → department link.",
           "grain": "one row per (TenantId, DepartmentMembershipHistoryId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "DepartmentMembershipHistoryId",
-            "UserId",
-            "DepartmentId"
-          ],
+          "joinKeys": ["TenantId", "DepartmentMembershipHistoryId", "UserId", "DepartmentId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -10287,10 +9767,7 @@
           "name": "analytics.departments",
           "description": "A department is a single-valued accounting dimension, separate from RBAC, for rolling up AI spend by org unit (Engineering, Marketing,...).",
           "grain": "one row per (TenantId, DepartmentId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "DepartmentId"
-          ],
+          "joinKeys": ["TenantId", "DepartmentId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -10349,11 +9826,7 @@
           "name": "analytics.discovered_agents",
           "description": "A non-human actor (a bot, agent or automation) discovered from a connected source, with the provider-native metadata the source published.",
           "grain": "one row per (TenantId, DiscoveredAgentId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "DiscoveredAgentId",
-            "RawAgentId"
-          ],
+          "joinKeys": ["TenantId", "DiscoveredAgentId", "RawAgentId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -10394,9 +9867,7 @@
               "type": "String",
               "description": "DisplayText",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10404,9 +9875,7 @@
               "type": "String",
               "description": "Workspace, plan, and kin - provider-native descriptive fields only.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10448,10 +9917,7 @@
           "name": "analytics.discovered_persons",
           "description": "A name-text seen on a provider's cost or audit rows: \"the provider told us someone called m.silva exists\".",
           "grain": "one row per (TenantId, DiscoveredPersonId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "DiscoveredPersonId"
-          ],
+          "joinKeys": ["TenantId", "DiscoveredPersonId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -10492,9 +9958,7 @@
               "type": "Nullable(String)",
               "description": "The department the provider's directory filed this person under, verbatim.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10526,9 +9990,7 @@
               "type": "Nullable(DateTime64(3))",
               "description": "Set alongside `erasedAt` and cleared once the daily cost rows have been removed and their rebuild requested.",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -10536,9 +9998,7 @@
               "type": "Nullable(String)",
               "description": "The earliest day to rebuild from, recorded BEFORE the rows are deleted.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10546,9 +10006,7 @@
               "type": "Nullable(DateTime64(3))",
               "description": "conflict rule: automatic linking has stopped for this identity because evidence pointed at two candidates, or contradicted an existing link.",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -10556,9 +10014,7 @@
               "type": "Nullable(String)",
               "description": "What tripped the suspension, for the human who reviews it.",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -10584,11 +10040,7 @@
           "name": "analytics.email_suppressions",
           "description": "Rows of the EmailSuppression table, one row per EmailSuppressionId.",
           "grain": "one row per EmailSuppressionId",
-          "joinKeys": [
-            "TenantId",
-            "EmailSuppressionId",
-            "TriggerId"
-          ],
+          "joinKeys": ["TenantId", "EmailSuppressionId", "TriggerId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -10621,9 +10073,7 @@
               "type": "String",
               "description": "Reason",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10641,10 +10091,7 @@
           "name": "analytics.erased_identifier_suppressions",
           "description": "Hashes of erased identifiers - the do-not-reimport list.",
           "grain": "one row per (TenantId, ErasedIdentifierSuppressionId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "ErasedIdentifierSuppressionId"
-          ],
+          "joinKeys": ["TenantId", "ErasedIdentifierSuppressionId"],
           "timeColumn": "ErasedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -10687,12 +10134,7 @@
           "name": "analytics.evaluators",
           "description": "Rows of the Evaluator table, one row per EvaluatorId.",
           "grain": "one row per EvaluatorId",
-          "joinKeys": [
-            "TenantId",
-            "EvaluatorId",
-            "WorkflowId",
-            "CopiedFromEvaluatorId"
-          ],
+          "joinKeys": ["TenantId", "EvaluatorId", "WorkflowId", "CopiedFromEvaluatorId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -10741,9 +10183,7 @@
               "type": "String",
               "description": "Config",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10793,13 +10233,7 @@
           "name": "analytics.experiment_versions",
           "description": "Rows of the ExperimentVersion table, one row per ExperimentVersionId.",
           "grain": "one row per ExperimentVersionId",
-          "joinKeys": [
-            "TenantId",
-            "ExperimentVersionId",
-            "ExperimentId",
-            "AuthorId",
-            "RunId"
-          ],
+          "joinKeys": ["TenantId", "ExperimentVersionId", "ExperimentId", "AuthorId", "RunId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -10856,9 +10290,7 @@
               "type": "Nullable(String)",
               "description": "CommitMessage",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10890,9 +10322,7 @@
               "type": "String",
               "description": "State",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -10926,11 +10356,7 @@
           "name": "analytics.experiments",
           "description": "One row per experiment, with its display name and kind.",
           "grain": "one row per ExperimentId",
-          "joinKeys": [
-            "TenantId",
-            "ExperimentId",
-            "WorkflowId"
-          ],
+          "joinKeys": ["TenantId", "ExperimentId", "WorkflowId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -11011,9 +10437,7 @@
               "type": "Nullable(String)",
               "description": "WorkbenchState",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -11031,12 +10455,7 @@
           "name": "analytics.gateway_budget_bucket_boundaries",
           "description": "Rows of the GatewayBudgetBucketBoundary table, one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "GatewayBudgetBucketBoundaryId",
-            "BudgetId",
-            "BucketScopeId"
-          ],
+          "joinKeys": ["TenantId", "GatewayBudgetBucketBoundaryId", "BudgetId", "BucketScopeId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -11167,9 +10586,7 @@
               "type": "Decimal(18, 6)",
               "description": "AmountUsd",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -11299,9 +10716,7 @@
               "type": "Nullable(String)",
               "description": "Description",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -11317,9 +10732,7 @@
               "type": "Decimal(18, 6)",
               "description": "LimitUsd",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -11335,9 +10748,7 @@
               "type": "Nullable(String)",
               "description": "Timezone",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -11353,9 +10764,7 @@
               "type": "String",
               "description": "Metadata",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -11363,9 +10772,7 @@
               "type": "Decimal(18, 6)",
               "description": "SpentUsd",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -11447,11 +10854,7 @@
           "name": "analytics.gateway_cache_rules",
           "description": "Rows of the GatewayCacheRule table, one row per (TenantId, GatewayCacheRuleId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, GatewayCacheRuleId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "GatewayCacheRuleId",
-            "CreatedById"
-          ],
+          "joinKeys": ["TenantId", "GatewayCacheRuleId", "CreatedById"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -11484,9 +10887,7 @@
               "type": "Nullable(String)",
               "description": "Description",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -11510,9 +10911,7 @@
               "type": "String",
               "description": "Matchers",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -11520,9 +10919,7 @@
               "type": "String",
               "description": "The cache rule's action configuration, as stored JSON.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -11572,13 +10969,7 @@
           "name": "analytics.gateway_change_events",
           "description": "Rows of the GatewayChangeEvent table, one row per Revision.",
           "grain": "one row per Revision",
-          "joinKeys": [
-            "TenantId",
-            "OrganizationId",
-            "VirtualKeyId",
-            "BudgetId",
-            "ModelProviderId"
-          ],
+          "joinKeys": ["TenantId", "OrganizationId", "VirtualKeyId", "BudgetId", "ModelProviderId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -11643,9 +11034,7 @@
               "type": "Nullable(String)",
               "description": "Payload",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -11702,9 +11091,7 @@
               "type": "Nullable(String)",
               "description": "Description",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -11836,9 +11223,7 @@
               "type": "String",
               "description": "Vendor",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -11902,9 +11287,7 @@
               "type": "Nullable(String)",
               "description": "CloseReason",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -11920,9 +11303,7 @@
               "type": "Nullable(String)",
               "description": "VendorCostRaw",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -11948,10 +11329,7 @@
           "name": "analytics.github_branch_pull_request_checks",
           "description": "The per-branch bookkeeping behind pull-request mapping: when a branch was last looked up on GitHub, how many pull requests it resolved to, and when it may be asked about again.",
           "grain": "one row per (TenantId, GithubBranchPullRequestCheckId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "GithubBranchPullRequestCheckId"
-          ],
+          "joinKeys": ["TenantId", "GithubBranchPullRequestCheckId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -11992,9 +11370,7 @@
               "type": "String",
               "description": "HeadBranch",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12068,12 +11444,7 @@
           "name": "analytics.github_installations",
           "description": "The organization's GitHub connection: a GitHub App installation mapped to a LangWatch organization.",
           "grain": "one row per (TenantId, GithubInstallationId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "GithubInstallationId",
-            "InstallationId",
-            "AccountId"
-          ],
+          "joinKeys": ["TenantId", "GithubInstallationId", "InstallationId", "AccountId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -12106,9 +11477,7 @@
               "type": "String",
               "description": "The GitHub account the App is installed on.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12132,9 +11501,7 @@
               "type": "String",
               "description": "\"all\" or \"selected\" — whether the App can see every repo on the account or only a chosen subset.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12142,9 +11509,7 @@
               "type": "Nullable(String)",
               "description": "Cached repository list [ ] when repositorySelection = \"selected\".",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12152,9 +11517,7 @@
               "type": "Nullable(DateTime64(3))",
               "description": "Set when GitHub suspends the installation; cleared on unsuspend.",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -12180,10 +11543,7 @@
           "name": "analytics.github_pull_requests",
           "description": "A pull request discovered through the organization's GitHub connection and mapped to the branch it was opened from, so a coding-agent session that knows only its branch can name the pull request it produced.",
           "grain": "one row per (TenantId, GithubPullRequestId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "GithubPullRequestId"
-          ],
+          "joinKeys": ["TenantId", "GithubPullRequestId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -12224,9 +11584,7 @@
               "type": "String",
               "description": "The branch the pull request was opened from.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12250,9 +11608,7 @@
               "type": "String",
               "description": "Title",
               "unit": null,
-              "gates": [
-                "input"
-              ],
+              "gates": ["input"],
               "available": true
             },
             {
@@ -12260,9 +11616,7 @@
               "type": "String",
               "description": "GitHub's own state string: \"open\" or \"closed\".",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12344,10 +11698,7 @@
           "name": "analytics.governance_tenant_histories",
           "description": "Every tenant id this organization has ever written governance rows under, appended on first use and never pruned.",
           "grain": "one row per (TenantId, GovernanceTenantHistoryId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "GovernanceTenantHistoryId"
-          ],
+          "joinKeys": ["TenantId", "GovernanceTenantHistoryId"],
           "timeColumn": "FirstUsedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -12390,12 +11741,7 @@
           "name": "analytics.identity_match_suggestions",
           "description": "Match candidates a background job computed and a human has yet to confirm.",
           "grain": "one row per (TenantId, IdentityMatchSuggestionId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "IdentityMatchSuggestionId",
-            "DiscoveredPersonId",
-            "UserId"
-          ],
+          "joinKeys": ["TenantId", "IdentityMatchSuggestionId", "DiscoveredPersonId", "UserId"],
           "timeColumn": "ComputedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -12454,12 +11800,7 @@
           "name": "analytics.identity_matches",
           "description": "A dated link from an external account to a platform user, opened when the match holds and closed when it stops being true.",
           "grain": "one row per (TenantId, IdentityMatchId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "IdentityMatchId",
-            "DiscoveredPersonId",
-            "UserId"
-          ],
+          "joinKeys": ["TenantId", "IdentityMatchId", "DiscoveredPersonId", "UserId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -12534,12 +11875,7 @@
           "name": "analytics.ingestion_pull_run_projections",
           "description": "Rebuildable per-source pull checkpoint and operator-facing run status.",
           "grain": "one row per IngestionPullRunProjectionId",
-          "joinKeys": [
-            "TenantId",
-            "IngestionPullRunProjectionId",
-            "SourceId",
-            "LastEventId"
-          ],
+          "joinKeys": ["TenantId", "IngestionPullRunProjectionId", "SourceId", "LastEventId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -12580,9 +11916,7 @@
               "type": "Nullable(String)",
               "description": "Cron",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12590,9 +11924,7 @@
               "type": "Nullable(String)",
               "description": "Cursor",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12608,9 +11940,7 @@
               "type": "Nullable(String)",
               "description": "LastRunOutcome",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12626,9 +11956,7 @@
               "type": "Nullable(String)",
               "description": "LastRunError",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12676,9 +12004,7 @@
               "type": "Nullable(String)",
               "description": "LastRunCompleteness",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12694,9 +12020,7 @@
               "type": "Nullable(String)",
               "description": "LastAgentsListingOutcome",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12712,9 +12036,7 @@
               "type": "Nullable(String)",
               "description": "LastAgentsListingReason",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12738,9 +12060,7 @@
               "type": "Nullable(String)",
               "description": "LastPeopleListingOutcome",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12764,9 +12084,7 @@
               "type": "Nullable(String)",
               "description": "LastPeopleListingReason",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12888,9 +12206,7 @@
               "type": "Nullable(String)",
               "description": "Description",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12906,9 +12222,7 @@
               "type": "Nullable(String)",
               "description": "Phase 10 - cron schedule for pull-mode sources.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12964,9 +12278,7 @@
               "type": "Nullable(String)",
               "description": "LastRunCompleteness",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -12974,9 +12286,7 @@
               "type": "Nullable(DateTime64(3))",
               "description": "- the window this source read while pulled cost recording was off for the organization, so its spend was dropped rather than priced.",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -12984,9 +12294,7 @@
               "type": "Nullable(DateTime64(3))",
               "description": "UnpricedUsageThrough",
               "unit": null,
-              "gates": [
-                "costs"
-              ],
+              "gates": ["costs"],
               "available": true
             },
             {
@@ -13028,12 +12336,7 @@
           "name": "analytics.ingestion_templates",
           "description": "Admin/platform-curated catalog row for upstream OTLP normalization.",
           "grain": "one row per (TenantId, IngestionTemplateId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "IngestionTemplateId",
-            "CreatedById",
-            "UpdatedById"
-          ],
+          "joinKeys": ["TenantId", "IngestionTemplateId", "CreatedById", "UpdatedById"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -13082,9 +12385,7 @@
               "type": "Nullable(String)",
               "description": "Description",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -13092,9 +12393,7 @@
               "type": "Nullable(String)",
               "description": "Icon source - single column, prefix-discriminated, mirrors AiToolEntry.iconAsset: `preset: ` (built-in slot) `data:image/svg+xml;base64,…` (admin-uploaded for org-authored) null → fall back to slug-default in UI.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -13102,9 +12401,7 @@
               "type": "String",
               "description": "Admin/platform-authored OTTL statements.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -13242,9 +12539,7 @@
               "type": "String",
               "description": "LeaseOwner",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -13328,9 +12623,7 @@
               "type": "Nullable(String)",
               "description": "Title",
               "unit": null,
-              "gates": [
-                "input"
-              ],
+              "gates": ["input"],
               "available": true
             },
             {
@@ -13402,9 +12695,7 @@
               "type": "Nullable(String)",
               "description": "LastError",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -13541,9 +12832,7 @@
               "type": "String",
               "description": "LangyMessagePart[] — the user question that opened the turn.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -13551,9 +12840,7 @@
               "type": "String",
               "description": "LangyMessagePart[] — the agent's whole final answer.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -13561,9 +12848,7 @@
               "type": "String",
               "description": "The turn's tool calls, as stored JSON.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -13571,9 +12856,7 @@
               "type": "Nullable(String)",
               "description": "The turn's plan, as stored JSON.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -13581,9 +12864,7 @@
               "type": "Nullable(String)",
               "description": "Error",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -13712,9 +12993,7 @@
               "type": "String",
               "description": "Parts",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -13836,9 +13115,7 @@
               "type": "String",
               "description": "LeaseOwner",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -13872,12 +13149,7 @@
           "name": "analytics.model_default_config_scopes",
           "description": "Rows of the ModelDefaultConfigScope table, one row per (TenantId, ModelDefaultConfigScopeId); a row reached through its parent appears once per project.",
           "grain": "one row per (TenantId, ModelDefaultConfigScopeId); a row reached through its parent appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "ModelDefaultConfigScopeId",
-            "ConfigId",
-            "ScopeId"
-          ],
+          "joinKeys": ["TenantId", "ModelDefaultConfigScopeId", "ConfigId", "ScopeId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -13936,11 +13208,7 @@
           "name": "analytics.model_default_configs",
           "description": "Rows of the ModelDefaultConfig table, one row per (TenantId, ModelDefaultConfigId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, ModelDefaultConfigId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "ModelDefaultConfigId",
-            "AuthorId"
-          ],
+          "joinKeys": ["TenantId", "ModelDefaultConfigId", "AuthorId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -13965,9 +13233,7 @@
               "type": "String",
               "description": "Config",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14001,12 +13267,7 @@
           "name": "analytics.model_provider_scopes",
           "description": "Rows of the ModelProviderScope table, one row per (TenantId, ModelProviderScopeId); a row reached through its parent appears once per project.",
           "grain": "one row per (TenantId, ModelProviderScopeId); a row reached through its parent appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "ModelProviderScopeId",
-            "ModelProviderId",
-            "ScopeId"
-          ],
+          "joinKeys": ["TenantId", "ModelProviderScopeId", "ModelProviderId", "ScopeId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -14065,10 +13326,7 @@
           "name": "analytics.model_providers",
           "description": "Rows of the ModelProvider table, one row per (TenantId, ModelProviderId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, ModelProviderId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "ModelProviderId"
-          ],
+          "joinKeys": ["TenantId", "ModelProviderId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -14109,9 +13367,7 @@
               "type": "Nullable(String)",
               "description": "RoutingHandle",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14127,9 +13383,7 @@
               "type": "Nullable(String)",
               "description": "CustomModels",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14137,9 +13391,7 @@
               "type": "Nullable(String)",
               "description": "CustomEmbeddingsModels",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14147,9 +13399,7 @@
               "type": "Nullable(String)",
               "description": "DeploymentMapping",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14189,9 +13439,7 @@
               "type": "Nullable(String)",
               "description": "ProviderConfig",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14207,9 +13455,7 @@
               "type": "Nullable(String)",
               "description": "LangySkipPermissionsModels",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14267,12 +13513,7 @@
           "name": "analytics.monitors",
           "description": "Rows of the Monitor table, one row per MonitorId.",
           "grain": "one row per MonitorId",
-          "joinKeys": [
-            "TenantId",
-            "MonitorId",
-            "ExperimentId",
-            "EvaluatorId"
-          ],
+          "joinKeys": ["TenantId", "MonitorId", "ExperimentId", "EvaluatorId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -14353,9 +13594,7 @@
               "type": "String",
               "description": "Preconditions",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14363,9 +13602,7 @@
               "type": "String",
               "description": "Parameters",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14373,9 +13610,7 @@
               "type": "Nullable(String)",
               "description": "Mappings",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14391,9 +13626,7 @@
               "type": "String",
               "description": "Level",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14427,11 +13660,7 @@
           "name": "analytics.notifications",
           "description": "Rows of the Notification table, one row per NotificationId.",
           "grain": "one row per NotificationId",
-          "joinKeys": [
-            "TenantId",
-            "NotificationId",
-            "OrganizationId"
-          ],
+          "joinKeys": ["TenantId", "NotificationId", "OrganizationId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -14464,9 +13693,7 @@
               "type": "String",
               "description": "Metadata",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14500,12 +13727,7 @@
           "name": "analytics.pinned_traces",
           "description": "Rows of the PinnedTrace table, one row per PinnedTraceId.",
           "grain": "one row per PinnedTraceId",
-          "joinKeys": [
-            "TenantId",
-            "PinnedTraceId",
-            "TraceId",
-            "UserId"
-          ],
+          "joinKeys": ["TenantId", "PinnedTraceId", "TraceId", "UserId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -14554,9 +13776,7 @@
               "type": "Nullable(String)",
               "description": "Reason",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14574,11 +13794,7 @@
           "name": "analytics.process_manager_inboxes",
           "description": "Idempotency marker for a source event consumed by a process definition.",
           "grain": "one row per ProcessManagerInboxId",
-          "joinKeys": [
-            "TenantId",
-            "ProcessManagerInboxId",
-            "SourceEventId"
-          ],
+          "joinKeys": ["TenantId", "ProcessManagerInboxId", "SourceEventId"],
           "timeColumn": "ConsumedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -14629,11 +13845,7 @@
           "name": "analytics.process_manager_instances",
           "description": "Durable state for a long-running event-sourced process.",
           "grain": "one row per ProcessManagerInstanceId",
-          "joinKeys": [
-            "TenantId",
-            "ProcessManagerInstanceId",
-            "UserId"
-          ],
+          "joinKeys": ["TenantId", "ProcessManagerInstanceId", "UserId"],
           "timeColumn": "NextWakeAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -14674,9 +13886,7 @@
               "type": "String",
               "description": "State",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14710,11 +13920,7 @@
           "name": "analytics.process_manager_outbox_attempts",
           "description": "One row per failed outbox delivery attempt, so the table grows with delivery trouble rather than with traffic.",
           "grain": "one row per ProcessManagerOutboxAttemptId",
-          "joinKeys": [
-            "TenantId",
-            "ProcessManagerOutboxAttemptId",
-            "OutboxId"
-          ],
+          "joinKeys": ["TenantId", "ProcessManagerOutboxAttemptId", "OutboxId"],
           "timeColumn": "OccurredAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -14779,9 +13985,7 @@
               "type": "String",
               "description": "The safe failure diagnostic the dispatcher already computes for its span — never a raw provider body.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14799,12 +14003,7 @@
           "name": "analytics.process_manager_outboxes",
           "description": "Transactional intents emitted by a durable process transition.",
           "grain": "one row per ProcessManagerOutboxId",
-          "joinKeys": [
-            "TenantId",
-            "ProcessManagerOutboxId",
-            "UserId",
-            "SourceEventId"
-          ],
+          "joinKeys": ["TenantId", "ProcessManagerOutboxId", "UserId", "SourceEventId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -14853,9 +14052,7 @@
               "type": "String",
               "description": "Payload",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14863,9 +14060,7 @@
               "type": "String",
               "description": "TraceCarrier",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14939,12 +14134,7 @@
           "name": "analytics.projects",
           "description": "The caller's project, with its display name and slug.",
           "grain": "one row per TenantId",
-          "joinKeys": [
-            "TenantId",
-            "TeamId",
-            "OwnerUserId",
-            "DepartmentId"
-          ],
+          "joinKeys": ["TenantId", "TeamId", "OwnerUserId", "DepartmentId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -14985,9 +14175,7 @@
               "type": "String",
               "description": "Language",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -14995,9 +14183,7 @@
               "type": "String",
               "description": "Framework",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15045,9 +14231,7 @@
               "type": "Nullable(String)",
               "description": "UserLinkTemplate",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15071,9 +14255,7 @@
               "type": "Nullable(String)",
               "description": "S3Endpoint",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15081,9 +14263,7 @@
               "type": "Nullable(String)",
               "description": "S3Bucket",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15115,9 +14295,7 @@
               "type": "String",
               "description": "Per-feature unlock flags for personal projects only.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15133,9 +14311,7 @@
               "type": "Nullable(String)",
               "description": "Per-project Langy egress allow-list.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15252,12 +14428,7 @@
           "name": "analytics.prompt_tags",
           "description": "Rows of the PromptTag table, one row per (TenantId, PromptTagId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, PromptTagId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "PromptTagId",
-            "CreatedById",
-            "UpdatedById"
-          ],
+          "joinKeys": ["TenantId", "PromptTagId", "CreatedById", "UpdatedById"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -15324,12 +14495,7 @@
           "name": "analytics.prompt_versions",
           "description": "One row per version of a prompt, carrying the version number a trace records.",
           "grain": "one row per PromptVersionId",
-          "joinKeys": [
-            "TenantId",
-            "PromptVersionId",
-            "AuthorId",
-            "PromptId"
-          ],
+          "joinKeys": ["TenantId", "PromptVersionId", "AuthorId", "PromptId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -15362,9 +14528,7 @@
               "type": "Nullable(String)",
               "description": "CommitMessage",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15388,9 +14552,7 @@
               "type": "String",
               "description": "ConfigData",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15406,9 +14568,7 @@
               "type": "String",
               "description": "RuntimeParameters",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15426,12 +14586,7 @@
           "name": "analytics.prompts",
           "description": "One row per prompt configuration, with the name its versions are known by.",
           "grain": "one row per PromptId",
-          "joinKeys": [
-            "TenantId",
-            "PromptId",
-            "OrganizationId",
-            "CopiedFromPromptId"
-          ],
+          "joinKeys": ["TenantId", "PromptId", "OrganizationId", "CopiedFromPromptId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -15456,9 +14611,7 @@
               "type": "Nullable(String)",
               "description": "Globally unique handle of the prompt, null when it has none.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15524,11 +14677,7 @@
           "name": "analytics.retention_policies",
           "description": "Rows of the RetentionPolicy table, one row per (TenantId, RetentionPolicyId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, RetentionPolicyId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "RetentionPolicyId",
-            "ScopeId"
-          ],
+          "joinKeys": ["TenantId", "RetentionPolicyId", "ScopeId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -15569,9 +14718,7 @@
               "type": "String",
               "description": "Category",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15605,12 +14752,7 @@
           "name": "analytics.routing_policies",
           "description": "Rows of the RoutingPolicy table, one row per (TenantId, RoutingPolicyId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, RoutingPolicyId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "RoutingPolicyId",
-            "CreatedById",
-            "UpdatedById"
-          ],
+          "joinKeys": ["TenantId", "RoutingPolicyId", "CreatedById", "UpdatedById"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -15643,9 +14785,7 @@
               "type": "Nullable(String)",
               "description": "Description",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15661,9 +14801,7 @@
               "type": "String",
               "description": "ModelAliases",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15679,9 +14817,7 @@
               "type": "String",
               "description": "PolicyRules",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15731,12 +14867,7 @@
           "name": "analytics.routing_policy_scopes",
           "description": "Rows of the RoutingPolicyScope table, one row per (TenantId, RoutingPolicyScopeId); a row reached through its parent appears once per project.",
           "grain": "one row per (TenantId, RoutingPolicyScopeId); a row reached through its parent appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "RoutingPolicyScopeId",
-            "RoutingPolicyId",
-            "ScopeId"
-          ],
+          "joinKeys": ["TenantId", "RoutingPolicyScopeId", "RoutingPolicyId", "ScopeId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -15795,11 +14926,7 @@
           "name": "analytics.saved_views",
           "description": "Rows of the SavedView table, one row per SavedViewId.",
           "grain": "one row per SavedViewId",
-          "joinKeys": [
-            "TenantId",
-            "SavedViewId",
-            "UserId"
-          ],
+          "joinKeys": ["TenantId", "SavedViewId", "UserId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -15840,9 +14967,7 @@
               "type": "String",
               "description": "Filters",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15850,9 +14975,7 @@
               "type": "Nullable(String)",
               "description": "Query",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15860,9 +14983,7 @@
               "type": "Nullable(String)",
               "description": "Period",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15904,12 +15025,7 @@
           "name": "analytics.scenario_versions",
           "description": "Rows of the ScenarioVersion table, one row per ScenarioVersionId.",
           "grain": "one row per ScenarioVersionId",
-          "joinKeys": [
-            "TenantId",
-            "ScenarioVersionId",
-            "ScenarioId",
-            "AuthorId"
-          ],
+          "joinKeys": ["TenantId", "ScenarioVersionId", "ScenarioId", "AuthorId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -15966,9 +15082,7 @@
               "type": "Nullable(String)",
               "description": "ChangeDescription",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -15976,9 +15090,7 @@
               "type": "String",
               "description": "Envelope holding the editable field set as saved and the names of the fields this save changed.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16004,12 +15116,7 @@
           "name": "analytics.scenarios",
           "description": "Rows of the Scenario table, one row per ScenarioId.",
           "grain": "one row per ScenarioId",
-          "joinKeys": [
-            "TenantId",
-            "ScenarioId",
-            "TestSuiteId",
-            "LastUpdatedById"
-          ],
+          "joinKeys": ["TenantId", "ScenarioId", "TestSuiteId", "LastUpdatedById"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -16042,9 +15149,7 @@
               "type": "String",
               "description": "Situation",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16052,9 +15157,7 @@
               "type": "Array(String)",
               "description": "Criteria",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16070,9 +15173,7 @@
               "type": "Nullable(String)",
               "description": "Parameters",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16112,9 +15213,7 @@
               "type": "Nullable(String)",
               "description": "Fields",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16122,9 +15221,7 @@
               "type": "Nullable(String)",
               "description": "CallerVoice",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16182,11 +15279,7 @@
           "name": "analytics.scheduled_jobs",
           "description": "Rows of the ScheduledJob table, one row per ScheduledJobId.",
           "grain": "one row per ScheduledJobId",
-          "joinKeys": [
-            "TenantId",
-            "ScheduledJobId",
-            "TargetId"
-          ],
+          "joinKeys": ["TenantId", "ScheduledJobId", "TargetId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -16227,9 +15320,7 @@
               "type": "String",
               "description": "Cron",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16237,9 +15328,7 @@
               "type": "String",
               "description": "Timezone",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16279,9 +15368,7 @@
               "type": "Nullable(String)",
               "description": "LastError",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16315,13 +15402,7 @@
           "name": "analytics.share_links",
           "description": "Rows of the ShareLink table, one row per ShareLinkId.",
           "grain": "one row per ShareLinkId",
-          "joinKeys": [
-            "TenantId",
-            "ShareLinkId",
-            "ResourceId",
-            "ThreadId",
-            "UserId"
-          ],
+          "joinKeys": ["TenantId", "ShareLinkId", "ResourceId", "ThreadId", "UserId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -16428,10 +15509,7 @@
           "name": "analytics.simulation_suites",
           "description": "Rows of the SimulationSuite table, one row per SimulationSuiteId.",
           "grain": "one row per SimulationSuiteId",
-          "joinKeys": [
-            "TenantId",
-            "SimulationSuiteId"
-          ],
+          "joinKeys": ["TenantId", "SimulationSuiteId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -16472,9 +15550,7 @@
               "type": "Nullable(String)",
               "description": "Description",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16490,9 +15566,7 @@
               "type": "String",
               "description": "Targets",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16540,9 +15614,7 @@
               "type": "Nullable(String)",
               "description": "The suite's scope configuration, as stored JSON.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16550,9 +15622,7 @@
               "type": "Nullable(String)",
               "description": "Fields",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16560,9 +15630,7 @@
               "type": "Nullable(String)",
               "description": "Evaluators",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16596,11 +15664,7 @@
           "name": "analytics.topic_clustering_run_history_projections",
           "description": "Per-project topic clustering run history (audit read model).",
           "grain": "one row per TopicClusteringRunHistoryProjectionId",
-          "joinKeys": [
-            "TenantId",
-            "TopicClusteringRunHistoryProjectionId",
-            "LastEventId"
-          ],
+          "joinKeys": ["TenantId", "TopicClusteringRunHistoryProjectionId", "LastEventId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -16625,9 +15689,7 @@
               "type": "String",
               "description": "Runs",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16723,9 +15785,7 @@
               "type": "Nullable(String)",
               "description": "LastRequestTrigger",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16741,9 +15801,7 @@
               "type": "Nullable(String)",
               "description": "completed | skipped | failed.",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16751,9 +15809,7 @@
               "type": "Nullable(String)",
               "description": "LastRunMode",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16761,9 +15817,7 @@
               "type": "Nullable(String)",
               "description": "LastRunSkippedReason",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16771,9 +15825,7 @@
               "type": "Nullable(String)",
               "description": "LastRunError",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -16911,11 +15963,7 @@
           "name": "analytics.topic_model_projections",
           "description": "Cursor row for the topic-model projection.",
           "grain": "one row per TopicModelProjectionId",
-          "joinKeys": [
-            "TenantId",
-            "TopicModelProjectionId",
-            "LastEventId"
-          ],
+          "joinKeys": ["TenantId", "TopicModelProjectionId", "LastEventId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -16990,11 +16038,7 @@
           "name": "analytics.topics",
           "description": "One row per topic, with the name a trace's TopicId resolves to.",
           "grain": "one row per TopicId",
-          "joinKeys": [
-            "TenantId",
-            "TopicId",
-            "ParentTopicId"
-          ],
+          "joinKeys": ["TenantId", "TopicId", "ParentTopicId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -17061,13 +16105,7 @@
           "name": "analytics.trace_edit_overlays",
           "description": "Rows of the TraceEditOverlay table, one row per TraceEditOverlayId.",
           "grain": "one row per TraceEditOverlayId",
-          "joinKeys": [
-            "TenantId",
-            "TraceEditOverlayId",
-            "TraceId",
-            "CreatedById",
-            "UpdatedById"
-          ],
+          "joinKeys": ["TenantId", "TraceEditOverlayId", "TraceId", "CreatedById", "UpdatedById"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -17100,9 +16138,7 @@
               "type": "String",
               "description": "Patch",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17144,13 +16180,7 @@
           "name": "analytics.trigger_sents",
           "description": "Rows of the TriggerSent table, one row per TriggerSentId.",
           "grain": "one row per TriggerSentId",
-          "joinKeys": [
-            "TenantId",
-            "TriggerSentId",
-            "TriggerId",
-            "TraceId",
-            "CustomGraphId"
-          ],
+          "joinKeys": ["TenantId", "TriggerSentId", "TriggerId", "TraceId", "CustomGraphId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -17225,11 +16255,7 @@
           "name": "analytics.triggers",
           "description": "Rows of the Trigger table, one row per TriggerId.",
           "grain": "one row per TriggerId",
-          "joinKeys": [
-            "TenantId",
-            "TriggerId",
-            "CustomGraphId"
-          ],
+          "joinKeys": ["TenantId", "TriggerId", "CustomGraphId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -17278,9 +16304,7 @@
               "type": "String",
               "description": "ActionParams",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17288,9 +16312,7 @@
               "type": "String",
               "description": "Filters",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17298,9 +16320,7 @@
               "type": "Nullable(String)",
               "description": "FilterQuery",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17340,9 +16360,7 @@
               "type": "Nullable(String)",
               "description": "PausedReason",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17358,9 +16376,7 @@
               "type": "Nullable(String)",
               "description": "Message",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17392,9 +16408,7 @@
               "type": "Nullable(String)",
               "description": "SlackTemplate",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17402,9 +16416,7 @@
               "type": "String",
               "description": "NotificationCadence",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17430,12 +16442,7 @@
           "name": "analytics.virtual_key_scopes",
           "description": "Rows of the VirtualKeyScope table, one row per (TenantId, VirtualKeyScopeId); a row reached through its parent appears once per project.",
           "grain": "one row per (TenantId, VirtualKeyScopeId); a row reached through its parent appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "VirtualKeyScopeId",
-            "VirtualKeyId",
-            "ScopeId"
-          ],
+          "joinKeys": ["TenantId", "VirtualKeyScopeId", "VirtualKeyId", "ScopeId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -17537,9 +16544,7 @@
               "type": "Nullable(String)",
               "description": "Description",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17571,9 +16576,7 @@
               "type": "String",
               "description": "Metadata",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17589,9 +16592,7 @@
               "type": "Nullable(String)",
               "description": "DisabledReason",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17607,9 +16608,7 @@
               "type": "String",
               "description": "DisplayPrefix",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17633,9 +16632,7 @@
               "type": "String",
               "description": "Config",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17715,9 +16712,7 @@
               "type": "Array(String)",
               "description": "ConnectServices",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17847,9 +16842,7 @@
               "type": "Nullable(String)",
               "description": "Error",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17857,9 +16850,7 @@
               "type": "Nullable(String)",
               "description": "Response",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17893,13 +16884,7 @@
           "name": "analytics.workflow_versions",
           "description": "Rows of the WorkflowVersion table, one row per WorkflowVersionId.",
           "grain": "one row per WorkflowVersionId",
-          "joinKeys": [
-            "TenantId",
-            "WorkflowVersionId",
-            "AuthorId",
-            "WorkflowId",
-            "ParentId"
-          ],
+          "joinKeys": ["TenantId", "WorkflowVersionId", "AuthorId", "WorkflowId", "ParentId"],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
@@ -17932,9 +16917,7 @@
               "type": "String",
               "description": "CommitMessage",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -17990,9 +16973,7 @@
               "type": "String",
               "description": "Dsl",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             }
           ],
@@ -18043,9 +17024,7 @@
               "type": "String",
               "description": "Icon",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -18053,9 +17032,7 @@
               "type": "String",
               "description": "Description",
               "unit": null,
-              "gates": [
-                "output"
-              ],
+              "gates": ["output"],
               "available": true
             },
             {
@@ -18152,10 +17129,7 @@
           "encoding": "text",
           "keyKind": "thread",
           "cap": 200,
-          "gates": [
-            "input",
-            "output"
-          ],
+          "gates": ["input", "output"],
           "available": true,
           "exampleSql": "SELECT ConversationId, conversation(ConversationId) AS transcript\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
@@ -18168,10 +17142,7 @@
           "encoding": "text",
           "keyKind": "thread",
           "cap": 200,
-          "gates": [
-            "input",
-            "output"
-          ],
+          "gates": ["input", "output"],
           "available": true,
           "exampleSql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
@@ -18184,10 +17155,7 @@
           "encoding": "text",
           "keyKind": "thread",
           "cap": 200,
-          "gates": [
-            "input",
-            "output"
-          ],
+          "gates": ["input", "output"],
           "available": true,
           "exampleSql": "SELECT ConversationId, llm_readable_thread(ConversationId, 8000) AS text\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
@@ -18213,10 +17181,7 @@
           "encoding": "text",
           "keyKind": "trace",
           "cap": 1000,
-          "gates": [
-            "input",
-            "output"
-          ],
+          "gates": ["input", "output"],
           "available": true,
           "exampleSql": "SELECT TraceId, llm_readable_trace(TraceId, 8000) AS text\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
         },
@@ -18229,10 +17194,7 @@
           "encoding": "json",
           "keyKind": "trace",
           "cap": 1000,
-          "gates": [
-            "input",
-            "output"
-          ],
+          "gates": ["input", "output"],
           "available": true,
           "exampleSql": "SELECT TraceId, llm_messages(TraceId) AS messages\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
         },
@@ -18245,9 +17207,7 @@
           "encoding": "json",
           "keyKind": "trace",
           "cap": 1000,
-          "gates": [
-            "input"
-          ],
+          "gates": ["input"],
           "available": true,
           "exampleSql": "SELECT TraceId, llm_input_messages(TraceId) AS messages\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
         },
@@ -18260,10 +17220,7 @@
           "encoding": "json",
           "keyKind": "trace",
           "cap": 1000,
-          "gates": [
-            "input",
-            "output"
-          ],
+          "gates": ["input", "output"],
           "available": true,
           "exampleSql": "SELECT TraceId, llm_output_messages(TraceId) AS messages\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
         },
@@ -18276,10 +17233,7 @@
           "encoding": "json",
           "keyKind": "span",
           "cap": 1000,
-          "gates": [
-            "input",
-            "output"
-          ],
+          "gates": ["input", "output"],
           "available": true,
           "exampleSql": "SELECT TraceId, SpanId, llm_messages_span(TraceId, SpanId) AS messages\nFROM analytics.spans\nWHERE StartTime >= subtractDays(now(), 1)\nORDER BY StartTime DESC\nLIMIT 20"
         },
@@ -18292,10 +17246,7 @@
           "encoding": "json",
           "keyKind": "trace",
           "cap": 1000,
-          "gates": [
-            "input",
-            "output"
-          ],
+          "gates": ["input", "output"],
           "available": true,
           "exampleSql": "SELECT TraceId, trace_json(TraceId) AS trace\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
         },
@@ -18432,11 +17383,7 @@
         "valueType": "categorical",
         "group": "trace",
         "facetable": true,
-        "knownValues": [
-          "error",
-          "warning",
-          "ok"
-        ]
+        "knownValues": ["error", "warning", "ok"]
       },
       {
         "name": "model",
@@ -18716,11 +17663,7 @@
         "valueType": "categorical",
         "group": "scenario",
         "facetable": false,
-        "knownValues": [
-          "success",
-          "failure",
-          "inconclusive"
-        ]
+        "knownValues": ["success", "failure", "inconclusive"]
       },
       {
         "name": "scenarioStatus",
@@ -18839,13 +17782,7 @@
         "valueType": "categorical",
         "group": "eval",
         "facetable": true,
-        "knownValues": [
-          "scheduled",
-          "in_progress",
-          "processed",
-          "skipped",
-          "error"
-        ]
+        "knownValues": ["scheduled", "in_progress", "processed", "skipped", "error"]
       },
       {
         "name": "evaluatorVerdict",
@@ -18853,13 +17790,7 @@
         "valueType": "categorical",
         "group": "eval",
         "facetable": true,
-        "knownValues": [
-          "pass",
-          "fail",
-          "error",
-          "skipped",
-          "unknown"
-        ]
+        "knownValues": ["pass", "fail", "error", "skipped", "unknown"]
       },
       {
         "name": "evaluatorScore",
@@ -18907,11 +17838,7 @@
         "valueType": "categorical",
         "group": "span",
         "facetable": true,
-        "knownValues": [
-          "ok",
-          "error",
-          "unset"
-        ]
+        "knownValues": ["ok", "error", "unset"]
       }
     ],
     "dynamicPrefixes": [
@@ -18919,9 +17846,7 @@
         "prefix": "trace.attribute.",
         "label": "Trace attribute",
         "description": "Filter by a key on the trace's `Attributes` map",
-        "aliases": [
-          "attribute."
-        ]
+        "aliases": ["attribute."]
       },
       {
         "prefix": "span.attribute.",
@@ -18933,9 +17858,7 @@
         "prefix": "event.attribute.",
         "label": "Event attribute",
         "description": "Filter by a key on any span event's `Attributes` map",
-        "aliases": [
-          "event."
-        ]
+        "aliases": ["event."]
       }
     ],
     "endpoints": [
@@ -18962,10 +17885,7 @@
       "title": "The most recent traces that failed",
       "intent": "triage",
       "language": "lwql",
-      "tags": [
-        "errors",
-        "starter"
-      ],
+      "tags": ["errors", "starter"],
       "text": "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\n  AND ContainsErrorStatus\nORDER BY OccurredAt DESC\nLIMIT 100",
       "parameters": [],
       "requires": {
@@ -18979,11 +17899,7 @@
       "title": "Error rate per day over a month",
       "intent": "triage",
       "language": "lwql",
-      "tags": [
-        "errors",
-        "time-series",
-        "rates"
-      ],
+      "tags": ["errors", "time-series", "rates"],
       "text": "SELECT\n  toStartOfDay(OccurredAt) AS day,\n  count() AS traces,\n  countIf(ContainsErrorStatus) AS errors\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 30)\nGROUP BY day\nORDER BY day",
       "parameters": [],
       "requires": {
@@ -18998,10 +17914,7 @@
       "title": "Latency percentiles over a week",
       "intent": "latency",
       "language": "lwql",
-      "tags": [
-        "latency",
-        "percentiles"
-      ],
+      "tags": ["latency", "percentiles"],
       "text": "SELECT\n  quantile(0.5)(TotalDurationMs) AS p50_ms,\n  quantile(0.95)(TotalDurationMs) AS p95_ms,\n  quantile(0.99)(TotalDurationMs) AS p99_ms\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 7)",
       "parameters": [],
       "requires": {
@@ -19015,10 +17928,7 @@
       "title": "Traffic and errors per hour from the rollup",
       "intent": "triage",
       "language": "lwql",
-      "tags": [
-        "time-series",
-        "rollups"
-      ],
+      "tags": ["time-series", "rollups"],
       "text": "SELECT\n  toStartOfHour(BucketStart) AS hour,\n  sum(TraceCount) AS traces,\n  sum(ErrorCount) AS errors\nFROM analytics.trace_metrics_by_minute\nWHERE BucketStart >= subtractDays(now(), 2)\nGROUP BY hour\nORDER BY hour",
       "parameters": [],
       "requires": {
@@ -19033,17 +17943,11 @@
       "title": "Spend and tokens by model over a week",
       "intent": "cost",
       "language": "lwql",
-      "tags": [
-        "cost",
-        "models",
-        "rollups"
-      ],
+      "tags": ["cost", "models", "rollups"],
       "text": "SELECT\n  Model,\n  sum(CostSum) AS cost_usd,\n  sum(PromptTokensSum + CompletionTokensSum) AS tokens\nFROM analytics.model_usage_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nGROUP BY Model\nORDER BY cost_usd DESC\nLIMIT 50",
       "parameters": [],
       "requires": {
-        "gates": [
-          "costs"
-        ],
+        "gates": ["costs"],
         "functions": []
       },
       "available": true
@@ -19053,9 +17957,7 @@
       "title": "The longest conversations of the week",
       "intent": "conversations",
       "language": "lwql",
-      "tags": [
-        "conversations"
-      ],
+      "tags": ["conversations"],
       "text": "SELECT\n  ConversationId,\n  count() AS turns,\n  min(OccurredAt) AS started_at,\n  max(OccurredAt) AS last_turn\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\n  AND ConversationId IS NOT NULL\nGROUP BY ConversationId\nORDER BY turns DESC\nLIMIT 50",
       "parameters": [],
       "requires": {
@@ -19070,10 +17972,7 @@
       "title": "Pass rate per evaluator",
       "intent": "quality",
       "language": "lwql",
-      "tags": [
-        "evaluations",
-        "rates"
-      ],
+      "tags": ["evaluations", "rates"],
       "text": "SELECT\n  EvaluatorName,\n  count() AS evaluations,\n  countIf(Passed = 1) AS passed\nFROM analytics.evaluations\nWHERE ScheduledAt >= subtractDays(now(), 7)\n  AND Status = 'processed'\nGROUP BY EvaluatorName\nORDER BY evaluations DESC\nLIMIT 50",
       "parameters": [],
       "requires": {
@@ -19088,11 +17987,7 @@
       "title": "Which traces have the slowest single span",
       "intent": "latency",
       "language": "lwql",
-      "tags": [
-        "latency",
-        "spans",
-        "joins"
-      ],
+      "tags": ["latency", "spans", "joins"],
       "text": "SELECT\n  t.TraceId AS TraceId,\n  t.TraceName AS TraceName,\n  count() AS spans,\n  max(s.DurationMs) AS slowest_span_ms\nFROM analytics.traces AS t\nINNER JOIN analytics.spans AS s\n  ON s.TenantId = t.TenantId AND s.TraceId = t.TraceId\nWHERE t.OccurredAt >= subtractDays(now(), 1)\n  AND s.StartTime >= subtractDays(now(), 1)\nGROUP BY TraceId, TraceName\nORDER BY slowest_span_ms DESC\nLIMIT 50",
       "parameters": [],
       "requires": {
@@ -19107,11 +18002,7 @@
       "title": "One user's traces, with the lookback as a parameter",
       "intent": "discovery",
       "language": "lwql",
-      "tags": [
-        "users",
-        "attributes",
-        "parameters"
-      ],
+      "tags": ["users", "attributes", "parameters"],
       "text": "SELECT\n  TraceId,\n  OccurredAt,\n  Attributes['langwatch.user_id'] AS user_id\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), {days:UInt32})\n  AND Attributes['langwatch.user_id'] = {user_id:String}\nORDER BY OccurredAt DESC\nLIMIT 100",
       "parameters": [
         {
@@ -19137,9 +18028,7 @@
       "title": "Simulation runs that failed",
       "intent": "quality",
       "language": "lwql",
-      "tags": [
-        "simulations"
-      ],
+      "tags": ["simulations"],
       "text": "SELECT ScenarioRunId, Name, Verdict, StartedAt\nFROM analytics.simulations\nWHERE StartedAt >= subtractDays(now(), 7)\n  AND Verdict = 'failure'\nORDER BY StartedAt DESC\nLIMIT 50",
       "parameters": [],
       "requires": {
@@ -19153,11 +18042,7 @@
       "title": "Export captured input and output, page by page",
       "intent": "export",
       "language": "lwql",
-      "tags": [
-        "export",
-        "paging",
-        "parameters"
-      ],
+      "tags": ["export", "paging", "parameters"],
       "text": "SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 7)\n  AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})\nORDER BY OccurredAt, TraceId\nLIMIT 1000",
       "parameters": [
         {
@@ -19172,10 +18057,7 @@
         }
       ],
       "requires": {
-        "gates": [
-          "input",
-          "output"
-        ],
+        "gates": ["input", "output"],
         "functions": []
       },
       "available": true,
@@ -19186,10 +18068,7 @@
       "title": "Traces that failed",
       "intent": "triage",
       "language": "trace-filter",
-      "tags": [
-        "errors",
-        "starter"
-      ],
+      "tags": ["errors", "starter"],
       "text": "status:error",
       "parameters": [],
       "requires": {
@@ -19204,10 +18083,7 @@
       "title": "Failures from the application, not from evaluations or simulations",
       "intent": "triage",
       "language": "trace-filter",
-      "tags": [
-        "errors",
-        "origin"
-      ],
+      "tags": ["errors", "origin"],
       "text": "origin:application AND status:error",
       "parameters": [],
       "requires": {
@@ -19222,11 +18098,7 @@
       "title": "Slow and expensive at once",
       "intent": "cost",
       "language": "trace-filter",
-      "tags": [
-        "latency",
-        "cost",
-        "ranges"
-      ],
+      "tags": ["latency", "cost", "ranges"],
       "text": "duration:>5000 AND cost:>0.10",
       "parameters": [],
       "requires": {
@@ -19241,11 +18113,7 @@
       "title": "One model family failing",
       "intent": "triage",
       "language": "trace-filter",
-      "tags": [
-        "errors",
-        "models",
-        "wildcards"
-      ],
+      "tags": ["errors", "models", "wildcards"],
       "text": "status:error AND model:gpt-*",
       "parameters": [],
       "requires": {
@@ -19259,9 +18127,7 @@
       "title": "Traces an evaluator marked failed",
       "intent": "quality",
       "language": "trace-filter",
-      "tags": [
-        "evaluations"
-      ],
+      "tags": ["evaluations"],
       "text": "evaluatorVerdict:fail",
       "parameters": [],
       "requires": {
@@ -19275,10 +18141,7 @@
       "title": "One evaluator scoring low",
       "intent": "quality",
       "language": "trace-filter",
-      "tags": [
-        "evaluations",
-        "ranges"
-      ],
+      "tags": ["evaluations", "ranges"],
       "text": "evaluator:\"Answer Relevancy\" AND evaluatorScore:<0.5",
       "parameters": [],
       "requires": {
@@ -19293,9 +18156,7 @@
       "title": "Every turn of one conversation",
       "intent": "conversations",
       "language": "trace-filter",
-      "tags": [
-        "conversations"
-      ],
+      "tags": ["conversations"],
       "text": "conversation:\"conv-01H8XK\"",
       "parameters": [],
       "requires": {
@@ -19310,10 +18171,7 @@
       "title": "Only traces that belong to a conversation",
       "intent": "conversations",
       "language": "trace-filter",
-      "tags": [
-        "conversations",
-        "existence"
-      ],
+      "tags": ["conversations", "existence"],
       "text": "has:conversation",
       "parameters": [],
       "requires": {
@@ -19328,9 +18186,7 @@
       "title": "One user's traces",
       "intent": "discovery",
       "language": "trace-filter",
-      "tags": [
-        "users"
-      ],
+      "tags": ["users"],
       "text": "user:\"alice@example.com\"",
       "parameters": [],
       "requires": {
@@ -19344,9 +18200,7 @@
       "title": "A trace-level attribute you send yourself",
       "intent": "discovery",
       "language": "trace-filter",
-      "tags": [
-        "attributes"
-      ],
+      "tags": ["attributes"],
       "text": "trace.attribute.langwatch.user_id:alice",
       "parameters": [],
       "requires": {
@@ -19361,10 +18215,7 @@
       "title": "An attribute on any span of the trace",
       "intent": "discovery",
       "language": "trace-filter",
-      "tags": [
-        "attributes",
-        "spans"
-      ],
+      "tags": ["attributes", "spans"],
       "text": "span.attribute.gen_ai.request.model:gpt-5-mini",
       "parameters": [],
       "requires": {
@@ -19379,11 +18230,7 @@
       "title": "An exception type recorded as a span event",
       "intent": "triage",
       "language": "trace-filter",
-      "tags": [
-        "attributes",
-        "events",
-        "errors"
-      ],
+      "tags": ["attributes", "events", "errors"],
       "text": "event.attribute.exception.type:TimeoutError",
       "parameters": [],
       "requires": {
@@ -19397,10 +18244,7 @@
       "title": "A tool call that failed",
       "intent": "triage",
       "language": "trace-filter",
-      "tags": [
-        "spans",
-        "errors"
-      ],
+      "tags": ["spans", "errors"],
       "text": "spanType:tool AND spanStatus:error",
       "parameters": [],
       "requires": {
@@ -19414,10 +18258,7 @@
       "title": "A phrase anywhere in the captured input or output",
       "intent": "discovery",
       "language": "trace-filter",
-      "tags": [
-        "free-text",
-        "starter"
-      ],
+      "tags": ["free-text", "starter"],
       "text": "\"refund policy\"",
       "parameters": [],
       "requires": {
@@ -19432,9 +18273,7 @@
       "title": "Everything except the clean runs",
       "intent": "triage",
       "language": "trace-filter",
-      "tags": [
-        "negation"
-      ],
+      "tags": ["negation"],
       "text": "origin:application AND NOT status:ok",
       "parameters": [],
       "requires": {
