@@ -114,11 +114,18 @@ vi.mock("../../../hooks/useFacetSearch", () => ({
 // Evals gate suite can flip the flag result and assert on one shared spy —
 // a fresh `vi.fn()` per render (the old shape) can never be asserted on.
 const estimateMutate = vi.fn();
+const enableMutate = vi.fn();
 const routeSearchMutate = vi.fn();
 const featureFlagMock: {
   data: { enabled: boolean } | undefined;
   isLoading: boolean;
 } = { data: { enabled: true }, isLoading: false };
+// The organization's own switch, read beside the flag. Off by default so the
+// flag alone decides in the suites above; the gate suite sets the offer.
+const accessMock: {
+  data: { released: boolean; offer: "enable" | "contact_us" } | undefined;
+  isLoading: boolean;
+} = { data: { released: false, offer: "contact_us" }, isLoading: false };
 vi.mock("~/utils/api", () => ({
   api: {
     tracesV2: {
@@ -126,6 +133,15 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: routeSearchMutate, isPending: false }),
       },
       instantEval: {
+        access: {
+          useQuery: () => ({
+            data: accessMock.data,
+            isLoading: accessMock.isLoading,
+          }),
+        },
+        enable: {
+          useMutation: () => ({ mutate: enableMutate, isPending: false }),
+        },
         estimate: {
           useMutation: () => ({ mutate: estimateMutate, isPending: false }),
         },
@@ -134,6 +150,11 @@ vi.mock("~/utils/api", () => ({
         },
       },
     },
+    useUtils: () => ({
+      tracesV2: {
+        instantEval: { access: { invalidate: vi.fn(), setData: vi.fn() } },
+      },
+    }),
     // The Instant Evals gate reads this flag; stub it enabled so these
     // smoke tests exercise the flag-on path unless a test overrides it.
     featureFlag: {
@@ -199,9 +220,12 @@ beforeEach(() => {
   langyMock.setDraft.mockClear();
   orgProjectMock.project = undefined;
   estimateMutate.mockClear();
+  enableMutate.mockClear();
   routeSearchMutate.mockClear();
   featureFlagMock.data = { enabled: true };
   featureFlagMock.isLoading = false;
+  accessMock.data = { released: false, offer: "contact_us" };
+  accessMock.isLoading = false;
   useSearchSubmitRequestStore.getState().clear();
 });
 
@@ -424,13 +448,14 @@ describe("<SearchBar /> Instant Evals gate", () => {
     orgProjectMock.project = { id: "project-1" };
   });
 
-  describe("given the Instant Evals flag is off for the project", () => {
+  describe("given Instant Evals are off for an enterprise organization", () => {
     beforeEach(() => {
       featureFlagMock.data = { enabled: false };
       featureFlagMock.isLoading = false;
+      accessMock.data = { released: false, offer: "contact_us" };
     });
 
-    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
     it("opens the contact-us popover and searches nothing", async () => {
       const typed = 'eval:"the user is annoyed"';
       // Seeds the store the way the bar shows a recognized chip while the
@@ -460,6 +485,68 @@ describe("<SearchBar /> Instant Evals gate", () => {
       // Nothing was applied over it: the chip stays exactly where the
       // reader left it, under the popover that explains why it did not run.
       expect(useExplorerStore.getState().queryText).toBe(typed);
+    });
+  });
+
+  describe("given Instant Evals are off for a self-serve organization", () => {
+    beforeEach(() => {
+      featureFlagMock.data = { enabled: false };
+      featureFlagMock.isLoading = false;
+      accessMock.data = { released: false, offer: "enable" };
+    });
+
+    /** @scenario "Instant Evals off for a self-serve organization open the enable popover" */
+    it("opens the enable popover, and Enable throws the switch for the project", async () => {
+      const typed = 'eval:"the user is annoyed"';
+      useExplorerStore.getState().applyQueryText(typed);
+      renderSearchBar();
+
+      act(() => {
+        useSearchSubmitRequestStore.getState().requestSubmit({ text: typed });
+      });
+
+      expect(
+        await screen.findByTestId("instant-eval-refusal"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Turn on Instant Evals for your organization"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Read more" })).toHaveAttribute(
+        "href",
+        expect.stringContaining("#where-the-judged-text-goes"),
+      );
+      expect(estimateMutate).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "Enable" }));
+      expect(enableMutate).toHaveBeenCalledTimes(1);
+      expect(enableMutate.mock.calls[0]?.[0]).toEqual({
+        projectId: "project-1",
+      });
+      expect(useExplorerStore.getState().queryText).toBe(typed);
+    });
+  });
+
+  describe("given the organization switched Instant Evals on itself", () => {
+    beforeEach(() => {
+      featureFlagMock.data = { enabled: false };
+      featureFlagMock.isLoading = false;
+      accessMock.data = { released: true, offer: "enable" };
+    });
+
+    /** @scenario "An organization that switched itself on is judged without the flag" */
+    it("lets the submit reach the estimate with the flag off", () => {
+      renderSearchBar();
+
+      act(() => {
+        useSearchSubmitRequestStore
+          .getState()
+          .requestSubmit({ text: 'eval:"the user is annoyed"' });
+      });
+
+      expect(estimateMutate).toHaveBeenCalledTimes(1);
+      expect(
+        screen.queryByTestId("instant-eval-refusal"),
+      ).not.toBeInTheDocument();
     });
   });
 

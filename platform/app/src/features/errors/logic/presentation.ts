@@ -496,12 +496,17 @@ const presentations = {
   instant_eval_not_enabled: {
     title: "Instant Evals aren't available yet",
     describe: () =>
-      "This project can't run Instant Evals. Ask us to turn them on for your workspace.",
+      "Instant Evals are off for this organization. Switch them on from the search bar, or ask us to.",
   },
   instant_eval_not_found: {
     title: "That run doesn't exist",
     describe: () =>
       "The run may have been deleted, or the id may belong to another project.",
+  },
+  instant_eval_opt_in_not_offered: {
+    title: "Ask us to switch Instant Evals on",
+    describe: () =>
+      "Your organization's Instant Evals are switched on by LangWatch. Contact us and we will activate them for you.",
   },
   instant_eval_query_invalid: {
     title: "That query can't run as a job",

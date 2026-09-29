@@ -19,6 +19,15 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getUserProtectionsForProject } from "~/server/api/utils";
 import {
+  instantEvalsReleased,
+  organizationOfProject,
+} from "~/server/app-layer/instant-evals/access";
+import { InstantEvalOptInNotOfferedError } from "~/server/app-layer/instant-evals/errors";
+import {
+  enableInstantEvals,
+  instantEvalOptInOffer,
+} from "~/server/app-layer/instant-evals/opt-in";
+import {
   getInstantEvalRunService,
   type InstantEvalRunInput,
   toInstantEvalExplorerRun,
@@ -27,6 +36,7 @@ import { INSTANT_EVAL_TARGETS } from "~/server/app-layer/instant-evals/shorthand
 import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
 import { queryWithoutInstantEvalChips } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { combineQueries } from "~/server/app-layer/traces/query-language/mutations";
+import { prisma } from "~/server/db";
 
 /**
  * Epoch milliseconds a JavaScript `Date` can represent. The run input is
@@ -119,7 +129,66 @@ const runIdSchema = z.object({
   runId: z.string().min(1).max(200),
 });
 
+const projectScopeSchema = z.object({ projectId: z.string() });
+
 export const tracesV2InstantEvalRouter = createTRPCRouter({
+  /**
+   * Whether the project may be offered a judgement, and what the popover
+   * offers when it may not: the organization's own switch, or a word with us.
+   *
+   * The organization is the project's, resolved here and never taken from the
+   * input: the permission check covers the project only, and an organization
+   * id in the input would let a member of one organization read, or throw,
+   * another organization's switch.
+   */
+  access: protectedProcedure
+    .input(projectScopeSchema)
+    .permission("analytics:view")
+    .query(async ({ input, ctx }) => {
+      const organizationId = await organizationOfProject({
+        prisma,
+        projectId: input.projectId,
+      });
+      const [released, offer] = await Promise.all([
+        instantEvalsReleased({
+          prisma,
+          projectId: input.projectId,
+          organizationId,
+        }),
+        instantEvalOptInOffer({ organizationId, user: ctx.session.user }),
+      ]);
+      return { released, offer };
+    }),
+
+  /**
+   * The organization's switch, thrown by a member who may spend on Instant
+   * Evals. Refused for an organization the popover offers "Contact us" to, so
+   * an enterprise organization is never switched on by a request the popover
+   * did not make.
+   */
+  enable: protectedProcedure
+    .input(projectScopeSchema)
+    .permission("analytics:manage")
+    .mutation(async ({ input, ctx }) => {
+      const organizationId = await organizationOfProject({
+        prisma,
+        projectId: input.projectId,
+      });
+      const offer = await instantEvalOptInOffer({
+        organizationId,
+        user: ctx.session.user,
+      });
+      if (offer !== "enable") {
+        throw new InstantEvalOptInNotOfferedError();
+      }
+      await enableInstantEvals({
+        prisma,
+        organizationId,
+        userId: ctx.session.user.id,
+      });
+      return { released: true, offer: "enable" as const };
+    }),
+
   estimate: protectedProcedure
     .input(explorerInstantEvalRunSchema)
     .permission("analytics:manage")

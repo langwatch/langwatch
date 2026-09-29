@@ -13,11 +13,20 @@ import {
   isSupportChatAvailable,
   toggleSupportChat,
 } from "~/utils/crispBubblePolicy";
+import { docsUrl } from "~/utils/docsUrl";
 
-/** Why an Instant Eval did not start, and what the popover says about it. */
+/**
+ * Why an Instant Eval did not start, and what the popover says about it.
+ *
+ * `opt_in` and `unreleased` are the same refusal, an organization Instant
+ * Evals are not on for, told to two readers: a self-serve organization is
+ * offered the switch, an enterprise organization or a self-hosted install is
+ * offered a word with us.
+ */
 export type InstantEvalRefusal =
   | { kind: "budget" }
   | { kind: "model" }
+  | { kind: "opt_in" }
   | { kind: "unreleased" };
 
 /** Where a paid plan is picked, which is what lifts the free budget. */
@@ -33,15 +42,23 @@ export const MODEL_PROVIDERS_HREF = "/settings/model-providers";
 export const CONTACT_US_HREF =
   "mailto:support@langwatch.ai?subject=Please%20enable%20Instant%20Evals";
 
+/** The docs paragraph that says where the judged text goes. */
+export const WHERE_THE_TEXT_GOES_HREF = docsUrl(
+  "/features/instant-evals/limits-and-cost#where-the-judged-text-goes",
+);
+
 interface InstantEvalRefusalPopoverProps {
   refusal: InstantEvalRefusal | null;
   /**
    * Closing, by the X, a click outside or the secondary button: for budget
-   * and model refusals the phrase search then runs; for an unreleased
-   * project there is no sentence to fall back to, so this only closes the
-   * popover.
+   * and model refusals the phrase search then runs; for an organization
+   * Instant Evals are not on for there is no sentence to fall back to, so
+   * this only closes the popover.
    */
   onClose: () => void;
+  /** The organization's switch. Read by the `opt_in` popover only. */
+  onEnable?: () => void;
+  isEnabling?: boolean;
   children: React.ReactElement;
 }
 
@@ -50,6 +67,8 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
   title: string;
   body: string;
   action: { label: string; href: string };
+  /** A second, quieter link beside the action, when the copy has one. */
+  more?: { label: string; href: string };
   dismiss: string;
 } {
   const what =
@@ -71,6 +90,15 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
       dismiss: "Skip",
     };
   }
+  if (refusal.kind === "opt_in") {
+    return {
+      title: "Turn on Instant Evals for your organization",
+      body: "To judge results, LangWatch sends the text of your traces and your question to TypeSafe's model, under our data processing agreement with them. It is never used to train the model. Enable turns this on for every project in your organization.",
+      action: { label: "Enable", href: "" },
+      more: { label: "Read more", href: WHERE_THE_TEXT_GOES_HREF },
+      dismiss: "Not now",
+    };
+  }
   return {
     title: "Instant Evals aren't enabled for this project yet",
     body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
@@ -83,13 +111,18 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
  * The refusal an Instant Eval met, anchored to the search bar: what the eval
  * would have found here, why it did not run, and the one thing that lifts
  * it. Closable every way. A spent budget or a missing judge falls back to
- * the phrase search, so neither is ever an error state on the page; a
- * project without Instant Evals has no phrase to fall back to, so this is
- * also that project's advertisement for the feature, and closing it just
+ * the phrase search, so neither is ever an error state on the page; an
+ * organization Instant Evals are not on for has no phrase to fall back to,
+ * so this is also its advertisement for the feature, and closing it just
  * leaves the typed chip where the reader put it.
  *
+ * The `opt_in` popover is the explanation the organization reads before it
+ * switches Instant Evals on: where the judged text goes, under what
+ * agreement, and that it is never trained on. "Enable" throws the switch;
+ * "Read more" opens the docs paragraph that says the same at length.
+ *
  * "Contact us" on the unreleased popover opens the support chat when one is
- * available, and falls back to a mailto link otherwise — the copy names
+ * available, and falls back to a mailto link otherwise: the copy names
  * neither route, so it reads the same either way.
  *
  * Spec: specs/traces-v2/instant-eval-search.feature ("A refusal is a
@@ -97,10 +130,11 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
  */
 export const InstantEvalRefusalPopover: React.FC<
   InstantEvalRefusalPopoverProps
-> = ({ refusal, onClose, children }) => {
+> = ({ refusal, onClose, onEnable, isEnabling = false, children }) => {
   const copy = refusal ? instantEvalRefusalCopy(refusal) : null;
   const useSupportChat =
     refusal?.kind === "unreleased" && isSupportChatAvailable();
+  const isOptIn = refusal?.kind === "opt_in";
   return (
     <PopoverRoot
       open={refusal !== null}
@@ -140,14 +174,15 @@ export const InstantEvalRefusalPopover: React.FC<
                 {copy.body}
               </Text>
               <HStack gap={2}>
-                {useSupportChat ? (
+                {isOptIn || useSupportChat ? (
                   <Button
                     size="xs"
                     flex={1}
                     bg="orange.solid"
                     color="white"
                     _hover={{ bg: "orange.fg" }}
-                    onClick={toggleSupportChat}
+                    onClick={isOptIn ? onEnable : toggleSupportChat}
+                    loading={isOptIn && isEnabling}
                   >
                     {copy.action.label}
                   </Button>
@@ -166,6 +201,17 @@ export const InstantEvalRefusalPopover: React.FC<
                       _hover={{ bg: "orange.fg" }}
                     >
                       {copy.action.label}
+                    </Button>
+                  </NextLink>
+                )}
+                {copy.more && (
+                  <NextLink
+                    href={copy.more.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button size="xs" variant="outline">
+                      {copy.more.label}
                     </Button>
                   </NextLink>
                 )}

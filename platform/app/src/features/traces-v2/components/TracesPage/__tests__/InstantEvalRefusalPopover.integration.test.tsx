@@ -24,6 +24,7 @@ import {
   instantEvalRefusalCopy,
   MODEL_PROVIDERS_HREF,
   UPGRADE_HREF,
+  WHERE_THE_TEXT_GOES_HREF,
 } from "../InstantEvalRefusalPopover";
 
 const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -84,9 +85,62 @@ describe("given the deployment has no classifier", () => {
   });
 });
 
-describe("given the Instant Evals flag is off for the project", () => {
+describe("given Instant Evals are off for a self-serve organization", () => {
   describe("when the popover opens", () => {
-    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    /** @scenario "Instant Evals off for a self-serve organization open the enable popover" */
+    it("explains where the text goes, offers Enable and Read more, and dismisses on Not now", () => {
+      const onClose = vi.fn();
+      const onEnable = vi.fn();
+      render(
+        <InstantEvalRefusalPopover
+          refusal={{ kind: "opt_in" }}
+          onClose={onClose}
+          onEnable={onEnable}
+        >
+          <span>anchor</span>
+        </InstantEvalRefusalPopover>,
+        { wrapper },
+      );
+      expect(
+        screen.getByText("Turn on Instant Evals for your organization"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "To judge results, LangWatch sends the text of your traces and your question to TypeSafe's model, under our data processing agreement with them. It is never used to train the model. Enable turns this on for every project in your organization.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Read more" })).toHaveAttribute(
+        "href",
+        WHERE_THE_TEXT_GOES_HREF,
+      );
+      expect(
+        screen.queryByRole("link", { name: "Enable" }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Enable" }));
+      expect(onEnable).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "Instant Evals off for a self-serve organization open the enable popover" */
+    it("links Read more to the docs paragraph on where the judged text goes", () => {
+      expect(WHERE_THE_TEXT_GOES_HREF).toMatch(
+        /\/features\/instant-evals\/limits-and-cost#where-the-judged-text-goes$/,
+      );
+      const copy = instantEvalRefusalCopy({ kind: "opt_in" });
+      expect(copy.action.label).toBe("Enable");
+      expect(copy.more).toEqual({
+        label: "Read more",
+        href: WHERE_THE_TEXT_GOES_HREF,
+      });
+      expect(copy.dismiss).toBe("Not now");
+    });
+  });
+});
+
+describe("given Instant Evals are off for an enterprise organization", () => {
+  describe("when the popover opens", () => {
+    /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
     it("says Instant Evals aren't enabled yet, offers Contact us, and dismisses on Not now", () => {
       const onClose = vi.fn();
       render(
@@ -114,7 +168,7 @@ describe("given the Instant Evals flag is off for the project", () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
     it("pins the unreleased copy, including its dismiss label", () => {
       const copy = instantEvalRefusalCopy({ kind: "unreleased" });
       expect(copy.title).toBe(
@@ -132,7 +186,7 @@ describe("given the Instant Evals flag is off for the project", () => {
   });
 
   describe("when the support chat is available", () => {
-    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
     it("opens the chat and renders no mailto link when Contact us is clicked", () => {
       crispPolicy.isSupportChatAvailable.mockReturnValue(true);
       const onClose = vi.fn();

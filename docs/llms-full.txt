@@ -39196,8 +39196,8 @@ In `-o json`, `run` still waits for the run and prints one document holding the 
 ---
 title: Instant Evals limits, cost and billing
 sidebarTitle: Limits and cost
-keywords: langwatch, instant evals, pricing, cost per token, row cap, free budget, estimate, billing, spend
-description: How many rows and questions a run takes, how long it runs, what a run costs, how to read the cost before you start, the free budget, and where the spend shows up.
+keywords: langwatch, instant evals, pricing, cost per token, row cap, free budget, estimate, billing, spend, typesafe, jev, data processing, sub-processor
+description: How many rows and questions a run takes, how long it runs, what a run costs, how to read the cost before you start, the free budget, where the spend shows up, and where the judged text goes.
 ---
 
 ## Limits
@@ -39262,6 +39262,14 @@ If you cancel a run, you pay for the rows it judged before it stopped, and a run
 
 LangWatch stores the trace, the question and the answer for each verdict, and none of the judged text; read the text again with `sample`. Verdicts are kept until you delete the project, so a question asked about last quarter still has its answer next year.
 
+## Where the judged text goes
+
+The judge is Jev, a model built and run by [TypeSafe](https://typesafe.ai). When a run starts, LangWatch sends TypeSafe the text of each row it judges, the inputs, outputs and metadata of the traces in that row, together with your questions and the name of the model. Nothing else goes with it: no account, organization or project identifier, and no key of yours. Because it is the content of your traces, it may contain personal data.
+
+TypeSafe processes that text on LangWatch's instructions under a data processing agreement, answers the questions, and does not use it to train its models. Nothing is sent unless someone in your organization starts a run or a judged query, and Instant Evals stay off for your organization until you switch them on from the search bar. TypeSafe is listed as a sub-processor on the [LangWatch trust center](https://langwatch.ai/trust-center), with the same description in the [privacy policy](https://langwatch.ai/legal/privacy-policy).
+
+A self-hosted install with its own `JEV_API_KEY` sends the text to TypeSafe directly, under its own agreement with them. A self-hosted install judging through [Connect](/self-hosting/connect) sends it to LangWatch, which passes it to TypeSafe as above.
+
 ---
 
 # FILE: ./features/instant-evals/overview.mdx
@@ -39278,6 +39286,8 @@ description: Ask up to ten questions of every conversation, trace or LLM call in
 An Instant Eval is a question in plain words, judged against every row in a time window of your history. For example, "the customer sounds frustrated" over the last 30 days of conversations comes back as a yes or no per conversation, with the probability behind it, and the count across all of them.
 
 Every row is judged rather than a sample, so the one conversation in ten thousand where the agent promised a refund it cannot give is in the result. The judge is a small calibrated model: 10,000 conversations take about a minute and cost well under a dollar, and 1,000 rows take about nine seconds.
+
+The judge is run by TypeSafe, so the judged text leaves LangWatch for the length of the run. [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes) says exactly what is sent, and under what agreement.
 
 ## Your first run
 
@@ -61286,7 +61296,7 @@ Each service states what it sends before you switch it on. Your traces, datasets
 
 | What is on | What this install sends to LangWatch |
 |---|---|
-| Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
+| Instant Evals | The judged text and the questions asked about it. LangWatch passes them to TypeSafe, the judge, and does not keep them. See [where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes). |
 | Managed models | The prompts and completions of calls that name a `langwatch/` model. No other call reaches the LangWatch slot. |
 | License sync, on a license naming a hosted service | A license token derived from the signed license key (a hash, not the key), the instance id, the app version, and two counts: members and lite members. No organization name. |
 
@@ -61679,7 +61689,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.20.0 # x-release-please-version
+    targetRevision: 3.20.1 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -61728,7 +61738,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.20.0 # x-release-please-version
+      targetRevision: 3.20.1 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -62108,7 +62118,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.20.0 # x-release-please-version
+VERSION=3.20.1 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -62124,13 +62134,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.20.0" # x-release-please-version
+    tag: "3.20.1" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.20.0" # x-release-please-version
+    tag: "3.20.1" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.20.0" # x-release-please-version
+    tag: "3.20.1" # x-release-please-version
 
 imagePullSecrets:
   - name: registry-credentials
@@ -66698,7 +66708,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.20.0 \
+  --version 3.20.1 \
   -f values-production.yaml
 # x-release-please-end
 ```

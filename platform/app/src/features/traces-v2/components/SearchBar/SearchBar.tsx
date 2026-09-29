@@ -26,6 +26,7 @@ import {
 } from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
+import { api } from "~/utils/api";
 import { useInstantEvalRuns } from "../../hooks/useInstantEvalRuns";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
@@ -297,15 +298,28 @@ export const SearchBar: React.FC = () => {
   // the estimate goes out; if the server refuses it, the user gets the model
   // popover and the phrase search fallback, so a slow flag read never hides a
   // feature the project actually has.
+  // The organization's own switch is read beside the flag: either one makes
+  // the judgement available, and the access read also says what the popover
+  // offers a refused reader (the switch, or a word with us).
   const { enabled: instantEvalsReleased, isLoading: instantEvalsFlagLoading } =
     useFeatureFlag("release_instant_evals", {
       projectId: project?.id,
       organizationId: organization?.id,
       enabled: !!project?.id && !!organization?.id,
     });
+  const instantEvalAccess = api.tracesV2.instantEval.access.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id, staleTime: 5 * 60 * 1000 },
+  );
   const isInstantEvalAvailable =
-    instantEvalsReleased || instantEvalsFlagLoading;
-  const instantEval = useInstantEvalRoute({ isInstantEvalAvailable });
+    instantEvalsReleased ||
+    instantEvalsFlagLoading ||
+    !!instantEvalAccess.data?.released ||
+    instantEvalAccess.isLoading;
+  const instantEval = useInstantEvalRoute({
+    isInstantEvalAvailable,
+    optInOffer: instantEvalAccess.data?.offer,
+  });
   const { onInstantEvalRoute } = instantEval;
   // The route's dialog and popover are anchored here, so a caller outside the
   // bar (a Langy action) reaches this same route rather than one of its own.
@@ -568,6 +582,8 @@ export const SearchBar: React.FC = () => {
           <InstantEvalRefusalPopover
             refusal={instantEval.refusal}
             onClose={instantEval.dismissRefusal}
+            onEnable={instantEval.enableInstantEvals}
+            isEnabling={instantEval.isEnabling}
           >
             <Box
               position="absolute"
