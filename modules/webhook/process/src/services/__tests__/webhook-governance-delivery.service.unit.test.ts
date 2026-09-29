@@ -15,10 +15,12 @@ import type { RecordVkLifecycleCommandData } from "@langwatch/gateway-contract";
 import { WEBHOOK_GOVERNANCE_DELIVERY_REQUESTED_EVENT_TYPE } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemorySqsWebhookDestinationChannel } from "../../channels/memory/memory.sqs-webhook-destination.channel.ts";
 import { MemoryWebhookDispatchChannel } from "../../channels/memory/memory.webhook-dispatch.channel.ts";
 import { MemoryWebhookRepositories } from "../../repositories/memory/memory.webhook.repositories.ts";
 import { GOVERNANCE_EVENTS_PROCESS_NAME } from "../../rules/webhook-delivery-contract.rules.ts";
 import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
+import { WebhookDestinationDispatchService } from "../webhook-destination-dispatch.service.ts";
 import { WebhookGovernanceDeliveryService } from "../webhook-governance-delivery.service.ts";
 
 const ORGANIZATION_ID = "organization-1";
@@ -45,8 +47,11 @@ function worker() {
     endpoints,
     pruneExpiredIdempotencyReceipts: async () => 0,
     dispatch: WebhookDeliveryService.dispatchThrough({
-      channel: receiver,
-      allowInsecureLocal: false,
+      destinations: WebhookDestinationDispatchService.create({
+        egress: receiver,
+        allowInsecureLocal: false,
+        sqs: MemorySqsWebhookDestinationChannel.create(),
+      }),
     }),
     getPlan: async () => ({ webhookEndpointsEnabled: true }),
     now: () => clock,

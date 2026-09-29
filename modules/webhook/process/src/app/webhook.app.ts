@@ -1,3 +1,5 @@
+import { AwsClientConfiguration } from "@langwatch/aws-client";
+import { getProcessOutboundProxyConfig, resolveProxyForHost } from "@langwatch/egress";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender, ProcessStore } from "@langwatch/eventing";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
@@ -20,6 +22,7 @@ import {
 } from "@langwatch/webhook-contract";
 
 import { HttpWebhookDispatchChannel } from "../channels/http/http.webhook-dispatch.channel.ts";
+import { SqsWebhookDestinationChannel } from "../channels/sqs/sqs.webhook-destination.channel.ts";
 import {
   buildWebhookDeliveryPipeline,
   type WebhookDeliveryDefinition,
@@ -28,17 +31,18 @@ import type { WebhookEndpointRepository } from "../repositories/webhook-endpoint
 import type { WebhookRepositories } from "../repositories/webhook.repositories.ts";
 import type { WebhookDispatchResult as DeliveryDispatchResult } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
+import { WebhookAccessService } from "../services/webhook-access.service.ts";
 import {
   WebhookDeliveryService,
   type WebhookDeliveryProcessDeps,
 } from "../services/webhook-delivery.service.ts";
+import { WebhookDestinationDispatchService } from "../services/webhook-destination-dispatch.service.ts";
 import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
 import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../services/webhook-events.service.ts";
 import { WebhookGovernanceDeliveryService } from "../services/webhook-governance-delivery.service.ts";
 import { WebhookHealthService } from "../services/webhook-health.service.ts";
 import { WebhookTestBoundsService } from "../services/webhook-test-bounds.service.ts";
-import { buildWebhookComposition } from "./webhook-composition.build.ts";
 
 /** Synthetic test-fire ids; sent once and never read back by kind. */
 const TEST_EVENT_KSUID_RESOURCE = "evttest";
@@ -146,23 +150,34 @@ type WebhookDeliveryParts = Readonly<{
 export class WebhookApp implements WebhookApiContract {
   static readonly contract = WebhookApi;
   /** The entitlement peer this app's own plan gate reads, composed in
-   *  {@link buildWebhookComposition} (`WebhookAccessService`). */
+   *  {@link WebhookApp.create} (`WebhookAccessService`). */
   static readonly dependencies = { entitlement: EntitlementApi };
   /** The test-fire door's per-organization counter. */
   static readonly reads = ["rateLimiter", "redis", "isSaas"] as const;
   static readonly config = webhookConfig;
 
   static create(input: WebhookSetup): WebhookApp {
-    const built = buildWebhookComposition({
-      entitlement: input.dependencies.entitlement,
-    });
     const { entitlement } = input.dependencies;
+    const access = WebhookAccessService.create(entitlement);
+    const http = HttpWebhookDispatchChannel.create({
+      redis: input.members.redis,
+      rejectUnauthorized: input.members.isSaas,
+    });
+    // Read per host at client build, so a proxy configured after boot still applies.
+    const aws = AwsClientConfiguration.create({
+      outboundProxy: {
+        tryResolveForHost: (host) => resolveProxyForHost(getProcessOutboundProxyConfig(), host),
+      },
+    });
     const deliver = WebhookDeliveryService.dispatchThrough({
-      channel: HttpWebhookDispatchChannel.create({
-        redis: input.members.redis,
-        rejectUnauthorized: input.members.isSaas,
+      destinations: WebhookDestinationDispatchService.create({
+        egress: http,
+        allowInsecureLocal: input.config.allowInsecureLocalUrls,
+        sqs: SqsWebhookDestinationChannel.create({
+          awsClientConfig: (config) => aws.build(config),
+        }),
+        rateLimiter: http.rateLimiter,
       }),
-      allowInsecureLocal: input.config.allowInsecureLocalUrls,
     });
 
     const app = new WebhookApp({
@@ -172,7 +187,7 @@ export class WebhookApp implements WebhookApiContract {
         events: input.repositories.events,
         envelopes: WebhookEnvelopeService.create(),
       }),
-      assertEndpointsEntitled: built.assertEndpointsEntitled.bind(built),
+      assertEndpointsEntitled: (organizationId) => access.assertEndpointsAvailable(organizationId),
       dispatch: deliver,
       testFireBounds: WebhookTestBoundsService.create({
         entitlement: input.dependencies.entitlement,

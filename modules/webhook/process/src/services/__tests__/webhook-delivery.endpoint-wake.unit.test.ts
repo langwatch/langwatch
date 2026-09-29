@@ -20,6 +20,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { spendSteps } from "../../__tests__/fixtures/spend-delivery.fixtures.ts";
+import { MemorySqsWebhookDestinationChannel } from "../../channels/memory/memory.sqs-webhook-destination.channel.ts";
 import { MemoryWebhookDispatchChannel } from "../../channels/memory/memory.webhook-dispatch.channel.ts";
 import { MemoryWebhookRepositories } from "../../repositories/memory/memory.webhook.repositories.ts";
 import {
@@ -28,6 +29,7 @@ import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
 } from "../../rules/webhook-delivery-contract.rules.ts";
 import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
+import { WebhookDestinationDispatchService } from "../webhook-destination-dispatch.service.ts";
 
 const ORGANIZATION_ID = "organization-1";
 const PROJECT_ID = "project-1";
@@ -69,8 +71,11 @@ function worker() {
     endpoints,
     pruneExpiredIdempotencyReceipts: async () => 0,
     dispatch: WebhookDeliveryService.dispatchThrough({
-      channel: receiver,
-      allowInsecureLocal: false,
+      destinations: WebhookDestinationDispatchService.create({
+        egress: receiver,
+        allowInsecureLocal: false,
+        sqs: MemorySqsWebhookDestinationChannel.create(),
+      }),
     }),
     getPlan: async () => ({ webhookEndpointsEnabled: true }),
     now: () => clock,

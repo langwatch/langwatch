@@ -44,3 +44,12 @@ Feature: Enterprise webhook endpoints
     Given the webhook endpoints and event-type lists
     When each is read
     Then each answers under "data"
+
+  @unit @integration
+  Scenario: A queue endpoint delivers to its queue through the process's AWS transport
+    Given an endpoint whose destination is an Amazon SQS queue
+    When a batch is delivered or the endpoint is test-fired
+    Then the exact batch body goes on the queue with the signature, delivery id and attempt as message attributes
+    And a queue that refuses the send is classified terminal or retryable from the SDK error, never thrown
+    And a batch over the message limit is refused terminally
+    And an HTTPS endpoint still sends through the egress

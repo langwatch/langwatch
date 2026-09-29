@@ -10,7 +10,7 @@ import { SqsWebhookDestinationService } from "./sqs-webhook-destination.service.
  * What a process must hold before it can deliver to either transport.
  */
 export type WebhookDestinationDeps = Readonly<{
-  egress: WebhookEgressService;
+  egress: Pick<WebhookEgressService, "send">;
   allowInsecureLocal: boolean;
   sqs: SqsWebhookSender;
   /**

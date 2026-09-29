@@ -14,7 +14,6 @@ import {
   type WebhookSpendEventRow,
 } from "@langwatch/webhook-contract";
 
-import type { WebhookDispatchChannel } from "../channels/webhook-dispatch.channel.ts";
 import type { WebhookDeliveryEvent } from "../eventing/webhook-governance-delivery.intent.ts";
 import { webhookSpendDeliveryRequestedEventSchema } from "../eventing/webhook-spend-delivery.intent.ts";
 import {
@@ -53,9 +52,9 @@ import {
   failedDeliverPayload,
   settledDeliverPayload,
 } from "../rules/webhook-spend-payload.rules.ts";
-import { HttpWebhookDestinationService } from "./http-webhook-destination.service.ts";
 import { WebhookBatchSendService } from "./webhook-batch-send.service.ts";
 import { WebhookDeliveryMaintenanceService } from "./webhook-delivery-maintenance.service.ts";
+import type { WebhookDestinationDispatchService } from "./webhook-destination-dispatch.service.ts";
 import { WebhookEndpointStreamService } from "./webhook-endpoint-stream.service.ts";
 import { WebhookEnvelopeService } from "./webhook-envelope.service.ts";
 
@@ -209,33 +208,12 @@ export class WebhookDeliveryService {
         .outbox(WEBHOOK_DELIVERY_OUTBOX);
   }
 
-  /**
-   * Main's `dispatchWebhookThrough` for a process with no AWS transport: an HTTPS endpoint
-   * sends through the channel, a queue endpoint answers main's terminal refusal.
-   */
+  /** Main's `dispatchWebhookThrough`: the transport an endpoint's configuration names sends the batch. */
   static dispatchThrough(input: {
-    channel: WebhookDispatchChannel;
-    allowInsecureLocal: boolean;
+    destinations: Pick<WebhookDestinationDispatchService, "destinationFor">;
   }): WebhookDeliveryProcessDeps["dispatch"] {
-    return (request) => {
-      if (request.destination.kind === "sqs") {
-        logger.error(
-          { organizationId: request.organizationId, endpointId: request.endpointId },
-          "webhook endpoint delivers to a queue, and this process composes no AWS transport",
-        );
-        return Promise.resolve({
-          verdict: "terminal",
-          status: null,
-          body: "",
-          dispatchId: request.batchId,
-          error: "This process composes no AWS transport for queue webhook destinations.",
-        });
-      }
-      return HttpWebhookDestinationService.create({
-        url: request.destination.url,
-        egress: input.channel,
-        allowInsecureLocal: input.allowInsecureLocal,
-      }).send({
+    return (request) =>
+      input.destinations.destinationFor(request.destination).send({
         organizationId: request.organizationId,
         endpointId: request.endpointId,
         body: request.body,
@@ -244,7 +222,6 @@ export class WebhookDeliveryService {
         signingSecrets: request.signingSecrets,
         ...(request.isTestFire ? { isTestFire: true } : {}),
       });
-    };
   }
 
   /** The delay before the attempt after the 1-based `attempt` that just failed. */

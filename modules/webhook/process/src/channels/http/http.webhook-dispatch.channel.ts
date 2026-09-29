@@ -22,15 +22,21 @@ export class HttpWebhookDispatchChannel implements WebhookDispatchChannel {
     redis: WebhookDispatchCounter;
     rejectUnauthorized: boolean;
   }): HttpWebhookDispatchChannel {
+    const rateLimiter = new RedisWebhookDispatchRateLimiter(input.redis);
     return new HttpWebhookDispatchChannel(
       WebhookEgressService.create({
-        rateLimiter: new RedisWebhookDispatchRateLimiter(input.redis),
+        rateLimiter,
         tls: { rejectUnauthorized: input.rejectUnauthorized },
       }),
+      rateLimiter,
     );
   }
 
-  private constructor(private readonly egress: WebhookEgressService) {}
+  /** `rateLimiter` is the counter `egress` already answers to, so a queue send can share it. */
+  private constructor(
+    private readonly egress: WebhookEgressService,
+    readonly rateLimiter: WebhookDispatchRateLimiter,
+  ) {}
 
   send(input: WebhookSendInput): Promise<WebhookSendResult> {
     return this.egress.send(input);
