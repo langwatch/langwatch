@@ -1,4 +1,4 @@
-import { createAnnotation as apiCreateAnnotation } from "../langwatch-api-annotations.js";
+import { createAnnotation as apiCreateAnnotation } from "../langwatch-api-annotations.ts";
 
 export async function handleCreateAnnotation(params: {
   traceId: string;

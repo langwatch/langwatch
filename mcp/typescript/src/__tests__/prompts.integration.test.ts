@@ -6,16 +6,16 @@ import {
   updatePrompt,
   type PromptDetailResponse,
   type PromptVersion,
-} from "../langwatch-api.js";
-import type * as langwatchApiModule from "../langwatch-api.js";
-import { handleGetPrompt } from "../tools/get-prompt.js";
-import { handleUpdatePrompt } from "../tools/update-prompt.js";
+} from "../langwatch-api.ts";
+import type * as langwatchApiModule from "../langwatch-api.ts";
+import { handleGetPrompt } from "../tools/get-prompt.ts";
+import { handleUpdatePrompt } from "../tools/update-prompt.ts";
 
 // Partial mock (spread over the real module) rather than a full replacement:
 // Scenario 11 dynamically imports create-mcp-server.js, which re-exports other
 // langwatch-api.js members (e.g. LangWatchApiError) at tool-registration time.
 // Only the prompt read/write functions need to be fakes for these tests.
-vi.mock("../langwatch-api.js", async (importOriginal) => {
+vi.mock("../langwatch-api.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof langwatchApiModule>();
   return {
     ...actual,
@@ -331,7 +331,7 @@ describe("MCP server platform_get_prompt tool registration", () => {
   describe("when inspecting the registered tool's input schema and description", () => {
     /** @scenario "Documenting the format parameter on the registered tool schema" */
     it("exposes a format parameter accepting digest or json and documents it in the description", async () => {
-      const { createMcpServer } = await import("../create-mcp-server.js");
+      const { createMcpServer } = await import("../create-mcp-server.ts");
       const server = createMcpServer();
       const registeredTools = (
         server as unknown as {
@@ -613,7 +613,7 @@ describe("handleUpdatePrompt()", () => {
   describe("when tag assignment fails but the version was committed", () => {
     /** @scenario "Reporting a version as created but untagged when tag assignment fails and a matching version is found" */
     it("reports the version as created and untagged, with its versionId and the failed tag", async () => {
-      const { LangWatchApiError } = await import("../langwatch-api.js");
+      const { LangWatchApiError } = await import("../langwatch-api.ts");
       mockUpdatePrompt.mockRejectedValue(
         new LangWatchApiError("Tag assignment rejected", 422, "{}"),
       );
@@ -642,7 +642,7 @@ describe("handleUpdatePrompt()", () => {
   describe("when tag assignment fails and no matching version exists", () => {
     /** @scenario "Reporting a plain failure when tag assignment fails and no matching version is found" */
     it("reports a plain failure with no versionId", async () => {
-      const { LangWatchApiError } = await import("../langwatch-api.js");
+      const { LangWatchApiError } = await import("../langwatch-api.ts");
       mockUpdatePrompt.mockRejectedValue(
         new LangWatchApiError("Tag assignment rejected", 422, "{}"),
       );
@@ -672,7 +672,7 @@ describe("handleUpdatePrompt()", () => {
   describe("when the update succeeds but the confirmation read fails", () => {
     /** @scenario "Reporting success without details when the confirmation read fails" */
     it("still reports success with a note that details are unavailable, instead of rejecting", async () => {
-      const { LangWatchApiError } = await import("../langwatch-api.js");
+      const { LangWatchApiError } = await import("../langwatch-api.ts");
       mockUpdatePrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
@@ -697,7 +697,7 @@ describe("handleUpdatePrompt()", () => {
   describe("when tag assignment fails and the confirmation read also fails", () => {
     /** @scenario "Preserving the tag-assignment failure when the confirmation read fails" */
     it("reports the tag failure without claiming whether a version was created", async () => {
-      const { LangWatchApiError } = await import("../langwatch-api.js");
+      const { LangWatchApiError } = await import("../langwatch-api.ts");
       mockUpdatePrompt.mockRejectedValue(
         new LangWatchApiError("Tag assignment rejected", 422, "{}"),
       );

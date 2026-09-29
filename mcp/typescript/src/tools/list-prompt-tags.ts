@@ -1,4 +1,4 @@
-import { listPromptTags as apiListPromptTags } from "../langwatch-api.js";
+import { listPromptTags as apiListPromptTags } from "../langwatch-api.ts";
 
 export async function handleListPromptTags(): Promise<string> {
   const tags = (await apiListPromptTags()) as {

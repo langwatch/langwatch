@@ -1,6 +1,6 @@
-import { getRunPlan as apiGetRunPlan } from "../langwatch-api-run-plans.js";
-import { describeRunPlanScope } from "./format-run-plan.js";
-import { formatEvaluatorAttachments } from "./format-suite-details.js";
+import { getRunPlan as apiGetRunPlan } from "../langwatch-api-run-plans.ts";
+import { describeRunPlanScope } from "./format-run-plan.ts";
+import { formatEvaluatorAttachments } from "./format-suite-details.ts";
 
 /**
  * Handles the platform_get_run_plan MCP tool invocation.

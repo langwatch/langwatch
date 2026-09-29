@@ -3,7 +3,7 @@ import { fileURLToPath } from "url";
 
 import { describe, expect, it } from "vitest";
 
-import { listNativeSkills, renderSkill } from "../_compiler/native.js";
+import { listNativeSkills, renderSkill } from "../_compiler/native.ts";
 
 // Backs specs/langy/langy-code-access.feature: the code-changes skill is what
 // tells Langy when a request needs the customer's code and when the platform

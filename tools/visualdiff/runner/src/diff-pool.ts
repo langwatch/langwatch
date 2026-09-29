@@ -1,6 +1,6 @@
 import { Worker } from "node:worker_threads";
 
-import type { DiffFiles, PixelDiff } from "./diff";
+import type { DiffFiles, PixelDiff } from "./diff.ts";
 
 /** DiffReply is what diff-worker.ts answers one DiffFiles with. */
 interface DiffReply {

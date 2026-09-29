@@ -122,6 +122,6 @@
     "@types/ws": "catalog:",
     "ioredis": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^4.1.9"
+    "vitest": "catalog:"
   }
 }

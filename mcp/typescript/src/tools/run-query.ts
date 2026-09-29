@@ -4,8 +4,8 @@
  * @see specs/mcp-server/schema-discovery.feature
  */
 
-import { runQuery } from "../langwatch-api-query.js";
-import { markdownTable } from "../utils/markdown-table.js";
+import { runQuery } from "../langwatch-api-query.ts";
+import { markdownTable } from "../utils/markdown-table.ts";
 
 /** Rows the table prints. Beyond this, aggregate or export through the CLI. */
 export const RUN_QUERY_ROW_CAP = 50;

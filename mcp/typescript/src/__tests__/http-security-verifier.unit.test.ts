@@ -5,7 +5,7 @@ import {
   createApiKeyVerifier,
   createRateLimiter,
   hashApiKey,
-} from "../http-security.js";
+} from "../http-security.ts";
 
 describe("apiKeysMatch", () => {
   it("matches identical keys", () => {

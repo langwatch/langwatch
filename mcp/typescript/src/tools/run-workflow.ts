@@ -1,4 +1,4 @@
-import { runWorkflow as apiRunWorkflow } from "../langwatch-api-workflows.js";
+import { runWorkflow as apiRunWorkflow } from "../langwatch-api-workflows.ts";
 
 /**
  * Handles the platform_run_workflow MCP tool invocation.

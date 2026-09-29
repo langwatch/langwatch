@@ -2,26 +2,26 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import packageJson from "../package.json" with { type: "json" };
-import { requireApiKey } from "./config.js";
-import { fetchDocumentation } from "./documentation-fetch.js";
-import type { TriggerSummary } from "./langwatch-api-triggers.js";
-import { createDatasetSchema, datasetColumnDefinitionSchema } from "./schemas/create-dataset.js";
+import { requireApiKey } from "./config.ts";
+import { fetchDocumentation } from "./documentation-fetch.ts";
+import type { TriggerSummary } from "./langwatch-api-triggers.ts";
+import { createDatasetSchema, datasetColumnDefinitionSchema } from "./schemas/create-dataset.ts";
 import {
   runParametersSchema,
   runPlanScopeSchema,
   runPlanTargetSchema,
-} from "./schemas/run-plan.js";
+} from "./schemas/run-plan.ts";
 import {
   evaluatorAttachmentsSchema,
   scenarioFieldValuesSchema,
   suiteFieldsSchema,
-} from "./schemas/suite-fields.js";
-import { handleExperimentResults } from "./tools/get-experiment-results.js";
-import { handleExperimentListRuns } from "./tools/list-experiment-runs.js";
-import { handleExperimentList } from "./tools/list-experiments.js";
-import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experiment.js";
-import { handleTestAgent } from "./tools/test-agent.js";
-import { handleUpdateTestSuite } from "./tools/update-test-suite.js";
+} from "./schemas/suite-fields.ts";
+import { handleExperimentResults } from "./tools/get-experiment-results.ts";
+import { handleExperimentListRuns } from "./tools/list-experiment-runs.ts";
+import { handleExperimentList } from "./tools/list-experiments.ts";
+import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experiment.ts";
+import { handleTestAgent } from "./tools/test-agent.ts";
+import { handleUpdateTestSuite } from "./tools/update-test-suite.ts";
 
 const modelSchema = z
   .string()
@@ -138,7 +138,7 @@ function registerDocsTools(server: McpServer): void {
         .describe("Which coding agent this is, e.g. claude-code, codex, cursor"),
     },
     withToolLogging("report_issue", async (params) => {
-      const { handleReportIssue } = await import("./tools/report-issue.js");
+      const { handleReportIssue } = await import("./tools/report-issue.ts");
       return {
         content: [{ type: "text", text: await handleReportIssue(params) }],
       };
@@ -192,27 +192,27 @@ function registerObservabilityTools(server: McpServer): void {
     },
     withToolLogging("discover_schema", async ({ category, evaluatorType }) => {
       if (category === "scenarios") {
-        const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.js");
+        const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.ts");
         return {
           content: [{ type: "text", text: formatScenarioSchema() }],
         };
       }
       if (category === "evaluators") {
-        const { formatEvaluatorSchema } = await import("./tools/discover-evaluator-schema.js");
+        const { formatEvaluatorSchema } = await import("./tools/discover-evaluator-schema.ts");
         return {
           content: [{ type: "text", text: formatEvaluatorSchema(evaluatorType) }],
         };
       }
-      const { formatSchema, needsQueryReference } = await import("./tools/discover-schema.js");
+      const { formatSchema, needsQueryReference } = await import("./tools/discover-schema.ts");
       // The filter and analytics-SQL halves are the PLATFORM's registries, not
       // copies of them, so those categories need the credential. The static
       // ones still answer without it.
       if (needsQueryReference(category)) requireApiKey();
       let text = await formatSchema(category);
       if (category === "all") {
-        const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.js");
+        const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.ts");
         text += "\n\n" + formatScenarioSchema();
-        const { formatEvaluatorSchema } = await import("./tools/discover-evaluator-schema.js");
+        const { formatEvaluatorSchema } = await import("./tools/discover-evaluator-schema.ts");
         text += "\n\n" + formatEvaluatorSchema();
       }
       return { content: [{ type: "text", text }] };
@@ -237,7 +237,7 @@ function registerObservabilityTools(server: McpServer): void {
     },
     withToolLogging("run_query", async (params) => {
       requireApiKey();
-      const { handleRunQuery } = await import("./tools/run-query.js");
+      const { handleRunQuery } = await import("./tools/run-query.ts");
       return {
         content: [{ type: "text", text: await handleRunQuery(params) }],
       };
@@ -275,7 +275,7 @@ function registerObservabilityTools(server: McpServer): void {
     },
     withToolLogging("search_traces", async (params) => {
       requireApiKey();
-      const { handleSearchTraces } = await import("./tools/search-traces.js");
+      const { handleSearchTraces } = await import("./tools/search-traces.ts");
       return {
         content: [{ type: "text", text: await handleSearchTraces(params) }],
       };
@@ -294,7 +294,7 @@ function registerObservabilityTools(server: McpServer): void {
     },
     withToolLogging("get_trace", async (params) => {
       requireApiKey();
-      const { handleGetTrace } = await import("./tools/get-trace.js");
+      const { handleGetTrace } = await import("./tools/get-trace.ts");
       return {
         content: [{ type: "text", text: await handleGetTrace(params) }],
       };
@@ -330,7 +330,7 @@ function registerObservabilityTools(server: McpServer): void {
     },
     withToolLogging("get_analytics", async (params) => {
       requireApiKey();
-      const { handleGetAnalytics } = await import("./tools/get-analytics.js");
+      const { handleGetAnalytics } = await import("./tools/get-analytics.ts");
       return {
         content: [{ type: "text", text: await handleGetAnalytics(params) }],
       };
@@ -377,7 +377,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
     },
     withToolLogging("platform_create_prompt", async (params) => {
       requireApiKey();
-      const { handleCreatePrompt } = await import("./tools/create-prompt.js");
+      const { handleCreatePrompt } = await import("./tools/create-prompt.ts");
       return {
         content: [{ type: "text", text: await handleCreatePrompt(params) }],
       };
@@ -390,7 +390,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
     {},
     withToolLogging("platform_list_prompts", async () => {
       requireApiKey();
-      const { handleListPrompts } = await import("./tools/list-prompts.js");
+      const { handleListPrompts } = await import("./tools/list-prompts.ts");
       return {
         content: [{ type: "text", text: await handleListPrompts() }],
       };
@@ -423,7 +423,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         };
       }
       requireApiKey();
-      const { handleGetPrompt } = await import("./tools/get-prompt.js");
+      const { handleGetPrompt } = await import("./tools/get-prompt.ts");
       return {
         content: [{ type: "text", text: await handleGetPrompt(params) }],
       };
@@ -453,7 +453,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
     },
     withToolLogging("platform_update_prompt", async (params) => {
       requireApiKey();
-      const { handleUpdatePrompt } = await import("./tools/update-prompt.js");
+      const { handleUpdatePrompt } = await import("./tools/update-prompt.ts");
       return {
         content: [{ type: "text", text: await handleUpdatePrompt(params) }],
       };
@@ -471,7 +471,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
     },
     withToolLogging("platform_assign_prompt_tag", async (params) => {
       requireApiKey();
-      const { handleAssignPromptTag } = await import("./tools/assign-prompt-tag.js");
+      const { handleAssignPromptTag } = await import("./tools/assign-prompt-tag.ts");
       return {
         content: [{ type: "text", text: await handleAssignPromptTag(params) }],
       };
@@ -485,7 +485,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
     {},
     withToolLogging("platform_list_prompt_tags", async () => {
       requireApiKey();
-      const { handleListPromptTags } = await import("./tools/list-prompt-tags.js");
+      const { handleListPromptTags } = await import("./tools/list-prompt-tags.ts");
       return {
         content: [{ type: "text", text: await handleListPromptTags() }],
       };
@@ -501,7 +501,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
     },
     withToolLogging("platform_create_prompt_tag", async (params) => {
       requireApiKey();
-      const { handleCreatePromptTag } = await import("./tools/create-prompt-tag.js");
+      const { handleCreatePromptTag } = await import("./tools/create-prompt-tag.ts");
       return {
         content: [{ type: "text", text: await handleCreatePromptTag(params) }],
       };
@@ -517,7 +517,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
     },
     withToolLogging("platform_rename_prompt_tag", async (params) => {
       requireApiKey();
-      const { handleRenamePromptTag } = await import("./tools/rename-prompt-tag.js");
+      const { handleRenamePromptTag } = await import("./tools/rename-prompt-tag.ts");
       return {
         content: [{ type: "text", text: await handleRenamePromptTag(params) }],
       };
@@ -532,7 +532,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
     },
     withToolLogging("platform_delete_prompt_tag", async (params) => {
       requireApiKey();
-      const { handleDeletePromptTag } = await import("./tools/delete-prompt-tag.js");
+      const { handleDeletePromptTag } = await import("./tools/delete-prompt-tag.ts");
       return {
         content: [{ type: "text", text: await handleDeletePromptTag(params) }],
       };
@@ -577,7 +577,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_create_scenario", async (params) => {
       requireApiKey();
-      const { handleCreateScenario } = await import("./tools/create-scenario.js");
+      const { handleCreateScenario } = await import("./tools/create-scenario.ts");
       return {
         content: [{ type: "text", text: await handleCreateScenario(params) }],
       };
@@ -596,7 +596,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_list_scenarios", async (params) => {
       requireApiKey();
-      const { handleListScenarios } = await import("./tools/list-scenarios.js");
+      const { handleListScenarios } = await import("./tools/list-scenarios.ts");
       return {
         content: [{ type: "text", text: await handleListScenarios(params) }],
       };
@@ -615,7 +615,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_get_scenario", async (params) => {
       requireApiKey();
-      const { handleGetScenario } = await import("./tools/get-scenario.js");
+      const { handleGetScenario } = await import("./tools/get-scenario.ts");
       return {
         content: [{ type: "text", text: await handleGetScenario(params) }],
       };
@@ -641,7 +641,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_update_scenario", async (params) => {
       requireApiKey();
-      const { handleUpdateScenario } = await import("./tools/update-scenario.js");
+      const { handleUpdateScenario } = await import("./tools/update-scenario.ts");
       return {
         content: [{ type: "text", text: await handleUpdateScenario(params) }],
       };
@@ -656,7 +656,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_archive_scenario", async (params) => {
       requireApiKey();
-      const { handleArchiveScenario } = await import("./tools/archive-scenario.js");
+      const { handleArchiveScenario } = await import("./tools/archive-scenario.ts");
       return {
         content: [{ type: "text", text: await handleArchiveScenario(params) }],
       };
@@ -731,7 +731,7 @@ function registerRunPlanTools(server: McpServer): void {
     },
     withToolLogging("platform_run_plan", async (params) => {
       requireApiKey();
-      const { handleRunPlan } = await import("./tools/run-plan.js");
+      const { handleRunPlan } = await import("./tools/run-plan.ts");
       return {
         content: [{ type: "text", text: await handleRunPlan(params) }],
       };
@@ -750,7 +750,7 @@ function registerRunPlanTools(server: McpServer): void {
     },
     withToolLogging("platform_list_run_plans", async (params) => {
       requireApiKey();
-      const { handleListRunPlans } = await import("./tools/list-run-plans.js");
+      const { handleListRunPlans } = await import("./tools/list-run-plans.ts");
       return {
         content: [{ type: "text", text: await handleListRunPlans(params) }],
       };
@@ -769,7 +769,7 @@ function registerRunPlanTools(server: McpServer): void {
     },
     withToolLogging("platform_get_run_plan", async (params) => {
       requireApiKey();
-      const { handleGetRunPlan } = await import("./tools/get-run-plan.js");
+      const { handleGetRunPlan } = await import("./tools/get-run-plan.ts");
       return {
         content: [{ type: "text", text: await handleGetRunPlan(params) }],
       };
@@ -792,7 +792,7 @@ function registerRunPlanTools(server: McpServer): void {
     },
     withToolLogging("platform_rerun_run_plan", async (params) => {
       requireApiKey();
-      const { handleRerunRunPlan } = await import("./tools/rerun-run-plan.js");
+      const { handleRerunRunPlan } = await import("./tools/rerun-run-plan.ts");
       return {
         content: [{ type: "text", text: await handleRerunRunPlan(params) }],
       };
@@ -807,7 +807,7 @@ function registerRunPlanTools(server: McpServer): void {
     },
     withToolLogging("platform_archive_run_plan", async (params) => {
       requireApiKey();
-      const { handleArchiveRunPlan } = await import("./tools/archive-run-plan.js");
+      const { handleArchiveRunPlan } = await import("./tools/archive-run-plan.ts");
       return {
         content: [{ type: "text", text: await handleArchiveRunPlan(params) }],
       };
@@ -829,7 +829,7 @@ function registerTestSuiteTools(server: McpServer): void {
     },
     withToolLogging("platform_list_test_suites", async (params) => {
       requireApiKey();
-      const { handleListTestSuites } = await import("./tools/list-test-suites.js");
+      const { handleListTestSuites } = await import("./tools/list-test-suites.ts");
       return {
         content: [{ type: "text", text: await handleListTestSuites(params) }],
       };
@@ -846,7 +846,7 @@ function registerTestSuiteTools(server: McpServer): void {
     },
     withToolLogging("platform_create_test_suite", async (params) => {
       requireApiKey();
-      const { handleCreateTestSuite } = await import("./tools/create-test-suite.js");
+      const { handleCreateTestSuite } = await import("./tools/create-test-suite.ts");
       return {
         content: [{ type: "text", text: await handleCreateTestSuite(params) }],
       };
@@ -865,7 +865,7 @@ function registerTestSuiteTools(server: McpServer): void {
     },
     withToolLogging("platform_get_test_suite", async (params) => {
       requireApiKey();
-      const { handleGetTestSuite } = await import("./tools/get-test-suite.js");
+      const { handleGetTestSuite } = await import("./tools/get-test-suite.ts");
       return {
         content: [{ type: "text", text: await handleGetTestSuite(params) }],
       };
@@ -906,7 +906,7 @@ function registerTestSuiteTools(server: McpServer): void {
     },
     withToolLogging("platform_rename_test_suite", async (params) => {
       requireApiKey();
-      const { handleRenameTestSuite } = await import("./tools/rename-test-suite.js");
+      const { handleRenameTestSuite } = await import("./tools/rename-test-suite.ts");
       return {
         content: [{ type: "text", text: await handleRenameTestSuite(params) }],
       };
@@ -921,7 +921,7 @@ function registerTestSuiteTools(server: McpServer): void {
     },
     withToolLogging("platform_archive_test_suite", async (params) => {
       requireApiKey();
-      const { handleArchiveTestSuite } = await import("./tools/archive-test-suite.js");
+      const { handleArchiveTestSuite } = await import("./tools/archive-test-suite.ts");
       return {
         content: [{ type: "text", text: await handleArchiveTestSuite(params) }],
       };
@@ -972,7 +972,7 @@ function registerTestSuiteTools(server: McpServer): void {
     },
     withToolLogging("platform_run_test_suite", async (params) => {
       requireApiKey();
-      const { handleRunTestSuite } = await import("./tools/run-test-suite.js");
+      const { handleRunTestSuite } = await import("./tools/run-test-suite.ts");
       return {
         content: [{ type: "text", text: await handleRunTestSuite(params) }],
       };
@@ -994,7 +994,7 @@ function registerSimulationRunTools(server: McpServer): void {
     },
     withToolLogging("platform_list_simulation_runs", async (params) => {
       requireApiKey();
-      const { handleListSimulationRuns } = await import("./tools/list-simulation-runs.js");
+      const { handleListSimulationRuns } = await import("./tools/list-simulation-runs.ts");
       return {
         content: [{ type: "text", text: await handleListSimulationRuns(params) }],
       };
@@ -1010,7 +1010,7 @@ function registerSimulationRunTools(server: McpServer): void {
     },
     withToolLogging("platform_get_simulation_run", async (params) => {
       requireApiKey();
-      const { handleGetSimulationRun } = await import("./tools/get-simulation-run.js");
+      const { handleGetSimulationRun } = await import("./tools/get-simulation-run.ts");
       return {
         content: [{ type: "text", text: await handleGetSimulationRun(params) }],
       };
@@ -1034,7 +1034,7 @@ function registerEvaluatorTools(server: McpServer): void {
     },
     withToolLogging("platform_create_evaluator", async (params) => {
       requireApiKey();
-      const { handleCreateEvaluator } = await import("./tools/create-evaluator.js");
+      const { handleCreateEvaluator } = await import("./tools/create-evaluator.ts");
       return {
         content: [{ type: "text", text: await handleCreateEvaluator(params) }],
       };
@@ -1047,7 +1047,7 @@ function registerEvaluatorTools(server: McpServer): void {
     {},
     withToolLogging("platform_list_evaluators", async () => {
       requireApiKey();
-      const { handleListEvaluators } = await import("./tools/list-evaluators.js");
+      const { handleListEvaluators } = await import("./tools/list-evaluators.ts");
       return {
         content: [{ type: "text", text: await handleListEvaluators() }],
       };
@@ -1062,7 +1062,7 @@ function registerEvaluatorTools(server: McpServer): void {
     },
     withToolLogging("platform_get_evaluator", async (params) => {
       requireApiKey();
-      const { handleGetEvaluator } = await import("./tools/get-evaluator.js");
+      const { handleGetEvaluator } = await import("./tools/get-evaluator.ts");
       return {
         content: [{ type: "text", text: await handleGetEvaluator(params) }],
       };
@@ -1082,7 +1082,7 @@ function registerEvaluatorTools(server: McpServer): void {
     },
     withToolLogging("platform_update_evaluator", async (params) => {
       requireApiKey();
-      const { handleUpdateEvaluator } = await import("./tools/update-evaluator.js");
+      const { handleUpdateEvaluator } = await import("./tools/update-evaluator.ts");
       return {
         content: [{ type: "text", text: await handleUpdateEvaluator(params) }],
       };
@@ -1097,7 +1097,7 @@ function registerEvaluatorTools(server: McpServer): void {
     },
     withToolLogging("platform_delete_evaluator", async (params) => {
       requireApiKey();
-      const { handleDeleteEvaluator } = await import("./tools/delete-evaluator.js");
+      const { handleDeleteEvaluator } = await import("./tools/delete-evaluator.ts");
       return {
         content: [{ type: "text", text: await handleDeleteEvaluator(params) }],
       };
@@ -1126,7 +1126,7 @@ function registerModelProviderTools(server: McpServer): void {
     },
     withToolLogging("platform_set_model_provider", async (params) => {
       requireApiKey();
-      const { handleSetModelProvider } = await import("./tools/set-model-provider.js");
+      const { handleSetModelProvider } = await import("./tools/set-model-provider.ts");
       return {
         content: [{ type: "text", text: await handleSetModelProvider(params) }],
       };
@@ -1139,7 +1139,7 @@ function registerModelProviderTools(server: McpServer): void {
     {},
     withToolLogging("platform_list_model_providers", async () => {
       requireApiKey();
-      const { handleListModelProviders } = await import("./tools/list-model-providers.js");
+      const { handleListModelProviders } = await import("./tools/list-model-providers.ts");
       return {
         content: [{ type: "text", text: await handleListModelProviders() }],
       };
@@ -1155,7 +1155,7 @@ function registerAgentTools(server: McpServer): void {
     {},
     withToolLogging("platform_list_agents", async () => {
       requireApiKey();
-      const { handleListAgents } = await import("./tools/list-agents.js");
+      const { handleListAgents } = await import("./tools/list-agents.ts");
       return {
         content: [{ type: "text", text: await handleListAgents() }],
       };
@@ -1170,7 +1170,7 @@ function registerAgentTools(server: McpServer): void {
     },
     withToolLogging("platform_get_agent", async (params) => {
       requireApiKey();
-      const { handleGetAgent } = await import("./tools/get-agent.js");
+      const { handleGetAgent } = await import("./tools/get-agent.ts");
       return {
         content: [{ type: "text", text: await handleGetAgent(params) }],
       };
@@ -1187,7 +1187,7 @@ function registerAgentTools(server: McpServer): void {
     },
     withToolLogging("platform_create_agent", async (params) => {
       requireApiKey();
-      const { handleCreateAgent } = await import("./tools/create-agent.js");
+      const { handleCreateAgent } = await import("./tools/create-agent.ts");
       const parsedConfig = params.config
         ? (JSON.parse(params.config) as Record<string, unknown>)
         : undefined;
@@ -1213,7 +1213,7 @@ function registerAgentTools(server: McpServer): void {
     },
     withToolLogging("platform_update_agent", async (params) => {
       requireApiKey();
-      const { handleUpdateAgent } = await import("./tools/update-agent.js");
+      const { handleUpdateAgent } = await import("./tools/update-agent.ts");
       const parsedConfig = params.config
         ? (JSON.parse(params.config) as Record<string, unknown>)
         : undefined;
@@ -1233,7 +1233,7 @@ function registerAgentTools(server: McpServer): void {
     },
     withToolLogging("platform_delete_agent", async (params) => {
       requireApiKey();
-      const { handleDeleteAgent } = await import("./tools/delete-agent.js");
+      const { handleDeleteAgent } = await import("./tools/delete-agent.ts");
       return {
         content: [{ type: "text", text: await handleDeleteAgent(params) }],
       };
@@ -1263,7 +1263,7 @@ function registerAgentTools(server: McpServer): void {
     },
     withToolLogging("platform_run_agent", async (params) => {
       requireApiKey();
-      const { handleRunAgent } = await import("./tools/run-agent.js");
+      const { handleRunAgent } = await import("./tools/run-agent.ts");
       return {
         content: [{ type: "text", text: await handleRunAgent(params) }],
       };
@@ -1293,7 +1293,7 @@ function registerDashboardTools(server: McpServer): void {
     {},
     withToolLogging("platform_list_dashboards", async () => {
       requireApiKey();
-      const { handleListDashboards } = await import("./tools/list-dashboards.js");
+      const { handleListDashboards } = await import("./tools/list-dashboards.ts");
       return {
         content: [{ type: "text", text: await handleListDashboards() }],
       };
@@ -1308,7 +1308,7 @@ function registerDashboardTools(server: McpServer): void {
     },
     withToolLogging("platform_get_dashboard", async (params) => {
       requireApiKey();
-      const { handleGetDashboard } = await import("./tools/get-dashboard.js");
+      const { handleGetDashboard } = await import("./tools/get-dashboard.ts");
       return {
         content: [{ type: "text", text: await handleGetDashboard(params) }],
       };
@@ -1323,7 +1323,7 @@ function registerDashboardTools(server: McpServer): void {
     },
     withToolLogging("platform_create_dashboard", async (params) => {
       requireApiKey();
-      const { handleCreateDashboard } = await import("./tools/create-dashboard.js");
+      const { handleCreateDashboard } = await import("./tools/create-dashboard.ts");
       return {
         content: [{ type: "text", text: await handleCreateDashboard(params) }],
       };
@@ -1338,7 +1338,7 @@ function registerDashboardTools(server: McpServer): void {
     },
     withToolLogging("platform_delete_dashboard", async (params) => {
       requireApiKey();
-      const { handleDeleteDashboard } = await import("./tools/delete-dashboard.js");
+      const { handleDeleteDashboard } = await import("./tools/delete-dashboard.ts");
       return {
         content: [{ type: "text", text: await handleDeleteDashboard(params) }],
       };
@@ -1354,7 +1354,7 @@ function registerDashboardTools(server: McpServer): void {
     },
     withToolLogging("platform_rename_dashboard", async (params) => {
       requireApiKey();
-      const { renameDashboard } = await import("./langwatch-api-dashboards.js");
+      const { renameDashboard } = await import("./langwatch-api-dashboards.ts");
       const result = await renameDashboard(params.id, { name: params.name });
       return {
         content: [
@@ -1376,7 +1376,7 @@ function registerWorkflowTools(server: McpServer): void {
     {},
     withToolLogging("platform_list_workflows", async () => {
       requireApiKey();
-      const { handleListWorkflows } = await import("./tools/list-workflows.js");
+      const { handleListWorkflows } = await import("./tools/list-workflows.ts");
       return {
         content: [{ type: "text", text: await handleListWorkflows() }],
       };
@@ -1391,7 +1391,7 @@ function registerWorkflowTools(server: McpServer): void {
     },
     withToolLogging("platform_get_workflow", async (params) => {
       requireApiKey();
-      const { handleGetWorkflow } = await import("./tools/get-workflow.js");
+      const { handleGetWorkflow } = await import("./tools/get-workflow.ts");
       return {
         content: [{ type: "text", text: await handleGetWorkflow(params) }],
       };
@@ -1406,7 +1406,7 @@ function registerWorkflowTools(server: McpServer): void {
     },
     withToolLogging("platform_delete_workflow", async (params) => {
       requireApiKey();
-      const { handleDeleteWorkflow } = await import("./tools/delete-workflow.js");
+      const { handleDeleteWorkflow } = await import("./tools/delete-workflow.ts");
       return {
         content: [{ type: "text", text: await handleDeleteWorkflow(params) }],
       };
@@ -1422,7 +1422,7 @@ function registerWorkflowTools(server: McpServer): void {
     },
     withToolLogging("platform_run_workflow", async (params) => {
       requireApiKey();
-      const { handleRunWorkflow } = await import("./tools/run-workflow.js");
+      const { handleRunWorkflow } = await import("./tools/run-workflow.ts");
       return {
         content: [{ type: "text", text: await handleRunWorkflow(params) }],
       };
@@ -1440,7 +1440,7 @@ function registerAnnotationTools(server: McpServer): void {
     },
     withToolLogging("platform_list_annotations", async (params) => {
       requireApiKey();
-      const { handleListAnnotations } = await import("./tools/list-annotations.js");
+      const { handleListAnnotations } = await import("./tools/list-annotations.ts");
       return {
         content: [{ type: "text", text: await handleListAnnotations(params) }],
       };
@@ -1458,7 +1458,7 @@ function registerAnnotationTools(server: McpServer): void {
     },
     withToolLogging("platform_create_annotation", async (params) => {
       requireApiKey();
-      const { handleCreateAnnotation } = await import("./tools/create-annotation.js");
+      const { handleCreateAnnotation } = await import("./tools/create-annotation.ts");
       return {
         content: [{ type: "text", text: await handleCreateAnnotation(params) }],
       };
@@ -1473,7 +1473,7 @@ function registerAnnotationTools(server: McpServer): void {
     },
     withToolLogging("platform_delete_annotation", async (params) => {
       requireApiKey();
-      const { handleDeleteAnnotation } = await import("./tools/delete-annotation.js");
+      const { handleDeleteAnnotation } = await import("./tools/delete-annotation.ts");
       return {
         content: [{ type: "text", text: await handleDeleteAnnotation(params) }],
       };
@@ -1488,7 +1488,7 @@ function registerAnnotationTools(server: McpServer): void {
     },
     withToolLogging("platform_get_annotation", async (params) => {
       requireApiKey();
-      const { getAnnotation } = await import("./langwatch-api-annotations.js");
+      const { getAnnotation } = await import("./langwatch-api-annotations.ts");
       const annotation = await getAnnotation(params.id);
       const lines = [
         `**ID**: ${annotation.id}`,
@@ -1527,7 +1527,7 @@ function registerTriggerTools(server: McpServer): void {
     },
     withToolLogging("platform_list_triggers", async (params) => {
       requireApiKey();
-      const { listTriggers } = await import("./langwatch-api-triggers.js");
+      const { listTriggers } = await import("./langwatch-api-triggers.ts");
       const triggers = await listTriggers();
       if (params.format === "json") {
         return { content: [{ type: "text", text: JSON.stringify(triggers, null, 2) }] };
@@ -1560,7 +1560,7 @@ function registerTriggerTools(server: McpServer): void {
     },
     withToolLogging("platform_create_trigger", async (params) => {
       requireApiKey();
-      const { createTrigger } = await import("./langwatch-api-triggers.js");
+      const { createTrigger } = await import("./langwatch-api-triggers.ts");
       let filters: Record<string, unknown> = {};
       if (params.filters) {
         try {
@@ -1599,7 +1599,7 @@ function registerTriggerTools(server: McpServer): void {
     },
     withToolLogging("platform_update_trigger", async (params) => {
       requireApiKey();
-      const { updateTrigger } = await import("./langwatch-api-triggers.js");
+      const { updateTrigger } = await import("./langwatch-api-triggers.ts");
       const trigger = await updateTrigger(params);
       return {
         content: [
@@ -1617,7 +1617,7 @@ function registerTriggerTools(server: McpServer): void {
     },
     withToolLogging("platform_delete_trigger", async (params) => {
       requireApiKey();
-      const { deleteTrigger } = await import("./langwatch-api-triggers.js");
+      const { deleteTrigger } = await import("./langwatch-api-triggers.ts");
       const result = await deleteTrigger(params.id);
       return { content: [{ type: "text", text: `Trigger ${result.id} deleted.` }] };
     }),
@@ -1632,7 +1632,7 @@ function registerMonitorTools(server: McpServer): void {
     {},
     withToolLogging("platform_list_monitors", async () => {
       requireApiKey();
-      const { listMonitors } = await import("./langwatch-api-monitors.js");
+      const { listMonitors } = await import("./langwatch-api-monitors.ts");
       const monitors = await listMonitors();
       if (monitors.length === 0) {
         return { content: [{ type: "text", text: "No monitors found." }] };
@@ -1660,7 +1660,7 @@ function registerMonitorTools(server: McpServer): void {
     },
     withToolLogging("platform_get_monitor", async (params) => {
       requireApiKey();
-      const { getMonitor } = await import("./langwatch-api-monitors.js");
+      const { getMonitor } = await import("./langwatch-api-monitors.ts");
       const m = await getMonitor(params.id);
       const lines = [
         `**${m.name}** (${m.id})`,
@@ -1691,7 +1691,7 @@ function registerMonitorTools(server: McpServer): void {
     },
     withToolLogging("platform_create_monitor", async (params) => {
       requireApiKey();
-      const { createMonitor } = await import("./langwatch-api-monitors.js");
+      const { createMonitor } = await import("./langwatch-api-monitors.ts");
       const monitor = await createMonitor(params);
       return {
         content: [
@@ -1719,7 +1719,7 @@ function registerMonitorTools(server: McpServer): void {
     },
     withToolLogging("platform_update_monitor", async (params) => {
       requireApiKey();
-      const { updateMonitor } = await import("./langwatch-api-monitors.js");
+      const { updateMonitor } = await import("./langwatch-api-monitors.ts");
       const monitor = await updateMonitor(params);
       return {
         content: [
@@ -1740,7 +1740,7 @@ function registerMonitorTools(server: McpServer): void {
     },
     withToolLogging("platform_delete_monitor", async (params) => {
       requireApiKey();
-      const { deleteMonitor } = await import("./langwatch-api-monitors.js");
+      const { deleteMonitor } = await import("./langwatch-api-monitors.ts");
       const result = await deleteMonitor(params.id);
       return {
         content: [{ type: "text", text: `Monitor ${result.id} deleted.` }],
@@ -1757,7 +1757,7 @@ function registerSecretTools(server: McpServer): void {
     {},
     withToolLogging("platform_list_secrets", async () => {
       requireApiKey();
-      const { listSecrets } = await import("./langwatch-api-secrets.js");
+      const { listSecrets } = await import("./langwatch-api-secrets.ts");
       const secrets = await listSecrets();
       if (secrets.length === 0) {
         return { content: [{ type: "text", text: "No secrets found." }] };
@@ -1783,7 +1783,7 @@ function registerSecretTools(server: McpServer): void {
     },
     withToolLogging("platform_create_secret", async (params) => {
       requireApiKey();
-      const { createSecret } = await import("./langwatch-api-secrets.js");
+      const { createSecret } = await import("./langwatch-api-secrets.ts");
       const secret = await createSecret({ name: params.name, value: params.value });
       return {
         content: [
@@ -1805,7 +1805,7 @@ function registerSecretTools(server: McpServer): void {
     },
     withToolLogging("platform_update_secret", async (params) => {
       requireApiKey();
-      const { updateSecret } = await import("./langwatch-api-secrets.js");
+      const { updateSecret } = await import("./langwatch-api-secrets.ts");
       const secret = await updateSecret({ id: params.id, value: params.value });
       return {
         content: [
@@ -1826,7 +1826,7 @@ function registerSecretTools(server: McpServer): void {
     },
     withToolLogging("platform_delete_secret", async (params) => {
       requireApiKey();
-      const { deleteSecret } = await import("./langwatch-api-secrets.js");
+      const { deleteSecret } = await import("./langwatch-api-secrets.ts");
       const result = await deleteSecret(params.id);
       return { content: [{ type: "text", text: `Secret ${result.id} deleted.` }] };
     }),
@@ -1965,9 +1965,9 @@ function registerDatasetTools(server: McpServer): void {
         .describe("Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"),
     },
     async (params) => {
-      const { requireApiKey } = await import("./config.js");
+      const { requireApiKey } = await import("./config.ts");
       requireApiKey();
-      const { handleListDatasets } = await import("./tools/list-datasets.js");
+      const { handleListDatasets } = await import("./tools/list-datasets.ts");
       return {
         content: [{ type: "text", text: await handleListDatasets(params) }],
       };
@@ -1985,9 +1985,9 @@ function registerDatasetTools(server: McpServer): void {
         .describe("Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"),
     },
     async (params) => {
-      const { requireApiKey } = await import("./config.js");
+      const { requireApiKey } = await import("./config.ts");
       requireApiKey();
-      const { handleGetDataset } = await import("./tools/get-dataset.js");
+      const { handleGetDataset } = await import("./tools/get-dataset.ts");
       return {
         content: [{ type: "text", text: await handleGetDataset(params) }],
       };
@@ -1999,9 +1999,9 @@ function registerDatasetTools(server: McpServer): void {
     "Create a new dataset on the LangWatch platform.",
     createDatasetSchema.shape,
     async (params) => {
-      const { requireApiKey } = await import("./config.js");
+      const { requireApiKey } = await import("./config.ts");
       requireApiKey();
-      const { handleCreateDataset } = await import("./tools/create-dataset.js");
+      const { handleCreateDataset } = await import("./tools/create-dataset.ts");
       return {
         content: [{ type: "text", text: await handleCreateDataset(params) }],
       };
@@ -2020,9 +2020,9 @@ function registerDatasetTools(server: McpServer): void {
         .describe("Updated column definitions"),
     },
     async (params) => {
-      const { requireApiKey } = await import("./config.js");
+      const { requireApiKey } = await import("./config.ts");
       requireApiKey();
-      const { handleUpdateDataset } = await import("./tools/update-dataset.js");
+      const { handleUpdateDataset } = await import("./tools/update-dataset.ts");
       return {
         content: [{ type: "text", text: await handleUpdateDataset(params) }],
       };
@@ -2036,9 +2036,9 @@ function registerDatasetTools(server: McpServer): void {
       slugOrId: z.string().describe("The dataset slug or ID to delete"),
     },
     async (params) => {
-      const { requireApiKey } = await import("./config.js");
+      const { requireApiKey } = await import("./config.ts");
       requireApiKey();
-      const { handleDeleteDataset } = await import("./tools/delete-dataset.js");
+      const { handleDeleteDataset } = await import("./tools/delete-dataset.ts");
       return {
         content: [{ type: "text", text: await handleDeleteDataset(params) }],
       };
@@ -2064,9 +2064,9 @@ function registerDatasetTools(server: McpServer): void {
         .describe("Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"),
     },
     async (params) => {
-      const { requireApiKey } = await import("./config.js");
+      const { requireApiKey } = await import("./config.ts");
       requireApiKey();
-      const { handleListDatasetRecords } = await import("./tools/list-dataset-records.js");
+      const { handleListDatasetRecords } = await import("./tools/list-dataset-records.ts");
       return {
         content: [{ type: "text", text: await handleListDatasetRecords(params) }],
       };
@@ -2085,9 +2085,9 @@ function registerDatasetTools(server: McpServer): void {
         .describe("Array of record entries to create (key-value objects matching dataset columns)"),
     },
     async (params) => {
-      const { requireApiKey } = await import("./config.js");
+      const { requireApiKey } = await import("./config.ts");
       requireApiKey();
-      const { handleCreateDatasetRecords } = await import("./tools/create-dataset-records.js");
+      const { handleCreateDatasetRecords } = await import("./tools/create-dataset-records.ts");
       return {
         content: [{ type: "text", text: await handleCreateDatasetRecords(params) }],
       };
@@ -2103,9 +2103,9 @@ function registerDatasetTools(server: McpServer): void {
       entry: z.record(z.string(), z.unknown()).describe("Updated record entry (key-value object)"),
     },
     async (params) => {
-      const { requireApiKey } = await import("./config.js");
+      const { requireApiKey } = await import("./config.ts");
       requireApiKey();
-      const { handleUpdateDatasetRecord } = await import("./tools/update-dataset-record.js");
+      const { handleUpdateDatasetRecord } = await import("./tools/update-dataset-record.ts");
       return {
         content: [{ type: "text", text: await handleUpdateDatasetRecord(params) }],
       };
@@ -2120,9 +2120,9 @@ function registerDatasetTools(server: McpServer): void {
       recordIds: z.array(z.string()).min(1).max(1000).describe("Array of record IDs to delete"),
     },
     async (params) => {
-      const { requireApiKey } = await import("./config.js");
+      const { requireApiKey } = await import("./config.ts");
       requireApiKey();
-      const { handleDeleteDatasetRecords } = await import("./tools/delete-dataset-records.js");
+      const { handleDeleteDatasetRecords } = await import("./tools/delete-dataset-records.ts");
       return {
         content: [{ type: "text", text: await handleDeleteDatasetRecords(params) }],
       };
@@ -2149,7 +2149,7 @@ function registerProjectTools(server: McpServer): void {
     },
     withToolLogging("platform_list_projects", async (params) => {
       requireApiKey();
-      const { handleListProjects } = await import("./tools/list-projects.js");
+      const { handleListProjects } = await import("./tools/list-projects.ts");
       return {
         content: [{ type: "text", text: await handleListProjects(params) }],
       };
@@ -2164,7 +2164,7 @@ function registerProjectTools(server: McpServer): void {
     },
     withToolLogging("platform_get_project", async (params) => {
       requireApiKey();
-      const { handleGetProject } = await import("./tools/get-project.js");
+      const { handleGetProject } = await import("./tools/get-project.ts");
       return {
         content: [{ type: "text", text: await handleGetProject(params) }],
       };
@@ -2185,7 +2185,7 @@ You must provide either teamId (to add the project to an existing team) or newTe
     },
     withToolLogging("platform_create_project", async (params) => {
       requireApiKey();
-      const { handleCreateProject } = await import("./tools/create-project.js");
+      const { handleCreateProject } = await import("./tools/create-project.ts");
       return {
         content: [{ type: "text", text: await handleCreateProject(params) }],
       };
@@ -2207,7 +2207,7 @@ You must provide either teamId (to add the project to an existing team) or newTe
     },
     withToolLogging("platform_update_project", async (params) => {
       requireApiKey();
-      const { handleUpdateProject } = await import("./tools/update-project.js");
+      const { handleUpdateProject } = await import("./tools/update-project.ts");
       return {
         content: [{ type: "text", text: await handleUpdateProject(params) }],
       };
@@ -2222,7 +2222,7 @@ You must provide either teamId (to add the project to an existing team) or newTe
     },
     withToolLogging("platform_archive_project", async (params) => {
       requireApiKey();
-      const { handleArchiveProject } = await import("./tools/archive-project.js");
+      const { handleArchiveProject } = await import("./tools/archive-project.ts");
       return {
         content: [{ type: "text", text: await handleArchiveProject(params) }],
       };
@@ -2239,7 +2239,7 @@ function registerApiKeyTools(server: McpServer): void {
     {},
     withToolLogging("platform_list_api_keys", async () => {
       requireApiKey();
-      const { handleListApiKeys } = await import("./tools/list-api-keys.js");
+      const { handleListApiKeys } = await import("./tools/list-api-keys.ts");
       return {
         content: [{ type: "text", text: await handleListApiKeys() }],
       };
@@ -2278,7 +2278,7 @@ The token is returned once and cannot be retrieved again.`,
     },
     withToolLogging("platform_create_api_key", async (params) => {
       requireApiKey();
-      const { handleCreateApiKey } = await import("./tools/create-api-key.js");
+      const { handleCreateApiKey } = await import("./tools/create-api-key.ts");
       return {
         content: [{ type: "text", text: await handleCreateApiKey(params) }],
       };
@@ -2293,7 +2293,7 @@ The token is returned once and cannot be retrieved again.`,
     },
     withToolLogging("platform_revoke_api_key", async (params) => {
       requireApiKey();
-      const { handleRevokeApiKey } = await import("./tools/revoke-api-key.js");
+      const { handleRevokeApiKey } = await import("./tools/revoke-api-key.ts");
       return {
         content: [{ type: "text", text: await handleRevokeApiKey(params) }],
       };

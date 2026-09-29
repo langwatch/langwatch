@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 
-import { closeBrowser } from "./capture";
+import { closeBrowser } from "./capture.ts";
 
 try {
   const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });

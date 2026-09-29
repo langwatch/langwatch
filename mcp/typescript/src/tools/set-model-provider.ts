@@ -1,4 +1,4 @@
-import { setModelProvider as apiSetModelProvider } from "../langwatch-api-model-providers.js";
+import { setModelProvider as apiSetModelProvider } from "../langwatch-api-model-providers.ts";
 
 /**
  * Handles the platform_set_model_provider MCP tool: creates or updates

@@ -1,5 +1,5 @@
-import { getTraceById as apiGetTraceById } from "../langwatch-api.js";
-import { formatEvaluationLines } from "../utils/format-evaluations.js";
+import { getTraceById as apiGetTraceById } from "../langwatch-api.ts";
+import { formatEvaluationLines } from "../utils/format-evaluations.ts";
 
 /**
  * Handles the get_trace MCP tool: retrieves a trace by ID as an

@@ -1,6 +1,6 @@
-import type { AnalyticsBucket } from "../langwatch-api.js";
-import { getAnalyticsTimeseries as apiGetAnalytics } from "../langwatch-api.js";
-import { parseRelativeDate } from "../utils/date-parsing.js";
+import type { AnalyticsBucket } from "../langwatch-api.ts";
+import { getAnalyticsTimeseries as apiGetAnalytics } from "../langwatch-api.ts";
+import { parseRelativeDate } from "../utils/date-parsing.ts";
 
 type GroupedData = Record<string, Record<string, number>>;
 

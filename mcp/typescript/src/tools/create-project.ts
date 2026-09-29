@@ -1,4 +1,4 @@
-import { createProject as apiCreateProject } from "../langwatch-api-projects.js";
+import { createProject as apiCreateProject } from "../langwatch-api-projects.ts";
 
 export async function handleCreateProject(params: {
   name: string;

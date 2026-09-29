@@ -158,11 +158,11 @@ describe("TourLayer", () => {
     emitMock.mockReset();
     pushMock.mockReset();
     rects.clear();
-    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
-      function (this: Element) {
-        return rects.get(this.getAttribute("data-tour") ?? "") ?? rect(0, 0, 0, 0);
-      },
-    );
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element,
+    ) {
+      return rects.get(this.getAttribute("data-tour") ?? "") ?? rect(0, 0, 0, 0);
+    });
     useTourRegistry.setState({ actions: {} });
     useGuidedTourStore.setState({
       running: false,

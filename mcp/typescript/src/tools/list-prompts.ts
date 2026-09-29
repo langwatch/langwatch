@@ -1,4 +1,4 @@
-import { listPrompts as apiListPrompts } from "../langwatch-api.js";
+import { listPrompts as apiListPrompts } from "../langwatch-api.ts";
 
 /**
  * Handles the platform_list_prompts MCP tool: lists prompts in the

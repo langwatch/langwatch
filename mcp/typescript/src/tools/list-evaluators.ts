@@ -1,7 +1,7 @@
 import {
   listEvaluators as apiListEvaluators,
   getEvaluatorType,
-} from "../langwatch-api-evaluators.js";
+} from "../langwatch-api-evaluators.ts";
 
 /**
  * Handles the platform_list_evaluators MCP tool: lists evaluators in

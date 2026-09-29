@@ -1,4 +1,4 @@
-import { createDatasetRecords as apiCreateDatasetRecords } from "../langwatch-api-datasets.js";
+import { createDatasetRecords as apiCreateDatasetRecords } from "../langwatch-api-datasets.ts";
 
 /**
  * Handles the platform_create_dataset_records MCP tool: creates records

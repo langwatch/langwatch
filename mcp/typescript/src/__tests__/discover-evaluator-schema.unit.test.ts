@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { formatEvaluatorSchema } from "../tools/discover-evaluator-schema.js";
+import { formatEvaluatorSchema } from "../tools/discover-evaluator-schema.ts";
 
 describe("formatEvaluatorSchema()", () => {
   describe("when called without evaluatorType (overview)", () => {

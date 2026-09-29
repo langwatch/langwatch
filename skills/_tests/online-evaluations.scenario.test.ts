@@ -15,8 +15,8 @@ import {
   installSkillToWorkDir,
   removeSkillTestWorkDir,
   SKILL_TESTS_SET_ID,
-} from "./helpers/claude-code-adapter";
-import { createSkillJudgeModel } from "./helpers/judge-model";
+} from "./helpers/claude-code-adapter.ts";
+import { createSkillJudgeModel } from "./helpers/judge-model.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

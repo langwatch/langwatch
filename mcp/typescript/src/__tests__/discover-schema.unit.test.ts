@@ -6,8 +6,8 @@
  */
 import { describe, it, expect } from "vitest";
 
-import type { QueryReferenceResponse } from "../langwatch-api-query.js";
-import { formatSchema, needsQueryReference } from "../tools/discover-schema.js";
+import type { QueryReferenceResponse } from "../langwatch-api-query.ts";
+import { formatSchema, needsQueryReference } from "../tools/discover-schema.ts";
 import fixture from "./fixtures/query-reference.json" with { type: "json" };
 
 const reference = fixture as unknown as QueryReferenceResponse;

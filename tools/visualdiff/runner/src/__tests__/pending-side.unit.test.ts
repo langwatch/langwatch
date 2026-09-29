@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readPendingSide } from "../pending-side";
+import { readPendingSide } from "../pending-side.ts";
 
 const definition = { name: "base", baseUrl: "", pending: "/run/base-side.json" };
 

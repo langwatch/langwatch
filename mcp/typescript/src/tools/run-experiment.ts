@@ -1,5 +1,5 @@
-import { LangWatchApiError, makeRequest } from "../langwatch-api.js";
-import { deriveRunStatus } from "./experiment-run-status.js";
+import { LangWatchApiError, makeRequest } from "../langwatch-api.ts";
+import { deriveRunStatus } from "./experiment-run-status.ts";
 
 interface EvaluationRunResponse {
   runId: string;

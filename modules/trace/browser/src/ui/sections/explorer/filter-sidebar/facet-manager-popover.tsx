@@ -279,24 +279,23 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
             <Text textStyle="2xs" fontWeight="600">
               {triggerLabel}
             </Text>
-            {orderedKeysAll.length > 0 &&
-              showCount && (
-                // Subtle "shown / available" hint so the user can tell at a
-                // glance how many facets are hidden behind the picker without
-                // opening it. Hidden when the sidebar is narrow (see showCount).
-                <Box
-                  as="span"
-                  bg="bg.muted"
-                  color="fg.subtle"
-                  borderRadius="sm"
-                  paddingX={1}
-                  fontVariantNumeric="tabular-nums"
-                >
-                  <Text as="span" textStyle="2xs" fontWeight="600">
-                    {visibleCount}/{orderedKeysAll.length}
-                  </Text>
-                </Box>
-              )}
+            {orderedKeysAll.length > 0 && showCount && (
+              // Subtle "shown / available" hint so the user can tell at a
+              // glance how many facets are hidden behind the picker without
+              // opening it. Hidden when the sidebar is narrow (see showCount).
+              <Box
+                as="span"
+                bg="bg.muted"
+                color="fg.subtle"
+                borderRadius="sm"
+                paddingX={1}
+                fontVariantNumeric="tabular-nums"
+              >
+                <Text as="span" textStyle="2xs" fontWeight="600">
+                  {visibleCount}/{orderedKeysAll.length}
+                </Text>
+              </Box>
+            )}
           </Button>
         ) : (
           <IconButton

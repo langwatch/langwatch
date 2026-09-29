@@ -48,10 +48,10 @@ WORKDIR /app/mcp/typescript
 
 # The HTTP server is network reachable, so it does not run as root. The node
 # image ships this unprivileged user; everything under /app is read-only at
-# runtime and tsx compiles into the system temp directory.
+# runtime; node transforms the types in memory.
 USER node
 # The HTTP server binds loopback by default. A container has to bind every
 # interface to be reachable from outside itself, so that is opted into here.
 # Publish the port only to a network you trust, and pass --allowedOrigin for
 # any browser origin that needs to reach it.
-CMD ["node", "--import", "tsx/esm", "src/index.ts", "--http", "--port", "3000", "--host", "0.0.0.0"]
+CMD ["node", "--experimental-transform-types", "src/index.ts", "--http", "--port", "3000", "--host", "0.0.0.0"]

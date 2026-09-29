@@ -2,8 +2,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
-import { initConfig } from "./config.js";
-import { createMcpServer } from "./create-mcp-server.js";
+import { initConfig } from "./config.ts";
+import { createMcpServer } from "./create-mcp-server.ts";
 
 const argv = await yargs(hideBin(process.argv))
   .option("apiKey", {
@@ -49,8 +49,8 @@ initConfig({
 });
 
 if (argv.http) {
-  const { startHttpServer } = await import("./http-server.js");
-  const { isLoopbackHost, parseAllowedOrigins } = await import("./http-security.js");
+  const { startHttpServer } = await import("./http-server.ts");
+  const { isLoopbackHost, parseAllowedOrigins } = await import("./http-security.ts");
 
   const allowedOrigins =
     argv.allowedOrigin && argv.allowedOrigin.length > 0

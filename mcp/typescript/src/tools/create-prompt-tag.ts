@@ -1,4 +1,4 @@
-import { createPromptTag as apiCreatePromptTag } from "../langwatch-api.js";
+import { createPromptTag as apiCreatePromptTag } from "../langwatch-api.ts";
 
 export async function handleCreatePromptTag(params: { name: string }): Promise<string> {
   await apiCreatePromptTag(params.name);

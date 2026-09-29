@@ -3,7 +3,7 @@ import { fileURLToPath } from "url";
 
 import { describe, expect, it } from "vitest";
 
-import { listNativeSkills, renderSkill } from "../_compiler/native.js";
+import { listNativeSkills, renderSkill } from "../_compiler/native.ts";
 
 // Backs specs/langy/langy-dogfood-scenarios.feature: the tracing skill is what
 // tells Langy how to prove the instrumentation works. A filmed run asked the

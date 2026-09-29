@@ -4,8 +4,8 @@ import { chromium } from "playwright";
 import type { Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { closeBrowser } from "../capture";
-import { targetOf } from "../flows/target";
+import { closeBrowser } from "../capture.ts";
+import { targetOf } from "../flows/target.ts";
 
 const installed = existsSync(chromium.executablePath());
 

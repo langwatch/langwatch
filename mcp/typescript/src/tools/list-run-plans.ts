@@ -1,5 +1,5 @@
-import { listRunPlans as apiListRunPlans } from "../langwatch-api-run-plans.js";
-import { describeRunPlanScope } from "./format-run-plan.js";
+import { listRunPlans as apiListRunPlans } from "../langwatch-api-run-plans.ts";
+import { describeRunPlanScope } from "./format-run-plan.ts";
 
 /**
  * Handles the platform_list_run_plans MCP tool invocation.

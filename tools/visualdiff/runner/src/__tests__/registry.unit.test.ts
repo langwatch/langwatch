@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { REGISTRY, resolveAction } from "../flows/registry";
+import { REGISTRY, resolveAction } from "../flows/registry.ts";
 
 /**
  * The Go side refuses a step naming an action this package does not implement,

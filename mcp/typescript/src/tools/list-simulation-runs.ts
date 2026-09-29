@@ -1,5 +1,5 @@
-import { listSimulationRuns as apiListSimulationRuns } from "../langwatch-api-simulation-runs.js";
-import { formatRunStatus } from "./format-suite-details.js";
+import { listSimulationRuns as apiListSimulationRuns } from "../langwatch-api-simulation-runs.ts";
+import { formatRunStatus } from "./format-suite-details.ts";
 
 /**
  * Handles the platform_list_simulation_runs MCP tool invocation.

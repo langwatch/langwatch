@@ -38,8 +38,7 @@ type PrepareStep struct {
 // generated files (Prisma client, evaluator types, the langy skill/setup
 // generators), then - modular layout only - the workspace packages the api
 // and worker import a built dist from. CI is unset for the install so
-// install-check-shims and friends behave as they do for a person, not for a
-// pipeline (dev/scripts/install-check-shims.mjs stands down under CI).
+// it behaves as it does for a person, not for a pipeline.
 //
 // The monolith layout's own generated-files script (platform/app's
 // start:prepare:files, on origin/main) already builds the SDK and the MCP

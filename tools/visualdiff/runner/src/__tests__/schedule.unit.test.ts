@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { orderFlows, runPool, width } from "../schedule";
+import { orderFlows, runPool, width } from "../schedule.ts";
 
 const flow = (id: string, actions: string[]) => ({
   id,

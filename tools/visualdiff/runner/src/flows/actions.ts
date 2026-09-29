@@ -1,6 +1,6 @@
-import type { Action } from "./context";
-import { argument, scope } from "./context";
-import { clickText, dismissTour, fillField, goTo } from "./primitives";
+import type { Action } from "./context.ts";
+import { argument, scope } from "./context.ts";
+import { clickText, dismissTour, fillField, goTo } from "./primitives.ts";
 
 const required = async (context: Parameters<Action>[0], text: string): Promise<void> =>
   clickText({ context, text });

@@ -8,8 +8,8 @@ import type { AddressInfo } from "node:net";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { initConfig } from "../config.js";
-import { startHttpServer } from "../http-server.js";
+import { initConfig } from "../config.ts";
+import { startHttpServer } from "../http-server.ts";
 import {
   countingVerifier,
   initializeBody,
@@ -17,7 +17,7 @@ import {
   startHarness,
   VALID_KEY,
   type Harness,
-} from "./support/http-server-harness.js";
+} from "./support/http-server-harness.ts";
 
 beforeEach(() => {
   initConfig({ endpoint: "https://app.langwatch.ai" });

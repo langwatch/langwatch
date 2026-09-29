@@ -1,5 +1,5 @@
-import { getScenario as apiGetScenario } from "../langwatch-api-scenarios.js";
-import { formatScenarioFields } from "./format-scenario.js";
+import { getScenario as apiGetScenario } from "../langwatch-api-scenarios.ts";
+import { formatScenarioFields } from "./format-scenario.ts";
 
 /**
  * Handles the get_scenario MCP tool: retrieves a scenario by ID and

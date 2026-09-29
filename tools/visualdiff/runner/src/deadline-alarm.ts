@@ -1,4 +1,4 @@
-import { note } from "./protocol";
+import { note } from "./protocol.ts";
 
 /** DEADLINE_ALARM_ROUTES is how many of a side's first routes decide whether settling is broken. */
 export const DEADLINE_ALARM_ROUTES = 5;

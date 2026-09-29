@@ -191,8 +191,7 @@ stack:
    generate time.
 2. `env -u CI pnpm install --frozen-lockfile` - pnpm's workspace symlinks are
    per worktree, so a developer's own `node_modules` is no help here. `CI` is
-   unset so `dev/scripts/install-check-shims.mjs` and friends behave as they
-   do for a person, not for a pipeline.
+   unset so the install behaves as it does for a person, not for a pipeline.
 3. `pnpm run start:prepare:files` - the generated files (Prisma client,
    evaluator types, the langy skill/setup generators). The same command on
    both refs: the script name is identical in both layouts' root

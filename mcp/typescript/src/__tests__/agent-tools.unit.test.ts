@@ -6,20 +6,20 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../langwatch-api.js", async (importOriginal) => {
+vi.mock("../langwatch-api.ts", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, makeRequest: vi.fn() };
 });
-vi.mock("../public-http-request.js", () => ({ requestPublicJson: vi.fn() }));
+vi.mock("../public-http-request.ts", () => ({ requestPublicJson: vi.fn() }));
 
-import { runAgent, type AgentSummary } from "../langwatch-api-agents.js";
-import { makeRequest } from "../langwatch-api.js";
-import { requestPublicJson } from "../public-http-request.js";
-import { runPlanTargetSchema, toWireTargets } from "../schemas/run-plan.js";
-import { handleGetAgent } from "../tools/get-agent.js";
-import { handleListAgents } from "../tools/list-agents.js";
-import { handleRunAgent } from "../tools/run-agent.js";
-import { handleTestAgent } from "../tools/test-agent.js";
+import { runAgent, type AgentSummary } from "../langwatch-api-agents.ts";
+import { makeRequest } from "../langwatch-api.ts";
+import { requestPublicJson } from "../public-http-request.ts";
+import { runPlanTargetSchema, toWireTargets } from "../schemas/run-plan.ts";
+import { handleGetAgent } from "../tools/get-agent.ts";
+import { handleListAgents } from "../tools/list-agents.ts";
+import { handleRunAgent } from "../tools/run-agent.ts";
+import { handleTestAgent } from "../tools/test-agent.ts";
 
 const mockRequest = vi.mocked(makeRequest);
 const mockPublic = vi.mocked(requestPublicJson);

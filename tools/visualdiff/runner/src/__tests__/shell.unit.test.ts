@@ -4,9 +4,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { Pairing, readReplay, SIGN_IN_FLOW } from "../pairing";
-import type { CaptureMessage, Plan } from "../protocol";
-import { shellBroken } from "../shell";
+import { Pairing, readReplay, SIGN_IN_FLOW } from "../pairing.ts";
+import type { CaptureMessage, Plan } from "../protocol.ts";
+import { shellBroken } from "../shell.ts";
 
 const capture = (overrides: Partial<CaptureMessage>): CaptureMessage => ({
   type: "capture",

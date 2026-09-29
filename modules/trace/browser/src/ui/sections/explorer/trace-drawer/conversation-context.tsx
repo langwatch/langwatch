@@ -529,70 +529,69 @@ function ContextBody({
           </Text>
         </Box>
       )}
-      {!showSkeleton &&
-        rows.length > 0 && (
-          // Bookshelf slide on navigation: the whole 3-row strip slides up
-          // (J / forward) or down (K / backward), exiting one strip while the
-          // new one slides in from the opposite side. Same snappy spring as
-          // the body bookshelf.
-          <Box
-            position="relative"
-            borderRadius="md"
-            borderWidth="1px"
-            // Light mode uses a deeper gray than `border.muted` so the
-            // card frame reads against the white panel surface. Dark
-            // mode keeps the validated muted border.
-            borderColor={{ base: "gray.200", _dark: "border.muted" }}
-            bg="bg.panel"
-            overflow="hidden"
-          >
-            <AnimatePresence mode="popLayout" initial={false}>
-              <motion.div
-                key={traceId}
-                variants={SLIDE_VARIANTS}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={SLIDE_TRANSITION}
-              >
-                <VStack align="stretch" gap={0}>
-                  {turnsAbove > 0 && (
-                    <Text
-                      textStyle="2xs"
-                      color="fg.subtle"
-                      textAlign="center"
-                      paddingY={1}
-                      borderBottomWidth="1px"
-                      borderColor={{ base: "gray.200", _dark: "border.muted" }}
-                    >
-                      {turnsAbove} {turnsAbove === 1 ? "turn" : "turns"} above
-                    </Text>
-                  )}
-                  {rows.map((row, i) => (
-                    <ConversationRow
-                      key={row.key}
-                      row={row}
-                      isLast={i === rows.length - 1 && turnsBelow === 0}
-                      onSelect={onSelect}
-                    />
-                  ))}
-                  {turnsBelow > 0 && (
-                    <Text
-                      textStyle="2xs"
-                      color="fg.subtle"
-                      textAlign="center"
-                      paddingY={1}
-                      borderTopWidth="1px"
-                      borderColor={{ base: "gray.200", _dark: "border.muted" }}
-                    >
-                      {turnsBelow} {turnsBelow === 1 ? "turn" : "turns"} below
-                    </Text>
-                  )}
-                </VStack>
-              </motion.div>
-            </AnimatePresence>
-          </Box>
-        )}
+      {!showSkeleton && rows.length > 0 && (
+        // Bookshelf slide on navigation: the whole 3-row strip slides up
+        // (J / forward) or down (K / backward), exiting one strip while the
+        // new one slides in from the opposite side. Same snappy spring as
+        // the body bookshelf.
+        <Box
+          position="relative"
+          borderRadius="md"
+          borderWidth="1px"
+          // Light mode uses a deeper gray than `border.muted` so the
+          // card frame reads against the white panel surface. Dark
+          // mode keeps the validated muted border.
+          borderColor={{ base: "gray.200", _dark: "border.muted" }}
+          bg="bg.panel"
+          overflow="hidden"
+        >
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.div
+              key={traceId}
+              variants={SLIDE_VARIANTS}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={SLIDE_TRANSITION}
+            >
+              <VStack align="stretch" gap={0}>
+                {turnsAbove > 0 && (
+                  <Text
+                    textStyle="2xs"
+                    color="fg.subtle"
+                    textAlign="center"
+                    paddingY={1}
+                    borderBottomWidth="1px"
+                    borderColor={{ base: "gray.200", _dark: "border.muted" }}
+                  >
+                    {turnsAbove} {turnsAbove === 1 ? "turn" : "turns"} above
+                  </Text>
+                )}
+                {rows.map((row, i) => (
+                  <ConversationRow
+                    key={row.key}
+                    row={row}
+                    isLast={i === rows.length - 1 && turnsBelow === 0}
+                    onSelect={onSelect}
+                  />
+                ))}
+                {turnsBelow > 0 && (
+                  <Text
+                    textStyle="2xs"
+                    color="fg.subtle"
+                    textAlign="center"
+                    paddingY={1}
+                    borderTopWidth="1px"
+                    borderColor={{ base: "gray.200", _dark: "border.muted" }}
+                  >
+                    {turnsBelow} {turnsBelow === 1 ? "turn" : "turns"} below
+                  </Text>
+                )}
+              </VStack>
+            </motion.div>
+          </AnimatePresence>
+        </Box>
+      )}
     </>
   );
 }

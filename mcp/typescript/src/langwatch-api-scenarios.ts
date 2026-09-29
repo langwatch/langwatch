@@ -1,5 +1,5 @@
-import { makeRequest } from "./langwatch-api.js";
-import type { ScenarioFieldValues } from "./schemas/suite-fields.js";
+import { makeRequest } from "./langwatch-api.ts";
+import type { ScenarioFieldValues } from "./schemas/suite-fields.ts";
 
 // --- Scenario types ---
 

@@ -1,11 +1,11 @@
 import { join } from "node:path";
 
-import { captureMessage, type Side } from "./capture";
-import { signIn } from "./flows/actions";
-import { declinePasskeyOffer, passkeyOffer } from "./flows/primitives";
-import { SIGN_IN_FLOW } from "./pairing";
-import type { Plan } from "./protocol";
-import type { Collect } from "./screens";
+import { captureMessage, type Side } from "./capture.ts";
+import { signIn } from "./flows/actions.ts";
+import { declinePasskeyOffer, passkeyOffer } from "./flows/primitives.ts";
+import { SIGN_IN_FLOW } from "./pairing.ts";
+import type { Plan } from "./protocol.ts";
+import type { Collect } from "./screens.ts";
 
 /** Sign-in waits this long for the passkey offer to arrive once the page has settled. */
 const PASSKEY_SIGN_IN_PROBE_MILLIS = 2000;

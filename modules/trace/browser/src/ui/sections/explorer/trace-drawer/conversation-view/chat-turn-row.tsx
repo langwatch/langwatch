@@ -363,19 +363,18 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           translate={assistantTranslate}
         />
       )}
-      {!assistantBody &&
-        turn.outputRedacted && (
-          // Output hidden by a privacy rule — the shared "Redacted" marker on the
-          // assistant side, so a hidden response isn't mistaken for an empty turn.
-          <RedactedTurnLine
-            layout={layout}
-            side={assistantSide}
-            tone={assistantVisuals.displayRole}
-            label={assistantLabel}
-            icon={<AssistantIcon />}
-            visibleTo={turn.outputVisibleTo}
-          />
-        )}
+      {!assistantBody && turn.outputRedacted && (
+        // Output hidden by a privacy rule — the shared "Redacted" marker on the
+        // assistant side, so a hidden response isn't mistaken for an empty turn.
+        <RedactedTurnLine
+          layout={layout}
+          side={assistantSide}
+          tone={assistantVisuals.displayRole}
+          label={assistantLabel}
+          icon={<AssistantIcon />}
+          visibleTo={turn.outputVisibleTo}
+        />
+      )}
     </VStack>
   );
 });

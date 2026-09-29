@@ -1,4 +1,4 @@
-import { getWorkflow as apiGetWorkflow } from "../langwatch-api-workflows.js";
+import { getWorkflow as apiGetWorkflow } from "../langwatch-api-workflows.ts";
 
 export async function handleGetWorkflow(params: { id: string }): Promise<string> {
   const workflow = await apiGetWorkflow(params.id);

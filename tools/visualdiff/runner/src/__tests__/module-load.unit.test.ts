@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { isModuleConsoleError, isModuleRequest, needsRecapture } from "../module-load";
-import type { CaptureMessage } from "../protocol";
-import { runPoolWithRecapture } from "../schedule";
+import { isModuleConsoleError, isModuleRequest, needsRecapture } from "../module-load.ts";
+import type { CaptureMessage } from "../protocol.ts";
+import { runPoolWithRecapture } from "../schedule.ts";
 
 const origin = "https://app.visualdiff-1-candidate.langwatch.localhost";
 

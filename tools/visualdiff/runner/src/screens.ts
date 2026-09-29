@@ -1,14 +1,14 @@
 import { join } from "node:path";
 
-import { captureMessage, type Side } from "./capture";
-import { DeadlineAlarm } from "./deadline-alarm";
-import { fillPath, sideFixtures } from "./flows/context";
-import { fillArgs, flowValues, ISOLATED_KEY, ISOLATED_SLUG, uidFor } from "./flows/values";
-import { describeExpect } from "./flows/expect";
-import { declinePasskeyOffer } from "./flows/primitives";
-import { resolveAction } from "./flows/registry";
-import { needsRecapture } from "./module-load";
-import { safeName } from "./pairing";
+import { captureMessage, type Side } from "./capture.ts";
+import { DeadlineAlarm } from "./deadline-alarm.ts";
+import { fillPath, sideFixtures } from "./flows/context.ts";
+import { fillArgs, flowValues, ISOLATED_KEY, ISOLATED_SLUG, uidFor } from "./flows/values.ts";
+import { describeExpect } from "./flows/expect.ts";
+import { declinePasskeyOffer } from "./flows/primitives.ts";
+import { resolveAction } from "./flows/registry.ts";
+import { needsRecapture } from "./module-load.ts";
+import { safeName } from "./pairing.ts";
 import {
   emit,
   note,
@@ -16,9 +16,9 @@ import {
   type Credential,
   type Plan,
   type PlanFlow,
-} from "./protocol";
-import { runPoolWithRecapture } from "./schedule";
-import { SHELL_PROBE, shellBroken, type ShellProbe } from "./shell";
+} from "./protocol.ts";
+import { runPoolWithRecapture } from "./schedule.ts";
+import { SHELL_PROBE, shellBroken, type ShellProbe } from "./shell.ts";
 
 export type Collect = (message: CaptureMessage) => void;
 

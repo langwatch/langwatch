@@ -1,4 +1,4 @@
-import type { ScenarioFieldValues } from "../schemas/suite-fields.js";
+import type { ScenarioFieldValues } from "../schemas/suite-fields.ts";
 
 /** The digest lines for the values a scenario carries per suite field. */
 export function formatScenarioFields(fields: ScenarioFieldValues | undefined): string[] {

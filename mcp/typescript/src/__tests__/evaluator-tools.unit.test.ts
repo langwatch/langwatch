@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../langwatch-api-evaluators.js", async (importOriginal) => {
+vi.mock("../langwatch-api-evaluators.ts", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
@@ -16,11 +16,11 @@ import {
   getEvaluator,
   createEvaluator,
   updateEvaluator,
-} from "../langwatch-api-evaluators.js";
-import { handleCreateEvaluator } from "../tools/create-evaluator.js";
-import { handleGetEvaluator } from "../tools/get-evaluator.js";
-import { handleListEvaluators } from "../tools/list-evaluators.js";
-import { handleUpdateEvaluator } from "../tools/update-evaluator.js";
+} from "../langwatch-api-evaluators.ts";
+import { handleCreateEvaluator } from "../tools/create-evaluator.ts";
+import { handleGetEvaluator } from "../tools/get-evaluator.ts";
+import { handleListEvaluators } from "../tools/list-evaluators.ts";
+import { handleUpdateEvaluator } from "../tools/update-evaluator.ts";
 
 const mockListEvaluators = vi.mocked(listEvaluators);
 const mockGetEvaluator = vi.mocked(getEvaluator);

@@ -10,8 +10,8 @@ import {
   createSkillTestWorkDir,
   installSkillToWorkDir,
   removeSkillTestWorkDir,
-} from "./claude-code-adapter";
-import { createSkillJudgeModel } from "./judge-model";
+} from "./claude-code-adapter.ts";
+import { createSkillJudgeModel } from "./judge-model.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

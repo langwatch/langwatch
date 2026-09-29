@@ -1,7 +1,7 @@
 import type { Locator, Page } from "playwright";
 
-import type { Side } from "../capture";
-import type { Credential, Plan } from "../protocol";
+import type { Side } from "../capture.ts";
+import type { Credential, Plan } from "../protocol.ts";
 
 export interface ActionContext {
   side: Side;

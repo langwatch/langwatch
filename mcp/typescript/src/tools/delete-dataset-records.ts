@@ -1,4 +1,4 @@
-import { deleteDatasetRecords as apiDeleteDatasetRecords } from "../langwatch-api-datasets.js";
+import { deleteDatasetRecords as apiDeleteDatasetRecords } from "../langwatch-api-datasets.ts";
 
 /**
  * Handles the platform_delete_dataset_records MCP tool: deletes records

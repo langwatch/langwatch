@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { describeExpect, judgeCount } from "../flows/expect";
-import { fixturePath } from "../flows/interactions";
-import { newest, summaries } from "../flows/mail";
-import { hasTarget, isTargeted } from "../flows/target";
-import { fillArgs, fillValues, uidFor } from "../flows/values";
-import { flowProject } from "../screens";
+import { describeExpect, judgeCount } from "../flows/expect.ts";
+import { fixturePath } from "../flows/interactions.ts";
+import { newest, summaries } from "../flows/mail.ts";
+import { hasTarget, isTargeted } from "../flows/target.ts";
+import { fillArgs, fillValues, uidFor } from "../flows/values.ts";
+import { flowProject } from "../screens.ts";
 
 const plan = {
   slug: "local-dev-project",

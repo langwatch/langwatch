@@ -4,8 +4,8 @@
 
 import { expect, vi } from "vitest";
 
-import type { ApiKeyVerifier } from "../../http-security.js";
-import { startHttpServer } from "../../http-server.js";
+import type { ApiKeyVerifier } from "../../http-security.ts";
+import { startHttpServer } from "../../http-server.ts";
 
 /** Standard headers the MCP Streamable HTTP protocol requires on POST. */
 export const MCP_POST_HEADERS = {

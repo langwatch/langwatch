@@ -60,6 +60,6 @@
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
-    "vitest": "^4.1.9"
+    "vitest": "catalog:"
   }
 }

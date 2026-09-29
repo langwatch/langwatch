@@ -2,9 +2,9 @@ import { basename, join } from "node:path";
 
 import type { Locator } from "playwright";
 
-import type { Action } from "./context";
-import { argument } from "./context";
-import { targetOf } from "./target";
+import type { Action } from "./context.ts";
+import { argument } from "./context.ts";
+import { targetOf } from "./target.ts";
 
 /** FIXTURES_DIR holds the files an `upload` step attaches: tools/visualdiff/fixtures. */
 const FIXTURES_DIR = join(import.meta.dirname, "..", "..", "..", "fixtures");

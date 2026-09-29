@@ -8,7 +8,7 @@ import scenario, { bashCommands } from "@langwatch/scenario";
 import dotenv from "dotenv";
 import { describe, it, expect } from "vitest";
 
-import { createClaudeCodeAgent, SKILL_TESTS_SET_ID } from "./helpers/claude-code-adapter";
+import { createClaudeCodeAgent, SKILL_TESTS_SET_ID } from "./helpers/claude-code-adapter.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

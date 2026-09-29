@@ -1,4 +1,4 @@
-import { archiveScenario as apiArchiveScenario } from "../langwatch-api-scenarios.js";
+import { archiveScenario as apiArchiveScenario } from "../langwatch-api-scenarios.ts";
 
 /**
  * Handles the platform_archive_scenario MCP tool invocation.

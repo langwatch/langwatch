@@ -6,7 +6,7 @@ import {
   headersForRedirect,
   requestPublicJson,
   resolvePublicDestination,
-} from "../public-http-request.js";
+} from "../public-http-request.ts";
 
 describe("public HTTP request security", () => {
   afterEach(() => {

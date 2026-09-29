@@ -5,7 +5,7 @@
  * @see specs/mcp-server/schema-discovery.feature
  */
 
-import { makeRequest } from "./langwatch-api.js";
+import { makeRequest } from "./langwatch-api.ts";
 
 /** One column of a query result. */
 export interface QueryResultColumn {

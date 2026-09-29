@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 
 import { describe, expect, it } from "vitest";
 
-import { listNativeSkills, listPublishedSkills, renderSkill } from "../_compiler/native.js";
+import { listNativeSkills, listPublishedSkills, renderSkill } from "../_compiler/native.ts";
 
 // Backs the skill rules of specs/langy/langy-guided-onboarding.feature: the
 // skill ships with Langy only, and every line the product says is in it

@@ -1,4 +1,4 @@
-import { archiveTestSuite as apiArchiveTestSuite } from "../langwatch-api-test-suites.js";
+import { archiveTestSuite as apiArchiveTestSuite } from "../langwatch-api-test-suites.ts";
 
 /**
  * Handles the platform_archive_test_suite MCP tool invocation.

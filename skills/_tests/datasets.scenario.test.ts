@@ -15,7 +15,7 @@ import {
   removeSkillTestWorkDir,
   SKILL_TESTS_SET_ID,
   setupLocalCli,
-} from "./helpers/claude-code-adapter";
+} from "./helpers/claude-code-adapter.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

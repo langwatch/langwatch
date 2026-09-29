@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { InFlightTracker, LONG_LIVED_MILLIS, shouldIgnoreRequest } from "../settle";
+import { InFlightTracker, LONG_LIVED_MILLIS, shouldIgnoreRequest } from "../settle.ts";
 
 const settings = { quietMillis: 500, deadlineMillis: 8000 };
 

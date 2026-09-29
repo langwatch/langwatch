@@ -1,4 +1,4 @@
-import { getDashboard as apiGetDashboard } from "../langwatch-api-dashboards.js";
+import { getDashboard as apiGetDashboard } from "../langwatch-api-dashboards.ts";
 
 export async function handleGetDashboard(params: { id: string }): Promise<string> {
   const dashboard = await apiGetDashboard(params.id);

@@ -1,4 +1,4 @@
-import { listProjects as apiListProjects } from "../langwatch-api-projects.js";
+import { listProjects as apiListProjects } from "../langwatch-api-projects.ts";
 
 export async function handleListProjects(params?: {
   page?: number;

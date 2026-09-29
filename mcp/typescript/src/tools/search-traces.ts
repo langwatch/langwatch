@@ -1,6 +1,6 @@
-import { searchTraces as apiSearchTraces, type TraceSearchResult } from "../langwatch-api.js";
-import { parseRelativeDate } from "../utils/date-parsing.js";
-import { formatEvaluationLines } from "../utils/format-evaluations.js";
+import { searchTraces as apiSearchTraces, type TraceSearchResult } from "../langwatch-api.ts";
+import { parseRelativeDate } from "../utils/date-parsing.ts";
+import { formatEvaluationLines } from "../utils/format-evaluations.ts";
 
 function previewLine({
   label,

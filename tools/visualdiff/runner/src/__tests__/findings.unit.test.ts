@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { oneSidedFailures } from "../findings";
-import type { CaptureMessage } from "../protocol";
+import { oneSidedFailures } from "../findings.ts";
+import type { CaptureMessage } from "../protocol.ts";
 
 const capture = (overrides: Partial<CaptureMessage>): CaptureMessage => ({
   type: "capture",

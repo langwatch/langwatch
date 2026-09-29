@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../langwatch-api.js", () => ({
+vi.mock("../langwatch-api.ts", () => ({
   searchTraces: vi.fn(),
   getTraceById: vi.fn(),
   getAnalyticsTimeseries: vi.fn(),
@@ -30,19 +30,19 @@ import {
   renamePromptTag,
   deletePromptTag,
   type PromptSummary,
-} from "../langwatch-api.js";
-import { handleAssignPromptTag } from "../tools/assign-prompt-tag.js";
-import { handleCreatePromptTag } from "../tools/create-prompt-tag.js";
-import { handleCreatePrompt } from "../tools/create-prompt.js";
-import { handleDeletePromptTag } from "../tools/delete-prompt-tag.js";
-import { handleGetAnalytics } from "../tools/get-analytics.js";
-import { handleGetPrompt } from "../tools/get-prompt.js";
-import { handleGetTrace } from "../tools/get-trace.js";
-import { handleListPromptTags } from "../tools/list-prompt-tags.js";
-import { handleListPrompts } from "../tools/list-prompts.js";
-import { handleRenamePromptTag } from "../tools/rename-prompt-tag.js";
-import { handleSearchTraces } from "../tools/search-traces.js";
-import { handleUpdatePrompt } from "../tools/update-prompt.js";
+} from "../langwatch-api.ts";
+import { handleAssignPromptTag } from "../tools/assign-prompt-tag.ts";
+import { handleCreatePromptTag } from "../tools/create-prompt-tag.ts";
+import { handleCreatePrompt } from "../tools/create-prompt.ts";
+import { handleDeletePromptTag } from "../tools/delete-prompt-tag.ts";
+import { handleGetAnalytics } from "../tools/get-analytics.ts";
+import { handleGetPrompt } from "../tools/get-prompt.ts";
+import { handleGetTrace } from "../tools/get-trace.ts";
+import { handleListPromptTags } from "../tools/list-prompt-tags.ts";
+import { handleListPrompts } from "../tools/list-prompts.ts";
+import { handleRenamePromptTag } from "../tools/rename-prompt-tag.ts";
+import { handleSearchTraces } from "../tools/search-traces.ts";
+import { handleUpdatePrompt } from "../tools/update-prompt.ts";
 
 const mockSearchTraces = vi.mocked(searchTraces);
 const mockGetTraceById = vi.mocked(getTraceById);

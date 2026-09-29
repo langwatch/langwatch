@@ -1,4 +1,4 @@
-import { testAgent as apiTestAgent } from "../langwatch-api-agents.js";
+import { testAgent as apiTestAgent } from "../langwatch-api-agents.ts";
 
 /**
  * Handles the platform_test_agent MCP tool invocation.

@@ -1,5 +1,5 @@
-import { getConfig } from "./config.js";
-import { makeRequest } from "./langwatch-api.js";
+import { getConfig } from "./config.ts";
+import { makeRequest } from "./langwatch-api.ts";
 
 export interface SecretSummary {
   id: string;

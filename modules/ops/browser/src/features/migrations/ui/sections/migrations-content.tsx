@@ -147,17 +147,16 @@ export function MigrationsContent() {
               there is nothing to enroll.
             </Text>
           )}
-          {enrollmentsQuery.error &&
-            !enrollmentsQuery.data && (
-              // The enrollment actions hide themselves when this read fails,
-              // which is the safe direction but an unexplained one: without
-              // this line a cloud operator sees a page that looks like a
-              // self-hosted installation.
-              <Text fontSize="sm" color="fg.muted">
-                Enrollment could not be read just now, so the enrollment actions are hidden. The
-                page retries every 30 seconds.
-              </Text>
-            )}
+          {enrollmentsQuery.error && !enrollmentsQuery.data && (
+            // The enrollment actions hide themselves when this read fails,
+            // which is the safe direction but an unexplained one: without
+            // this line a cloud operator sees a page that looks like a
+            // self-hosted installation.
+            <Text fontSize="sm" color="fg.muted">
+              Enrollment could not be read just now, so the enrollment actions are hidden. The page
+              retries every 30 seconds.
+            </Text>
+          )}
         </Stack>
         <Spacer />
         <Button

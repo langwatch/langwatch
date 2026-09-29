@@ -1,4 +1,4 @@
-import type { CaptureMessage } from "./protocol";
+import type { CaptureMessage } from "./protocol.ts";
 
 /**
  * Report failures on only one side; failures on both indicate fixture or locator problems,

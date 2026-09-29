@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { analyticsGroups } from "../schemas/analytics-groups.js";
-import { analyticsMetrics } from "../schemas/analytics-metrics.js";
+import { analyticsGroups } from "../schemas/analytics-groups.ts";
+import { analyticsMetrics } from "../schemas/analytics-metrics.ts";
 
 describe("schemas", () => {
   describe("when reading analyticsMetrics", () => {

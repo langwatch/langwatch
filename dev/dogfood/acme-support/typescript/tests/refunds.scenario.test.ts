@@ -9,8 +9,8 @@ import scenario, { AgentRole, type AgentAdapter } from "@langwatch/scenario";
 import type { ModelMessage } from "ai";
 import { describe, expect, it } from "vitest";
 
-import { answerTurn } from "../src/agent.js";
-import { acmeSupport } from "../src/server.js";
+import { answerTurn } from "../src/agent.ts";
+import { acmeSupport } from "../src/server.ts";
 
 const judgeModel = openai("gpt-5-mini");
 

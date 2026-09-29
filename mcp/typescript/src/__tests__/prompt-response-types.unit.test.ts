@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { PromptDetailResponse, PromptMutationResponse } from "../langwatch-api.js";
+import type { PromptDetailResponse, PromptMutationResponse } from "../langwatch-api.ts";
 
 describe("Prompt response type interfaces", () => {
   describe("given fully-populated PromptDetailResponse and PromptMutationResponse fixtures", () => {

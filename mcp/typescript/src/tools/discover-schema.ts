@@ -1,7 +1,7 @@
-import { getQueryReference, type QueryReferenceResponse } from "../langwatch-api-query.js";
-import { analyticsGroups } from "../schemas/analytics-groups.js";
-import { analyticsMetrics } from "../schemas/analytics-metrics.js";
-import { markdownTable } from "../utils/markdown-table.js";
+import { getQueryReference, type QueryReferenceResponse } from "../langwatch-api-query.ts";
+import { analyticsGroups } from "../schemas/analytics-groups.ts";
+import { analyticsMetrics } from "../schemas/analytics-metrics.ts";
+import { markdownTable } from "../utils/markdown-table.ts";
 
 export type Category = "filters" | "lwql" | "metrics" | "aggregations" | "groups" | "all";
 

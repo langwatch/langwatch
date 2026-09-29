@@ -6,4 +6,4 @@
 # Run from the repo root. docs-ci runs it before diffing the generated files.
 set -euo pipefail
 cd "$(dirname "$0")/../../modules/ops/process"
-pnpm exec tsx scripts/generate-usage-report-dictionary.ts "$@"
+node --experimental-transform-types scripts/generate-usage-report-dictionary.ts "$@"

@@ -1,5 +1,5 @@
-import { listDatasetRecords as apiListDatasetRecords } from "../langwatch-api-datasets.js";
-import { escapeMarkdown } from "../utils/escape-markdown.js";
+import { listDatasetRecords as apiListDatasetRecords } from "../langwatch-api-datasets.ts";
+import { escapeMarkdown } from "../utils/escape-markdown.ts";
 
 /**
  * Handles the platform_list_dataset_records MCP tool invocation.

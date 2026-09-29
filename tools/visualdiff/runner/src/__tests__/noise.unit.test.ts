@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { DeadlineAlarm } from "../deadline-alarm";
-import { isExpectedThrottle, isThrottleConsoleError } from "../noise";
+import { DeadlineAlarm } from "../deadline-alarm.ts";
+import { isExpectedThrottle, isThrottleConsoleError } from "../noise.ts";
 
 const OFFER = "http://app/api/trpc/joinRequests.offer?batch=1&input=%7B%7D";
 

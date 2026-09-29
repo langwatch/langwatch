@@ -29,9 +29,6 @@ seconds; a tree carrying errors pays for them on every run, which is why
 Install admission hooks per worktree with
 `haven setup gate-hook codex-gate-hook` for Claude and Codex respectively.
 Codex project hooks require a trusted project and review through `/hooks`.
-`pnpm install` removes old automatic compiler/linter shims without replacing
-fresh pnpm launchers. Existing checkouts can run
-`node dev/scripts/install-check-shims.mjs --remove` immediately.
 Use `haven slot run -- pnpm typecheck` for explicit terminal queueing.
 
 For local iteration, check the one package you touched:

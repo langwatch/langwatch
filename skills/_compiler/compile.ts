@@ -1,8 +1,8 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env node
 /**
  * Prompt compiler — generates self-contained copy-paste prompts from AgentSkills.
- *   tsx skills/_compiler/compile.ts --skills tracing --mode platform
- *   tsx skills/_compiler/compile.ts --skills level-up --mode platform --api-key sk-lw-xxx
+ *   node skills/_compiler/compile.ts --skills tracing --mode platform
+ *   node skills/_compiler/compile.ts --skills level-up --mode platform --api-key sk-lw-xxx
  */
 
 import fs from "fs";
@@ -10,7 +10,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import { splitFrontmatter } from "../_lib/frontmatter.ts";
-import { inlineMdx } from "../_lib/mdx-inline.js";
+import { inlineMdx } from "../_lib/mdx-inline.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -136,9 +136,9 @@ Available skills:
   tracing, experiments, online-evaluations, evaluations, scenarios, prompts, analytics, level-up
 
 Examples:
-  tsx compile.ts --skills tracing --mode platform --api-key sk-lw-xxx
-  tsx compile.ts --skills level-up --mode docs
-  tsx compile.ts --skills tracing,scenarios --mode platform`);
+  node compile.ts --skills tracing --mode platform --api-key sk-lw-xxx
+  node compile.ts --skills level-up --mode docs
+  node compile.ts --skills tracing,scenarios --mode platform`);
         process.exit(0);
     }
   }

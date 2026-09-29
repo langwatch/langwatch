@@ -3,9 +3,9 @@ import type { AddressInfo } from "node:net";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { initConfig } from "../config.js";
-import { createMcpServer } from "../create-mcp-server.js";
-import { handleReportIssue } from "../tools/report-issue.js";
+import { initConfig } from "../config.ts";
+import { createMcpServer } from "../create-mcp-server.ts";
+import { handleReportIssue } from "../tools/report-issue.ts";
 
 /**
  * Integration tests for the report_issue tool against a REAL local HTTP
