@@ -1048,7 +1048,7 @@
             "trigger delete",
             "slack-connection list"
           ],
-          "skill": null,
+          "skill": "automations",
           "docs": "https://langwatch.ai/docs/api-reference/triggers/overview.md"
         },
         "platform": {

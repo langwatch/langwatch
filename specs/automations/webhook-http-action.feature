@@ -156,11 +156,11 @@ Feature: Webhook (generic HTTP) automation action
       Then the error says the endpoint answered HTTP 500
 
     @unit
-    Scenario: The development request log never shows header values or the signing secret
+    Scenario: The development request log never shows what a request carried
       Given the browser logs each request in development
       When a webhook automation is test-fired or saved with header values and a signing secret
-      Then the logged request shows the header names with their values redacted
-      And the signing secret is redacted
+      Then the log names only the operation and how long it took
+      And no input or result, header value or signing secret appears in it
 
   Rule: Delivery is SSRF-fenced
 
