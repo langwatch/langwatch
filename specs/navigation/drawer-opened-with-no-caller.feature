@@ -42,3 +42,35 @@ Feature: A drawer opened from a link, with nothing behind it
       Given scenario is installed
       When a surface opens the "suiteEditor" drawer
       Then scenario's run plan editor loads
+
+    @unit
+    Scenario: The model provider editor opens by its drawer name
+      Given model-provider is installed
+      When a surface opens the "editModelProvider" drawer
+      Then model-provider's provider editor loads
+
+    @unit
+    Scenario: The default model override editor opens by its drawer name
+      Given model-provider is installed
+      When a surface opens the "defaultModelOverride" drawer
+      Then model-provider's default model override editor loads
+
+    @unit
+    Scenario: The model cost editor opens by its drawer name
+      Given model-provider is installed
+      When a surface opens the "llmModelCost" drawer
+      Then model-provider's model cost editor loads
+
+  Rule: A drawer the host mounts is open
+
+    The host mounts only the drawer the address names, so the drawer's `open`
+    prop is `true` there. It is never the drawer's name string: a drawer that
+    checked `open === true` against the name read itself as closed and never
+    rendered, which left the prompt editor and the agent editors dead.
+
+    @integration
+    Scenario: A drawer the host mounts from an address reads itself as open
+      Given an address that names a drawer
+      And the drawer renders only when its open prop is true
+      When the page renders
+      Then the drawer is on screen

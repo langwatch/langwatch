@@ -29,7 +29,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
 
   return (
     <Drawer.Root
-      open={props.open === true}
+      open={props.open !== false && props.open !== undefined}
       onOpenChange={({ open }) => !open && form.close()}
       size="lg"
       closeOnInteractOutside={false}

@@ -42,7 +42,7 @@ export type ConnectFromCodeDrawerProps = {
 
 export function ConnectFromCodeDrawer(props: ConnectFromCodeDrawerProps) {
   const onClose = props.onClose;
-  const isOpen = props.open === true;
+  const isOpen = props.open !== false && props.open !== undefined;
   const snippets = connectSnippets({});
 
   return (
