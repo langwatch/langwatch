@@ -55,6 +55,7 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
+import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -64,6 +65,7 @@ import {
   type MembersRead,
   type RateLimiter,
 } from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
 import { HttpConnectGatewayChannel } from "../channels/http/http.connect-gateway.channel.ts";
@@ -98,6 +100,7 @@ import { ConnectSpendBufferService } from "../services/connect-spend-buffer.serv
 import { ContractBudgetStoreService } from "../services/contract-budget-store.service.ts";
 import { ContractBudgetService } from "../services/contract-budget.service.ts";
 import { HostedServicesService } from "../services/hosted-services.service.ts";
+import { HostedUsageReaderService } from "../services/hosted-usage-reader.service.ts";
 import { InstanceIdentityService } from "../services/instance-identity.service.ts";
 import { LicenseGenerationService } from "../services/license-generation.service.ts";
 import { LicenseRefreshService } from "../services/license-refresh.service.ts";
@@ -210,6 +213,10 @@ export class LicensingApp implements LicensingApiContract {
     gateway: GatewayApi,
     /** Whose memberships a licence's seats are counted from. */
     organizations: OrganizationApi,
+    /** The judge a hosted classify call reaches, its price, and where its spend is recorded. */
+    instantEval: InstantEvalApi,
+    /** Whose team a hosted caller's project belongs to, for the budgets that apply to it. */
+    projects: ProjectApi,
   };
   static readonly config = licensingConfig;
   /**
@@ -325,10 +332,7 @@ export class LicensingApp implements LicensingApiContract {
               rateLimiter: members.rateLimiter,
               signingKey: licensePrivateKey,
             }),
-            hosted: {
-              ...partial.unavailableHostedServices(),
-              budgets: ContractBudgetStoreService.create({ gateway: dependencies.gateway }),
-            },
+            hosted: hostedServicesOverPeers(dependencies),
             instances: selfHostedInstancesOverPrisma({
               database: members.prisma,
               organizations: dependencies.organizations,
@@ -677,6 +681,7 @@ export class LicensingApp implements LicensingApiContract {
   classifyForHostedCaller(input: {
     caller: HostedCaller;
     payload: unknown;
+    signal?: AbortSignal;
   }): Promise<HostedClassifyAnswer> {
     return this.#hosted.classify(input);
   }
@@ -946,6 +951,40 @@ function licenseRegistryOverPrisma({
     cipher: encryption,
     signingKey: () => signingKey,
     systemActorId,
+  };
+}
+
+/**
+ * The hosted end of Connect composed from its owners, as main composed it on every deployment:
+ * instant-eval judges, prices and records the spend, and the gateway keeps the budgets. The door
+ * is not composed here, so the family still refuses by name until the gateway's is shared.
+ */
+function hostedServicesOverPeers({
+  gateway,
+  instantEval,
+  projects,
+}: {
+  gateway: Pick<
+    GatewayApi,
+    | "listBudgetsWithHealth"
+    | "createBudget"
+    | "updateBudget"
+    | "resetBudget"
+    | "findVirtualKeyById"
+    | "resolveApplicableBudgets"
+  >;
+  instantEval: Pick<InstantEvalApi, "classify" | "priceOf" | "recordSpendForHostedCalls">;
+  projects: Pick<ProjectApi, "findById">;
+}): HostedServicesInfrastructure {
+  return {
+    budgets: ContractBudgetStoreService.create({ gateway }),
+    usage: HostedUsageReaderService.create({ gateway, projects }),
+    judge: {
+      classify: (input, signal) =>
+        instantEval.classify({ ...input, ...(signal ? { signal } : {}) }),
+      priceOf: (input) => instantEval.priceOf(input),
+    },
+    spend: { recordSpend: (entry) => instantEval.recordSpendForHostedCalls(entry) },
   };
 }
 

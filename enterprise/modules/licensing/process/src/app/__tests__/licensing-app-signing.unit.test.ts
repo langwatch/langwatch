@@ -4,8 +4,10 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
@@ -28,6 +30,8 @@ const PURCHASE = {
 function licensingWithSigningKey(signingKey: string | undefined): Promise<LicensingApp> {
   return LicensingApp.create({
     dependencies: {
+      instantEval: createApiFixture<InstantEvalApi>(),
+      projects: createApiFixture<ProjectApi>(),
       gateway: createApiFixture<GatewayApi>(),
       organizations: createApiFixture<OrganizationApi>(),
     },

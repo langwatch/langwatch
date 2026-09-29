@@ -98,6 +98,14 @@ describe("recordPricedSpend", () => {
     });
   });
 
+  it("names the key a hosted call's spend is billed to, so that key's budgets are debited", async () => {
+    const { sent, service } = serviceOver({ withPipeline: true });
+
+    await service.recordPricedSpend({ ...PRICED, virtualKeyId: "vk-connect" });
+
+    expect(sent[0]).toMatchObject({ virtual_key_id: "vk-connect", admitted_at: 0 });
+  });
+
   it("carries only the input tokens it was given, the rest of the usage at zero", async () => {
     const { sent, service } = serviceOver({ withPipeline: true });
 

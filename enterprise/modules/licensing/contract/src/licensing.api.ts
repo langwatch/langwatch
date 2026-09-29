@@ -211,6 +211,8 @@ export interface LicensingApi {
   classifyForHostedCaller(input: {
     caller: HostedCaller;
     payload: unknown;
+    /** The calling install's request: a judgement it no longer waits for is abandoned. */
+    signal?: AbortSignal;
   }): Promise<HostedClassifyAnswer>;
   /** What the caller spent against every budget that applies to it. */
   getHostedUsage(input: { caller: HostedCaller }): Promise<HostedUsageAnswer>;

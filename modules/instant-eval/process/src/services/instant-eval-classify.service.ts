@@ -8,6 +8,7 @@
 import type { InstantEvalJudgement, InstantEvalQuestion } from "@langwatch/instant-eval-contract";
 
 import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
+import { instantEvalCostUsd, instantEvalPriceUsd } from "../rules/instant-eval-pricing.rules.ts";
 
 export class InstantEvalClassifyService {
   private constructor(private readonly judge: InstantEvalJudgeChannel) {}
@@ -24,11 +25,20 @@ export class InstantEvalClassifyService {
     projectId,
     text,
     questions,
+    signal,
   }: {
     projectId: string;
     text: string;
     questions: readonly InstantEvalQuestion[];
+    signal?: AbortSignal;
   }): Promise<InstantEvalJudgement> {
-    return this.judge.classify({ projectId, text, questions });
+    return this.judge.classify({ projectId, text, questions }, signal);
+  }
+
+  /** Priced at this judge's own rate, as main priced a hosted judgement. */
+  priceOf({ inputTokens }: { inputTokens: number }): { costUsd: number; priceUsd: number } {
+    const costUsd = instantEvalCostUsd({ inputTokens, pricing: this.judge.pricing });
+
+    return { costUsd, priceUsd: instantEvalPriceUsd({ costUsd, pricing: this.judge.pricing }) };
   }
 }

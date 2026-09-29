@@ -50,8 +50,12 @@ export const connectHostedRest = defineRestRouter(LicensingApi)
   .withAccess(anyAuthenticated({ reason: HOSTED_CONNECT_GATE }))
   .withOutput(hostedClassifyAnswerSchema)
   .withDocs({ hide: true })
-  .handle(({ input, app }) =>
-    app.classifyForHostedCaller({ caller: callerOf(input), payload: input.payload }),
+  .handle(({ input, app, signal }) =>
+    app.classifyForHostedCaller({
+      caller: callerOf(input),
+      payload: input.payload,
+      ...(signal ? { signal } : {}),
+    }),
   )
 
   .post("/api/internal/gateway/connect/usage", "getHostedUsage")

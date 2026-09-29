@@ -143,6 +143,48 @@ Feature: Enterprise licensing lifecycle
       When a peer asks licensing to sign a licence
       Then it is refused as license_signing_not_configured
 
+  Rule: Every deployment composes the hosted Connect services from their owners
+
+    Main composed the hosted services on every deployment: instant-eval judges a hosted call,
+    prices it at its judge's rate and records the spend under the calling key; the gateway keeps
+    the budgets a connected install reads.
+
+    @integration
+    Scenario: A hosted judgement is priced at the rate of the judge that made it
+      Given LangWatch Cloud judges hosted calls with a judge at its own rate and markup
+      When licensing asks what a judgement's input tokens were worth
+      Then it is told the cost and the customer price at that judge's rate
+
+    @integration
+    Scenario: A hosted judgement stops when the calling install hangs up
+      Given a hosted classify call is being judged
+      When the calling install's request is abandoned
+      Then the judge is handed that request's signal
+
+    @integration
+    Scenario: Hosted spend is billed to the calling key on the spend spine
+      Given the spend spine is registered
+      When a hosted call's spend is recorded
+      Then one outcome at the customer price is recorded under the project's organization and the calling key
+
+    @integration
+    Scenario: Hosted spend is refused while the spend spine is not registered
+      Given the spend spine is not registered
+      When a hosted call's spend is recorded
+      Then the record is refused, so the caller keeps the spend and tries again
+
+    @unit
+    Scenario: Hosted usage lists only the budgets that apply to the calling key
+      Given the organization has budgets of which only some apply to the calling key
+      When a connected install reads its hosted usage
+      Then only the applicable budgets are listed, and the contract budget is marked as the contract
+
+    @unit
+    Scenario: Hosted usage reports spend as unknown when live spend cannot be read
+      Given live spend cannot be read
+      When a connected install reads its hosted usage
+      Then each budget's spend is unknown rather than zero
+
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber

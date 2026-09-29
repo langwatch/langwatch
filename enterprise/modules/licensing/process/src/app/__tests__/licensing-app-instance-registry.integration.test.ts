@@ -6,9 +6,11 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Encryption, RateLimiter } from "@langwatch/process-stores/members";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
 import { nowInstant } from "@langwatch/time";
@@ -61,6 +63,8 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry in produc
       });
       const app = await LicensingApp.create({
         dependencies: {
+          instantEval: createApiFixture<InstantEvalApi>(),
+          projects: createApiFixture<ProjectApi>(),
           gateway: createApiFixture<GatewayApi>(),
           organizations: createApiFixture<OrganizationApi>({
             findProvisioningSummary: async (organizationId) =>
