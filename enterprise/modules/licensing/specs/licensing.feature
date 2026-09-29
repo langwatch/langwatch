@@ -108,6 +108,24 @@ Feature: Enterprise licensing lifecycle
       When an operator lists the self-hosted instances
       Then the read is refused naming the self-hosted instance registry
 
+  Rule: Every deployment composes the licence registry from its own stores
+
+    Main built the licence registry, activation codes and licence sync from
+    Postgres on every deployment. The managed keys and the contract budget are
+    the gateway's, reached through its operations.
+
+    @unit
+    Scenario: The contract budget is the organization's live gateway budget named by the contract's id
+      Given the organization's gateway budgets include one carrying the contract's external id
+      When licensing reads the organization's contract budget
+      Then it answers that budget's limit in cents and whether the customer set the cap
+
+    @unit
+    Scenario: An archived contract budget is no contract budget
+      Given the organization's only contract budget is archived
+      When licensing reads the organization's contract budget
+      Then it answers none
+
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber

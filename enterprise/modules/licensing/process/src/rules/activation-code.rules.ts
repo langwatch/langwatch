@@ -88,3 +88,9 @@ export function statusOfActivationCode(
   if (Temporal.Instant.compare(now, row.expiresAt) >= 0) return "expired";
   return "active";
 }
+
+/**
+ * Guessing bound, as main set it: a code is eighty bits, so the limit is not what stops a
+ * search, but what stops one costing anything. Generous for a customer mistyping twice.
+ */
+export const ACTIVATION_ATTEMPTS_LIMIT = { requests: 10, seconds: 60 * 60 } as const;

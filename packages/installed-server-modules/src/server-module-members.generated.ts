@@ -63,7 +63,7 @@ export const serverModuleMembers = {
   "enterprise-gateway": ["isSaas"],
   "enterprise-ops": [],
   governance: ["encryption", "isSaas", "publicBaseUrl", "rateLimiter"],
-  licensing: ["logger", "prisma"],
+  licensing: ["encryption", "logger", "prisma", "rateLimiter"],
   "managed-provider": [],
   saas: ["isSaas"],
   scim: ["eventing"],
