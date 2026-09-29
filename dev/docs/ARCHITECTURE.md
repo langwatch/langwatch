@@ -382,6 +382,27 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
    handed. The owner keeps its UI and its data; rule 5's duplicate is for thin,
    non-fetching surfaces only.
 
+### 3.5 Can this be used here? Four capability layers (Alex, 2026-09-29)
+
+"Capability" means exactly these four layers. Each has one owner and one answer; nothing else
+decides it, and no layer, projection or screen re-derives another's answer.
+
+| Layer | Question | Owner and where it is answered | How the browser learns it |
+| --- | --- | --- | --- |
+| Deployment availability | Does this install have it (email, object storage, langevals, the gateway)? | The owning module's process member, which holds the config and the secrets, answered once through a declared supply token (§3.3 rule 4) | A public-config boolean projected from that same answer after members are built; never recomputed from config leaves or secret presence |
+| Entitlement | May this organization use it (plan, licence)? | `EntitlementApi`; routes stay mounted and refuse per organization (§11) | An entitlement read through the owner's `*Api` |
+| Permission | May this user do it? | authz; the service checks before acting | The session's `hasPermission` / `hasOrganizationPermission` |
+| Release flag | Is it rolled out here yet? | Feature flags | The flags host service |
+
+**Off is opaque by default.** The feature is hidden or disabled, and the screen says only "contact
+LangWatch support" (SaaS) or "contact your administrator" (self-hosted), never why. A reader holding
+the permission that could fix it may be told what is missing, through a read only that permission
+answers: the explanation is never in public config or in any page's HTML for everyone.
+
+The shell's lent services (session, navigation, storage, toasts, slots, drawers) are **host
+services**, not capabilities (§16). Enforcement is prose for now; a lint rule follows once email is
+converted (no availability logic in `*.config.ts` projections; off states use the shared notice).
+
 ---
 
 ## 4. A process, whole
@@ -2018,6 +2039,7 @@ chain. New code uses the left column only.
 | `TraceModule` + `.withApi(...)`               | `TraceApp` + `.withApp(...)`                                       |
 | `<f>.module.ts` / `<f>.web.ts` file stems     | `<f>.server.ts` / `<f>.web.ts`                                     |
 | `definePipeline(...).withEvents(schemas)`     | `defineAggregate({ events: defineEvents([...type strings]) })`     |
+| host services (`@langwatch/browser-host`: session, navigation, storage, toasts, slots, drawers) | "capabilities" (§3.5 reserves the word for the four layers) |
 | `enterprise/modules/audit-log` (§4)           | `modules/audit-log`                                                |
 
 `createProcessApp` stays the target shape. Its previous implementation, the
