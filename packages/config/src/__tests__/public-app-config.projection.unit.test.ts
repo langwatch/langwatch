@@ -35,6 +35,12 @@ describe("public application configuration projection", () => {
     expect(JSON.stringify(config)).not.toContain("must-not-cross-the-browser-boundary");
   });
 
+  it("hands the browser an ops slice with Cloud admin off, which the ops schema requires", () => {
+    const config = resolvePublicAppConfig({ BASE_HOST: "https://app.example.test" });
+
+    expect(config.ops).toEqual({ cloudOps: false });
+  });
+
   it("hands the browser HIDE_DEV_INDICATOR only when it is switched on", () => {
     const base = { BASE_HOST: "https://app.example.test", NODE_ENV: "development" };
     const processSlice = (source: Record<string, string>) => resolvePublicAppConfig(source).process;

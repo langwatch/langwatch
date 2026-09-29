@@ -243,8 +243,12 @@ function projectPublicAppConfig(
         config.rum.enabled && Boolean(config.rum.collectorEndpoint || config.rum.telemetryEndpoint),
       sampleRatio: config.rum.sampleRatio,
     },
-    ops: config.telemetry.posthogKey
-      ? { posthog: { key: config.telemetry.posthogKey, host: config.telemetry.posthogHost } }
-      : {},
+    ops: {
+      // The dev server cannot ask ops whether the licence key pairs, so Cloud admin stays off.
+      cloudOps: false,
+      ...(config.telemetry.posthogKey
+        ? { posthog: { key: config.telemetry.posthogKey, host: config.telemetry.posthogHost } }
+        : {}),
+    },
   });
 }
