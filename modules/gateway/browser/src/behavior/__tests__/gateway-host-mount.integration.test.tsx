@@ -76,7 +76,7 @@ class AdminSession extends UiSession {
   }
 }
 
-function harness(scope: UiActiveScope) {
+function harness(scope: UiActiveScope, gatewayBaseUrl?: string) {
   const capabilities: UiCapabilities = {
     ...createUiCapabilitiesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
@@ -90,6 +90,7 @@ function harness(scope: UiActiveScope) {
       hasNlpService: true,
       hasLangevals: true,
       hasEmailProvider: false,
+      ...(gatewayBaseUrl ? { gatewayBaseUrl } : {}),
     },
   };
 
@@ -186,6 +187,45 @@ describe("given a gateway host above a surface gated on the plan", () => {
       });
 
       expect(screen.getByTestId("loading")).toHaveTextContent("true");
+    });
+  });
+});
+
+/** Stands in for the usage snippet, which prints the address a customer's SDK points at. */
+function DeploymentReader() {
+  const deployment = useGatewayHost().deployment();
+
+  return (
+    <div>
+      <span data-testid="app">{deployment.appBaseUrl}</span>
+      <span data-testid="gateway">{deployment.gatewayBaseUrl ?? "(none)"}</span>
+    </div>
+  );
+}
+
+describe("given a gateway host above a surface that prints the gateway address", () => {
+  describe("when the deployment carries a gateway address", () => {
+    /** @scenario "A mounted host answers the reading its screen renders from" */
+    it("reports it beside the app address", () => {
+      render(<DeploymentReader />, {
+        wrapper: harness(
+          { organizationId: ORGANIZATION_ID, projectId: null },
+          "http://localhost:5563",
+        ),
+      });
+
+      expect(screen.getByTestId("app")).toHaveTextContent("https://app.langwatch.test");
+      expect(screen.getByTestId("gateway")).toHaveTextContent("http://localhost:5563");
+    });
+  });
+
+  describe("when the deployment configures none", () => {
+    it("reports absence rather than an empty address", () => {
+      render(<DeploymentReader />, {
+        wrapper: harness({ organizationId: ORGANIZATION_ID, projectId: null }),
+      });
+
+      expect(screen.getByTestId("gateway")).toHaveTextContent("(none)");
     });
   });
 });

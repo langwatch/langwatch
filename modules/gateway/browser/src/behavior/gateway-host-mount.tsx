@@ -1,7 +1,6 @@
 /**
  * Gateway's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability or its own read. Missing capabilities
- * (deployment addresses) read honestly empty. ARCHITECTURE.md §10.1.
+ * `@langwatch/browser-host` capability or its own read. ARCHITECTURE.md §10.1.
  */
 
 import {
@@ -92,7 +91,7 @@ function planOf({
 class CapabilityGatewayHost extends GatewayHostApi {
   private readonly activeScope: GatewayScope;
   private readonly scopeHost: UiScopeHost | undefined;
-  private readonly isSaas: boolean;
+  private readonly deployment_: GatewayDeployment;
   private readonly session: UiSession;
   private readonly navigation: UiNavigation;
   private readonly uiRoute: UiRoute;
@@ -103,7 +102,7 @@ class CapabilityGatewayHost extends GatewayHostApi {
   constructor({
     activeScope,
     scopeHost,
-    isSaas,
+    deployment,
     session,
     navigation,
     uiRoute,
@@ -113,7 +112,7 @@ class CapabilityGatewayHost extends GatewayHostApi {
   }: {
     activeScope: GatewayScope;
     scopeHost: UiScopeHost | undefined;
-    isSaas: boolean;
+    deployment: GatewayDeployment;
     session: UiSession;
     navigation: UiNavigation;
     uiRoute: UiRoute;
@@ -124,7 +123,7 @@ class CapabilityGatewayHost extends GatewayHostApi {
     super();
     this.activeScope = activeScope;
     this.scopeHost = scopeHost;
-    this.isSaas = isSaas;
+    this.deployment_ = deployment;
     this.session = session;
     this.navigation = navigation;
     this.uiRoute = uiRoute;
@@ -175,9 +174,8 @@ class CapabilityGatewayHost extends GatewayHostApi {
     return this.plan_;
   }
 
-  /** No deployment-address capability exists yet; recorded gap, see the handoff. */
   deployment(): GatewayDeployment {
-    return { isSaas: this.isSaas, appBaseUrl: "", gatewayBaseUrl: "" };
+    return this.deployment_;
   }
 
   route(): GatewayRouteReading {
@@ -221,7 +219,7 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
   const { session, navigation, route, feedback } = useUiCapabilities();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost = useUiScope().scopeHost();
-  const { isSaaS } = useUiDeployment();
+  const { isSaaS, appBaseUrl, gatewayBaseUrl } = useUiDeployment();
 
   // Shares the tRPC cache entry with every other reader of this procedure, so
   // the graph is fetched once per page however many hosts want it.
@@ -246,7 +244,7 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
       new CapabilityGatewayHost({
         activeScope: { organizationId, projectId },
         scopeHost,
-        isSaas: isSaaS,
+        deployment: { isSaas: isSaaS, appBaseUrl, gatewayBaseUrl },
         session,
         navigation,
         uiRoute: route,
@@ -259,6 +257,8 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
       projectId,
       scopeHost,
       isSaaS,
+      appBaseUrl,
+      gatewayBaseUrl,
       session,
       navigation,
       route,

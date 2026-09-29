@@ -68,7 +68,7 @@ export type GatewayFailureNotice = {
 export type GatewayDeployment = {
   isSaas: boolean;
   appBaseUrl: string;
-  gatewayBaseUrl: string;
+  gatewayBaseUrl?: string;
 };
 
 /**

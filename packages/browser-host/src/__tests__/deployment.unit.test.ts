@@ -89,6 +89,15 @@ describe("deriveUiDeployment", () => {
     });
   });
 
+  describe("given a gateway address", () => {
+    it("carries it, and omits the key when none is configured", () => {
+      expect(
+        deriveUiDeployment(slicesWith({ gatewayBaseUrl: "http://localhost:5563" })).gatewayBaseUrl,
+      ).toBe("http://localhost:5563");
+      expect("gatewayBaseUrl" in deriveUiDeployment(slicesWith({}))).toBe(false);
+    });
+  });
+
   describe("given no demo project", () => {
     it("omits the slug", () => {
       expect("demoProjectSlug" in deriveUiDeployment(slicesWith({}))).toBe(false);

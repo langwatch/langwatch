@@ -41,6 +41,7 @@ describe("browser feature configuration", () => {
         hasEmailProvider: true,
         authProvider: "auth0",
         passkeysEnabled: true,
+        gatewayBaseUrl: "https://gateway.langwatch.test",
       });
     });
   });

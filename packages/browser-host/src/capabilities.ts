@@ -294,6 +294,8 @@ export type UiDeployment = {
   authProvider?: string;
   /** Whether this deployment mounted passkeys; absent reads as no. */
   passkeysEnabled?: boolean;
+  /** Where a customer's SDK reaches the gateway, without `/v1`; absent when unconfigured. */
+  gatewayBaseUrl?: string;
 };
 
 /** What a composition that declared no deployment is read as. */
