@@ -322,31 +322,42 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
   }
 
   /**
-   * What a job that ran to the end records: the connected agent instance
-   * the child named, when one did. A record that cannot be written never
-   * fails a job that already succeeded.
+   * What a job that ran to the end records: the connected agent instance the child named, and
+   * whether the call was cut at the maximum duration. Each is independent, and a record that
+   * cannot be written never fails a job that already succeeded.
    */
   async handleSucceeded(input: {
     jobData: ExecutionJobData;
     result: ScenarioExecutionResult;
     jobLogger?: Logger;
   }): Promise<void> {
+    const { projectId, scenarioRunId } = input.jobData;
+    const jobLogger = input.jobLogger ?? logger;
     const agentInstance = input.result.agentInstance;
-    if (!agentInstance) {
-      return;
+    if (agentInstance) {
+      try {
+        await this.options.execution.recordAgentInstance({
+          projectId,
+          scenarioRunId,
+          agentInstance,
+        });
+      } catch (error) {
+        jobLogger.warn(
+          { err: error, scenarioRunId },
+          "Could not record the agent instance that served the run",
+        );
+      }
     }
 
-    try {
-      await this.options.execution.recordAgentInstance({
-        projectId: input.jobData.projectId,
-        scenarioRunId: input.jobData.scenarioRunId,
-        agentInstance,
-      });
-    } catch (error) {
-      (input.jobLogger ?? logger).warn(
-        { err: error, scenarioRunId: input.jobData.scenarioRunId },
-        "Could not record the agent instance that served the run",
-      );
+    if (input.result.isCutAtLimit) {
+      try {
+        await this.options.execution.recordCutAtLimit({ projectId, scenarioRunId });
+      } catch (error) {
+        jobLogger.warn(
+          { err: error, scenarioRunId },
+          "Could not record that the run was cut at the call limit",
+        );
+      }
     }
   }
 

@@ -5,7 +5,12 @@
 
 import type { Logger } from "@langwatch/observability";
 import * as ScenarioRunner from "@langwatch/scenario";
-import type { ChildProcessJobData } from "@langwatch/scenario-contract";
+import {
+  type CallLimitTimer,
+  type ChildProcessJobData,
+  createCallLimitTimer,
+  DEFAULT_CALLER_VOICE,
+} from "@langwatch/scenario-contract";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 
 import type { ScenarioHttp } from "../channels/http/http.serialized-http-agent.channel.ts";
@@ -14,12 +19,14 @@ import type { NlpFetchTimeouts } from "../channels/nlp-fetch.channel.ts";
 import {
   SerializedAgentChannelRegistry,
   type VoiceAgentBuilder,
+  type VoiceCallEnder,
 } from "../channels/serialized-agent-channels.registry.ts";
 import { SerializedAgentChannel } from "../channels/serialized-agent.channel.ts";
 import {
   agentGreetsFirst,
   buildAgentGreetsFirstScript,
 } from "../rules/agent-first-script.rules.ts";
+import { buildCallerVoiceSimulatorConfig } from "../rules/caller-voice-simulator.rules.ts";
 import { buildRemoteTraceRunConfig } from "../rules/remote-trace-run.rules.ts";
 import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
 import { AgentTestScriptService } from "./agent-test-script.service.ts";
@@ -45,6 +52,8 @@ export interface ScenarioChildRuntime {
   nlpTimeouts?: NlpFetchTimeouts;
   /** Builds a voice target's adapter over the transports, with this child's environment. */
   voiceAgents: VoiceAgentBuilder;
+  /** Hangs up a voice target's live call when the whole-call limit elapses. */
+  endVoiceCall: VoiceCallEnder;
 }
 
 export interface ScenarioChildExecutionResult {
@@ -57,6 +66,46 @@ export interface ScenarioChildExecutionResult {
    * kind of target.
    */
   agentInstance?: { hostname: string; label: string | null };
+  /** LangWatch ended the voice call at the maximum call duration (AC28). */
+  isCutAtLimit?: boolean;
+}
+
+/**
+ * Voice-only run setup: the caller metadata recorded on the run (AC20, AC24) and the whole-call
+ * timer that ends the call so the judge still runs on what was said (AC28).
+ */
+function buildVoiceRunSetup({
+  jobData,
+  adapter,
+  runtime,
+}: {
+  jobData: ChildProcessJobData;
+  adapter: ScenarioRunner.AgentAdapter;
+  runtime: ScenarioChildRuntime;
+}): { voiceMetadata: Record<string, unknown>; callLimitTimer: CallLimitTimer | null } {
+  const { target, adapterData } = jobData;
+  if (target.type !== "voice" || adapterData.type !== "voice") {
+    return { voiceMetadata: {}, callLimitTimer: null };
+  }
+  const callerVoice = jobData.callerVoice ?? DEFAULT_CALLER_VOICE;
+  const effectiveCaller = buildCallerVoiceSimulatorConfig(callerVoice);
+  const voiceMetadata = {
+    callerKind: "simulated" as const,
+    caller: {
+      voice: effectiveCaller.voice,
+      interruptProbability: callerVoice.interruptProbability,
+      effects: callerVoice.effects,
+    },
+  };
+  const callLimitTimer = createCallLimitTimer({
+    maxCallSeconds: adapterData.maxCallSeconds,
+    onLimit: () => {
+      runtime.logger.warn("voice call reached the max duration; ending the call");
+      // Cleanup failure must not mask the run result.
+      void runtime.endVoiceCall({ data: adapterData, adapter }).catch(() => undefined);
+    },
+  });
+  return { voiceMetadata, callLimitTimer };
 }
 
 /**
@@ -83,6 +132,12 @@ function buildRunCast({
   const { nlpServiceUrl, scenario } = jobData;
   const roleModelParams = selectRoleModelParams(jobData);
   const models = litellmModelChannels.live.create();
+  // A voice target's user simulator speaks with the scenario's caller voice, interrupt
+  // probability and audio effects; the judge and adapter are unchanged from a text run.
+  const voiceSimConfig =
+    jobData.target.type === "voice"
+      ? buildCallerVoiceSimulatorConfig(jobData.callerVoice ?? DEFAULT_CALLER_VOICE)
+      : null;
   const simulatorModel = models.model({
     litellmParams: roleModelParams.simulator,
     nlpServiceUrl,
@@ -99,7 +154,7 @@ function buildRunCast({
   return {
     agents: [
       adapter,
-      ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
+      ScenarioRunner.userSimulatorAgent({ model: simulatorModel, ...voiceSimConfig }),
       ScenarioRunner.judgeAgent({
         criteria: scenario.criteria,
         model: judgeModel,
@@ -158,49 +213,56 @@ async function executeScenarioChildValue({
     logger,
   });
   const cast = buildRunCast({ jobData, adapter });
+  const { voiceMetadata, callLimitTimer } = buildVoiceRunSetup({ jobData, adapter, runtime });
 
-  // Results are reported via LangWatch SDK automatically
-  const result = await ScenarioRunner.run(
-    {
-      id: scenario.id,
-      name: scenario.name,
-      description: scenario.situation,
-      setId: context.setId,
-      agents: cast.agents,
-      ...(cast.script ? { script: cast.script } : {}),
-      verbose: runtime.verbose,
-      // An http target's own spans land in the trace each turn propagates,
-      // so the judge fetches them back from the platform's trace API before
-      // any verdict. The wait budget comes from the prefetcher's per-project
-      // ingest-lag measurement.
-      ...buildRemoteTraceRunConfig({
-        targetType: target.type,
-        traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
-        langwatchEndpoint,
-        langwatchApiKey,
-      }),
-      ...buildMaxTurnsRunConfig({
-        jobData,
-        scenarioMaxTurns: scenario.maxTurns,
-      }),
-      ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
-      metadata: {
-        langwatch: {
-          targetReferenceId: target.referenceId,
+  // The timer clears on a rejected run too, or it could fire after the failure is reported.
+  let result: Awaited<ReturnType<typeof ScenarioRunner.run>>;
+  try {
+    result = await ScenarioRunner.run(
+      {
+        id: scenario.id,
+        name: scenario.name,
+        description: scenario.situation,
+        setId: context.setId,
+        agents: cast.agents,
+        ...(cast.script ? { script: cast.script } : {}),
+        verbose: runtime.verbose,
+        // An http target's own spans land in the trace each turn propagates,
+        // so the judge fetches them back from the platform's trace API before
+        // any verdict. The wait budget comes from the prefetcher's per-project
+        // ingest-lag measurement.
+        ...buildRemoteTraceRunConfig({
           targetType: target.type,
+          traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
+          langwatchEndpoint,
+          langwatchApiKey,
+        }),
+        ...buildMaxTurnsRunConfig({
+          jobData,
+          scenarioMaxTurns: scenario.maxTurns,
+        }),
+        ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
+        metadata: {
+          langwatch: {
+            targetReferenceId: target.referenceId,
+            targetType: target.type,
+            ...voiceMetadata,
+          },
+          ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
         },
-        ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
       },
-    },
-    {
-      batchRunId: context.batchRunId,
-      runId: jobData.scenarioRunId,
-      langwatch: {
-        endpoint: langwatchEndpoint,
-        apiKey: langwatchApiKey,
+      {
+        batchRunId: context.batchRunId,
+        runId: jobData.scenarioRunId,
+        langwatch: {
+          endpoint: langwatchEndpoint,
+          apiKey: langwatchApiKey,
+        },
       },
-    },
-  );
+    );
+  } finally {
+    callLimitTimer?.clear();
+  }
 
   // A failed test is still a successful execution — results are reported via SDK.
   if (result.success) {
@@ -227,6 +289,8 @@ async function executeScenarioChildValue({
   const servedInstance =
     adapter instanceof SerializedAgentChannel ? adapter.servedInstance : undefined;
   if (servedInstance) outputResult.agentInstance = servedInstance;
+  // The parent records the marker so the run header can show "Cut at the call limit".
+  if (callLimitTimer?.wasCut()) outputResult.isCutAtLimit = true;
   return outputResult;
 }
 

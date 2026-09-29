@@ -100,6 +100,12 @@ class ProducerOnlyScenarioExecution extends ScenarioExecutionService {
       producerOnly(this.processName, "record the agent instance that served a scenario run"),
     );
   }
+
+  recordCutAtLimit(): Promise<never> {
+    return Promise.reject(
+      producerOnly(this.processName, "record a scenario run cut at the call limit"),
+    );
+  }
 }
 
 /**
@@ -140,6 +146,9 @@ class ProducerOnlySimulationExecution extends SimulationExecutionRepository {
   }
   recordAgentInstance(): Promise<never> {
     return this.refuse("record the agent instance that served a simulation run");
+  }
+  recordCutAtLimit(): Promise<never> {
+    return this.refuse("record a simulation run cut at the call limit");
   }
 
   private refuse(capability: string): Promise<never> {

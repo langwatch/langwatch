@@ -69,4 +69,12 @@ export class ScenarioExecutionService extends ScenarioExecutionServiceContract {
       occurredAt: nowInstant().epochMilliseconds,
     });
   }
+
+  recordCutAtLimit(input: { projectId: string; scenarioRunId: string }): Promise<void> {
+    return this.options.simulations.recordCutAtLimit({
+      tenantId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
+      occurredAt: nowInstant().epochMilliseconds,
+    });
+  }
 }

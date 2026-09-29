@@ -79,6 +79,7 @@ export type ScenarioChildProcessResult = {
   error?: string;
   reasoning?: string;
   agentInstance?: { hostname: string; label: string | null };
+  isCutAtLimit?: boolean;
 };
 
 export class NodeScenarioChildService implements ScenarioChildBootstrap {
@@ -313,6 +314,8 @@ const scenarioChildProcessResultSchema = z.object({
   reasoning: z.string().optional(),
   /** The connected agent instance that answered the run's turns, when one did. */
   agentInstance: ScenarioAgentInstanceSchema.optional(),
+  /** LangWatch ended the voice call at the maximum call duration. */
+  isCutAtLimit: z.boolean().optional(),
 });
 
 function buildChildEnvironmentValue(input: {
@@ -459,6 +462,7 @@ function childExitResult({
     success: true,
     ...(childResult?.reasoning ? { reasoning: childResult.reasoning } : {}),
     ...(childResult?.agentInstance ? { agentInstance: childResult.agentInstance } : {}),
+    ...(childResult?.isCutAtLimit ? { isCutAtLimit: true } : {}),
   };
 }
 

@@ -142,6 +142,7 @@ function buildSimulationProcessingPipelineDefinition(
     .withCommand("cancelRun", commands.cancelRun)
     .withCommand("deleteRun", commands.deleteRun)
     .withCommand("recordAgentInstance", commands.recordAgentInstance)
+    .withCommand("recordCutAtLimit", commands.recordCutAtLimit)
     .withCommandInstance({
       name: "computeRunMetrics",
       handlerClass: ComputeRunMetricsCommand,

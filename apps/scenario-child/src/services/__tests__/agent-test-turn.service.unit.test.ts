@@ -33,6 +33,7 @@ function runtimeFor(agent: AgentAdapter): ScenarioChildRuntime {
     httpPort: { fetch: () => Promise.reject(new Error("no HTTP in this test")) },
     logger: createLogger("langwatch:scenarios:agent-test-turn:test"),
     voiceAgents: () => agent,
+    endVoiceCall: () => Promise.resolve(),
   };
 }
 

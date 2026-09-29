@@ -116,6 +116,7 @@ function service(clock = new TestClock()): ScenarioServiceContract {
     cancelRun: async () => {},
     deleteRun: async () => {},
     recordAgentInstance: async () => {},
+    recordCutAtLimit: async () => {},
   } satisfies SimulationService;
 
   return ScenarioServiceContract.create({

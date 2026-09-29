@@ -15,6 +15,7 @@ import {
   type SimulationRunData,
   type SimulationSetData,
   type SimulationRecordAgentInstance,
+  type SimulationRecordCutAtLimit,
   type RecordEvaluationsCommandData,
   type SimulationStartRun,
   type SimulationTextMessageEnd,
@@ -152,6 +153,8 @@ export class TestSimulationService extends SimulationService {
   async recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void> {
     await this.options.recordAgentInstance?.(input);
   }
+
+  async recordCutAtLimit(_input: SimulationRecordCutAtLimit): Promise<void> {}
 
   async recordEvaluations(input: RecordEvaluationsCommandData): Promise<void> {
     await this.options.recordEvaluations?.(input);
