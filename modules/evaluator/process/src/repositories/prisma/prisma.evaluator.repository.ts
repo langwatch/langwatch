@@ -11,17 +11,8 @@ import type { Prisma } from "@langwatch/prisma-client/generated";
 import { nowInstant, toDate } from "@langwatch/time";
 import { z } from "zod";
 
+import { generateEvaluatorSlug } from "../../rules/evaluator-slug.rules.ts";
 import type { EvaluatorRepository, PersistEvaluatorInput } from "../evaluator.repository.ts";
-
-const generateEvaluatorSlug = (name: string): string => {
-  const slug = name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-
-  return slug || "evaluator";
-};
 
 /** The copy lineage names the project a replica sits in, all the way up. */
 const evaluatorCopySelect = {

@@ -59,7 +59,7 @@ describe("PrismaEvaluatorRepository slug generation", () => {
 
       await repository.create(persistInput({ name: "My Custom Evaluator" }));
 
-      expect(created[0]?.slug).toBe("my-custom-evaluator");
+      expect(created[0]?.slug).toMatch(/^my-custom-evaluator-[a-z0-9]{5}$/);
     });
 
     /** @scenario "Handle special characters in name" */
@@ -70,48 +70,50 @@ describe("PrismaEvaluatorRepository slug generation", () => {
       await repository.create(persistInput({ name: "LLM Judge (v2.0) - Beta!" }));
 
       expect(created[0]?.slug).toMatch(/^[a-z0-9-]+$/);
-      expect(created[0]?.slug).toBe("llm-judge-v2-0-beta");
+      expect(created[0]?.slug).toMatch(/^llm-judge-v20-beta-[a-z0-9]{5}$/);
     });
 
     /** @scenario "Handle unicode characters in name" */
-    it("collapses non-alphanumeric unicode characters to hyphens rather than crashing", async () => {
+    it("transliterates unicode characters rather than crashing", async () => {
       const { database, created } = fakeDatabase();
       const repository = PrismaEvaluatorRepository.create({ prisma: database });
 
       await repository.create(persistInput({ name: "Säfety Check" }));
 
-      expect(created[0]?.slug).toMatch(/^[a-z0-9-]+$/);
+      expect(created[0]?.slug).toMatch(/^safety-check-[a-z0-9]{5}$/);
     });
 
     /** @scenario "Handle very long names" */
-    it("does not reject a very long name — the slug carries its full length", async () => {
+    it("truncates a very long name and keeps the suffix", async () => {
       const { database, created } = fakeDatabase();
       const repository = PrismaEvaluatorRepository.create({ prisma: database });
       const longName = "A".repeat(200);
 
       await repository.create(persistInput({ name: longName }));
 
-      expect(created[0]?.slug).toBe("a".repeat(200));
+      expect(created[0]?.slug).toMatch(/^a{50}-[a-z0-9]{5}$/);
     });
 
     /** @scenario "Handle empty or whitespace-only names" */
-    it("falls back to the literal 'evaluator' slug for a whitespace-only name", async () => {
+    it("falls back to the suffix alone for a whitespace-only name", async () => {
       const { database, created } = fakeDatabase();
       const repository = PrismaEvaluatorRepository.create({ prisma: database });
 
       await repository.create(persistInput({ name: "   " }));
 
-      expect(created[0]?.slug).toBe("evaluator");
+      expect(created[0]?.slug).toMatch(/^[a-z0-9]{5}$/);
     });
   });
 
   describe("given two evaluators with the same name in the same project", () => {
     /** @scenario "Slug uniqueness within project" */
     it("retries create on a slug unique-constraint violation", async () => {
+      const attempted: unknown[] = [];
       let attempts = 0;
       const { database, created } = fakeDatabase({
         create: async (args: { data: Record<string, unknown> }) => {
           attempts += 1;
+          attempted.push(args.data.slug);
           if (attempts === 1) {
             throw new Error("Unique constraint failed on the fields: (`slug`)");
           }
@@ -131,13 +133,15 @@ describe("PrismaEvaluatorRepository slug generation", () => {
       const result = await repository.create(persistInput({ name: "Exact Match" }));
 
       expect(attempts).toBe(2);
-      expect(result.slug).toBe("exact-match");
+      expect(attempted[1]).not.toBe(attempted[0]);
+      expect(result.slug).toMatch(/^exact-match-[a-z0-9]{5}$/);
+      expect(created).toHaveLength(1);
     });
   });
 
   describe("given the same evaluator name used in two different projects", () => {
     /** @scenario "Same name allowed in different projects" */
-    it("generates the same slug for each project without either create failing", async () => {
+    it("creates both without either failing", async () => {
       const { database, created } = fakeDatabase();
       const repository = PrismaEvaluatorRepository.create({ prisma: database });
 
@@ -148,8 +152,8 @@ describe("PrismaEvaluatorRepository slug generation", () => {
         persistInput({ id: "eval_2", projectId: "proj2", name: "Exact Match" }),
       );
 
-      expect(created[0]?.slug).toBe("exact-match");
-      expect(created[1]?.slug).toBe("exact-match");
+      expect(created[0]?.slug).toMatch(/^exact-match-[a-z0-9]{5}$/);
+      expect(created[1]?.slug).toMatch(/^exact-match-[a-z0-9]{5}$/);
     });
   });
 

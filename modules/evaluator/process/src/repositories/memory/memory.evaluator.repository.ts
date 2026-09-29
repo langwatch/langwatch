@@ -8,17 +8,8 @@ import {
 } from "@langwatch/evaluator-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
+import { generateEvaluatorSlug } from "../../rules/evaluator-slug.rules.ts";
 import type { EvaluatorRepository, PersistEvaluatorInput } from "../evaluator.repository.ts";
-
-const generateEvaluatorSlug = (name: string): string => {
-  const slug = name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-
-  return slug || "evaluator";
-};
 
 /**
  * The project path a copy is listed under. Postgres reads it through the
@@ -182,12 +173,13 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
 
   /** Postgres retries a slug collision inside the project; so does the twin. */
   #freeSlug(input: PersistEvaluatorInput): string {
-    const requested = input.slug ?? generateEvaluatorSlug(input.name);
-    const taken = this.#live().some(
-      (row) => row.projectId === input.projectId && row.slug === requested,
-    );
+    let slug = input.slug ?? generateEvaluatorSlug(input.name);
 
-    return taken ? `${requested}-${this.#rows.size + 1}` : requested;
+    while (this.#live().some((row) => row.projectId === input.projectId && row.slug === slug)) {
+      slug = generateEvaluatorSlug(input.name);
+    }
+
+    return slug;
   }
 
   #require(input: { id: string; projectId: string }): Evaluator {

@@ -63,28 +63,41 @@ function contractCases(backend: Backend): void {
   describe("when an evaluator is created", () => {
     it("derives a slug from the name and reads the row back by id and by slug", async () => {
       const created = await create();
+      const slug = created.slug ?? "";
 
       expect(created).toMatchObject({
         id: backend.id("a"),
         projectId: backend.projectId(),
         name: "Exact match",
-        slug: "exact-match",
         type: "evaluator",
         archivedAt: null,
       });
+      expect(slug).toMatch(/^exact-match-[a-z0-9]{5}$/);
 
       await expect(
         backend.repository().findById({ id: created.id, projectId: backend.projectId() }),
-      ).resolves.toMatchObject({ id: created.id, slug: "exact-match" });
+      ).resolves.toMatchObject({ id: created.id, slug });
       await expect(
-        backend.repository().findBySlug({ slug: "exact-match", projectId: backend.projectId() }),
+        backend.repository().findBySlug({ slug, projectId: backend.projectId() }),
       ).resolves.toMatchObject({ id: created.id });
     });
 
     it("keeps a name that carries no slug characters addressable", async () => {
       const created = await create({ name: "!!!" });
 
-      expect(created.slug).toBe("evaluator");
+      expect(created.slug).toMatch(/^[a-z0-9]{5}$/);
+    });
+
+    it("gives two evaluators that share a name distinct slugs, each addressable", async () => {
+      const first = await create({ id: backend.id("dup-1"), name: "Same name" });
+      const second = await create({ id: backend.id("dup-2"), name: "Same name" });
+
+      expect(second.slug).not.toBe(first.slug);
+      await expect(
+        backend
+          .repository()
+          .findBySlug({ slug: second.slug ?? "", projectId: backend.projectId() }),
+      ).resolves.toMatchObject({ id: second.id });
     });
 
     it("finds a workflow evaluator by the workflow it backs", async () => {
@@ -177,7 +190,7 @@ function contractCases(backend: Backend): void {
 
   describe("when another project holds an evaluator of the same slug", () => {
     it("never answers with the other project's row", async () => {
-      await backend.repository().create({
+      const other = await backend.repository().create({
         id: backend.id("b"),
         projectId: backend.otherProjectId(),
         name: "Exact match",
@@ -186,7 +199,7 @@ function contractCases(backend: Backend): void {
       });
 
       await expect(
-        backend.repository().findBySlug({ slug: "exact-match", projectId: backend.projectId() }),
+        backend.repository().findBySlug({ slug: other.slug ?? "", projectId: backend.projectId() }),
       ).resolves.toBeUndefined();
       await expect(
         backend.repository().findAll({ projectId: backend.projectId() }),
